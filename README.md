@@ -19,31 +19,39 @@ NLM IS intended to become:
 
 ## Current Phase
 
-**PHASE 1: SKELETON**
+**PHASE 2: REAL NEURAL COMPUTATION**
 
-This repository contains the complete architectural skeleton for NLM. The actual neural computation (real spiking dynamics, synaptic plasticity, etc.) will be implemented in Phase 2 and beyond.
+This phase implements real spiking neural computation with:
+- Leaky Integrate-and-Fire (LIF) neuron dynamics
+- Event-driven spike propagation with synaptic delays
+- STDP (Spike-Timing-Dependent Plasticity)
+- Hebbian learning
+- Structural plasticity (synaptogenesis and pruning)
 
 Current status:
 - ✅ Project compiles with C++20
+- ✅ Real LIF neuron dynamics
+- ✅ Event-driven spike propagation with delays
+- ✅ STDP plasticity rule
+- ✅ Hebbian plasticity rule
+- ✅ Structural plasticity
+- ✅ Learning experiments with measurable weight changes
+- ✅ Unit tests for core mechanisms
 - ✅ Clean architecture with interfaces
 - ✅ Core types defined
 - ✅ Random generator with deterministic seed
 - ✅ Simulation clock
-- ✅ Brain skeleton with regions and populations
-- ✅ Neuron and Synapse interfaces
-- ✅ Environment interface
-- ✅ Experiment framework
+- ✅ Brain with regions and populations
 - ✅ Configuration system
 - ✅ Logging system
-- ❌ Real neural computation (Phase 2+)
 
 ## Building
 
 ```bash
 mkdir build
 cd build
-cmake ..
-make
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
 ```
 
 ## Running
@@ -92,7 +100,9 @@ NLM/
 
 NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
 
+- Simplified LIF neuron model (not Hodgkin-Huxley)
 - No realistic ion channel dynamics
+- No detailed dendritic morphology
 - No detailed cortical architecture
 - No claim of consciousness or intelligence
 - Limited to what can be simulated with available computing resources

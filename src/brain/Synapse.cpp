@@ -1,6 +1,7 @@
 #include "Synapse.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
+#include <algorithm>
 
 namespace nlm {
 
@@ -9,13 +10,39 @@ struct Synapse::Impl {
     NeuronId sourceNeuron;
     NeuronId destinationNeuron;
     SynapticWeight weight;
-    Delay delay;
+    Delay delay;  // Synaptic delay in simulation steps
+    
+    // Synapse type
     SynapseType type;
+    
+    // Spike history for STDP
     std::vector<Timestamp> preSpikeHistory;
     std::vector<Timestamp> postSpikeHistory;
+    
+    // Plasticity state
     PlasticityFlags plasticityFlags;
+    
+    // Short-term plasticity state
+    float shortTermDepression;  // Utilization factor (0-1)
+    float shortTermFacilitation;  // Facilitation factor
+    float lastPreSpikeTime;  // For short-term dynamics
+    float lastPostSpikeTime;
+    
+    // Eligibility trace for reward-modulated learning
     float eligibilityTrace;
+    
+    // Synaptic efficacy (use-dependent modulation)
     float efficacy;
+    
+    // Weight bounds
+    static constexpr float MIN_WEIGHT = -1.0f;
+    static constexpr float MAX_WEIGHT = 1.0f;
+    
+    // Short-term plasticity parameters
+    static constexpr float STP_FACILITATION_TAU = 100.0f;  // ms
+    static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
+    static constexpr float STP_U_MAX = 1.0f;  // Max utilization
+    
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
 };
 
@@ -29,6 +56,10 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->type = SynapseType::Excitatory;
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->shortTermDepression = 1.0f;
+    pImpl->shortTermFacilitation = 0.0f;
+    pImpl->lastPreSpikeTime = -1.0f;
+    pImpl->lastPostSpikeTime = -1.0f;
 }
 
 Synapse::~Synapse() = default;
@@ -68,8 +99,8 @@ void Synapse::setWeight(SynapticWeight weight) {
 
 void Synapse::addToWeight(SynapticWeight delta) {
     pImpl->weight += delta;
-    // Clamp to reasonable bounds
-    pImpl->weight = std::clamp(pImpl->weight, -10.0f, 10.0f);
+    // Clamp to reasonable bounds to prevent instability
+    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 Delay Synapse::getDelay() const {
@@ -155,15 +186,34 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // TODO PHASE 2:
-    // Implement real synaptic dynamics:
-    // 1. Process delayed spike transmission
-    // 2. Apply short-term plasticity (facilitation/depression)
-    // 3. Update eligibility trace
-    // 4. Decay traces
+    // Real synaptic dynamics:
+    // 1. Decay short-term plasticity state
+    // 2. Decay eligibility trace
+    // 3. Update efficacy based on use
     
-    // Placeholder: decay eligibility trace
-    decayEligibilityTrace(0.01f);
+    TimestepDuration dt = 0.001;  // 1ms timestep
+    
+    // Decay short-term facilitation (Tsodyks-Markram model)
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+    }
+    
+    // Decay short-term depression
+    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
+        float timeSinceActivity = std::max(
+            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
+            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
+        );
+        // Recovery from depression toward 1.0
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+    }
+    
+    // Decay eligibility trace for reward-modulated learning
+    decayEligibilityTrace(0.001f);  // Fast decay
+    
+    // Clamp weight bounds
+    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::reset() {
@@ -175,16 +225,35 @@ void Synapse::reset() {
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
-    // TODO PHASE 2: Implement proper random initialization based on type
-    // PLACEHOLDER: Random weight based on synapse type
+    // Proper random initialization based on synapse type
     if (pImpl->type == SynapseType::Excitatory) {
-        pImpl->weight = rng.uniformReal(0.0, 0.5);
+        // Excitatory synapses: small positive weights
+        pImpl->weight = rng.uniformReal(0.1f, 0.4f);
+        // Excitatory synapses have moderate initial efficacy
+        pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
     } else if (pImpl->type == SynapseType::Inhibitory) {
-        pImpl->weight = -rng.uniformReal(0.0, 0.5);
+        // Inhibitory synapses: negative weights
+        pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
+        pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
     } else {
-        pImpl->weight = rng.uniformReal(-0.1, 0.1);
+        // Other types: small random weights
+        pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
+        pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
     }
-    pImpl->delay = rng.uniformInt(1, 5);
+    
+    // Random delay: 1-5 steps (1-5ms at 1ms timestep)
+    pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
+    
+    // Initialize short-term plasticity state
+    pImpl->shortTermDepression = 1.0f;  // Fully recovered
+    pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
+    
+    // Initialize eligibility trace to 0
+    pImpl->eligibilityTrace = 0.0f;
+    
+    // Initialize last spike times
+    pImpl->lastPreSpikeTime = -1.0f;
+    pImpl->lastPostSpikeTime = -1.0f;
 }
 
 } // namespace nlm

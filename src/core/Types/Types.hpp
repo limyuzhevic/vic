@@ -138,8 +138,37 @@ struct SpikeEvent {
     SimulationStep step;
     
     SpikeEvent() : source_neuron(), timestamp(0.0), step(0) {}
-    SpikeEvent(NeuronId nid, Timestamp ts, SimulationStep s) 
+    SpikeEvent(NeuronId nid, Timestamp ts, SimulationStep s)
         : source_neuron(nid), timestamp(ts), step(s) {}
+};
+
+// Delayed spike event for synaptic transmission with delay
+struct DelayedSpikeEvent {
+    NeuronId source_neuron;
+    NeuronId destination_neuron;
+    SynapseId synapse_id;
+    SynapticWeight weight;  // Weight at time of spike (frozen)
+    SynapseType synapse_type;
+    Timestamp timestamp;      // When spike occurs
+    Timestamp delivery_time;  // When spike reaches destination (timestamp + delay)
+    SimulationStep step;      // Current simulation step
+    SimulationStep delivery_step;  // Step when spike should be delivered
+    bool is_excitatory;  // Cached for quick lookup
+    
+    DelayedSpikeEvent()
+        : source_neuron(), destination_neuron(), synapse_id()
+        , weight(0.0f), synapse_type(SynapseType::Excitatory)
+        , timestamp(0.0), delivery_time(0.0), step(0), delivery_step(0)
+        , is_excitatory(true) {}
+    
+    DelayedSpikeEvent(NeuronId src, NeuronId dst, SynapseId syn,
+                      SynapticWeight w, SynapseType type,
+                      Timestamp ts, Timestamp delivery, SimulationStep s, SimulationStep deliveryS)
+        : source_neuron(src), destination_neuron(dst), synapse_id(syn)
+        , weight(w), synapse_type(type)
+        , timestamp(ts), delivery_time(delivery)
+        , step(s), delivery_step(deliveryS)
+        , is_excitatory(type == SynapseType::Excitatory) {}
 };
 
 // Action potential state

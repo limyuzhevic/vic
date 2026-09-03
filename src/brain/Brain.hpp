@@ -2,6 +2,10 @@
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
+#include "../dynamics/SpikeSystem.hpp"
+#include "../plasticity/STDP.hpp"
+#include "../plasticity/Hebbian.hpp"
+#include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
 
@@ -29,7 +33,7 @@ struct InterRegionConnection {
 };
 
 // Brain: The central coordinator of the neural system
-// PLACEHOLDER - Phase 2 will implement real neural computation
+// Implements real spiking neural computation with event-driven dynamics
 
 class Brain {
 public:
@@ -54,8 +58,28 @@ public:
     void step(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment
-    // TODO PHASE 2: Implement real sensory processing
+    // Injects current into sensory neurons based on input pattern
     void receiveSensoryInput(const class SensoryInput& input);
+    
+    // Inject current directly into a specific neuron
+    void injectCurrent(NeuronId neuron, MembranePotential current);
+    
+    // Inject current into all neurons of a specific type
+    void injectCurrentToNeurons(NeuronType type, MembranePotential current);
+    
+    // Spike system access
+    SpikeSystem* getSpikeSystem();
+    const SpikeSystem* getSpikeSystem() const;
+    
+    // Plasticity system access
+    STDP* getSTDP();
+    Hebbian* getHebbian();
+    StructuralPlasticity* getStructuralPlasticity();
+    
+    // Statistics
+    float getExcitationInhibitionRatio() const;
+    size_t getTotalSpikeCount() const;
+    size_t getPendingSpikeEventCount() const;
     
     // Produce motor/action output
     // TODO PHASE 2: Implement real action selection

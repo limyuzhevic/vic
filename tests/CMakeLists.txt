@@ -11,6 +11,8 @@ add_executable(nlm_test
     test_random.cpp
     test_clock.cpp
     test_neuron.cpp
+    test_synapse.cpp
+    test_stdp.cpp
     test_brain.cpp
 )
 
