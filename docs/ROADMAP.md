@@ -29,7 +29,7 @@
 - [x] Documentation
 - [x] Tests
 
-## Phase 2 — Working Neural Core
+## Phase 2 — Working Neural Core (COMPLETE)
 **Status**: Complete
 
 - [x] Real membrane potential dynamics (leaky integrate-and-fire)
@@ -44,8 +44,8 @@
 - [x] Spike propagation
 - [x] Eligibility traces
 
-## Phase 3 — Development + Environment
-**Status**: In Progress
+## Phase 3 — Development + Environment (COMPLETE)
+**Status**: Complete
 
 - [x] Working environment interface (SimpleWorld)
 - [x] Basic sensory processing (Vision, Touch, Internal, Proprioception)
@@ -60,21 +60,43 @@
 - [x] Eligibility traces for reward-modulated learning
 - [x] Agent/Body system with energy
 - [x] Phase 3 experiment demo
-- [ ] Full episodic memory (Phase 4)
-- [ ] Episode recording (Phase 4)
 
-## Phase 4 — Emerging Cognition
-**Status**: Not Started
+## Phase 4 — Emerging Cognition (COMPLETE)
+**Status**: Complete
 
-- [ ] Prediction system implementation
-- [ ] Curiosity-driven exploration
-- [ ] Episodic memory implementation
-- [ ] Semantic memory development
-- [ ] Procedural memory (skill learning)
-- [ ] Associative memory
-- [ ] Attention mechanisms
-- [ ] Hierarchical processing
-- [ ] Working memory integration
+### Prediction Systems
+- [x] NeuralPrediction - Temporal sequence learning
+- [x] Action-consequence prediction
+- [x] Multi-step prediction
+- [x] PredictionErrorSignal - Error computation for learning
+
+### Memory Systems
+- [x] NeuralWorkingMemory - Persistent activity for temporary storage
+- [x] NeuralEpisodicMemory - Experience encoding in neural patterns
+- [x] NeuralAssociativeMemory - Experience-based associations
+- [x] ConceptFormation - Pattern discovery without labels
+- [x] SpatialRepresentation - Learned spatial relationships
+- [x] TemporalRelation - Before/after/sequence encoding
+
+### Cognitive Mechanisms
+- [x] AttentionalSelection - Competition-based attention (NOT Transformer)
+- [x] NeuralPlanner - Predictive action selection
+- [x] SelfModel - Sensorimotor self-awareness
+- [x] SocialLearning - Observation and imitation
+
+### Experiments
+- [x] TemporalPredictionExperiment
+- [x] WorkingMemoryExperiment
+- [x] EpisodicRecallExperiment
+- [x] ConceptFormationExperiment
+- [x] AttentionExperiment
+- [x] PlanningExperiment
+- [x] SelfModelExperiment
+- [x] SocialLearningExperiment
+- [x] ContinualLearningExperiment
+- [x] GeneralizationExperiment
+- [x] Phase4IntegratedExperiment
+- [x] RepresentationAnalyzer tools
 
 ## Phase 5 — Scaling + Research Platform
 **Status**: Not Started
@@ -111,3 +133,6 @@ If at any point the architecture begins to resemble a transformer, it should be 
 ## Version History
 
 - v0.1.0 (Phase 1): Initial skeleton release
+- v0.2.0 (Phase 2): Working neural core with real spiking dynamics
+- v0.3.0 (Phase 3): World interaction and developmental mechanisms
+- v0.4.0 (Phase 4): Emerging cognition - prediction, memory, attention, planning, self-model, social learning

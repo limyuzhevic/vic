@@ -16,52 +16,55 @@ NLM IS intended to become:
 - A neural system that learns from experience
 - A brain-inspired architecture with neurons and synapses
 - A system that develops and adapts over time
+- A system where cognition emerges from neural dynamics
 
 ## Current Phase
 
-**PHASE 3: WORLD INTERACTION + DEVELOPMENT**
+**PHASE 4: EMERGING COGNITION**
 
-This phase places the neural brain inside a real interactive environment:
-- Simple 2D world with objects (resources and hazards)
-- Visual sensory pathway (16x16 grayscale)
-- Motor actions decoded from neural activity
-- Reward prediction error system
-- Eligibility traces for credit assignment
-- Developmental stages affecting plasticity
-- Novelty and curiosity mechanisms
-- Homeostatic regulation
+This phase implements mechanisms for increasingly complex cognitive behavior to emerge:
 
-Phase 2 completed:
-- Real LIF neuron dynamics
-- Event-driven spike propagation with synaptic delays
-- STDP (Spike-Timing-Dependent Plasticity)
-- Hebbian learning
-- Structural plasticity (synaptogenesis and pruning)
+### Prediction
+- Temporal sequence learning
+- Action-consequence prediction
+- Multi-step prediction
+- Prediction error signals
 
-Phase 3 adds:
-- Environment interaction loop
-- Sensory input from world to brain
-- Motor output from brain to world
-- Consequence/reward signals
-- Reward-modulated plasticity
-- Developmental progression
+### Memory
+- Working memory (persistent neural activity)
+- Episodic-like memory (experience encoding)
+- Associative memory (Hebbian associations)
+- Semantic-like memory (generalized knowledge)
 
-Current status:
-- ✅ Project compiles with C++20
-- ✅ Real LIF neuron dynamics
-- ✅ Event-driven spike propagation with delays
-- ✅ STDP plasticity rule
-- ✅ Hebbian plasticity rule
-- ✅ Structural plasticity
-- ✅ Learning experiments with measurable weight changes
-- ✅ Unit tests for core mechanisms
-- ✅ Clean architecture with interfaces
-- ✅ Core types defined
-- ✅ Random generator with deterministic seed
-- ✅ Simulation clock
-- ✅ Brain with regions and populations
-- ✅ Configuration system
-- ✅ Logging system
+### Concept Formation
+- Discovers patterns from experience
+- No predefined labels or categories
+- Stability measurement
+- Generalization ability
+
+### Attention
+- Competition-based selection
+- NOT Transformer attention (no QKV matrices)
+- Top-down and bottom-up influence
+- Winner-take-more dynamics
+
+### Planning
+- Uses learned predictions
+- Multi-step action sequences
+- Goal-directed behavior
+- Adaptive based on outcomes
+
+### Self-Model
+- Sensorimotor self-awareness
+- Body schema learning
+- Self vs external distinction
+- Action consequence prediction
+
+### Social Learning
+- Observation of others
+- Imitation capability
+- Simple communication signals
+- Social prediction
 
 ## Building
 
@@ -74,24 +77,14 @@ make -j4
 
 ## Running
 
-### Phase 2 Neural Computation Demo
+### Phase 4 Demo
 ```bash
-./nlm
-```
-
-### Phase 3 World Interaction Demo
-```bash
-./nlm_phase3_demo [num_episodes] [steps_per_episode]
+./nlm_phase4_demo [num_trials]
 ```
 
 For example:
 ```bash
-./nlm_phase3_demo 5 200
-```
-
-With custom configuration:
-```bash
-./nlm --config=../configs/custom.cfg
+./nlm_phase4_demo 100
 ```
 
 ## Project Structure
@@ -113,9 +106,10 @@ NLM/
 │   ├── plasticity/     # Plasticity rules
 │   ├── development/     # Developmental system
 │   ├── neuromodulation/# Neuromodulators
-│   ├── memory/         # Memory systems
+│   ├── memory/         # Memory systems (Phase 4)
+│   ├── prediction/      # Prediction systems (Phase 4)
+│   ├── cognition/      # Cognitive mechanisms (Phase 4)
 │   ├── sensory/        # Sensory processing
-│   ├── prediction/     # Prediction system
 │   ├── motor/          # Motor system
 │   ├── environment/    # Environment interface
 │   ├── experiments/    # Experiment framework
@@ -125,6 +119,37 @@ NLM/
 └── data/
 ```
 
+## Phase Summary
+
+### Phase 1 (Complete)
+- Project skeleton
+- Core types and configuration
+- Neural interfaces
+
+### Phase 2 (Complete)
+- Real LIF neuron dynamics
+- Event-driven spike propagation
+- STDP and Hebbian plasticity
+- Structural plasticity
+
+### Phase 3 (Complete)
+- World interaction loop
+- Sensory input and motor output
+- Reward prediction error
+- Developmental stages
+- Novelty and curiosity
+
+### Phase 4 (Current)
+- Neural prediction system
+- Working memory
+- Episodic-like memory
+- Concept formation
+- Neural attention (NOT Transformer)
+- Predictive planning
+- Self-model
+- Social learning
+- Continual learning
+
 ## Scientific Limitations
 
 NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
@@ -133,8 +158,22 @@ NLM is a research project investigating computational brain-like systems. We mak
 - No realistic ion channel dynamics
 - No detailed dendritic morphology
 - No detailed cortical architecture
-- No claim of consciousness or intelligence
+- No claim of consciousness, intelligence, or human-like cognition
 - Limited to what can be simulated with available computing resources
+
+Phase 4 does NOT claim:
+- Human intelligence
+- Consciousness or sentience
+- Human-like reasoning
+- Genuine subjective experience
+
+Phase 4 DOES investigate:
+- Whether prediction can emerge from spiking dynamics
+- Whether memory can be grounded in neural activity
+- Whether concepts can form without predefined labels
+- Whether planning can arise from predictive mechanisms
+- Whether self-models can develop through sensorimotor learning
+- Whether social learning can emerge from observation
 
 ## License
 
