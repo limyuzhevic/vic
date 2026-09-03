@@ -125,24 +125,105 @@ This document explicitly lists what NLM cannot currently do and where it diverge
 - No proprioception
 - No coordination
 
+## Phase 4 Specific Limitations
+
+### Prediction
+- No generative model or world simulator
+- Limited temporal horizon
+- No probabilistic prediction
+- No uncertainty representation
+
+### Working Memory
+- Limited capacity compared to biological WM
+- No complex working memory binding
+- No sophisticated maintenance mechanisms
+- Rapid decay compared to biological systems
+
+### Episodic Memory
+- No detailed temporal ordering
+- No pattern separation/completion mechanisms like dentate gyrus
+- No hippocampal architecture
+- Limited consolidation mechanisms
+
+### Concept Formation
+- No symbolic representation
+- No hierarchical concepts
+- Limited abstraction capability
+- No language-based concepts (intentional)
+
+### Attention
+- Simple competition model
+- No sophisticated attention control
+- No working memory integration
+- Limited attentional control
+
+### Planning
+- Limited planning depth
+- No tree search or simulation
+- No sophisticated state representation
+- No hierarchical planning
+
+### Self-Model
+- No sophisticated body schema
+- No self-recognition
+- No self-consciousness claims
+- Limited self-awareness
+
+### Social Learning
+- No theory of mind
+- No sophisticated imitation learning
+- No cultural transmission
+- No language-based social learning
+
 ## Claims We Do NOT Make
 
-NLM does NOT claim to:
-1. Simulate a human brain
-2. Reproduce consciousness
-3. Match biological neural coding
-4. Explain perception or cognition
-5. Replace neuroscience research
-6. Achieve artificial general intelligence
+NLM Phase 4 does NOT claim to have:
+1. Human-like intelligence
+2. Consciousness or sentience
+3. Genuine self-awareness
+4. Human-like reasoning
+5. Understanding of concepts like humans do
+6. Real episodic memory like humans
+7. Genuine planning capability
+8. Social cognition like humans
+9. Subjective experience
 
-## What NLM IS
+## What NLM Phase 4 IS
 
-NLM is:
+NLM Phase 4 IS:
 1. A computational exploration of developmental learning principles
-2. A testbed for neural architecture hypotheses
-3. An educational tool for understanding neural computation
-4. A research platform with explicit approximations
-5. A project that acknowledges its limitations honestly
+2. An investigation of whether prediction can emerge from spiking dynamics
+3. A test of whether concepts can form without predefined labels
+4. A study of whether planning can arise from predictive mechanisms
+5. An exploration of whether self-models can develop through sensorimotor learning
+6. A testbed for neural architecture hypotheses
+7. An educational tool for understanding neural computation
+8. A research platform with explicit approximations
+9. A project that acknowledges its limitations honestly
+
+## Measurement vs. Claims
+
+Phase 4 experiments measure:
+- Prediction error reduction over time
+- Retention accuracy in working memory tasks
+- Recall accuracy for stored episodes
+- Stability of discovered patterns
+- Selectivity in attention tasks
+- Success rate in multi-step tasks
+- Self-prediction accuracy
+- Imitation success rate
+
+Phase 4 does NOT claim:
+- "NLM understands concepts"
+- "NLM has episodic memory like humans"
+- "NLM is conscious"
+- "NLM has self-awareness"
+
+Instead we say:
+- "NLM developed stable representations for recurring patterns"
+- "NLM showed retention of information across delays"
+- "NLM's behavior was influenced by past experiences"
+- "NLM predicted action consequences with X% accuracy"
 
 ## Importance of Acknowledgment
 
@@ -155,4 +236,10 @@ By explicitly listing limitations, we:
 
 ## Future Improvements
 
-Future phases may increase biological fidelity for specific subsystems, but the fundamental gap between computation and biology will persist.
+Future phases may increase biological fidelity for specific subsystems:
+- More detailed neuron models
+- Larger scale simulations
+- More realistic plasticity mechanisms
+- Better cognitive architectures
+
+But the fundamental gap between computation and biology will persist.

@@ -65,37 +65,136 @@ Neuromodulators (dopamine, acetylcholine, norepinephrine, serotonin) modulate ne
 - Receptor types, receptor distribution, and second-messenger systems not modeled
 - Effects on neural dynamics are simplified
 
-## Prediction and Error Signals
+## Phase 4: Emerging Cognition
 
-### Biological Inspiration
-Brains are prediction machines. Predictive coding suggests that brains constantly predict sensory inputs and signals errors when predictions fail.
+### Prediction Systems
 
-### Computational Implementation
-- Simple next-state prediction
-- Error signals drive learning
+#### Biological Inspiration
+The free energy principle and predictive coding suggest that brains are fundamentally prediction machines. Hierarchical predictive models allow organisms to anticipate future states and minimize prediction errors.
 
-### Known Limitations
-- Real predictive coding involves complex hierarchical processing
-- Error signals propagate through multiple pathways
-- Our implementation is a placeholder
+#### Computational Implementation
+- **NeuralPrediction**: Learns temporal sequences through repeated experience
+- **ActionConsequencePrediction**: Associates actions with their effects
+- **Multi-step Prediction**: Chains predictions to anticipate distant futures
 
-## Memory Systems
+#### Known Limitations
+- No hierarchical generative model
+- Limited temporal horizon
+- No explicit uncertainty representation
 
-### Biological Inspiration
-Multiple memory systems in the brain:
-- Working memory (prefrontal cortex)
-- Episodic memory (hippocampus)
-- Semantic memory (cortex)
-- Procedural memory (basal ganglia, cerebellum)
+### Working Memory
 
-### Computational Implementation
-- Abstract storage systems with capacity limits
-- Simple consolidation mechanisms
+#### Biological Inspiration
+Working memory in prefrontal cortex maintains information active for seconds to minutes through persistent neural activity and recurrent circuits.
 
-### Known Limitations
-- Real memory systems involve complex neural circuits
-- Hippocampal-cortical interactions not modeled
-- Memory consolidation and retrieval are vastly more complex
+#### Computational Implementation
+- **NeuralWorkingMemory**: Persistent activity in recurrent circuits
+- **Competition**: Winner-take-more dynamics for selective retention
+- **Decay**: Activity decays when not reinforced
+
+#### Known Limitations
+- No complex binding mechanisms
+- Limited capacity
+- Simplified recurrent architecture
+
+### Episodic Memory
+
+#### Biological Inspiration
+Hippocampus stores episodes with temporal, spatial, and contextual information. Pattern completion allows retrieval from partial cues.
+
+#### Computational Implementation
+- **NeuralEpisodicMemory**: Stores experiences as neural activity patterns
+- **Pattern Completion**: Retrieves full episodes from partial cues
+- **Replay**: Reactivates past patterns
+
+#### Known Limitations
+- No hippocampal architecture
+- No pattern separation
+- Limited consolidation mechanisms
+
+### Concept Formation
+
+#### Biological Inspiration
+Cortex forms stable representations through repeated exposure. Similar experiences converge to share representations.
+
+#### Computational Implementation
+- **ConceptFormation**: Clusters similar patterns into stable prototypes
+- **Hebbian Averaging**: Prototype moves toward new instances
+- **Stability Measurement**: Tracks how consistent patterns are
+
+#### Known Limitations
+- No hierarchical concept structure
+- No symbolic representation
+- Limited abstraction
+
+### Attention
+
+#### Biological Inspiration
+Attention involves competitive dynamics where stronger signals inhibit weaker ones. Both bottom-up salience and top-down goals influence selection.
+
+#### Computational Implementation (NOT Transformer)
+- **AttentionalSelection**: Lateral inhibition competition
+- **Winner-Take-More**: Winners receive excitation, losers receive inhibition
+- **Top-Down Bias**: Goals can influence selection
+- **Bottom-Up Salience**: Stimulus strength affects selection
+
+#### IMPORTANT: NOT Transformer Attention
+NLM attention is NOT:
+- Query-Key-Value matrices
+- Softmax attention weights
+- Attention heads
+- Self-attention
+
+NLM attention IS:
+- Competitive dynamics
+- Lateral inhibition
+- Recurrent amplification
+- Neural circuit mechanism
+
+### Planning
+
+#### Biological Inspiration
+Prefrontal cortex uses learned models to simulate future outcomes and select actions that lead to goals.
+
+#### Computational Implementation
+- **NeuralPlanner**: Evaluates action sequences using predictions
+- **Action Quality**: Learns which actions work in which states
+- **Plan Adaptation**: Updates based on success/failure
+
+#### Known Limitations
+- Shallow planning depth
+- No tree search
+- Limited world model
+
+### Self-Model
+
+#### Biological Inspiration
+The brain maintains a model of the body (body schema) and distinguishes self-generated from externally generated events (agency).
+
+#### Computational Implementation
+- **SelfModel**: Learns forward model of sensory consequences
+- **Self-Generated Likeness**: Predicts whether change is self-caused
+- **Action Quality**: Tracks which actions lead to rewards
+
+#### Known Limitations
+- No sophisticated body schema
+- No self-recognition
+- No explicit agency computation
+
+### Social Learning
+
+#### Biological Inspiration
+Mirror neurons and social observation allow learning from others' actions and their consequences.
+
+#### Computational Implementation
+- **SocialLearning**: Observes other agents' actions
+- **Imitation**: Can reproduce observed actions
+- **Communication Signals**: Learns simple associated signals
+
+#### Known Limitations
+- No theory of mind
+- No sophisticated imitation learning
+- No cultural transmission
 
 ## The Learning Loop
 
@@ -141,7 +240,38 @@ DEVELOPMENTAL CHANGE
 BEHAVIORAL CHANGE
 ```
 
-This loop is inspired by biological learning but implemented in a simplified computational form.
+### Phase 4: Emerging Cognition
+```
+WORLD
+      ↓
+ATTENTION (competitive selection)
+      ↓
+SENSORY INPUT
+      ↓
+PREDICTION (learn temporal relationships)
+      ↓
+WORKING MEMORY (maintain information)
+      ↓
+EPISODIC MEMORY (store experiences)
+      ↓
+CONCEPTS (discover patterns)
+      ↓
+PLANNING (simulate futures)
+      ↓
+SELF-MODEL (predict self)
+      ↓
+ACTION SELECTION
+      ↓
+MOTOR OUTPUT
+      ↓
+WORLD
+      ↓
+REWARD / CONSEQUENCE
+      ↓
+SOCIAL OBSERVATION (if others present)
+      ↓
+LEARNING UPDATES
+```
 
 ## Eligibility Traces and Credit Assignment
 
@@ -175,12 +305,15 @@ NLM is NOT:
 - A model that accurately reproduces neural physiology
 - A replacement for neuroscience research
 - An intelligent system
+- A transformer or LLM
+- A pretrained AI system
 
 NLM IS:
 - A computational exploration of brain-inspired architecture
 - A testbed for developmental learning hypotheses
 - A research platform for artificial neural systems
 - An educational tool for understanding neural computation
+- An investigation of whether cognition can emerge from spiking dynamics
 
 ## Acknowledging Uncertainty
 
@@ -189,3 +322,4 @@ We acknowledge that:
 2. Our understanding of the brain is incomplete
 3. Many approximations are necessary for computational tractability
 4. Claims of "brain-like" behavior should be critically examined
+5. Phase 4 does not claim human-like intelligence, consciousness, or genuine understanding
