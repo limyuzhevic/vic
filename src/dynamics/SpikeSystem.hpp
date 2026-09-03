@@ -5,6 +5,7 @@
 #include <vector>
 #include <queue>
 #include <functional>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -22,8 +23,7 @@ struct DetailedSpikeEvent {
 };
 
 // Event-driven neural computation system
-// PLACEHOLDER - Phase 2 will implement efficient spike event processing
-
+// Handles spike event processing and delayed synaptic transmission
 class SpikeSystem {
 public:
     SpikeSystem();
@@ -39,12 +39,22 @@ public:
     void queueSpike(const SpikeEvent& event);
     void queueSpike(NeuronId neuron, Timestamp timestamp, SimulationStep step);
     
+    // Queue a delayed spike event (for synaptic transmission)
+    void queueDelayedSpike(const DelayedSpikeEvent& event);
+    
     // Process all queued spikes for current step
     void processSpikes(SimulationStep currentStep);
     
-    // Register spike handler callback
+    // Process pending delayed spikes that should be delivered now
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Register spike handler callback (called when spikes are generated)
     using SpikeHandler = std::function<void(const DetailedSpikeEvent&)>;
     void registerHandler(SpikeHandler handler);
+    
+    // Register delayed spike handler (called when delayed spikes are delivered)
+    using DelayedSpikeHandler = std::function<void(const DelayedSpikeEvent&)>;
+    void registerDelayedHandler(DelayedSpikeHandler handler);
     
     // Get spike history
     const std::vector<DetailedSpikeEvent>& getSpikeHistory() const;
@@ -53,6 +63,7 @@ public:
     // Get spike count
     size_t getSpikeCount() const;
     size_t getPendingSpikeCount() const;
+    size_t getPendingDelayedCount() const;
     
     // Statistics
     float getAverageSpikeRate() const;

@@ -8,7 +8,7 @@ namespace nlm {
 class Neuron;
 
 // Synapse representing a connection between neurons
-// PLACEHOLDER - Phase 2 will implement real synaptic transmission and plasticity
+// Implements real synaptic transmission with delays and short-term plasticity
 
 class Synapse {
 public:

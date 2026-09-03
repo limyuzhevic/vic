@@ -1,5 +1,5 @@
 // NLM Test Main
-// Phase 1: Skeleton tests
+// Phase 2: Real Neural Computation Tests
 
 #include <iostream>
 #include <cassert>
@@ -25,12 +25,24 @@ namespace test_neuron {
     void runAll();
 }
 
+namespace test_synapse {
+    void runAll();
+}
+
+namespace test_stdp {
+    void runAll();
+}
+
 namespace test_brain {
     void runAll();
 }
 
 int main() {
-    std::cout << "=== NLM Phase 1 Skeleton Tests ===" << std::endl;
+    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
+    std::cout << "Testing Real Neural Computation:" << std::endl;
+    std::cout << "  - LIF Neuron Dynamics" << std::endl;
+    std::cout << "  - Synaptic Transmission" << std::endl;
+    std::cout << "  - STDP Plasticity" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -74,6 +86,24 @@ int main() {
     std::cout << "Running Neuron tests..." << std::endl;
     try {
         test_neuron::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Synapse tests..." << std::endl;
+    try {
+        test_synapse::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running STDP tests..." << std::endl;
+    try {
+        test_stdp::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
