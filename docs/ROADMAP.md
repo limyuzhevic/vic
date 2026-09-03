@@ -30,32 +30,38 @@
 - [x] Tests
 
 ## Phase 2 — Working Neural Core
-**Status**: Not Started
+**Status**: Complete
 
-- [ ] Real membrane potential dynamics (leaky integrate-and-fire)
-- [ ] Real synaptic transmission
-- [ ] Real STDP implementation
-- [ ] Real Hebbian learning
-- [ ] Event-driven spike processing
-- [ ] Refractory period implementation
-- [ ] Basic plasticity rules working
-- [ ] Synaptic weight initialization
-- [ ] Connection initialization
-- [ ] Spike propagation
+- [x] Real membrane potential dynamics (leaky integrate-and-fire)
+- [x] Real synaptic transmission
+- [x] Real STDP implementation
+- [x] Real Hebbian learning
+- [x] Event-driven spike processing
+- [x] Refractory period implementation
+- [x] Basic plasticity rules working
+- [x] Synaptic weight initialization
+- [x] Connection initialization
+- [x] Spike propagation
+- [x] Eligibility traces
 
 ## Phase 3 — Development + Environment
-**Status**: Not Started
+**Status**: In Progress
 
-- [ ] Working environment interface
-- [ ] Basic sensory processing
-- [ ] Basic motor output
-- [ ] Developmental system implementation
-- [ ] Synaptogenesis implementation
-- [ ] Pruning implementation
-- [ ] Reward computation
-- [ ] Basic neuromodulation
-- [ ] Working memory implementation
-- [ ] Episode recording
+- [x] Working environment interface (SimpleWorld)
+- [x] Basic sensory processing (Vision, Touch, Internal, Proprioception)
+- [x] Basic motor output (MotorCommand decoding)
+- [x] Developmental system implementation (stages, plasticity modifiers)
+- [x] Synaptogenesis implementation
+- [x] Pruning implementation
+- [x] Reward computation (prediction error)
+- [x] Basic neuromodulation (dopamine-like signal)
+- [x] Novelty detection
+- [x] Curiosity mechanism
+- [x] Eligibility traces for reward-modulated learning
+- [x] Agent/Body system with energy
+- [x] Phase 3 experiment demo
+- [ ] Full episodic memory (Phase 4)
+- [ ] Episode recording (Phase 4)
 
 ## Phase 4 — Emerging Cognition
 **Status**: Not Started

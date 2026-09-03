@@ -19,14 +19,32 @@ NLM IS intended to become:
 
 ## Current Phase
 
-**PHASE 2: REAL NEURAL COMPUTATION**
+**PHASE 3: WORLD INTERACTION + DEVELOPMENT**
 
-This phase implements real spiking neural computation with:
-- Leaky Integrate-and-Fire (LIF) neuron dynamics
+This phase places the neural brain inside a real interactive environment:
+- Simple 2D world with objects (resources and hazards)
+- Visual sensory pathway (16x16 grayscale)
+- Motor actions decoded from neural activity
+- Reward prediction error system
+- Eligibility traces for credit assignment
+- Developmental stages affecting plasticity
+- Novelty and curiosity mechanisms
+- Homeostatic regulation
+
+Phase 2 completed:
+- Real LIF neuron dynamics
 - Event-driven spike propagation with synaptic delays
 - STDP (Spike-Timing-Dependent Plasticity)
 - Hebbian learning
 - Structural plasticity (synaptogenesis and pruning)
+
+Phase 3 adds:
+- Environment interaction loop
+- Sensory input from world to brain
+- Motor output from brain to world
+- Consequence/reward signals
+- Reward-modulated plasticity
+- Developmental progression
 
 Current status:
 - ✅ Project compiles with C++20
@@ -56,8 +74,19 @@ make -j4
 
 ## Running
 
+### Phase 2 Neural Computation Demo
 ```bash
 ./nlm
+```
+
+### Phase 3 World Interaction Demo
+```bash
+./nlm_phase3_demo [num_episodes] [steps_per_episode]
+```
+
+For example:
+```bash
+./nlm_phase3_demo 5 200
 ```
 
 With custom configuration:

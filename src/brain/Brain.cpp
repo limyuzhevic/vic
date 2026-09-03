@@ -5,6 +5,10 @@
 #include "../core/SimulationClock/SimulationClock.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -20,9 +24,10 @@ struct Brain::Impl {
     std::unique_ptr<class EpisodicMemory> episodicMemory;
     std::unique_ptr<class SemanticMemory> semanticMemory;
     std::unique_ptr<class ProceduralMemory> proceduralMemory;
-    std::unique_ptr<class DevelopmentSystem> developmentSystem;
-    std::unique_ptr<class Neuromodulator> neuromodulator;
-    std::unique_ptr<class PredictionSystem> predictionSystem;
+    std::unique_ptr<DevelopmentSystem> developmentSystem;
+    std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Curiosity> curiosity;
+    std::unique_ptr<PredictionError> predictionError;
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
     
@@ -68,6 +73,14 @@ struct Brain::Impl {
         stdp = std::make_unique<STDP>();
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
+        
+        // Initialize development system
+        developmentSystem = std::make_unique<DevelopmentSystem>();
+        
+        // Initialize neuromodulation systems
+        dopamine = std::make_unique<Dopamine>();
+        curiosity = std::make_unique<Curiosity>();
+        predictionError = std::make_unique<PredictionError>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -592,7 +605,7 @@ class ProceduralMemory* Brain::getProceduralMemory() {
 }
 
 class DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return nullptr;
+    return pImpl->developmentSystem.get();
 }
 
 DevelopmentalStage Brain::getDevelopmentalStage() const {
@@ -603,12 +616,12 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;
 }
 
-class Neuromodulator* Brain::getNeuromodulator() {
-    return nullptr;
+Dopamine* Brain::getNeuromodulator() {
+    return pImpl->dopamine.get();
 }
 
-class PredictionSystem* Brain::getPredictionSystem() {
-    return nullptr;
+PredictionSystem* Brain::getPredictionSystem() {
+    return nullptr;  // Not implemented yet
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
