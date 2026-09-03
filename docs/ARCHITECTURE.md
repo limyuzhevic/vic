@@ -119,35 +119,64 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 
 ## Data Flow
 
+### Phase 2: Neural Computation
 ```
-Environment
-     ↓
-SensoryInput
-     ↓
+Sensory Input (test signals)
+      ↓
 Brain.receiveSensoryInput()
-     ↓
-Sensory Processing
-     ↓
-Brain Regions (Neural Computation)
-     ↓
-Prediction System
-     ↓
-Motor System
-     ↓
-Action
-     ↓
-Environment.step(Action)
-     ↓
-Observation + Reward
-     ↓
-Neuromodulation
-     ↓
-Plasticity Updates
-     ↓
-Development Updates
-     ↓
-Memory Updates
+      ↓
+Neural Computation (LIF dynamics)
+      ↓
+Spike Processing (event-driven)
+      ↓
+Plasticity (STDP, Hebbian)
+      ↓
+Structural Plasticity (synaptogenesis/pruning)
 ```
+
+### Phase 3: World Interaction
+```
+WORLD (SimpleWorld)
+      ↓
+SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
+      ↓
+AgentBrain.processSensoryInput()
+      ↓
+Brain.receiveSensoryInput() → Sensory Neurons
+      ↓
+Neural Computation (LIF dynamics)
+      ↓
+Spike Processing (event-driven)
+      ↓
+Motor Decoding → MotorCommand
+      ↓
+AgentBrain.decodeMotorCommand()
+      ↓
+WORLD.applyMotorCommand()
+      ↓
+ACTION RESULT (reward, success)
+      ↓
+Reward Prediction Error
+      ↓
+Neuromodulation (dopamine-like signal)
+      ↓
+Eligibility Trace Update
+      ↓
+Plasticity (STDP, Hebbian, Reward-Modulated)
+      ↓
+Structural Plasticity (synaptogenesis/pruning)
+      ↓
+Development System (stage progression)
+```
+
+## Agent-Brain Interface
+
+Phase 3 introduces the AgentBrain class that connects the NLM brain to the world:
+
+- **SensoryTransduction**: Converts world percepts to neural input
+- **MotorDecoding**: Converts neural activity to motor commands
+- **Neuromodulation**: Applies reward signals to plasticity
+- **Development**: Updates developmental stage
 
 ## Key Design Principles
 

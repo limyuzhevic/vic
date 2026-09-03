@@ -99,29 +99,74 @@ Multiple memory systems in the brain:
 
 ## The Learning Loop
 
+### Phase 2: Isolated Neural Computation
 ```
-ENVIRONMENT
-     ↓
-SENSORY EXPERIENCE
-     ↓
+SENSORY INPUT (test signals)
+      ↓
 NEURAL ACTIVITY
-     ↓
-PREDICTION
-     ↓
-ACTION
-     ↓
-CONSEQUENCE
-     ↓
-REWARD / ERROR / NOVELTY
-     ↓
-SYNAPTIC PLASTICITY
-     ↓
-NETWORK DEVELOPMENT
-     ↓
-NEW EXPERIENCE
+      ↓
+SPIKE PROCESSING
+      ↓
+PLASTICITY (STDP, Hebbian)
+      ↓
+NETWORK CHANGE
+```
+
+### Phase 3: Environment Interaction
+```
+WORLD (2D environment with objects)
+      ↓
+SENSORY PERCEPT (vision, touch, internal)
+      ↓
+NEURAL ACTIVITY (LIF dynamics)
+      ↓
+MOTOR OUTPUT (decoded from brain)
+      ↓
+ACTION (movement, interaction)
+      ↓
+WORLD STATE CHANGE
+      ↓
+REWARD / CONSEQUENCE
+      ↓
+PREDICTION ERROR
+      ↓
+NEUROMODULATION (dopamine-like)
+      ↓
+ELIGIBILITY TRACES
+      ↓
+PLASTICITY UPDATE
+      ↓
+DEVELOPMENTAL CHANGE
+      ↓
+BEHAVIORAL CHANGE
 ```
 
 This loop is inspired by biological learning but implemented in a simplified computational form.
+
+## Eligibility Traces and Credit Assignment
+
+### Biological Inspiration
+In biological brains, synaptic changes must be attributed to the correct action even when the consequence occurs later. Eligibility traces allow synapses to be "tagged" and modified when reward arrives.
+
+### Computational Implementation
+- Synapses maintain an eligibility trace during activity
+- When reward prediction error occurs, trace is converted to weight change
+- Traces decay over time if no reward signal arrives
+
+### Known Limitations
+- Real synaptic tagging involves complex molecular mechanisms
+- Timing requirements are simplified
+- Only recent activity is credited
+
+## Developmental Plasticity
+
+### Biological Inspiration
+Early development has higher plasticity ("critical periods") that decreases with age. This allows learning when young but provides stability later.
+
+### Computational Implementation
+- Developmental stages: Initial → CriticalPeriod → Maturation → Adult
+- Plasticity rates decrease with age
+- Synaptogenesis higher early, pruning higher later
 
 ## What NLM is NOT
 

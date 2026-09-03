@@ -55,7 +55,7 @@ struct LearningExperiment {
     size_t initialSynapseCount;
     std::vector<float> initialWeights;
     std::vector<float> finalWeights;
-    std::vector<size_t> spikeCounts;
+    std::vector<NeuronId> mostActiveNeurons;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
         : brain(b), seed(s), initialSynapseCount(0) {}
@@ -90,7 +90,7 @@ struct LearningExperiment {
             }
         }
         
-        spikeCounts = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
@@ -144,7 +144,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Spike Activity:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        NLM_LOG_INFO("  Most active neurons: " + std::to_string(spikeCounts.size()));
+        NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
         
         // Determine if learning occurred
         bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||

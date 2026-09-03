@@ -145,7 +145,7 @@ public:
     
     // Neuromodulation system
     // TODO PHASE 2: Implement real neuromodulation
-    class Neuromodulator* getNeuromodulator();
+    class Dopamine* getNeuromodulator();
     
     // Prediction system
     // TODO PHASE 2: Implement real prediction

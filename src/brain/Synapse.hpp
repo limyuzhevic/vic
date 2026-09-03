@@ -58,6 +58,9 @@ public:
     const PlasticityFlags& getPlasticityFlags() const;
     PlasticityFlags& getPlasticityFlags();
     
+    // Enable/disable plasticity rules
+    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
+    
     // Eligibility trace (for reward-modulated learning)
     float getEligibilityTrace() const;
     void setEligibilityTrace(float trace);
