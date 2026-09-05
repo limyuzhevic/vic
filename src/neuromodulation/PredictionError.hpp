@@ -5,18 +5,20 @@
 namespace nlm {
 
 // Prediction error signal for curiosity and learning
-// PLACEHOLDER - Phase 2 will implement real prediction error computation
+// Computes difference between predicted and actual values
 
 class PredictionError {
 public:
     PredictionError();
     ~PredictionError();
     
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
     // Get error value
     float getError() const;
     
     // Compute prediction error
-    // TODO PHASE 2: Implement real prediction error
     void computeError(float predicted, float actual);
     
     // Update prediction

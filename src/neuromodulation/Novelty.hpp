@@ -5,21 +5,27 @@
 namespace nlm {
 
 // Novelty detection signal
-// PLACEHOLDER - Phase 2 will implement real novelty detection
+// Computes novelty from comparison with previous observations
 
 class Novelty {
 public:
     Novelty();
     ~Novelty();
     
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
     // Get novelty level
     float getLevel() const;
     void setLevel(float level);
     
     // Detect novelty from observation
-    // TODO PHASE 2: Implement real novelty detection
     void detectNovelty(const class Observation& observation, 
                        const class Observation& previousObservation);
+    
+    // Detect novelty from sensory input pattern
+    void detectNovelty(const std::vector<float>& currentPattern,
+                       const std::vector<float>& previousPattern);
     
     // Decay novelty over time
     void update(TimestepDuration dt);

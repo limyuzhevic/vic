@@ -20,51 +20,49 @@ NLM IS intended to become:
 
 ## Current Phase
 
-**PHASE 4: EMERGING COGNITION**
+**PHASE 6: FINAL INTEGRATION**
 
-This phase implements mechanisms for increasingly complex cognitive behavior to emerge:
+Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
 
-### Prediction
-- Temporal sequence learning
-- Action-consequence prediction
-- Multi-step prediction
-- Prediction error signals
+### Phase 6 Integration Achievements
 
-### Memory
-- Working memory (persistent neural activity)
-- Episodic-like memory (experience encoding)
-- Associative memory (Hebbian associations)
-- Semantic-like memory (generalized knowledge)
+#### Memory Systems
+- Working memory with persistent activity and competition
+- Episodic memory with experience encoding and replay
+- Associative memory with Hebbian pattern associations
+- All memory systems connected to neural processing
 
-### Concept Formation
-- Discovers patterns from experience
-- No predefined labels or categories
-- Stability measurement
-- Generalization ability
+#### Neuromodulation Integration
+- Dopamine affects neural excitability and plasticity
+- Curiosity drives exploration behavior
+- Novelty detection integrated with sensory processing
+- All neuromodulators connected to plasticity rules
 
-### Attention
-- Competition-based selection
-- NOT Transformer attention (no QKV matrices)
-- Top-down and bottom-up influence
-- Winner-take-more dynamics
+#### Prediction System
+- Prediction system integrated into brain loop
+- Prediction error signals affect learning
+- Confidence tracking implemented
 
-### Planning
-- Uses learned predictions
-- Multi-step action sequences
-- Goal-directed behavior
-- Adaptive based on outcomes
+#### Cognition Systems
+- Neural planner with action sequence evaluation
+- Concept formation from experience patterns
+- Attention with competitive selection dynamics
+- All cognition systems connected to perception and action
 
-### Self-Model
-- Sensorimotor self-awareness
-- Body schema learning
-- Self vs external distinction
-- Action consequence prediction
+#### Development Integration
+- Developmental stages affect plasticity rates
+- Structural plasticity modulated by age
+- Neural excitability changes with development
 
-### Social Learning
-- Observation of others
-- Imitation capability
-- Simple communication signals
-- Social prediction
+#### Persistence
+- Checkpoint save/load implemented
+- Brain state serialization working
+- Can resume from saved checkpoints
+
+#### Replay and Consolidation
+- Episodic memory replay during simulation
+- Memory consolidation for important episodes
+- Integration with sleep/rest cycle
 
 ## Building
 
@@ -77,15 +75,12 @@ make -j4
 
 ## Running
 
-### Phase 4 Demo
+### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase4_demo [num_trials]
+./nlm_phase6_demo
 ```
 
-For example:
-```bash
-./nlm_phase4_demo 100
-```
+This runs a comprehensive integration test verifying all brain systems are connected.
 
 ## Project Structure
 
@@ -98,25 +93,25 @@ NLM/
 │   ├── SCIENCE.md
 │   ├── ROADMAP.md
 │   ├── EXPERIMENTS.md
-│   └── LIMITATIONS.md
+│   ├── LIMITATIONS.md
+│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
 ├── src/
 │   ├── core/           # Core utilities
-│   ├── brain/          # Neural components
+│   ├── brain/          # Neural components (integrated)
 │   ├── dynamics/       # Neural dynamics
 │   ├── plasticity/     # Plasticity rules
-│   ├── development/     # Developmental system
-│   ├── neuromodulation/# Neuromodulators
-│   ├── memory/         # Memory systems (Phase 4)
-│   ├── prediction/      # Prediction systems (Phase 4)
-│   ├── cognition/      # Cognitive mechanisms (Phase 4)
-│   ├── sensory/        # Sensory processing
-│   ├── motor/          # Motor system
-│   ├── environment/    # Environment interface
-│   ├── experiments/    # Experiment framework
+│   ├── development/    # Developmental system
+│   ├── neuromodulation/# Neuromodulators (integrated)
+│   ├── memory/        # Memory systems (integrated)
+│   ├── prediction/     # Prediction systems (integrated)
+│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── sensory/       # Sensory processing
+│   ├── motor/         # Motor system
+│   ├── environment/   # Environment interface
+│   ├── experiments/   # Experiment framework (Phase 6)
 │   └── visualization/  # Visualization
 ├── tests/
-├── configs/
-└── data/
+└── configs/
 ```
 
 ## Phase Summary
@@ -139,7 +134,7 @@ NLM/
 - Developmental stages
 - Novelty and curiosity
 
-### Phase 4 (Current)
+### Phase 4 (Complete)
 - Neural prediction system
 - Working memory
 - Episodic-like memory
@@ -149,6 +144,23 @@ NLM/
 - Self-model
 - Social learning
 - Continual learning
+
+### Phase 5 (Complete)
+- Performance optimizations
+- Memory pools and event queues
+- SIMD vectorization
+- Parallel processing
+- Checkpoint system
+
+### Phase 6 (Complete - Final Integration)
+- All systems integrated into coherent brain loop
+- Memory systems connected to neural processing
+- Neuromodulation affects plasticity and dynamics
+- Prediction integrated with learning
+- Development affects plasticity rates
+- Checkpoint save/load working
+- Replay and consolidation functional
+- Phase 6 integration experiment created
 
 ## Scientific Limitations
 
@@ -161,19 +173,53 @@ NLM is a research project investigating computational brain-like systems. We mak
 - No claim of consciousness, intelligence, or human-like cognition
 - Limited to what can be simulated with available computing resources
 
-Phase 4 does NOT claim:
+Phase 6 does NOT claim:
 - Human intelligence
 - Consciousness or sentience
 - Human-like reasoning
 - Genuine subjective experience
 
-Phase 4 DOES investigate:
-- Whether prediction can emerge from spiking dynamics
-- Whether memory can be grounded in neural activity
-- Whether concepts can form without predefined labels
-- Whether planning can arise from predictive mechanisms
-- Whether self-models can develop through sensorimotor learning
-- Whether social learning can emerge from observation
+Phase 6 DOES investigate:
+- Whether memory systems can integrate with neural dynamics
+- Whether neuromodulation can affect plasticity in a coordinated way
+- Whether prediction can become a central organizing principle
+- Whether developmental stages can modulate learning
+- Whether replay can reinforce memory consolidation
+- Whether the complete brain loop functions coherently
+
+## Architecture Philosophy
+
+The NLM brain operates as a closed-loop system:
+
+```
+WORLD
+  ↓
+SENSORY INPUT
+  ↓
+NEURAL PROCESSING (LIF dynamics, spikes)
+  ↓
+INTERNAL STATE (working memory, attention)
+  ↓
+MEMORY / PREDICTION
+  ↓
+MOTIVATION / NEUROMODULATION (dopamine, curiosity)
+  ↓
+ACTION SELECTION
+  ↓
+MOTOR OUTPUT
+  ↓
+WORLD CONSEQUENCE
+  ↓
+REWARD / SURPRISE / ERROR
+  ↓
+PLASTICITY (STDP, Hebbian, structural)
+  ↓
+MEMORY / DEVELOPMENT
+  ↓
+CHANGED BRAIN
+  ↓
+CHANGED FUTURE BEHAVIOR
+```
 
 ## License
 
