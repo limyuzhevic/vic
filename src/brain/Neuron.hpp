@@ -89,7 +89,6 @@ public:
     // LIF neuron parameters
     void setLeakConductance(MembranePotential conductance);
     MembranePotential getLeakConductance() const;
-    void setRefractoryPeriod(uint32_t steps);
     uint32_t getRefractoryPeriod() const;
     void setRestingPotential(MembranePotential potential);
     MembranePotential getRestingPotential() const;

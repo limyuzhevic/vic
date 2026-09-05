@@ -188,7 +188,10 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
         
         // Synaptogenesis: Create new synapses between active neurons
         if (region->getSynapseCount() < pImpl->maxTotalSynapses) {
-            for (size_t i = 0; i < neuronCount && rng.bernoulli(pImpl->synaptogenesisRate); ++i) {
+            for (size_t attempt = 0; attempt < neuronCount; ++attempt) {
+                // Probabilistic synapse formation
+                if (!rng.bernoulli(pImpl->synaptogenesisRate)) continue;
+                
                 size_t idx1 = rng.uniformInt(0, static_cast<int>(neuronCount) - 1);
                 size_t idx2 = rng.uniformInt(0, static_cast<int>(neuronCount) - 1);
                 

@@ -78,7 +78,7 @@ void Hebbian::update(Synapse* synapse,
 void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
-    float newWeight = synapse->getWeight() + delta * pImpl->learningRate;
+    float newWeight = synapse->getWeight() + delta;
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
     synapse->setWeight(newWeight);
 }
