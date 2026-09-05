@@ -70,13 +70,6 @@ void Neuron::setFiringState(FiringState state) {
     pImpl->state.firingState = state;
 }
 
-void Neuron::setRefractoryPeriod(uint32_t steps) {
-    pImpl->state.refractoryRemaining = steps;
-    if (steps > 0) {
-        pImpl->state.firingState = FiringState::Refractory;
-    }
-}
-
 void Neuron::decrementRefractory() {
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;

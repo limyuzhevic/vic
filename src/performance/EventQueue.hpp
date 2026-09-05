@@ -398,14 +398,15 @@ inline size_t DelayedSpikeQueue::bucketSize(uint64_t step) const {
 
 inline void DelayedSpikeQueue::clear() {
     for (auto& bucket : buckets_) {
-        // Reset bucket
+        bucket = SpikeBucket();  // Reset bucket to default state
     }
     std::fill(pendingCounts_.begin(), pendingCounts_.end(), 0);
+    oldestStep_ = currentStep_;
 }
 
 inline void DelayedSpikeQueue::advanceTime(uint64_t currentStep) {
     // Advance the oldest step marker
-    while (oldestStep_ <= currentStep && oldestStep_ < currentStep - numBuckets_) {
+    while (oldestStep_ <= currentStep && oldestStep_ <= currentStep - numBuckets_) {
         size_t bucketIdx = oldestStep_ % numBuckets_;
         buckets_[bucketIdx] = SpikeBucket();  // Reset bucket
         pendingCounts_[bucketIdx].store(0, std::memory_order_relaxed);
