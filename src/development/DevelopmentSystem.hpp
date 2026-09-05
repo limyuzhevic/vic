@@ -2,11 +2,15 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include <functional>
 
 namespace nlm {
 
+// Forward declarations
+class RandomGenerator;
+
 // Development system: orchestrates neural development
-// PLACEHOLDER - Phase 2 will implement real developmental processes
+// Implements developmental stages, plasticity modulation, and structural changes
 
 class DevelopmentSystem {
 public:
@@ -23,8 +27,11 @@ public:
     // Get stage name
     const char* getStageName() const;
     
-    // Update development
+    // Update development (simple version)
     void update(Brain* brain, SimulationStep currentStep);
+    
+    // Update development with full parameters
+    void update(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
     
     // Get plasticity modifier for current stage
     float getPlasticityModifier() const;
@@ -33,9 +40,16 @@ public:
     bool isCriticalPeriod() const;
     float getCriticalPeriodProgress() const;
     
+    // Get developmental age (in simulation time)
+    double getDevelopmentalAge() const { return age_; }
+    
+    // Set developmental age
+    void setDevelopmentalAge(double age) { age_ = age; }
+    
 private:
     struct Impl;
     Impl* pImpl;
+    double age_;
 };
 
 } // namespace nlm

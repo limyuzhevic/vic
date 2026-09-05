@@ -16,6 +16,18 @@ class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
+class NeuralWorkingMemory;
+class NeuralEpisodicMemory;
+class NeuralAssociativeMemory;
+class PredictionSystem;
+class NeuralPlanner;
+class ConceptFormation;
+class AttentionalSelection;
+class DevelopmentSystem;
+class Dopamine;
+class Curiosity;
+class Novelty;
+class PredictionError;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -34,6 +46,7 @@ struct InterRegionConnection {
 
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
+// and integrated memory, prediction, cognition, and neuromodulation systems
 
 class Brain {
 public:
@@ -81,31 +94,25 @@ public:
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
-    // Produce motor/action output
-    // TODO PHASE 2: Implement real action selection
+    // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
     
     // Apply neuromodulatory signals
-    // TODO PHASE 2: Implement real neuromodulation
     void applyNeuromodulation(const class Neuromodulator& signal);
     
-    // Update plasticity rules
-    // TODO PHASE 2: Implement real plasticity
+    // Update plasticity rules (called automatically in step)
     void updatePlasticity();
     
-    // Apply developmental changes
-    // TODO PHASE 2: Implement real development
+    // Apply developmental changes (called automatically in step)
     void develop();
     
     // Reset brain state
     void reset();
     
-    // Save brain state to file
-    // TODO PHASE 2: Implement checkpointing
+    // Save brain state to file (checkpointing)
     bool save(const std::string& filepath) const;
     
     // Load brain state from file
-    // TODO PHASE 2: Implement checkpoint loading
     bool load(const std::string& filepath);
     
     // Region management
@@ -130,26 +137,52 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // Memory systems
-    // TODO PHASE 2: Implement real memory systems
-    class WorkingMemory* getWorkingMemory();
-    class EpisodicMemory* getEpisodicMemory();
-    class SemanticMemory* getSemanticMemory();
-    class ProceduralMemory* getProceduralMemory();
+    // ========== MEMORY SYSTEMS ==========
     
-    // Development system
-    // TODO PHASE 2: Implement real development
-    class DevelopmentSystem* getDevelopmentSystem();
+    // Working memory - transient active information
+    NeuralWorkingMemory* getWorkingMemory();
+    
+    // Episodic memory - experience storage
+    NeuralEpisodicMemory* getEpisodicMemory();
+    
+    // Associative memory - pattern associations
+    NeuralAssociativeMemory* getAssociativeMemory();
+    
+    // ========== PREDICTION SYSTEM ==========
+    
+    // Prediction system for sensory prediction and error computation
+    PredictionSystem* getPredictionSystem();
+    
+    // ========== COGNITION SYSTEMS ==========
+    
+    // Neural planner for action planning
+    NeuralPlanner* getPlanner();
+    
+    // Concept formation for pattern discovery
+    ConceptFormation* getConceptFormation();
+    
+    // Attentional selection for focus
+    AttentionalSelection* getAttention();
+    
+    // ========== DEVELOPMENT SYSTEM ==========
+    
+    DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // Neuromodulation system
-    // TODO PHASE 2: Implement real neuromodulation
-    class Dopamine* getNeuromodulator();
+    // ========== NEUROMODULATION SYSTEMS ==========
     
-    // Prediction system
-    // TODO PHASE 2: Implement real prediction
-    class PredictionSystem* getPredictionSystem();
+    // Dopamine - reward and reinforcement
+    Dopamine* getDopamine();
+    
+    // Curiosity - exploration motivation
+    Curiosity* getCuriosity();
+    
+    // Novelty - novelty detection
+    Novelty* getNovelty();
+    
+    // Prediction error signal
+    PredictionError* getPredictionErrorSignal();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

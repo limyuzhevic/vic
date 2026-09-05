@@ -1,15 +1,18 @@
 #include "Curiosity.hpp"
+#include "../core/Logger/Logger.hpp"
 
 namespace nlm {
 
 struct Curiosity::Impl {
+    class Brain* brain;
     float level;
     float noveltyWeight;
     float predictionErrorWeight;
     float decayRate;
     
     Impl() 
-        : level(0.0f)
+        : brain(nullptr)
+        , level(0.0f)
         , noveltyWeight(0.5f)
         , predictionErrorWeight(0.5f)
         , decayRate(0.05f) {}
@@ -18,6 +21,11 @@ struct Curiosity::Impl {
 Curiosity::Curiosity() : pImpl(new Impl) {}
 
 Curiosity::~Curiosity() = default;
+
+void Curiosity::initialize(Brain* brain) {
+    pImpl->brain = brain;
+    NLM_LOG_INFO("Curiosity system initialized");
+}
 
 float Curiosity::getLevel() const {
     return pImpl->level;
@@ -37,6 +45,14 @@ void Curiosity::update(float novelty, float predictionError, TimestepDuration dt
 
 float Curiosity::getExplorationDrive() const {
     return pImpl->level;
+}
+
+void Curiosity::setNoveltyWeight(float weight) {
+    pImpl->noveltyWeight = weight;
+}
+
+void Curiosity::setPredictionErrorWeight(float weight) {
+    pImpl->predictionErrorWeight = weight;
 }
 
 void Curiosity::reset() {

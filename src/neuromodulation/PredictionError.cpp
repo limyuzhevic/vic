@@ -1,20 +1,27 @@
 #include "PredictionError.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <cmath>
 
 namespace nlm {
 
 struct PredictionError::Impl {
+    class Brain* brain;
     float error;
     float predictedValue;
     float actualValue;
     std::vector<float> history;
     
-    Impl() : error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
+    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
 };
 
 PredictionError::PredictionError() : pImpl(new Impl) {}
 
 PredictionError::~PredictionError() = default;
+
+void PredictionError::initialize(Brain* brain) {
+    pImpl->brain = brain;
+    NLM_LOG_INFO("PredictionError system initialized");
+}
 
 float PredictionError::getError() const {
     return pImpl->error;
