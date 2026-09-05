@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -177,8 +178,10 @@ private:
     std::vector<RegionId> attendedRegions_;
     std::vector<NeuronId> winners_;
     std::vector<float> neuronSalience_;
-    std::vector<float> topDownBias_;
-    std::vector<float> bottomUpSalience_;
+    
+    // Biases/salience stored by NeuronId for correct lookup in processCompetition
+    std::unordered_map<uint64_t, float> topDownBias_;
+    std::unordered_map<uint64_t, float> bottomUpSalience_;
 };
 
 } // namespace nlm

@@ -283,9 +283,11 @@ std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector
     for (size_t i = 0; i < competitors.size(); ++i) {
         NeuronId neuron = competitors[i];
         
-        // Get current activation from salience and top-down bias
-        float salience = i < bottomUpSalience_.size() ? bottomUpSalience_[i] : 0.0f;
-        float bias = i < topDownBias_.size() ? topDownBias_[i] : 0.0f;
+        // Get current activation from salience and top-down bias (from maps)
+        auto salIt = bottomUpSalience_.find(neuron.value);
+        float salience = (salIt != bottomUpSalience_.end()) ? salIt->second : 0.0f;
+        auto biasIt = topDownBias_.find(neuron.value);
+        float bias = (biasIt != topDownBias_.end()) ? biasIt->second : 0.0f;
         
         activities[i] = salience + bias;
         totalActivity += activities[i];
@@ -393,35 +395,31 @@ bool AttentionalSelection::isAttended(NeuronId neuron) const {
 }
 
 void AttentionalSelection::applyTopDownBias(NeuronId neuron, float biasStrength) {
-    // Find or add bias for this neuron
-    auto it = std::find(winners_.begin(), winners_.end(), neuron);
-    if (it != winners_.end()) {
-        size_t idx = std::distance(winners_.begin(), it);
-        
-        if (idx >= topDownBias_.size()) {
-            topDownBias_.resize(idx + 1, 0.0f);
-        }
-        topDownBias_[idx] += biasStrength;
+    // Store bias in map keyed by NeuronId
+    auto it = topDownBias_.find(neuron.value);
+    if (it != topDownBias_.end()) {
+        it->second += biasStrength;
+    } else {
+        topDownBias_[neuron.value] = biasStrength;
     }
 }
 
 void AttentionalSelection::applyBottomUpSalience(NeuronId neuron, float salienceStrength) {
-    auto it = std::find(winners_.begin(), winners_.end(), neuron);
-    if (it != winners_.end()) {
-        size_t idx = std::distance(winners_.begin(), it);
-        
-        if (idx >= bottomUpSalience_.size()) {
-            bottomUpSalience_.resize(idx + 1, 0.0f);
-        }
-        bottomUpSalience_[idx] += salienceStrength;
+    // Store salience in map keyed by NeuronId
+    auto it = bottomUpSalience_.find(neuron.value);
+    if (it != bottomUpSalience_.end()) {
+        it->second += salienceStrength;
+    } else {
+        bottomUpSalience_[neuron.value] = salienceStrength;
     }
 }
 
 void AttentionalSelection::reset() {
     winners_.clear();
     attendedRegions_.clear();
-    bottomUpSalience_.clear();
+    neuronSalience_.clear();
     topDownBias_.clear();
+    bottomUpSalience_.clear();
     pImpl->inhibitionLevel.clear();
 }
 
