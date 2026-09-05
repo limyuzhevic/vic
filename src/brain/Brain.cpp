@@ -245,15 +245,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
-                // Check if neuron just fired (threshold crossed)
-                if (neuron->getState().firingState == FiringState::Refractory &&
-                    neuron->getLastSpikeTime() >= 0.0f &&
-                    std::abs(static_cast<float>(currentTime) - neuron->getLastSpikeTime()) < pImpl->timestep * 2.0f) {
-                    
+                // Check if neuron just fired this step
+                // A neuron that fired will have:
+                // 1. Been in Refractory state (set by stepLIF after firing)
+                // 2. lastSpikeTime set to current time by stepLIF
+                const auto& state = neuron->getState();
+                bool justFired = (state.firingState == FiringState::Refractory &&
+                                 state.lastSpikeTime >= 0.0f &&
+                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+
+                if (justFired) {
                     // Neuron fired this step - queue the spike
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
                     pImpl->spikeSystem->queueSpike(event);
-                    
+
+                    // Record post-synaptic spike for incoming synapses (plasticity)
+                    auto incomingSynapses = region->getSynapsesTo(neuron->getId());
+                    for (Synapse* syn : incomingSynapses) {
+                        syn->recordPostSpike(currentTime);
+                    }
+
                     // Get outgoing synapses and schedule delayed spike events
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
@@ -261,7 +272,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                         Delay delay = syn->getDelay();
                         SimulationStep deliveryStep = currentStep + delay;
                         Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
-                        
+
                         DelayedSpikeEvent delayedEvent(
                             neuron->getId(),
                             syn->getDestinationNeuron(),
@@ -273,9 +284,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                             currentStep,
                             deliveryStep
                         );
-                        
+
                         pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
-                        
+
                         // Record pre-synaptic spike for plasticity
                         syn->recordPreSpike(currentTime);
                     }
