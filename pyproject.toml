@@ -1,0 +1,57 @@
+[build-system]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "pynlm"
+version = "0.1.0"
+description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+authors = [
+    {name = "NLM Authors"}
+]
+keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: C++",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "numpy>=1.20",
+]
+
+[project.urls]
+Homepage = "https://github.com/nlm-project/nlm"
+Documentation = "https://nlm.readthedocs.io"
+Repository = "https://github.com/nlm-project/nlm.git"
+
+[tool.scikit-build]
+cmake.minimum-version = "3.16"
+cmake.build-type = "Release"
+cmake.args = [
+    "-DCMAKE_CXX_STANDARD=20",
+    "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
+    "-DPYTHON_EXECUTABLE={python}",
+]
+
+[tool.scikit-build.cmake.define]
+NLM_SOURCE_DIR = "src"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
