@@ -119,6 +119,11 @@ float Neuron::getLastSpikeTime() const {
     return pImpl->state.lastSpikeTime;
 }
 
+bool Neuron::isFiring() const {
+    // Neuron is considered "firing" if it's in Refractory state
+    return pImpl->state.firingState == FiringState::Refractory;
+}
+
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
