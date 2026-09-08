@@ -160,6 +160,41 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Advanced configuration methods
+        .def("set", py::overload_cast<const std::string&, const ConfigValue&, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value")
+        .def("set", py::overload_cast<const std::string&, const std::string&, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value (string)")
+        .def("set", py::overload_cast<const std::string&, int, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value (int)")
+        .def("set", py::overload_cast<const std::string&, double, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value (double)")
+        .def("set", py::overload_cast<const std::string&, bool, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value (bool)")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove configuration key")
+        .def("get", &Config::get<std::string>, py::arg("key"),
+             "Get configuration value as string (optional)")
+        .def("getOr", &Config::getOr<std::string>, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value as string, or return default if not found")
+        // Add more get overloads for other types
+        .def("get", &Config::get<int64_t>, py::arg("key"),
+             "Get configuration value as int64 (optional)")
+        .def("getOr", &Config::getOr<int64_t>, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value as int64, or return default if not found")
+        .def("get", &Config::get<double>, py::arg("key"),
+             "Get configuration value as double (optional)")
+        .def("getOr", &Config::getOr<double>, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value as double, or return default if not found")
+        .def("get", &Config::get<bool>, py::arg("key"),
+             "Get configuration value as bool (optional)")
+        .def("getOr", &Config::getOr<bool>, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value as bool, or return default if not found")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });

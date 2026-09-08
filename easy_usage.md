@@ -14,6 +14,49 @@ That's it! NLM simulates all of this.
 
 ---
 
+## Quick Setup and Installation
+
+### Prerequisites
+
+- **Python**: 3.8+ (for Python bindings)
+- **Build Tools**: CMake 3.16+ and a C++ compiler
+- **Optional**: Visual Studio Code with C++ extensions for debugging
+
+### Installation Steps
+
+```bash
+# Install Python dependencies
+pip install pybind11 scikit-build-core pytest numpy
+
+# Build and install the Python package
+pip install .
+
+# Or install in development mode (for modifying source)
+pip install -e .
+
+# Build the C++ demo applications (optional)
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+### Verify Installation
+
+```python
+import pynlm
+
+print("NLM Python bindings version:", getattr(pynlm, '__version__', 'Unknown'))
+print("Available functions:", [f for f in dir(pynlm) if not f.startswith('_')])
+
+# Create a simple brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+```
+
+---
+
 ## The 3 Things You Need to Know
 
 1. **Brain** - The virtual brain that thinks
