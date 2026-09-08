@@ -144,22 +144,45 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
+        .def("set", (void (Config::*)(const std::string&, const ConfigValue&, ConfigSource)) &Config::set, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value")
+        .def("set", (void (Config::*)(const std::string&, const std::string&, ConfigSource)) &Config::set, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value")
+        .def("set", (void (Config::*)(const std::string&, int, ConfigSource)) &Config::set, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value")
+        .def("set", (void (Config::*)(const std::string&, double, ConfigSource)) &Config::set, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value")
+        .def("set", (void (Config::*)(const std::string&, bool, ConfigSource)) &Config::set, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value")
+        .def("get", static_cast<std::optional<int> (Config::*)(const std::string&) const> (&Config::get<int>), py::arg("key"),
+             "Get an integer configuration value")
+        .def("get", static_cast<std::optional<double> (Config::*)(const std::string&) const> (&Config::get<double>), py::arg("key"),
+             "Get a double configuration value")
+        .def("get", static_cast<std::optional<bool> (Config::*)(const std::string&) const> (&Config::get<bool>), py::arg("key"),
+             "Get a boolean configuration value")
+        .def("get", static_cast<std::optional<std::string> (Config::*)(const std::string&) const> (&Config::get<std::string>), py::arg("key"),
+             "Get a string configuration value")
+        .def("getOr", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get an integer with default")
+        .def("getOr", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get a double with default")
+        .def("getOr", [](const Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get a boolean with default")
+        .def("getOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get a string with default")
+        .def("has", &Config::has, py::arg("key"), "Check if a configuration key exists")
+        .def("getKeys", &Config::getKeys, "Get all configuration keys")
+        .def("remove", &Config::remove, py::arg("key"), "Remove a configuration key")
+        .def("clear", &Config::clear, "Clear all configuration entries")
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+             "Load configuration from a file")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+             "Save configuration to a file")
+        .def("summary", &Config::summary, "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });

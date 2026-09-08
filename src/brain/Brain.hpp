@@ -18,6 +18,8 @@ class SimulationClock;
 class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
+class NeuralSemanticMemory;
+class NeuralProceduralMemory;
 class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
@@ -28,6 +30,11 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+
+// Inter-regional connection (long-range connectivity)
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -148,6 +155,12 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
+    // Semantic memory - knowledge representation
+    NeuralSemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - skills and habits
+    NeuralProceduralMemory* getProceduralMemory();
+    
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
@@ -184,7 +197,14 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and social behavior
+    Serotonin* getSerotonin();
     std::shared_ptr<const Config> getConfig() const;
     
     // Get random generator

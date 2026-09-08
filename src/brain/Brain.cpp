@@ -112,6 +112,8 @@ struct Brain::Impl {
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        semanticMemory = std::make_unique<NeuralSemanticMemory>();
+        proceduralMemory = std::make_unique<NeuralProceduralMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -238,6 +240,14 @@ bool Brain::initialize() {
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
+    
+    // Initialize semantic memory
+    pImpl->semanticMemory = std::make_unique<NeuralSemanticMemory>();
+    pImpl->semanticMemory->initialize(this);
+    
+    // Initialize procedural memory
+    pImpl->proceduralMemory = std::make_unique<NeuralProceduralMemory>();
+    pImpl->proceduralMemory->initialize(this);
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
@@ -582,9 +592,39 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
+    // ========== STEP 16: Sleep/rest cycle ==========
+    pImpl->isResting = pImpl->developmentSystem && pImpl->developmentSystem->shouldSleep(currentTime);
+    if (pImpl->isResting) {
+        // During sleep, consolidate memories and replay experiences
+        if (currentStep % 1000 == 0 && pImpl->episodicMemory) {
+            // Memory consolidation during sleep
+            pImpl->episodicMemory->consolidate(0.3f);
+        }
+        if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
+            // Replay during sleep
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+        }
+    }
+}
+    
+    // ========== STEP 16: Sleep/rest cycle ==========
+    pImpl->isResting = pImpl->developmentSystem && pImpl->developmentSystem->shouldSleep(currentTime);
+    if (pImpl->isResting) {
+        // During sleep, consolidate memories and replay experiences
+        if (currentStep % 1000 == 0 && pImpl->episodicMemory) {
+            // Memory consolidation during sleep
+            pImpl->episodicMemory->consolidate(0.3f);
+        }
+        if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
+            // Replay during sleep
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+        }
     }
 }
 
@@ -752,9 +792,11 @@ void Brain::reset() {
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
-    // Reset memory systems
+        // Reset memory systems
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
+    if (pImpl->semanticMemory) pImpl->semanticMemory->clear();
+    if (pImpl->proceduralMemory) pImpl->proceduralMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
     
@@ -1003,7 +1045,7 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
+    // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
@@ -1015,6 +1057,14 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+}
+
+NeuralSemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+NeuralProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
@@ -1095,6 +1145,12 @@ void Brain::logStatus() const {
     }
     if (pImpl->episodicMemory) {
         NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    }
+    if (pImpl->semanticMemory) {
+        NLM_LOG_INFO("Semantic memory facts: " + std::to_string(pImpl->semanticMemory->getFactCount()));
+    }
+    if (pImpl->proceduralMemory) {
+        NLM_LOG_INFO("Procedural memory skills: " + std::to_string(pImpl->proceduralMemory->getSkillCount()));
     }
     
     // Neuromodulation status
