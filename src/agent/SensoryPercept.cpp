@@ -7,10 +7,12 @@ SensoryPercept::SensoryPercept()
     , visionHeight_(16)
     , timestamp_(0.0)
 {
-    vision_.resize(16 * 16, 0.0f);
-    touch_.resize(8, 0.0f);
-    internal_.resize(4, 0.0f);
-    proprioception_.resize(6, 0.0f);
+    // Initialize all sensory signal vectors with default values
+    vision_.resize(16 * 16, 0.0f);        // 16x16 grayscale vision grid
+    touch_.resize(8, 0.0f);              // 8 touch/proximity sensors
+    internal_.resize(4, 0.0f);           // 4 internal homeostatic signals
+    proprioception_.resize(6, 0.0f);    // 6 proprioceptive (body position) signals
+    // Audio intentionally left empty (0 elements) - can be enabled if needed
     audio_.resize(0, 0.0f);
 }
 
