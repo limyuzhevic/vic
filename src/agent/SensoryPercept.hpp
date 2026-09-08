@@ -17,9 +17,11 @@ public:
     // Vision: simple grayscale intensity grid (no RGB, no object labels)
     // Format: row-major, values 0.0-1.0
     const std::vector<float>& getVision() const { return vision_; }
-    void setVision(const std::vector<float>& v) { vision_ = v; }
-    size_t getVisionWidth() const { return visionWidth_; }
-    size_t getVisionHeight() const { return visionHeight_; }
+    void setVision(const std::vector<float>& v) { 
+        vision_ = v; 
+        visionWidth_ = 16;  // Default 16x16 vision
+        visionHeight_ = 16;
+    }
     
     // Touch/proximity sensors (binary collision signals)
     const std::vector<float>& getTouch() const { return touch_; }

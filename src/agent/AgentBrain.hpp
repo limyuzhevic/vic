@@ -69,12 +69,82 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced features
+    // Get agent state snapshot for checkpointing
+    std::string getStateSnapshot() const;
+    
+    // Set agent state from snapshot
+    bool restoreStateFromSnapshot(const std::string& snapshot);
+    
+    // Get current agent performance metrics
+    struct PerformanceMetrics {
+        float curiosityLevel = 0.0f;
+        float noveltyLevel = 0.0f;
+        float predictionError = 0.0f;
+        float dopamineLevel = 0.0f;
+        float developmentalStage = 0.0f;
+        uint64_t totalSteps = 0;
+        uint64_t totalSpikes = 0;
+    };
+    
+    PerformanceMetrics getPerformanceMetrics() const;
+    
+    // Enable/disable specific neuromodulators
+    void setNeuromodulatorLevel(float dopamine, float serotonin, float acetylcholine);
+    
+    // Get current neuromodulator levels
+    void getNeuromodulatorLevels(float& dopamine, float& serotonin, float& acetylcholine) const;
+    
+    // Configuration management
+    void setSensoryConfig(const std::string& configJson);
+    void setMotorConfig(const std::string& configJson);
+    std::string getConfigSummary() const;
+    
+    // Debug and monitoring
+    void enableDebugLogging(bool enable) { debugLoggingEnabled_ = enable; }
+    bool isDebugLoggingEnabled() const { return debugLoggingEnabled_; }
+    
+    // Set curiosity threshold for exploration
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = threshold; }
+    float getCuriosityThreshold() const { return curiosityThreshold_; }
+    
+    // Set reward prediction learning rate
+    void setRewardPredictionLearningRate(float rate) { rewardPredictionLearningRate_ = rate; }
+    float getRewardPredictionLearningRate() const { return rewardPredictionLearningRate_; }
+    
+    // Set neuromodulation strength
+    void setNeuromodulationStrength(float strength) { neuromodulationStrength_ = strength; }
+    float getNeuromodulationStrength() const { return neuromodulationStrength_; }
+    
+    // Get number of active neurons by type
+    size_t getActiveMotorNeuronCount() const;
+    size_t getActiveSensoryNeuronCount() const;
+    
+    // Set exploration strategy
+    enum class ExplorationStrategy {
+        None,
+        Random,
+        CuriosityDriven,
+        RewardBased
+    };
+    
+    void setExplorationStrategy(ExplorationStrategy strategy) { explorationStrategy_ = strategy; }
+    ExplorationStrategy getExplorationStrategy() const { return explorationStrategy_; }
+    
+    // Enable/disable curiosity-based exploration
+    void setCuriosityExploration(bool enable) { curiosityExplorationEnabled_ = enable; }
+    bool isCuriosityExplorationEnabled() const { return curiosityExplorationEnabled_; }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Internal helper methods
+    void clearNeuronGroups();
+    void validateNeuronGroups() const;
     
     std::shared_ptr<Brain> brain_;
     
@@ -94,6 +164,8 @@ private:
     
     // Neuromodulation state
     float dopamineLevel_;
+    float serotoninLevel_;
+    float acetylcholineLevel_;
     float noveltyLevel_;
     float curiosityLevel_;
     float predictionError_;
@@ -108,10 +180,36 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool debugLoggingEnabled_;
+    bool curiosityExplorationEnabled_;
+    
+    // Additional configuration
+    float curiosityThreshold_;
+    float rewardPredictionLearningRate_;
+    float neuromodulationStrength_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Performance tracking
+    uint64_t totalSteps_;
+    uint64_t totalSpikes_;
+    mutable uint64_t debugCounter_;
+    
+    // Exploration strategy
+    ExplorationStrategy explorationStrategy_;
+    
+    // Performance metrics cache
+    mutable PerformanceMetrics cachedMetrics_;
+    mutable bool metricsDirty_;
+    
+    // Internal helpers
+    static std::string serializeState(const AgentBrain& agent);
+    static bool deserializeState(AgentBrain& agent, const std::string& data);
+    
+    void updateCachedMetrics() const;
+    
+    // Legacy compatibility
+    void migrateLegacyState();
 };
-
-} // namespace nlm
