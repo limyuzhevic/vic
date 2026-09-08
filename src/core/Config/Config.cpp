@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <map>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -19,40 +21,74 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Implement proper JSON parser using nlohmann::json
+    try {
+        // Try to parse as JSON first (Phase 2 requirement)
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Parse JSON content
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Convert JSON to config entries
+        for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+            const std::string& key = it.key();
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Handle different JSON value types
+            if (it->is_string()) {
+                set(key, it->get<std::string>(), ConfigSource::File);
+            } else if (it->is_number_integer()) {
+                set(key, it->get<int64_t>(), ConfigSource::File);
+            } else if (it->is_number_float()) {
+                set(key, it->get<double>(), ConfigSource::File);
+            } else if (it->is_boolean()) {
+                set(key, it->get<bool>(), ConfigSource::File);
+            } else if (it->is_array()) {
+                // For arrays, store as string representation for now
+                // TODO: Implement proper array support
+                set(key, it->dump(), ConfigSource::File);
+            }
+        }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        // If JSON parsing fails, fall back to simple key=value format
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '\"' && value.back() == '\"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        
+        return true;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -79,17 +115,71 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    try {
+        // Use nlohmann::json for proper serialization
+        nlohmann::json jsonData;
+        
+        // Convert config entries to JSON
+        for (const auto& entry : pImpl->entries) {
+            // Convert value to appropriate JSON type
+            std::visit([&jsonData, &entry](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, int>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, int64_t>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    jsonData[entry.key] = arg;
+                }
+            }, entry.value);
+        }
+        
+        // Write JSON to file
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        file << jsonData.dump(2); // Pretty print with 2-space indentation
+        return true;
+        
+    } catch (const std::exception& e) {
+        // Fall back to simple key=value format
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            // Convert value to string representation
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, int> || 
+                             std::is_same_v<T, int64_t> ||
+                             std::is_same_v<T, double> ||
+                             std::is_same_v<T, bool>) {
+                    file << entry.key << " = " << arg << "\n";
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    file << entry.key << " = \"" << arg << "\"\n";
+                } else {
+                    file << entry.key << " = " << arg << "\n";
+                }
+            }, entry.value);
+        }
+        
+        return true;
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
 }
 
 template<typename T>
@@ -212,4 +302,38 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
-} // namespace nlm
+// Add validation for configuration parameters
+bool Config::validate() const {
+    bool valid = true;
+    
+    for (const auto& entry : pImpl->entries) {
+        const std::string& key = entry.key;
+        
+        // Parameter-specific validation
+        if (key == "neuron_count") {
+            if (std::holds_alternative<int64_t>(entry.value)) {
+                int64_t count = std::get<int64_t>(entry.value);
+                if (count <= 0) {
+                    // TODO: Add logging for validation errors
+                    valid = false;
+                }
+            }
+        } else if (key == "connection_probability") {
+            if (std::holds_alternative<double>(entry.value)) {
+                double prob = std::get<double>(entry.value);
+                if (prob < 0.0 || prob > 1.0) {
+                    valid = false;
+                }
+            }
+        } else if (key == "simulation_timestep") {
+            if (std::holds_alternative<double>(entry.value)) {
+                double timestep = std::get<double>(entry.value);
+                if (timestep <= 0.0) {
+                    valid = false;
+                }
+            }
+        }
+    }
+    
+    return valid;
+}
