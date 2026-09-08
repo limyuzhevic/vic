@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Action.hpp"
+#include <memory>
+#include <vector>
 
 namespace nlm {
 
@@ -19,6 +21,12 @@ public:
     
     // Clone
     std::unique_ptr<Observation> clone() const;
+    
+    // Position-based reward computation helpers
+    bool getPositionAvailable() const;
+    float getX() const;
+    float getY() const;
+    const char* getType() const;
     
 private:
     std::unique_ptr<SensoryInput> sensoryInput_;

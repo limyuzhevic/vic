@@ -15,6 +15,8 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/neuromodulation/Reward.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -133,6 +135,28 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Interact", MotorCommand::Interact)
         .value("Wait", MotorCommand::Wait)
         .export_values();
+
+    // Add Hebbian plasticity rule
+    py::class_<Hebbian>(m, "Hebbian", R"pbdoc(Hebbian plasticity rule)pbdoc")
+        .def(py::init<>())
+        .def("update", &Hebbian::update, py::arg("synapse"), py::arg("pre_spikes"), py::arg("post_spikes"), py::arg("dt"))
+        .def("applyWeightChange", &Hebbian::applyWeightChange, py::arg("synapse"), py::arg("delta"))
+        .def("getName", &Hebbian::getName)
+        .def("setLearningRate", &Hebbian::setLearningRate, py::arg("rate"))
+        .def("getLearningRate", &Hebbian::getLearningRate)
+        .def("setMaxWeight", &Hebbian::setMaxWeight, py::arg("maxWeight"))
+        .def("getMaxWeight", &Hebbian::getMaxWeight);
+
+    // Add Reward neuromodulation
+    py::class_<Reward>(m, "Reward", R"pbdoc(Reward neuromodulation system)pbdoc")
+        .def(py::init<>())
+        .def("getValue", &Reward::getValue)
+        .def("setValue", &Reward::setValue, py::arg("value"))
+        .def("add", &Reward::add, py::arg("delta"))
+        .def("reset", &Reward::reset)
+        .def("computeReward", &Reward::computeReward, py::arg("observation"))
+        .def("getHistory", &Reward::getHistory)
+        .def("clearHistory", &Reward::clearHistory);
 
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
         .value("Empty", WorldObjectType::Empty)
