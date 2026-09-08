@@ -20,6 +20,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Safety check - ensure brain exists
+    if (!brain_) {
+        throw std::runtime_error("AgentBrain initialized with null brain!");
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
