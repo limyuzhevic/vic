@@ -129,6 +129,12 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -286,9 +292,79 @@ bool Brain::initialize() {
         }
     });
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+// Configure checkpoint manager
+        std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+        
+        // Set providers for checkpoint manager
+        pImpl->checkpointManager->setNeuronProvider([this](NeuronCheckpointData& data) {
+            // Gather neuron state data from all regions and populations
+            data.membranePotential.reserve(getTotalNeuronCount());
+            data.restingPotential.reserve(getTotalNeuronCount());
+            data.threshold.reserve(getTotalNeuronCount());
+            data.resetPotential.reserve(getTotalNeuronCount());
+            data.leakConductance.reserve(getTotalNeuronCount());
+            data.firingState.reserve(getTotalNeuronCount());
+            data.refractoryRemaining.reserve(getTotalNeuronCount());
+            data.refractoryPeriod.reserve(getTotalNeuronCount());
+            data.lastSpikeTime.reserve(getTotalNeuronCount());
+            data.neuronType.reserve(getTotalNeuronCount());
+            data.regionId.reserve(getTotalNeuronCount());
+            data.populationId.reserve(getTotalNeuronCount());
+            
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        data.membranePotential.push_back(state.membranePotential);
+                        data.restingPotential.push_back(state.restingPotential);
+                        data.threshold.push_back(state.threshold);
+                        data.resetPotential.push_back(state.resetPotential);
+                        data.leakConductance.push_back(state.leakConductance);
+                        data.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                        data.refractoryRemaining.push_back(state.refractoryRemaining);
+                        data.refractoryPeriod.push_back(state.refractoryPeriod);
+                        data.lastSpikeTime.push_back(state.lastSpikeTime);
+                        data.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                        data.regionId.push_back(static_cast<uint64_t>(neuron->getRegionId().index()));
+                        data.populationId.push_back(static_cast<uint64_t>(neuron->getPopulationId().index()));
+                    }
+                }
+            }
+            
+            return !data.membranePotential.empty();
+        });
+        
+        pImpl->checkpointManager->setSynapseProvider([this](SynapseCheckpointData& data) {
+            // Gather synapse state data from all regions
+            data.sourceNeuron.reserve(getTotalSynapseCount());
+            data.destinationNeuron.reserve(getTotalSynapseCount());
+            data.weight.reserve(getTotalSynapseCount());
+            data.delay.reserve(getTotalSynapseCount());
+            data.synapseType.reserve(getTotalSynapseCount());
+            data.plasticityFlags.reserve(getTotalSynapseCount());
+            data.eligibilityTrace.reserve(getTotalSynapseCount());
+            data.efficacy.reserve(getTotalSynapseCount());
+            data.shortTermDepression.reserve(getTotalSynapseCount());
+            data.shortTermFacilitation.reserve(getTotalSynapseCount());
+            
+            for (const auto& region : pImpl->regions) {
+                for (const auto* syn : region->getSynapses()) {
+                    data.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                    data.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                    data.weight.push_back(syn->getWeight());
+                    data.delay.push_back(syn->getDelay());
+                    data.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                    data.plasticityFlags.push_back(static_cast<uint8_t>(syn->getPlasticityFlags()));
+                    data.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                    data.efficacy.push_back(syn->getEfficacy());
+                    data.shortTermDepression.push_back(syn->getShortTermDepression());
+                    data.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
+                }
+            }
+            
+            return !data.sourceNeuron.empty();
+        });
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
