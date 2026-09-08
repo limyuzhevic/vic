@@ -64,6 +64,9 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
+    // Export to JSON format
+    bool exportToJson(const std::string& filepath) const;
+    
     // Get values
     template<typename T>
     std::optional<T> get(const std::string& key) const;

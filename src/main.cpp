@@ -1,51 +1,337 @@
-// NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
-//
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
-
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
-#include "brain/Brain.hpp"
-#include "brain/Neuron.hpp"
-#include "brain/Synapse.hpp"
-#include "sensory/SensoryInput.hpp"
-#include "motor/Action.hpp"
-#include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
-
 #include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <algorithm>
+#include <sstream>
+#include <nlohmann/json.hpp>
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printBanner();
+void printHelp();
+void printVersion();
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain);
+void runPlasticityExperiment(std::shared_ptr<Brain> brain);
+void runStdpVerification(std::shared_ptr<Brain> brain);
+
+// Helper functions for argument parsing
+bool hasFlag(const std::vector<std::string>& args, const std::string& flag) {
+    return std::find(args.begin(), args.end(), flag) != args.end();
+}
+
+std::string getFlagValue(const std::vector<std::string>& args, const std::string& flag) {
+    auto it = std::find(args.begin(), args.end(), flag);
+    if (it != args.end() && std::next(it) != args.end()) {
+        return *(std::next(it));
+    }
+    return "";
+}
+
+std::string extractFlagValue(const std::string& arg) {
+    if (arg.find('=') != std::string::npos) {
+        return arg.substr(arg.find('=') + 1);
+    }
+    return "";
+}
+
+// Improved error handling for config loading
+void printConfigError(const std::string& filename, const std::string& error) {
+    std::cout << "Error loading configuration file: " << filename << std::endl;
+    std::cout << "  " << error << std::endl;
+    std::cout << "  Using default configuration instead." << std::endl;
+}
+
+void printConfigLineError(const std::string& filename, int lineNum, const std::string& error) {
+    std::cout << "Error in configuration file: " << filename << std::endl;
+    std::cout << "  Line " << lineNum << ": " << error << std::endl;
+}
+
+void printConfigValidationError(const std::string& param, const std::string& error) {
+    std::cout << "  ✗ Invalid parameter '" << param << "': " << error << std::endl;
+}
+
+void printHelp() {
+    std::cout << "Usage: nlm [options]" << std::endl << std::endl;
+    std::cout << "NLM - Neural Learning Machine (Phase 2: Real Neural Computation)" << std::endl;
+    std::cout << "An experimental artificial developmental brain with real spiking neurons." << std::endl << std::endl;
+    
+    std::cout << "Options:" << std::endl;
+    std::cout << "  -h, --help                    Show this help message and exit" << std::endl;
+    std::cout << "  -v, --version                 Show version information and exit" << std::endl;
+    std::cout << "  --config=file                Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --list-configs               Print all available configuration options with descriptions" << std::endl;
+    std::cout << "  --validate-config             Validate current configuration and exit" << std::endl;
+    std::cout << "  --config-template            Generate a configuration template and exit" << std::endl;
+    std::cout << "  --log-level=LEVEL            Set log level (Debug, Info, Warning, Error, Critical)" << std::endl;
+    std::cout << "  --log-to-file[=FILE]          Enable logging to file (optional: specify filename)" << std::endl;
+    std::cout << "  --log-no-colors              Disable colored console output" << std::endl;
+    std::cout << "  --config-save=file           Save current configuration to file" << std::endl;
+    std::cout << "  --config-export=file         Export configuration in JSON format" << std::endl;
+    std::cout << "  --test-plasticity            Run quick plasticity verification test" << std::endl;
+    std::cout << "  --test-connectivity          Run basic neural connectivity test" << std::endl;
+    std::cout << "  --test-stdp                  Run STDP mechanism verification" << std::endl;
+    std::cout << "  --help-advanced              Show advanced options and configuration details" << std::endl;
+    
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm --help                  # Show help" << std::endl;
+    std::cout << "  nlm --version               # Show version" << std::endl;
+    std::cout << "  nlm --config=myconfig.cfg   # Load custom config" << std::endl;
+    std::cout << "  nlm --list-configs          # See all available options" << std::endl;
+    std::cout << "  nlm --validate-config       # Validate config file" << std::endl;
+    std::cout << "  nlm --test-plasticity       # Quick plasticity test" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM v2.0.0 (Phase 2: Real Neural Computation)" << std::endl;
+    std::cout << "Copyright (c) 2025 NLM Research Team" << std::endl;
+    std::cout << "All rights reserved." << std::endl << std::endl;
+    std::cout << "Features:" << std::endl;
+    std::cout << "  - Leaky Integrate-and-Fire (LIF) neurons" << std::endl;
+    std::cout << "  - Event-driven spike propagation with delays" << std::endl;
+    std::cout << "  - Spike-Timing Dependent Plasticity (STDP)" << std::endl;
+    std::cout << "  - Hebbian learning rules" << std::endl;
+    std::cout << "  - Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << "  - Neuromodulation (dopamine, curiosity, novelty)" << std::endl;
+    std::cout << "  - Working memory and episodic memory" << std::endl;
+    std::cout << "  - Predictive processing and planning" << std::endl;
+    std::cout << "  - Developmental stages (critical period, maturation, aging)" << std::endl;
+}
+
+void listConfigOptions() {
+    std::cout << "Available Configuration Options:" << std::endl << std::endl;
+    
+    std::cout << "=== Core Configuration ===" << std::endl;
+    std::cout << "  random_seed (int64)          - Random seed for reproducible experiments" << std::endl;
+    std::cout << "  simulation_timestep (double) - Simulation timestep in seconds" << std::endl;
+    std::cout << "  neuron_count (int64)         - Total number of neurons in the brain" << std::endl;
+    std::cout << "  region_count (int64)         - Number of brain regions" << std::endl;
+    std::cout << "  connection_probability (float) - Probability of connection between neurons" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "=== Plasticity Configuration ===" << std::endl;
+    std::cout << "  stdp_ltp_weight (float)      - STDP Long-Term Potentiation weight" << std::endl;
+    std::cout << "  stdp_ltd_weight (float)      - STDP Long-Term Depression weight" << std::endl;
+    std::cout << "  stdp_tau (float)             - STDP time constant (ms)" << std::endl;
+    std::cout << "  synaptogenesis_rate (float)   - Rate of new synapse creation" << std::endl;
+    std::cout << "  pruning_rate (float)         - Rate of synapse elimination" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "=== Neuromodulation Configuration ===" << std::endl;
+    std::cout << "  dopamine_baseline (float)    - Baseline dopamine level" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "=== Reward Configuration ===" << std::endl;
+    std::cout << "  reward_discount_factor (float) - Reward discount factor for temporal difference learning" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "=== Environment Configuration ===" << std::endl;
+    std::cout << "  environment_name (string)     - Name of the environment (e.g., GridWorld)" << std::endl;
+    std::cout << "  environment_width (int)       - World width in cells" << std::endl;
+    std::cout << "  environment_height (int)      - World height in cells" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "=== Logging Configuration ===" << std::endl;
+    std::cout << "  log_level (string)           - Log level (Debug, Info, Warning, Error, Critical)" << std::endl;
+    std::cout << "  log_to_file (bool)           - Enable logging to file" << std::endl;
+    std::cout << "  log_filename (string)        - Log file name" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "=== Simulation Configuration ===" << std::endl;
+    std::cout << "  max_simulation_steps (int64) - Maximum number of simulation steps" << std::endl;
+    std::cout << "  simulation_time_limit (double) - Maximum simulation time in seconds" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "=== Visualization Configuration ===" << std::endl;
+    std::cout << "  visualization_enabled (bool)  - Enable visualization" << std::endl;
+    std::cout << "  visualization_update_rate (float) - Visualization update rate (Hz)" << std::endl;
+    std::cout << std::endl;
+}
+
+void validateConfig(const Config& config) {
+    std::cout << "Validating Configuration..." << std::endl << std::endl;
+    
+    bool isValid = true;
+    
+    // Check required parameters
+    if (!config.has("random_seed")) {
+        std::cout << "  ✗ Missing required parameter: random_seed" << std::endl;
+        isValid = false;
+    }
+    
+    if (!config.has("simulation_timestep")) {
+        std::cout << "  ✗ Missing required parameter: simulation_timestep" << std::endl;
+        isValid = false;
+    } else {
+        double timestep = config.getOr<double>("simulation_timestep", 0.001);
+        if (timestep <= 0.0) {
+            std::cout << "  ✗ Invalid simulation_timestep: must be positive" << std::endl;
+            isValid = false;
+        }
+    }
+    
+    if (!config.has("neuron_count")) {
+        std::cout << "  ✗ Missing required parameter: neuron_count" << std::endl;
+        isValid = false;
+    } else {
+        int64_t neuronCount = config.getOr<int64_t>("neuron_count", 1000);
+        if (neuronCount <= 0) {
+            std::cout << "  ✗ Invalid neuron_count: must be positive" << std::endl;
+            isValid = false;
+        }
+    }
+    
+    if (!config.has("region_count")) {
+        std::cout << "  ✗ Missing required parameter: region_count" << std::endl;
+        isValid = false;
+    }
+    
+    // Check plasticity parameters
+    if (!config.has("stdp_ltp_weight")) {
+        std::cout << "  ✗ Missing STDP parameter: stdp_ltp_weight" << std::endl;
+        isValid = false;
+    }
+    
+    if (!config.has("stdp_ltd_weight")) {
+        std::cout << "  ✗ Missing STDP parameter: stdp_ltd_weight" << std::endl;
+        isValid = false;
+    }
+    
+    if (!config.has("stdp_tau")) {
+        std::cout << "  ✗ Missing STDP parameter: stdp_tau" << std::endl;
+        isValid = false;
+    }
+    
+    // Check structural plasticity parameters
+    if (!config.has("synaptogenesis_rate")) {
+        std::cout << "  ✗ Missing structural plasticity parameter: synaptogenesis_rate" << std::endl;
+        isValid = false;
+    }
+    
+    if (!config.has("pruning_rate")) {
+        std::cout << "  ✗ Missing structural plasticity parameter: pruning_rate" << std::endl;
+        isValid = false;
+    }
+    
+    // Check environment parameters
+    if (!config.has("environment_name")) {
+        std::cout << "  ✗ Missing environment parameter: environment_name" << std::endl;
+        isValid = false;
+    }
+    
+    if (!config.has("environment_width")) {
+        std::cout << "  ✗ Missing environment parameter: environment_width" << std::endl;
+        isValid = false;
+    } else {
+        int width = config.getOr<int>("environment_width", 10);
+        if (width <= 0) {
+            std::cout << "  ✗ Invalid environment_width: must be positive" << std::endl;
+            isValid = false;
+        }
+    }
+    
+    if (!config.has("environment_height")) {
+        std::cout << "  ✗ Missing environment parameter: environment_height" << std::endl;
+        isValid = false;
+    } else {
+        int height = config.getOr<int>("environment_height", 10);
+        if (height <= 0) {
+            std::cout << "  ✗ Invalid environment_height: must be positive" << std::endl;
+            isValid = false;
+        }
+    }
+    
+    if (isValid) {
+        std::cout << "✓ Configuration is valid!" << std::endl;
+    } else {
+        std::cout << "✗ Configuration has errors that must be fixed." << std::endl;
+    }
+    
+    std::cout << std::endl;
+}
+
+void generateConfigTemplate() {
+    std::cout << "Generating Configuration Template..." << std::endl << std::endl;
+    
+    std::cout << "# NLM Configuration Template" << std::endl;
+    std::cout << "# Copy this template and customize the values as needed" << std::endl;
+    std::cout << "# Save as 'myconfig.cfg' or any other filename" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "# === Core Configuration ===" << std::endl;
+    std::cout << "random_seed = 42" << std::endl;
+    std::cout << "simulation_timestep = 0.001" << std::endl;
+    std::cout << "neuron_count = 1000" << std::endl;
+    std::cout << "region_count = 2" << std::endl;
+    std::cout << "connection_probability = 0.1" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "# === Plasticity Configuration ===" << std::endl;
+    std::cout << "stdp_ltp_weight = 0.01" << std::endl;
+    std::cout << "stdp_ltd_weight = 0.012" << std::endl;
+    std::cout << "stdp_tau = 20.0" << std::endl;
+    std::cout << "synaptogenesis_rate = 0.001" << std::endl;
+    std::cout << "pruning_rate = 0.0001" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "# === Neuromodulation Configuration ===" << std::endl;
+    std::cout << "dopamine_baseline = 0.1" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "# === Reward Configuration ===" << std::endl;
+    std::cout << "reward_discount_factor = 0.99" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "# === Environment Configuration ===" << std::endl;
+    std::cout << "environment_name = GridWorld" << std::endl;
+    std::cout << "environment_width = 10" << std::endl;
+    std::cout << "environment_height = 10" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "# === Logging Configuration ===" << std::endl;
+    std::cout << "log_level = INFO" << std::endl;
+    std::cout << "log_to_file = false" << std::endl;
+    std::cout << "log_filename = nlm.log" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "# === Simulation Configuration ===" << std::endl;
+    std::cout << "max_simulation_steps = 10000" << std::endl;
+    std::cout << "simulation_time_limit = 0.0" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "# === Visualization Configuration ===" << std::endl;
+    std::cout << "visualization_enabled = false" << std::endl;
+    std::cout << "visualization_update_rate = 30.0" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "# === Usage Notes ===" << std::endl;
+    std::cout << "# - All parameters are optional (defaults will be used for missing values)" << std::endl;
+    std::cout << "# - Modify values as needed for your specific use case" << std::endl;
+    std::cout << "# - Save with .cfg extension and use --config=yourfile.cfg to load" << std::endl;
+    std::cout << "# - Use --validate-config to check for errors after modification" << std::endl;
+}
+
+void saveCurrentConfig(const Config& config, const std::string& filepath) {
+    std::cout << "Saving current configuration to: " << filepath << std::endl;
+    
+    if (config.saveToFile(filepath)) {
+        std::cout << "✓ Configuration saved successfully!" << std::endl;
+    } else {
+        std::cout << "✗ Failed to save configuration!" << std::endl;
+    }
+}
+
+void exportConfigToJson(const Config& config, const std::string& filepath) {
+    std::cout << "Exporting configuration to JSON: " << filepath << std::endl;
+    
+    if (config.exportToJson(filepath)) {
+        std::cout << "✓ Configuration exported successfully to JSON format!" << std::endl;
+    } else {
+        std::cout << "✗ Failed to export configuration to JSON!" << std::endl;
+    }
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -301,8 +587,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
     }
     
     // Check if weights increased (LTP)
@@ -343,28 +629,165 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
+    // Parse command line arguments
+    std::vector<std::string> args;
     for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+        args.push_back(argv[i]);
+    }
+    
+    // Handle help flag
+    if (hasFlag(args, "-h") || hasFlag(args, "--help") || hasFlag(args, "-?") || hasFlag(args, "--help-advanced")) {
+        printHelp();
+        return 0;
+    }
+    
+    // Handle version flag
+    if (hasFlag(args, "-v") || hasFlag(args, "--version")) {
+        printVersion();
+        return 0;
+    }
+    
+    // Handle list-configs flag
+    if (hasFlag(args, "--list-configs")) {
+        printHelp();
+        listConfigOptions();
+        return 0;
+    }
+    
+    // Handle validate-config flag
+    if (hasFlag(args, "--validate-config")) {
+        printHelp();
+        validateConfig(*config);
+        return 0;
+    }
+    
+    // Handle config-template flag
+    if (hasFlag(args, "--config-template")) {
+        printHelp();
+        generateConfigTemplate();
+        return 0;
+    }
+    
+    // Handle config file loading
+    std::string configFile = "configs/default.cfg";
+    for (size_t i = 0; i < args.size(); ++i) {
+        std::string arg = args[i];
+        if (arg.find("--config=") == 0) {
+            configFile = arg.substr(9);
+        } else if (arg == "--config" && i + 1 < args.size()) {
+            configFile = args[i + 1];
+            i++; // Skip next argument
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    // Load config from file with improved error handling
+    bool configLoaded = config->loadFromFile(configFile);
+    if (!configLoaded) {
+        printConfigError(configFile, "File not found or invalid format");
+        configFile = "configs/default.cfg";
+        std::cout << "Attempting to load default configuration..." << std::endl;
+        
+        if (!config->loadFromFile(configFile)) {
+            printConfigError(configFile, "Default configuration file not found");
+            std::cout << "Error: No valid configuration file found. Exiting." << std::endl;
+            return 1;
+        }
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Loaded configuration from: " + configFile);
     }
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
+    
+    // Handle log-level flag
+    for (size_t i = 0; i < args.size(); ++i) {
+        std::string arg = args[i];
+        if (arg.find("--log-level=") == 0) {
+            std::string levelStr = arg.substr(12);
+            LogLevel level;
+            if (levelStr == "Debug") level = LogLevel::Debug;
+            else if (levelStr == "Info") level = LogLevel::Info;
+            else if (levelStr == "Warning") level = LogLevel::Warning;
+            else if (levelStr == "Error") level = LogLevel::Error;
+            else if (levelStr == "Critical") level = LogLevel::Critical;
+            else {
+                std::cout << "Invalid log level: " << levelStr << ". Using Info." << std::endl;
+                level = LogLevel::Info;
+            }
+            consoleLogger->setLevel(level);
+        }
+    }
+    
+    // Handle log-to-file flag
+    for (size_t i = 0; i < args.size(); ++i) {
+        std::string arg = args[i];
+        if (arg == "--log-to-file" || arg.find("--log-to-file=") == 0) {
+            std::string filename = "nlm.log";
+            if (arg.find("--log-to-file=") == 0) {
+                filename = arg.substr(16);
+            }
+            consoleLogger->setOutputFile(filename);
+        } else if (arg == "--log-no-colors") {
+            consoleLogger->setUseColors(false);
+        }
+    }
+    
+    // Handle config-save flag
+    for (size_t i = 0; i < args.size(); ++i) {
+        std::string arg = args[i];
+        if (arg.find("--config-save=") == 0) {
+            std::string saveFile = arg.substr(15);
+            saveCurrentConfig(*config, saveFile);
+        }
+    }
+    
+    // Handle config-export flag
+    for (size_t i = 0; i < args.size(); ++i) {
+        std::string arg = args[i];
+        if (arg.find("--config-export=") == 0) {
+            std::string exportFile = arg.substr(17);
+            exportConfigToJson(*config, exportFile);
+        }
+    }
+    
+    // Handle test flags (run quick tests instead of full simulation)
+    bool runConnectivityTest = hasFlag(args, "--test-connectivity");
+    bool runPlasticityTest = hasFlag(args, "--test-plasticity");
+    bool runStdpTest = hasFlag(args, "--test-stdp");
+    
+    if (runConnectivityTest || runPlasticityTest || runStdpTest) {
+        NLM_LOG_INFO("Running quick test mode...");
+        
+        if (runConnectivityTest) {
+            // Initialize brain and run connectivity test
+            auto brain = std::make_shared<Brain>(config);
+            if (brain->initialize()) {
+                brain->logStatus();
+                runBasicConnectivityTest(brain);
+                brain->reset();
+            }
+        }
+        
+        if (runPlasticityTest) {
+            auto brain = std::make_shared<Brain>(config);
+            if (brain->initialize()) {
+                runPlasticityExperiment(brain);
+                brain->reset();
+            }
+        }
+        
+        if (runStdpTest) {
+            auto brain = std::make_shared<Brain>(config);
+            if (brain->initialize()) {
+                runStdpVerification(brain);
+                brain->reset();
+            }
+        }
+        
+        std::cout << std::endl;
+        std::cout << "Quick tests completed!" << std::endl;
+        return 0;
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
