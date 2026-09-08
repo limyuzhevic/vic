@@ -59,6 +59,11 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     for (auto& ep : episodes_) {
         ep.age++;
     }
+    
+    // Store in associated memory for pattern completion
+    if (brain_) {
+        brain_->getAssociativeMemory()->associateFromExperience(episode);
+    }
 }
 
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveSimilar(

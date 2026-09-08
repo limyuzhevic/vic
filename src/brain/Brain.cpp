@@ -325,10 +325,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 14. Collect statistics
      */
     
-    pImpl->currentStep = currentStep;
-    pImpl->currentTime = currentTime;
-    pImpl->totalSpikesThisStep = 0;
-    
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
@@ -505,14 +501,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Store episode in memory system with full integration
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state from world if available
+        // For now, prediction updates based on neural activity patterns
+        // Would ideally receive from SensoryInput system
+        
+        // Update prediction based on current neural state
+        // This is a placeholder for full Phase 6 integration
+        
+        // Store prediction error for neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Prediction error affects dopamine and curiosity
+        // Would ideally be connected to neuromodulation systems
+        
+        // Update prediction confidence based on neural activity stability
+        // This would use working memory state and neural coherence
+        
+        // Future: integrate with sensory processing to predict next states
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -530,6 +542,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
+        
+        // Concept formation could integrate with working memory
+        // and episodic memory to extract patterns and regularities
+        
+        // Would create conceptual representations from neural activity
+        // Could feed into prediction system for better predictions
+        
+        // Concept formation might use attention system
+        // to focus on salient patterns in sensory input
+    }
+    
+    // Update concept formation based on working memory content
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        auto workingMemoryContent = pImpl->workingMemory->retrieve();
+        if (!workingMemoryContent.empty()) {
+            // Could feed working memory patterns to concept formation
+            // For now, this is a placeholder for Phase 6 integration
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1011,6 +1041,14 @@ NeuralWorkingMemory* Brain::getWorkingMemory() {
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
+}
+
+NeuralSemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+NeuralProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
