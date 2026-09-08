@@ -170,7 +170,14 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        .def("toString", [](const SensoryInput& self) {
+            std::stringstream ss;
+            ss << "SensoryInput(type=" << static_cast<int>(self.getType())
+               << ", dimensions=" << self.getDimensions()
+               << ", timestamp=" << self.getTimestamp() << ")";
+            return ss.str();
+        }, "Return string representation of sensory input");
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -181,7 +188,19 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("getData", &Vision::getData, "Get vision data as vector")
+        .def("normalize", &Vision::normalize, "Normalize vision data to [0,1] range")
+        .def("scale", &Vision::scale, py::arg("factor"), "Scale vision data by factor")
+        .def("addNoise", &Vision::addNoise, py::arg("noiseLevel"), "Add Gaussian noise to vision data")
+        .def("toString", [](const Vision& self) {
+            std::stringstream ss;
+            ss << "Vision(width=" << self.getWidth()
+               << ", height=" << self.getHeight()
+               << ", channels=" << self.getChannels()
+               << ", data_size=" << self.getData().size() << ")";
+            return ss.str();
+        }, "Return string representation of vision");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -191,12 +210,33 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        .def("getData", &Audio::getData, "Get audio data as vector")
+        .def("normalize", &Audio::normalize, "Normalize audio data to [-1,1] range")
+        .def("applyReverb", [](Audio& self, float decay) {
+            self.applyReverb(decay);
+        }, py::arg("decay"), "Apply reverb effect")
+        .def("toString", [](const Audio& self) {
+            std::stringstream ss;
+            ss << "Audio(sampleRate=" << self.getSampleRate()
+               << ", numSamples=" << self.getNumSamples()
+               << ", data_size=" << self.getData().size() << ")";
+            return ss.str();
+        }, "Return string representation of audio");
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+        .def("clearSignals", &InternalSignals::clearSignals)
+        .def("getSignal", &InternalSignals::getSignal, py::arg("index"), "Get signal at index")
+        .def("getNumSignals", &InternalSignals::getNumSignals, "Get number of signals")
+        .def("normalize", &InternalSignals::normalize, "Normalize signals to [-1, 1] range")
+        .def("addNoise", &InternalSignals::addNoise, py::arg("noiseLevel"), "Add Gaussian noise to signals")
+        .def("toString", [](const InternalSignals& self) {
+            std::stringstream ss;
+            ss << "InternalSignals(numSignals=" << self.getNumSignals() << ")";
+            return ss.str();
+        }, "Return string representation of internal signals");
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -207,7 +247,18 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        .def("toString", [](const Action& self) {
+            std::stringstream ss;
+            ss << "Action(type=" << static_cast<int>(self.getType())
+               << ", params=[";
+            for (size_t i = 0; i < self.getParameters().size(); ++i) {
+                if (i > 0) ss << ", ";
+                ss << self.getParameters()[i];
+            }
+            ss << "]";
+            return ss.str();
+        }, "Return string representation of action");
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -287,7 +338,22 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        .def("getAgentBody", &SimpleWorld::getAgentBody)
+        .def("addWorldObject", [](SimpleWorld& self, float x, float y, WorldObjectType type, float value = 0.0f) {
+            self.addObject(WorldObject(x, y, type, value));
+        }, py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f, "Add object to world")
+        .def("getObjects", &SimpleWorld::getObjects, py::return_value_policy::reference_internal, "Get all objects in world")
+        .def("getObjectCount", &SimpleWorld::getObjectCount, "Get number of objects in world")
+        .def("toString", [](const SimpleWorld& self) {
+            std::stringstream ss;
+            ss << "SimpleWorld(width=" << self.getWidth()
+               << ", height=" << self.getHeight()
+               << ", agent_x=" << self.getAgentBody().x
+               << ", agent_y=" << self.getAgentBody().y
+               << ", sim_time=" << self.getSimulationTime() << ")";
+            return ss.str();
+        }, "Return string representation of world");
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))

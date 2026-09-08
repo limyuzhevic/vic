@@ -12,6 +12,142 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+## Quick Start
+
+The most important method to remember: **`brain.step(step_number)`** - this advances the brain by one simulation step and should be called in your main simulation loop.
+
+## Best Practices
+
+1. **Always initialize**: Call `brain.initialize()` after creating a brain
+2. **Simulation loop**: Use `for step in range(num_steps): brain.step(step)`
+3. **Reset for new simulations**: Call `brain.reset()` when starting a new simulation
+4. **Save checkpoints**: Use `brain.save("checkpoint.bin")` to preserve learned weights
+5. **Enable learning**: Call `agent.enableRewardModulation(True)` to enable learning
+
+## Common Workflow Pattern
+
+Here's the most common pattern for using NLM:
+
+```python
+import pynlm
+
+# 1. Create configuration and brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# 2. (Optional) Create agent and world for interaction
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# 3. Enable learning if needed
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# 4. Run simulation
+for step in range(1000):
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    
+    # Brain thinks
+    brain.step(step)
+    
+    # Get action and apply to world
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply rewards
+    agent.applyRewardModulation(0.0, 0.0)
+    
+    # Update development
+    agent.updateDevelopment(0.1)
+    
+    # Print progress
+    if step % 100 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+# 5. Save results
+brain.save("final_brain.bin")
+print("Simulation complete!")
+```
+
+## Error Handling
+
+If you encounter issues, check:
+
+1. **Brain not initialized**: Make sure you call `brain.initialize()`
+2. **No activity**: Brains need time to warm up - try more steps
+3. **World not updating**: Make sure `world.update()` is called in your loop
+4. **Agent not moving**: Check that `world.applyMotorCommand()` is being called
+
+## Example: Learning Agent
+
+Here's a complete example that demonstrates learning:
+
+```python
+import pynlm
+
+# Create brain with learning enabled
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+
+# Enable all learning subsystems
+agent.enableRewardModulation(True)      # Learn from rewards
+agent.enableStructuralPlasticity(True)  # Grow new connections
+agent.enableDevelopment(True)           # Brain matures over time
+agent.enableCuriosity(True)             # Explore new things
+
+# Run simulation with learning
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    
+    # Get action and apply
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Learn from outcome
+    reward = 0.0  # This would come from your actual task
+    agent.applyRewardModulation(reward, 0.0)
+    
+    # Update development
+    agent.updateDevelopment(0.1)
+
+print("Learning simulation complete!")
+print(f"Final stage: {brain.getDevelopmentalStage()}")
+print(f"Curiosity level: {agent.getCuriosityLevel():.3f}")
+```
+
+## Performance Tips
+
+1. **Use batch operations**: When processing multiple inputs
+2. **Monitor stats**: Use `brain.getFiringNeuronCount()`, `brain.getTotalSpikeCount()`
+3. **Save frequently**: Use checkpoints to avoid re-running long simulations
+4. **Profile slowly**: Start with small simulations to debug issues
+
+## Getting Help
+
+If you're stuck:
+
+1. Read the [HOW_TO_USE.md](HOW_TO_USE.md) for detailed API documentation
+2. Check the [docs/](docs/) directory for architecture and science documentation
+3. Run the demo executables from the build directory
+4. Look at the test files for examples of usage
+
+Remember: NLM is complex but powerful! Start simple and add complexity gradually.
+
 ---
 
 ## The 3 Things You Need to Know
