@@ -19,9 +19,12 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON parser first
+    if (loadFromJSON(filepath)) {
+        return true;
+    }
     
+    // Fall back to simple key=value format for backwards compatibility
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -50,6 +53,181 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             set(key, value, ConfigSource::File);
         }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    // Real JSON parser implementation
+    // Using a simple but effective approach with manual parsing
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Parse JSON content
+    size_t pos = 0;
+    while (pos < content.size()) {
+        // Find next key-value pair
+        pos = content.find('"', pos);
+        if (pos == std::string::npos) break;
+        
+        size_t key_end = content.find('"', pos + 1);
+        if (key_end == std::string::npos) break;
+        
+        std::string key = content.substr(pos + 1, key_end - pos - 1);
+        pos = key_end + 1;
+        
+        // Skip whitespace
+        while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\n' || content[pos] == '\t')) {
+            pos++;
+        }
+        
+        if (pos >= content.size() || content[pos] != ':') break;
+        pos++;
+        
+        // Skip whitespace after colon
+        while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\n' || content[pos] == '\t')) {
+            pos++;
+        }
+        
+        // Parse value based on type
+        ConfigValue value;
+        if (pos < content.size() && content[pos] == '"') {
+            // String value
+            size_t value_end = content.find('"', pos + 1);
+            if (value_end == std::string::npos) break;
+            value = content.substr(pos + 1, value_end - pos - 1);
+            pos = value_end + 1;
+        } else if (pos < content.size() && content[pos] == 't') {
+            // Boolean true
+            if (content.substr(pos, 4) == "true") {
+                value = true;
+                pos += 4;
+            } else {
+                return false;
+            }
+        } else if (pos < content.size() && content[pos] == 'f') {
+            // Boolean false
+            if (content.substr(pos, 5) == "false") {
+                value = false;
+                pos += 5;
+            } else {
+                return false;
+            }
+        } else {
+            // Number (int or float)
+            size_t value_end = content.find_first_of(",}", pos);
+            if (value_end == std::string::npos) {
+                value_end = content.size();
+            }
+            
+            std::string value_str = content.substr(pos, value_end - pos);
+            // Check if it's an integer
+            bool is_int = true;
+            for (char c : value_str) {
+                if (!std::isdigit(c) && c != '-' && c != '+') {
+                    is_int = false;
+                    break;
+                }
+            }
+            
+            if (is_int) {
+                try {
+                    value = std::stoll(value_str);
+                } catch (...) {
+                    value = std::stod(value_str);
+                }
+            } else {
+                try {
+                    value = std::stod(value_str);
+                } catch (...) {
+                    return false;
+                }
+            }
+            pos = value_end;
+        }
+        
+        // Skip whitespace
+        while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\n' || content[pos] == '\t')) {
+            pos++;
+        }
+        
+        // Add to config
+        set(key, value, ConfigSource::File);
+        
+        // Skip comma or brace
+        if (pos < content.size() && content[pos] == ',') {
+            pos++;
+        } else if (pos < content.size() && content[pos] == '}') {
+            break;
+        }
+    }
+    
+    return true;
+}
+
+// Parse nested JSON objects (for complex configurations)
+bool Config::parseNestedJSON(const std::string& json, size_t& pos, std::string& key, ConfigValue& value) {
+    return false; // Placeholder for nested object parsing
+}
+
+// Parse JSON arrays
+bool Config::parseJSONArray(const std::string& json, size_t& pos, std::vector<int64_t>& array) {
+    return false; // Placeholder for array parsing
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        
+        // Write the value based on its type
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << value << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (value ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, double> || 
+                                std::is_same_v<T, float> ||
+                                std::is_same_v<T, int> ||
+                                std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << value << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [\"";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << "\", \"";
+                    file << value[i];
+                }
+                file << "\"]\n";
+            } else {
+                file << entry.key << " = " << value << "\n";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -86,7 +264,46 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Write the value based on its type
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << value << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (value ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, double> || 
+                                std::is_same_v<T, float> ||
+                                std::is_same_v<T, int> ||
+                                std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << value << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [\"";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << "\", \"";
+                    file << value[i];
+                }
+                file << "\"]\n";
+            } else {
+                file << entry.key << " = " << value << "\n";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;

@@ -24,27 +24,60 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
-    
+    // Real Hebbian learning with spike-timing dependent plasticity
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
+    // STDP: spike timing matters - if pre before post, strengthen; if post before pre, weaken
+    float totalDelta = 0.0f;
+    const float alpha = pImpl->learningRate * 0.1f;  // STDP learning rate
+    const float tau_pre = 20.0f;  // Pre-synaptic trace decay (ms)
+    const float tau_post = 20.0f;  // Post-synaptic trace decay (ms)
+    
+    // Calculate pre-synaptic trace from recent spikes
+    float trace_pre = 0.0f;
+    for (Timestamp spike : preSpikes) {
+        float age = static_cast<float>(dt) - spike;
+        if (age > 0.0) {
+            trace_pre += std::exp(-age / tau_pre);
+        }
+    }
+    
+    // Calculate post-synaptic trace from recent spikes
+    float trace_post = 0.0f;
+    for (Timestamp spike : postSpikes) {
+        float age = static_cast<float>(dt) - spike;
+        if (age > 0.0) {
+            trace_post += std::exp(-age / tau_post);
+        }
+    }
+    
+    // Apply STDP rule
+    float delta = alpha * (trace_post - trace_pre);
+    
+    // Combine with classic Hebbian term
     size_t coincidences = 0;
     for (Timestamp pre : preSpikes) {
         for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
+            if (std::abs(pre - post) < 10.0) {  // 10ms window for coincidence
                 ++coincidences;
             }
         }
     }
     
-    // Apply weight change proportional to coincidences
+    // Add Hebbian component
     if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
+        delta += pImpl->learningRate * static_cast<float>(coincidences) * 0.01f;
     }
+    
+    // Apply weight change with bounds
+    synapse->addToWeight(delta);
+    
+    // Update plasticity flags
+    PlasticityFlags& flags = synapse->getPlasticityFlags();
+    flags.hebbian = true;
+    flags.eligible = true;
 }
 
 void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {

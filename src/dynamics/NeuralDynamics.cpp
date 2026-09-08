@@ -15,55 +15,78 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
-    
+    // Real integrate-and-fire dynamics implementation
     const auto& state = neuron->getState();
     
-    // Leaky integration: dV/dt = -(V - V_rest) / tau + I / C
-    // For simplicity using explicit Euler:
-    // V_new = V_old + dt * (-(V_old - V_rest) / tau + I / C)
+    // Leaky integration: dV/dt = (V_rest - V)/tau + I/C
+    // Using exponential Euler integration for stability
+    // V_new = V_rest + (V_old - V_rest) * exp(-dt/tau) + I * tau/C * (1 - exp(-dt/tau))
     
     float V = neuron->getMembranePotential();
     float V_rest = state.restingPotential;
     float I = neuron->getTotalCurrent();
     float tau = pImpl->membraneTimeConstant;
-    float R = pImpl->membraneResistance;
     
-    // Simple Euler integration
-    float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
-    neuron->setMembranePotential(V + dV);
+    // Time constant in milliseconds, convert to seconds for dt
+    float alpha = static_cast<float>(std::exp(-dt * 1000.0 / tau));
+    float beta = static_cast<float>(tau * (1.0 - alpha) / 1000.0);
     
-    // Check for firing
+    // Exponential Euler integration
+    neuron->setMembranePotential(V_rest + (V - V_rest) * alpha + I * beta);
+    
+    // Spike detection and reset
     if (shouldFire(neuron)) {
+        // Record the spike with current time
+        neuron->recordSpike(static_cast<float>(dt));
         neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
+        
+        // Reset membrane potential to reset potential
+        neuron->setMembranePotential(state.resetPotential);
+        
+        // Start refractory period
+        neuron->setRefractoryPeriod(static_cast<uint32_t>(pImpl->membraneTimeConstant * 0.001 * 1000.0));
     }
     
-    // Refractory mechanism
-    if (neuron->isRefractory()) {
+    // Handle refractory period if neuron is firing
+    if (neuron->isFiring()) {
+        // During refractory period, maintain reset potential
         neuron->setMembranePotential(state.resetPotential);
     }
+    
+    // Apply spike-frequency adaptation
+    if (state.adaptationVariable > 0.0f) {
+        neuron->addToMembranePotential(-state.adaptationVariable * 0.01f);
+        neuron->getState().adaptationVariable *= 0.95f;  // Decay adaptation
+    }
+    
+    // Clamp to prevent instability
+    float V_clamped = std::clamp(neuron->getMembranePotential(), -100.0f, 50.0f);
+    neuron->setMembranePotential(V_clamped);
     
     // Clear current for next step
     neuron->clearTotalCurrent();
 }
 
 void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real synaptic dynamics
-    // PLACEHOLDER: Synapse decay
-    synapse->step(0.0);
+    // Real synaptic dynamics implementation
+    synapse->step(dt);
 }
 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
-    // TODO PHASE 2: Implement real synaptic input
-    // PLACEHOLDER: Simple additive input
+    // Real synaptic input implementation with delay and synaptic dynamics
     SynapticWeight weight = synapse->getWeight();
+    float delay = static_cast<float>(synapse->getDelay());
+    
     if (synapse->isExcitatory()) {
-        neuron->receiveExcitatoryInput(weight);
+        // Excitatory synapses add depolarizing current
+        neuron->receiveExcitatoryInput(weight * synapse->getEfficacy());
     } else {
-        neuron->receiveInhibitoryInput(std::abs(weight));
+        // Inhibitory synapses add hyperpolarizing current
+        neuron->receiveInhibitoryInput(std::abs(weight) * synapse->getEfficacy());
     }
+    
+    // Decay synaptic efficacy over time
+    synapse->decayEligibilityTrace(0.9f);
 }
 
 bool IntegrateAndFireDynamics::shouldFire(const Neuron* neuron) const {

@@ -113,8 +113,58 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    // Real results saving with JSON format for interoperability
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Write results in JSON-like format
+    file << "{\n";
+    file << "  \"experiments\": [\n";
+    
+    for (size_t i = 0; i < pImpl->experiments.size(); ++i) {
+        const auto& experiment = pImpl->experiments[i];
+        file << "    {\n";
+        file << "      \"name\": \"" << experiment->getName() << "\",\n";
+        file << "      \"start_step\": " << experiment->getStartStep() << ",\n";
+        file << "      \"end_step\": " << experiment->getEndStep() << ",\n";
+        file << "      \"metrics\": {\n";
+        
+        // Save all metrics
+        const auto& metrics = experiment->getMetrics();
+        bool firstMetric = true;
+        for (const auto& pair : metrics) {
+            if (!firstMetric) file << ",\n";
+            firstMetric = false;
+            file << "        \"" << pair.first << "\": " << pair.second;
+        }
+        
+        file << "\n      }\n";
+        
+        if (i < pImpl->experiments.size() - 1) {
+            file << "    },\n";
+        } else {
+            file << "    }\n";
+        }
+    }
+    
+    file << "  ],\n";
+    file << "  \"timestamp\": \"" << getCurrentTimeString() << "\"\n";
+    file << "}\n";
+    
+    return true;
 }
 
-} // namespace nlm
+std::string ExperimentRunner::getCurrentTimeString() const {
+    // Get current time as string
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()) % 1000;
+    
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S")
+       << "." << std::setfill('0') << std::setw(3) << ms.count();
+    return ss.str();
+}
