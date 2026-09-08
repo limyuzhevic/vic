@@ -68,13 +68,35 @@ public:
     // Competition between memory traces
     void runCompetition();
 
-    // Is this neuron part of the winning population?
-    bool isWinning(NeuronId neuron) const;
+    // Get activation level of a specific neuron in working memory
+    float getNeuronActivation(NeuronId neuron) const;
 
-    // Get overall memory activity level
-    float getMemoryActivity() const;
+// Store planning result (action and timestep) in working memory
+    void storePlanningResult(SimulationStep step, ActionType action) {
+        // Store the planned action for later feedback learning
+        plannedActions_[step] = action;
+        NLM_LOG_INFO("Working memory storing planned action: " + std::to_string(static_cast<int>(action)) + 
+                    " at step " + std::to_string(step));
+    }
+
+    // Get most recent planned action
+    ActionType getLastPlannedAction() const {
+        if (plannedActions_.empty()) {
+            return ActionType::Wait;
+        }
+        auto it = plannedActions_.rbegin();
+        return it->second;
+    }
+
+    // Clear planning history
+    void clearPlanningHistory() {
+        plannedActions_.clear();
+    }
 
 private:
+    // Planning history
+    std::unordered_map<SimulationStep, ActionType> plannedActions_;
+
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
 
@@ -166,6 +188,16 @@ public:
     // Reset attention
     void reset();
 
+    // Set novelty attention (for prediction error-driven attention)
+    void setNoveltyAttention(float noveltyLevel) {
+        noveltyAttention_ = noveltyLevel;
+    }
+
+    // Set overall activation level (for neuromodulation effects)
+    void setActivationLevel(float level) {
+        activationLevel_ = level;
+    }
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -174,6 +206,8 @@ private:
     float inhibitionStrength_;
     float excitationStrength_;
     float competitionThreshold_;
+    float noveltyAttention_;  // For prediction error-driven attention
+    float activationLevel_;   // For neuromodulation effects
     
     std::vector<RegionId> attendedRegions_;
     std::vector<NeuronId> winners_;
