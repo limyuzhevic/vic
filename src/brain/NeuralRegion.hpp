@@ -49,6 +49,9 @@ public:
     size_t getSynapseCount() const;
     const std::vector<std::unique_ptr<Synapse>>& getSynapses() const;
     
+    // Remove synapse from region
+    void removeSynapse(SynapseId synapseId);
+    
     // Connectivity queries
     std::vector<Synapse*> getSynapsesFrom(NeuronId neuron);
     std::vector<Synapse*> getSynapsesTo(NeuronId neuron);
@@ -71,9 +74,9 @@ public:
     
     // Initialize connectivity
     void initializeRandomConnectivity(class RandomGenerator& rng, 
-                                      float connectionProbability,
-                                      float meanWeight,
-                                      float weightVariance);
+                                       float connectionProbability,
+                                       float meanWeight,
+                                       float weightVariance);
     
     // Get all neurons across all populations
     std::vector<Neuron*> getAllNeurons();

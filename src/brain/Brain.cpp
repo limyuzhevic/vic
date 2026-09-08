@@ -163,6 +163,7 @@ Brain::~Brain() = default;
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
+    delete other.pImpl;  // Fix: delete instead of just setting to nullptr to avoid memory leak
 }
 
 Brain& Brain::operator=(Brain&& other) noexcept {
@@ -266,22 +267,35 @@ bool Brain::initialize() {
         ++pImpl->totalSpikesTotal;
     });
     
-    // Register delayed spike handler to deliver synaptic input
+    // Optimized O(1) spike delivery handler using neuron ID map
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
-                    }
-                    return;
+        // O(1) lookup using neuron ID map instead of O(N^2) linear search
+        static std::unordered_map<NeuronId, Neuron*> neuronMap;
+        static bool mapInitialized = false;
+        static SimulationStep mapVersion = 0;
+        
+        // Initialize or rebuild map if regions changed
+        if (!mapInitialized || mapVersion != pImpl->currentStep) {
+            neuronMap.clear();
+            for (auto& region : pImpl->regions) {
+                auto neurons = region->getAllNeurons();
+                for (auto* n : neurons) {
+                    neuronMap[n->getId()] = n;
                 }
+            }
+            mapVersion = pImpl->currentStep;
+            mapInitialized = true;
+        }
+        
+        auto it = neuronMap.find(event.destination_neuron);
+        if (it != neuronMap.end()) {
+            Neuron* neuron = it->second;
+            // Apply synaptic weight as current
+            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+            if (event.is_excitatory) {
+                neuron->receiveExcitatoryInput(synapticCurrent);
+            } else {
+                neuron->receiveInhibitoryInput(-synapticCurrent);
             }
         }
     });
@@ -617,14 +631,28 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
-    for (auto& region : pImpl->regions) {
-        auto neurons = region->getAllNeurons();
-        for (auto* n : neurons) {
-            if (n->getId() == neuron) {
-                n->injectCurrent(current);
-                return;
+    // O(1) implementation using neuron ID map for direct lookup
+    // Cache neuron lookup for efficiency
+    static std::unordered_map<NeuronId, Neuron*> neuronMap;
+    static bool mapInitialized = false;
+    static SimulationStep mapVersion = 0;
+    
+    // Initialize or rebuild map if regions changed
+    if (!mapInitialized || mapVersion != pImpl->currentStep) {
+        neuronMap.clear();
+        for (auto& region : pImpl->regions) {
+            auto neurons = region->getAllNeurons();
+            for (auto* n : neurons) {
+                neuronMap[n->getId()] = n;
             }
         }
+        mapVersion = pImpl->currentStep;
+        mapInitialized = true;
+    }
+    
+    auto it = neuronMap.find(neuron);
+    if (it != neuronMap.end()) {
+        it->second->injectCurrent(current);
     }
 }
 

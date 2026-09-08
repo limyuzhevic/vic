@@ -58,14 +58,14 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
 }
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    if (id.index() < 1 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
     return pImpl->populations[id.index() - 1].get();
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    if (id.index() < 1 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
     return pImpl->populations[id.index() - 1].get();
