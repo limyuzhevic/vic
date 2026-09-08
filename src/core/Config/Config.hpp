@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -58,11 +60,17 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from JSON/YAML
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Save to file (JSON/YAML format)
+    bool saveToFile(const std::string& filepath) const;
+    bool saveToJSON(const std::string& filepath) const;
+    bool saveToYAML(const std::string& filepath) const;
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
-    
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
     
     // Get values
     template<typename T>
@@ -93,13 +101,41 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Internal helpers
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    
+    // Description management
+    void setDescription(const std::string& key, const std::string& description);
+    std::string getDescription(const std::string& key) const;
+    
+    // Validation
+    bool validate() const;
+    
+    // Merge configurations
+    bool merge(const Config& other);
+    
+    // Dump configuration for debugging
+    void dump() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    void parseJSON(const nlohmann::json& jsonData);
+    void parseYAML(const YAML::Node& yamlData);
+    void setFromJSONValue(const std::string& key, const nlohmann::json& value);
+    void setFromYAMLValue(const std::string& key, const YAML::Node& value);
+    std::string getValueAsString(const ConfigValue& value) const;
+    std::string getFileExtension(const std::string& filepath) const;
+    bool isNumericString(const std::string& str) const;
+    bool hasDecimalPoint(const std::string& str) const;
+    std::string arrayToString(const std::vector<std::string>& items) const;
+    
+    // Legacy format support
+    bool loadFromSimpleFormat(const std::string& filepath);
+    bool saveToSimpleFormat(const std::string& filepath) const;
 };
 
 } // namespace nlm
