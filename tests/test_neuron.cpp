@@ -147,6 +147,162 @@ void testReset() {
     std::cout << "    testReset passed" << std::endl;
 }
 
+void testLIFDynamics() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Set realistic biological parameters
+    neuron.setThreshold(-55.0f);
+    neuron.setLeakConductance(0.1f);
+    neuron.setRefractoryPeriod(5);
+    
+    // Simulate input current
+    neuron.injectCurrent(10.0f);
+    
+    // Simulate membrane potential dynamics for 10 timesteps
+    float timeStep = 0.001f;  // 1ms timestep
+    int steps = 10;
+    for (int i = 0; i < steps; ++i) {
+        // Check if neuron would fire
+        if (neuron.checkThreshold()) {
+            neuron.setFiringState(nlm::FiringState::Active);
+            neuron.recordSpike(static_cast<float>(i) * timeStep);
+            neuron.setMembranePotential(neuron.getResetPotential());
+            neuron.setRefractoryPeriod(5);
+        }
+        
+        // Update membrane potential with leak
+        float delta = neuron.getTotalCurrent() * timeStep - 
+                      neuron.getLeakConductance() * 
+                      (neuron.getMembranePotential() - neuron.getRestingPotential()) * timeStep;
+        neuron.addToMembranePotential(delta);
+        
+        // Decrement refractory period
+        neuron.decrementRefractory();
+        
+        // Clear current for next timestep
+        neuron.clearTotalCurrent();
+    }
+    
+    // Verify dynamics
+    assert(!neuron.getSpikeHistory().empty());
+    assert(neuron.getFiringRate() < 100.0f);  // Reasonable firing rate
+    
+    std::cout << "    testLIFDynamics passed" << std::endl;
+}
+
+void testRefractoryPeriod() {
+    nlm::Neuron neuron(nlm::NeuronId(2));
+    
+    neuron.setRefractoryPeriod(10);
+    neuron.setFiringState(nlm::FiringState::Refractory);
+    
+    assert(neuron.isRefractory());
+    assert(!neuron.isFiring());
+    
+    // Decrement to first 4 steps
+    neuron.decrementRefractory();
+    neuron.decrementRefractory();
+    neuron.decrementRefractory();
+    neuron.decrementRefractory();
+    assert(neuron.isRefractory());
+    
+    // Decrement to last step
+    neuron.decrementRefractory();
+    assert(!neuron.isRefractory());
+    assert(neuron.getFiringState() == nlm::FiringState::Resting);
+    
+    // Test that neuron can fire after refractory period
+    neuron.injectCurrent(20.0f);
+    neuron.setFiringState(nlm::FiringState::Active);
+    assert(neuron.checkThreshold());
+    
+    std::cout << "    testRefractoryPeriod passed" << std::endl;
+}
+
+void testSpikeTiming() {
+    nlm::Neuron neuron(nlm::NeuronId(3));
+    
+    // Test spike history with precise timing
+    const float baseTime = 10.0f;
+    neuron.recordSpike(baseTime + 0.0f);
+    neuron.recordSpike(baseTime + 5.0f);
+    neuron.recordSpike(baseTime + 15.0f);
+    neuron.recordSpike(baseTime + 25.0f);
+    
+    auto spikes = neuron.getSpikeHistory();
+    assert(spikes.size() == 4);
+    assert(spikes[0] == baseTime + 0.0f);
+    assert(spikes[1] == baseTime + 5.0f);
+    assert(spikes[2] == baseTime + 15.0f);
+    assert(spikes[3] == baseTime + 25.0f);
+    
+    // Test inter-spike intervals
+    float isi1 = spikes[1] - spikes[0];
+    float isi2 = spikes[2] - spikes[1];
+    float isi3 = spikes[3] - spikes[2];
+    
+    assert(isi1 > 0.0f && isi1 < 10.0f);
+    assert(isi2 > 5.0f && isi2 < 20.0f);
+    assert(isi3 > 5.0f && isi3 < 20.0f);
+    
+    std::cout << "    testSpikeTiming passed" << std::endl;
+}
+
+void testSynapticIntegration() {
+    nlm::Neuron neuron(nlm::NeuronId(4));
+    
+    // Simulate excitatory and inhibitory inputs
+    neuron.receiveExcitatoryInput(5.0f);  // +5mV
+    neuron.receiveInhibitoryInput(2.0f);  // -2mV
+    neuron.injectCurrent(10.0f);  // External current
+    
+    // Get membrane potential after inputs
+    float currentPotential = neuron.getMembranePotential();
+    
+    // The neuron should have integrated these inputs
+    // Note: In real implementation, this would depend on specific integration model
+    assert(neuron.getTotalCurrent() == 10.0f);  // External current preserved
+    
+    std::cout << "    testSynapticIntegration passed" << std::endl;
+}
+
+void testNeuronTypeSpecificBehavior() {
+    nlm::Neuron excitatory(nlm::NeuronId(5));
+    nlm::Neuron inhibitory(nlm::NeuronId(6));
+    
+    excitatory.setType(nlm::NeuronType::Excitatory);
+    inhibitory.setType(nlm::NeuronType::Inhibitory);
+    
+    assert(excitatory.getType() == nlm::NeuronType::Excitatory);
+    assert(inhibitory.getType() == nlm::NeuronType::Inhibitory);
+    
+    // Test type-specific initialization
+    excitatory.initializeRandom(nlm::RandomGenerator(42));
+    inhibitory.initializeRandom(nlm::RandomGenerator(42));
+    
+    // Excitatory neurons typically have different parameters
+    assert(excitatory.getThreshold() < -50.0f);  // Typically higher threshold
+    assert(inhibitory.getThreshold() < -55.0f);
+    
+    std::cout << "    testNeuronTypeSpecificBehavior passed" << std::endl;
+}
+
+void testRegionPopulationMembership() {
+    nlm::Neuron neuron(nlm::NeuronId(7));
+    
+    neuron.setRegionId(nlm::RegionId(1));
+    neuron.setPopulationId(nlm::PopulationId(1));
+    
+    assert(neuron.getRegionId() == nlm::RegionId(1));
+    assert(neuron.getPopulationId() == nlm::PopulationId(1));
+    
+    // Test region and population identification
+    assert(neuron.getRegionId().index() > 0);
+    assert(neuron.getPopulationId().index() > 0);
+    
+    std::cout << "    testRegionPopulationMembership passed" << std::endl;
+}
+
 void runAll() {
     testNeuronCreation();
     testNeuronType();

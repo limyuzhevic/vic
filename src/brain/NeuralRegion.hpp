@@ -46,6 +46,7 @@ public:
                          SynapticWeight weight = 0.0f, Delay delay = 1);
     Synapse* getSynapse(SynapseId id);
     const Synapse* getSynapse(SynapseId id) const;
+    bool removeSynapse(SynapseId id);
     size_t getSynapseCount() const;
     const std::vector<std::unique_ptr<Synapse>>& getSynapses() const;
     

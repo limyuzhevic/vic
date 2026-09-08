@@ -1,10 +1,13 @@
 // STDP Tests
+// Phase 2: Real Neural Computation Tests - Spike-Timing-Dependent Plasticity
+
 #include "brain/Synapse.hpp"
 #include "plasticity/STDP.hpp"
 #include "core/Random/Random.hpp"
 #include <cassert>
 #include <iostream>
 #include <cmath>
+#include <algorithm>
 
 namespace test_stdp {
 
@@ -145,6 +148,176 @@ void testSTDPWeightBounds() {
     std::cout << "    testSTDPWeightBounds passed" << std::endl;
 }
 
+void testSTDPTimeConstant() {
+    nlm::STDP stdp;
+    
+    // Test different time constants
+    stdp.setTimeConstant(10.0f);
+    assert(stdp.getTimeConstant() == 10.0f);
+    
+    stdp.setTimeConstant(50.0f);
+    assert(stdp.getTimeConstant() == 50.0f);
+    
+    // Test bounds
+    stdp.setTimeConstant(0.5f);  // Below minimum
+    assert(stdp.getTimeConstant() == 1.0f);  // Should be clamped to min
+    
+    stdp.setTimeConstant(1000.0f);  // Above maximum
+    assert(stdp.getTimeConstant() == 100.0f);  // Should be clamped to max
+    
+    std::cout << "    testSTDPTimeConstant passed" << std::endl;
+}
+
+void testSTDPParameterBounds() {
+    nlm::STDP stdp;
+    
+    // Test LTP weight bounds
+    stdp.setLTPWeight(-1.0f);  // Below minimum
+    assert(stdp.getLTPWeight() == 0.0f);  // Should be clamped to min
+    
+    stdp.setLTPWeight(5.0f);   // Above maximum
+    assert(stdp.getLTPWeight() == 1.0f);  // Should be clamped to max
+    
+    // Test LTD weight bounds
+    stdp.setLTDWeight(-1.0f);
+    assert(stdp.getLTDWeight() == 0.0f);
+    
+    stdp.setLTDWeight(5.0f);
+    assert(stdp.getLTDWeight() == 1.0f);
+    
+    std::cout << "    testSTDPParameterBounds passed" << std::endl;
+}
+
+void testSTDPSpikeTimingVariations() {
+    nlm::STDP stdp;
+    
+    nlm::Synapse synapse(nlm::SynapseId(5), nlm::NeuronId(9), nlm::NeuronId(10));
+    synapse.setType(nlm::SynapseType::Excitatory);
+    synapse.setWeight(0.5f);
+    
+    float initialWeight = synapse.getWeight();
+    
+    // Test very small dt (should have significant effect)
+    std::vector<nlm::Timestamp> preSpikes = {0.0};
+    std::vector<nlm::Timestamp> postSpikes = {0.5};  // 0.5ms after pre
+    
+    stdp.update(&synapse, preSpikes, postSpikes, 0.001);
+    float weightAfterSmallDt = synapse.getWeight();
+    
+    // Reset
+    synapse.setWeight(0.5f);
+    
+    // Test large dt (should have minimal effect)
+    preSpikes = {0.0};
+    postSpikes = {100.0};  // 100ms after pre
+    
+    stdp.update(&synapse, preSpikes, postSpikes, 0.001);
+    float weightAfterLargeDt = synapse.getWeight();
+    
+    // Small dt should produce larger potentiation than large dt
+    assert(weightAfterSmallDt > weightAfterLargeDt);
+    
+    std::cout << "    testSTDPSpikeTimingVariations passed" << std::endl;
+}
+
+void testSTDPConnectionType() {
+    nlm::STDP stdp;
+    
+    // Test that STDP works differently for different synapse types
+    // Excitatory synapse
+    nlm::Synapse excitatorySynapse(nlm::SynapseId(6), nlm::NeuronId(11), nlm::NeuronId(12));
+    excitatorySynapse.setType(nlm::SynapseType::Excitatory);
+    excitatorySynapse.setWeight(0.5f);
+    
+    std::vector<nlm::Timestamp> preSpikes = {0.0};
+    std::vector<nlm::Timestamp> postSpikes = {5.0};
+    
+    stdp.update(&excitatorySynapse, preSpikes, postSpikes, 0.001);
+    float excitatoryWeightAfter = excitatorySynapse.getWeight();
+    
+    // Inhibitory synapse
+    nlm::Synapse inhibitorySynapse(nlm::SynapseId(7), nlm::NeuronId(13), nlm::NeuronId(14));
+    inhibitorySynapse.setType(nlm::SynapseType::Inhibitory);
+    inhibitorySynapse.setWeight(0.5f);
+    
+    stdp.update(&inhibitorySynapse, preSpikes, postSpikes, 0.001);
+    float inhibitoryWeightAfter = inhibitorySynapse.getWeight();
+    
+    // Both should change, but may do so differently based on type
+    assert(inhibitoryWeightAfter != 0.5f);  // Should change due to STDP
+    
+    std::cout << "    testSTDPConnectionType passed" << std::endl;
+}
+
+void testSTDPLearningRate() {
+    nlm::STDP stdp;
+    
+    nlm::Synapse synapse(nlm::SynapseId(8), nlm::NeuronId(15), nlm::NeuronId(16));
+    synapse.setType(nlm::SynapseType::Excitatory);
+    synapse.setWeight(0.5f);
+    
+    float initialWeight = synapse.getWeight();
+    
+    // Test with high learning rate
+    stdp.setLTPWeight(0.1f);   // Higher potentiation
+    stdp.setLTDWeight(0.12f);  // Higher depression
+    
+    std::vector<nlm::Timestamp> preSpikes = {0.0};
+    std::vector<nlm::Timestamp> postSpikes = {5.0};
+    
+    stdp.update(&synapse, preSpikes, postSpikes, 0.001);
+    float weightAfterHighRate = synapse.getWeight();
+    
+    // Reset
+    synapse.setWeight(0.5f);
+    
+    // Test with low learning rate
+    stdp.setLTPWeight(0.001f);   // Lower potentiation
+    stdp.setLTDWeight(0.0012f);  // Lower depression
+    
+    stdp.update(&synapse, preSpikes, postSpikes, 0.001);
+    float weightAfterLowRate = synapse.getWeight();
+    
+    // High learning rate should produce larger changes
+    assert(std::abs(weightAfterHighRate - initialWeight) > 
+           std::abs(weightAfterLowRate - initialWeight));
+    
+    std::cout << "    testSTDPLearningRate passed" << std::endl;
+}
+
+void testSTDPIntegration() {
+    nlm::STDP stdp;
+    
+    nlm::Synapse synapse(nlm::SynapseId(9), nlm::NeuronId(17), nlm::NeuronId(18));
+    synapse.setType(nlm::SynapseType::Excitatory);
+    synapse.setWeight(0.3f);
+    synapse.enablePlasticity(true, false, false);  // Only STDP enabled
+    
+    std::vector<nlm::Timestamp> preSpikes = {0.0, 5.0, 10.0};
+    std::vector<nlm::Timestamp> postSpikes = {2.0, 7.0, 12.0};
+    
+    // Record weight before
+    float weightBefore = synapse.getWeight();
+    
+    // Update with STDP enabled
+    stdp.update(&synapse, preSpikes, postSpikes, 0.001);
+    
+    float weightAfter = synapse.getWeight();
+    assert(weightAfter != weightBefore);  // Should have changed
+    
+    // Now disable STDP
+    synapse.enablePlasticity(false, false, false);
+    synapse.setWeight(0.3f);  // Reset
+    
+    weightBefore = synapse.getWeight();
+    stdp.update(&synapse, preSpikes, postSpikes, 0.001);
+    weightAfter = synapse.getWeight();
+    
+    assert(weightAfter == weightBefore);  // Should not change when STDP disabled
+    
+    std::cout << "    testSTDPIntegration passed" << std::endl;
+}
+
 void runAll() {
     std::cout << "Running STDP tests..." << std::endl;
     testSTDPCreation();
@@ -155,6 +328,12 @@ void runAll() {
     testSTDPDepression();
     testSTDPEmptySpikes();
     testSTDPWeightBounds();
+    testSTDPTimeConstant();
+    testSTDPParameterBounds();
+    testSTDPSpikeTimingVariations();
+    testSTDPConnectionType();
+    testSTDPLearningRate();
+    testSTDPIntegration();
 }
 
 } // namespace test_stdp

@@ -1,7 +1,11 @@
 // Config Tests
+// Phase 2: Real Neural Computation Tests - Configuration System
+
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 
 namespace test_config {
 
@@ -79,6 +83,7 @@ void testConfigKeys() {
 }
 
 void runAll() {
+    std::cout << "Running Config tests..." << std::endl;
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();

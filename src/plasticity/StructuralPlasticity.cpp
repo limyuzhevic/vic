@@ -44,8 +44,51 @@ SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source,
         return INVALID_SYNAPSE_ID;
     }
     
-    // Find the region containing the destination neuron
+    // Validate that both neurons exist in the brain and are in the same region
+    // Find region containing source neuron
+    NeuralRegion* sourceRegion = nullptr;
     for (auto& region : brain->getRegions()) {
+        auto neurons = region->getAllNeurons();
+        for (auto* neuron : neurons) {
+            if (neuron->getId() == source) {
+                sourceRegion = region.get();
+                break;
+            }
+        }
+        if (sourceRegion) break;
+    }
+    
+    if (!sourceRegion) {
+        return INVALID_SYNAPSE_ID;  // Source neuron doesn't exist
+    }
+    
+    // Find region containing destination neuron
+    NeuralRegion* destinationRegion = nullptr;
+    for (auto& region : brain->getRegions()) {
+        auto neurons = region->getAllNeurons();
+        for (auto* neuron : neurons) {
+            if (neuron->getId() == destination) {
+                destinationRegion = region.get();
+                break;
+            }
+        }
+        if (destinationRegion) break;
+    }
+    
+    if (!destinationRegion) {
+        return INVALID_SYNAPSE_ID;  // Destination neuron doesn't exist
+    }
+    
+    // Synapses must be created within the same region
+    if (sourceRegion != destinationRegion) {
+        return INVALID_SYNAPSE_ID;  // Neurons are in different regions
+    }
+    
+    // Find and create synapse in the region containing both neurons
+    for (auto& region : brain->getRegions()) {
+        // Check if this is the region where both neurons exist
+        if (region.get() != sourceRegion) continue;
+        
         auto synapsesTo = region->getSynapsesTo(destination);
         
         // Check if connection already exists
@@ -57,16 +100,16 @@ SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source,
         
         // Check max synapses limit
         if (region->getSynapseCount() >= pImpl->maxTotalSynapses) {
-            return INVALID_SYNAPSE_ID;
+            continue;  // Skip region if at capacity
         }
         
         // Count outgoing synapses from source in this region
         auto synapsesFrom = region->getSynapsesFrom(source);
         if (synapsesFrom.size() >= pImpl->maxSynapsesPerNeuron) {
-            continue;  // Try next region
+            continue;  // Try next region (should be same as source region)
         }
         
-        // Create the synapse
+        // Create the synapse in the correct region
         SynapseId synId = region->addSynapse(source, destination, weight, 1);
         if (synId != INVALID_SYNAPSE_ID) {
             ++pImpl->totalSynapsesCreated;
@@ -86,9 +129,8 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
     for (auto& region : brain->getRegions()) {
         Synapse* syn = region->getSynapse(synapse);
         if (syn) {
-            // For now, we mark the synapse for removal by zeroing its weight
-            // Actual removal would require modifying the region's synapse storage
-            syn->setWeight(0.0f);
+            // Remove synapse from region's storage
+            region->removeSynapse(synapse);
             ++pImpl->totalSynapsesPruned;
             return true;
         }

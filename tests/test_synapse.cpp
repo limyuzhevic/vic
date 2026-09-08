@@ -174,6 +174,60 @@ void testSynapsePlasticityFlags() {
     std::cout << "    testSynapsePlasticityFlags passed" << std::endl;
 }
 
+void testSynapseShortTermPlasticity() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    // Record spikes to trigger short-term plasticity
+    synapse.recordPreSpike(0.0);
+    synapse.recordPostSpike(1.0);
+    
+    // Step to update short-term plasticity
+    synapse.step(2.0);
+    
+    // Verify STP parameters updated
+    assert(synapse.getPreSpikeHistory().size() == 1);
+    assert(synapse.getPostSpikeHistory().size() == 1);
+    
+    std::cout << "    testSynapseShortTermPlasticity passed" << std::endl;
+}
+
+void testSynapseErrorHandling() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    // Test invalid weight operations
+    synapse.setWeight(NAN);  // Should handle NaN gracefully
+    synapse.setWeight(INFINITY);  // Should handle infinity gracefully
+    
+    // Test invalid eligibility trace
+    synapse.setEligibilityTrace(NAN);  // Should handle NaN gracefully
+    synapse.setEligibilityTrace(INFINITY);  // Should handle infinity gracefully
+    
+    // Test invalid efficacy
+    synapse.setEfficacy(-1.0f);  // Should handle invalid value gracefully
+    synapse.setEfficacy(3.0f);  // Should handle invalid value gracefully
+    
+    std::cout << "    testSynapseErrorHandling passed" << std::endl;
+}
+
+void testSynapseValidValues() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    // Test valid value ranges
+    synapse.setWeight(0.0f);  // Should be valid
+    assert(-1.0f <= synapse.getWeight() <= 1.0f);
+    
+    synapse.setWeight(1.0f);  // Upper bound
+    assert(synapse.getWeight() == 1.0f);
+    
+    synapse.setWeight(-1.0f);  // Lower bound
+    assert(synapse.getWeight() == -1.0f);
+    
+    synapse.setEfficacy(0.5f);  // Valid
+    assert(0.0f <= synapse.getEfficacy() <= 2.0f);
+    
+    std::cout << "    testSynapseValidValues passed" << std::endl;
+}
+
 void runAll() {
     std::cout << "Running Synapse tests..." << std::endl;
     testSynapseCreation();

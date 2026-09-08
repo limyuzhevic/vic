@@ -1,6 +1,9 @@
 #include "NeuralRegion.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <stdexcept>
+#include <cmath>
+#include <numeric>
 
 namespace nlm {
 
@@ -16,23 +19,49 @@ struct NeuralRegion::Impl {
     explicit Impl(RegionId id) : id(id), nextSynapseId(1) {}
 };
 
-NeuralRegion::NeuralRegion(RegionId id) : pImpl(new Impl(id)) {}
-
-NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(new Impl(id)) {
-    pImpl->name = name;
+NeuralRegion::NeuralRegion(RegionId id) {
+    // Validate region ID
+    if (id == INVALID_REGION_ID) {
+        NLM_LOG_ERROR("NeuralRegion: Cannot create region with invalid ID");
+        throw std::invalid_argument("Region ID is invalid");
+    }
+    
+    pImpl.reset(new Impl(id));
+    NLM_LOG_DEBUG("NeuralRegion: Created region with ID " + std::to_string(id.index()));
 }
 
-NeuralRegion::~NeuralRegion() = default;
+NeuralRegion::NeuralRegion(RegionId id, const std::string& name) {
+    // Validate inputs
+    if (id == INVALID_REGION_ID) {
+        NLM_LOG_ERROR("NeuralRegion: Cannot create region with invalid ID");
+        throw std::invalid_argument("Region ID is invalid");
+    }
+    
+    if (name.empty()) {
+        NLM_LOG_WARNING("NeuralRegion: Creating region with empty name");
+    }
+    
+    pImpl.reset(new Impl(id));
+    pImpl->name = name;
+    NLM_LOG_DEBUG("NeuralRegion: Created region with ID " + std::to_string(id.index()) + 
+                 " (name: " + name + ")");
+}
 
-NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(other.pImpl) {
+NeuralRegion::~NeuralRegion() {
+    pImpl.reset();
+}
+
+NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(std::move(other.pImpl)) {
     other.pImpl = nullptr;
+    NLM_LOG_DEBUG("NeuralRegion: Move constructor completed");
 }
 
 NeuralRegion& NeuralRegion::operator=(NeuralRegion&& other) noexcept {
     if (this != &other) {
         delete pImpl;
-        pImpl = other.pImpl;
+        pImpl = std::move(other.pImpl);
         other.pImpl = nullptr;
+        NLM_LOG_DEBUG("NeuralRegion: Move assignment completed");
     }
     return *this;
 }
@@ -72,10 +101,19 @@ const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
 }
 
 size_t NeuralRegion::getPopulationCount() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("NeuralRegion: Cannot get population count - pImpl is null");
+        return 0;
+    }
     return pImpl->populations.size();
 }
 
 const std::vector<std::unique_ptr<NeuralPopulation>>& NeuralRegion::getPopulations() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("NeuralRegion: Cannot get populations - pImpl is null");
+        static const std::vector<std::unique_ptr<NeuralPopulation>> empty;
+        return empty;
+    }
     return pImpl->populations;
 }
 
@@ -111,47 +149,41 @@ Synapse* NeuralRegion::getSynapse(SynapseId id) {
     return nullptr;
 }
 
-const Synapse* NeuralRegion::getSynapse(SynapseId id) const {
-    for (auto& syn : pImpl->synapses) {
-        if (syn->getId() == id) {
-            return syn.get();
+bool NeuralRegion::removeSynapse(SynapseId id) {
+    // Find synapse in the synapse vector
+    auto it = std::find_if(pImpl->synapses.begin(), pImpl->synapses.end(),
+        [id](const std::unique_ptr<Synapse>& syn) { return syn->getId() == id; });
+    
+    if (it == pImpl->synapses.end()) {
+        return false; // Synapse not found
+    }
+    
+    // Get source and destination before removing
+    SynapseId sourceId = (*it)->getSourceNeuron();
+    SynapseId destId = (*it)->getDestinationNeuron();
+    
+    // Remove from synapses vector
+    pImpl->synapses.erase(it);
+    
+    // Remove from outgoing synapse map
+    auto outIt = pImpl->outgoingSynapses.find(sourceId);
+    if (outIt != pImpl->outgoingSynapses.end()) {
+        outIt->second.erase(std::remove(outIt->second.begin(), outIt->second.end(), id), outIt->second.end());
+        if (outIt->second.empty()) {
+            pImpl->outgoingSynapses.erase(outIt);
         }
     }
-    return nullptr;
-}
-
-size_t NeuralRegion::getSynapseCount() const {
-    return pImpl->synapses.size();
-}
-
-const std::vector<std::unique_ptr<Synapse>>& NeuralRegion::getSynapses() const {
-    return pImpl->synapses;
-}
-
-std::vector<Synapse*> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
-    std::vector<Synapse*> result;
-    auto it = pImpl->outgoingSynapses.find(neuron);
-    if (it != pImpl->outgoingSynapses.end()) {
-        for (SynapseId synId : it->second) {
-            if (auto* syn = getSynapse(synId)) {
-                result.push_back(syn);
-            }
+    
+    // Remove from incoming synapse map
+    auto inIt = pImpl->incomingSynapses.find(destId);
+    if (inIt != pImpl->incomingSynapses.end()) {
+        inIt->second.erase(std::remove(inIt->second.begin(), inIt->second.end(), id), inIt->second.end());
+        if (inIt->second.empty()) {
+            pImpl->incomingSynapses.erase(inIt);
         }
     }
-    return result;
-}
-
-std::vector<Synapse*> NeuralRegion::getSynapsesTo(NeuronId neuron) {
-    std::vector<Synapse*> result;
-    auto it = pImpl->incomingSynapses.find(neuron);
-    if (it != pImpl->incomingSynapses.end()) {
-        for (SynapseId synId : it->second) {
-            if (auto* syn = getSynapse(synId)) {
-                result.push_back(syn);
-            }
-        }
-    }
-    return result;
+    
+    return true;
 }
 
 size_t NeuralRegion::getTotalNeuronCount() const {

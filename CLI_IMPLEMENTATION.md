@@ -1,6 +1,3 @@
-// Main entry point for NLM command-line interface
-// Provides comprehensive CLI with support for configuration, tests, simulation, and profiling
-
 #include "core/Config/Config.hpp"
 #include "core/Logger/Logger.hpp"
 #include "brain/Brain.hpp"
