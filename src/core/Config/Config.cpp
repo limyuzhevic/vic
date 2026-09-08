@@ -8,9 +8,13 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    bool validationEnabled = true;
+    std::vector<std::string> validationErrors;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    pImpl->validationEnabled = true;
+}
 
 Config::~Config() = default;
 
@@ -186,20 +190,314 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+// Validation implementations
+void Config::enableValidation(bool enable) {
+    pImpl->validationEnabled = enable;
+    pImpl->validationErrors.clear();
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+bool Config::isValidationEnabled() const {
+    return pImpl->validationEnabled;
 }
 
-// Explicit template instantiations
+bool Config::validate() const {
+    pImpl->validationErrors.clear();
+    bool valid = true;
+    
+    if (!checkDuplicateKeys()) valid = false;
+    if (!validateParameterRanges()) valid = false;
+    if (!checkParameterConsistency()) valid = false;
+    
+    return valid;
+}
+
+std::string Config::validateAndGetErrors() const {
+    pImpl->validationErrors.clear();
+    validate();
+    return pImpl->validationErrors.empty() ? "All configurations are valid." : "Validation failed:\n" + joinErrors();
+}
+
+bool Config::checkDuplicateKeys() const {
+    bool valid = true;
+    std::vector<std::string> seenKeys;
+    
+    for (const auto& entry : pImpl->entries) {
+        bool isDuplicate = false;
+        for (const auto& key : seenKeys) {
+            if (toLower(key) == toLower(entry.key)) {
+                isDuplicate = true;
+                break;
+            }
+        }
+        
+        if (isDuplicate) {
+            std::string error = "Duplicate key: '" + entry.key + "' (first appeared at source " + 
+                               std::to_string(static_cast<int>(entry.source)) + ")";
+            pImpl->validationErrors.push_back(error);
+            valid = false;
+        } else {
+            seenKeys.push_back(entry.key);
+        }
+    }
+    
+    return valid;
+}
+
+bool Config::validateParameterRanges() const {
+    bool valid = true;
+    
+    for (const auto& entry : pImpl->entries) {
+        std::string error;
+        if (!validateParameter(entry.key, entry.value, error)) {
+            pImpl->validationErrors.push_back(error);
+            valid = false;
+        }
+    }
+    
+    return valid;
+}
+
+bool Config::checkParameterConsistency() const {
+    bool valid = true;
+    
+    // Check plasticity parameters for consistency
+    auto plasticityEnabled = get<bool>("plasticity_enabled");
+    auto learningRate = get<double>("learning_rate");
+    auto decayRate = get<double>("decay_rate");
+    
+    if (plasticityEnabled && plasticityEnabled.value()) {
+        if (learningRate.has_value()) {
+            double rate = learningRate.value();
+            if (rate < 0.0 || rate > 1.0) {
+                pImpl->validationErrors.push_back("learning_rate must be between 0.0 and 1.0 when plasticity_enabled is true");
+                valid = false;
+            }
+        }
+        
+        if (decayRate.has_value()) {
+            double rate = decayRate.value();
+            if (rate < 0.0 || rate > 1.0) {
+                pImpl->validationErrors.push_back("decay_rate must be between 0.0 and 1.0 when plasticity_enabled is true");
+                valid = false;
+            }
+        }
+        
+        // Check that learning rate is greater than decay rate (if both present)
+        if (learningRate.has_value() && decayRate.has_value()) {
+            if (learningRate.value() <= decayRate.value()) {
+                pImpl->validationErrors.push_back("learning_rate must be greater than decay_rate");
+                valid = false;
+            }
+        }
+    }
+    
+    // Check network size parameters
+    auto neuronCount = get<int>("neuron_count");
+    auto inputSize = get<int>("input_size");
+    
+    if (neuronCount.has_value() && inputSize.has_value()) {
+        if (neuronCount.value() <= 0) {
+            pImpl->validationErrors.push_back("neuron_count must be positive");
+            valid = false;
+        }
+        if (inputSize.value() <= 0) {
+            pImpl->validationErrors.push_back("input_size must be positive");
+            valid = false;
+        }
+        if (neuronCount.value() <= inputSize.value()) {
+            pImpl->validationErrors.push_back("neuron_count must be greater than input_size");
+            valid = false;
+        }
+    }
+    
+    // Check connection probability
+    auto connProb = get<double>("connection_probability");
+    if (connProb.has_value()) {
+        if (connProb.value() < 0.0 || connProb.value() > 1.0) {
+            pImpl->validationErrors.push_back("connection_probability must be between 0.0 and 1.0");
+            valid = false;
+        }
+    }
+    
+    return valid;
+}
+
+bool Config::validateParameter(const std::string& key, const ConfigValue& value, std::string& errorMsg) const {
+    double min, max;
+    if (!getParameterBounds(key, min, max)) {
+        return true; // No bounds defined for this parameter
+    }
+    
+    try {
+        if (std::holds_alternative<int>(value)) {
+            double val = static_cast<double>(std::get<int>(value));
+            if (val < min || val > max) {
+                errorMsg = key + " must be between " + std::to_string(min) + " and " + std::to_string(max);
+                return false;
+            }
+        } else if (std::holds_alternative<int64_t>(value)) {
+            double val = static_cast<double>(std::get<int64_t>(value));
+            if (val < min || val > max) {
+                errorMsg = key + " must be between " + std::to_string(min) + " and " + std::to_string(max);
+                return false;
+            }
+        } else if (std::holds_alternative<double>(value)) {
+            double val = std::get<double>(value);
+            if (val < min || val > max) {
+                errorMsg = key + " must be between " + std::to_string(min) + " and " + std::to_string(max);
+                return false;
+            }
+        } else if (std::holds_alternative<std::vector<int>>(value)) {
+            for (const auto& item : std::get<std::vector<int>>(value)) {
+                if (static_cast<double>(item) < min || static_cast<double>(item) > max) {
+                    errorMsg = key + " elements must be between " + std::to_string(min) + " and " + std::to_string(max);
+                    return false;
+                }
+            }
+        } else if (std::holds_alternative<std::vector<double>>(value)) {
+            for (const auto& item : std::get<std::vector<double>>(value)) {
+                if (item < min || item > max) {
+                    errorMsg = key + " elements must be between " + std::to_string(min) + " and " + std::to_string(max);
+                    return false;
+                }
+            }
+        }
+    } catch (const std::bad_variant_access&) {
+        errorMsg = "Invalid type for parameter: " + key;
+        return false;
+    }
+    
+    return true;
+}
+
+bool Config::getParameterBounds(const std::string& key, double& min, double& max) const {
+    // Define bounds for critical parameters
+    std::string lowerKey = toLower(key);
+    
+    // Neuron-related parameters
+    if (lowerKey == "neuron_count" || lowerKey == "num_neurons" || lowerKey == "hidden_size") {
+        min = 1.0;
+        max = 10000.0;
+        return true;
+    }
+    
+    // Input/output sizes
+    if (lowerKey == "input_size" || lowerKey == "output_size") {
+        min = 1.0;
+        max = 1000.0;
+        return true;
+    }
+    
+    // Learning rate
+    if (lowerKey == "learning_rate" || lowerKey == "lr") {
+        min = 0.0;
+        max = 1.0;
+        return true;
+    }
+    
+    // Decay rate
+    if (lowerKey == "decay_rate" || lowerKey == "decay" || lowerKey == "gamma") {
+        min = 0.0;
+        max = 1.0;
+        return true;
+    }
+    
+    // Connection probability
+    if (lowerKey == "connection_probability" || lowerKey == "conn_prob" || lowerKey == "sparsity") {
+        min = 0.0;
+        max = 1.0;
+        return true;
+    }
+    
+    // Threshold/firing rate
+    if (lowerKey == "threshold" || lowerKey == "threshold_voltage" || lowerKey == "vth") {
+        min = -100.0;
+        max = 100.0;
+        return true;
+    }
+    
+    // Weight range
+    if (lowerKey == "weight_min" || lowerKey == "weight_max" || lowerKey == "weight_range") {
+        min = -10.0;
+        max = 10.0;
+        return true;
+    }
+    
+    // Time constant
+    if (lowerKey == "time_constant" || lowerKey == "tau" || lowerKey == "dt") {
+        min = 0.001;
+        max = 1000.0;
+        return true;
+    }
+    
+    // Batch size
+    if (lowerKey == "batch_size") {
+        min = 1.0;
+        max = 10000.0;
+        return true;
+    }
+    
+    // Temperature
+    if (lowerKey == "temperature") {
+        min = 0.0;
+        max = 1000.0;
+        return true;
+    }
+    
+    // Number of epochs
+    if (lowerKey == "epochs" || lowerKey == "num_epochs") {
+        min = 1.0;
+        max = 100000.0;
+        return true;
+    }
+    
+    // Memory/limit parameters
+    if (lowerKey == "memory_limit_mb" || lowerKey == "memory_limit") {
+        min = 1.0;
+        max = 1000000.0;
+        return true;
+    }
+    
+    // Voltage range
+    if (lowerKey == "v_min" || lowerKey == "v_max" || lowerKey == "voltage_min" || lowerKey == "voltage_max") {
+        min = -500.0;
+        max = 500.0;
+        return true;
+    }
+    
+    // Default bounds for numeric parameters
+    if (isNumericType(lowerKey)) {
+        min = -1e9;
+        max = 1e9;
+        return true;
+    }
+    
+    return false;
+}
+
+void Config::addError(const std::string& error) {
+    pImpl->validationErrors.push_back(error);
+}
+
+std::string Config::joinErrors() const {
+    std::ostringstream oss;
+    for (const auto& error : pImpl->validationErrors) {
+        oss << "  - " << error << "\n";
+    }
+    return oss.str();
+}
+
+bool Config::isNumericType(const std::string& key) const {
+    std::string lowerKey = toLower(key);
+    return lowerKey.find("rate") != std::string::npos || 
+           lowerKey.find("size") != std::string::npos ||
+           lowerKey.find("count") != std::string::npos ||
+           lowerKey.find("number") != std::string::npos ||
+           lowerKey.find("amount") != std::string::npos ||
+           lowerKey.find("limit") != std::string::npos ||
+           lowerKey.find("threshold") != std::string::npos ||
+           lowerKey.find("value") != std::string::npos;
+}
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;

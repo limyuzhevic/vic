@@ -93,6 +93,28 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    void enableValidation(bool enable);
+    bool isValidationEnabled() const;
+    bool validate() const;
+    std::string validateAndGetErrors() const;
+    
+private:
+    // Validation methods
+    bool checkDuplicateKeys() const;
+    bool validateParameterRanges() const;
+    bool checkParameterConsistency() const;
+    bool validateParameter(const std::string& key, const ConfigValue& value, std::string& errorMsg) const;
+    
+    // Get parameter validation bounds
+    bool getParameterBounds(const std::string& key, double& min, double& max) const;
+    
+    // Error collection
+    void addError(const std::string& error);
+    
+    // Validation flag
+    bool validationEnabled;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

@@ -8,6 +8,8 @@ namespace nlm {
 // Abstract base class for plasticity rules
 // PLACEHOLDER - Phase 2 will implement real plasticity rules
 
+class LearningRateAdapter;
+
 class PlasticityRule {
 public:
     virtual ~PlasticityRule() = default;
@@ -29,15 +31,27 @@ public:
     bool isEnabled() const;
     void setEnabled(bool enabled);
     
+    // Set learning rate adapter for adaptive learning rates
+    void setLearningRateAdapter(LearningRateAdapter* adapter);
+    
+    // Get current learning rate from adapter or default
+    float getCurrentLearningRate() const;
+    
+    // Update learning rate based on synaptic history
+    void updateLearningRate(Synapse* synapse, const std::vector<SynapticWeight>& weightHistory,
+                           const std::vector<float>& stabilityHistory,
+                           const std::vector<float>& performanceHistory,
+                           TimestepDuration dt);
+    
 protected:
-    PlasticityRule() : enabled_(true) {}
+    PlasticityRule();
     
 private:
     bool enabled_;
+    LearningRateAdapter* learningRateAdapter_;
 };
 
-// Hebbian plasticity rule: "neurons that fire together, wire together"
-// PLACEHOLDER - Phase 2 will implement real Hebbian learning
+// HebbianRule constructor was missing, adding it back
 class HebbianRule : public PlasticityRule {
 public:
     HebbianRule();
@@ -63,24 +77,50 @@ private:
 // PLACEHOLDER - Phase 2
 class AntiHebbianRule : public PlasticityRule {
 public:
+    AntiHebbianRule();
+    ~AntiHebbianRule() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "AntiHebbian"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // Parameters
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
-// Bienenstock-Cooper-Munro (BCM) rule
+// Bienenstock-Cooper-Munro (BCM) rule with synaptic scaling
 // PLACEHOLDER - Phase 2
 class BCMRule : public PlasticityRule {
 public:
+    BCMRule();
+    ~BCMRule() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "BCM"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // BCM parameters
+    void setTheta(float theta);    // Sliding threshold
+    float getTheta() const;
+    void setLearningRate(float rate);    // Base learning rate
+    float getLearningRate() const;
+    void setSynapticScaling(float scaling);    // Synaptic weight scaling
+    float getSynapticScaling() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm
