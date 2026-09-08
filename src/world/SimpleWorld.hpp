@@ -54,6 +54,11 @@ public:
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
     
+    // World interface methods for agent interaction
+    SensoryPercept observe(const Brain* brain) const;
+    ActionResult applyAction(const Brain* brain, MotorCommand cmd);
+    float computeReward(const Brain* brain) const;
+    
     // Add object to world
     void addObject(const WorldObject& obj);
     

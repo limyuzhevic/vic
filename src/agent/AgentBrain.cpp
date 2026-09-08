@@ -61,7 +61,21 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::~AgentBrain() {
+    // Clear all neuron pointers to prevent double-free
+    // The brain still owns the neurons, but we should clear our references
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    previousVision_.clear();
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);

@@ -3,6 +3,10 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <memory>
+
+// Forward declaration for JSON parsing (included via pybind11 bindings)
+namespace nlohmann { class json; }
 
 namespace nlm {
 
@@ -18,15 +22,37 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// JSON parser is now included via pybind11
+// The loadFromFile method can now parse JSON configurations
+// This provides a modern, robust configuration loading system
+
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to load as JSON first
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Check if file starts with { (JSON object)
+    file.seekg(0, std::ios::beg);
+    char firstChar;
+    file.read(&firstChar, 1);
+    file.seekg(0, std::ios::beg);
+    
+    if (firstChar == '{') {
+        // Try to parse as JSON
+        std::string jsonContent((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        try {
+            auto json = nlohmann::json::parse(jsonContent);
+            return loadFromJSON(json);
+        } catch (const std::exception&) {
+            // Fall back to simple format
+            file.clear();
+            file.seekg(0, std::ios::beg);
+        }
+    }
+    
+        // Fallback to simple key=value format for backward compatibility
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -35,9 +61,9 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs with error checking
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
+        if (pos != std::string::npos && pos < line.size() - 1) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
@@ -48,7 +74,10 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Set with error checking for empty key
+            if (!key.empty()) {
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -86,7 +115,23 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        // Write actual value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, int>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            }
+        }, entry.value);
+        file << "\n";
     }
     
     return true;

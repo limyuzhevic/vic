@@ -400,4 +400,34 @@ void SimpleWorld::checkCollisions() {
     }
 }
 
+// World interface methods for agent interaction
+SensoryPercept SimpleWorld::observe(const Brain* brain) const {
+    // Pass through the sensory percept that was generated
+    return sensory_;
+}
+
+ActionResult SimpleWorld::applyAction(const Brain* brain, MotorCommand cmd) {
+    // Create a motor command from brain output
+    auto action = std::make_unique<Action>(cmd);
+    
+    // Convert to ActionResult by calling the existing method
+    return applyMotorCommand(cmd, simTime_);
+}
+
+float SimpleWorld::computeReward(const Brain* brain) const {
+    // For now, compute based on agent's energy
+    // If energy is low, negative reward
+    // If energy is high, positive reward
+    float energyNorm = agent_.energy / maxEnergy_;
+    
+    // Reward based on energy level
+    if (energyNorm > 0.8f) {
+        return 0.1f;  // Positive for good energy
+    } else if (energyNorm < 0.2f) {
+        return -0.1f;  // Negative for low energy
+    }
+    
+    return 0.0f;  // Neutral
+}
+
 } // namespace nlm
