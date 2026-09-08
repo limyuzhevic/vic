@@ -32,11 +32,12 @@ void NeuralEpisodicMemory::initialize(Brain* brain) {
 }
 
 void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
+    if (!brain_) return;
+    
     // Create episode copy with age 0
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
-    
-    episodes_.push_back(stored);
+    stored.timestamp = episodes_.size(); // Use index as timestamp for simplicity
     
     // Create episode neuron for pattern completion
     if (brain_ && !episode.sensoryState.empty()) {
@@ -45,7 +46,10 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
         
         // Store episode index in the neuron
         // (This is a simplified approach - real implementation would use more distributed encoding)
+        brain_->injectCurrent(epNeuron, 0.5f); // Activate episode neuron
     }
+    
+    episodes_.push_back(stored);
     
     // Remove old episodes if over capacity
     while (episodes_.size() > maxEpisodes_) {
@@ -180,13 +184,26 @@ void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
     // Also inject sensory pattern if available
     if (!episode->sensoryState.empty()) {
         // This would go through sensory channels - simplified here
+        // For now, just reactivate the episode neuron
+        for (const auto& epNeur : pImpl->episodeNeurons) {
+            brain_->injectCurrent(epNeur, 0.5f);
+        }
     }
 }
 
 void NeuralEpisodicMemory::updateRelevance(SimulationStep episodeId, float relevanceDelta) {
     if (episodeId < episodes_.size()) {
-        // In a full implementation, episodes would have a relevance field
-        // For now, this would age the episode differently
+        // Add relevance field to episodes and update it
+        // For now, we'll modify age as a proxy for relevance
+        // Age represents how recent/fresh the memory is
+        // Negative relevanceDelta means make it less relevant (older)
+        // Positive relevanceDelta means make it more relevant (younger)
+        
+        // Prevent age from going below 0
+        if (episodes_[episodeId].age > 0) {
+            episodes_[episodeId].age = std::max(0, 
+                static_cast<SimulationStep>(episodes_[episodeId].age - relevanceDelta));
+        }
     }
 }
 

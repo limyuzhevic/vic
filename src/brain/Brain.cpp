@@ -509,12 +509,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
-    }
-    
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
@@ -528,8 +522,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Encode current neural activity patterns for concept formation
+        // Get working memory content as pattern
+        std::vector<float> currentPattern = pImpl->workingMemory->retrieve();
+        
+        if (!currentPattern.empty()) {
+            // Get reward from dopamine system
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Present experience to concept formation system
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                currentPattern, currentPattern, reward, currentStep);
+            
+            // If we have a stable concept, integrate it into attention
+            if (conceptId > 0 && pImpl->conceptFormation->isConceptStable(conceptId)) {
+                // Get the concept prototype
+                auto prototype = pImpl->conceptFormation->getConceptPrototype(conceptId);
+                if (!prototype.empty()) {
+                    // Use the matching concept to inform attention
+                    pImpl->conceptFormation->getMatchingConcept(prototype);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

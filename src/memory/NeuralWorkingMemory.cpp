@@ -116,6 +116,9 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
     
+    // Clear active traces for this update
+    activeTraces_.clear();
+    
     // Update maintenance - reinforce active memory neurons
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         NeuronId neuron = memoryNeurons_[i];
@@ -124,6 +127,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         if (activation > 0.1f) {
             // Inject maintenance current
             brain_->injectCurrent(neuron, activation * 2.0f);
+            
+            // Track active trace
+            activeTraces_.push_back(i);
             
             // Age the trace
             memoryTimestamps_[i]++;
@@ -136,6 +142,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             memoryActivations_[i] = activation;
         }
     }
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
     
     // Decay weak traces
     decayWeakTraces();
@@ -221,6 +230,14 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
         if (fromActivation > 0.1f && brain_) {
             // Send maintenance signal
             brain_->injectCurrent(conn.second, fromActivation * 2.0f);
+            
+            // Also track this connection as active
+            for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+                if (memoryNeurons_[i] == conn.second) {
+                    activeTraces_.push_back(i);
+                    break;
+                }
+            }
         }
     }
 }
