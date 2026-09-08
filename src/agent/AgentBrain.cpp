@@ -347,4 +347,44 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
+// Helper method to store episodic memory
+void AgentBrain::storeEpisodicMemory(const std::vector<float>& sensoryState, 
+                                     const MotorCommand& action,
+                                     float reward,
+                                     SimulationStep step) {
+    if (!brain_) return;
+    
+    auto* episodicMem = brain_->getEpisodicMemory();
+    if (!episodicMem) return;
+    
+    // Create episodic memory item
+    EpisodicMemoryItem episode;
+    episode.timestamp = step;
+    episode.reward = reward;
+    episode.action = action;
+    
+    // Store sensory state
+    episode.sensoryState = sensoryState;
+    
+    // Store agent state in the episode
+    // In a real implementation, this would capture more detailed agent state
+    // For now, we'll create a simplified representation
+    episode.agentState.push_back(dopamineLevel_);
+    episode.agentState.push_back(curiosityLevel_);
+    episode.agentState.push_back(noveltyLevel_);
+    episode.agentState.push_back(predictionError_);
+    
+    // Store in episodic memory
+    episodicMem->storeEpisode(episode);
+    
+    // Also update associative memory with action-reward association
+    if (!sensoryState.empty()) {
+        auto* assocMem = brain_->getAssociativeMemory();
+        if (assocMem) {
+            // Store the sensory pattern that led to this action and reward
+            assocMem->associateFromExperience(episode);
+        }
+    }
+}
+
 } // namespace nlm

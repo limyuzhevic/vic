@@ -64,10 +64,25 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get observation
         SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
         
+        // Get sensory data as vector for episodic memory storage
+        std::vector<float> sensoryData;
+        auto& vision = percept.getVision();
+        auto& touch = percept.getTouch();
+        auto& internal = percept.getInternal();
+        auto& proprio = percept.getProprioception();
+        
+        sensoryData.insert(sensoryData.end(), vision.begin(), vision.end());
+        sensoryData.insert(sensoryData.end(), touch.begin(), touch.end());
+        sensoryData.insert(sensoryData.end(), internal.begin(), internal.end());
+        sensoryData.insert(sensoryData.end(), proprio.begin(), proprio.end());
+        
         // Process sensory input
         agent.processSensoryInput(percept);
         
-        // Brain step
+        // Store episodic memory before brain step (captures this time step's state)
+        agent.storeEpisodicMemory(sensoryData, MotorCommand::Wait, 0.0f, step);
+        
+        // Brain step (this also stores episodic memory internally)
         brain->step(step, step * 0.001);
         
         // Get motor command
@@ -80,8 +95,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
         totalReward += reward;
         
-        // Apply reward modulation
+        // Apply reward modulation (updates episodic memory)
         agent.applyRewardModulation(reward, 0.0f);
+        
+        // Update episodic memory with the actual reward and action
+        agent.storeEpisodicMemory(sensoryData, cmd, reward, step);
         
         // Update development
         if (config.enableDevelopment) {
@@ -98,7 +116,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
                         " | Reward: " + std::to_string(totalReward / (step + 1)) +
                         " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
                         " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+                            brain->getWorkingMemory()->getActiveTraces() : 0) +
+                        " | Episodes: " + std::to_string(brain->getEpisodicMemory() ? 
+                            brain->getEpisodicMemory()->getEpisodeCount() : 0));
         }
     }
     
