@@ -50,10 +50,12 @@ public:
 
     // Get number of active memory traces
     size_t getActiveTraces() const { return activeTraces_.size(); }
-
-    // Get capacity
-    size_t getCapacity() const { return capacity_; }
-    void setCapacity(size_t cap) { capacity_ = cap; }
+    
+    // Get active traces (neuron IDs that are currently in working memory)
+    const std::vector<size_t>& getActiveTraces() const { return activeTraces_; }
+    
+    // Record a new working memory trace
+    void recordWorkingMemoryTrace(NeuronId neuron, float activation);
 
     // Decay rate for memory traces
     float getDecayRate() const { return decayRate_; }

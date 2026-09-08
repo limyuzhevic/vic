@@ -142,6 +142,22 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     
     // Run competition to select winners
     runCompetition();
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
+}
+
+void NeuralWorkingMemory::recordWorkingMemoryTrace(NeuronId neuron, float activation) {
+    // Add to active traces for statistics
+    activeTraces_.push_back(neuron.value);
+    
+    // Also store if not already in memory
+    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    if (it == memoryNeurons_.end() && memoryNeurons_.size() < capacity_) {
+        memoryNeurons_.push_back(neuron);
+        memoryActivations_.push_back(activation);
+        memoryTimestamps_.push_back(0);
+    }
 }
 
 void NeuralWorkingMemory::clear() {

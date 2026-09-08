@@ -388,11 +388,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                         syn->recordPreSpike(currentTime);
                     }
                     
-                    // Store to working memory - neurons that fire become part of working memory
-                    if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
-                    }
+                    // Record working memory trace for statistics
+                        if (pImpl->workingMemory) {
+                            pImpl->workingMemory->recordWorkingMemoryTrace(neuron->getId(), 
+                                std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                        }
                 }
             }
         }

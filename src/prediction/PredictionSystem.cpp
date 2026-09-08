@@ -1,4 +1,5 @@
 #include "PredictionSystem.hpp"
+#include "../sensory/SensoryInput.hpp"
 
 namespace nlm {
 
@@ -37,6 +38,30 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
     }
 }
 
+void PredictionSystem::update(const SensoryInput& observation) {
+    // Update prediction based on new observation
+    // For now, just store in history
+    pImpl->errorHistory.push_back(0.0f);  // Placeholder
+}
+
+void PredictionSystem::update(TimestepDuration dt) {
+    // Update prediction dynamics
+    // Decay error history over time
+    if (pImpl->errorHistory.size() > 10) {
+        pImpl->errorHistory.erase(pImpl->errorHistory.begin());
+    }
+    
+    // Confidence based on prediction error
+    if (!pImpl->errorHistory.empty()) {
+        float avgError = 0.0f;
+        for (float error : pImpl->errorHistory) {
+            avgError += error;
+        }
+        avgError /= pImpl->errorHistory.size();
+        pImpl->confidence = 1.0f / (1.0f + avgError);
+    }
+}
+
 float PredictionSystem::getPredictionError() const {
     return pImpl->predictionError;
 }
@@ -51,10 +76,13 @@ const std::vector<float>& PredictionSystem::getErrorHistory() const {
 
 void PredictionSystem::clearHistory() {
     pImpl->errorHistory.clear();
+    pImpl->predictionError = 0.0f;
+    pImpl->confidence = 0.5f;
 }
 
 void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
+    // Placeholder for future implementation
 }
 
 } // namespace nlm
