@@ -20,48 +20,131 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
+    // Validate input parameter
+    if (!brain) {
+        NLM_LOG_CRITICAL("AgentBrain constructor: brain pointer is null, cannot create agent brain");
+        return;
+    }
+    
+    // Initialize motor and sensory neuron groups with enhanced validation
+    try {
+        // Validate brain structure before processing
+        if (brain_->getRegions().empty()) {
+            NLM_LOG_CRITICAL("AgentBrain constructor: brain has no regions, agent cannot be initialized");
+            return;
+        }
+        
+        // Initialize neuron groups with comprehensive logging
+        int motorNeuronsProcessed = 0;
+        int sensoryNeuronsProcessed = 0;
+        
         for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
+            if (!region) {
+                NLM_LOG_WARNING("AgentBrain constructor: null region found in brain, skipping");
+                continue;
+            }
+            
+            if (!region->getPopulations()) {
+                NLM_LOG_WARNING("AgentBrain constructor: region has null populations, skipping");
+                continue;
+            }
+            
+            for (const auto& pop : region->getPopulations()) {
+                if (!pop) {
+                    NLM_LOG_WARNING("AgentBrain constructor: null population found in region, skipping");
+                    continue;
+                }
+                
+                if (!pop->getNeurons()) {
+                    NLM_LOG_WARNING("AgentBrain constructor: population has null neurons, skipping");
+                    continue;
+                }
+                
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
+                        // Safety check for null neuron pointer
+                        if (!n) {
+                            NLM_LOG_WARNING("AgentBrain constructor: null neuron pointer found, skipping");
+                            continue;
+                        }
+                        
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
                         
                         switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                            case 0: motorForward_.push_back(n); motorNeuronsProcessed++; break;
+                            case 1: motorBackward_.push_back(n); motorNeuronsProcessed++; break;
+                            case 2: motorTurnLeft_.push_back(n); motorNeuronsProcessed++; break;
+                            case 3: motorTurnRight_.push_back(n); motorNeuronsProcessed++; break;
+                            case 4: motorInteract_.push_back(n); motorNeuronsProcessed++; break;
+                            case 5: motorWait_.push_back(n); motorNeuronsProcessed++; break;
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
+                        // Safety check for null neuron pointer
+                        if (!n) {
+                            NLM_LOG_WARNING("AgentBrain constructor: null neuron pointer found, skipping");
+                            continue;
+                        }
+                        
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
                         switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
+                            case 0: sensoryVision_.push_back(n); sensoryNeuronsProcessed++; break;
+                            case 1: sensoryTouch_.push_back(n); sensoryNeuronsProcessed++; break;
+                            case 2: sensoryInternal_.push_back(n); sensoryNeuronsProcessed++; break;
+                            case 3: sensoryProprioception_.push_back(n); sensoryNeuronsProcessed++; break;
                         }
                     }
                 }
             }
         }
+        
+        // Log initialization summary with comprehensive statistics
+        NLM_LOG_INFO("AgentBrain constructor: successfully initialized agent brain");
+        NLM_LOG_INFO("AgentBrain constructor: initialized with " +
+                     std::to_string(motorForward_.size()) + " forward, " +
+                     std::to_string(motorBackward_.size()) + " backward, " +
+                     std::to_string(motorTurnLeft_.size()) + " left, " +
+                     std::to_string(motorTurnRight_.size()) + " right, " +
+                     std::to_string(motorInteract_.size()) + " interact, " +
+                     std::to_string(motorWait_.size()) + " wait motor neurons (" +
+                     std::to_string(motorNeuronsProcessed) + " total processed); " +
+                     std::to_string(sensoryVision_.size()) + " vision, " +
+                     std::to_string(sensoryTouch_.size()) + " touch, " +
+                     std::to_string(sensoryInternal_.size()) + " internal, " +
+                     std::to_string(sensoryProprioception_.size()) + " proprioception sensory neurons (" +
+                     std::to_string(sensoryNeuronsProcessed) + " total processed)");
+    
+    } catch (const std::exception& e) {
+        NLM_LOG_CRITICAL("AgentBrain constructor: exception during initialization: " + std::string(e.what()));
+    } catch (...) {
+        NLM_LOG_CRITICAL("AgentBrain constructor: unknown exception during initialization");
     }
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::~AgentBrain() {
+    // Clean up neuron pointers (they are owned by the brain, so we don't delete them)
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    
+    NLM_LOG_INFO("AgentBrain destructor: AgentBrain instance destroyed");
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
@@ -85,7 +168,16 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    // Validate brain and percept
+    if (!brain_) {
+        NLM_LOG_WARNING("AgentBrain::processSensoryInput: brain pointer is null, skipping processing");
+        return;
+    }
+    
+    if (!percept) {
+        NLM_LOG_WARNING("AgentBrain::processSensoryInput: percept is null, skipping processing");
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -94,6 +186,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_WARNING("AgentBrain::processSensoryInput: null vision neuron at index " + std::to_string(i));
         }
     }
     
@@ -103,6 +197,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_WARNING("AgentBrain::processSensoryInput: null touch neuron at index " + std::to_string(i));
         }
     }
     
@@ -112,6 +208,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_WARNING("AgentBrain::processSensoryInput: null internal neuron at index " + std::to_string(i));
         }
     }
     
@@ -121,6 +219,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_WARNING("AgentBrain::processSensoryInput: null proprioception neuron at index " + std::to_string(i));
         }
     }
     

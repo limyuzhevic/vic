@@ -8,8 +8,55 @@
 
 namespace nlm {
 
-// Forward declarations
-class Config;
+// Agent-specific configuration
+struct AgentConfig {
+    // Sensory processing parameters
+    double visionScaleFactor = 5.0;
+    double touchScaleFactor = 8.0;
+    double internalScaleFactor = 5.0;
+    double proprioceptionScaleFactor = 3.0;
+    
+    // Motor decoding parameters
+    float activityThreshold = 0.5f;
+    float curiosityThreshold = 0.3f;
+    float explorationFactor = 0.3f;
+    
+    // Neuromodulation parameters
+    float rewardModulationFactor = 1.0f;
+    float dopamineLearningRate = 0.01f;
+    
+    // Development parameters
+    double developmentalStage1End = 60.0;    // ~1 minute
+    double developmentalStage2End = 300.0;  // ~5 minutes
+    double developmentalStage3End = 900.0;  // ~15 minutes
+    
+    // Novelty detection
+    float noveltyDecayRate = 0.99f;
+    
+    // Memory parameters
+    float memoryRetentionRate = 0.95f;
+    
+    // Exploration
+    float curiositySensitivity = 2.0f;
+    float predictionErrorWeight = 0.5f;
+    
+    // Performance
+    size_t sensoryVisionWidth = 16;
+    size_t sensoryVisionHeight = 16;
+    size_t sensoryTouchCount = 8;
+    size_t sensoryInternalCount = 4;
+    size_t sensoryProprioceptionCount = 6;
+    size_t motorCommandCount = 6;
+    
+    // Validation
+    bool validate() const {
+        return visionScaleFactor > 0.0 && touchScaleFactor > 0.0 &&
+               internalScaleFactor > 0.0 && proprioceptionScaleFactor > 0.0 &&
+               activityThreshold >= 0.0f && activityThreshold <= 1.0f &&
+               curiosityThreshold >= 0.0f && curiosityThreshold <= 1.0f &&
+               noveltyDecayRate > 0.0f && noveltyDecayRate <= 1.0f;
+    }
+};
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -41,6 +88,19 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// Configuration converter utilities
+class ConfigConverter {
+public:
+    // Convert Config to AgentConfig
+    static AgentConfig toAgentConfig(const Config& config);
+    
+    // Convert AgentConfig to Config
+    static void fromAgentConfig(Config& config, const AgentConfig& agentConfig);
+    
+    // Validate AgentConfig against configuration bounds
+    static std::vector<std::string> validateAgentConfig(const AgentConfig& config);
 };
 
 // Main configuration class
