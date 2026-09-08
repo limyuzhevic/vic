@@ -32,6 +32,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<NeuralSemanticMemory> semanticMemory;
+    std::unique_ptr<NeuralProceduralMemory> proceduralMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -75,6 +77,11 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // Sleep/rest state
+    size_t stepsSinceLastRest;
+    size_t restInterval;
+    bool enableSleepMode;
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -92,6 +99,9 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , stepsSinceLastRest(0)
+        , restInterval(10000)      // Rest every 10000 steps
+        , enableSleepMode(false)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -112,6 +122,8 @@ struct Brain::Impl {
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        semanticMemory = std::make_unique<NeuralSemanticMemory>();
+        proceduralMemory = std::make_unique<NeuralProceduralMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -231,26 +243,16 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    // Initialize semantic memory
+    pImpl->semanticMemory->initialize(this);
     
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
-    
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    // Initialize procedural memory
+    pImpl->proceduralMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
-    
-    pImpl->conceptFormation->initialize(this);
-    
+    // Initialize attention system
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
@@ -258,6 +260,7 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -404,6 +407,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Connect neuromodulation to working memory
+        if (pImpl->dopamine) {
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            // Dopamine enhances working memory strength (stabilizes representations)
+            if (dopamineLevel > 0.0f) {
+                pImpl->workingMemory->strengthenMemory(1.0f + dopamineLevel * 0.5f);
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -436,6 +448,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                 }
             }
+        }
+        
+        // Apply dopamine effects on memory systems
+        if (pImpl->workingMemory) {
+            // Dopamine enhances working memory consolidation
+            float memoryStrength = 1.0f + dopamineLevel * 0.5f;
+            pImpl->workingMemory->strengthenMemory(memoryStrength);
+        }
+        
+        if (pImpl->episodicMemory) {
+            // Dopamine enhances episodic memory consolidation
+            float memoryStrength = 1.0f + dopamineLevel * 0.3f;
+            // Episodic memory stores dopamine level as part of episode
         }
     }
     
@@ -513,6 +538,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        if (pImpl->predictionError) {
+            pImpl->predictionError->update(pImpl->timestep);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -530,6 +558,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
+    }
+    
+    // ========== STEP 10.5: Neural planner integration ==========
+    if (pImpl->planner) {
+        // The neural planner integrates with attention and working memory to select and execute actions
+        pImpl->planner->update(pImpl->timestep);
+        
+        // The planner can also influence working memory through strategic focus
+        if (pImpl->workingMemory) {
+            std::vector<NeuronId> plannedNeurons = pImpl->planner->getPlannedActions();
+            // Store planned actions in working memory
+            for (NeuronId neuronId : plannedNeurons) {
+                pImpl->workingMemory->storeToNeuron(neuronId, 1.0f);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1015,6 +1058,18 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+}
+
+// ========== SEMANTIC MEMORY ACCESSOR ==========
+
+NeuralSemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+// ========== PROCEDURAL MEMORY ACCESSOR ==========
+
+NeuralProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
