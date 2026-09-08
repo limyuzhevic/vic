@@ -98,9 +98,28 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
 }
 
 NeuronId StructuralPlasticity::createNeuron(Brain* brain, NeuronType type) {
-    // Neuron creation would require adding to a population
     // For Phase 2, we focus on synaptic structural plasticity
-    // and don't implement neuronal creation
+    // Neuron creation requires finding a region and adding to a population
+    if (!brain) return INVALID_NEURON_ID;
+    
+    // Try to create a neuron in the first available region
+    for (auto& region : brain->getRegions()) {
+        // Create a population first (if not exists, we need a method to add population)
+        // For simplicity in Phase 2, we'll create a population with 1 neuron
+        // In a full implementation, this would be handled by NeuralRegion
+        auto* regionPtr = region.get();
+        if (regionPtr->getPopulationCount() == 0) {
+            // Add a population for this type
+            regionPtr->addPopulation(1, type);
+            
+            // Get the created population
+            auto* population = regionPtr->getPopulation(regionPtr->getPopulationCount() - 1);
+            if (population && population->getNeurons().size() > 0) {
+                return population->getNeurons()[0]->getId();
+            }
+        }
+    }
+    
     return INVALID_NEURON_ID;
 }
 

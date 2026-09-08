@@ -51,6 +51,42 @@ public:
     // Get current sensory percept for the agent
     const SensoryPercept& getSensoryPercept() const { return sensory_; }
     
+    // Apply observation to agent (equivalent to world.observe() in Phase6Demo.cpp)
+    // This matches the expected signature in Phase6Demo.cpp line 65
+    SensoryPercept observe(const class NeuralRegion* region) {
+        // Generate vision based on region
+        generateVision();
+        // Return sensory percept based on world state
+        return sensory_;
+    }
+    
+    // Apply action result to the world (equivalent to world.applyAction() in Phase6Demo.cpp)
+    // This matches the expected signature in Phase6Demo.cpp line 77
+    void applyAction(const class NeuralRegion* region, MotorCommand cmd) {
+        // For now, just call the regular applyMotorCommand with cmd
+        // In a real implementation, this would be more integrated
+        applyMotorCommand(cmd, simTime_);
+    }
+    
+    // Get current reward from world
+    float computeReward(const class NeuralRegion* region) const {
+        // Simple reward system based on agent energy and position
+        float reward = 0.0f;
+        
+        // Energy-based reward
+        if (agent_.energy > maxEnergy_ * 0.8f) {
+            reward += 1.0f;
+        }
+        
+        // Position-based reward (avoid boundaries)
+        if (agent_.x > width_ * 0.1f && agent_.x < width_ * 0.9f &&
+            agent_.y > height_ * 0.1f && agent_.y < height_ * 0.9f) {
+            reward += 0.5f;
+        }
+        
+        return reward;
+    }
+    
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
     

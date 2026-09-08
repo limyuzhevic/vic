@@ -165,6 +165,10 @@ Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
 }
 
+// Copy constructor: disable copying to prevent memory issues
+Brain::Brain(const Brain& other) = delete;
+Brain& Brain::operator=(const Brain& other) = delete;
+
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
         delete pImpl;
