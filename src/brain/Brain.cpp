@@ -765,6 +765,7 @@ bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
+        // Use the checkpoint system for saving brain state
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
@@ -819,7 +820,11 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                synapseData.plasticityFlags.push_back(syn->getPlasticityFlags());
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.efficacy.push_back(syn->getEfficacy());
+                synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+                synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
             }
         }
         
@@ -847,6 +852,7 @@ bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
     try {
+        // Use the checkpoint system for loading brain state
         CheckpointReader reader;
         if (!reader.open(filepath)) {
             NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
@@ -896,8 +902,43 @@ bool Brain::load(const std::string& filepath) {
         }
         
         // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
+        // For now, just log the count and restore weights for matching synapses
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // Match and restore synapses by source/destination neuron IDs
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                if (synapseIdx < synapseData.sourceNeuron.size()) {
+                    uint64_t sourceId = synapseData.sourceNeuron[synapseIdx];
+                    uint64_t destId = synapseData.destinationNeuron[synapseIdx];
+                    
+                    // Check if this synapse matches the current synapse
+                    if (syn->getSourceNeuron().index() == sourceId &&
+                        syn->getDestinationNeuron().index() == destId) {
+                        
+                        // Restore synapse state
+                        syn->setWeight(synapseData.weight[synapseIdx]);
+                        if (synapseIdx < synapseData.plasticityFlags.size()) {
+                            syn->setPlasticityFlags(synapseData.plasticityFlags[synapseIdx]);
+                        }
+                        if (synapseIdx < synapseData.eligibilityTrace.size()) {
+                            syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx]);
+                        }
+                        if (synapseIdx < synapseData.efficacy.size()) {
+                            syn->setEfficacy(synapseData.efficacy[synapseIdx]);
+                        }
+                        if (synapseIdx < synapseData.shortTermDepression.size()) {
+                            syn->setShortTermDepression(synapseData.shortTermDepression[synapseIdx]);
+                        }
+                        if (synapseIdx < synapseData.shortTermFacilitation.size()) {
+                            syn->setShortTermFacilitation(synapseData.shortTermFacilitation[synapseIdx]);
+                        }
+                    }
+                }
+                synapseIdx++;
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

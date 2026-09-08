@@ -139,50 +139,50 @@ public:
     
     // ========== MEMORY SYSTEMS ==========
     
-    // Working memory - transient active information
+// Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
-    
+
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
+
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
-    // Prediction system for sensory prediction and error computation
+// Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
-    
+
     // ========== COGNITION SYSTEMS ==========
-    
+
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
-    
+
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
-    
+
     // Attentional selection for focus
     AttentionalSelection* getAttention();
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    
+
+    // Development system
     DevelopmentSystem* getDevelopmentSystem();
+
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
-    
+
     // ========== NEUROMODULATION SYSTEMS ==========
-    
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
-    
+
     // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
-    
+    Curiosity* getCuriosity() { return pImpl->curiosity.get(); }
+
     // Novelty - novelty detection
-    Novelty* getNovelty();
-    
+    Novelty* getNovelty() { return pImpl->novelty.get(); }
+
     // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    PredictionError* getPredictionErrorSignal() { return pImpl->predictionError.get(); }
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
