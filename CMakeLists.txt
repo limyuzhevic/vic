@@ -139,6 +139,57 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Python bindings
+set(PYTHON_EXECUTABLE ${PYTHON_EXECUTABLE})
+find_package(Python REQUIRED COMPONENTS Development Interpreter)
+
+# Find pybind11
+set(pybind11_DIR "" CACHE PATH "Path to pybind11 config")
+find_package(pybind11 REQUIRED)
+
+# Create Python bindings target
+add_library(pynlm MODULE
+    python/bindings.cpp
+)
+
+set_target_properties(pynlm PROPERTIES
+    PREFIX ""
+    SUFFIX "${PYTHON_MODULE_EXTENSION}"
+    CXX_STANDARD 20
+)
+
+target_include_directories(pynlm PRIVATE
+    python
+    ${PYTHON_INCLUDE_DIRS}
+    ${pybind11_INCLUDE_DIRS}
+)
+
+target_link_libraries(pynlm PRIVATE
+    nlm_core
+    pybind11::module
+)
+
+# Add test target for Python bindings
+add_custom_target(test_python_bindings
+    COMMAND ${PYTHON_EXECUTABLE} -c "import sys; sys.path.insert(0, '${CMAKE_BINARY_DIR}/python'); import pynlm; print('Python bindings imported successfully!')"
+    DEPENDS pynlm
+    COMMENT "Testing Python bindings import"
+)
+
+# Add comprehensive test executable
+add_executable(test_all_improvements
+    tests/test_improvements.cpp
+)
+target_link_libraries(test_all_improvements
+    nlm_core
+)
+
+# Add a test target for the new comprehensive tests
+add_test(NAME all_improvements_test
+    COMMAND test_all_improvements
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
@@ -148,4 +199,13 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+install(TARGETS pynlm
+    LIBRARY DESTINATION python
+    RUNTIME DESTINATION python
+)
+
+install(FILES python/__init__.py
+    DESTINATION python
 )

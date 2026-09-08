@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,14 +20,67 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try JSON format first
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Convert JSON back to key=value format for internal processing
+        clear();
+        
+        for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+            std::string key = it.key();
+            
+            // Handle different value types
+            if (it->is_string()) {
+                set(key, it->get<std::string>(), ConfigSource::File);
+            } else if (it->is_number_integer()) {
+                set(key, it->get<int>(), ConfigSource::File);
+            } else if (it->is_number_unsigned()) {
+                set(key, static_cast<int64_t>(it->get<uint64_t>()), ConfigSource::File);
+            } else if (it->is_number_float()) {
+                set(key, it->get<double>(), ConfigSource::File);
+            } else if (it->is_boolean()) {
+                set(key, it->get<bool>(), ConfigSource::File);
+            } else if (it->is_array()) {
+                // Handle array values
+                if (it->empty()) {
+                    set(key, std::vector<int>(), ConfigSource::File);
+                } else if (std::all_of(it->begin(), it->end(), [](const auto& v) { return v.is_number_integer(); })) {
+                    std::vector<int> arr;
+                    for (const auto& v : *it) {
+                        arr.push_back(v.get<int>());
+                    }
+                    set(key, arr, ConfigSource::File);
+                } else if (std::all_of(it->begin(), it->end(), [](const auto& v) { return v.is_number_float(); })) {
+                    std::vector<double> arr;
+                    for (const auto& v : *it) {
+                        arr.push_back(v.get<double>());
+                    }
+                    set(key, arr, ConfigSource::File);
+                } else if (std::all_of(it->begin(), it->end(), [](const auto& v) { return v.is_string(); })) {
+                    std::vector<std::string> arr;
+                    for (const auto& v : *it) {
+                        arr.push_back(v.get<std::string>());
+                    }
+                    set(key, arr, ConfigSource::File);
+                }
+            }
+        }
+        
+        return true;
+    } catch (const nlohmann::json::parse_error&) {
+        // JSON parsing failed, try simple key=value format
+        file.clear();
+        file.seekg(0);
+    }
+    
+    // Fallback to simple key=value format for backward compatibility
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -48,7 +102,43 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Try to parse as different types
+            bool parsed = false;
+            
+            // Try boolean
+            if (!parsed && (value == "true" || value == "false")) {
+                set(key, value == "true", ConfigSource::File);
+                parsed = true;
+            }
+            
+            // Try integer
+            if (!parsed) {
+                try {
+                    size_t posEnd;
+                    int intVal = std::stoi(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        set(key, intVal, ConfigSource::File);
+                        parsed = true;
+                    }
+                } catch (...) {}
+            }
+            
+            // Try double
+            if (!parsed) {
+                try {
+                    size_t posEnd;
+                    double doubleVal = std::stod(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        set(key, doubleVal, ConfigSource::File);
+                        parsed = true;
+                    }
+                } catch (...) {}
+            }
+            
+            // If couldn't parse as specific type, treat as string
+            if (!parsed) {
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
