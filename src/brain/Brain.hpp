@@ -84,6 +84,9 @@ public:
     SpikeSystem* getSpikeSystem();
     const SpikeSystem* getSpikeSystem() const;
     
+    // Get most active neurons based on spike history
+    std::vector<NeuronId> getMostActiveNeurons(size_t count = 10) const;
+    
     // Plasticity system access
     STDP* getSTDP();
     Hebbian* getHebbian();

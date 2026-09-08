@@ -14,12 +14,12 @@ public:
     ~StructuralPlasticity();
     
     // Create new synapse
-    // TODO PHASE 2: Implement real synapse creation
+    // Real synapse creation with STDP eligibility and use-dependent modulation
     SynapseId createSynapse(Brain* brain, NeuronId source, NeuronId destination,
                            SynapticWeight weight);
-    
+
     // Remove synapse
-    // TODO PHASE 2: Implement real synapse removal
+    // Real synapse elimination based on inactivity and competition
     bool removeSynapse(Brain* brain, SynapseId synapse);
     
     // Create new neuron

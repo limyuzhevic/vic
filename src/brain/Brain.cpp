@@ -660,6 +660,13 @@ StructuralPlasticity* Brain::getStructuralPlasticity() {
     return pImpl->structuralPlasticity.get();
 }
 
+std::vector<NeuronId> Brain::getMostActiveNeurons(size_t count) const {
+    if (pImpl->spikeSystem) {
+        return pImpl->spikeSystem->getMostActiveNeurons(count);
+    }
+    return std::vector<NeuronId>();
+}
+
 float Brain::getExcitationInhibitionRatio() const {
     float totalExcitatory = 0.0f;
     float totalInhibitory = 0.0f;
@@ -1003,8 +1010,6 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
-
 NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
 }
@@ -1067,14 +1072,6 @@ Novelty* Brain::getNovelty() {
 
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
-}
-
-std::shared_ptr<const Config> Brain::getConfig() const {
-    return pImpl->config;
-}
-
-RandomGenerator* Brain::getRandomGenerator() {
-    return pImpl->rng.get();
 }
 
 void Brain::logStatus() const {

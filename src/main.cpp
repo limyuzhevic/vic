@@ -90,7 +90,7 @@ struct LearningExperiment {
             }
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        mostActiveNeurons = brain->getMostActiveNeurons(10);
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
@@ -321,6 +321,169 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+// User command processing functions
+void processUserCommand(const std::string& cmd, std::shared_ptr<Config> config, std::shared_ptr<Brain> brain) {
+    // Convert command to lowercase for case-insensitive matching
+    std::string lowerCmd = cmd;
+    std::transform(lowerCmd.begin(), lowerCmd.end(), lowerCmd.begin(), ::tolower);
+    
+    if (lowerCmd == "help" || lowerCmd == "?" || lowerCmd == "h") {
+        config->showHelp();
+    } 
+    else if (lowerCmd == "set beginner" || lowerCmd == "beginner") {
+        config->setBeginnerMode(true);
+        NLM_LOG_INFO("Switched to Beginner mode - Guided help enabled, advanced features restricted");
+    }
+    else if (lowerCmd == "set intermediate" || lowerCmd == "intermediate") {
+        config->setIntermediateMode(true);
+        NLM_LOG_INFO("Switched to Intermediate mode - Full features available");
+    }
+    else if (lowerCmd == "set expert" || lowerCmd == "expert") {
+        config->setExpertMode(true);
+        NLM_LOG_INFO("Switched to Expert mode - Advanced debugging and raw output enabled");
+    }
+    else if (lowerCmd == "tutorial" || lowerCmd == "t") {
+        config->showTutorial();
+    }
+    else if (lowerCmd.substr(0, 8) == "tutorial ") {
+        std::string topic = lowerCmd.substr(8);
+        config->showTutorial(topic);
+    }
+    else if (lowerCmd == "run_basic_tests") {
+        NLM_LOG_INFO("=== Beginner Mode: Basic Tests ===");
+        runBasicConnectivityTest(brain);
+    }
+    else if (lowerCmd == "run_tests" || lowerCmd == "test") {
+        NLM_LOG_INFO("=== Intermediate Mode: Full Test Suite ===");
+        runBasicConnectivityTest(brain);
+        
+        // Reset for next test
+        brain->reset();
+        brain->initialize();
+        runPlasticityExperiment(brain);
+        
+        // Reset for next test
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+    }
+    else if (lowerCmd == "debug" || lowerCmd == "debug mode") {
+        NLM_LOG_INFO("=== Expert Mode: Debug Commands ===");
+        NLM_LOG_INFO("Debug Information:");
+        NLM_LOG_INFO("  User Level: " + std::to_string(static_cast<int>(config->getUserLevel())));
+        NLM_LOG_INFO("  Tutorial Mode: " + std::string(config->isTutorialMode() ? "ON" : "OFF"));
+        NLM_LOG_INFO("  Debug Mode: " + std::string(config->isDebugMode() ? "ON" : "OFF"));
+        NLM_LOG_INFO("  Configuration Keys: " + std::to_string(config->getKeys().size()));
+        
+        if (brain) {
+            NLM_LOG_INFO("  Neuron Count: " + std::to_string(brain->getTotalNeuronCount()));
+            NLM_LOG_INFO("  Synapse Count: " + std::to_string(brain->getTotalSynapseCount()));
+            NLM_LOG_INFO("  Firing Neurons: " + std::to_string(brain->getFiringNeuronCount()));
+            NLM_LOG_INFO("  Average Firing Rate: " + std::to_string(brain->getAverageFiringRate()));
+        }
+        
+        NLM_LOG_INFO("  Configuration Summary:");
+        NLM_LOG_INFO("    " + config->summary());
+    }
+    else if (lowerCmd == "explore config" || lowerCmd == "config") {
+        NLM_LOG_INFO("=== Configuration Explorer ===");
+        NLM_LOG_INFO("Current User Level: " + std::to_string(static_cast<int>(config->getUserLevel())));
+        NLM_LOG_INFO("Tutorial Mode: " + std::string(config->isTutorialMode() ? "ON" : "OFF"));
+        NLM_LOG_INFO("Debug Mode: " + std::string(config->isDebugMode() ? "ON" : "OFF"));
+        NLM_LOG_INFO("\nAvailable Configuration Commands:");
+        NLM_LOG_INFO("  help             - Show help information");
+        NLM_LOG_INFO("  tutorial <topic>  - Start a tutorial");
+        NLM_LOG_INFO("  set beginner     - Set to beginner mode");
+        NLM_LOG_INFO("  set intermediate  - Set to intermediate mode");
+        NLM_LOG_INFO("  set expert       - Set to expert mode");
+    }
+    else if (lowerCmd == "demo beginner" || lowerCmd == "beginner demo") {
+        NLM_LOG_INFO("=== Beginner Demonstration Mode ===");
+        NLM_LOG_INFO("This demo shows the basics of NLM:")
+        NLM_LOG_INFO("1. Brain initialization and basic neural activity")
+        NLM_LOG_INFO("2. Simple spike propagation through the network")
+        NLM_LOG_INFO("3. Basic learning through synaptic changes");
+        
+        // Run basic connectivity test
+        runBasicConnectivityTest(brain);
+        
+        // Reset for learning demo
+        brain->reset();
+        brain->initialize();
+        
+        NLM_LOG_INFO("\nBasic demo complete! Key points:")
+        NLM_LOG_INFO("- Neurons fire when given enough input")
+        NLM_LOG_INFO("- Spikes propagate through connected neurons")
+        NLM_LOG_INFO("- Learning occurs through synaptic weight changes");
+    }
+    else if (lowerCmd == "demo advanced" || lowerCmd == "advanced demo") {
+        NLM_LOG_INFO("=== Advanced Demonstration Mode ===");
+        NLM_LOG_INFO("This demo shows advanced NLM features:")
+        NLM_LOG_INFO("1. Plasticity experiments (STDP and Hebbian learning)")
+        NLM_LOG_INFO("2. Complex network dynamics")
+        NLM_LOG_INFO("3. Integration with brain subsystems");
+        
+        // Run full test suite
+        runBasicConnectivityTest(brain);
+        
+        // Reset for plasticity demo
+        brain->reset();
+        brain->initialize();
+        runPlasticityExperiment(brain);
+        
+        // Reset for STDP demo
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+        
+        NLM_LOG_INFO("\nAdvanced demo complete! Key points:")
+        NLM_LOG_INFO("- STDP enables spike-timing dependent learning")
+        NLM_LOG_INFO("- Hebbian learning strengthens co-active neurons")
+        NLM_LOG_INFO("- The network adapts based on activity patterns");
+    }
+    else {
+        NLM_LOG_INFO("Unknown command: " + cmd);
+        NLM_LOG_INFO("Type 'help' for available commands");
+    }
+}
+
+void printUserInterface(const UserLevel& level) {
+    std::cout << "\n";
+    std::cout << "╔═══════════════════════════════════════════════════════════════╗\n";
+    std::cout << "║               NLM User Interface - Level: ";
+    
+    switch (level) {
+        case UserLevel::Beginner:
+            std::cout << "BEGINNER                     ";
+            break;
+        case UserLevel::Intermediate:
+            std::cout << "INTERMEDIATE                  ";
+            break;
+        case UserLevel::Expert:
+            std::cout << "EXPERT                       ";
+            break;
+    }
+    
+    std::cout << "║\n";
+    std::cout << "║                                                               ║\n";
+    
+    switch (level) {
+        case UserLevel::Beginner:
+            std::cout << "║  Simple, guided environment with tutorials and help      ║\n";
+            break;
+        case UserLevel::Intermediate:
+            std::cout << "║  Balanced interface with full feature access            ║\n";
+            break;
+        case UserLevel::Expert:
+            std::cout << "║  Advanced interface with debugging and raw output       ║\n";
+            break;
+    }
+    
+    std::cout << "║                                                               ║\n";
+    std::cout << "╚═══════════════════════════════════════════════════════════════╝\n";
+    std::cout << "\n";
+}
+
 int main(int argc, char** argv) {
     printBanner();
     
@@ -342,6 +505,30 @@ int main(int argc, char** argv) {
     
     // Load configuration
     auto config = std::make_shared<Config>();
+    
+    // Detect user level from command line arguments
+    UserLevel userLevel = UserLevel::Beginner;  // Default
+    
+    // Check for user level settings in command line
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--beginner" || arg == "-b") {
+            userLevel = UserLevel::Beginner;
+            NLM_LOG_INFO("Beginner mode detected from command line");
+        } else if (arg == "--intermediate" || arg == "-i") {
+            userLevel = UserLevel::Intermediate;
+            NLM_LOG_INFO("Intermediate mode detected from command line");
+        } else if (arg == "--expert" || arg == "-e") {
+            userLevel = UserLevel::Expert;
+            NLM_LOG_INFO("Expert mode detected from command line");
+        }
+    }
+    
+    // Set user level
+    config->setUserLevel(userLevel);
+    
+    // Print user interface
+    printUserInterface(config->getUserLevel());
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
@@ -382,9 +569,9 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
+    // Log configuration summary with user level
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Configuration (User Level: " + std::to_string(static_cast<int>(config->getUserLevel())) + "):");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
@@ -409,20 +596,109 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Welcome message based on user level
+    NLM_LOG_INFO("");
+    switch (config->getUserLevel()) {
+        case UserLevel::Beginner:
+            NLM_LOG_INFO("Welcome to NLM! This is Beginner mode.")
+            NLM_LOG_INFO("You can use 'help' to see available commands or 'tutorial getting_started' for a quick start.");
+            break;
+        case UserLevel::Intermediate:
+            NLM_LOG_INFO("Welcome to NLM! This is Intermediate mode.")
+            NLM_LOG_INFO("You have full access to all features. Use 'help' to see available commands.");
+            break;
+        case UserLevel::Expert:
+            NLM_LOG_INFO("Welcome to NLM! This is Expert mode.")
+            NLM_LOG_INFO("You have advanced debugging tools and raw output. Use 'help' to see available commands.");
+            break;
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    // Run different demonstrations based on user level
+    switch (config->getUserLevel()) {
+        case UserLevel::Beginner:
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("=== Running Beginner Demonstration ===");
+            runBasicConnectivityTest(brain);
+            
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("Beginner demo complete! Your brain has learned basic connectivity.");
+            NLM_LOG_INFO("To continue exploring, type 'tutorial getting_started' or 'help' for commands.");
+            break;
+            
+        case UserLevel::Intermediate:
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("=== Running Intermediate Tests ===");
+            runBasicConnectivityTest(brain);
+            
+            // Reset for plasticity test
+            brain->reset();
+            brain->initialize();
+            runPlasticityExperiment(brain);
+            
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("Intermediate tests complete! Your brain has learned about plasticity.");
+            NLM_LOG_INFO("To run all tests, type 'run_tests' or explore more with 'help'.");
+            break;
+            
+        case UserLevel::Expert:
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("=== Running Expert Tests ===");
+            runBasicConnectivityTest(brain);
+            
+            // Reset for plasticity test
+            brain->reset();
+            brain->initialize();
+            runPlasticityExperiment(brain);
+            
+            // Reset for STDP test
+            brain->reset();
+            brain->initialize();
+            runStdpVerification(brain);
+            
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("Expert tests complete! Your brain has demonstrated STDP and Hebbian learning.");
+            NLM_LOG_INFO("Use 'debug' for detailed information or 'help' for available commands.");
+            break;
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    // Display interactive help for user level
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Interactive Help ===");
+    NLM_LOG_INFO("To get help with specific commands, type:")
+    NLM_LOG_INFO("  help           - Show help information");
+    NLM_LOG_INFO("  tutorial topic - Start a tutorial on a specific topic");
+    NLM_LOG_INFO("  debug          - Show debugging information");
+    NLM_LOG_INFO("  explore config  - Explore configuration options");
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Check if running in non-interactive mode (for scripts)
+    bool interactive = true;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--non-interactive" || arg == "-n") {
+            interactive = false;
+            break;
+        }
+    }
+    
+    if (interactive) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("You are now in interactive mode. Type commands to explore NLM.")
+        NLM_LOG_INFO("Examples: 'help', 'tutorial getting_started', 'debug'")
+        NLM_LOG_INFO("Type 'exit' or 'quit' to exit.")
+        
+        std::string input;
+        while (std::getline(std::cin, input)) {
+            if (input == "exit" || input == "quit" || input == "q") {
+                NLM_LOG_INFO("Exiting NLM. Goodbye!");
+                break;
+            }
+            
+            // Process user command
+            processUserCommand(input, config, brain);
+            
+            NLM_LOG_INFO("Type 'help' for available commands or 'exit' to quit.");
+        }
+    }
     
     // Final brain status
     NLM_LOG_INFO("");

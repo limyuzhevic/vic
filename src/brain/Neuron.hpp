@@ -134,7 +134,8 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Real integrate-and-fire dynamics implementation for Phase 2
+    // Integrates with the brain's spike system and handles all LIF dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state

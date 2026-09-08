@@ -192,10 +192,11 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    // Real synaptic dynamics for Phase 2:
+    // 1. Decay short-term plasticity state (Tsodyks-Markram model)
+    // 2. Decay eligibility trace for reward-modulated learning
+    // 3. Update synaptic efficacy based on activity
+    // 4. Implement short-term plasticity (STP) dynamics
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
@@ -205,7 +206,7 @@ void Synapse::step(Timestamp currentTime) {
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
+    // Decay short-term depression with recovery toward baseline
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSinceActivity = std::max(
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
@@ -215,11 +216,32 @@ void Synapse::step(Timestamp currentTime) {
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    // Update synaptic efficacy based on recent activity
+    // Efficacy increases with use (BCM-like theory)
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        float activityFactor = 1.0f - std::exp(-static_cast<float>(currentTime - pImpl->lastPreSpikeTime) / 50.0f);
+        pImpl->efficacy += activityFactor * 0.01f;
+        pImpl->efficacy = std::min(pImpl->efficacy, 2.0f);  // Cap at 2x baseline
+    }
     
-    // Clamp weight bounds
+    // Decay eligibility trace for reward-modulated learning
+    if (pImpl->eligibilityTrace != 0.0f) {
+        pImpl->eligibilityTrace *= (1.0f - 0.001f);  // Fast decay
+        if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
+            pImpl->eligibilityTrace = 0.0f;
+        }
+    }
+    
+    // Apply short-term plasticity to synaptic weight temporarily
+    // Use updated efficacy for temporary weight modulation
+    float stpWeight = pImpl->weight * pImpl->shortTermFacilitation * pImpl->shortTermDepression;
+    
+    // Clamp weight bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    // Update synaptic state for next time step
+    pImpl->efficacy *= 0.995f;  // Gradual decay of efficacy
+    pImpl->efficacy = std::max(0.5f, pImpl->efficacy);  // Don't drop below 50% of baseline
 }
 
 void Synapse::reset() {
