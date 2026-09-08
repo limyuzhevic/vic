@@ -121,6 +121,35 @@ void testBrainStatus() {
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 
+void testBrainMove() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(2), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain1(config);
+    brain1.initialize();
+    
+    // Test move constructor
+    nlm::Brain brain2(std::move(brain1));
+    
+    // Original brain should be in valid moved-from state (null pImpl)
+    // Note: The pImpl pointer is internal, so we can't directly check it,
+    // but we can verify that we can still use brain2
+    assert(brain2.getRegionCount() == 2);
+    
+    // Test move assignment operator
+    nlm::Brain brain3(config);
+    brain3.initialize();
+    
+    brain3 = std::move(brain2);
+    
+    // brain3 should now own the moved resources
+    assert(brain3.getRegionCount() == 2);
+    assert(brain3.getTotalNeuronCount() == 100);
+    
+    std::cout << "    testBrainMove passed" << std::endl;
+}
+
 void runAll() {
     testBrainCreation();
     testBrainInitialization();
@@ -129,6 +158,7 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    testBrainMove();
 }
 
 } // namespace test_brain

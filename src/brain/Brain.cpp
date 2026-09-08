@@ -159,16 +159,28 @@ struct Brain::Impl {
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
-Brain::~Brain() = default;
+Brain::~Brain() {
+    delete pImpl;
+}
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
+    // Move the implementation pointer from other to this
+    // After moving, other should not own the implementation anymore
+    // Nullify other's pointer to prevent double deletion
     other.pImpl = nullptr;
 }
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        // Clean up current implementation if it exists
+        if (pImpl) {
+            delete pImpl;
+        }
+        
+        // Move implementation from other to this
         pImpl = other.pImpl;
+        
+        // Nullify other's pointer to prevent double deletion
         other.pImpl = nullptr;
     }
     return *this;
