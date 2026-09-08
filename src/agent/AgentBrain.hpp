@@ -11,10 +11,23 @@ namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Forward declaration to avoid including Brain.hpp in AgentBrain.hpp
+class Brain;
+
+namespace nlm {
+
+// AgentBrain: Connects NLM brain to the world
+// Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
+    
+    // Disable copying, enable moving
+    AgentBrain(const AgentBrain&) = delete;
+    AgentBrain& operator=(const AgentBrain&) = delete;
+    AgentBrain(AgentBrain&&) noexcept;
+    AgentBrain& operator=(AgentBrain&&) noexcept;
     
     // Initialize with world
     void initialize(const SimpleWorld& world);
@@ -57,6 +70,7 @@ public:
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    const Brain* getBrain() const { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -75,6 +89,10 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Pimpl implementation for cleaner interface and better encapsulation
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
     
     std::shared_ptr<Brain> brain_;
     
@@ -113,5 +131,7 @@ private:
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
 };
+
+} // namespace nlm
 
 } // namespace nlm

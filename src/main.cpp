@@ -65,10 +65,13 @@ struct LearningExperiment {
         initialWeights.clear();
         
         // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
+        auto* region = brain->getRegion(RegionId(0));
+        if (region) {
             for (const auto& syn : region->getSynapses()) {
                 initialWeights.push_back(syn->getWeight());
             }
+        } else {
+            NLM_LOG_INFO("ERROR: Region 0 not found, cannot record initial weights");
         }
         
         NLM_LOG_INFO("Initial state recorded:");
@@ -84,10 +87,13 @@ struct LearningExperiment {
         finalWeights.clear();
         
         // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
+        auto* region = brain->getRegion(RegionId(0));
+        if (region) {
             for (const auto& syn : region->getSynapses()) {
                 finalWeights.push_back(syn->getWeight());
             }
+        } else {
+            NLM_LOG_INFO("ERROR: Region 0 not found, cannot record final weights");
         }
         
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
@@ -164,8 +170,11 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
     // Inject current into a few neurons and see if spikes propagate
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    auto* region = brain->getRegion(RegionId(0));
+    if (!region) {
+        NLM_LOG_INFO("ERROR: Region 0 not found, skipping connectivity test");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -212,10 +221,13 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.recordInitialState();
     
     // Enable plasticity on synapses
-    if (auto* region = brain->getRegion(RegionId(1))) {
+    auto* region = brain->getRegion(RegionId(0));
+    if (region) {
         for (auto& syn : region->getSynapses()) {
             syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
         }
+    } else {
+        NLM_LOG_INFO("ERROR: Region 0 not found, skipping plasticity test");
     }
     
     // Apply repeated input pattern to stimulate learning
@@ -249,8 +261,11 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    auto* region = brain->getRegion(RegionId(0));
+    if (!region) {
+        NLM_LOG_INFO("ERROR: Region 0 not found, skipping STDP verification");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
