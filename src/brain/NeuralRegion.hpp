@@ -75,9 +75,8 @@ public:
                                       float meanWeight,
                                       float weightVariance);
     
-    // Get all neurons across all populations
-    std::vector<Neuron*> getAllNeurons();
-    std::vector<const Neuron*> getAllNeurons() const;
+    // Clear all synapses and connectivity mappings
+    void clearAllSynapses();
     
 private:
     struct Impl;

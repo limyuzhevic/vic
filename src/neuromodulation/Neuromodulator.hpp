@@ -61,7 +61,7 @@ public:
     float getLevel() const override { return 0.0f; }
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    void update(TimestepDuration dt) override {};
 };
 
 // Norepinephrine: Arousal and vigilance
@@ -72,7 +72,7 @@ public:
     float getLevel() const override { return 0.0f; }
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    void update(TimestepDuration dt) override {};
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
@@ -83,7 +83,7 @@ public:
     float getLevel() const override { return 0.0f; }
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    void update(TimestepDuration dt) override {};
 };
 
 } // namespace nlm

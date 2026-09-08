@@ -164,6 +164,10 @@ struct NeuronCheckpointData {
 struct SynapseCheckpointData {
     std::vector<uint64_t> sourceNeuron;
     std::vector<uint64_t> destinationNeuron;
+    std::vector<uint64_t> sourceRegion;
+    std::vector<uint64_t> sourcePopulation;
+    std::vector<uint64_t> destinationRegion;
+    std::vector<uint64_t> destinationPopulation;
     std::vector<float> weight;
     std::vector<uint32_t> delay;
     std::vector<uint8_t> synapseType;

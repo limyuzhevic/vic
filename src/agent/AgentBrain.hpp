@@ -3,6 +3,8 @@
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/NeuralPlanner.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
@@ -28,6 +30,9 @@ public:
     // Process sensory percept and inject into brain
     void processSensoryInput(const SensoryPercept& percept);
     
+    // Process current state with learned concepts
+    void processWithConcepts();
+    
     // Decode brain motor activity into motor command
     MotorCommand decodeMotorCommand();
     
@@ -40,11 +45,17 @@ public:
     // Get current developmental stage
     DevelopmentalStage getDevelopmentalStage() const;
     
-    // Get neuromodulation level
+// Get neuromodulation level
     float getNeuromodulationLevel() const;
-    
+
     // Get curiosity level
     float getCuriosityLevel() const;
+    
+    // Get neuromodulator levels
+    float getAcetylcholineLevel() const;
+    float getNorepinephrineLevel() const;
+    float getSerotoninLevel() const;
+    float getDopamineLevel() const;
     
     // Get novelty level
     float getNoveltyLevel() const;
@@ -52,11 +63,22 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Save episodic memory with current state and reward
+    void saveEpisodeWithReward(const SimpleWorld& world);
+    
     // Reset agent for new episode
     void reset();
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    
+    // Get ConceptFormation for concept-based processing
+    ConceptFormation* getConceptFormation() { return brain_ ? brain_->getConceptFormation() : nullptr; }
+    
+    // NeuralPlanner integration
+    NeuralPlanner* getPlanner() { return brain_ ? brain_->getPlanner() : nullptr; }
+    void integratePlanner(const std::vector<float>& state);
+    float getPlanningConfidence() const;
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -69,16 +91,12 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Private method for concept influence
+    void applyConceptInfluence(const DiscoveredConcept* concept);
+    
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
     
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
-    std::shared_ptr<Brain> brain_;
-    
-    // Motor neuron groups
+    // Neuron containers for motor and sensory populations
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
@@ -86,32 +104,15 @@ private:
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
-    // Sensory neuron groups
     std::vector<Neuron*> sensoryVision_;
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
     
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
-    
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
-    
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
-    
-    // Previous sensory state for novelty detection
+    // Previous vision for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
-};
+
+} // namespace nlm
 
 } // namespace nlm

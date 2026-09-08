@@ -313,4 +313,9 @@ std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
     return result;
 }
 
-} // namespace nlm
+void NeuralRegion::clearAllSynapses() {
+    pImpl->synapses.clear();
+    pImpl->outgoingSynapses.clear();
+    pImpl->incomingSynapses.clear();
+    pImpl->nextSynapseId = 1;
+}

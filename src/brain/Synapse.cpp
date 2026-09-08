@@ -183,15 +183,37 @@ void Synapse::decayEligibilityTrace(float decayRate) {
     }
 }
 
-float Synapse::getEfficacy() const {
-    return pImpl->efficacy;
+float Synapse::getShortTermDepression() const {
+    return pImpl->shortTermDepression;
 }
 
-void Synapse::setEfficacy(float efficacy) {
-    pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
+float Synapse::getShortTermFacilitation() const {
+    return pImpl->shortTermFacilitation;
 }
 
-void Synapse::step(Timestamp currentTime) {
+float Synapse::getLastPreSpikeTime() const {
+    return pImpl->lastPreSpikeTime;
+}
+
+float Synapse::getLastPostSpikeTime() const {
+    return pImpl->lastPostSpikeTime;
+}
+
+void Synapse::setShortTermDepression(float depression) {
+    pImpl->shortTermDepression = std::clamp(depression, 0.0f, 1.0f);
+}
+
+void Synapse::setShortTermFacilitation(float facilitation) {
+    pImpl->shortTermFacilitation = std::clamp(facilitation, 0.0f, 10.0f);
+}
+
+void Synapse::setLastPreSpikeTime(float time) {
+    pImpl->lastPreSpikeTime = time;
+}
+
+void Synapse::setLastPostSpikeTime(float time) {
+    pImpl->lastPostSpikeTime = time;
+}
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
