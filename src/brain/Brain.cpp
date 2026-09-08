@@ -242,22 +242,23 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
-    
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
-    
-    pImpl->conceptFormation->initialize(this);
-    
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
-    
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+// Initialize prediction system
+        pImpl->predictionSystem->initialize(this);
+        
+        // Initialize cognition systems
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+        
+        pImpl->conceptFormation->initialize(this);
+        
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+        
+        // Initialize neuromodulation
+        pImpl->predictionError->initialize(this);
+        pImpl->novelty->initialize(this);
+        pImpl->curiosity->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -329,7 +330,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
     
-    // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
+    // ========== STEP 1: Process delayed spike events (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
@@ -342,6 +343,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
+    // Collect sensory input pattern for prediction and concept formation
+    std::vector<float> sensoryPattern;
+    if (!pImpl->sensoryNeurons.empty()) {
+        sensoryPattern.reserve(pImpl->sensoryNeurons.size());
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            const auto& state = neuron->getState();
+            sensoryPattern.push_back(std::abs(state.membranePotential - state.restingPotential) / 20.0f);
+        }
+    }
+    
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -526,10 +537,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // Add proper sensory-to-concept mapping integration
+    if (pImpl->novelty && pImpl->predictionError && pImpl->curiosity) {
+        // Use novelty and prediction error to guide concept formation
+        // Novelty detects new patterns, prediction error signals prediction failures
+        // This informs concept formation about which patterns are truly novel or problematic
+        
+        // Store current sensory pattern for concept learning
+        if (!sensoryPattern.empty()) {
+            // Use working memory traces as features for concept formation
+            std::vector<float> features = workingPattern;
+            
+            // Reward signal from dopamine for interesting patterns
+            float noveltyLevel = pImpl->novelty->getLevel();
+            float predictionErrorLevel = pImpl->predictionError->getError();
+            
+            // Curiosity-driven learning from novel or surprising patterns
+            float curiosityLevel = pImpl->curiosity->getLevel();
+            
+            // Combine signals for concept learning
+            float learningSignal = (noveltyLevel * 0.4f) + 
+                                 (std::abs(predictionErrorLevel) * 0.4f) + 
+                                 (curiosityLevel * 0.2f);
+            
+            // Present experience with combined novelty/prediction error info
+            if (learningSignal > 0.3f) {
+                // High learning signal - good candidate for concept formation
+                pImpl->conceptFormation->presentExperience(
+                    sensoryPattern,
+                    features,
+                    learningSignal,
+                    currentStep
+                );
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
