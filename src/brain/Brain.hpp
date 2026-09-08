@@ -134,8 +134,9 @@ public:
     size_t getTotalNeuronCount() const;
     size_t getTotalSynapseCount() const;
     size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
+    SimulationStep getCurrentStep() const;
+    
+    Timestamp getCurrentTime() const;
     
     // ========== MEMORY SYSTEMS ==========
     

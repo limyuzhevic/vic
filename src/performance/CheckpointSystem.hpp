@@ -175,6 +175,278 @@ struct SynapseCheckpointData {
 };
 
 /**
+ * Working memory state for checkpointing
+ */
+struct WorkingMemoryCheckpointData {
+    std::vector<uint64_t> memoryNeurons;
+    std::vector<float> memoryActivations;
+    std::vector<SimulationStep> memoryTimestamps;
+    std::vector<size_t> activeTraces;
+    std::vector<std::pair<uint64_t, uint64_t>> recurrentConnections;
+    std::vector<uint64_t> winners;
+    float decayRate;
+    size_t capacity;
+};
+
+/**
+ * Episodic memory state for checkpointing
+ */
+struct EpisodicMemoryCheckpointData {
+    std::deque<EpisodicMemoryItem> episodes;
+    std::vector<NeuronId> episodeNeurons;
+    bool replayEnabled;
+    size_t maxEpisodes;
+};
+
+/**
+ * Associative memory state for checkpointing
+ */
+struct AssociativeMemoryCheckpointData {
+    std::vector<std::pair<NeuronId, std::vector<float>>> patternNeurons;
+    std::vector<std::tuple<NeuronId, NeuronId, float>> associations;
+    float noveltyThreshold;
+};
+
+/**
+ * Prediction system state for checkpointing
+ */
+struct PredictionSystemCheckpointData {
+    float predictionError;
+    float confidence;
+    std::vector<float> errorHistory;
+    float lastPrediction;
+    float lastActual;
+};
+
+/**
+ * Neural planner state for checkpointing
+ */
+struct NeuralPlannerCheckpointData {
+    std::vector<ActionType> actionHistory;
+    std::vector<float> rewardHistory;
+    std::vector<float> uncertainty;
+    size_t planningDepth;
+    float explorationRate;
+    float exploitationRate;
+};
+
+/**
+ * Concept formation state for checkpointing
+ */
+struct ConceptFormationCheckpointData {
+    std::vector<DiscoveredConcept> concepts;
+    std::vector<ConceptInstance> instances;
+    float noveltyThreshold;
+    float stabilityThreshold;
+};
+
+/**
+ * Attentional selection state for checkpointing
+ */
+struct AttentionalSelectionCheckpointData {
+    std::vector<RegionId> attendedRegions;
+    std::vector<NeuronId> winners;
+    std::vector<float> neuronSalience;
+    std::unordered_map<uint64_t, float> topDownBias;
+    std::unordered_map<uint64_t, float> bottomUpSalience;
+    float inhibitionStrength;
+    float excitationStrength;
+    float competitionThreshold;
+};
+
+/**
+ * Development system state for checkpointing
+ */
+struct DevelopmentSystemCheckpointData {
+    DevelopmentalStage developmentalStage;
+    SimulationStep stageStartStep;
+    SimulationStep stepsInCurrentStage;
+    double stageAge;
+    double systemAge;
+    float plasticityModifier;
+    bool isCriticalPeriod;
+};
+
+/**
+ * Neuromodulator state for checkpointing
+ */
+struct NeuromodulatorCheckpointData {
+    float level;
+    float plasticityFactor;
+    float decayRate;
+    std::vector<float> history;
+    float lastUpdate;
+};
+
+/**
+ * Dopamine state for checkpointing
+ */
+struct DopamineCheckpointData {
+    float level;
+    float plasticityFactor;
+    float decayRate;
+    float predictionError;
+    std::vector<float> rewardHistory;
+    float lastRewardTime;
+};
+
+/**
+ * Curiosity state for checkpointing
+ */
+struct CuriosityCheckpointData {
+    float level;
+    float noveltyWeight;
+    float predictionErrorWeight;
+    float decayRate;
+    std::vector<float> noveltyHistory;
+    std::vector<float> predictionErrorHistory;
+    float lastUpdate;
+};
+
+/**
+ * Novelty state for checkpointing
+ */
+struct NoveltyCheckpointData {
+    float level;
+    float decayRate;
+    float noveltyThreshold;
+    std::vector<float> history;
+    std::vector<float> lastPattern;
+    float lastUpdate;
+};
+
+/**
+ * Prediction error state for checkpointing
+ */
+struct PredictionErrorCheckpointData {
+    float error;
+    float predictedValue;
+    float actualValue;
+    std::vector<float> history;
+    float magnitude;
+    float lastComputeTime;
+};
+
+/**
+ * Plasticity system state for checkpointing
+ */
+struct PlasticitySystemCheckpointData {
+    float stdpLtpWeight;
+    float stdpLtdWeight;
+    float stdpTimeConstant;
+    float hebbianLearningRate;
+    float structuralSynaptogenesisRate;
+    float structuralPruningRate;
+    float eligibilityTraceDecay;
+};
+
+/**
+ * Development state for checkpointing
+ */
+struct DevelopmentStateCheckpointData {
+    DevelopmentalStage developmentalStage;
+    SimulationStep lastStageAdvance;
+    double stageAge;
+    double systemAge;
+    float plasticityModifier;
+    bool isCriticalPeriod;
+    SimulationStep criticalPeriodProgress;
+};
+
+/**
+ * Random generator state for checkpointing
+ */
+struct RandomGeneratorCheckpointData {
+    uint64_t seed;
+    uint64_t currentSeed;
+    uint64_t currentState;  // For MT19937
+};
+
+/**
+ * Simulation state for checkpointing
+ */
+struct SimulationStateCheckpointData {
+    SimulationStep currentStep;
+    Timestamp currentTime;
+    TimestepDuration timestep;
+    size_t totalSpikesThisStep;
+    size_t totalSpikesTotal;
+    Timestamp simulationStartTime;
+    double simulationTime;
+    bool isResting;
+    size_t stepsSinceLastEpisode;
+    size_t replayInterval;
+    size_t consolidationInterval;
+};
+
+/**
+ * Inter-region connections for checkpointing
+ */
+struct InterRegionConnectionsCheckpointData {
+    std::vector<InterRegionConnection> connections;
+    size_t connectionCount;
+};
+
+/**
+ * Spike system state for checkpointing
+ */
+struct SpikeSystemCheckpointData {
+    std::vector<SpikeEvent> pendingSpikes;
+    std::vector<DelayedSpikeEvent> pendingDelayedSpikes;
+    size_t pendingSpikeCount;
+    size_t pendingDelayedCount;
+    Timestamp lastSpikeTime;
+    SimulationStep lastSpikeStep;
+};
+
+/**
+ * All brain state data for checkpointing
+ */
+struct BrainCheckpointData {
+    // Neuron and synapse data
+    NeuronCheckpointData neurons;
+    SynapseCheckpointData synapses;
+    
+    // Integration state
+    InterRegionConnectionsCheckpointData interRegionConnections;
+    SpikeSystemCheckpointData spikeSystem;
+    
+    // Memory systems
+    WorkingMemoryCheckpointData workingMemory;
+    EpisodicMemoryCheckpointData episodicMemory;
+    AssociativeMemoryCheckpointData associativeMemory;
+    
+    // Cognition systems
+    PredictionSystemCheckpointData predictionSystem;
+    NeuralPlannerCheckpointData neuralPlanner;
+    ConceptFormationCheckpointData conceptFormation;
+    AttentionalSelectionCheckpointData attentionalSelection;
+    
+    // Development system
+    DevelopmentSystemCheckpointData developmentSystem;
+    
+    // Neuromodulation systems
+    DopamineCheckpointData dopamine;
+    CuriosityCheckpointData curiosity;
+    NoveltyCheckpointData novelty;
+    PredictionErrorCheckpointData predictionError;
+    
+    // Plasticity systems
+    PlasticitySystemCheckpointData plasticitySystem;
+    
+    // Random generator
+    RandomGeneratorCheckpointData randomGenerator;
+    
+    // Simulation state
+    SimulationStateCheckpointData simulationState;
+    
+    // Statistics
+    size_t totalNeuronCount;
+    size_t totalSynapseCount;
+    size_t regionCount;
+};
+
+/**
  * Checkpoint reader
  */
 class CheckpointReader {
