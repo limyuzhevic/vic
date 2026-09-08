@@ -18,6 +18,10 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "commands/Command.hpp"
+#include "commands/ConcreteCommands.hpp"
+#include "commands/CommandRegistry.hpp"
+#include "cli/CommandExecutor.hpp"
 
 #include <iostream>
 #include <memory>
@@ -27,6 +31,11 @@
 #include <numeric>
 
 using namespace nlm;
+
+namespace commands {
+    extern CommandRegistry commandRegistry;
+    void registerAllCommands();
+}
 
 void printBanner() {
     std::cout << R"(
@@ -359,8 +368,22 @@ int main(int argc, char** argv) {
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        
+        // Validate critical configuration parameters
+        auto neuronCountOpt = config->get<int64_t>("neuron_count");
+        if (neuronCountOpt && (*neuronCountOpt <= 0)) {
+            NLM_LOG_WARNING("Invalid neuron_count in config, using default value");
+            config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        }
+        
+        auto timestepOpt = config->get<double>("simulation_timestep");
+        if (timestepOpt && (*timestepOpt <= 0.0)) {
+            NLM_LOG_WARNING("Invalid simulation_timestep in config, using default value");
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        }
+        
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Configuration file not found: " + configFile + ". Using defaults");
     }
     
     // Override with command line args
