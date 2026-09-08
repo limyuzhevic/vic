@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <filesystem>
 
 namespace nlm {
 
@@ -55,7 +56,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/simple format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,13 +94,26 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Validation and error handling
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const ConfigValue& value) const;
+    std::string getLastError() const;
+    
+    // Internal file format detection (private)
+    bool isJSONFile(const std::string& filepath) const;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+private:
+    // Internal file format loader
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromSimpleFile(const std::string& filepath);
+    
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
+

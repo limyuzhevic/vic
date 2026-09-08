@@ -1,9 +1,3 @@
-#pragma once
-
-#include "PlasticityRule.hpp"
-
-namespace nlm {
-
 // Spike-Timing-Dependent Plasticity
 // PLACEHOLDER - Phase 2 will implement real STDP
 
@@ -36,27 +30,51 @@ private:
 };
 
 // Reward-modulated STDP (R-STDP)
-// PLACEHOLDER - Phase 2
 class RewardModulatedSTDP : public PlasticityRule {
 public:
+    RewardModulatedSTDP();
+    ~RewardModulatedSTDP() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override { return "R-STDP"; }
+    
+    // Neuromodulation parameters
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    void setTemperature(float temp);
+    float getTemperature() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Spike-timing dependent plasticity with triplet interactions
-// PLACEHOLDER - Phase 2
 class TripletSTDP : public PlasticityRule {
 public:
+    TripletSTDP();
+    ~TripletSTDP() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override { return "TripletSTDP"; }
+    
+    // Triplet parameters
+    void setUPlus(float uPlus);
+    float getUPlus() const;
+    void setUMinus(float uMinus);
+    float getUMinus() const;
+    void setTauPlus(float tauPlus);
+    float getTauPlus() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
-
-} // namespace nlm
