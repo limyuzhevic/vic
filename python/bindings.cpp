@@ -15,6 +15,7 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
 
 namespace py = pybind11;
 namespace nlm {
