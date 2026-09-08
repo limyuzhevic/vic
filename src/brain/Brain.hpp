@@ -19,6 +19,8 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class SemanticMemory;
+class ProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
@@ -97,17 +99,14 @@ public:
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
     
-    // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
-    
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();
     
     // Apply developmental changes (called automatically in step)
     void develop();
     
-    // Reset brain state
-    void reset();
+    // Collect brain state statistics
+    void collectStats(SimulationStep currentStep, Timestamp currentTime);
     
     // Save brain state to file (checkpointing)
     bool save(const std::string& filepath) const;
@@ -147,6 +146,12 @@ public:
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    
+    // Semantic memory - knowledge and facts
+    SemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - learned skills and habits
+    ProceduralMemory* getProceduralMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
