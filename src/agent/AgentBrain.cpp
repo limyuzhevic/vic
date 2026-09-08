@@ -19,6 +19,12 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , explorationWeight_(0.5f)
+    , exploitationWeight_(0.5f)
+    , totalNeuromodulationSum_(0.0f)
+    , maxNeuromodulation_(0.0f)
+    , minNeuromodulation_(0.0f)
+    , neuromodulationCount_(0)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -65,6 +71,8 @@ AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    previousTouch_.resize(world.getTouchSize(), 0.0f);
+    previousInternal_.resize(world.getInternalSize(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
@@ -250,6 +258,12 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
+    // Update statistics
+    neuromodulationCount_++;
+    totalNeuromodulationSum_ += std::abs(dopamineLevel_);
+    maxNeuromodulation_ = std::max(maxNeuromodulation_, std::abs(dopamineLevel_));
+    minNeuromodulation_ = std::min(minNeuromodulation_, std::abs(dopamineLevel_));
+    
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
@@ -343,8 +357,40 @@ void AgentBrain::reset() {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    // Clear previous vision
+    // Reset statistics
+    totalNeuromodulationSum_ = 0.0f;
+    maxNeuromodulation_ = 0.0f;
+    minNeuromodulation_ = 0.0f;
+    neuromodulationCount_ = 0;
+    
+    // Clear previous sensory state
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    std::fill(previousTouch_.begin(), previousTouch_.end(), 0.0f);
+    std::fill(previousInternal_.begin(), previousInternal_.end(), 0.0f);
+}
+
+float AgentBrain::getAverageNeuromodulation() const {
+    if (neuromodulationCount_ == 0) return 0.0f;
+    return totalNeuromodulationSum_ / neuromodulationCount_;
+}
+
+float AgentBrain::getMaxNeuromodulation() const {
+    return maxNeuromodulation_;
+}
+
+float AgentBrain::getMinNeuromodulation() const {
+    return minNeuromodulation_;
+}
+
+float AgentBrain::clamp(float value, float min, float max) {
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+}
+
+float AgentBrain::normalize(float value, float min, float max) {
+    if (max - min < 0.0001f) return 0.5f;
+    return (value - min) / (max - min);
 }
 
 } // namespace nlm
