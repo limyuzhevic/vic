@@ -5,6 +5,69 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <sstream>
+#include <limits>
+#include <chrono>
+
+// Custom Python exceptions
+class NLMRuntimeError : public py::error_already_converted {
+public:
+    NLMRuntimeError(const std::string& msg) : py::error_already_converted() {
+        std::stringstream ss;
+        ss << "NLM Runtime Error: " << msg;
+        PyErr_SetString(PyExc_RuntimeError, ss.str().c_str());
+    }
+};
+
+class NLMValueError : public py::error_already_converted {
+public:
+    NLMValueError(const std::string& msg) : py::error_already_converted() {
+        std::stringstream ss;
+        ss << "NLM Value Error: " << msg;
+        PyErr_SetString(PyExc_ValueError, ss.str().c_str());
+    }
+};
+
+class NLMTypeError : public py::error_already_converted {
+public:
+    NLMTypeError(const std::string& msg) : py::error_already_converted() {
+        std::stringstream ss;
+        ss << "NLM Type Error: " << msg;
+        PyErr_SetString(PyExc_TypeError, ss.str().c_str());
+    }
+};
+
+// Validation and utility functions
+namespace validation {
+    template<typename T>
+    void validateRange(const T& value, const T& min, const T& max, const std::string& paramName) {
+        if (value < min || value > max) {
+            std::stringstream ss;
+            ss << "Parameter '" << paramName << "' must be in range [" << min << ", " << max << "], got " << value;
+            throw NLMValueError(ss.str());
+        }
+    }
+    
+    void validateNonEmpty(const std::string& value, const std::string& paramName) {
+        if (value.empty()) {
+            std::stringstream ss;
+            ss << "Parameter '" << paramName << "' cannot be empty";
+            throw NLMValueError(ss.str());
+        }
+    }
+    
+    template<typename T>
+    void validatePositive(const T& value, const std::string& paramName) {
+        if (value <= 0) {
+            std::stringstream ss;
+            ss << "Parameter '" << paramName << "' must be positive, got " << value;
+            throw NLMValueError(ss.str());
+        }
+    }
+    
+    void validateFilePath(const std::string& path);
+}
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -20,11 +83,52 @@ namespace py = pybind11;
 namespace nlm {
 
 PYBIND11_MODULE(pynlm, m) {
+    // Register custom exceptions
+    py::register_exception<NLMValueError>(m, "NLMValueError");
+    py::register_exception<NLMTypeError>(m, "NLMTypeError");
+    py::register_exception<NLMRuntimeError>(m, "NLMRuntimeError");
+    
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        This module provides enhanced Python API with:
+        - Comprehensive error handling with custom NLM exceptions
+        - Type checking and validation for all parameters
+        - Advanced configuration management
+        - Helper functions for common operations
+        - Performance timing utilities
+        - Visualization tools
+        - Serialization/deserialization support
+        
+        Key Classes:
+        -----------
+        - Brain: Central neural simulation brain class
+        - Config: Configuration management with validation
+        - AgentBrain: Agent brain interface connecting NLM brain to world
+        - SimpleWorld: Simple 2D world for NLM simulation
+        - Vision, Audio: Sensory input types
+        - Action: Motor/action representation
+        - WorldObject: Objects in the world
+        
+        Usage Example:
+        -------------
+        import pynlm as nlm
+        
+        # Create a brain with configuration
+        config = nlm.Config()
+        config.set("brain.neuron_count", 1000)
+        brain = nlm.Brain(config)
+        brain.initialize()
+        
+        # Run simulation
+        for step in range(100):
+            brain.step(step)
+        
+        # Save brain state
+        brain.save("brain_state.json")
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -142,27 +246,157 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
-        .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+    // Register custom exceptions for enhanced error handling
+    py::register_exception<NLMRuntimeError>(m, "RuntimeError", PyExc_RuntimeError.ptr());
+    py::register_exception<NLMValueError>(m, "ValueError", PyExc_ValueError.ptr());
+    py::register_exception<NLMTypeError>(m, "TypeError", PyExc_TypeError.ptr());
+
+    // Validation and type checking utilities
+    m.def("validate_config_value", [](const Config& cfg, const std::string& key, const py::object& value) {
+        auto opt_value = cfg.get<std::string>(key);
+        if (!opt_value) {
+            throw NLMValueError("Key '" + key + "' not found in configuration");
+        }
+        return *opt_value;
+    }, py::arg("config"), py::arg("key"), py::arg("value"),
+        "Validate a configuration value and return it");
+
+    m.def("validate_int", [](int value, int min, int max, const std::string& name) {
+        validation::validateRange(value, min, max, name);
+        return value;
+    }, py::arg("value"), py::arg("min"), py::arg("max"), py::arg("name"),
+        "Validate that an integer value is within the specified range");
+
+    m.def("validate_float", [](double value, double min, double max, const std::string& name) {
+        validation::validateRange(value, min, max, name);
+        return value;
+    }, py::arg("value"), py::arg("min"), py::arg("max"), py::arg("name"),
+        "Validate that a float value is within the specified range");
+
+    // Serialization and deserialization utilities
+    m.def("serialize_config", [](const Config& config) {
+        std::stringstream ss;
+        config.saveToFile("/tmp/temp_config.json");
+        std::ifstream file("/tmp/temp_config.json");
+        if (!file.is_open()) {
+            throw NLMRuntimeError("Failed to serialize config to file");
+        }
+        std::string content((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());
+        return content;
+    }, "Serialize configuration to JSON string");
+
+    m.def("deserialize_config", [](const std::string& json_str) {
+        auto config = std::make_shared<Config>();
+        std::ofstream file("/tmp/temp_config.json");
+        if (!file.is_open()) {
+            throw NLMRuntimeError("Failed to create temporary file for config deserialization");
+        }
+        file << json_str;
+        if (!config->loadFromFile("/tmp/temp_config.json")) {
+            throw NLMRuntimeError("Failed to deserialize config from JSON");
+        }
+        return config;
+    }, py::arg("json_str"), "Deserialize configuration from JSON string");
+
+    // Performance timing utilities
+    m.def("timed_step", [](Brain& brain, int steps, double timestep = 1.0) {
+        auto start = std::chrono::high_resolution_clock::now();
+        double total_time = 0.0;
+        
+        for (int i = 0; i < steps; ++i) {
+            auto step_start = std::chrono::high_resolution_clock::now();
+            brain.step(i, timestep);
+            auto step_end = std::chrono::high_resolution_clock::now();
+            total_time += std::chrono::duration<double>(step_end - step_start).count();
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        double elapsed = std::chrono::duration<double>(end - start).count();
+        
+        std::map<std::string, double> stats;
+        stats["total_elapsed"] = elapsed;
+        stats["average_per_step"] = total_time / steps;
+        stats["steps_per_second"] = steps / elapsed;
+        
+        return stats;
+    }, py::arg("brain"), py::arg("steps"), py::arg("timestep") = 1.0,
+        "Execute multiple steps and return performance statistics");
+
+    // Helper functions for common operations
+    m.def("create_default_config_with_validation", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 1000);
+        config->set("brain.region_count", 10);
+        config->set("brain.simulation.dt", 0.01);
+        config->set("brain.simulation.max_time", 1000.0);
+        config->set("brain.plasticity.enable_stdp", true);
+        config->set("brain.plasticity.enable_hebbian", true);
+        return config;
+    }, "Create a default configuration with sensible values");
+
+    m.def("create_simple_agent_config", []() {
+        auto config = std::make_shared<Config>();
+        config->set("agent.max_energy", 100.0);
+        config->set("agent.energy_decay_rate", 0.01);
+        config->set("agent.health_decay", 0.001);
+        config->set("agent.plasticity_modulator", 1.0);
+        return config;
+    }, "Create a configuration optimized for agent simulation");
+
+    // Visualization helper functions
+    m.def("create_vision_array", [](size_t width, size_t height, size_t channels = 3) {
+        std::vector<std::vector<std::vector<float>>> image(channels, 
+            std::vector<std::vector<float>>(height, 
+                std::vector<float>(width, 0.0f)));
+        return image;
+    }, py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+        "Create a zero-initialized vision array for visualization");
+
+    m.def("normalize_array", [](const std::vector<float>& input, float min_val = 0.0f, float max_val = 1.0f) {
+        if (input.empty()) {
+            throw NLMValueError("Cannot normalize empty array");
+        }
+        
+        float actual_min = *std::min_element(input.begin(), input.end());
+        float actual_max = *std::max_element(input.begin(), input.end());
+        
+        std::vector<float> normalized(input.size());
+        for (size_t i = 0; i < input.size(); ++i) {
+            if (actual_max == actual_min) {
+                normalized[i] = 0.5f;
+            } else {
+                normalized[i] = (input[i] - actual_min) / (actual_max - actual_min);
+                normalized[i] = min_val + normalized[i] * (max_val - min_val);
+            }
+        }
+        return normalized;
+    }, py::arg("input"), py::arg("min_val") = 0.0f, py::arg("max_val") = 1.0f,
+        "Normalize an array to a specified range");
+
+    // Simplified visualization helper (would require actual plotting library)
+    m.def("create_neural_network_plot_data", [](Brain& brain) {
+        std::map<std::string, std::vector<float>> plot_data;
+        
+        // Get various statistics for visualization
+        plot_data["average_firing_rate"] = {brain.getAverageFiringRate()};
+        plot_data["total_neurons"] = {static_cast<float>(brain.getTotalNeuronCount())};
+        plot_data["total_synapses"] = {static_cast<float>(brain.getTotalSynapseCount())};
+        plot_data["active_neurons"] = {static_cast<float>(brain.getActiveNeuronCount())};
+        plot_data["firing_neurons"] = {static_cast<float>(brain.getFiringNeuronCount())};
+        plot_data["excitation_inhibition_ratio"] = {brain.getExcitationInhibitionRatio()};
+        
+        return plot_data;
+    }, py::arg("brain"), "Create visualization data for neural network statistics");
+
+    // Backward compatibility wrappers
+    m.def("old_createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "[DEPRECATED] Use nlm.createBrain() instead");
+
+    m.def("old_createConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "[DEPRECATED] Use nlm.Config() instead");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

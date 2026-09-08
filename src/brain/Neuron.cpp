@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <memory>
 
 namespace nlm {
 
@@ -9,8 +10,9 @@ struct Neuron::Impl {
     NeuronId id;
     NeuronType type;
     NeuronState state;
-    RegionId regionId;
-    PopulationId populationId;
+    std::optional<RegionId> regionId;
+    std::optional<PopulationId> populationId;
+    std::optional<float> lastSpikeTime;  // Optional spike time
     MembranePotential totalCurrent;  // Total synaptic current input this step
     MembranePotential synapticInput;  // Accumulated synaptic input
     std::vector<Timestamp> spikeHistory;
@@ -23,51 +25,61 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
-    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+    Impl() : id(), type(NeuronType::Internal), state(),
+             regionId(std::nullopt), populationId(std::nullopt),
+             lastSpikeTime(std::nullopt), totalCurrent(0.0f), synapticInput(0.0f) {}
 };
 
-Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+Neuron::Neuron(NeuronId id) : pImpl(std::make_unique<Impl>()) {
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
-    pImpl->regionId = INVALID_REGION_ID;
-    pImpl->populationId = INVALID_POPULATION_ID;
+    pImpl->regionId = std::nullopt;
+    pImpl->populationId = std::nullopt;
+    pImpl->lastSpikeTime = std::nullopt;
     pImpl->totalCurrent = 0.0f;
 }
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
 
-void Neuron::setType(NeuronType type) {
-    pImpl->type = type;
+NeuronId Neuron::getId() const {
+    return pImpl->id;
 }
 
-void Neuron::setMembranePotential(MembranePotential potential) {
-    pImpl->state.membranePotential = potential;
+NeuronType Neuron::getType() const {
+    return pImpl->type;
 }
 
-void Neuron::addToMembranePotential(MembranePotential delta) {
-    pImpl->state.membranePotential += delta;
+const NeuronState& Neuron::getState() const {
+    return pImpl->state;
 }
 
-void Neuron::setThreshold(MembranePotential threshold) {
-    pImpl->state.threshold = threshold;
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
+}
+
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
 }
 
 void Neuron::setFiringState(FiringState state) {
     pImpl->state.firingState = state;
+}
+
+void Neuron::setRefractoryPeriod(uint32_t steps) {
+    pImpl->state.refractoryPeriod = steps;
 }
 
 void Neuron::decrementRefractory() {
@@ -79,8 +91,20 @@ void Neuron::decrementRefractory() {
     }
 }
 
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
+}
+
 void Neuron::setFiringRate(FiringRate rate) {
     pImpl->state.firingRate = rate;
+}
+
+MembranePotential Neuron::getResetPotential() const {
+    return pImpl->state.resetPotential;
+}
+
+void Neuron::setResetPotential(MembranePotential potential) {
+    pImpl->state.resetPotential = potential;
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
@@ -91,55 +115,91 @@ MembranePotential Neuron::getLeakConductance() const {
     return pImpl->state.leakConductance;
 }
 
-void Neuron::setRefractoryPeriod(uint32_t steps) {
-    pImpl->state.refractoryPeriod = steps;
-}
-
 uint32_t Neuron::getRefractoryPeriod() const {
     return pImpl->state.refractoryPeriod;
-}
-
-void Neuron::setRestingPotential(MembranePotential potential) {
-    pImpl->state.restingPotential = potential;
 }
 
 MembranePotential Neuron::getRestingPotential() const {
     return pImpl->state.restingPotential;
 }
 
-void Neuron::setResetPotential(MembranePotential potential) {
-    pImpl->state.resetPotential = potential;
+void Neuron::setRestingPotential(MembranePotential potential) {
+    pImpl->state.restingPotential = potential;
+}
+
+MembranePotential Neuron::getLastSpikeTime() const {
+    return pImpl->lastSpikeTime.value_or(-1.0f);
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->totalCurrent;
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
+}
+
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId.value_or(INVALID_REGION_ID);
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId.value_or(INVALID_POPULATION_ID);
+}
+
+NeuronState& Neuron::getState() {
+    return pImpl->state;
+}
+
+PlasticityFlags& Neuron::getPlasticityFlags() {
+    return pImpl->plasticityFlags;
+}
+
+MembranePotential Neuron::getMembranePotential() const {
+    return pImpl->state.membranePotential;
+}
+
+void Neuron::setMembranePotential(MembranePotential potential) {
+    pImpl->state.membranePotential = potential;
+}
+
+void Neuron::addToMembranePotential(MembranePotential delta) {
+    pImpl->state.membranePotential += delta;
+}
+
+MembranePotential Neuron::getThreshold() const {
+    return pImpl->state.threshold;
+}
+
+void Neuron::setThreshold(MembranePotential threshold) {
+    pImpl->state.threshold = threshold;
 }
 
 bool Neuron::checkThreshold() const {
     return pImpl->state.membranePotential >= pImpl->state.threshold;
 }
 
-float Neuron::getLastSpikeTime() const {
-    return pImpl->state.lastSpikeTime;
-}
-
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
-    // Real synaptic input: excitatory currents add to total current
-    // amplitude represents synaptic conductance * reversal potential contribution
     pImpl->synapticInput += amplitude;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
-    // Real inhibitory input: subtract from total current
-    // Inhibitory synaptic currents hyperpolarize the neuron
     pImpl->synapticInput -= amplitude;
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
-    // Modulatory input affects plasticity but not directly integrated
-    // Used for neuromodulation (e.g., dopamine, acetylcholine)
     pImpl->state.adaptationVariable += amplitude * 0.1f;
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
-    // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
     pImpl->synapticInput += current;
 }
 
@@ -152,10 +212,12 @@ void Neuron::recordSpike(Timestamp timestamp) {
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
     }
+    pImpl->lastSpikeTime = static_cast<float>(timestamp);
 }
 
 void Neuron::clearSpikeHistory() {
     pImpl->spikeHistory.clear();
+    pImpl->lastSpikeTime = std::nullopt;
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
@@ -164,14 +226,6 @@ void Neuron::addIncomingSynapse(SynapseHandle handle) {
 
 void Neuron::addOutgoingSynapse(SynapseHandle handle) {
     pImpl->outgoingSynapses.push_back(handle);
-}
-
-NeuronState& Neuron::getState() {
-    return pImpl->state;
-}
-
-PlasticityFlags& Neuron::getPlasticityFlags() {
-    return pImpl->plasticityFlags;
 }
 
 void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
@@ -188,7 +242,11 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+void Neuron::setType(NeuronType type) {
+    pImpl->type = type;
+}
+
+void Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
     // Handle refractory period
@@ -269,6 +327,7 @@ void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    pImpl->lastSpikeTime = std::nullopt;
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {

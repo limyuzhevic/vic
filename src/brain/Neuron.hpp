@@ -3,6 +3,8 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <memory>
+#include <optional>
 
 namespace nlm {
 
@@ -65,17 +67,11 @@ public:
     // State access
     const NeuronState& getState() const;
     NeuronState& getState();
-    
-    // Membrane potential
-    MembranePotential getMembranePotential() const;
-    void setMembranePotential(MembranePotential potential);
-    void addToMembranePotential(MembranePotential delta);
-    
-    // Threshold
-    MembranePotential getThreshold() const;
-    void setThreshold(MembranePotential threshold);
-    
-    // Firing state
+
+    const PlasticityFlags& getPlasticityFlags() const;
+    PlasticityFlags& getPlasticityFlags();
+
+    // Firing state checks
     bool isFiring() const;
     bool isRefractory() const;
     void setFiringState(FiringState state);
@@ -85,6 +81,15 @@ public:
     // Firing rate (for rate-based computation)
     FiringRate getFiringRate() const;
     void setFiringRate(FiringRate rate);
+    
+    // Membrane potential
+    MembranePotential getMembranePotential() const;
+    void setMembranePotential(MembranePotential potential);
+    void addToMembranePotential(MembranePotential delta);
+    
+    // Threshold
+    MembranePotential getThreshold() const;
+    void setThreshold(MembranePotential threshold);
     
     // LIF neuron parameters
     void setLeakConductance(MembranePotential conductance);
@@ -123,8 +128,6 @@ public:
     const std::vector<SynapseHandle>& getOutgoingSynapses() const;
     
     // Plasticity state
-    const PlasticityFlags& getPlasticityFlags() const;
-    PlasticityFlags& getPlasticityFlags();
     void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
     
     // Region/population membership
@@ -145,7 +148,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

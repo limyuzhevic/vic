@@ -1,48 +1,3 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
-
-// Forward declarations
-class Config;
-
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
-};
-
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
-    
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
-};
-
 // Main configuration class
 class Config {
 public:
@@ -93,6 +48,87 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate(bool treatWarningsAsErrors = false);
+    std::vector<ValidationError> getValidationErrors() const;
+    void addValidationRule(const ValidationRule& rule);
+    void clearValidationRules();
+    
+    // Range validation helpers
+    static bool validateRange(const ConfigValue& value, double min, double max);
+    
+    // Pattern validation helpers
+    static bool validatePattern(const std::string& value, const std::string& pattern);
+    
+    // Conditional validation
+    void addConditionalValidation(const std::string& conditionKey, const std::string& dependentKey,
+                                  std::function<bool(const ConfigValue&, const ConfigValue&)> validator);
+    
+    // Default configuration templates
+    static ConfigTemplate getPhase2Template();
+    static ConfigTemplate getPhase4Template();
+    static ConfigTemplate getPhase6Template();
+    void applyTemplate(const ConfigTemplate& template);
+    
+    // Configuration inheritance/substitution
+    void applyInheritance(const Config& parentConfig);
+    bool resolveSubstitutions();
+    
+    // Configuration merge strategies
+    enum class MergeStrategy {
+        Override,
+        Merge,
+        KeepExisting,
+        DeepMerge
+    };
+    void merge(const Config& other, MergeStrategy strategy = MergeStrategy::Override);
+    
+    // Serialization enhancements
+    bool saveToJSON(const std::string& filepath) const;
+    bool saveToYAML(const std::string& filepath) const;
+    bool saveToBinary(const std::string& filepath) const;
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool loadFromBinary(const std::string& filepath);
+    
+    // Configuration versioning
+    void incrementVersion(const std::string& description = "");
+    std::string getVersion() const;
+    std::vector<ConfigVersion> getVersionHistory() const;
+    
+    // Configuration comparison utilities
+    bool hasDiff(const Config& other) const;
+    std::vector<ConfigDiff> getDiff(const Config& other) const;
+    
+    // Configuration patch system
+    bool applyPatch(const std::vector<ConfigDiff>& diff);
+    bool exportDiff(const std::string& filepath) const;
+    bool importDiff(const std::string& filepath);
+    
+    // Configuration macro substitution
+    bool substituteMacros(const std::map<std::string, std::string>& macros);
+    
+    // Advanced features
+    bool exportConfig(const std::string& filepath, const std::string& format = "auto") const;
+    bool importConfig(const std::string& filepath, const std::string& format = "auto");
+    
+    // Configuration monitoring
+    void setMonitorEnabled(bool enabled);
+    bool isMonitorEnabled() const;
+    std::vector<ConfigError> getRecentErrors() const;
+    std::vector<ConfigError> getRecentWarnings() const;
+    
+    // Get detailed validation report
+    std::string getValidationReport() const;
+    
+    // File format detection
+    static std::string detectFileFormat(const std::string& filepath);
+    
+    // Error reporting
+    static ConfigError createError(ConfigErrorType type, const std::string& message, 
+                                  const std::string& key = "", const std::string& file = "",
+                                  int line = 0, int column = 0, bool isWarning = false);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +136,14 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Internal validation implementation
+    void validateEntry(const ConfigEntry& entry, std::vector<ValidationError>& errors) const;
+    void validateConditionalDependencies(std::vector<ValidationError>& errors) const;
+    
+    // Error handling helpers
+    void reportError(const ConfigError& error);
+    void reportWarning(const ConfigError& error);
 };
 
 } // namespace nlm
