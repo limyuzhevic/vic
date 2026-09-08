@@ -99,7 +99,8 @@ public:
     float getLastSpikeTime() const;
     
     // LIF step function - returns true if neuron fired
-    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
+    // Phase 2: Implement real integrate-and-fire dynamics
+    bool stepLIF(Timestamp currentTime, TimestepDuration dt, RandomGenerator* rng = nullptr);
     
     // Incoming signals (post-synaptic potentials)
     void receiveExcitatoryInput(MembranePotential amplitude);

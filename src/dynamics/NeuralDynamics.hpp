@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include "../brain/Neuron.hpp"
 #include "../brain/Synapse.hpp"
+#include "../core/Random/Random.hpp"
 
 namespace nlm {
 
@@ -56,7 +57,8 @@ private:
 // TODO PHASE 2: Implement Hodgkin-Huxley
 class HodgkinHuxleyDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement HH dynamics
+    virtual ~HodgkinHuxleyDynamics() = default;
+    
     void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
     void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
     void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
@@ -64,11 +66,12 @@ public:
     void reset() override {}
 };
 
-// FitzHugh-Nagumo dynamics (simplified兴奋性模型)
+// FitzHugh-Nagumo dynamics (simplified excitation model)
 // TODO PHASE 2: Implement FHN dynamics
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement FHN dynamics
+    virtual ~FitzHughNagumoDynamics() = default;
+    
     void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
     void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
     void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}

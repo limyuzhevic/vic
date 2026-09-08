@@ -336,7 +336,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
+                // Pass the brain's random generator for stochastic noise in LIF integration
+                neuron->stepLIF(currentTime, pImpl->timestep, pImpl->rng.get());
             }
         }
     }
