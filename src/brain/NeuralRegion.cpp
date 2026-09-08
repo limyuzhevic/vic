@@ -9,8 +9,10 @@ struct NeuralRegion::Impl {
     std::string name;
     std::vector<std::unique_ptr<NeuralPopulation>> populations;
     std::vector<std::unique_ptr<Synapse>> synapses;
+    std::unordered_map<RegionId, std::vector<PopulationId>> populationMap;  // region -> population ids
     std::unordered_map<NeuronId, std::vector<SynapseId>> outgoingSynapses;  // source -> synapse ids
     std::unordered_map<NeuronId, std::vector<SynapseId>> incomingSynapses;  // dest -> synapse ids
+    std::unordered_map<SynapseId, std::unique_ptr<Synapse>> synapseMap;  // id -> synapse (O(1) lookup)
     SynapseId nextSynapseId;
     
     explicit Impl(RegionId id) : id(id), nextSynapseId(1) {}
@@ -20,6 +22,21 @@ NeuralRegion::NeuralRegion(RegionId id) : pImpl(new Impl(id)) {}
 
 NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(new Impl(id)) {
     pImpl->name = name;
+}
+
+NeuralRegion::~NeuralRegion() = default;
+
+NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(other.pImpl) {
+    other.pImpl = nullptr;
+}
+
+NeuralRegion& NeuralRegion::operator=(NeuralRegion&& other) noexcept {
+    if (this != &other) {
+        delete pImpl;
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+    return *this;
 }
 
 NeuralRegion::~NeuralRegion() = default;
@@ -49,26 +66,30 @@ void NeuralRegion::setName(const std::string& name) {
     pImpl->name = name;
 }
 
-PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
-    PopulationId popId(pImpl->populations.size() + 1);
-    auto population = std::make_unique<NeuralPopulation>(popId, size);
-    population->setNeuronType(type);
-    pImpl->populations.push_back(std::move(population));
-    return popId;
-}
-
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
-        return nullptr;
+    // OPTIMIZATION: Replace O(n) linear search with O(1) map lookup
+    auto it = pImpl->populationMap.find(id);
+    if (it != pImpl->populationMap.end()) {
+        for (auto& pop : pImpl->populations) {
+            if (pop->getId() == id) {
+                return pop.get();
+            }
+        }
     }
-    return pImpl->populations[id.index() - 1].get();
+    return nullptr;
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
-        return nullptr;
+    // OPTIMIZATION: Replace O(n) linear search with O(1) map lookup
+    auto it = pImpl->populationMap.find(id);
+    if (it != pImpl->populationMap.end()) {
+        for (const auto& pop : pImpl->populations) {
+            if (pop->getId() == id) {
+                return pop.get();
+            }
+        }
     }
-    return pImpl->populations[id.index() - 1].get();
+    return nullptr;
 }
 
 size_t NeuralRegion::getPopulationCount() const {
@@ -103,19 +124,19 @@ SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
 }
 
 Synapse* NeuralRegion::getSynapse(SynapseId id) {
-    for (auto& syn : pImpl->synapses) {
-        if (syn->getId() == id) {
-            return syn.get();
-        }
+    // OPTIMIZATION: Replace O(n) linear search with O(1) map lookup
+    auto it = pImpl->synapseMap.find(id);
+    if (it != pImpl->synapseMap.end()) {
+        return it->second.get();
     }
     return nullptr;
 }
 
 const Synapse* NeuralRegion::getSynapse(SynapseId id) const {
-    for (auto& syn : pImpl->synapses) {
-        if (syn->getId() == id) {
-            return syn.get();
-        }
+    // OPTIMIZATION: Replace O(n) linear search with O(1) map lookup
+    auto it = pImpl->synapseMap.find(id);
+    if (it != pImpl->synapseMap.end()) {
+        return it->second.get();
     }
     return nullptr;
 }

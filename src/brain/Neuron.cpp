@@ -23,8 +23,14 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
+    // Spike history circular buffer optimization
+    size_t spikeHistoryWritePos;
+    size_t spikeHistoryCount;
+    
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             spikeHistory(MAX_SPIKE_HISTORY),
+             spikeHistoryWritePos(0), spikeHistoryCount(0) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -35,7 +41,9 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->totalCurrent = 0.0f;
 }
 
-Neuron::~Neuron() = default;
+Neuron::~Neuron() {
+    delete pImpl;
+}
 
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -148,10 +156,9 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
-    }
+    // OPTIMIZATION: Replace vector with circular buffer for O(1) insertion
+    pImpl->spikeHistory[pImpl->spikeHistoryWritePos] = timestamp;
+    pImpl->spikeHistoryWritePos = (pImpl->spikeHistoryWritePos + 1) % pImpl->spikeHistory.capacity();
 }
 
 void Neuron::clearSpikeHistory() {
@@ -201,7 +208,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         }
         return false;
     }
-    
+
     // LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)

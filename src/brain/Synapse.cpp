@@ -62,7 +62,9 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->lastPostSpikeTime = -1.0f;
 }
 
-Synapse::~Synapse() = default;
+Synapse::~Synapse() {
+    delete pImpl;
+}
 
 Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -205,12 +207,17 @@ void Synapse::step(Timestamp currentTime) {
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
+    // Decay short-term depression independently
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
+        float timeSinceActivity = 0.0f;
+        
+        if (pImpl->lastPostSpikeTime >= 0.0f) {
+            timeSinceActivity = std::max(timeSinceActivity, static_cast<float>(currentTime - pImpl->lastPostSpikeTime));
+        }
+        if (pImpl->lastPreSpikeTime >= 0.0f) {
+            timeSinceActivity = std::max(timeSinceActivity, static_cast<float>(currentTime - pImpl->lastPreSpikeTime));
+        }
+        
         // Recovery from depression toward 1.0
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }

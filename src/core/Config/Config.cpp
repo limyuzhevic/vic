@@ -24,6 +24,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        std::cerr << "Config::loadFromFile: Failed to open file: " << filepath << std::endl;
         return false;
     }
     
