@@ -190,9 +190,8 @@ std::vector<std::vector<float>> NeuralPrediction::predictMultipleSteps(Simulatio
 }
 
 void NeuralPrediction::recordAction(ActionType action, SimulationStep step) {
-    if (recentSensoryStates_.empty()) return;
-    
-    recentActions_.push_back({action, recentSensoryStates_.back()});
+    recentActions_.push_back({action, recentSensoryStates_.empty() ? 
+                               std::vector<float>() : recentSensoryStates_.back()});
     if (recentActions_.size() > 100) {
         recentActions_.erase(recentActions_.begin());
     }

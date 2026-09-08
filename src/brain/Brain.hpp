@@ -1,5 +1,3 @@
-#pragma once
-
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
@@ -19,7 +17,9 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
-class PredictionSystem;
+class NeuralPrediction;
+class ActionConsequencePredictor;
+class PredictionErrorSignal;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
@@ -137,31 +137,22 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
+    // ========== MEMORY SYSTEM ACCESSORS ==========
     
-    // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
-    
-    // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
-    // ========== PREDICTION SYSTEM ==========
+    // ========== PREDICTION SYSTEM ACCESSORS ==========
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    NeuralPrediction* getPredictionSystem();
+    ActionConsequencePredictor* getActionConsequencePredictor();
+    PredictionErrorSignal* getPredictionErrorSignal();
     
-    // ========== COGNITION SYSTEMS ==========
+    // ========== COGNITION SYSTEM ACCESSORS ==========
     
-    // Neural planner for action planning
     NeuralPlanner* getPlanner();
-    
-    // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
-    
-    // Attentional selection for focus
     AttentionalSelection* getAttention();
     
     // ========== DEVELOPMENT SYSTEM ==========

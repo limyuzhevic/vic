@@ -36,10 +36,11 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
     
+    // Store the episode
     episodes_.push_back(stored);
     
     // Create episode neuron for pattern completion
-    if (brain_ && !episode.sensoryState.empty()) {
+    if (brain_ && !stored.sensoryState.empty()) {
         NeuronId epNeuron(episodes_.size() + 20000);
         pImpl->episodeNeurons.push_back(epNeuron);
         

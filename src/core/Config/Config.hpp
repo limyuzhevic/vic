@@ -5,11 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
-
-// Forward declarations
-class Config;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -55,7 +53,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -100,6 +98,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON parsing helpers
+    static void parseJsonObject(const nlohmann::json& j, std::vector<ConfigEntry>& entries);
+    static void convertJsonToConfigValue(const nlohmann::json& j, ConfigValue& value);
+    static nlohmann::json convertConfigValueToJson(const ConfigValue& value);
 };
 
 } // namespace nlm

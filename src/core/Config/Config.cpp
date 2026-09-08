@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
+#include <iostream>
+#include <limits>
 
 namespace nlm {
 
@@ -19,40 +22,22 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    try {
+        // Parse JSON file
+        auto j = nlohmann::json::parse(file);
+        pImpl->entries.clear();
+        parseJsonObject(j, pImpl->entries);
+        return true;
+    } catch (const nlohmann::json::parse_error& e) {
+        return false;
+    } catch (const std::exception& e) {
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,14 +69,93 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    nlohmann::json j = nlohmann::json::array();
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        nlohmann::json entryJson;
+        entryJson["key"] = entry.key;
+        entryJson["description"] = entry.description;
+        entryJson["value"] = convertConfigValueToJson(entry.value);
+        entryJson["source"] = static_cast<int>(entry.source);
+        j.push_back(entryJson);
     }
     
+    file << j.dump(2);
     return true;
 }
 
+// Convert ConfigValue to JSON
+template<typename T>
+nlohmann::json toJson(const T& value) {
+    return value;
+}
+
+nlohmann::json Config::convertConfigValueToJson(const ConfigValue& value) {
+    return std::visit([](auto&& arg) -> nlohmann::json {
+        return toJson(arg);
+    }, value);
+}
+
+// Convert JSON to ConfigValue
+void Config::convertJsonToConfigValue(const nlohmann::json& j, ConfigValue& value) {
+    if (j.is_string()) {
+        value = j.get<std::string>();
+    } else if (j.is_number_integer()) {
+        int64_t intVal = j.get<int64_t>();
+        if (intVal >= std::numeric_limits<int>::min() && 
+            intVal <= std::numeric_limits<int>::max()) {
+            value = static_cast<int>(intVal);
+        } else {
+            value = intVal;
+        }
+    } else if (j.is_number_float()) {
+        value = j.get<double>();
+    } else if (j.is_boolean()) {
+        value = j.get<bool>();
+    } else if (j.is_array()) {
+        if (!j.empty()) {
+            if (j[0].is_number_integer()) {
+                value = j.get<std::vector<int>>();
+            } else if (j[0].is_number_float()) {
+                value = j.get<std::vector<double>>();
+            } else if (j[0].is_string()) {
+                value = j.get<std::vector<std::string>>();
+            } else {
+                throw std::runtime_error("Unsupported array element type in JSON");
+            }
+        } else {
+            value = std::vector<std::string>();
+        }
+    } else {
+        throw std::runtime_error("Unsupported JSON type for configuration value");
+    }
+}
+
+void Config::parseJsonObject(const nlohmann::json& j, std::vector<ConfigEntry>& entries) {
+    if (j.is_array()) {
+        for (const auto& item : j) {
+            ConfigEntry entry;
+            entry.key = item.value("key", "");
+            entry.description = item.value("description", "");
+            entry.source = static_cast<ConfigSource>(item.value("source", 0));
+            convertJsonToConfigValue(item["value"], entry.value);
+            entries.push_back(entry);
+        }
+    } else if (j.is_object()) {
+        for (const auto& [key, value] : j.items()) {
+            ConfigEntry entry;
+            entry.key = key;
+            entry.description = "";
+            entry.source = ConfigSource::File;
+            convertJsonToConfigValue(value, entry.value);
+            entries.push_back(entry);
+        }
+    } else {
+        throw std::runtime_error("Invalid JSON format for configuration file");
+    }
+}
+
+// Implementation of template get methods
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
@@ -108,12 +172,14 @@ std::optional<T> Config::get(const std::string& key) const {
     }
 }
 
+// Implementation of template getOr methods
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
     return val.has_value() ? val.value() : defaultValue;
 }
 
+// Set methods implementation
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
@@ -142,6 +208,7 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
+// Other methods
 bool Config::has(const std::string& key) const {
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
@@ -186,6 +253,7 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+// Helper function implementations
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
