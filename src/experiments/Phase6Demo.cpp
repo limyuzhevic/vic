@@ -1,13 +1,13 @@
-/**
- * Phase 6 Demo - Integration Test
- * 
- * This demo runs the Phase 6 integration experiment to verify
- * that all brain systems are properly connected.
- */
+#pragma once
+
+// Phase6Demo.cpp - Phase 6 Demo Application
+// This is the main demo application for Phase 6 integration testing
+// It provides a comprehensive test of all integrated brain systems
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
+#include <chrono>
 
 using namespace nlm;
 
@@ -60,7 +60,11 @@ int main(int argc, char* argv[]) {
     config.enableReplay = true;
     config.enableDevelopment = true;
     
-    auto result = experiment.run(config);
+    auto startTime = std::chrono::high_resolution_clock::now();
+    Phase6Result result = experiment.run(config);
+    auto endTime = std::chrono::high_resolution_clock::now();
+    
+    auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(endTime - startTime);
     
     std::cout << std::endl;
     std::cout << "=== FINAL RESULTS ===" << std::endl;

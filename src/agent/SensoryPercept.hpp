@@ -1,58 +1,97 @@
 #pragma once
 
-#include "AgentBody.hpp"
-#include "../sensory/SensoryInput.hpp"
+// SensoryPercept.hpp - Sensory percept container
+// This header defines the SensoryPercept class that aggregates all sensory inputs
+
+#include "Vision.hpp"
+#include "Audio.hpp"
+#include "InternalSignals.hpp"
+#include "../core/Types/Types.hpp"
 #include <memory>
-#include <vector>
+#include <string>
 
 namespace nlm {
 
-// Sensory data packet - what the agent perceives
-// Contains only low-level sensory signals, NO semantic labels
+/**
+ * @class SensoryPercept
+ * @brief Container for all sensory inputs from environment
+ * 
+ * The SensoryPercept class aggregates all sensory modalities that an agent
+ * receives from the environment. This includes vision (external visual input),
+ * touch (tactile sensing), proprioception (body position awareness),
+ * and internal signals (internal physiological states).
+ * 
+ * This class is used by the AgentBrain to communicate with the NLM brain,
+ * allowing the brain to receive environmental information and generate
+ * appropriate motor commands.
+ */
 class SensoryPercept {
 public:
     SensoryPercept();
-    ~SensoryPercept() = default;
+    ~SensoryPercept();
     
-    // Vision: simple grayscale intensity grid (no RGB, no object labels)
-    // Format: row-major, values 0.0-1.0
-    const std::vector<float>& getVision() const { return vision_; }
-    void setVision(const std::vector<float>& v) { vision_ = v; }
-    size_t getVisionWidth() const { return visionWidth_; }
-    size_t getVisionHeight() const { return visionHeight_; }
+    // Disable copying, enable moving
+    SensoryPercept(const SensoryPercept&) = delete;
+    SensoryPercept& operator=(const SensoryPercept&) = delete;
+    SensoryPercept(SensoryPercept&&) noexcept;
+    SensoryPercept& operator=(SensoryPercept&&) noexcept;
     
-    // Touch/proximity sensors (binary collision signals)
-    const std::vector<float>& getTouch() const { return touch_; }
-    void setTouch(const std::vector<float>& t) { touch_ = t; }
+    // Vision sensory input
+    Vision& getVision();
+    const Vision& getVision() const;
+    void setVision(const Vision& vision);
     
-    // Internal state signals (homeostatic signals)
-    const std::vector<float>& getInternal() const { return internal_; }
-    void setInternal(const std::vector<float>& i) { internal_ = i; }
+    // Vision properties
+    size_t getVisionWidth() const;
+    size_t getVisionHeight() const;
+    size_t getVisionChannels() const;
     
-    // Proprioception: body position/velocity signals
-    const std::vector<float>& getProprioception() const { return proprioception_; }
-    void setProprioception(const std::vector<float>& p) { proprioception_ = p; }
+    // Touch/Proprioception (combined for simplicity)
+    InternalSignals& getTouch();
+    const InternalSignals& getTouch() const;
+    void setTouch(const InternalSignals& touch);
     
-    // Audio-like signals (if enabled)
-    const std::vector<float>& getAudio() const { return audio_; }
-    void setAudio(const std::vector<float>& a) { audio_ = a; }
+    // Internal signals (body state)
+    InternalSignals& getInternal();
+    const InternalSignals& getInternal() const;
+    void setInternal(const InternalSignals& internal);
     
-    // Get all signals concatenated (for brain input)
+    // Proprioception (body position/rotation)
+    std::vector<float>& getProprioception();
+    const std::vector<float>& getProprioception() const;
+    void setProprioception(const std::vector<float>& proprioception);
+    
+    // Audio sensory input
+    Audio& getAudio();
+    const Audio& getAudio() const;
+    void setAudio(const Audio& audio);
+    
+    // Audio properties
+    size_t getAudioSampleRate() const;
+    size_t getAudioNumSamples() const;
+    
+    // All sensory signals
     std::vector<float> getAllSignals() const;
     
-    // Timestamp
-    double getTimestamp() const { return timestamp_; }
-    void setTimestamp(double t) { timestamp_ = t; }
+    // Timestamp management
+    double getTimestamp() const;
+    void setTimestamp(double timestamp);
+    
+    // Reset all sensory inputs
+    void reset();
+    
+    // Check if any sensory data is present
+    bool hasData() const;
+    
+    // Get total sensory dimensionality
+    size_t getTotalDimensionality() const;
+    
+    // Get sensory data summary
+    std::string getSummary() const;
     
 private:
-    std::vector<float> vision_;
-    size_t visionWidth_;
-    size_t visionHeight_;
-    std::vector<float> touch_;
-    std::vector<float> internal_;
-    std::vector<float> proprioception_;
-    std::vector<float> audio_;
-    double timestamp_;
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm
