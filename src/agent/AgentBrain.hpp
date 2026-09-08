@@ -6,6 +6,7 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <string>
 
 namespace nlm {
 
@@ -69,12 +70,40 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced features for expert users
+    // Set action history limit
+    void setActionHistoryLimit(size_t limit) { actionHistorySizeLimit_ = limit; }
+    
+    // Get action history
+    const std::vector<MotorCommand>& getActionHistory() const { return actionHistory_; }
+    
+    // Clear action history
+    void clearActionHistory() { actionHistory_.clear(); }
+    
+    // Get learning statistics
+    float getActionSuccessRate(MotorCommand cmd) const;
+    size_t getActionCount(MotorCommand cmd) const;
+    size_t getTotalActionCount() const;
+    
+    // Enable/disable action learning
+    void enableActionLearning(bool enable) { actionLearningEnabled_ = enable; }
+    bool isActionLearningEnabled() const { return actionLearningEnabled_; }
+    
+    // Reset action statistics
+    void resetActionStatistics();
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Organize neurons by type based on brain configuration
+    void organizeNeuronsByType();
+    
+    // Helper functions
+    std::string motorCommandToString(MotorCommand cmd) const;
     
     std::shared_ptr<Brain> brain_;
     
@@ -108,6 +137,15 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    
+    // Advanced learning features
+    bool actionLearningEnabled_;
+    size_t actionHistorySizeLimit_;
+    std::vector<MotorCommand> actionHistory_;
+    
+    // Action statistics for learning
+    std::vector<size_t> actionSuccessCount_;
+    std::vector<size_t> actionTotalCount_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
