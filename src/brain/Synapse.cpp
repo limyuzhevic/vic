@@ -158,14 +158,22 @@ PlasticityFlags& Synapse::getPlasticityFlags() {
     return pImpl->plasticityFlags;
 }
 
+const PlasticityFlags& Synapse::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
+}
+
 void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
     pImpl->plasticityFlags.hebbian = hebbian;
     pImpl->plasticityFlags.stdp = stdp;
     pImpl->plasticityFlags.reward_modulated = rewardModulated;
 }
 
-const PlasticityFlags& Synapse::getPlasticityFlags() const {
-    return pImpl->plasticityFlags;
+const std::vector<SynapseHandle>& Synapse::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Synapse::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
 }
 
 float Synapse::getEligibilityTrace() const {
