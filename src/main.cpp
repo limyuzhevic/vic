@@ -262,9 +262,9 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("  Testing STDP on 5 synapses:");
     
     // Record initial weights
-    std::vector<float> beforeWeights;
+    std::vector<float> beforeWeights(5);
     for (size_t i = 0; i < 5; ++i) {
-        beforeWeights.push_back(synapses[i]->getWeight());
+        beforeWeights[i] = synapses[i]->getWeight();
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
                     " before: " + std::to_string(beforeWeights[i]));

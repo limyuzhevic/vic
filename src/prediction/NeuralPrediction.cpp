@@ -476,8 +476,8 @@ float PredictionErrorSignal::computeError(const std::vector<float>& predicted,
         intensityDiff += diff * diff;
     }
     
-    float meanError = totalDiff / predicted.size();
-    float meanSqError = intensityDiff / predicted.size();
+    float meanError = totalDiff / std::max<size_t>(predicted.size(), 1);
+    float meanSqError = intensityDiff / std::max<size_t>(predicted.size(), 1);
     
     // Compute spatial error (variance of differences)
     float spatialVar = 0.0f;

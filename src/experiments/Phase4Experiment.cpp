@@ -722,8 +722,9 @@ float RepresentationAnalyzer::measureSelectivity(const std::vector<std::vector<f
     if (totalResponse < 0.0001f) return 0.0f;
     
     // Selectivity = how much the max dominates
-    float avgResponse = totalResponse / responses.size();
-    return maxResponse > 0.0f ? (maxResponse - avgResponse) / maxResponse : 0.0f;
+    size_t responseCount = responses.size();
+    if (responseCount == 0) return 0.0f;
+    float avgResponse = totalResponse / responseCount;
 }
 
 std::vector<float> RepresentationAnalyzer::computePopulationVector(

@@ -44,11 +44,13 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+        if (auto* region = brain_->getRegion(neuron.getId() / 1000)) {
+            if (auto* n = region->getAllNeurons()) {
+                for (auto* nn : *n) {
+                    if (nn->getId() == neuron) {
+                        nn->injectCurrent(activation * 5.0f);
+                        break;
+                    }
                 }
             }
         }
@@ -194,7 +196,7 @@ float NeuralWorkingMemory::getMemoryActivity() const {
     for (float act : memoryActivations_) {
         total += act;
     }
-    return total / memoryActivations_.size();
+    return total / static_cast<float>(memoryActivations_.size());
 }
 
 void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
@@ -316,7 +318,9 @@ std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector
     }
     
     // Winners are neurons with above-threshold activity
-    float threshold = competitionThreshold_ * totalActivity / competitors.size();
+    size_t competitorCount = competitors.size();
+    if (competitorCount == 0) return winners_;
+    float threshold = competitionThreshold_ * totalActivity / static_cast<float>(competitorCount);
     
     for (size_t i = 0; i < competitors.size(); ++i) {
         if (activities[i] >= threshold) {

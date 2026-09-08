@@ -215,7 +215,7 @@ float NeuralEpisodicMemory::getAverageReward() const {
     for (const auto& ep : episodes_) {
         sum += ep.reward;
     }
-    return sum / episodes_.size();
+    return sum / static_cast<float>(episodes_.size());
 }
 
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
