@@ -45,6 +45,13 @@ float PredictionSystem::getConfidence() const {
     return pImpl->confidence;
 }
 
+// Get predicted state (for attention guidance)
+std::vector<float> PredictionSystem::getPredictedState() const {
+    // TODO: Implement actual prediction storage
+    // For now, return empty vector
+    return {};
+}
+
 const std::vector<float>& PredictionSystem::getErrorHistory() const {
     return pImpl->errorHistory;
 }

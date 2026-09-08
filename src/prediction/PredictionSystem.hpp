@@ -18,6 +18,9 @@ public:
     // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
+    // Get predicted state (for attention guidance)
+    std::vector<float> getPredictedState() const;
+    
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
