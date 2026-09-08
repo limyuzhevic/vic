@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,40 +20,57 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Load from JSON file using nlohmann::json
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Process JSON object recursively
+        processJSON(jsonData, ConfigSource::File, "");
+        
+        return true;
+    } catch (const std::exception& e) {
+        // Fall back to simple parser on error
+        std::ifstream fallbackFile(filepath);
+        if (!fallbackFile.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        std::string line;
+        while (std::getline(fallbackFile, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        
+        return true;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -199,17 +217,123 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+void Config::processJSON(const nlohmann::json& jsonData, ConfigSource source, const std::string& prefix) {
+    // Helper function to recursively process JSON data into configuration entries
+    if (jsonData.is_object()) {
+        for (const auto& [key, value] : jsonData.items()) {
+            std::string fullKey = prefix.empty() ? key : prefix + "." + key;
+            processJSON(value, source, fullKey);
+        }
+    } else if (jsonData.is_array()) {
+        // Convert array to string representation
+        std::stringstream ss;
+        ss << "[";
+        for (size_t i = 0; i < jsonData.size(); ++i) {
+            if (i > 0) ss << ", ";
+            ss << jsonData[i];
+        }
+        ss << "]";
+        set(prefix, ss.str(), source);
+    } else {
+        // Convert primitive type to ConfigValue
+        ConfigValue configValue;
+        if (jsonData.is_string()) {
+            configValue = jsonData.get<std::string>();
+        } else if (jsonData.is_number_integer()) {
+            configValue = jsonData.get<int64_t>();
+        } else if (jsonData.is_number_unsigned()) {
+            configValue = jsonData.get<uint64_t>();
+        } else if (jsonData.is_number()) {
+            configValue = jsonData.get<double>();
+        } else if (jsonData.is_boolean()) {
+            configValue = jsonData.get<bool>();
+        } else if (jsonData.is_null()) {
+            configValue = std::string("null");
+        }
+        
+        if (configValue.index() != std::variant_npos) {
+            set(prefix, configValue, source);
+        }
+    }
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool Config::saveToFile(const std::string& filepath) const {
+    // Save to JSON file using nlohmann::json
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        nlohmann::json jsonData;
+        
+        // Convert configuration entries to JSON
+        for (const auto& entry : pImpl->entries) {
+            setJSONValue(jsonData, entry.key, entry.value);
+        }
+        
+        // Write pretty-printed JSON
+        file << jsonData.dump(2);
+        return true;
+    } catch (const std::exception& e) {
+        // Fall back to simple format on error
+        std::ofstream fallbackFile(filepath);
+        if (!fallbackFile.is_open()) {
+            return false;
+        }
+        
+        for (const auto& entry : pImpl->entries) {
+            fallbackFile << "# " << entry.description << "\n";
+            fallbackFile << entry.key << " = " << "VALUE_PLACEHOLDER\n";
+        }
+        
+        return true;
+    }
+}
 
-} // namespace nlm
+void Config::setJSONValue(nlohmann::json& jsonData, const std::string& key, const ConfigValue& value) {
+    // Helper function to convert ConfigValue to nlohmann::json
+    std::string processedKey = key;
+    
+    // Handle dotted keys for nested JSON structure
+    size_t dotPos = key.find('.');
+    if (dotPos != std::string::npos) {
+        std::string parentKey = key.substr(0, dotPos);
+        std::string childKey = key.substr(dotPos + 1);
+        
+        if (!jsonData.contains(parentKey)) {
+            jsonData[parentKey] = nlohmann::json::object();
+        }
+        
+        setJSONValue(jsonData[parentKey], childKey, value);
+    } else {
+        std::visit([&jsonData, &processedKey](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            
+            if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t>) {
+                jsonData[processedKey] = arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                jsonData[processedKey] = arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                jsonData[processedKey] = arg;
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                jsonData[processedKey] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                jsonData[processedKey] = nlohmann::json::array();
+                for (const auto& item : arg) {
+                    jsonData[processedKey].push_back(item);
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                jsonData[processedKey] = nlohmann::json::array();
+                for (const auto& item : arg) {
+                    jsonData[processedKey].push_back(item);
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                jsonData[processedKey] = nlohmann::json::array();
+                for (const auto& item : arg) {
+                    jsonData[processedKey].push_back(item);
+                }
+            }
+        }, value);
+    }
+}
