@@ -75,11 +75,14 @@ public:
     MembranePotential getThreshold() const;
     void setThreshold(MembranePotential threshold);
     
-    // Firing state
+// Firing state
     bool isFiring() const;
     bool isRefractory() const;
     void setFiringState(FiringState state);
     void setRefractoryPeriod(uint32_t steps);
+    uint32_t getRefractoryPeriod() const;
+    uint32_t getRefractoryRemaining() const;
+    void setRefractoryRemaining(uint32_t steps);
     void decrementRefractory();
     
     // Firing rate (for rate-based computation)
@@ -93,6 +96,8 @@ public:
     void setRestingPotential(MembranePotential potential);
     MembranePotential getRestingPotential() const;
     void setResetPotential(MembranePotential potential);
+    uint32_t getRefractoryRemaining() const;
+    void setRefractoryRemaining(uint32_t steps);
     
     // Spike detection
     bool checkThreshold() const;

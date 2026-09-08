@@ -95,20 +95,16 @@ void Neuron::setRefractoryPeriod(uint32_t steps) {
     pImpl->state.refractoryPeriod = steps;
 }
 
+void Neuron::setRefractoryRemaining(uint32_t steps) {
+    pImpl->state.refractoryRemaining = steps;
+}
+
 uint32_t Neuron::getRefractoryPeriod() const {
     return pImpl->state.refractoryPeriod;
 }
 
-void Neuron::setRestingPotential(MembranePotential potential) {
-    pImpl->state.restingPotential = potential;
-}
-
-MembranePotential Neuron::getRestingPotential() const {
-    return pImpl->state.restingPotential;
-}
-
-void Neuron::setResetPotential(MembranePotential potential) {
-    pImpl->state.resetPotential = potential;
+uint32_t Neuron::getRefractoryRemaining() const {
+    return pImpl->state.refractoryRemaining;
 }
 
 bool Neuron::checkThreshold() const {

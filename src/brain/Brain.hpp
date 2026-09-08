@@ -8,6 +8,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <limits>
 
 namespace nlm {
 
@@ -28,6 +29,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class BrainStepOrchestrator;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
