@@ -1,9 +1,3 @@
-#include "DevelopmentSystem.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-
-namespace nlm {
-
 struct DevelopmentSystem::Impl {
     DevelopmentalStage stage;
     SimulationStep stageStartStep;
@@ -13,7 +7,7 @@ struct DevelopmentSystem::Impl {
     Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
 };
 
-DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
+DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0), consolidationCount_(0), avgConsolidationStrength_(0.0f) {}
 
 DevelopmentSystem::~DevelopmentSystem() = default;
 
@@ -114,6 +108,33 @@ float DevelopmentSystem::getCriticalPeriodProgress() const {
     }
     // Progress through critical period (0 to 1)
     return std::min(1.0f, static_cast<float>(pImpl->stageAge / 300.0));
+}
+
+void DevelopmentSystem::recordConsolidationEvent(int episodeCount, float dopamineLevel, SimulationStep step) {
+    ++consolidationCount_;
+    
+    // Compute consolidation strength based on episode count and dopamine
+    float strength = 0.0f;
+    
+    if (episodeCount > 0) {
+        // More episodes = better consolidation
+        float episodeStrength = std::min(1.0f, static_cast<float>(episodeCount) / 100.0f);
+        
+        // Dopamine modulates consolidation
+        float dopamineMod = 1.0f + std::max(0.0f, dopamineLevel) * 0.5f;
+        
+        strength = episodeStrength * dopamineMod * 0.5f;
+    }
+    
+    // Update moving average
+    if (consolidationCount_ == 1) {
+        avgConsolidationStrength_ = strength;
+    } else {
+        avgConsolidationStrength_ = avgConsolidationStrength_ * 0.9f + strength * 0.1f;
+    }
+    
+    NLM_LOG_INFO("DevelopmentSystem: Recorded consolidation event " + std::to_string(consolidationCount_) +
+                 " (strength: " + std::to_string(strength) + ", avg: " + std::to_string(avgConsolidationStrength_) + ")");
 }
 
 } // namespace nlm

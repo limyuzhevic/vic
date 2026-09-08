@@ -124,6 +124,64 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
+    // Prepare sensory state for prediction system
+    std::vector<float> sensoryState;
+    
+    // Add vision data (create feature vector from vision)
+    for (size_t i = 0; i < vision.size(); ++i) {
+        // Convert pixel to feature: [brightness, edges, directionality]
+        // Simple implementation: use raw pixel value
+        sensoryState.push_back(vision[i]);
+    }
+    
+    // Add touch features
+    for (size_t i = 0; i < touch.size(); ++i) {
+        sensoryState.push_back(touch[i]);
+    }
+    
+    // Add internal signal features
+    for (size_t i = 0; i < intern.size(); ++i) {
+        sensoryState.push_back(intern[i]);
+    }
+    
+    // Add proprioception features
+    for (size_t i = 0; i < proprio.size(); ++i) {
+        sensoryState.push_back(proprio[i]);
+    }
+    
+    // Update prediction system with new sensory input
+    auto* predictionSystem = brain_->getPredictionSystem();
+    if (predictionSystem) {
+        // Set current sensory state
+        predictionSystem->setCurrentSensoryState(sensoryState);
+        
+        // Generate prediction for next step
+        auto predictedState = predictionSystem->predictNextState();
+        
+        // Compute prediction error if we have both predicted and actual
+        if (!predictedState.empty()) {
+            predictionError_ = 0.0f;
+            
+            // Calculate prediction error between actual and predicted states
+            // For now, compare only vision part since prediction system might return
+            // full state but we only need to compare relevant parts
+            size_t visionFeatures = std::min<size_t>(vision.size(), predictedState.size());
+            float errorSum = 0.0f;
+            
+            for (size_t i = 0; i < visionFeatures; ++i) {
+                float diff = vision[i] - predictedState[i];
+                errorSum += diff * diff;
+            }
+            
+            if (visionFeatures > 0) {
+                predictionError_ = std::sqrt(errorSum / visionFeatures);
+            }
+            
+            // Update prediction system with actual observation for learning
+            predictionSystem->updatePredictions(predictedState, vision);
+        }
+    }
+    
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
         float totalDiff = 0.0f;
@@ -142,7 +200,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty and prediction error
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);

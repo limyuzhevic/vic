@@ -6,6 +6,11 @@ struct PredictionSystem::Impl {
     float predictionError;
     float confidence;
     std::vector<float> errorHistory;
+    std::vector<float> currentSensoryState;
+    std::vector<float> predictedState;
+    std::vector<NeuronId> patternNeurons;
+    std::vector<std::vector<float>> patternRepresentations;
+    std::vector<std::pair<NeuronId, NeuronId>> sequenceAssociations;
     
     Impl() : predictionError(0.0f), confidence(0.5f) {}
 };
@@ -55,6 +60,58 @@ void PredictionSystem::clearHistory() {
 
 void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
+}
+
+// Get predicted active neurons based on learned patterns
+const std::vector<NeuronId>& PredictionSystem::getPredictedActiveNeurons() const {
+    return pImpl->patternNeurons;
+}
+
+// Get predicted sensory state as vector
+const std::vector<float>& PredictionSystem::getPredictedState() const {
+    return pImpl->predictedState;
+}
+
+// Get current sensory state
+const std::vector<float>& PredictionSystem::getCurrentSensoryState() const {
+    return pImpl->currentSensoryState;
+}
+
+// Set current sensory state (for integration)
+void PredictionSystem::setCurrentSensoryState(const std::vector<float>& state) {
+    pImpl->currentSensoryState = state;
+    pImpl->predictedState = state; // Initially predict current state
+}
+
+// Update prediction system with current time step
+void PredictionSystem::update(SimulationStep currentStep, Timestamp currentTime) {
+    // Generate predictions based on current state
+    pImpl->predictionError = 0.0f;
+    pImpl->confidence = 0.5f;
+    
+    // If we have current sensory state, generate prediction
+    if (!pImpl->currentSensoryState.empty()) {
+        // Simple prediction: current state modified by learned dynamics
+        // For now, just keep current state
+        pImpl->predictedState = pImpl->currentSensoryState;
+    }
+}
+
+// Get prediction neurons (learned pattern representations)
+const std::vector<NeuronId>& PredictionSystem::getPatternNeurons() const {
+    return pImpl->patternNeurons;
+}
+
+// Get sequence associations (what predicts what)
+const std::vector<std::pair<NeuronId, NeuronId>>& PredictionSystem::getSequenceAssociations() const {
+    return pImpl->sequenceAssociations;
+}
+
+// Add pattern neuron to system
+void PredictionSystem::addPatternNeuron(NeuronId id, const std::vector<float>& representation) {
+    pImpl->patternNeurons.push_back(id);
+    pImpl->patternRepresentations.push_back(representation);
+    pImpl->sequenceAssociations.emplace_back(id, id); // Self-association for now
 }
 
 } // namespace nlm

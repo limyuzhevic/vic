@@ -46,10 +46,21 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // Record a consolidation event for memory development
+    void recordConsolidationEvent(int episodeCount, float dopamineLevel, SimulationStep step);
+    
+    // Get number of consolidation events recorded
+    size_t getConsolidationCount() const { return consolidationCount_; }
+    
+    // Get average consolidation strength (0-1)
+    float getAverageConsolidationStrength() const { return avgConsolidationStrength_; }
+    
 private:
     struct Impl;
     Impl* pImpl;
     double age_;
+    size_t consolidationCount_;
+    float avgConsolidationStrength_;
 };
 
 } // namespace nlm
