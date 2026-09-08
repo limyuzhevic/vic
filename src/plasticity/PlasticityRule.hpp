@@ -1,15 +1,20 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "../brain/Synapse.hpp"
-
-namespace nlm {
-
 // Abstract base class for plasticity rules
 // PLACEHOLDER - Phase 2 will implement real plasticity rules
 
 class PlasticityRule {
 public:
+    // Parameter validation for plasticity rule parameters
+    struct ValidationError {
+        std::string rule;
+        std::string parameter;
+        std::string message;
+    };
+    
+    // Validate plasticity rule parameters
+    static bool validateParameters(const std::string& typeName, 
+                                   const std::map<std::string, float>& params,
+                                   std::vector<ValidationError>& errors);
+    
     virtual ~PlasticityRule() = default;
     
     // Update synaptic weights based on pre/post synaptic activity
@@ -53,6 +58,9 @@ public:
     // Parameters
     void setLearningRate(float rate);
     float getLearningRate() const;
+    
+    static bool validateHebbianParameters(const std::map<std::string, float>& params,
+                                          std::vector<ValidationError>& errors);
     
 private:
     struct Impl;

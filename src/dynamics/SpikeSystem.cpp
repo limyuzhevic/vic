@@ -66,9 +66,11 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         // Track spike count per neuron
         pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
         
-        // Trim history if needed
+        // Trim history if needed (remove from front efficiently)
         if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+            auto removeCount = pImpl->spikeHistory.size() - pImpl->maxHistorySize;
+            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin(), 
+                                     pImpl->spikeHistory.begin() + removeCount);
         }
         
         // Call handlers

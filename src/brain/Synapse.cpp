@@ -212,7 +212,7 @@ void Synapse::step(Timestamp currentTime) {
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
         // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        pImpl->shortTermDepression = 1.0f - (1.0f - pImpl->shortTermDepression) * std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU);
     }
     
     // Decay eligibility trace for reward-modulated learning

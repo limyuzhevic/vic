@@ -44,7 +44,7 @@ struct NeuronState {
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
 class Neuron {
 public:
-    // Create neuron with ID
+    // Create neuron with ID - validate ID
     explicit Neuron(NeuronId id);
     
     ~Neuron();
@@ -147,5 +147,3 @@ private:
     struct Impl;
     Impl* pImpl;
 };
-
-} // namespace nlm

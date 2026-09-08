@@ -11,9 +11,10 @@ struct STDP::Impl {
     float timeConstant;   // Tau for exponential window (ms)
     float minWeight;      // Minimum synaptic weight
     float maxWeight;      // Maximum synaptic weight
+    float spikeHistoryTTL; // Time-to-live for spike history (ms)
     
     Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
+             minWeight(-1.0f), maxWeight(1.0f), spikeHistoryTTL(2000.0f) {}
 };
 
 STDP::STDP() : pImpl(new Impl) {}
