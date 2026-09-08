@@ -53,16 +53,27 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
+    // O(n log n) instead of O(n²) by using frequency counting and sliding window
+    // Sort spike times for efficient correlation counting
+    std::vector<Timestamp> sortedPreSpikes = preSpikes;
+    std::vector<Timestamp> sortedPostSpikes = postSpikes;
+    
+    std::sort(sortedPreSpikes.begin(), sortedPreSpikes.end());
+    std::sort(sortedPostSpikes.begin(), sortedPostSpikes.end());
+    
+    // For each pre spike, find all post spikes within correlation window
+    // Using binary search for O(n log n) instead of O(n²)
     size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
-            }
-        }
+    const float correlationWindow = 100.0f;  // 100ms correlation window
+    
+    for (Timestamp preTime : sortedPreSpikes) {
+        // Find range of post spikes within correlation window
+        auto lower = std::lower_bound(sortedPostSpikes.begin(), sortedPostSpikes.end(), 
+                                     preTime - correlationWindow);
+        auto upper = std::upper_bound(sortedPostSpikes.begin(), sortedPostSpikes.end(),
+                                     preTime + correlationWindow);
+        
+        correlationCount += std::distance(lower, upper);
     }
     
     // Compute weight change based on correlation

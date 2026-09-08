@@ -764,7 +764,18 @@ void Brain::reset() {
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
+    // Validate inputs
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Cannot save brain to empty filepath");
+        return false;
+    }
+    
     try {
+        // Check if we have data to save
+        if (getTotalNeuronCount() == 0 || getTotalSynapseCount() == 0) {
+            NLM_LOG_WARNING("Saving brain with no neurons or synapses");
+        }
+        
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
@@ -846,6 +857,18 @@ bool Brain::save(const std::string& filepath) const {
 bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
+    // Validate inputs
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Cannot load brain from empty filepath");
+        return false;
+    }
+    
+    // Validate file extension
+    if (filepath.size() < 4 || filepath.substr(filepath.size() - 4) != ".bin" && 
+        filepath.size() < 5 || filepath.substr(filepath.size() - 5) != ".json") {
+        NLM_LOG_WARNING("Unusual file extension, proceeding anyway");
+    }
+    
     try {
         CheckpointReader reader;
         if (!reader.open(filepath)) {
@@ -853,6 +876,7 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
+        // Validate checkpoint before proceeding
         if (!reader.validate()) {
             NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
             return false;

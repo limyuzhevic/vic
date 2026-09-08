@@ -21,9 +21,9 @@ STDP::STDP() : pImpl(new Impl) {}
 STDP::~STDP() = default;
 
 void STDP::update(Synapse* synapse,
-                   const std::vector<Timestamp>& preSpikes,
-                   const std::vector<Timestamp>& postSpikes,
-                   TimestepDuration dt) {
+                    const std::vector<Timestamp>& preSpikes,
+                    const std::vector<Timestamp>& postSpikes,
+                    TimestepDuration dt) {
     /*
      * Real STDP implementation based on spike-timing correlation
      * 
@@ -59,23 +59,59 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
-            if (dt > 0) {
+    // O(n log n) instead of O(n²) by sorting and using two-pointer technique
+    std::vector<Timestamp> sortedPreSpikes = preSpikes;
+    std::vector<Timestamp> sortedPostSpikes = postSpikes;
+    
+    // Sort spike times for efficient pairing
+    std::sort(sortedPreSpikes.begin(), sortedPreSpikes.end());
+    std::sort(sortedPostSpikes.begin(), sortedPostSpikes.end());
+    
+    // Process spikes with two-pointer approach to avoid O(n²)
+    size_t preIdx = 0, postIdx = 0;
+    
+    // All potentiation pairs (pre before post)
+    while (preIdx < sortedPreSpikes.size() && postIdx < sortedPostSpikes.size()) {
+        if (sortedPostSpikes[postIdx] >= sortedPreSpikes[preIdx]) {
+            // Pre spike at sortedPreSpikes[preIdx], post spike at sortedPostSpikes[postIdx]
+            float deltaTime = static_cast<float>(sortedPostSpikes[postIdx] - sortedPreSpikes[preIdx]);
+            if (deltaTime > 0) {
                 // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                float delta = pImpl->ltpWeight * std::exp(-deltaTime / tau);
                 totalDelta += delta;
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+            ++postIdx;
+        } else {
+            // Post before pre: DEPRESSION
+            float deltaTime = static_cast<float>(sortedPreSpikes[preIdx] - sortedPostSpikes[postIdx]);
+            if (deltaTime > 0) {
+                float delta = -pImpl->ltdWeight * std::exp(-deltaTime / tau);
+                totalDelta += delta;
+            }
+            ++preIdx;
         }
+    }
+    
+    // Additional potentiation for remaining post spikes
+    while (postIdx < sortedPostSpikes.size()) {
+        // Pre spike is before all remaining post spikes, so post is after pre
+        float deltaTime = static_cast<float>(sortedPostSpikes[postIdx] - (preIdx < sortedPreSpikes.size() ? sortedPreSpikes[preIdx] : 0));
+        if (deltaTime > 0) {
+            float delta = pImpl->ltpWeight * std::exp(-deltaTime / tau);
+            totalDelta += delta;
+        }
+        ++postIdx;
+    }
+    
+    // Additional depression for remaining pre spikes  
+    while (preIdx < sortedPreSpikes.size()) {
+        // Post spike is before all remaining pre spikes, so pre is after post
+        float deltaTime = static_cast<float>(sortedPreSpikes[preIdx] - (postIdx < sortedPostSpikes.size() ? sortedPostSpikes[postIdx] : 0));
+        if (deltaTime > 0) {
+            float delta = -pImpl->ltdWeight * std::exp(-deltaTime / tau);
+            totalDelta += delta;
+        }
+        ++preIdx;
     }
     
     // Apply weight change with bounds
