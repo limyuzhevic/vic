@@ -96,10 +96,16 @@ void STDP::update(Synapse* synapse,
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
-    // Clamp weight to bounds
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    // Apply weight change with eligibility trace modulation
+    float eligibility = synapse->getEligibilityTrace();
+    if (std::abs(eligibility) > 0.001f) {
+        // Reward-modulated STDP: delta is scaled by eligibility trace
+        float modulatedDelta = delta * eligibility;
+        synapse->addToWeight(modulatedDelta);
+    } else {
+        // Standard STDP without reward modulation
+        synapse->addToWeight(delta);
+    }
 }
 
 const char* STDP::getName() const {
