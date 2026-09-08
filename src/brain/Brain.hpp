@@ -22,6 +22,8 @@ class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
+class SelfModel;
+class SocialLearning;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
@@ -150,16 +152,20 @@ public:
     
     // ========== PREDICTION SYSTEM ==========
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
+// Neural prediction for temporal processing
+     NeuralPrediction* getNeuralPrediction();
     
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
     
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
+    
+    // Self-model for body awareness and prediction
+    SelfModel* getSelfModel();
+    
+    // Social learning for observation and imitation
+    SocialLearning* getSocialLearning();
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
@@ -187,15 +193,11 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Get current simulation step
+    SimulationStep getCurrentStep() const;
     
-    // Logging
-    void logStatus() const;
+    // Collect neuron data for checkpointing
+    NeuronCheckpointData collectNeuronCheckpointData() const;
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-} // namespace nlm
+    // Collect synapse data for checkpointing
+    SynapseCheckpointData collectSynapseCheckpointData() const;

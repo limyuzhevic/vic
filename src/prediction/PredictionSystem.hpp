@@ -14,8 +14,11 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
+    // TODO PHASE 2: Implement real prediction using NLM's neural substrate
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
@@ -33,6 +36,9 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Get access to neural prediction subsystem
+    NeuralPrediction* getNeuralPrediction();
     
 private:
     struct Impl;

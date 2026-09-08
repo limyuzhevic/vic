@@ -30,6 +30,53 @@ void ConceptFormation::initialize(Brain* brain) {
     NLM_LOG_INFO("ConceptFormation initialized");
 }
 
+void ConceptFormation::update(const std::vector<float>& neuralActivity, 
+                            const std::vector<float>& sensoryFeatures,
+                            float reward) {
+    // Use neural activity patterns as input to concept formation
+    // This represents the brain's current percept
+    size_t conceptId = presentExperience(neuralActivity, sensoryFeatures, reward, 0);
+    
+    if (conceptId > 0) {
+        // Concept formed or updated
+        const DiscoveredConcept* concept = getConcept(conceptId);
+        if (concept) {
+            NLM_LOG_DEBUG("ConceptFormation: Updated concept " + std::to_string(conceptId) +
+                         " with stability: " + std::to_string(getConceptStability(conceptId)));
+        }
+    }
+    
+    // Periodically merge similar concepts that may have formed independently
+    static int mergeCounter = 0;
+    if (++mergeCounter % 100 == 0) {
+        mergeSimilarConcepts();
+    }
+}
+
+void ConceptFormation::mergeSimilarConcepts() {
+    // Merge concepts that are similar to each other
+    // Simple implementation: merge concepts with low stability
+    if (concepts_.size() < 2) return;
+    
+    // Find concept pairs that should be merged
+    for (size_t i = 0; i < concepts_.size(); ++i) {
+        for (size_t j = i + 1; j < concepts_.size(); ++j) {
+            if (concepts_[i].id == 0 || concepts_[j].id == 0) continue;  // Skip invalid
+            
+            float similarity = computeSimilarity(concepts_[i].prototype, concepts_[j].prototype);
+            if (similarity > 0.9f && concepts_[i].avgStability < 0.5f && concepts_[j].avgStability < 0.5f) {
+                // Merge less stable concept into more stable one
+                if (concepts_[i].avgStability >= concepts_[j].avgStability) {
+                    mergeConcepts(concepts_[i].id, concepts_[j].id);
+                } else {
+                    mergeConcepts(concepts_[j].id, concepts_[i].id);
+                }
+                return;
+            }
+        }
+    }
+}
+
 size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
                                           const std::vector<float>& features,
                                           float reward,

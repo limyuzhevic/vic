@@ -72,6 +72,16 @@ struct DiscoveredConcept {
 // - Category discovery based on shared properties
 // - No predefined labels or semantic categories
 
+// ConceptFormation: Discovers recurring patterns from experience
+// NOT a predefined taxonomy - concepts emerge through repeated experience
+//
+// Key mechanisms:
+// - Pattern clustering through similarity
+// - Prototype formation through averaging
+// - Instance tracking for stability measurement
+// - Category discovery based on shared properties
+// - No predefined labels or semantic categories
+
 class ConceptFormation {
 public:
     ConceptFormation();
@@ -80,13 +90,20 @@ public:
     // Initialize with brain reference
     void initialize(Brain* brain);
 
+    // Update concept formation with current neural activity
+    // Processes neural patterns and sensory features to form new concepts
+    // or update existing ones based on recent experience
+    void update(const std::vector<float>& neuralActivity,
+                const std::vector<float>& sensoryFeatures,
+                float reward);
+
     // Present a new experience to the concept formation system
     // Returns concept ID if this experience belongs to an existing concept,
     // or 0 if it's too early to tell, or new concept ID if novel
     size_t presentExperience(const std::vector<float>& pattern,
-                            const std::vector<float>& features,
-                            float reward,
-                            SimulationStep currentTime);
+                             const std::vector<float>& features,
+                             float reward,
+                             SimulationStep currentTime);
 
     // Get the concept that best matches a pattern
     size_t getMatchingConcept(const std::vector<float>& pattern,
@@ -119,7 +136,7 @@ public:
 
     // Compute similarity between two patterns
     float computeSimilarity(const std::vector<float>& a,
-                          const std::vector<float>& b) const;
+                           const std::vector<float>& b) const;
 
     // Check if pattern is novel (doesn't belong to any existing concept)
     bool isNovel(const std::vector<float>& pattern,
@@ -139,6 +156,9 @@ public:
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
 
 private:
+    // Merge similar concepts based on their prototypes
+    void mergeSimilarConcepts();
+
     // Create new concept from pattern
     size_t createConcept(const std::vector<float>& pattern,
                         const std::vector<float>& features,
@@ -156,7 +176,7 @@ private:
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
-    
+
     // Parameters
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable

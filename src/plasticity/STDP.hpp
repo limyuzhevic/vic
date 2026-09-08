@@ -30,6 +30,9 @@ public:
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
     
+    // Prediction error modulation for reward-modulated STDP
+    void setPredictionError(float error);  // Sets prediction error for learning modulation
+    
 private:
     struct Impl;
     Impl* pImpl;

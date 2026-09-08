@@ -73,6 +73,7 @@ add_library(nlm_core STATIC
     # Prediction
     src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
+    src/brain/getCurrentStep.cpp
     # Motor
     src/motor/MotorSystem.cpp
     # Environment

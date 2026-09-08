@@ -400,6 +400,151 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Enhanced Python API factory functions
+    m.def("createSimpleAgent", []() -> std::shared_ptr<AgentBrain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        return agent;
+    }, "Create a simple agent with one-line setup");
+
+    m.def("runSimulation", [](int num_steps, float timestep) {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        
+        for (int step = 0; step < num_steps; ++step) {
+            world->update(timestep);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("num_steps"), py::arg("timestep"), "High-level simulation runner with result analysis");
+
+    m.def("createDefaultConfig", [](const std::string& profile) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        if (profile == "explorer") {
+            config->set("brain.neuron_count", 2000);
+            config->set("neuromodulation.curiosity.weight", 1.0);
+            config->set("neuromodulation.novelty.threshold", 0.05);
+            config->set("memory.capacity", 2000);
+            config->set("plasticity.structural.enable", true);
+        } else if (profile == "learner") {
+            config->set("brain.neuron_count", 3000);
+            config->set("plasticity.stdp.learning_rate", 0.01);
+            config->set("memory.capacity", 5000);
+            config->set("memory.episodic.max_episodes", 1000);
+            config->set("neuromodulation.dopamine.base", 0.2);
+        } else if (profile == "developer") {
+            config->set("brain.neuron_count", 1500);
+            config->set("development.critical_period_duration", 1000);
+            config->set("development.maturation_rate", 0.01);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.structural.enable", true);
+        } else if (profile == "benchmark") {
+            config->set("brain.neuron_count", 500);
+            config->set("simulation.timestep", 0.01);
+            config->set("memory.capacity", 1000);
+            config->set("plasticity.stdp.enable", false);
+            config->set("neuromodulation.curiosity.enable", false);
+        } else { // balanced
+            config->set("brain.neuron_count", 1000);
+            config->set("plasticity.stdp.learning_rate", 0.001);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("memory.capacity", 3000);
+            config->set("neuromodulation.curiosity.weight", 0.5);
+            config->set("neuromodulation.novelty.threshold", 0.1);
+        }
+        
+        return config;
+    }, py::arg("profile"), "Create configuration with predefined profiles");
+
+    m.def("createBrainSession", [](std::shared_ptr<Config> config, 
+                                 std::shared_ptr<SimpleWorld> world,
+                                 std::shared_ptr<AgentBrain> agent) {
+        return std::make_shared<BrainSession>(config, world, agent);
+    }, py::arg("config"), py::arg("world"), py::arg("agent"), 
+       "Create a brain session for managing simulation state");
+
+    m.def("PlotResults", [](std::shared_ptr<Brain> brain, 
+                          std::shared_ptr<SimpleWorld> world,
+                          std::shared_ptr<AgentBrain> agent,
+                          const std::string& filename) {
+        auto session = std::make_shared<BrainSession>(brain->getConfig(), world, agent);
+        
+        std::vector<std::string> metrics = {
+            "Firing Rate", "Curiosity", "Novelty", "Prediction Error"
+        };
+        
+        plt.figure(figsize=(12, 10));
+        plt.suptitle("NLM Simulation Results", fontsize=16, fontweight='bold');
+        
+        for (int i = 0; i < metrics.size() && i < 4; ++i) {
+            plt.subplot(2, 2, i + 1);
+            plt.plot(session->getSteps(), session->getMetric(metrics[i]), linewidth=1.5);
+            plt.xlabel("Step");
+            plt.ylabel(metrics[i]);
+            plt.title(metrics[i] + " Over Time");
+            plt.grid(True, alpha=0.3);
+        }
+        
+        plt.tight_layout();
+        plt.savefig(filename, dpi=150, bbox_inches='tight');
+        plt.close();
+        
+        return true;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("filename"), 
+       "Generate performance plots from simulation results");
+
+    m.def("Benchmark", [](std::shared_ptr<Config> config, 
+                        int num_steps,
+                        const std::string& description) {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        for (int step = 0; step < num_steps; ++step) {
+            world->update(0.1f);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time);
+        
+        return std::make_tuple(brain, world, agent, duration.count(), description);
+    }, py::arg("config"), py::arg("num_steps"), py::arg("description"), 
+       "Benchmark function for comparing configurations");
+
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
