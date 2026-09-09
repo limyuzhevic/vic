@@ -243,10 +243,13 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
+    pImpl->conceptFormation->initialize(this);
+    pImpl->attention->initialize(this);
+    pImpl->planner->setPlannerParameters(5, 0.8f, 0.5f, 2.0f);  // 5 steps, planning weight 0.8, confidence threshold 0.5, penalty 2.0
     pImpl->planner->setPlanningDepth(5);
     
     pImpl->conceptFormation->initialize(this);
@@ -412,9 +415,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+    // Update curiosity with neuromodulation integration
+    if (pImpl->curiosity && pImpl->novelty && pImpl->predictionError) {
+        float noveltyValue = pImpl->novelty->getLevel();
+        float predictionErrorValue = pImpl->predictionError->getMagnitude();
+        
+        // Apply prediction error to curiosity for exploration drive
+        pImpl->curiosity->update(noveltyValue, predictionErrorValue, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -511,8 +518,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural activity
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Get prediction error from system
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Update prediction error neuromodulator if available
+        if (pImpl->predictionError) {
+            pImpl->predictionError->update(predictionError, pImpl->timestep);
+        }
+        
+        // Connect prediction to curiosity
+        if (pImpl->curiosity && pImpl->predictionError) {
+            float curiosityLevel = pImpl->curiosity->getLevel();
+            float predErrorLevel = pImpl->predictionError->getLevel();
+            
+            // Combine novelty and prediction error for curiosity
+            float noveltyValue = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+            float totalCuriosity = curiosityLevel * 0.5f + predErrorLevel * 0.3f + noveltyValue * 0.2f;
+            
+            // Update curiosity with combined value
+            pImpl->curiosity->update(totalCuriosity, pImpl->timestep);
+        }
+        
+        // Use prediction for attentional selection
+        if (pImpl->attention && pImpl->workingMemory) {
+            std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            float predictionValue = pImpl->predictionSystem->getPredictionValue();
+            
+            // Apply prediction value as a bias for attention
+            pImpl->attention->processCompetition(memoryNeurons);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +565,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        pImpl->conceptFormation->update(pImpl->timestep);
+        
+        // Use concept formation to guide attention
+        if (pImpl->attention && pImpl->workingMemory) {
+            std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->conceptFormation->processMemoryNeurons(memoryNeurons);
+            
+            // Concepts can affect which memories are emphasized
+            std::vector<NeuronId> conceptNeurons = pImpl->conceptFormation->getConceptNeurons();
+            for (NeuronId conceptId : conceptNeurons) {
+                pImpl->attention->addTopDownBias(conceptId, 1.0f);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

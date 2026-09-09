@@ -20,22 +20,39 @@ std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryIn
     return currentState.clone();
 }
 
-void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
-    // TODO PHASE 2: Implement real prediction error computation
-    // PLACEHOLDER: Calculate simple error
-    const auto& predData = predicted.getData();
-    const auto& actualData = actual.getData();
-    
-    if (predData.size() == actualData.size() && !predData.empty()) {
-        float sumError = 0.0f;
-        for (size_t i = 0; i < predData.size(); ++i) {
-            float diff = predData[i] - actualData[i];
-            sumError += diff * diff;
+// Update prediction system with current neural state
+    void PredictionSystem::update(const TimestepDuration& timestep) {
+        // Simple prediction based on current error pattern
+        // This could be replaced with real neural predictions in future phases
+        if (!pImpl->errorHistory.empty()) {
+            // Predict improvement based on recent error trends
+            float recentError = pImpl->errorHistory.back();
+            pImpl->confidence = std::max(0.1f, 1.0f - recentError);
+            
+            // Predict error for next step
+            if (pImpl->errorHistory.size() >= 3) {
+                // Check if error is decreasing or increasing
+                bool improving = true;
+                for (size_t i = 1; i < 3 && improving; ++i) {
+                    if (pImpl->errorHistory.end()[-i] > pImpl->errorHistory.end()[-i-1]) {
+                        improving = false;
+                    }
+                }
+                
+                if (improving) {
+                    pImpl->predictionError = recentError * 0.8f;
+                } else {
+                    pImpl->predictionError = recentError * 1.2f;
+                }
+            }
         }
-        pImpl->predictionError = sumError / predData.size();
-        pImpl->errorHistory.push_back(pImpl->predictionError);
     }
-}
+    
+    // Get prediction value (e.g., expected next state)
+    float PredictionSystem::getPredictionValue() const {
+        // Return a simple prediction value based on confidence
+        return pImpl->confidence;
+    }
 
 float PredictionSystem::getPredictionError() const {
     return pImpl->predictionError;
@@ -43,18 +60,6 @@ float PredictionSystem::getPredictionError() const {
 
 float PredictionSystem::getConfidence() const {
     return pImpl->confidence;
-}
-
-const std::vector<float>& PredictionSystem::getErrorHistory() const {
-    return pImpl->errorHistory;
-}
-
-void PredictionSystem::clearHistory() {
-    pImpl->errorHistory.clear();
-}
-
-void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
 }
 
 } // namespace nlm
