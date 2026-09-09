@@ -85,6 +85,13 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Performance optimizations
+    src/performance/CheckpointSystem.cpp
+    src/performance/ParallelProcessing.cpp
+    src/performance/SIMDVectorization.cpp
+    src/performance/SparseConnectivity.cpp
+    src/performance/EventQueue.cpp
+    src/performance/MemoryPool.cpp
 )
 
 target_include_directories(nlm_core PUBLIC

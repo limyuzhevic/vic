@@ -74,16 +74,6 @@ void AgentBrain::initialize(const SimpleWorld& world) {
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
 }
 
-size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
-}
-
-size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
-}
-
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
@@ -147,6 +137,16 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+}
+
+size_t AgentBrain::getSensoryInputSize() const {
+    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
+    return 256 + 8 + 4 + 6;
+}
+
+size_t AgentBrain::getMotorOutputSize() const {
+    // One motor neuron per action
+    return 6;
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
