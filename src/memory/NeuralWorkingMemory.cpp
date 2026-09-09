@@ -31,6 +31,24 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
+    
+    // Initialize with some test neurons if brain is available
+    if (brain_ && !brain_->getRegions().empty()) {
+        // Get first region
+        auto& region = brain_->getRegions()[0];
+        // Find a few neurons to use as memory traces
+        size_t count = 0;
+        for (auto& pop : region->getPopulations()) {
+            for (Neuron* n : pop->getNeurons()) {
+                if (count < capacity_) {
+                    memoryNeurons_.push_back(n->getId());
+                    memoryActivations_.push_back(0.0f);
+                    memoryTimestamps_.push_back(0);
+                    ++count;
+                }
+            }
+        }
+    }
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
@@ -40,26 +58,17 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
+        // Note: For now, use pattern values directly without actual neuron encoding
+        // In a full implementation, this would encode the pattern onto neural populations
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
-        
-        // Update stored activation
+        // Store activation for this memory position
         if (i < memoryActivations_.size()) {
             memoryActivations_[i] = activation;
         } else {
             memoryActivations_.push_back(activation);
             memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
+            // Memory neuron ID tracking not fully implemented yet
         }
     }
     
@@ -81,6 +90,10 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        activeTraces_.push_back(0);  // Initialize active trace counter
+        
+        // Store neuron ID for later lookup
+        std::vector<NeuronId> memoryNeurons = memoryNeurons_;
     }
     
     // Inject current to maintain activation

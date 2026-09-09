@@ -59,6 +59,33 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
             }
         }
     }
+    
+    // Integrate with brain's cognitive systems for action selection
+    if (brain_) {
+        // Connect prediction system for action consequences
+        auto* predictionSystem = brain_->getPredictionSystem();
+        if (predictionSystem) {
+            predictionSystem->initialize(brain_.get());
+        }
+        
+        // Connect neural planner for action planning
+        auto* neuralPlanner = brain_->getPlanner();
+        if (neuralPlanner) {
+            neuralPlanner->initialize(brain_.get());
+        }
+        
+        // Connect concept formation for categorization
+        auto* conceptFormation = brain_->getConceptFormation();
+        if (conceptFormation) {
+            conceptFormation->initialize(brain_.get());
+        }
+        
+        // Connect attentional selection
+        auto* attention = brain_->getAttention();
+        if (attention) {
+            attention->initialize(brain_.get());
+        }
+    }
 }
 
 AgentBrain::~AgentBrain() = default;
@@ -345,6 +372,21 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset prediction system
+    if (brain_ && brain_->getPredictionSystem()) {
+        brain_->getPredictionSystem()->clearHistory();
+    }
+    
+    // Reset neural planner
+    if (brain_ && brain_->getPlanner()) {
+        brain_->getPlanner()->clearCache();
+    }
+    
+    // Reset concept formation
+    if (brain_ && brain_->getConceptFormation()) {
+        brain_->getConceptFormation()->clear();
+    }
 }
 
 } // namespace nlm

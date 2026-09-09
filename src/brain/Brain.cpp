@@ -142,15 +142,15 @@ struct Brain::Impl {
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
+        // Configure checkpoint manager
+        checkpointManager = std::make_unique<CheckpointManager>();
+        
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
         
         // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
     }
     
     DevelopmentalStage developmentalStage;
@@ -229,21 +229,8 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
-    
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
-    
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
-    
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -297,6 +284,7 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
     
     return true;
+}
 }
 
 void Brain::step(SimulationStep currentStep) {
@@ -404,6 +392,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Also update recurrent connections for maintenance
+        if (currentStep % 10 == 0) {  // Update maintenance every 10 steps
+            pImpl->workingMemory->updateRecurrentConnections();
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========

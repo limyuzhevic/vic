@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -41,6 +43,20 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// Json utilities for converting between json and ConfigValue
+class JsonUtils {
+public:
+    // Convert json value to ConfigValue
+    static ConfigValue jsonToConfigValue(const nlohmann::json& j);
+    
+    // Convert ConfigValue to json value
+    static nlohmann::json configValueToJson(const ConfigValue& value);
+    
+    // Convert string value to appropriate type
+    template<typename T>
+    static T stringToValue(const std::string& str);
 };
 
 // Main configuration class
