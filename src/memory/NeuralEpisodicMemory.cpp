@@ -40,11 +40,23 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     
     // Create episode neuron for pattern completion
     if (brain_ && !episode.sensoryState.empty()) {
-        NeuronId epNeuron(episodes_.size() + 20000);
-        pImpl->episodeNeurons.push_back(epNeuron);
+        // Check if we have neurons available in the brain first
+        bool hasValidNeurons = false;
+        size_t totalNeurons = brain_->getTotalNeuronCount();
         
-        // Store episode index in the neuron
-        // (This is a simplified approach - real implementation would use more distributed encoding)
+        // Try to find existing neurons to use, or ensure we don't create invalid IDs
+        if (totalNeurons > 0) {
+            // We have neurons in brain, so we can create valid neuron IDs
+            NeuronId epNeuron(static_cast<uint64_t>(episodes_.size()) + 100000);
+            pImpl->episodeNeurons.push_back(epNeuron);
+            
+            // Store episode index in the neuron
+            // (This is a simplified approach - real implementation would use more distributed encoding)
+            hasValidNeurons = true;
+        } else {
+            // No neurons in brain yet, skip creating episode neuron
+            NLM_LOG_WARN("NeuralEpisodicMemory: No neurons available in brain, skipping episode neuron creation");
+        }
     }
     
     // Remove old episodes if over capacity

@@ -44,13 +44,23 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+        // First check if neuron exists by searching all regions
+        bool neuronFound = false;
+        for (auto& region : *brain_) {
+            auto neurons = region->getAllNeurons();
+            for (auto* nn : neurons) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
+                    neuronFound = true;
                     break;
                 }
             }
+            if (neuronFound) break;
+        }
+        
+        if (!neuronFound) {
+            NLM_LOG_WARN("NeuralWorkingMemory: Neuron " + std::to_string(neuron.getId()) + 
+                        " not found in brain for memory encoding");
         }
         
         // Update stored activation

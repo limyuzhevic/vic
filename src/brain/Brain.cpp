@@ -425,14 +425,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Bounds check for dopamine level (should be in [-1.0, 1.0] based on Dopamine class)
+        if (dopamineLevel < -1.0f) dopamineLevel = -1.0f;
+        if (dopamineLevel > 1.0f) dopamineLevel = 1.0f;
+        
+        float excitabilityMod = dopamineLevel * 0.5f;
+        
+        // Additional bounds check for excitability modulation (keep small for stability)
+        // This prevents runaway excitation that could destabilize the neural network
+        if (excitabilityMod > 0.5f) excitabilityMod = 0.5f;
+        if (excitabilityMod < -0.5f) excitabilityMod = -0.5f;
+        
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
                     // Dopamine modulates excitability by injecting additional current
                     // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
+                    } else if (excitabilityMod < 0.0f) {
+                        // Negative dopamine inhibits excitability
+                        neuron->injectCurrent(excitabilityMod * 0.5f); // Less inhibition
                     }
                 }
             }
