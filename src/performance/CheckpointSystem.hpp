@@ -67,8 +67,10 @@ enum class CheckpointSection : uint32_t {
     RandomState = 10,
     SimulationState = 11,
     Environment = 12,
-    Checksum = 13,
-    End = 14
+    Prediction = 13,
+    Cognitive = 14,
+    Checksum = 15,
+    End = 16
 };
 
 /**
@@ -172,6 +174,107 @@ struct SynapseCheckpointData {
     std::vector<float> efficacy;
     std::vector<float> shortTermDepression;
     std::vector<float> shortTermFacilitation;
+};
+
+/**
+ * Working memory state for checkpointing
+ */
+struct WorkingMemoryCheckpointData {
+    uint64_t traceCount;
+    std::vector<float> traceActivity;
+    std::vector<float> traceStrength;
+};
+
+/**
+ * Episodic memory state for checkpointing
+ */
+struct EpisodicMemoryCheckpointData {
+    uint64_t episodeCount;
+    std::vector<uint64_t> episodeTimestamps;
+    std::vector<float> episodeRewards;
+    std::vector<float> episodeNovelties;
+    std::vector<float> episodeRelevance;
+};
+
+/**
+ * Associative memory state for checkpointing
+ */
+struct AssociativeMemoryCheckpointData {
+    uint64_t associationCount;
+    std::vector<float> associationStrengths;
+    std::vector<uint64_t> associatedPatterns;
+};
+
+/**
+ * Prediction system state for checkpointing
+ */
+struct PredictionSystemCheckpointData {
+    bool predictionActive;
+    float predictionConfidence;
+    std::vector<float> predictionErrors;
+    std::vector<float> predictionHistory;
+};
+
+/**
+ * Neural planner state for checkpointing
+ */
+struct PlannerCheckpointData {
+    bool planningActive;
+    int32_t planningDepth;
+    std::vector<float> actionValues;
+    std::vector<int32_t> planHistory;
+};
+
+/**
+ * Concept formation state for checkpointing
+ */
+struct ConceptFormationCheckpointData {
+    bool conceptActive;
+    uint64_t conceptCount;
+    std::vector<float> conceptStability;
+    std::vector<float> conceptActivation;
+};
+
+/**
+ * Attention state for checkpointing
+ */
+struct AttentionCheckpointData {
+    bool attentionActive;
+    uint64_t winnersCount;
+    std::vector<float> attentionWeights;
+    std::vector<uint64_t> attendedNeurons;
+};
+
+/**
+ * Development system state for checkpointing
+ */
+struct DevelopmentSystemCheckpointData {
+    bool developmentActive;
+    int32_t developmentalStage;
+    float developmentProgress;
+    std::vector<float> plasticityRates;
+    std::vector<float> maturationStages;
+};
+
+/**
+ * Neuromodulation state for checkpointing
+ */
+struct NeuromodulationCheckpointData {
+    float dopamineLevel;
+    float curiosityLevel;
+    float noveltyLevel;
+    float predictionErrorLevel;
+    std::vector<float> neuromodulatorHistory;
+};
+
+/**
+ * Memory context state for checkpointing
+ */
+struct MemoryContextCheckpointData {
+    uint64_t episodeCount;
+    uint64_t traceCount;
+    std::vector<float> patternSimilarities;
+    std::vector<float> relevanceScores;
 };
 
 /**

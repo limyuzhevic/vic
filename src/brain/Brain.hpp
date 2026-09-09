@@ -28,6 +28,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class MemoryContext;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -94,7 +95,7 @@ public:
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
-    // Produce motor/action output based on motor neuron activity
+    // Produce motor/action output based on neural activity
     std::unique_ptr<class Action> produceAction();
     
     // Apply neuromodulatory signals
@@ -183,6 +184,9 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Memory context for system integration
+    MemoryContext* getMemoryContext();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

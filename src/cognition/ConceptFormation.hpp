@@ -2,6 +2,9 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/MemoryContext.hpp"
 #include <vector>
 #include <memory>
 #include <functional>
@@ -77,16 +80,34 @@ public:
     ConceptFormation();
     ~ConceptFormation();
 
-    // Initialize with brain reference
+// Initialize with brain reference
     void initialize(Brain* brain);
 
-    // Present a new experience to the concept formation system
-    // Returns concept ID if this experience belongs to an existing concept,
-    // or 0 if it's too early to tell, or new concept ID if novel
-    size_t presentExperience(const std::vector<float>& pattern,
-                            const std::vector<float>& features,
-                            float reward,
-                            SimulationStep currentTime);
+    // Process experiences from episodic memory
+    void processEpisodicExperiences();
+    
+    // Update concepts based on new episodic memories
+    void updateConceptsFromMemory();
+    
+    // Use concepts to enhance episodic memory retrieval
+    std::vector<size_t> enhanceMemoryRetrieval(const std::vector<float>& pattern,
+                                               float similarityThreshold = 0.7f);
+    
+    // Integrate with working memory for active concept processing
+    void integrateWithWorkingMemory();
+    
+    // Process a working memory trace
+    size_t processWorkingMemoryTrace(const std::vector<float>& pattern,
+                                    const std::vector<float>& features,
+                                    float reward,
+                                    SimulationStep currentTime);
+    
+    // Get memory-enhanced concept statistics
+    float getMemoryEnhancementScore() const;
+    
+    // Enable/disable memory integration
+    void setMemoryIntegration(bool enabled) { useMemoryIntegration_ = enabled; }
+    bool isMemoryIntegrationEnabled() const { return useMemoryIntegration_; }
 
     // Get the concept that best matches a pattern
     size_t getMatchingConcept(const std::vector<float>& pattern,
@@ -116,6 +137,12 @@ public:
     // Update concept with new instance
     void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
                       const std::vector<float>& features, float reward);
+
+    // Update concept with new pattern (memory integration helper)
+    void updateConceptForPattern(const std::vector<float>& newPattern,
+                                const std::vector<float>& features,
+                                float reward,
+                                SimulationStep currentTime);
 
     // Compute similarity between two patterns
     float computeSimilarity(const std::vector<float>& a,
@@ -150,13 +177,19 @@ private:
     // Check if concept is stable enough to be considered "discovered"
     bool isConceptStable(size_t conceptId) const;
 
-    struct Impl;
+struct Impl;
     std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
-    
+
+    // ========== MEMORY INTEGRATION ==========
+    // References to memory systems for episodic memory processing
+    NeuralWorkingMemory* workingMemory_;
+    NeuralEpisodicMemory* episodicMemory_;
+    MemoryContext* memoryContext_;
+
     // Parameters
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable

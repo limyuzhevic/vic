@@ -1,0 +1,51 @@
+#!/bin/bash
+echo "Examining key integration issues..."
+echo ""
+
+echo "1. Checking NeuralWorkingMemory integration in Brain.cpp:"
+grep -n "workingMemory" src/brain/Brain.cpp | head -20
+echo ""
+echo "2. Checking NeuralEpisodicMemory integration in Brain.cpp:"
+grep -n "episodicMemory\|storeEpisode\|replayEpisode" src/brain/Brain.cpp | head -20
+echo ""
+echo "3. Checking PredictionSystem integration in Brain.cpp:"
+grep -n "predictionSystem\|predictNextState\|getPredictionError" src/brain/Brain.cpp | head -10
+echo ""
+echo "4. Checking NeuralPlanner integration in Brain.cpp:"
+grep -n "planner\|planAction\|evaluateSequence" src/brain/Brain.cpp | head -10
+echo ""
+echo "5. Checking ConceptFormation integration in Brain.cpp:"
+grep -n "conceptFormation\|presentExperience\|getConcept" src/brain/Brain.cpp | head -10
+echo ""
+echo "6. Checking checkpoint implementation in Brain.cpp:"
+grep -n "checkpointManager\|save\|load" src/brain/Brain.cpp | head -20
+echo ""
+echo "7. Checking neuromodulation integration in Brain.cpp:"
+grep -n "dopamine\|novelty\|curiosity\|predictionError" src/brain/Brain.cpp | head -20
+echo ""
+echo "8. Checking sleep/rest and replay mechanisms:"
+grep -n "isResting\|replayInterval\|consolidationInterval" src/brain/Brain.cpp
+echo ""
+echo "9. Checking mismatch between Brain.hpp Phase 2 and Brain.cpp Phase 6:"
+echo "Brain.hpp mentions: Memory, Prediction, Planner, ConceptFormation, Attention systems"
+echo "Brain.cpp implements: NeuralWorkingMemory, NeuralEpisodicMemory, PredictionSystem, NeuralPlanner, ConceptFormation"
+echo ""
+echo "Key findings:"
+echo "- Working memory stores neurons on firing (Brain.cpp:392-395)"
+echo "- Episodic memory stores active neurons every 10 steps (Brain.cpp:480-510)"
+echo "- Prediction system has placeholder predictNextState (Brain.cpp:513-517)"
+echo "- Neural planner has placeholder predictNextState (Brain.cpp:514)"
+echo "- Concept formation has placeholder updates (Brain.cpp:529-533)"
+echo "- Checkpoint system has stubs but Brain.cpp save/load exist"
+echo "- Dopamine modulates excitability but has placeholder plasticity factor"
+echo "- ACh and other neuromodulators have placeholder implementations"
+echo ""
+echo "Integration issues identified:"
+echo "1. Working memory stores neuron activations but doesn't integrate with attention system properly"
+echo "2. Episodic memory stores neurons but doesn't connect to prediction system for prediction error"
+echo "3. Prediction system placeholders need to use neural dynamics for real prediction"
+echo "4. Neural planner needs to use episodic memory for planning"
+echo "5. Concept formation needs to integrate with working memory patterns"
+echo "6. Checkpoint system needs full implementation with neural plasticity state"
+echo "7. Neuromodulation needs ACh effects on attention/memory"
+echo "8. Sleep/rest cycle needs memory consolidation through replay"

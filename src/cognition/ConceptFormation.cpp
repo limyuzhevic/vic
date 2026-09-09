@@ -8,17 +8,24 @@ namespace nlm {
 
 struct ConceptFormation::Impl {
     Brain* brain;
+    NeuralWorkingMemory* workingMemory;
+    NeuralEpisodicMemory* episodicMemory;
+    MemoryContext* memoryContext;
     
-    Impl() : brain(nullptr) {}
+    Impl() : brain(nullptr), workingMemory(nullptr), episodicMemory(nullptr), memoryContext(nullptr) {}
 };
 
 ConceptFormation::ConceptFormation()
     : pImpl(new Impl)
     , brain_(nullptr)
+    , workingMemory_(nullptr)
+    , episodicMemory_(nullptr)
+    , memoryContext_(nullptr)
     , nextConceptId_(1)
     , formationThreshold_(0.75f)
     , stabilityThreshold_(0.7f)
     , stabilityWindow_(5)
+    , useMemoryIntegration_(true)
 {
 }
 
@@ -27,6 +34,19 @@ ConceptFormation::~ConceptFormation() = default;
 void ConceptFormation::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
+    
+    // Set up memory system pointers
+    if (brain) {
+        pImpl->workingMemory = brain->getWorkingMemory();
+        pImpl->episodicMemory = brain->getEpisodicMemory();
+        pImpl->memoryContext = brain->getMemoryContext();
+    }
+    
+    // Also update class member variables for external access
+    workingMemory_ = pImpl->workingMemory;
+    episodicMemory_ = pImpl->episodicMemory;
+    memoryContext_ = pImpl->memoryContext;
+    
     NLM_LOG_INFO("ConceptFormation initialized");
 }
 
@@ -232,6 +252,38 @@ void ConceptFormation::mergeConcepts(size_t conceptA, size_t conceptB) {
 bool ConceptFormation::isNovel(const std::vector<float>& pattern,
                                float similarityThreshold) const {
     return findConceptForPattern(pattern) == 0;
+}
+
+// Update concept with new pattern (memory integration helper)
+void ConceptFormation::updateConceptForPattern(const std::vector<float>& newPattern,
+                                             const std::vector<float>& features,
+                                             float reward,
+                                             SimulationStep currentTime) {
+    // Check if pattern matches existing concept
+    size_t matchingConcept = findConceptForPattern(newPattern);
+    
+    if (matchingConcept > 0) {
+        updateConcept(matchingConcept, newPattern, features, reward);
+    } else if (isNovel(newPattern, formationThreshold_)) {
+        // For early-stage concepts, only create if different enough
+        if (!concepts_.empty()) {
+            bool differentEnough = true;
+            for (const auto& concept : concepts_) {
+                float sim = computeSimilarity(newPattern, concept.prototype);
+                if (sim > 0.8f) {  // Very similar patterns likely the same concept
+                    differentEnough = false;
+                    break;
+                }
+            }
+            
+            if (differentEnough) {
+                createConcept(newPattern, features, reward);
+            }
+        } else {
+            // First concept, create it
+            createConcept(newPattern, features, reward);
+        }
+    }
 }
 
 size_t ConceptFormation::findConceptForPattern(const std::vector<float>& pattern) const {
