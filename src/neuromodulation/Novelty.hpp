@@ -1,38 +1,49 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <string>
+#include <vector>
 
 namespace nlm {
 
-// Novelty detection signal
-// Computes novelty from comparison with previous observations
+// Novelty detection from neural activity patterns
+// Extracts novel features from observation patterns and neural activity
+// Computes novelty as the deviation from expected patterns
 
 class Novelty {
 public:
     Novelty();
     ~Novelty();
     
-    // Initialize with brain reference
+    // Initialize with brain reference for accessing neural data
     void initialize(class Brain* brain);
     
-    // Get novelty level
+    // Get current novelty level (0.0 to 1.0)
     float getLevel() const;
+    
+    // Set novelty level
     void setLevel(float level);
     
-    // Detect novelty from observation
-    void detectNovelty(const class Observation& observation, 
-                       const class Observation& previousObservation);
+    // Detect novelty from two observations (previous and current)
+    // Extracts features from neural activity patterns
+    void detectNovelty(const Observation& observation, 
+                       const Observation& previousObservation);
     
-    // Detect novelty from sensory input pattern
+    // Detect novelty from neural activity patterns
+    // Computes deviation from expected patterns using neural firing rates
     void detectNovelty(const std::vector<float>& currentPattern,
                        const std::vector<float>& previousPattern);
     
-    // Decay novelty over time
+    // Update novelty state (apply decay)
     void update(TimestepDuration dt);
     
     // Get novelty history
     const std::vector<float>& getHistory() const;
     void clearHistory();
+    
+    // Get novelty threshold
+    float getThreshold() const;
+    void setThreshold(float threshold);
     
 private:
     struct Impl;

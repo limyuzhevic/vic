@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Curiosity drive: exploration motivation based on novelty and prediction error
-// Computed as weighted combination of novelty and prediction error
+// Computes weighted combination of novelty and prediction error with adaptation
 
 class Curiosity {
 public:
@@ -15,7 +15,7 @@ public:
     // Initialize with brain reference
     void initialize(class Brain* brain);
     
-    // Get curiosity level
+    // Get curiosity level (0.0 to 1.0)
     float getLevel() const;
     
     // Update curiosity based on novelty and prediction error
@@ -28,8 +28,14 @@ public:
     void setNoveltyWeight(float weight);
     void setPredictionErrorWeight(float weight);
     
-    // Reset
+    // Reset to initial state
     void reset();
+    
+    // Get prediction error from brain
+    float getPredictionError() const;
+    
+    // Get novelty from brain
+    float getNovelty() const;
     
 private:
     struct Impl;

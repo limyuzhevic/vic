@@ -1,13 +1,10 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
+#include "../cognition/SpatialRepresentation.hpp"
+#include "../cognition/TemporalRelation.hpp"
 
 namespace nlm {
 
@@ -23,6 +20,10 @@ class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
+class TemporalRelation;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
@@ -161,10 +162,17 @@ public:
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // Self-model: Represents the agent's internal model of itself
+    SelfModel* getSelfModel();
     
-    // ========== DEVELOPMENT SYSTEM ==========
+    // Social learning: Enables learning from observing other agents
+    SocialLearning* getSocialLearning();
+    
+    // Spatial representation: Learns spatial relationships from experience
+    SpatialRepresentation* getSpatialRepresentation();
+    
+    // Temporal relations: Learns temporal relationships (before, after, sequence)
+    TemporalRelation* getTemporalRelation();
     
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;

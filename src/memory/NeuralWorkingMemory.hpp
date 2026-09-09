@@ -42,6 +42,9 @@ public:
     // Get activation level of a specific neuron in working memory
     float getNeuronActivation(NeuronId neuron) const;
 
+    // Get activation levels for all neurons in working memory
+    const std::vector<float>& getNeuronActivations() const { return memoryActivations_; }
+
     // Update working memory (maintenance and decay)
     void update(TimestepDuration dt);
 
