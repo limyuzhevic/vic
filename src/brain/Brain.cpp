@@ -511,8 +511,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction with current sensory input from working memory
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Create a simple prediction based on current working memory activity
+            // This is a placeholder implementation - can be enhanced with neural prediction
+            float predictionError = 0.0f;
+            
+            // Get current observation from working memory traces
+            auto activeNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (NeuronId neuronId : activeNeurons) {
+                // Find neuron to get its activation
+                for (auto& region : pImpl->regions) {
+                    auto neurons = region->getAllNeurons();
+                    for (auto* neuron : neurons) {
+                        if (neuron->getId() == neuronId) {
+                            float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                            // Simple prediction based on current activity
+                            predictionError += activation * 0.01f;
+                        }
+                    }
+                }
+            }
+            
+            // Apply prediction error signal for learning
+            if (pImpl->predictionError) {
+                pImpl->predictionError->setLevel(predictionError);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,9 +552,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Process current neural activity patterns to form concepts
+        // Extract patterns from working memory activity
+        auto activeNeurons = pImpl->workingMemory->getMemoryNeurons();
+        if (!activeNeurons.empty()) {
+            // Create a pattern vector from active neuron activations
+            std::vector<float> pattern;
+            for (NeuronId neuronId : activeNeurons) {
+                for (auto& region : pImpl->regions) {
+                    auto neurons = region->getAllNeurons();
+                    for (auto* neuron : neurons) {
+                        if (neuron->getId() == neuronId) {
+                            float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                            pattern.push_back(activation);
+                        }
+                    }
+                }
+            }
+            
+            // Normalize pattern
+            float patternStrength = 0.0f;
+            for (float value : pattern) patternStrength += value;
+            if (patternStrength > 0.0f) {
+                for (float& value : pattern) value /= patternStrength;
+            }
+            
+            // Feed pattern to concept formation system
+            pImpl->conceptFormation->processPattern(pattern, pImpl->currentTime);
+            
+            // Store concept in associative memory
+            if (pImpl->associativeMemory && !pattern.empty()) {
+                pImpl->associativeMemory->storePattern(pattern, activeNeurons);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -690,39 +746,94 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Enhanced action selection with cognitive integration
     
-    if (pImpl->motorNeurons.empty()) {
-        return std::make_unique<Action>(ActionType::Wait);
-    }
+    // First, let cognitive systems plan action
+    std::unique_ptr<class Action> action = std::make_unique<Action>(ActionType::Wait);
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+    // Try cognitive planning first
+    if (pImpl->planner) {
+        // Get planned action from neural planner
+        auto plannedAction = pImpl->planner->planAction(pImpl->currentStep, pImpl->currentTime);
+        if (plannedAction) {
+            action = std::move(plannedAction);
+            NLM_LOG_INFO("Planner selected action: " + std::to_string(static_cast<int>(action->getType())));
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    // If cognitive system didn't provide a plan, fallback to basic motor selection
+    if (action->getType() == ActionType::Wait && !pImpl->motorNeurons.empty()) {
+        // Calculate activity of motor neuron groups
+        size_t firingMotor = 0;
+        for (auto* neuron : pImpl->motorNeurons) {
+            if (neuron->isFiring()) {
+                ++firingMotor;
+            }
+        }
+        
+        // If cognitive planner selected wait but motor is active, use motor command
+        if (firingMotor > 0) {
+            // Enhanced: Use attention system to prioritize among motor groups
+            if (pImpl->attention) {
+                // Get attended motor groups for action selection
+                auto attendedMotorGroups = pImpl->attention->getAttendedMotorGroups();
+                if (!attendedMotorGroups.empty()) {
+                    // Select action based on attended motor groups
+                    action = std::make_unique<Action>(attendedMotorGroups[0].actionType);
+                } else {
+                    // Default to movement if motor neurons firing
+                    action = std::make_unique<Action>(ActionType::MoveForward);
+                }
+            } else {
+                // Default to movement if motor neurons firing
+                action = std::make_unique<Action>(ActionType::MoveForward);
+            }
+        }
     }
     
-    auto action = std::make_unique<Action>(type);
+    // Log concept influence on action
+    if (pImpl->conceptFormation) {
+        auto concepts = pImpl->conceptFormation->getActiveConcepts();
+        if (!concepts.empty()) {
+            NLM_LOG_INFO("Concept influences action: " + concepts[0].name + " (strength: " + std::to_string(concepts[0].strength) + ")");
+        }
+    }
     
     return action;
 }
 
-void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
-    float modulation = signal.getLevel();
+void Brain::produceActionFromCognition() {
+    // Let cognitive systems select action
+    if (pImpl->planner) {
+        // Get planned action from neural planner
+        auto action = pImpl->planner->planAction(pImpl->currentStep, pImpl->currentTime);
+        if (action) {
+            // Store in motor system for execution
+            // Note: In a real implementation, the planner would directly
+            // communicate with motor neurons or action output system
+            // For now, this is a placeholder for the cognitive-motor integration
+            NLM_LOG_INFO("Planner suggests action: " + std::to_string(static_cast<int>(action->getType())));
+        }
+    }
     
-    // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
+    // Also integrate concept-based decision making
+    if (pImpl->conceptFormation) {
+        // Get current concepts and their strengths
+        auto concepts = pImpl->conceptFormation->getActiveConcepts();
+        for (const auto& concept : concepts) {
+            // Concepts influence action selection through their associated
+            // motor patterns and action tendencies
+            NLM_LOG_INFO("Active concept: " + concept.name + " (strength: " + std::to_string(concept.strength) + ")");
+        }
+    }
+    
+    // Let attention system prioritize which concepts lead to action
+    if (pImpl->attention) {
+        auto attentionWeights = pImpl->attention->getAttentionWeights();
+        if (!attentionWeights.empty()) {
+            NLM_LOG_INFO("Attention weights: " + std::to_string(attentionWeights.size()) + " regions competing for focus");
+        }
+    }
 }
 
 void Brain::updatePlasticity() {

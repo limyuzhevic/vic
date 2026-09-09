@@ -94,6 +94,9 @@ public:
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
+    // Produce action with cognitive integration
+    void produceActionFromCognition();
+    
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
     
