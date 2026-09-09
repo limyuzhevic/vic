@@ -58,7 +58,7 @@ struct LearningExperiment {
     std::vector<NeuronId> mostActiveNeurons;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+        : brain(b), seed(s), initialSynapseCount(0), mostActiveNeurons() {}
     
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
@@ -160,6 +160,9 @@ struct LearningExperiment {
 };
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+    const size_t NEURONS_TO_EXCITE = 10;
+    const size_t STEPS_TO_RUN = 50;
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
@@ -177,14 +180,14 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     size_t initialSpikes = brain->getTotalSpikeCount();
     
     // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
+    NLM_LOG_INFO("  Injecting current into " + std::to_string(std::min(NEURONS_TO_EXCITE, neurons.size())) + " neurons...");
+    for (size_t i = 0; i < std::min(NEURONS_TO_EXCITE, neurons.size()); ++i) {
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
     }
     
     // Run a few steps
-    for (SimulationStep step = 0; step < 50; ++step) {
-        brain->step(step, step * 0.001);
+    for (SimulationStep step = 0; step < STEPS_TO_RUN; ++step) {
+        brain->step(step, static_cast<Timestamp>(step) * 0.001f);
     }
     
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
@@ -203,6 +206,9 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
 }
 
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
+    const size_t STEPS_TO_RUN = 1000;
+    const size_t INPUT_NEURONS = 20;
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
     
@@ -220,15 +226,16 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    NLM_LOG_INFO("Applying repeated input patterns (" + std::to_string(STEPS_TO_RUN) + " steps)...");
     
-    for (SimulationStep step = 0; step < 1000; ++step) {
+    for (SimulationStep step = 0; step < STEPS_TO_RUN; ++step) {
         // Create input pattern - inject current into sensory neurons
-        for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
+        size_t neuronsToStimulate = std::min(INPUT_NEURONS, brain->getTotalNeuronCount() / 4);
+        for (size_t i = 0; i < neuronsToStimulate; ++i) {
             brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
         }
         
-        brain->step(step, step * 0.001);
+        brain->step(step, step * 0.001f);
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
