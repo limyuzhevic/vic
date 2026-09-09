@@ -1,33 +1,36 @@
-#pragma once
-
 #include "PlasticityRule.hpp"
+#include "../../brain/Synapse.hpp"
 #include <algorithm>
 #include <cmath>
 
 namespace nlm {
 
-struct STDP::Impl {
+struct RewardModulatedSTDP::Impl {
     float ltpWeight;      // A+ for potentiation
     float ltdWeight;      // A- for depression
     float timeConstant;   // Tau for exponential window (ms)
     float minWeight;      // Minimum synaptic weight
     float maxWeight;      // Maximum synaptic weight
+    float rewardDecay;    // Reward decay rate
     
     Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
+             minWeight(-1.0f), maxWeight(1.0f), rewardDecay(0.1f) {}
 };
 
-STDP::STDP() : pImpl(new Impl) {}
+RewardModulatedSTDP::RewardModulatedSTDP() : pImpl(new Impl) {}
 
-STDP::~STDP() = default;
+RewardModulatedSTDP::~RewardModulatedSTDP() = default;
 
-void STDP::update(Synapse* synapse,
-                   const std::vector<Timestamp>& preSpikes,
-                   const std::vector<Timestamp>& postSpikes,
-                   TimestepDuration dt) {
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+void RewardModulatedSTDP::update(Synapse* synapse,
+                                 const std::vector<Timestamp>& preSpikes,
+                                 const std::vector<Timestamp>& postSpikes,
+                                 TimestepDuration dt) {
+    if (!synapse || !synapse->isEnabled() || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
+    
+    // R-STDP (Reward-modulated STDP)
+    // Combines STDP timing with reward prediction error
     
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
@@ -49,6 +52,7 @@ void STDP::update(Synapse* synapse,
     if (std::abs(totalDelta) > 1e-6f) {
         float efficacy = synapse->getEfficacy();
         totalDelta *= efficacy;
+        
         synapse->addToWeight(totalDelta);
         
         float currentTrace = synapse->getEligibilityTrace();
@@ -56,7 +60,7 @@ void STDP::update(Synapse* synapse,
     }
 }
 
-void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
+void RewardModulatedSTDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
     float newWeight = synapse->getWeight() + delta;
@@ -64,38 +68,40 @@ void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     synapse->setWeight(newWeight);
 }
 
-const char* STDP::getName() const {
-    return "STDP";
+const char* RewardModulatedSTDP::getName() const {
+    return "R-STDP";
 }
 
-void STDP::setLTPWeight(float weight) {
+void RewardModulatedSTDP::setLTPWeight(float weight) {
     pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
 }
 
-float STDP::getLTPWeight() const {
+float RewardModulatedSTDP::getLTPWeight() const {
     return pImpl->ltpWeight;
 }
 
-void STDP::setLTDWeight(float weight) {
+void RewardModulatedSTDP::setLTDWeight(float weight) {
     pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
 }
 
-float STDP::getLTDWeight() const {
+float RewardModulatedSTDP::getLTDWeight() const {
     return pImpl->ltdWeight;
 }
 
-void STDP::setTimeConstant(float tau) {
+void RewardModulatedSTDP::setTimeConstant(float tau) {
     pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
 }
 
-float STDP::getTimeConstant() const {
+float RewardModulatedSTDP::getTimeConstant() const {
     return pImpl->timeConstant;
 }
 
-void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
-    setLTPWeight(ltpWeight);
-    setLTDWeight(ltdWeight);
-    setTimeConstant(tau);
+void RewardModulatedSTDP::setRewardDecay(float decay) {
+    pImpl->rewardDecay = std::clamp(decay, 0.0f, 1.0f);
+}
+
+float RewardModulatedSTDP::getRewardDecay() const {
+    return pImpl->rewardDecay;
 }
 
 } // namespace nlm

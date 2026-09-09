@@ -1,9 +1,6 @@
 #pragma once
 
-#include "PlasticityRule.hpp"
-#include "../../brain/Synapse.hpp"
-#include <algorithm>
-#include <cmath>
+#include "Hebbian.hpp"
 
 namespace nlm {
 

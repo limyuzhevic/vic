@@ -1,34 +1,10 @@
 #pragma once
 
 #include "PlasticityRule.hpp"
-#include "../../brain/Synapse.hpp"
 #include <algorithm>
 #include <cmath>
 
 namespace nlm {
-
-class RewardModulatedSTDP : public PlasticityRule {
-public:
-    RewardModulatedSTDP();
-    ~RewardModulatedSTDP() override;
-    
-    void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override;
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
-    const char* getName() const override;
-    
-    // Reward parameters
-    void setRewardDecay(float decay);
-    float getRewardDecay() const;
-    void setBaseline(float baseline);
-    float getBaseline() const;
-    
-private:
-    struct Impl;
-    Impl* pImpl;
-};
 
 class TripletSTDP : public PlasticityRule {
 public:

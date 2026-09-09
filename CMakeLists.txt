@@ -41,6 +41,11 @@ add_library(nlm_core STATIC
     # Plasticity
     src/plasticity/PlasticityRule.cpp
     src/plasticity/Hebbian.cpp
+    src/plasticity/HebbianRule.cpp
+    src/plasticity/AntiHebbian.cpp
+    src/plasticity/BCMAntiarHebbian.cpp
+    src/plasticity/RewardModulatedSTDP.cpp
+    src/plasticity/TripletSTDP.cpp
     src/plasticity/STDP.cpp
     src/plasticity/StructuralPlasticity.cpp
     # Development
