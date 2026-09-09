@@ -2,6 +2,8 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Synapse.hpp"
+#include <cmath>
+#include <algorithm>
 
 namespace nlm {
 
@@ -54,6 +56,44 @@ public:
     void setLearningRate(float rate);
     float getLearningRate() const;
     
+    // BCM (Bienenstock-Cooper-Munro) rule parameters
+    void setMu(float mu);
+    float getMu() const;
+    void setThetaM(float theta_m);
+    float getThetaM() const;
+    void setThetaPlus(float theta_plus);
+    float getThetaPlus() const;
+    void setThetaMinus(float theta_minus);
+    float getThetaMinus() const;
+    
+    // Calcium dynamics
+    void setCalciumDecay(float decay);
+    float getCalciumDecay() const;
+    
+    // Weight normalization
+    void setWeightNormTarget(float target);
+    float getWeightNormTarget() const;
+    void setWeightNormRate(float rate);
+    float getWeightNormRate() const;
+    
+    // Neuromodulator gating
+    void setNeuromodulatorGating(float gating);
+    float getNeuromodulatorGating() const;
+    
+    // Metaplasticity
+    void setMetaplasticRate(float rate);
+    float getMetaplasticRate() const;
+    
+    // Hebbian-LTD parameters
+    void setLTDThreshold(float threshold);
+    float getLTDThreshold() const;
+    void setLTDRate(float rate);
+    float getLTDRate() const;
+    
+    // Spike history
+    void setSpikeHistorySize(float size);
+    float getSpikeHistorySize() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
@@ -82,5 +122,18 @@ public:
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
     const char* getName() const override { return "BCM"; }
 };
+
+// Helper functions for HebbianRule
+namespace HebbianHelpers {
+    void computeCovariance(const std::vector<Timestamp>& spikes, 
+                          float& mean, float& variance, float n);
+    void computeCrossCovariance(const std::vector<Timestamp>& preSpikes,
+                              const std::vector<Timestamp>& postSpikes,
+                              float& cov, float n);
+    float computeBCMWeightChange(float covariance, float calcium, 
+                                float theta_m, float learningRate);
+    float applyOjaNormalization(float delta, float weight, float weightSq);
+    float normalizeWeight(float weight, float target, float rate);
+}
 
 } // namespace nlm

@@ -70,9 +70,48 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
-    // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Tsodyks-Markram STP variables (for short-term plasticity)
+    float getUtilization() const;
+    float getRecovery() const;
+    float getResources() const;
+    
+    // Reversal potentials (in mV)
+    float getReversalPotential() const;
+    void setReversalPotential(float potential);
+    
+    // Synaptic conductance state
+    float getConductance() const;
+    void setConductance(float conductance);
+    float getAMPAConductance() const;
+    float getNMDAConductance() const;
+    
+    // Synaptic weight dynamics
+    float getCalciumConcentration() const;
+    void setCalciumConcentration(float calcium);
+    float getWeightChangeRate() const;
+    
+    // Synaptic noise
+    float getNoiseLevel() const;
+    void setNoiseLevel(float noise);
+    
+    // Synaptic activity history for bursting
+    int getRecentSpikeCount(int timeWindow, Timestamp currentTime) const;
+    float getBurstingProbability() const;
+    
+    // Update synapse for one simulation step with realistic synaptic dynamics
     void step(Timestamp currentTime);
+    
+    // Handle presynaptic spike (update STP variables)
+    void onPreSpike(Timestamp time);
+    
+    // Handle postsynaptic spike (for STP and calcium dynamics)
+    void onPostSpike(Timestamp time);
+    
+    // Calculate synaptic current based on conductance dynamics
+    float calculateCurrent(float vPost, Timestamp currentTime) const;
+    
+    // Apply plasticity rules based on spike timing and calcium
+    void applyPlasticity(Timestamp currentTime);
     
     // Reset to initial state
     void reset();

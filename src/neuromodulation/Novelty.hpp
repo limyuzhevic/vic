@@ -5,7 +5,9 @@
 namespace nlm {
 
 // Novelty detection signal
-// Computes novelty from comparison with previous observations
+// Real novelty detection based on prediction errors
+// Change detection and surprise computation
+// Exploration-exploitation trade-off
 
 class Novelty {
 public:
@@ -27,12 +29,24 @@ public:
     void detectNovelty(const std::vector<float>& currentPattern,
                        const std::vector<float>& previousPattern);
     
-    // Decay novelty over time
+    // Update novelty over time
     void update(TimestepDuration dt);
     
     // Get novelty history
     const std::vector<float>& getHistory() const;
     void clearHistory();
+    
+    // Set novelty parameters
+    void setNoveltyThreshold(float threshold);
+    void setDecayRate(float rate);
+    void setIntegrationFactor(float factor);
+    void setSurpriseFactor(float factor);
+    
+    // Compute surprise from prediction error
+    float computeSurprise(float predictionError) const;
+    
+    // Get exploration value for novelty-based exploration
+    float getExplorationValue() const;
     
 private:
     struct Impl;
