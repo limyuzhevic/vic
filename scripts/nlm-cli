@@ -1,0 +1,618 @@
+#!/usr/bin/env python3
+"""
+NLM CLI - Advanced command-line interface for Neural Learning Machine
+
+Provides advanced users with control over NLM simulations, including:
+- Configuration management
+- Experiment management
+- Profiling capabilities
+- Checkpoint management
+- Utility functions
+
+Usage: nlm-cli [OPTIONS] COMMAND [ARGS]...
+"""
+
+import argparse
+import json
+import sys
+import os
+from pathlib import Path
+from typing import Optional, Dict, Any
+from datetime import datetime
+import time
+
+# Add current directory to path to import pynlm
+sys.path.insert(0, str(Path(__file__).parent))
+
+try:
+    import pynlm
+    PYNLM_AVAILABLE = True
+except ImportError:
+    PYNLM_AVAILABLE = False
+    print("Error: pynlm module not available. Please install pynlm first.", file=sys.stderr)
+
+# Default configuration file path
+DEFAULT_CONFIG_PATH = Path.home() / ".nlm" / "config.json"
+DEFAULT_CHECKPOINT_DIR = Path.home() / ".nlm" / "checkpoints"
+DEFAULT_LOG_FILE = Path.home() / ".nlm" / "nlm_cli.log"
+
+# Global state
+_state = {
+    "config": None,
+    "brain": None,
+    "world": None,
+    "agent": None,
+    "current_step": 0,
+    "is_running": False,
+    "profiler": None,
+    "start_time": None,
+}
+
+
+def get_pynlm():
+    """Get pynlm module, raise error if not available"""
+    if not PYNLM_AVAILABLE:
+        raise ImportError("pynlm module not available. Please install pynlm")
+    return pynlm
+
+
+def log_message(message: str):
+    """Write message to log file"""
+    timestamp = datetime.now().isoformat()
+    log_entry = f"[{timestamp}] {message}\n"
+    
+    # Ensure log directory exists
+    DEFAULT_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Append to log file
+    with open(DEFAULT_LOG_FILE, "a") as f:
+        f.write(log_entry + "\n")
+
+
+def print_info(message: str):
+    """Print info message"""
+    print(f"[INFO] {message}")
+
+
+def print_error(message: str):
+    """Print error message"""
+    print(f"[ERROR] {message}", file=sys.stderr)
+
+
+def print_success(message: str):
+    """Print success message"""
+    print(f"[SUCCESS] {message}")
+
+
+def create_argument_parser():
+    """Create and configure the argument parser"""
+    parser = argparse.ArgumentParser(
+        description="NLM CLI - Advanced command-line interface for Neural Learning Machine",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    
+    parser.add_argument(
+        "-v", "--version",
+        action="store_true",
+        help="Show version information and exit"
+    )
+    
+    parser.add_argument(
+        "-c", "--config-path",
+        type=str,
+        default=str(DEFAULT_CONFIG_PATH),
+        help="Path to configuration file (default: ~/.nlm/config.json)"
+    )
+    
+    parser.add_argument(
+        "-l", "--log-path",
+        type=str,
+        default=str(DEFAULT_LOG_FILE),
+        help="Path to log file (default: ~/.nlm/nlm_cli.log)"
+    )
+    
+    subparsers = parser.add_subparsers(
+        dest="command",
+        title="Commands",
+        description="Available commands",
+        help="Command to execute"
+    )
+    
+    # Config subcommands
+    config_parser = subparsers.add_parser(
+        "config",
+        help="Configuration management"
+    )
+    config_sub = config_parser.add_subparsers(dest="config_command")
+    
+    config_show = config_sub.add_parser("show", help="Show current configuration")
+    config_show.set_defaults(func=cmd_config_show)
+    
+    config_set = config_sub.add_parser("set", help="Set a configuration value")
+    config_set.add_argument("key", help="Configuration key")
+    config_set.add_argument("value", help="Configuration value")
+    config_set.set_defaults(func=cmd_config_set)
+    
+    config_load = config_sub.add_parser("load", help="Load configuration from file")
+    config_load.add_argument("filepath", help="Path to configuration file")
+    config_load.set_defaults(func=cmd_config_load)
+    
+    config_save = config_sub.add_parser("save", help="Save configuration to file")
+    config_save.add_argument("filepath", nargs="?", default=str(DEFAULT_CONFIG_PATH), help="Path to save configuration")
+    config_save.set_defaults(func=cmd_config_save)
+    
+    config_reset = config_sub.add_parser("reset", help="Reset configuration to defaults")
+    config_reset.set_defaults(func=cmd_config_reset)
+    
+    # Experiment subcommands
+    exp_parser = subparsers.add_parser(
+        "experiment",
+        help="Experiment management"
+    )
+    exp_sub = exp_parser.add_subparsers(dest="exp_command")
+    
+    exp_run = exp_sub.add_parser("run", help="Run an experiment")
+    exp_run.add_argument("phase", help="Experiment phase (demo|phase3|phase4|phase6)")
+    exp_run.add_argument("-s", "--steps", type=int, default=100, help="Number of simulation steps")
+    exp_run.add_argument("-c", "--config", type=str, help="Path to configuration file")
+    exp_run.set_defaults(func=cmd_exp_run)
+    
+    exp_list = exp_sub.add_parser("list", help="List available experiments")
+    exp_list.set_defaults(func=cmd_exp_list)
+    
+    # Profile subcommands
+    profile_parser = subparsers.add_parser(
+        "profile",
+        help="Profiling capabilities"
+    )
+    profile_sub = profile_parser.add_subparsers(dest="profile_command")
+    
+    profile_start = profile_sub.add_parser("start", help="Start profiling")
+    profile_start.add_argument(
+        "-d", "--duration",
+        type=int,
+        default=60,
+        help="Profile duration in seconds (default: 60)"
+    )
+    profile_start.add_argument(
+        "-o", "--output",
+        type=str,
+        default="profile_report.json",
+        help="Output file for profile data (default: profile_report.json)"
+    )
+    profile_start.set_defaults(func=cmd_profile_start)
+    
+    profile_stop = profile_sub.add_parser("stop", help="Stop profiling")
+    profile_stop.set_defaults(func=cmd_profile_stop)
+    
+    profile_report = profile_sub.add_parser("report", help="Generate profile report")
+    profile_report.add_argument(
+        "-f", "--file",
+        type=str,
+        default="profile_report.json",
+        help="Profile data file (default: profile_report.json)"
+    )
+    profile_report.set_defaults(func=cmd_profile_report)
+    
+    # Checkpoint subcommands
+    checkpoint_parser = subparsers.add_parser(
+        "checkpoint",
+        help="Checkpoint management"
+    )
+    checkpoint_sub = checkpoint_parser.add_subparsers(dest="checkpoint_command")
+    
+    checkpoint_save = checkpoint_sub.add_parser("save", help="Save checkpoint")
+    checkpoint_save.add_argument(
+        "name",
+        nargs="?",
+        default=f"checkpoint_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+        help="Checkpoint name (default: timestamped)"
+    )
+    checkpoint_save.add_argument(
+        "-d", "--description",
+        type=str,
+        help="Checkpoint description"
+    )
+    checkpoint_save.set_defaults(func=cmd_checkpoint_save)
+    
+    checkpoint_load = checkpoint_sub.add_parser("load", help="Load checkpoint")
+    checkpoint_load.add_argument("name", help="Checkpoint name to load")
+    checkpoint_load.set_defaults(func=cmd_checkpoint_load)
+    
+    # Utility subcommands
+    utility_parser = subparsers.add_parser(
+        "utility",
+        help="Utility functions"
+    )
+    utility_sub = utility_parser.add_subparsers(dest="utility_command")
+    
+    status_cmd = utility_sub.add_parser("status", help="Show system status")
+    status_cmd.set_defaults(func=cmd_status)
+    
+    validate_cmd = utility_sub.add_parser("validate", help="Validate configuration")
+    validate_cmd.set_defaults(func=cmd_validate)
+    
+    return parser
+
+
+def initialize_nlm(config_path: Optional[str] = None):
+    """Initialize NLM components"""
+    global _state
+    
+    # Create default config if needed
+    if config_path:
+        config = pynlm.createDefaultConfig()
+        config.loadFromFile(config_path)
+    else:
+        config = pynlm.createDefaultConfig()
+    
+    # Update global state
+    _state["config"] = config
+    _state["brain"] = None
+    _state["world"] = None
+    _state["agent"] = None
+    _state["current_step"] = 0
+    
+    log_message(f"NLM initialized with config from: {config_path or 'default'}")
+    print_info(f"NLM initialized with config")
+
+
+def cmd_config_show(args):
+    """Show current configuration"""
+    if _state["config"] is None:
+        print_error("NLM not initialized. Use 'nlm-cli config load <file>' first.")
+        return
+    
+    print_info("Current Configuration:")
+    print(_state["config"].summary())
+    
+    # Print all keys
+    print_info("\nConfiguration keys:")
+    for key in _state["config"].getKeys():
+        print(f"  {key}")
+
+
+def cmd_config_set(args):
+    """Set a configuration value"""
+    # This would need to be implemented based on the Config class API
+    # For now, just a placeholder
+    print_info(f"Setting config key '{args.key}' to value '{args.value}'")
+    print_error("Config set not yet implemented")
+
+
+def cmd_config_load(args):
+    """Load configuration from file"""
+    try:
+        config = pynlm.createDefaultConfig()
+        config.loadFromFile(args.filepath)
+        
+        _state["config"] = config
+        log_message(f"Config loaded from: {args.filepath}")
+        print_success(f"Configuration loaded from {args.filepath}")
+        
+    except Exception as e:
+        print_error(f"Failed to load configuration: {e}")
+
+
+def cmd_config_save(args):
+    """Save configuration to file"""
+    if _state["config"] is None:
+        print_error("NLM not initialized. Nothing to save.")
+        return
+    
+    try:
+        _state["config"].saveToFile(args.filepath)
+        log_message(f"Config saved to: {args.filepath}")
+        print_success(f"Configuration saved to {args.filepath}")
+        
+    except Exception as e:
+        print_error(f"Failed to save configuration: {e}")
+
+
+def cmd_config_reset(args):
+    """Reset configuration to defaults"""
+    _state["config"] = pynlm.createDefaultConfig()
+    print_success("Configuration reset to defaults")
+    log_message("Configuration reset to defaults")
+
+
+def cmd_exp_run(args):
+    """Run an experiment"""
+    # Check if NLM is initialized
+    if _state["config"] is None:
+        print_error("NLM not initialized. Use 'nlm-cli config load <file>' first.")
+        return
+    
+    print_info(f"Running {args.phase} experiment...")
+    print_info(f"Steps: {args.steps}")
+    
+    # Create components
+    config = _state["config"]
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create world if needed
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Run experiment
+    for step in range(args.steps):
+        world.update(0.1)
+        
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        brain.step(step)
+        
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Log every 10 steps
+        if step % 10 == 0:
+            print_info(f"  Step {step}/{args.steps} complete")
+    
+    # Print results
+    print_info("\nExperiment Results:")
+    print_info(f"  Total neurons: {brain.getTotalNeuronCount()}")
+    print_info(f"  Total spikes: {brain.getTotalSpikeCount()}")
+    print_info(f"  Active neurons: {brain.getActiveNeuronCount()}")
+    print_info(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+    print_info(f"  Average firing rate: {brain.getAverageFiringRate():.2f}")
+    print_info(f"  Developmental stage: {brain.getDevelopmentalStage()}")
+    
+    log_message(f"Experiment {args.phase} completed: {args.steps} steps")
+    print_success(f"Experiment {args.phase} completed successfully")
+
+
+def cmd_exp_list(args):
+    """List available experiments"""
+    print_info("Available experiments:")
+    
+    experiments = [
+        ("demo", "Basic demonstration of NLM functionality"),
+        ("phase3", "Phase 3 experiment (World interaction)"),
+        ("phase4", "Phase 4 experiment (Cognition and memory)"),
+        ("phase6", "Phase 6 integration test (All systems)"),
+    ]
+    
+    for name, description in experiments:
+        print_info(f"  {name:10} - {description}")
+
+
+def cmd_profile_start(args):
+    """Start profiling"""
+    if _state["is_running"]:
+        print_error("Profiling already in progress")
+        return
+    
+    _state["is_running"] = True
+    _state["start_time"] = time.time()
+    
+    print_info(f"Starting profiling for {args.duration} seconds...")
+    print_info(f"Profile data will be saved to: {args.output}")
+    
+    # Start a timer for profiling (simplified - would use actual profiling in real implementation)
+    # This is just a demonstration structure
+    log_message(f"Profiling started: duration={args.duration}s, output={args.output}")
+    
+    # In a real implementation, you would start actual profiling here
+    print_info("Profiling started (note: this is a simplified demonstration)")
+
+
+def cmd_profile_stop(args):
+    """Stop profiling"""
+    if not _state["is_running"]:
+        print_error("Profiling is not running")
+        return
+    
+    _state["is_running"] = False
+    elapsed = time.time() - _state["start_time"]
+    
+    print_success(f"Profiling stopped (duration: {elapsed:.2f} seconds)")
+    log_message(f"Profiling stopped after {elapsed:.2f} seconds")
+
+
+def cmd_profile_report(args):
+    """Generate profile report"""
+    if not Path(args.file).exists():
+        print_error(f"Profile data file not found: {args.file}")
+        return
+    
+    try:
+        with open(args.file, "r") as f:
+            data = json.load(f)
+        
+        print_info(f"Profile report from: {args.file}")
+        
+        # Generate a simple report (would use actual profiling data in real implementation)
+        report = {
+            "timestamp": datetime.now().isoformat(),
+            "file": args.file,
+            "summary": "Profile report (simplified demonstration)",
+            "note": "Real implementation would analyze actual profiling data"
+        }
+        
+        print_info(f"Generated report: {json.dumps(report, indent=2)}")
+        
+    except Exception as e:
+        print_error(f"Failed to generate profile report: {e}")
+
+
+def cmd_checkpoint_save(args):
+    """Save checkpoint"""
+    if _state["brain"] is None:
+        print_error("No brain to checkpoint. Initialize NLM first.")
+        return
+    
+    # Create checkpoints directory
+    checkpoint_dir = Path.home() / ".nlm" / "checkpoints"
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Save brain state
+    checkpoint_file = checkpoint_dir / f"{args.name}.nlm"
+    
+    try:
+        _state["brain"].save(str(checkpoint_file))
+        
+        # Save metadata
+        metadata = {
+            "name": args.name,
+            "timestamp": datetime.now().isoformat(),
+            "description": args.description,
+            "step": _state["current_step"],
+            "config": json.loads(_state["config"].summary()) if hasattr(_state["config"], 'summary') else {}
+        }
+        
+        metadata_file = checkpoint_dir / f"{args.name}.meta.json"
+        with open(metadata_file, "w") as f:
+            json.dump(metadata, f, indent=2)
+        
+        print_success(f"Checkpoint saved: {checkpoint_file}")
+        log_message(f"Checkpoint saved: {args.name}")
+        
+    except Exception as e:
+        print_error(f"Failed to save checkpoint: {e}")
+
+
+def cmd_checkpoint_load(args):
+    """Load checkpoint"""
+    checkpoint_dir = Path.home() / ".nlm" / "checkpoints"
+    
+    # Try to find the checkpoint
+    checkpoint_file = checkpoint_dir / f"{args.name}.nlm"
+    metadata_file = checkpoint_dir / f"{args.name}.meta.json"
+    
+    if not checkpoint_file.exists():
+        print_error(f"Checkpoint not found: {args.name}")
+        return
+    
+    try:
+        # Load brain state
+        brain = pynlm.createBrain(_state["config"])
+        brain.load(str(checkpoint_file))
+        
+        _state["brain"] = brain
+        _state["current_step"] = 0
+        
+        # Load metadata
+        if metadata_file.exists():
+            with open(metadata_file, "r") as f:
+                metadata = json.load(f)
+            
+            print_success(f"Checkpoint loaded: {args.name}")
+            print_info(f"  Timestamp: {metadata.get('timestamp', 'unknown')}")
+            print_info(f"  Description: {metadata.get('description', 'none')}")
+            print_info(f"  Step: {metadata.get('step', 'unknown')}")
+        
+        log_message(f"Checkpoint loaded: {args.name}")
+        
+    except Exception as e:
+        print_error(f"Failed to load checkpoint: {e}")
+
+
+def cmd_status(args):
+    """Show system status"""
+    print_info("NLM CLI Status:")
+    print_info(f"  Python version: {sys.version}")
+    print_info(f"  PYNLM available: {PYNLM_AVAILABLE}")
+    print_info(f"  Config initialized: {_state['config'] is not None}")
+    print_info(f"  Brain created: {_state['brain'] is not None}")
+    print_info(f"  Simulation running: {_state['is_running']}")
+    print_info(f"  Current step: {_state['current_step']}")
+    
+    if _state["config"] is not None:
+        print_info(f"  Config keys: {len(_state['config'].getKeys())}")
+
+
+def cmd_validate(args):
+    """Validate configuration"""
+    if _state["config"] is None:
+        print_error("NLM not initialized. No configuration to validate.")
+        return
+    
+    try:
+        # Perform basic validation
+        config_keys = _state["config"].getKeys()
+        print_info(f"Configuration validation:")
+        print_info(f"  Number of keys: {len(config_keys)}")
+        print_info(f"  Keys: {config_keys}")
+        
+        # Check for required keys
+        required_keys = ["brain_neurons", "brain_connections"]
+        missing_keys = [key for key in required_keys if key not in config_keys]
+        
+        if missing_keys:
+            print_error(f"Missing required keys: {missing_keys}")
+        else:
+            print_success("Configuration appears valid")
+        
+        log_message(f"Configuration validated: {len(config_keys)} keys found")
+        
+    except Exception as e:
+        print_error(f"Validation failed: {e}")
+
+
+def main():
+    """Main entry point"""
+    parser = create_argument_parser()
+    
+    if len(sys.argv) == 1:
+        parser.print_help()
+        return
+    
+    # Check version flag
+    for arg in sys.argv:
+        if arg in ["-v", "--version"]:
+            print_info("NLM CLI v0.1.0")
+            print_info("Advanced command-line interface for Neural Learning Machine")
+            return
+    
+    args = parser.parse_args()
+    
+    try:
+        if args.command == "config":
+            if hasattr(args, "func"):
+                args.func(args)
+            else:
+                parser.parse_args(["config", "--help"])
+                
+        elif args.command == "experiment":
+            if hasattr(args, "func"):
+                args.func(args)
+            else:
+                parser.parse_args(["experiment", "--help"])
+                
+        elif args.command == "profile":
+            if hasattr(args, "func"):
+                args.func(args)
+            else:
+                parser.parse_args(["profile", "--help"])
+                
+        elif args.command == "checkpoint":
+            if hasattr(args, "func"):
+                args.func(args)
+            else:
+                parser.parse_args(["checkpoint", "--help"])
+                
+        elif args.command == "utility":
+            if hasattr(args, "func"):
+                args.func(args)
+            else:
+                parser.parse_args(["utility", "--help"])
+                
+        else:
+            parser.print_help()
+            
+    except Exception as e:
+        print_error(f"Error: {e}")
+        return 1
+    
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

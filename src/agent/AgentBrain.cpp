@@ -85,12 +85,15 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot process sensory input: brain_ not available");
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
+        if (sensoryVision_[i]) {  // Memory safety check
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
@@ -100,7 +103,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
+        if (sensoryTouch_[i]) {  // Memory safety check
             float current = touch[i] * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
         }
@@ -109,7 +112,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
+        if (sensoryInternal_[i]) {  // Memory safety check
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
         }
@@ -118,7 +121,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
+        if (sensoryProprioception_[i]) {  // Memory safety check
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
         }
@@ -126,6 +129,14 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
+        // Check previousVision_ size matches vision.size() for safety
+        if (previousVision_.size() != vision.size()) {
+            NLM_LOG_ERROR("Previous vision size mismatch: expected " + std::to_string(vision.size()) +
+                          ", got " + std::to_string(previousVision_.size()));
+            // Resize to match, filling with zeros
+            previousVision_.resize(vision.size(), 0.0f);
+        }
+        
         float totalDiff = 0.0f;
         for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
             float diff = std::abs(vision[i] - previousVision_[i]);
@@ -150,7 +161,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot decode motor command: brain_ not available");
+        return MotorCommand::Wait;
+    }
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
@@ -236,7 +250,14 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot apply reward modulation: brain_ not available");
+        return;
+    }
+    if (!rewardModulationEnabled_) {
+        NLM_LOG_ERROR("Cannot apply reward modulation: reward modulation is disabled");
+        return;
+    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -280,7 +301,14 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot update development: brain_ not available");
+        return;
+    }
+    if (!developmentEnabled_) {
+        NLM_LOG_ERROR("Cannot update development: development is disabled");
+        return;
+    }
     
     developmentalAge_ += timestep;
     
@@ -314,7 +342,10 @@ void AgentBrain::updateDevelopment(double timestep) {
 }
 
 DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
-    if (!brain_) return DevelopmentalStage::Initial;
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot get developmental stage: brain_ not available");
+        return DevelopmentalStage::Initial;
+    }
     return brain_->getDevelopmentalStage();
 }
 
