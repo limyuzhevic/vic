@@ -87,7 +87,7 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
-    Brain* brain_;
+    std::shared_ptr<Brain> brain_;
     size_t capacity_;
     float decayRate_;
     

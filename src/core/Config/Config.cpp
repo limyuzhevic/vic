@@ -3,11 +3,13 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::map<std::string, std::string> descriptions;  // Backup for descriptions
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,12 +21,9 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        throw ConfigError("Cannot open configuration file: " + filepath);
     }
     
     std::string line;
@@ -186,6 +185,47 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+// Pythonic helper methods
+bool Config::operator[](const std::string& key) const {
+    auto val = get<bool>(key);
+    if (!val.has_value()) {
+        throw ConfigKeyError(key);
+    }
+    return val.value();
+}
+
+int Config::getInt(const std::string& key) const {
+    auto val = get<int>(key);
+    if (!val.has_value()) {
+        throw ConfigKeyError(key);
+    }
+    return val.value();
+}
+
+double Config::getDouble(const std::string& key) const {
+    auto val = get<double>(key);
+    if (!val.has_value()) {
+        throw ConfigKeyError(key);
+    }
+    return val.value();
+}
+
+std::string Config::getString(const std::string& key) const {
+    auto val = get<std::string>(key);
+    if (!val.has_value()) {
+        throw ConfigKeyError(key);
+    }
+    return val.value();
+}
+
+bool Config::getBool(const std::string& key) const {
+    auto val = get<bool>(key);
+    if (!val.has_value()) {
+        throw ConfigKeyError(key);
+    }
+    return val.value();
+}
+
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -197,6 +237,28 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+// Configuration presets for common brain settings
+void Config::applyDefaultBrainSettings(Config& config) {
+    config.set("brain.neuron_count", 1000);
+    config.set("brain.synapse_density", 0.1);
+    config.set("brain.connection_probability", 0.05);
+    config.set("brain.v_thresh", -50.0);
+    config.set("brain.v_rest", -70.0);
+    config.set("brain.tau_mem", 20.0);
+}
+
+void Config::applyPerformanceSettings(Config& config) {
+    config.set("performance.enable_simd", true);
+    config.set("performance.enable_events", true);
+    config.set("performance.memory_pool_size", 10000);
+}
+
+void Config::applyDevelopmentSettings(Config& config) {
+    config.set("development.enable", true);
+    config.set("development.critical_period", 100.0);
+    config.set("development.maturation_rate", 0.01);
 }
 
 // Explicit template instantiations

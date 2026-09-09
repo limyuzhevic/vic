@@ -16,8 +16,12 @@
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
 
-namespace py = pybind11;
 namespace nlm {
+
+// Forward declare exception classes for Python binding
+class ConfigError;
+class ConfigKeyError;
+class ConfigValueError;
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
@@ -141,6 +145,21 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Wall", WorldObjectType::Wall)
         .value("Marker", WorldObjectType::Marker)
         .export_values();
+
+    // Define exception classes within the module
+    py::class_<ConfigError>(m, "ConfigError", "Configuration error")
+        .def(py::init<const std::string&>());
+
+    py::class_<ConfigKeyError, ConfigError>(m, "ConfigKeyError", "Configuration key error")
+        .def(py::init<const std::string&>());
+
+    py::class_<ConfigValueError, ConfigError>(m, "ConfigValueError", "Configuration value error")
+        .def(py::init<const std::string&, const std::string&>());
+
+    // Register exceptions with pybind11
+    py::register_exception<ConfigError>(m, "ConfigError");
+    py::register_exception<ConfigKeyError>(m, "ConfigKeyError");
+    py::register_exception<ConfigValueError>(m, "ConfigValueError");
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
@@ -420,6 +439,35 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Pythonic helper functions
+    m.def("run_simulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                              std::shared_ptr<AgentBrain> agent, int num_steps) {
+        for (int i = 0; i < num_steps; ++i) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps"),
+       "Run a complete simulation episode");
+
+    m.def("create_brain_from_config_file", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return std::make_shared<Brain>(config);
+    }, py::arg("filepath"),
+       "Create a brain from a configuration file");
+
+    m.def("create_simple_config", [](int neuron_count, double connection_prob) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", neuron_count);
+        config->set("brain.connection_probability", connection_prob);
+        return config;
+    }, py::arg("neuron_count") = 1000, py::arg("connection_prob") = 0.05,
+       "Create a simple brain configuration");
 }
 
 } // namespace nlm

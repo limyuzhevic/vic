@@ -71,6 +71,37 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### NEW: Enhanced Example with Configuration
+
+```python
+import pynlm
+
+# Step 1: Create brain with Pythonic configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2000)  # Pythonic way to set values
+config.set("brain.connection_probability", 0.1)
+
+# Apply preset configurations (NEW FEATURE)
+pynlm.apply_default_brain_settings(config)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Step 2: Create world and agent
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=16, visionHeight=16)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Step 3: Run complete simulation using utility function (NEW FEATURE)
+# This is the high-level way to run simulations
+pynlm.run_simulation(brain, world, agent, 500)
+
+print("✓ Enhanced simulation completed!")
+```
+
 ---
 
 ## Simple Analogy
@@ -153,6 +184,32 @@ agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
 ```
 
+### Pattern 4: Pythonic Configuration (NEW)
+
+```python
+# NEW: Use Pythonic configuration interface
+config = pynlm.createDefaultConfig()
+
+# Check if a key exists
+if config.has("brain.neuron_count"):
+    print(f"Current neuron count: {config.getInt('brain.neuron_count')}")
+
+# Set values with type safety
+config.set("brain.neuron_count", 3000)
+config.set("performance.enable_simd", True)
+
+# Get values with helpful error messages
+try:
+    count = config.getInt("brain.neuron_count")
+    print(f"Neurons: {count}")
+except pynlm.ConfigKeyError as e:
+    print(f"Configuration error: {e}")
+
+# Get value or default
+max_neurons = config.getOr("brain.neuron_count", 1000)
+print(f"Max neurons: {max_neurons}")
+```
+
 ---
 
 ## What Each Part Does
@@ -178,6 +235,17 @@ Gives sensory information (vision, touch, etc.) to the brain.
 
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
+
+### NEW: Configuration Helpers
+
+#### `pynlm.apply_default_brain_settings(config)`
+Apply standard brain configuration settings.
+
+#### `pynlm.apply_performance_settings(config)`
+Enable performance optimizations like SIMD.
+
+#### `pynlm.apply_development_settings(config)`
+Enable developmental features and critical periods.
 
 ---
 
@@ -221,13 +289,15 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent (ENHANCED)
 
 ```python
 import pynlm
 
-# Setup
+# Setup with Pythonic configuration
 config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 3000)
+
 brain = pynlm.createBrain(config)
 brain.initialize()
 world = pynlm.createSimpleWorld()
@@ -240,18 +310,31 @@ agent.initialize(world)
 agent.enableRewardModulation(True)
 agent.enableCuriosity(True)
 
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
+# Run agent using high-level utility
+brain = pynlm.run_simulation(brain, world, agent, 200)
     
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
-
 print("Agent simulation complete!")
+```
+
+### Project 4: Configuration Examples (NEW)
+
+```python
+import pynlm
+
+# Example 1: Create simple config
+config = pynlm.create_simple_config(neuron_count=5000, connection_prob=0.05)
+brain = pynlm.createBrain(config)
+
+# Example 2: Create brain from file
+brain = pynlm.create_brain_from_config_file("my_config.cfg")
+
+# Example 3: Run with error handling
+try:
+    world = pynlm.createSimpleWorld()
+    world.configure(width=30, height=30)
+    # ... rest of simulation
+except pynlm.ConfigError as e:
+    print(f"Configuration error: {e}")
 ```
 
 ---
@@ -269,6 +352,14 @@ print("Agent simulation complete!")
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
 
+| Configuration | Code |
+|---------------|------|
+| Pythonic config | `config.set("key", value)` |
+| Get with error handling | `config.getInt("key")` |
+| Apply presets | `pynlm.apply_default_brain_settings(config)` |
+| High-level simulation | `pynlm.run_simulation(...)` |
+| Create from file | `pynlm.create_brain_from_config_file("file.cfg")` |
+
 ---
 
 ## Troubleshooting
@@ -281,17 +372,75 @@ print("Agent simulation complete!")
 - Did you call `world.applyMotorCommand()`?
 - Check that `world.update()` is being called
 
+**"Configuration error"**
+- Use try-catch with `pynlm.ConfigError` for better error messages
+- Check that configuration keys exist with `config.has("key")`
+
 **"Everything is 0"**
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
+
+**"Pythonic config not working"**
+- Make sure you're using the right method names: `getInt()`, `getDouble()`, `getString()`, `getBool()`
+- Check type compatibility: `config.getInt("key")` expects an integer value
 
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md` for more details**
+2. **Read `docs/ARCHITECTURE.md` to understand how it all works**
+3. **Experiment with different configurations!**
+4. **Try the enhanced Pythonic interface features**
+5. **Use high-level utility functions for complex simulations**
+6. **Explore configuration presets and error handling**
+
+---
+
+## Quick Start Guide
+
+### For Absolute Beginners:
+```python
+# One line to get started
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+for i in range(10):
+    brain.step(i)
+print("Done!")
+```
+
+### For Intermediate Users:
+```python
+# Use Pythonic configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 5000)
+
+# Use presets
+pynlm.apply_default_brain_settings(config)
+
+# Run simulation
+brain = pynlm.run_simulation(brain, world, agent, 500)
+```
+
+### For Advanced Users:
+```python
+# Use high-level utilities
+brain = pynlm.create_brain_from_config_file("advanced_config.cfg")
+brain = pynlm.run_simulation(brain, world, agent, 1000)
+
+# Handle errors gracefully
+with try-catch for configuration and runtime errors:
+    # Your simulation code
+```
+
+That's it! You're now ready to use NLM with the enhanced Python bindings.
+
+The new Pythonic interface makes it easier to:
+- **Configure brains** with type-safe methods
+- **Handle errors** with descriptive exception messages
+- **Use presets** for common configurations
+- **Run simulations** with high-level utilities
+- **Extend functionality** with improved API discoverability
+

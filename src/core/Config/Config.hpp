@@ -5,11 +5,30 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <stdexcept>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+
+// Custom exceptions for configuration operations
+class ConfigError : public std::runtime_error {
+public:
+    explicit ConfigError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class ConfigKeyError : public ConfigError {
+public:
+    explicit ConfigKeyError(const std::string& key) : ConfigError("Configuration key not found: " + key) {}
+};
+
+class ConfigValueError : public ConfigError {
+public:
+    explicit ConfigValueError(const std::string& key, const std::string& expected) 
+        : ConfigError("Configuration value error for key " + key + ": expected " + expected) {}
+};
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -43,7 +62,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Main configuration class with Pythonic interface
 class Config {
 public:
     Config();
@@ -71,27 +90,35 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Pythonic interface: dictionary-like access
+    bool has(const std::string& key) const;
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
-    bool has(const std::string& key) const;
-    
-    // Remove key
+    // Pythonic methods
     void remove(const std::string& key);
-    
-    // Get all keys
     std::vector<std::string> getKeys() const;
-    
-    // Clear all
     void clear();
-    
-    // Get configuration summary
     std::string summary() const;
+    
+    // Pythonic helper methods
+    bool operator[](const std::string& key) const;  // For bool values
+    int getInt(const std::string& key) const;
+    double getDouble(const std::string& key) const;
+    std::string getString(const std::string& key) const;
+    bool getBool(const std::string& key) const;
+    
+    // Conversion helpers
+    static std::string toPythonKey(const std::string& key);
+    static std::string fromPythonKey(const std::string& key);
+    
+    // Configuration presets for common brain settings
+    static void applyDefaultBrainSettings(Config& config);
+    static void applyPerformanceSettings(Config& config);
+    static void applyDevelopmentSettings(Config& config);
     
 private:
     struct Impl;

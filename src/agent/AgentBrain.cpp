@@ -27,32 +27,32 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
+                    for (auto* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
                         
                         switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                            case 0: motorForward_.push_back(std::unique_ptr<Neuron>(n)); break;
+                            case 1: motorBackward_.push_back(std::unique_ptr<Neuron>(n)); break;
+                            case 2: motorTurnLeft_.push_back(std::unique_ptr<Neuron>(n)); break;
+                            case 3: motorTurnRight_.push_back(std::unique_ptr<Neuron>(n)); break;
+                            case 4: motorInteract_.push_back(std::unique_ptr<Neuron>(n)); break;
+                            case 5: motorWait_.push_back(std::unique_ptr<Neuron>(n)); break;
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
+                    for (auto* n : pop->getNeurons()) {
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
                         switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
+                            case 0: sensoryVision_.push_back(std::unique_ptr<Neuron>(n)); break;
+                            case 1: sensoryTouch_.push_back(std::unique_ptr<Neuron>(n)); break;
+                            case 2: sensoryInternal_.push_back(std::unique_ptr<Neuron>(n)); break;
+                            case 3: sensoryProprioception_.push_back(std::unique_ptr<Neuron>(n)); break;
                         }
                     }
                 }
@@ -345,6 +345,38 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset all neuron groups to their initial state
+    for (auto& group : motorForward_) {
+        if (group) group->reset();
+    }
+    for (auto& group : motorBackward_) {
+        if (group) group->reset();
+    }
+    for (auto& group : motorTurnLeft_) {
+        if (group) group->reset();
+    }
+    for (auto& group : motorTurnRight_) {
+        if (group) group->reset();
+    }
+    for (auto& group : motorInteract_) {
+        if (group) group->reset();
+    }
+    for (auto& group : motorWait_) {
+        if (group) group->reset();
+    }
+    for (auto& group : sensoryVision_) {
+        if (group) group->reset();
+    }
+    for (auto& group : sensoryTouch_) {
+        if (group) group->reset();
+    }
+    for (auto& group : sensoryInternal_) {
+        if (group) group->reset();
+    }
+    for (auto& group : sensoryProprioception_) {
+        if (group) group->reset();
+    }
 }
 
 } // namespace nlm
