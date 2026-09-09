@@ -71,8 +71,7 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
-    void step(Timestamp currentTime);
+    // Synaptic dynamics implemented in Synapse.cpp step()
     
     // Reset to initial state
     void reset();

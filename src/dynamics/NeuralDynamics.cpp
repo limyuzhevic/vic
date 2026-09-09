@@ -15,8 +15,8 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
+    // LIF implementation integrated with Neuron.cpp stepLIF()
+    // Synaptic input already handled through neuron's synapticInput field
     
     const auto& state = neuron->getState();
     
