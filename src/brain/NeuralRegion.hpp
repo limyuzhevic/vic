@@ -1,17 +1,19 @@
 #pragma once
-
+ 
 #include "../core/Types/Types.hpp"
 #include "NeuralPopulation.hpp"
 #include "Synapse.hpp"
+#include "OptimizedConnectivity.hpp"
 #include <vector>
 #include <memory>
 #include <unordered_map>
-
+#include <array>
+ 
 namespace nlm {
-
+ 
 // NeuralRegion: A brain region containing multiple populations and local connectivity
-// PLACEHOLDER - Phase 2 will implement region-level dynamics
-
+// Optimized to use CSR format for efficient connectivity management
+ 
 class NeuralRegion {
 public:
     // Create region with ID
@@ -41,17 +43,24 @@ public:
     const std::vector<std::unique_ptr<NeuralPopulation>>& getPopulations() const;
     std::vector<NeuralPopulation*> getAllPopulations();
     
-    // Synapse management (local connections within this region)
+    // Optimized synapse management using CSR format
     SynapseId addSynapse(NeuronId source, NeuronId destination, 
                          SynapticWeight weight = 0.0f, Delay delay = 1);
     Synapse* getSynapse(SynapseId id);
     const Synapse* getSynapse(SynapseId id) const;
     size_t getSynapseCount() const;
-    const std::vector<std::unique_ptr<Synapse>>& getSynapses() const;
     
-    // Connectivity queries
+    // Optimized connectivity queries using CSR
     std::vector<Synapse*> getSynapsesFrom(NeuronId neuron);
     std::vector<Synapse*> getSynapsesTo(NeuronId neuron);
+    
+    // Get connectivity statistics
+    float getAverageSynapticWeight() const;
+    float getSynapticDensity() const;
+    
+    // Get internal connectivity structure
+    CSRConnectivity& getConnectivity() { return connectivity_; }
+    const CSRConnectivity& getConnectivity() const { return connectivity_; }
     
     // Statistics
     size_t getTotalNeuronCount() const;
@@ -59,29 +68,44 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // Local connectivity statistics
-    float getAverageSynapticWeight() const;
-    float getSynapticDensity() const;  // fraction of possible connections
-    
     // Step all populations and synapses
     void step(Timestamp currentTime);
     
     // Reset all neurons and synapses
     void reset();
     
-    // Initialize connectivity
+    // Initialize connectivity with optimization
     void initializeRandomConnectivity(class RandomGenerator& rng, 
-                                      float connectionProbability,
-                                      float meanWeight,
-                                      float weightVariance);
+                                       float connectionProbability,
+                                       float meanWeight,
+                                       float weightVariance);
     
     // Get all neurons across all populations
     std::vector<Neuron*> getAllNeurons();
     std::vector<const Neuron*> getAllNeurons() const;
     
+    // Get connectivity statistics
+    CSRConnectivity::Stats getConnectivityStats() const;
+    
+    // Check if connectivity is optimized
+    bool isConnectivityOptimized() const { return useOptimizedConnectivity_; }
+    
+    // Enable/disable optimized connectivity
+    void enableOptimizedConnectivity(bool enable) { useOptimizedConnectivity_ = enable; }
+    
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Optimized connectivity structure
+    CSRConnectivity connectivity_;
+    NeuronIndexer neuronIndexer_;
+    
+    // Flag to enable optimized connectivity
+    bool useOptimizedConnectivity_;
+    
+    // Cache for frequently accessed connectivity
+    ConnectivityCache connectivityCache_;
 };
-
+ 
 } // namespace nlm

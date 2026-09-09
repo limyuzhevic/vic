@@ -6,27 +6,56 @@
 #include <queue>
 #include <functional>
 #include <unordered_map>
+#include <memory>
+#include <atomic>
+#include <algorithm>
+#include <cstdint>
+#include <thread>
+#include <shared_mutex>
 
 namespace nlm {
 
-// SpikeEvent with additional metadata
-struct DetailedSpikeEvent {
-    NeuronId source;
-    Timestamp timestamp;
-    SimulationStep step;
-    RegionId regionId;
-    PopulationId populationId;
-    
-    DetailedSpikeEvent() : source(), timestamp(0.0), step(0), regionId(), populationId() {}
-    DetailedSpikeEvent(NeuronId nid, Timestamp ts, SimulationStep s, RegionId rid, PopulationId pid)
-        : source(nid), timestamp(ts), step(s), regionId(rid), populationId(pid) {}
-};
-
 // Event-driven neural computation system
-// Handles spike event processing and delayed synaptic transmission
+// Handles spike event processing and delayed synaptic transmission with memory efficiency
 class SpikeSystem {
 public:
+    // Configuration parameters for adaptive spike processing
+    struct Config {
+        size_t maxSpikeHistory;           // Maximum number of spikes to keep in history
+        size_t maxImmediateQueueSize;     // Maximum size of immediate spike queue
+        size_t maxDelayedQueueSize;       // Maximum size of delayed spike queue
+        bool enableSpatialHashing;        // Enable spatial hashing for large networks
+        size_t spatialHashCellSize;       // Size of spatial hash cells
+        bool enableMemoryPool;            // Enable memory pools for spike events
+        bool enableCompression;           // Enable spike compression for dense networks
+        float compressionThreshold;       // Threshold for spike compression
+        bool enableParallelProcessing;    // Enable parallel spike processing
+        size_t parallelThreads;           // Number of parallel processing threads
+        bool enableSIMD;                  // Enable SIMD optimizations
+        bool enableMultiLevelQueues;      // Enable multi-level queue architecture
+        size_t immediateQueueCapacity;    // Capacity for immediate spikes
+        size_t delayedQueueCapacity;      // Capacity for delayed spikes
+        size_t scheduledQueueCapacity;    // Capacity for scheduled spikes
+        
+        Config() : maxSpikeHistory(10000),
+                  maxImmediateQueueSize(100000),
+                  maxDelayedQueueSize(100000),
+                  enableSpatialHashing(true),
+                  spatialHashCellSize(16),
+                  enableMemoryPool(true),
+                  enableCompression(true),
+                  compressionThreshold(0.1f),
+                  enableParallelProcessing(false),
+                  parallelThreads(std::thread::hardware_concurrency()),
+                  enableSIMD(true),
+                  enableMultiLevelQueues(true),
+                  immediateQueueCapacity(10000),
+                  delayedQueueCapacity(10000),
+                  scheduledQueueCapacity(10000) {}
+    };
+
     SpikeSystem();
+    explicit SpikeSystem(const Config& cfg);
     ~SpikeSystem();
     
     // Disable copying, enable moving
@@ -69,8 +98,37 @@ public:
     float getAverageSpikeRate() const;
     std::vector<NeuronId> getMostActiveNeurons(size_t count) const;
     
-    // Reset
+    // Reset with efficient memory cleanup
     void reset();
+    
+    // Configuration and tuning methods
+    void configure(const Config& cfg);
+    const Config& getConfig() const { return config; }
+    
+    // Spatial hashing for large networks
+    void updateSpatialHash(const Neuron* neuron, Timestamp x, Timestamp y);
+    std::vector<Neuron*> queryNeuronsInRange(Timestamp x1, Timestamp y1, Timestamp x2, Timestamp y2);
+    
+    // Spike compression for dense networks
+    void compressSpikes(const std::vector<SpikeEvent>& spikes);
+    void decompressSpikes(std::vector<SpikeEvent>& spikes);
+    
+    // Batch processing for improved performance
+    void batchQueueSpikes(const std::vector<SpikeEvent>& events);
+    void batchProcessSpikes(SimulationStep currentStep);
+    
+    // Parallel processing support
+    void startParallelProcessing();
+    void stopParallelProcessing();
+    bool isParallelProcessing() const;
+    
+    // Optimized for networks with >10,000 neurons
+    void enableCompressionForLargeNetworks();
+    bool isCompressionEnabled() const;
+    
+    // Memory usage statistics
+    size_t getMemoryUsage() const;
+    size_t getMaxMemoryUsage() const;
     
 private:
     struct Impl;

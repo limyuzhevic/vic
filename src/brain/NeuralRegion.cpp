@@ -1,6 +1,8 @@
 #include "NeuralRegion.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <stdexcept>
+#include <cmath>
 
 namespace nlm {
 

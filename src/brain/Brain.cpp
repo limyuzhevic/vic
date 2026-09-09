@@ -15,6 +15,7 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../dynamics/SpikeSystem.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>

@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
 
 namespace nlm {
 
@@ -37,11 +38,53 @@ struct ConfigEntry {
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    std::string category;
+    std::string subcategory;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description(), category("general"), subcategory("") {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+        : key(k), value(v), source(s), description(desc), category("general"), subcategory("") {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc, const std::string& cat, const std::string& subcat = "")
+        : key(k), value(v), source(s), description(desc), category(cat), subcategory(subcat) {}
 };
+
+// Configuration categories
+namespace ConfigCategory {
+    constexpr const char* General = "general";
+    constexpr const char* Performance = "performance";
+    constexpr const char* Neural = "neural";
+    constexpr const char* Learning = "learning";
+    constexpr const char* Memory = "memory";
+    constexpr const char* Development = "development";
+    constexpr const char* Neuromodulation = "neuromodulation";
+    constexpr const char* Experimental = "experimental";
+    constexpr const char* Debugging = "debugging";
+    constexpr const char* Session = "session";
+    constexpr const char* Input = "input";
+    constexpr const char* Output = "output";
+}
+
+// Configuration subcategories
+namespace ConfigSubcategory {
+    constexpr const char* Basic = "basic";
+    constexpr const char* Advanced = "advanced";
+    constexpr const char* Optimization = "optimization";
+    constexpr const char* Timestep = "timestep";
+    constexpr const char* Connectivity = "connectivity";
+    constexpr const char* Plasticity = "plasticity";
+    constexpr const char* STDP = "stdp";
+    constexpr const char* Hebbian = "hebbian";
+    constexpr const char* Structural = "structural";
+    constexpr const char* MemorySystems = "memory_systems";
+    constexpr const char* Development = "development";
+    constexpr const char* Neuromodulation = "neuromodulation";
+    constexpr const char* Experiment = "experiment";
+    constexpr const char* Debug = "debug";
+    constexpr const char* Verbosity = "verbosity";
+    constexpr const char* Checkpoint = "checkpoint";
+    constexpr const char* Seed = "seed";
+    constexpr const char* Logging = "logging";
+}
 
 // Main configuration class
 class Config {
