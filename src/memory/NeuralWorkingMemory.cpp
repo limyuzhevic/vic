@@ -22,6 +22,12 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , memoryNeurons_()
+    , memoryActivations_()
+    , memoryTimestamps_()
+    , activeTraces_()
+    , recurrentConnections_()
+    , winners_()
 {
 }
 
@@ -36,6 +42,14 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
+    // If memory is empty, we need to initialize it first
+    if (memoryNeurons_.empty()) {
+        // For now, use the first few available neurons from brain regions
+        // In a real implementation, this would be more sophisticated
+        NLM_LOG_INFO("Working memory empty - need to initialize with brain neurons");
+        return;
+    }
+    
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
@@ -44,13 +58,11 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
+        if (brain_->getRegion(neuron.getId() / 1000)) {
+            // Try to find the specific neuron in the region
+            // This is a simplified implementation - in real code you'd need proper neuron lookup
+            // For now, inject current to a nearby neuron
+            brain_->injectCurrent(neuron, activation * 5.0f);
         }
         
         // Update stored activation
