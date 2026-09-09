@@ -3,6 +3,14 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <cctype>
+#include <unordered_map>
+#include <vector>
+#include <memory>
+#include <limits>
+#include <stdexcept>
+#include <cstdint>
 
 namespace nlm {
 
@@ -19,14 +27,124 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Load JSON file
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    try {
+        // Parse JSON file
+        nlohmann::json j;
+        file >> j;
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Process JSON recursively
+        processJsonObject(j, ConfigSource::File);
+        
+        return true;
+    } catch (const std::exception& e) {
+        // In case nlohmann::json is not available or parsing fails, 
+        // fallback to simple parser
+        return fallbackLoadFromFile(filepath);
+    }
+}
+
+// Process JSON and convert to config entries
+void Config::processJsonObject(const nlohmann::json& j, ConfigSource source, const std::string& parentKey) {
+    if (j.is_object()) {
+        for (const auto& element : j.items()) {
+            std::string key = parentKey.empty() ? element.key() : parentKey + "." + element.key();
+            
+            if (element.value().is_object()) {
+                // Nested object - recursively process
+                processJsonObject(element.value(), source, key);
+            } else if (element.value().is_array()) {
+                // Array - process as single value
+                setArrayConfig(key, element.value(), source);
+            } else {
+                // Primitive value - process directly
+                setPrimitiveConfig(key, element.value(), source);
+            }
+        }
+    }
+}
+
+// Set primitive config values from JSON
+void Config::setPrimitiveConfig(const std::string& key, const nlohmann::json& value, ConfigSource source) {
+    if (value.is_string()) {
+        set(key, value.get<std::string>(), source);
+    } else if (value.is_number_integer()) {
+        // Handle different integer types
+        if (value.get<int64_t>() <= std::numeric_limits<int>::max() && 
+            value.get<int64_t>() >= std::numeric_limits<int>::min()) {
+            set(key, value.get<int>(), source);
+        } else {
+            set(key, value.get<int64_t>(), source);
+        }
+    } else if (value.is_number_float()) {
+        set(key, value.get<double>(), source);
+    } else if (value.is_boolean()) {
+        set(key, value.get<bool>(), source);
+    } else if (value.is_null()) {
+        // Treat null as empty string
+        set(key, "", source);
+    }
+}
+
+// Set array config values from JSON
+void Config::setArrayConfig(const std::string& key, const nlohmann::json& array, ConfigSource source) {
+    // Determine array type based on first element
+    if (array.empty()) {
+        // Empty array
+        return;
+    }
+    
+    // Determine element type by checking first element
+    if (array[0].is_string()) {
+        std::vector<std::string> strArray;
+        for (const auto& element : array) {
+            strArray.push_back(element.get<std::string>());
+        }
+        set(key, strArray, source);
+    } else if (array[0].is_number_integer()) {
+        // Check if all elements are integers
+        bool allIntegers = std::all_of(array.begin(), array.end(), 
+            [](const nlohmann::json& el) { return el.is_number_integer(); });
+        if (allIntegers) {
+            std::vector<int> intArray;
+            for (const auto& element : array) {
+                intArray.push_back(element.get<int>());
+            }
+            set(key, intArray, source);
+        } else {
+            // Mixed or float numbers
+            std::vector<double> doubleArray;
+            for (const auto& element : array) {
+                doubleArray.push_back(element.get<double>());
+            }
+            set(key, doubleArray, source);
+        }
+    } else {
+        // All numbers are treated as doubles for consistency
+        std::vector<double> doubleArray;
+        for (const auto& element : array) {
+            doubleArray.push_back(element.get<double>());
+        }
+        set(key, doubleArray, source);
+    }
+}
+
+// Fallback parser for when nlohmann::json is not available or parsing fails
+bool Config::fallbackLoadFromFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Parse simple key=value format for backward compatibility
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -84,12 +202,67 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    nlohmann::json j;
+    
+    // Convert config entries to JSON structure
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (entry.key.find('.') != std::string::npos) {
+            // Nested key (e.g., "nested.key") - create nested object
+            std::string parentKey = entry.key.substr(0, entry.key.find('.'));
+            std::string childKey = entry.key.substr(entry.key.find('.') + 1);
+            
+            if (!j.contains(parentKey)) {
+                j[parentKey] = nlohmann::json::object();
+            }
+            
+            // Recursively set nested values
+            setJsonValue(j[parentKey], childKey, entry.value);
+        } else {
+            // Top-level key
+            setJsonValue(j, entry.key, entry.value);
+        }
     }
     
+    // Write JSON to file with indentation for readability
+    file << j.dump(2) << std::endl;
+    
     return true;
+}
+
+void Config::setJsonValue(nlohmann::json& j, const std::string& key, const ConfigValue& value) {
+    std::visit([&](auto&& val) {
+        using T = std::decay_t<decltype(val)>;
+        
+        if constexpr (std::is_same_v<T, std::string>) {
+            j[key] = val;
+        } else if constexpr (std::is_same_v<T, int>) {
+            j[key] = val;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            j[key] = val;
+        } else if constexpr (std::is_same_v<T, double>) {
+            j[key] = val;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            j[key] = val;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            nlohmann::json array = nlohmann::json::array();
+            for (const auto& item : val) {
+                array.push_back(item);
+            }
+            j[key] = array;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            nlohmann::json array = nlohmann::json::array();
+            for (const auto& item : val) {
+                array.push_back(item);
+            }
+            j[key] = array;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            nlohmann::json array = nlohmann::json::array();
+            for (const auto& item : val) {
+                array.push_back(item);
+            }
+            j[key] = array;
+        }
+    }, value);
 }
 
 template<typename T>

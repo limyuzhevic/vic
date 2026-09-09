@@ -141,10 +141,11 @@ void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
     pImpl->synapticInput += current;
+    pImpl->totalCurrent += current;  // Also update total for getTotalCurrent()
 }
 
-void Neuron::clearTotalCurrent() {
-    pImpl->synapticInput = 0.0f;
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->totalCurrent;
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
@@ -260,10 +261,26 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
-}
+        // Real LIF integrate-and-fire dynamics with Euler integration:
+        // dV/dt = -(V - V_rest) / tau + I / C
+        // V_new = V_old + dt * (-(V_old - V_rest) / tau + I / C)
+        
+        TimestepDuration dt = 0.001;  // 1ms timestep
+        bool fired = stepLIF(currentTime, dt);
+        
+        // Integration with existing state machine for rate-based computation
+        if (fired) {
+            pImpl->state.firingState = FiringState::Active;
+        } else if (pImpl->state.firingState == FiringState::Active) {
+            // Maintain active state until next spike
+            pImpl->state.firingState = FiringState::Active;
+        } else {
+            pImpl->state.firingState = FiringState::Resting;
+        }
+        
+        // Clear total current for next step (synaptic input is cleared in stepLIF)
+        clearTotalCurrent();
+    }
 
 void Neuron::reset() {
     pImpl->state = NeuronState();

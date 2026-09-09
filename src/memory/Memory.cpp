@@ -108,7 +108,54 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    if (pImpl->episodes.empty()) return;
+    
+    // Calculate relevance score for each episode based on recency and activity
+    std::vector<std::pair<size_t, float>> relevanceScores;
+    for (size_t i = 0; i < pImpl->episodes.size(); ++i) {
+        const auto& episode = pImpl->episodes[i];
+        float score = 0.0f;
+        
+        // Recency factor: more recent episodes are more relevant (0.0 to 1.0)
+        float recencyFactor = static_cast<float>(i) / static_cast<float>(pImpl->episodes.size() - 1);
+        score += recencyFactor * 0.4f;
+        
+        // Activity factor: based on number of active neurons
+        if (!episode.neurons.empty()) {
+            float avgActivity = 0.0f;
+            for (float value : episode.values) {
+                avgActivity += value;
+            }
+            avgActivity /= static_cast<float>(episode.values.size());
+            score += avgActivity * 0.3f;
+        }
+        
+        // Metadata importance factor
+        if (!episode.metadata.empty() && episode.metadata != "unknown") {
+            score += 0.3f;  // Base importance for having metadata
+        }
+        
+        relevanceScores.emplace_back(i, score);
+}
+    
+    // Sort by relevance score descending
+    std::sort(relevanceScores.begin(), relevanceScores.end(),
+        [](const auto& a, const auto& b) { return a.second > b.second; });
+    // Filter episodes based on threshold and capacity
+    std::vector<EpisodicMemoryItem> consolidated;
+    for (const auto& item : relevanceScores) {
+        if (item.second >= relevanceThreshold) {
+            consolidated.push_back(pImpl->episodes[item.first]);
+        }
+    }
+    
+    // If we're still over capacity, keep the most relevant
+    while (consolidated.size() > pImpl->maxEpisodes) {
+        consolidated.pop_back();
+    }
+    
+    // Update the episodes list with consolidated memories
+    pImpl->episodes = std::move(consolidated);
 }
 
 // Semantic Memory Implementation

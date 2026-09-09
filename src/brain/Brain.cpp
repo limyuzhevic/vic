@@ -546,35 +546,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+        if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
             
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+            // Development affects plasticity rates
+            auto* sp = pImpl->structuralPlasticity;
+            if (sp) {
+                DevelopmentalStage stage = pImpl->developmentalStage;
+                float plasticityMod = 1.0f;
+                
+                switch (stage) {
+                    case DevelopmentalStage::Initial:
+                        plasticityMod = 1.0f;  // High plasticity
+                        break;
+                    case DevelopmentalStage::CriticalPeriod:
+                        plasticityMod = 0.8f;
+                        break;
+                    case DevelopmentalStage::Maturation:
+                        plasticityMod = 0.5f;
+                        break;
+                    case DevelopmentalStage::Adult:
+                        plasticityMod = 0.2f;  // Stable
+                        break;
+                }
+                
+                sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+                sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
             }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
-    }
     
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
@@ -738,17 +737,6 @@ void Brain::develop() {
 void Brain::reset() {
     NLM_LOG_INFO("Resetting NLM Brain...");
     
-    pImpl->currentStep = 0;
-    pImpl->currentTime = 0.0;
-    pImpl->totalSpikesThisStep = 0;
-    pImpl->totalSpikesTotal = 0;
-    pImpl->isResting = false;
-    pImpl->stepsSinceLastEpisode = 0;
-    
-    for (auto& region : pImpl->regions) {
-        region->reset();
-    }
-    
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
@@ -787,6 +775,11 @@ bool Brain::save(const std::string& filepath) const {
         neuronData.threshold.reserve(getTotalNeuronCount());
         neuronData.resetPotential.reserve(getTotalNeuronCount());
         neuronData.leakConductance.reserve(getTotalNeuronCount());
+        neuronData.firingRate.reserve(getTotalNeuronCount());
+        neuronData.firingState.reserve(getTotalNeuronCount());
+        neuronData.refractoryRemaining.reserve(getTotalNeuronCount());
+        neuronData.refractoryPeriod.reserve(getTotalNeuronCount());
+        neuronData.lastSpikeTime.reserve(getTotalNeuronCount());
         
         for (const auto& region : pImpl->regions) {
             for (const auto& pop : region->getPopulations()) {
@@ -797,6 +790,7 @@ bool Brain::save(const std::string& filepath) const {
                     neuronData.threshold.push_back(state.threshold);
                     neuronData.resetPotential.push_back(state.resetPotential);
                     neuronData.leakConductance.push_back(state.leakConductance);
+                    neuronData.firingRate.push_back(state.firingRate);
                     neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);

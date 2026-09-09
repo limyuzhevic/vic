@@ -14,7 +14,6 @@ public:
     virtual ~NeuralDynamics() = default;
     
     // Update neuron state for one step
-    // TODO PHASE 2: Implement real dynamics
     virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
     
     // Update synapse state for one step
