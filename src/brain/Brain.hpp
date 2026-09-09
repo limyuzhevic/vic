@@ -28,6 +28,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Serotonin;
+class Norepinephrine;
+class Acetylcholine;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -175,11 +178,20 @@ public:
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
     // Novelty - novelty detection
     Novelty* getNovelty();
+    
+    // Curiosity - exploration motivation
+    Curiosity* getCuriosity();
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
