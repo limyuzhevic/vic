@@ -79,9 +79,9 @@ public:
                 // 2. Inject sensory input into brain
                 agentBrain.processSensoryInput(percept);
                 
-                // 3. Simulate brain (multiple steps per action)
+                    // 3. Simulate brain (multiple steps per action)
                 for (int neuralStep = 0; neuralStep < 10; ++neuralStep) {
-                    brain->step(neuralStep);
+                    brain->step(neuralStep, 0.01);  // Provide both step and time
                 }
                 
                 // 4. Decode motor command from brain activity

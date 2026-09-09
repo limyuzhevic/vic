@@ -9,6 +9,11 @@
 #include <memory>
 #include <string>
 
+// Header guard for external inclusion
+#ifndef NLM_BRAIN_HPP
+#define NLM_BRAIN_HPP
+#ifndef NLM_BRAIN_HPP
+
 namespace nlm {
 
 // Forward declarations
@@ -170,10 +175,19 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
+// ========== NEUROMODULATION SYSTEMS ==========
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and motivation
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();

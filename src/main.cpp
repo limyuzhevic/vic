@@ -402,8 +402,18 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
     
+    if (!brain) {
+        NLM_LOG_ERROR("Failed to allocate brain!");
+        return 1;
+    }
+    
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
+        return 1;
+    }
+    
+    if (!brain) {
+        NLM_LOG_ERROR("Brain object became null after initialization!");
         return 1;
     }
     
