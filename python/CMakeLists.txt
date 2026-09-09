@@ -61,7 +61,7 @@ set(NLM_CORE_SOURCES
 )
 
 set(NLM_AGENT_SOURCES
-    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
+    ${NLM_SOURCE_DIR}/agent/SensoryInput.cpp
     ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
 )
 

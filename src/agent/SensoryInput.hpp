@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AgentBody.hpp"
+#include "../sensory/SensoryInput.hpp"
 #include <memory>
 #include <vector>
 
@@ -53,8 +54,5 @@ private:
     std::vector<float> audio_;
     double timestamp_;
 };
-
-// Type alias for backward compatibility
-using SensoryInput = SensoryPercept;
 
 } // namespace nlm

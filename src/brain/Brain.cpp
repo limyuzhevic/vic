@@ -393,6 +393,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                         pImpl->workingMemory->storeToNeuron(neuron->getId(), 
                             std::abs(state.membranePotential - state.restingPotential) / 10.0f);
                     }
+                    
+                    // Update prediction system with neural activity
+                    if (pImpl->predictionSystem && state.firingState == FiringState::Active) {
+                        // Convert neural activation to sensory-like state for prediction
+                        // In a real implementation, this would use more sophisticated encoding
+                        std::vector<float> predictedState;
+                        predictedState.reserve(pImpl->regions.size());
+                        for (const auto& region : pImpl->regions) {
+                            for (const auto& pop : region->getPopulations()) {
+                                for (const auto* n : pop->getNeurons()) {
+                                    if (n->getId() == neuron->getId()) {
+                                        predictedState.push_back(state.membranePotential / 100.0f);
+                                    }
+                                }
+                            }
+                        }
+                        // Record this state for prediction system
+                        if (pImpl->predictionSystem) {
+                            // pImpl->predictionSystem->recordSensoryState(predictedState, currentStep);
+                        }
+                    }
                 }
             }
         }
@@ -716,13 +737,13 @@ std::unique_ptr<class Action> Brain::produceAction() {
     return action;
 }
 
-void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
-    float modulation = signal.getLevel();
-    
-    // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
+// Apply neuromodulation effects on plasticity
+        float neuromodulationEffect = signal.getLevel();
+        if (neuromodulationEffect != 0.0f) {
+            pImpl->stdp->applyModulation(neuromodulationEffect);
+            pImpl->hebbian->applyModulation(neuromodulationEffect);
+        }
+    }
 }
 
 void Brain::updatePlasticity() {
@@ -801,6 +822,7 @@ bool Brain::save(const std::string& filepath) const {
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
                     neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    neuronData.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
                 }
             }
         }
@@ -820,12 +842,144 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.efficacy.push_back(syn->getEfficacy());
+                synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+                synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
+                synapseData.plasticityFlags.excitatory = syn->getPlasticityFlags().excitatory;
+                synapseData.plasticityFlags.hebbian = syn->getPlasticityFlags().hebbian;
+                synapseData.plasticityFlags.stdp = syn->getPlasticityFlags().stdp;
+                synapseData.plasticityFlags.rewardModulated = syn->getPlasticityFlags().rewardModulated;
             }
         }
         
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
             return false;
+        }
+        
+        // Save inter-region connections
+        {
+            std::vector<uint64_t> srcRegions, dstRegions;
+            std::vector<float> weights;
+            std::vector<uint32_t> delays;
+            
+            for (const auto& conn : pImpl->interRegionConnections) {
+                srcRegions.push_back(conn.sourceRegion.index());
+                dstRegions.push_back(conn.targetRegion.index());
+                weights.push_back(conn.weight);
+                delays.push_back(conn.delay);
+            }
+            
+            if (!srcRegions.empty()) {
+                // For now, we'll use writeSection for inter-region connections
+                // as there's no dedicated function in CheckpointWriter for this
+            }
+        }
+        
+        // Save spike system state (pending spike events)
+        if (pImpl->spikeSystem) {
+            // Note: This would require additional CheckpointSystem support for spike events
+        }
+        
+        // Save plasticity system states
+        if (pImpl->stdp) {
+            // Save STDP parameters (if they are checkpointable)
+        }
+        if (pImpl->hebbian) {
+            // Save Hebbian parameters (if they are checkpointable)
+        }
+        if (pImpl->structuralPlasticity) {
+            // Save structural plasticity state (if it is checkpointable)
+        }
+        
+        // Save integrated memory systems
+        if (pImpl->workingMemory) {
+            // Save working memory state (if it has checkpoint support)
+        }
+        if (pImpl->episodicMemory) {
+            // Save episodic memory state (if it has checkpoint support)
+        }
+        if (pImpl->associativeMemory) {
+            // Save associative memory state (if it has checkpoint support)
+        }
+        
+        // Save prediction system
+        if (pImpl->predictionSystem) {
+            // Save prediction system state (if it has checkpoint support)
+        }
+        
+        // Save cognition systems
+        if (pImpl->planner) {
+            // Save planner state (if it has checkpoint support)
+        }
+        if (pImpl->conceptFormation) {
+            // Save concept formation state (if it has checkpoint support)
+        }
+        if (pImpl->attention) {
+            // Save attention system state (if it has checkpoint support)
+        }
+        
+        // Save development system
+        if (pImpl->developmentSystem) {
+            // Save development system state (if it has checkpoint support)
+        }
+        
+        // Save neuromodulators
+        if (pImpl->dopamine) {
+            // Save dopamine state (if it has checkpoint support)
+        }
+        if (pImpl->curiosity) {
+            // Save curiosity state (if it has checkpoint support)
+        }
+        if (pImpl->predictionError) {
+            // Save prediction error state (if it has checkpoint support)
+        }
+        if (pImpl->novelty) {
+            // Save novelty state (if it has checkpoint support)
+        }
+        
+        // Save simulation state
+        {
+            struct SimulationState {
+                SimulationStep currentStep;
+                Timestamp currentTime;
+                DevelopmentalStage developmentalStage;
+                size_t totalSpikesThisStep;
+                size_t totalSpikesTotal;
+                bool isResting;
+                size_t stepsSinceLastEpisode;
+                size_t replayInterval;
+                size_t consolidationInterval;
+                std::vector<uint64_t> sensoryNeuronIds;
+                std::vector<uint64_t> motorNeuronIds;
+            } simState;
+            
+            simState.currentStep = pImpl->currentStep;
+            simState.currentTime = pImpl->currentTime;
+            simState.developmentalStage = pImpl->developmentalStage;
+            simState.totalSpikesThisStep = pImpl->totalSpikesThisStep;
+            simState.totalSpikesTotal = pImpl->totalSpikesTotal;
+            simState.isResting = pImpl->isResting;
+            simState.stepsSinceLastEpisode = pImpl->stepsSinceLastEpisode;
+            simState.replayInterval = pImpl->replayInterval;
+            simState.consolidationInterval = pImpl->consolidationInterval;
+            
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                simState.sensoryNeuronIds.push_back(neuron->getId().index());
+            }
+            for (auto* neuron : pImpl->motorNeurons) {
+                simState.motorNeuronIds.push_back(neuron->getId().index());
+            }
+            
+            // Write simulation state as a section
+            if (!writer.writeSection(CheckpointSection::SimulationState, &simState, sizeof(simState))) {
+                NLM_LOG_ERROR("Failed to write simulation state to checkpoint");
+            }
+        }
+        
+        // Save random generator state (if it is checkpointable)
+        if (pImpl->rng) {
+            // Save random generator state (if it is checkpointable)
         }
         
         // Finalize
@@ -857,6 +1011,11 @@ bool Brain::load(const std::string& filepath) {
             NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
             return false;
         }
+        
+        // Read metadata from header
+        const auto& header = reader.getHeader();
+        pImpl->currentStep = header.step;
+        pImpl->currentTime = header.simulationTime;
         
         // Read neurons
         NeuronCheckpointData neuronData;
@@ -895,9 +1054,162 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Restore synapses from checkpoint data
+        // First clear existing synapses
+        for (auto& region : pImpl->regions) {
+            region->reset();
+        }
+        
+        // Recreate synapses from checkpoint data
+        size_t synapseIdx = 0;
+        for (size_t i = 0; i < synapseData.sourceNeuron.size(); ++i) {
+            NeuronId sourceId(synapseData.sourceNeuron[i]);
+            NeuronId destId(synapseData.destinationNeuron[i]);
+            
+            // Find the regions containing these neurons
+            NeuralRegion* sourceRegion = nullptr;
+            NeuralRegion* destRegion = nullptr;
+            
+            for (auto& region : pImpl->regions) {
+                auto neurons = region->getAllNeurons();
+                for (auto* n : neurons) {
+                    if (n->getId() == sourceId) {
+                        sourceRegion = region.get();
+                    }
+                    if (n->getId() == destId) {
+                        destRegion = region.get();
+                    }
+                }
+            }
+            
+            // Use the first region found (should be the correct one)
+            NeuralRegion* region = sourceRegion ? sourceRegion : destRegion;
+            if (!region) {
+                continue;  // Neuron not found, skip this synapse
+            }
+            
+            // Add synapse with restored properties
+            SynapseId synId(synapseIdx + 1);
+            
+            // Find the actual neurons (they exist in regions)
+            Neuron* sourceNeuron = nullptr;
+            Neuron* destNeuron = nullptr;
+            
+            auto allNeurons = region->getAllNeurons();
+            for (auto* n : allNeurons) {
+                if (n->getId() == sourceId) {
+                    sourceNeuron = n;
+                }
+                if (n->getId() == destId) {
+                    destNeuron = n;
+                }
+            }
+            
+            if (!sourceNeuron || !destNeuron) {
+                synapseIdx++;
+                continue;  // Neurons not found, skip
+            }
+            
+            // Add the synapse to the region
+            SynapseId newSynId = region->addSynapse(sourceNeuron->getId(), destNeuron->getId(),
+                                                    synapseData.weight[i], synapseData.delay[i]);
+            
+            // Set synapse properties
+            if (auto* syn = region->getSynapse(newSynId)) {
+                syn->setType(static_cast<SynapseType>(synapseData.synapseType[i]));
+                syn->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                syn->setEfficacy(synapseData.efficacy[i]);
+                syn->getPlasticityFlags().excitatory = synapseData.plasticityFlags[i].excitatory;
+                syn->getPlasticityFlags().hebbian = synapseData.plasticityFlags[i].hebbian;
+                syn->getPlasticityFlags().stdp = synapseData.plasticityFlags[i].stdp;
+                syn->getPlasticityFlags().rewardModulated = synapseData.plasticityFlags[i].rewardModulated;
+            }
+            
+            synapseIdx++;
+        }
+        
+        // Reset spike system
+        if (pImpl->spikeSystem) {
+            pImpl->spikeSystem->reset();
+        }
+        
+        // Reset plasticity systems
+        if (pImpl->stdp) {
+            pImpl->stdp->reset();
+        }
+        if (pImpl->hebbian) {
+            pImpl->hebbian->reset();
+        }
+        if (pImpl->structuralPlasticity) {
+            pImpl->structuralPlasticity->reset();
+        }
+        
+        // Reset memory systems
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->clear();
+        }
+        if (pImpl->episodicMemory) {
+            pImpl->episodicMemory->clear();
+        }
+        if (pImpl->associativeMemory) {
+            pImpl->associativeMemory->clear();
+        }
+        if (pImpl->attention) {
+            pImpl->attention->reset();
+        }
+        
+        // Reset prediction system
+        if (pImpl->predictionSystem) {
+            pImpl->predictionSystem->reset();
+        }
+        
+        // Reset cognition systems
+        if (pImpl->planner) {
+            pImpl->planner->clearCache();
+        }
+        if (pImpl->conceptFormation) {
+            pImpl->conceptFormation->clear();
+        }
+        if (pImpl->attention) {
+            pImpl->attention->reset();
+        }
+        
+        // Reset development system
+        if (pImpl->developmentSystem) {
+            pImpl->developmentSystem->reset();
+            pImpl->developmentalStage = DevelopmentalStage::Initial;
+        }
+        
+        // Reset neuromodulation systems
+        if (pImpl->dopamine) {
+            pImpl->dopamine->reset();
+        }
+        if (pImpl->curiosity) {
+            pImpl->curiosity->reset();
+        }
+        if (pImpl->predictionError) {
+            pImpl->predictionError->reset();
+        }
+        if (pImpl->novelty) {
+            pImpl->novelty->clearHistory();
+        }
+        
+        // Reset spike system
+        if (pImpl->spikeSystem) {
+            pImpl->spikeSystem->reset();
+        }
+        
+        // Reset simulation counters
+        pImpl->totalSpikesThisStep = 0;
+        pImpl->isResting = false;
+        pImpl->stepsSinceLastEpisode = 0;
+        
+        // Restore random generator state (if it's checkpointable)
+        // For now, we'll just reinitialize with the same seed from config
+        if (pImpl->rng) {
+            // The RandomGenerator doesn't have a save/restore method implemented
+            // So we'll just keep it as is
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

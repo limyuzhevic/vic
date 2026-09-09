@@ -1,4 +1,4 @@
-#include "SensoryPercept.hpp"
+#include "SensoryInput.hpp"
 
 namespace nlm {
 

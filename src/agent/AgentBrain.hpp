@@ -1,7 +1,7 @@
 #pragma once
 
 #include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
+#include "SensoryInput.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
@@ -25,8 +25,8 @@ public:
     // Get motor output size expected
     size_t getMotorOutputSize() const;
     
-    // Process sensory percept and inject into brain
-    void processSensoryInput(const SensoryPercept& percept);
+    // Process sensory input and inject into brain
+    void processSensoryInput(const SensoryInput& input);
     
     // Decode brain motor activity into motor command
     MotorCommand decodeMotorCommand();
