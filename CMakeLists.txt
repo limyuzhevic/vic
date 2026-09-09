@@ -74,17 +74,30 @@ add_library(nlm_core STATIC
     src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
     # Motor
+    src/motor/Action.cpp
     src/motor/MotorSystem.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
+    # Agent system
+    src/agent/SensoryPercept.cpp
+    src/agent/AgentBrain.cpp
+    src/agent/AgentBody.cpp
+    # World system
+    src/world/SimpleWorld.cpp
+    src/world/Observation.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+    src/experiments/Phase3Experiment.cpp
+    src/experiments/Phase4Experiment.cpp
+    src/experiments/Phase5Experiment.cpp
+    src/experiments/Phase6IntegratedExperiment.cpp
+    src/experiments/Phase6Demo.cpp
+    # Demos
+    src/experiments/Phase3Demo.cpp
+    src/experiments/Phase4Demo.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -96,14 +109,18 @@ target_include_directories(nlm_core PUBLIC
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
+    src/agent/AgentBody.cpp
 )
+
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
+    src/world/Observation.cpp
 )
+
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
@@ -111,6 +128,7 @@ target_link_libraries(nlm_world PUBLIC nlm_core)
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
+
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
@@ -118,34 +136,90 @@ target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
+
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 5 experiments
+add_library(nlm_phase5 STATIC
+    src/experiments/Phase5Experiment.cpp
+)
+
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 experiments
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
+
 target_link_libraries(nlm PUBLIC nlm_core)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
+
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
+
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 5 demo executable
+add_executable(nlm_phase5_demo
+    src/experiments/Phase5Demo.cpp
+)
+
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
+
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
+# Python bindings
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+find_package(pybind11 REQUIRED)
+
+pybind11_add_module(pynlm python/bindings.cpp)
+target_link_libraries(pynlm PRIVATE nlm_core)
+target_include_directories(pynlm PRIVATE src ${Python3_INCLUDE_DIRS})
+
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6
+    nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+install(TARGETS pynlm
+    LIBRARY DESTINATION lib/python
+)
+
+# Create a build-info target for easy testing
+add_custom_target(info
+    COMMAND ${CMAKE_COMMAND} -E echo "NLM Build Configuration:"
+    COMMAND ${CMAKE_COMMAND} -E echo "  Build type: ${CMAKE_BUILD_TYPE}"
+    COMMAND ${CMAKE_COMMAND} -E echo "  Compiler: ${CMAKE_CXX_COMPILER_ID}"
+    COMMAND ${CMAKE_COMMAND} -E echo "  C++ standard: ${CMAKE_CXX_STANDARD}"
+    COMMENT "Display build configuration"
 )
