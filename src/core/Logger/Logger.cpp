@@ -22,27 +22,26 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
 
 ConsoleLogger::~ConsoleLogger() = default;
 
-void ConsoleLogger::log(const LogEntry& entry) {
-    if (entry.level < pImpl->level) {
-        return;
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Extract filename and function name from log entry
+    std::string filename = entry.file;
+    std::string function = entry.function;
+    size_t filePos = filename.find_last_of('/');
+    if (filePos != std::string::npos) {
+        filename = filename.substr(filePos + 1);
     }
     
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
-    
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-    
-    oss << " " << entry.message;
+    // Log entry with full context
+    oss << "[" << pImpl->levelToString(entry.level) << "] "
+        << "[" << filename << ":" << entry.line << " " << function << "] "
+        << entry.message;
     
     std::string output = oss.str();
     
-    // Console output
+    // Console output with colors
     if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+        std::cout << pImpl->levelToColor(entry.level) << output << "\033[0m\n";
     } else {
         std::cout << output << "\n";
     }

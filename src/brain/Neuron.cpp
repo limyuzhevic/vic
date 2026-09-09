@@ -1,5 +1,6 @@
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Constants.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -20,7 +21,7 @@ struct Neuron::Impl {
     
     // LIF parameters
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
+    static constexpr float TIME_CONSTANT = constants::STDP_TIME_CONSTANT;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
@@ -35,7 +36,9 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->totalCurrent = 0.0f;
 }
 
-Neuron::~Neuron() = default;
+Neuron::~Neuron() {
+    delete pImpl;
+}
 
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -224,38 +227,45 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        V -= pImpl->state.adaptationVariable * constants::ADAPTATION_COEFFICIENT;
+        pImpl->state.adaptationVariable *= constants::ADAPTATION_DECAY_RATE;  // Decay adaptation
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    V = std::clamp(V, constants::NEURON_CLAMP_MIN, constants::NEURON_CLAMP_MAX);
     
-    // Check for spike
-    if (V >= threshold) {
-        fired = true;
-        pImpl->state.firingState = FiringState::Active;
-        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
-        
-        // Record spike
-        recordSpike(currentTime);
-        
-        // Reset membrane potential
-        V = V_reset;
-        
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
-        pImpl->state.firingState = FiringState::Refractory;
-        
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
-    } else {
-        pImpl->state.firingState = FiringState::Active;
+        // Check for spike
+        if (V >= threshold) {
+            fired = true;
+            pImpl->state.firingState = FiringState::Active;
+            pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+            
+            // Record spike
+            recordSpike(currentTime);
+            
+            // Reset membrane potential
+            V = constants::NEURON_RESET_POTENTIAL;
+            
+            // Enter refractory period
+            pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+            pImpl->state.firingState = FiringState::Refractory;
+            
+            // Update adaptation for spike-frequency adaptation
+            pImpl->state.adaptationVariable += 1.0f;
+        } else {
+            pImpl->state.firingState = FiringState::Active;
+        }
+    
+        // Clear synaptic input for next step
+        pImpl->synapticInput = 0.0f;
+    
+        return fired;
     }
-    
+}
+
     // Clear synaptic input for next step
     pImpl->synapticInput = 0.0f;
-    
+
     return fired;
 }
 
@@ -269,6 +279,10 @@ void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    pImpl->incomingSynapses.clear();
+    pImpl->outgoingSynapses.clear();
+    pImpl->plasticityFlags = PlasticityFlags();
+    pImpl->totalCurrent = 0.0f;
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {

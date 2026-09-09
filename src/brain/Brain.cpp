@@ -447,6 +447,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     for (auto& region : pImpl->regions) {
+        if (!region) continue;  // Safety check
         for (auto& syn : region->getSynapses()) {
             // Apply STDP with neuromodulation
             if (syn->getPlasticityFlags().stdp) {
@@ -665,6 +666,7 @@ float Brain::getExcitationInhibitionRatio() const {
     float totalInhibitory = 0.0f;
     
     for (const auto& region : pImpl->regions) {
+        if (!region) continue;  // Safety check
         for (const auto& syn : region->getSynapses()) {
             float weight = syn->getWeight();
             if (weight > 0) {
