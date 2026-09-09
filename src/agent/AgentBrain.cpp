@@ -1,5 +1,7 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../brain/Neuron.hpp"
+#include "../core/Types/Types.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -56,9 +58,17 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                         }
                     }
                 }
+                // Handle other neuron types if needed
+                else if (type == NeuronType::Internal) {
+                    // For now, ignore internal neurons in this distribution
+                    // Could be added to a separate group or used differently
+                }
             }
         }
     }
+    
+    // Ensure all sensory groups are initialized
+    // (additional initialization if needed)
 }
 
 AgentBrain::~AgentBrain() = default;

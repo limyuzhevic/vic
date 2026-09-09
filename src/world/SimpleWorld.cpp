@@ -2,6 +2,9 @@
 #include <cmath>
 #include <algorithm>
 #include <iostream>
+#include "../agent/AgentBody.hpp"
+#include "../agent/SensoryPercept.hpp"
+#include "../core/Types/Types.hpp"
 
 namespace nlm {
 
