@@ -32,6 +32,12 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<NeuralSemanticMemory> semanticMemory;
+    std::unique_ptr<NeuralProceduralMemory> proceduralMemory;
+    std::unique_ptr<NeuralActionMemory> actionMemory;
+    std::unique_ptr<NeuralSemanticMemory> semanticMemory;
+    std::unique_ptr<NeuralProceduralMemory> proceduralMemory;
+    std::unique_ptr<NeuralActionMemory> actionMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -120,6 +126,12 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        
+        // Initialize attention system with proper configuration
+        attention->initialize(this);
+        attention->setInhibitionStrength(0.5f);
+        attention->setExcitationStrength(1.5f);
+        attention->setCompetitionThreshold(0.3f);
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
