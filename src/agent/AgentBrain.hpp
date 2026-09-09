@@ -76,6 +76,27 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Configuration
+    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
+    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
+    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
+    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    
+    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
+    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
+    bool isDevelopmentEnabled() const { return developmentEnabled_; }
+    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+private:
+    // Helper function to validate percept data
+    bool validatePercept(const SensoryPercept& percept) const;
+    
+    // Motor decoding: convert neural activity to motor command
+    MotorCommand decodeFromMotorNeurons();
+    
+    // Motor command selection with curiosity/exploration
+    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups

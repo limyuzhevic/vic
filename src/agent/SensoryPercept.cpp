@@ -7,15 +7,21 @@ SensoryPercept::SensoryPercept()
     , visionHeight_(16)
     , timestamp_(0.0)
 {
-    vision_.resize(16 * 16, 0.0f);
-    touch_.resize(8, 0.0f);
-    internal_.resize(4, 0.0f);
-    proprioception_.resize(6, 0.0f);
-    audio_.resize(0, 0.0f);
+    // Pre-allocate with known sizes instead of resize to avoid unnecessary reallocations
+    vision_.assign(16 * 16, 0.0f);
+    touch_.assign(8, 0.0f);
+    internal_.assign(4, 0.0f);
+    proprioception_.assign(6, 0.0f);
+    // Don't initialize audio_ since it's empty
 }
 
 std::vector<float> SensoryPercept::getAllSignals() const {
     std::vector<float> all;
+    
+    // Pre-allocate capacity for better performance
+    size_t totalSize = vision_.size() + touch_.size() + internal_.size() + 
+                      proprioception_.size() + audio_.size();
+    all.reserve(totalSize);
     
     // Vision (flattened)
     all.insert(all.end(), vision_.begin(), vision_.end());
