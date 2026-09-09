@@ -37,7 +37,7 @@ public:
     // Update development system
     void updateDevelopment(double timestep);
     
-    // Get current developmental stage
+    // Get developmental stage
     DevelopmentalStage getDevelopmentalStage() const;
     
     // Get neuromodulation level
@@ -75,6 +75,9 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Initialize neuron groups for motor and sensory processing
+    void initializeNeuronGroups();
     
     std::shared_ptr<Brain> brain_;
     
