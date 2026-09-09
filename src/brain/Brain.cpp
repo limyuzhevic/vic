@@ -403,6 +403,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // Store recently active neurons in working memory for competition
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Store to working memory if neuron fired this step or has high activity
+                    const auto& state = neuron->getState();
+                    if (neuron->isFiring() || 
+                        std::abs(state.membranePotential - state.restingPotential) > 5.0f) {
+                        float activity = std::abs(state.membranePotential - state.restingPotential) / 20.0f;
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), activity);
+                    }
+                }
+            }
+        }
+        
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
@@ -509,10 +524,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    // ========== STEP 8.5: PREDICTION SYSTEM INTEGRATION ==========
+    if (pImpl->predictionSystem && pImpl->episodicMemory) {
+        // Train prediction on recent episodic memories
+        auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(3);
+        for (const auto* episode : recentEpisodes) {
+            // Create SensoryInput from episode data for training
+            SensoryInput observation;
+            observation.setData(episode->sensoryData);
+            observation.setTimestamp(episode->timestamp);
+            
+            // Train prediction system with this observation
+            pImpl->predictionSystem->train(observation);
+        }
+        
+        // Generate next state prediction for current sensory context
+        // This would be called with actual sensory input during agent operation
+        // For now, we can prepare the prediction system
+        // pImpl->predictionSystem->generatePrediction();
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -613,6 +642,31 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
+    }
+    
+    // Store sensory experience in episodic memory for learning
+    if (pImpl->episodicMemory && pImpl->stepsSinceLastEpisode >= 5) {  // Store more frequently
+        EpisodicMemoryItem episode;
+        episode.timestamp = pImpl->currentStep;
+        episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        episode.sensoryData = values;  // Store raw sensory data
+        
+        // Store active neurons during this sensory input
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        episode.activeNeurons.push_back(neuron->getId());
+                        episode.neuronActivations.push_back(
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+        }
+        
+        pImpl->episodicMemory->storeEpisode(episode);
+        pImpl->stepsSinceLastEpisode = 0;  // Reset counter
     }
 }
 
