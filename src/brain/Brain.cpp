@@ -114,7 +114,8 @@ struct Brain::Impl {
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
         // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
+        pImpl->predictionSystem = std::make_unique<PredictionSystem>();
+        pImpl->predictionSystem->initialize(this);
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
@@ -243,7 +244,8 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem = std::make_unique<PredictionSystem>();
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -511,8 +513,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Store prediction for this timestep
+        if (pImpl->workingMemory) {
+            std::vector<float> currentPattern = pImpl->workingMemory->retrieve();
+            if (!currentPattern.empty()) {
+                pImpl->predictionSystem->storePattern(currentPattern);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========

@@ -43,14 +43,21 @@ public:
     bool shouldFire(const Neuron* neuron) const override;
     void reset() override;
     
-    // Parameters
-    void setMembraneTimeConstant(float tau);
-    float getMembraneTimeConstant() const;
+    // Configuration methods
+    void setNeuronType(NeuronType type);
+    void setTemperature(float tempCelsius);
+    void setAdaptationConductance(float g_adapt);
+    void setSynapticTimeConstant(float tau_syn);
+    void setRefractoryPeriod(uint32_t abs_ref, uint32_t rel_ref);
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
+    // Parameter getter methods
+    float getAdaptationConductance() const;
+    float getSynapticTimeConstant() const;
+    uint32_t getAbsoluteRefractoryPeriod() const;
+    uint32_t getRelativeRefractoryPeriod() const;
+    
+    NeuronType getNeuronType() const;
+    float getTemperature() const;
 
 // Hodgkin-Huxley dynamics (detailed model)
 // TODO PHASE 2: Implement Hodgkin-Huxley
