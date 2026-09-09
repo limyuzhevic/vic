@@ -56,7 +56,7 @@ public:
     void reset();
     
     // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    Brain* getBrain() const { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }

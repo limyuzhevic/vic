@@ -55,17 +55,28 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
-    // Run simulation
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
+        // Get observation from world
         SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        
+        // Validate observation
+        if (percept.getDimensions() == 0) {
+            NLM_LOG_ERROR("Invalid observation received");
+            continue;
+        }
         
         // Process sensory input
         agent.processSensoryInput(percept);
+        
+        // Validate brain step parameters
+        if (step > std::numeric_limits<uint64_t>::max() - 1) {
+            NLM_LOG_ERROR("Step overflow, stopping simulation");
+            break;
+        }
         
         // Brain step
         brain->step(step, step * 0.001);

@@ -35,7 +35,18 @@ struct GridWorldEnvironment::Impl {
     EnvironmentState state;
     
     Impl(int w, int h) : width(w), height(h), agentX(0), agentY(0), 
-                         goalX(w-1), goalY(h-1), steps(0), maxSteps(1000), done(false) {}
+                         goalX(w-1), goalY(h-1), steps(0), maxSteps(1000), done(false) {
+        // Validate dimensions
+        if (width <= 0 || height <= 0) {
+            width = 10;  // Default to 10x10 if invalid
+            height = 10;
+            goalX = width - 1;
+            goalY = height - 1;
+        }
+        // Ensure goal is within bounds
+        goalX = std::max(0, std::min(width - 1, goalX));
+        goalY = std::max(0, std::min(height - 1, goalY));
+    }
 };
 
 GridWorldEnvironment::GridWorldEnvironment(int width, int height) 
