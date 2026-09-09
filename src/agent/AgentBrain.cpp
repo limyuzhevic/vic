@@ -1,7 +1,10 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Types/Types.hpp"
 #include <algorithm>
 #include <cmath>
+#include <numeric>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -19,6 +22,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , explorationBalance_(0.5f)  // Default: balanced exploration-exploitation
+    , curiosityThreshold_(0.3f)  // Default: moderate curiosity threshold
+    , curiosityScaling_(2.0f)    // Default scaling factor
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -67,6 +73,9 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    explorationBalance_ = 0.5f;  // Default: balanced exploration-exploitation
+    curiosityThreshold_ = 0.3f;  // Default: moderate curiosity threshold
+    curiosityScaling_ = 2.0f;    // Default scaling factor
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -87,66 +96,15 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
-    const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
-        }
-    }
+    // Process each sensory modality separately
+    processVisionInput(percept.getVision());
+    processTouchInput(percept.getTouch());
+    processInternalInput(percept.getInternal());
+    processProprioceptionInput(percept.getProprioception());
     
-    // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
-        }
-        
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
-    }
-    
-    // Update curiosity based on novelty
-    if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
-        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
-    }
+    // Update novelty and curiosity levels
+    computeNoveltyLevel(percept.getVision());
+    computeCuriosityLevel();
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
@@ -342,9 +300,269 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    explorationBalance_ = 0.5f;  // Reset to balanced
+    curiosityThreshold_ = 0.3f;  // Reset to moderate
+    curiosityScaling_ = 2.0f;    // Reset to default
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+void AgentBrain::processVisionInput(const std::vector<float>& vision) {
+    // Vision input (256 values -> sensoryVision_ neurons)
+    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+        if (sensoryVision_[i]) {
+            // Inject current proportional to vision intensity
+            float current = vision[i] * 5.0f;  // Scale factor
+            sensoryVision_[i]->injectCurrent(current);
+        }
+    }
+}
+
+void AgentBrain::processTouchInput(const std::vector<float>& touch) {
+    // Touch input (8 values -> sensoryTouch_ neurons)
+    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
+        if (sensoryTouch_[i]) {
+            float current = touch[i] * 8.0f;  // Collision signal
+            sensoryTouch_[i]->injectCurrent(current);
+        }
+    }
+}
+
+void AgentBrain::processInternalInput(const std::vector<float>& internal) {
+    // Internal signals (4 values -> sensoryInternal_ neurons)
+    for (size_t i = 0; i < sensoryInternal_.size() && i < internal.size(); ++i) {
+        if (sensoryInternal_[i]) {
+            float current = (internal[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            sensoryInternal_[i]->injectCurrent(current);
+        }
+    }
+}
+
+void AgentBrain::processProprioceptionInput(const std::vector<float>& proprio) {
+    // Proprioception (6 values -> sensoryProprioception_ neurons)
+    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
+        if (sensoryProprioception_[i]) {
+            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            sensoryProprioception_[i]->injectCurrent(current);
+        }
+    }
+}
+
+void AgentBrain::computeNoveltyLevel(const std::vector<float>& vision) {
+    // Compute novelty (difference from previous vision)
+    if (!vision.empty()) {
+        float totalDiff = 0.0f;
+        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
+            float diff = std::abs(vision[i] - previousVision_[i]);
+            totalDiff += diff;
+        }
+        
+        // Normalize
+        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        
+        // Decay
+        noveltyLevel_ *= sensoryNoveltyDecay_;
+        
+        // Store for next time
+        previousVision_ = vision;
+    }
+}
+
+void AgentBrain::computeCuriosityLevel() {
+    // Update curiosity based on novelty and prediction error
+    if (curiosityEnabled_) {
+        curiosityLevel_ = noveltyLevel_ * curiosityScaling_ + std::abs(predictionError_) * 0.5f;
+        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // Apply exploration-exploitation balance
+    if (explorationBalance_ > 0.5f) {
+        // Biased towards exploration
+        curiosityLevel_ *= (explorationBalance_ * 2.0f);
+    } else {
+        // Biased towards exploitation
+        curiosityLevel_ *= (1.0f - explorationBalance_);
+    }
+}
+
+// AttentionalSelection Implementation
+struct AttentionalSelection::Impl {
+    // Neuron competition state
+    std::vector<float> competitionStrength;
+    std::vector<float> inhibitionLevel;
+    
+    Impl() {}
+};
+
+AttentionalSelection::AttentionalSelection()
+    : pImpl(new Impl)
+    , brain_(nullptr)
+    , inhibitionStrength_(0.5f)
+    , excitationStrength_(1.5f)
+    , competitionThreshold_(0.3f)
+{
+}
+
+AttentionalSelection::~AttentionalSelection() = default;
+
+void AttentionalSelection::initialize(Brain* brain) {
+    pImpl = std::make_unique<Impl>();
+    brain_ = brain;
+    NLM_LOG_INFO("AttentionalSelection initialized");
+}
+
+std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector<NeuronId>& competitors,
+                                                              float globalInhibition) {
+    winners_.clear();
+    
+    if (competitors.empty()) return winners_;
+    
+    // Compute activity levels for competitors
+    std::vector<float> activities(competitors.size(), 0.0f);
+    float totalActivity = 0.0f;
+    
+    for (size_t i = 0; i < competitors.size(); ++i) {
+        NeuronId neuron = competitors[i];
+        
+        // Get current activation from salience and top-down bias (from maps)
+        auto salIt = bottomUpSalience_.find(neuron.value);
+        float salience = (salIt != bottomUpSalience_.end()) ? salIt->second : 0.0f;
+        auto biasIt = topDownBias_.find(neuron.value);
+        float bias = (biasIt != topDownBias_.end()) ? biasIt->second : 0.0f;
+        
+        activities[i] = salience + bias;
+        totalActivity += activities[i];
+    }
+    
+    if (totalActivity < 0.001f) {
+        // No strong competitors - all equal
+        return competitors;
+    }
+    
+    // Competition: neurons inhibit each other based on relative activity
+    for (size_t i = 0; i < competitors.size(); ++i) {
+        for (size_t j = 0; j < competitors.size(); ++j) {
+            if (i == j) continue;
+            
+            float relativeActivity = activities[i] / (activities[j] + 0.001f);
+            
+            if (relativeActivity > 1.5f) {
+                // i is much stronger than j - apply inhibition to j
+                if (brain_) {
+                    brain_->injectCurrent(competitors[j], -globalInhibition * inhibitionStrength_);
+                }
+                pImpl->inhibitionLevel.push_back(globalInhibition * inhibitionStrength_);
+            }
+        }
+    }
+    
+    // Winners are neurons with above-threshold activity
+    float threshold = competitionThreshold_ * totalActivity / competitors.size();
+    
+    for (size_t i = 0; i < competitors.size(); ++i) {
+        if (activities[i] >= threshold) {
+            winners_.push_back(competitors[i]);
+            
+            // Apply excitation to winners
+            if (brain_) {
+                brain_->injectCurrent(competitors[i], excitationStrength_ * 2.0f);
+            }
+        }
+    }
+    
+    return winners_;
+}
+
+void AttentionalSelection::focusOnRegion(RegionId region) {
+    if (std::find(attendedRegions_.begin(), attendedRegions_.end(), region) == attendedRegions_.end()) {
+        attendedRegions_.push_back(region);
+    }
+}
+
+void AttentionalSelection::releaseAttention() {
+    attendedRegions_.clear();
+}
+
+std::vector<RegionId> AttentionalSelection::getAttendedRegions() const {
+    return attendedRegions_;
+}
+
+void AttentionalSelection::setInhibitionStrength(float strength) {
+    inhibitionStrength_ = strength;
+}
+
+void AttentionalSelection::setExcitationStrength(float strength) {
+    excitationStrength_ = strength;
+}
+
+void AttentionalSelection::setCompetitionThreshold(float threshold) {
+    competitionThreshold_ = threshold;
+}
+
+float AttentionalSelection::getInhibitionFor(NeuronId neuron) const {
+    auto it = std::find(winners_.begin(), winners_.end(), neuron);
+    if (it != winners_.end()) {
+        return 0.0f;  // Winners don't receive inhibition
+    }
+    return inhibitionStrength_;
+}
+
+float AttentionalSelection::getExcitationFor(NeuronId neuron) const {
+    auto it = std::find(winners_.begin(), winners_.end(), neuron);
+    if (it != winners_.end()) {
+        return excitationStrength_;
+    }
+    return 0.0f;
+}
+
+void AttentionalSelection::update(TimestepDuration dt) {
+    // Decay salience and bias over time
+    for (auto& s : bottomUpSalience_) {
+        s *= 0.95f;
+    }
+    
+    for (auto& b : topDownBias_) {
+        b *= 0.98f;
+    }
+    
+    // Decay inhibition
+    for (auto& i : pImpl->inhibitionLevel) {
+        i *= 0.9f;
+    }
+}
+
+bool AttentionalSelection::isAttended(NeuronId neuron) const {
+    return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
+}
+
+void AttentionalSelection::applyTopDownBias(NeuronId neuron, float biasStrength) {
+    // Store bias in map keyed by NeuronId
+    auto it = topDownBias_.find(neuron.value);
+    if (it != topDownBias_.end()) {
+        it->second += biasStrength;
+    } else {
+        topDownBias_[neuron.value] = biasStrength;
+    }
+}
+
+void AttentionalSelection::applyBottomUpSalience(NeuronId neuron, float salienceStrength) {
+    // Store salience in map keyed by NeuronId
+    auto it = bottomUpSalience_.find(neuron.value);
+    if (it != bottomUpSalience_.end()) {
+        it->second += salienceStrength;
+    } else {
+        bottomUpSalience_[neuron.value] = salienceStrength;
+    }
+}
+
+void AttentionalSelection::reset() {
+    winners_.clear();
+    attendedRegions_.clear();
+    neuronSalience_.clear();
+    topDownBias_.clear();
+    bottomUpSalience_.clear();
+    pImpl->inhibitionLevel.clear();
 }
 
 } // namespace nlm

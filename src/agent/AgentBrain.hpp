@@ -1,14 +1,3 @@
-#pragma once
-
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
-#include <vector>
-
-namespace nlm {
-
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
@@ -64,6 +53,18 @@ public:
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
     
+    // Exploration-exploitation balance (0.0 = exploit only, 1.0 = explore only)
+    void setExplorationBalance(float balance) { explorationBalance_ = std::clamp(balance, 0.0f, 1.0f); }
+    float getExplorationBalance() const { return explorationBalance_; }
+    
+    // Curiosity threshold for exploration (higher = more exploration)
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = std::clamp(threshold, 0.0f, 1.0f); }
+    float getCuriosityThreshold() const { return curiosityThreshold_; }
+    
+    // Curiosity scaling factor
+    void setCuriosityScaling(float scaling) { curiosityScaling_ = std::clamp(scaling, 0.0f, 10.0f); }
+    float getCuriosityScaling() const { return curiosityScaling_; }
+    
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
@@ -112,6 +113,11 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // New configuration parameters
+    float explorationBalance_;  // 0.0 = exploit only, 1.0 = explore only
+    float curiosityThreshold_;  // Threshold for curiosity-driven exploration
+    float curiosityScaling_;    // How much novelty affects curiosity
 };
 
 } // namespace nlm
