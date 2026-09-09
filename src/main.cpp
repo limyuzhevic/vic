@@ -30,7 +30,7 @@ using namespace nlm;
 
 void printBanner() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
+    ╔═══════════════════════════════════════════════════════════════════════════════╗
     ║                                                               ║
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
@@ -44,7 +44,7 @@ void printBanner() {
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    ╚═══════════════════════════════════════════════════════════════════════════════╝
     )" << std::endl;
 }
 
@@ -220,7 +220,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    NLM_LOG_INFO("  Applying repeated input patterns (1000 steps)...");
     
     for (SimulationStep step = 0; step < 1000; ++step) {
         // Create input pattern - inject current into sensory neurons

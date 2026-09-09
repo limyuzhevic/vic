@@ -142,6 +142,14 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
+        .value("Empty", WorldObjectType::Empty)
+        .value("Resource", WorldObjectType::Resource)
+        .value("Hazard", WorldObjectType::Hazard)
+        .value("Wall", WorldObjectType::Wall)
+        .value("Marker", WorldObjectType::Marker)
+        .export_values();
+
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -149,7 +157,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
