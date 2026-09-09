@@ -124,6 +124,20 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
+    // Connect to brain's prediction system
+    // Update brain with current sensory input
+    SensoryInput sensoryInput;
+    // Build sensory input from percept
+    std::vector<float> combinedInput;
+    combinedInput.reserve(vision.size() + touch.size() + intern.size() + proprio.size());
+    combinedInput.insert(combinedInput.end(), vision.begin(), vision.end());
+    combinedInput.insert(combinedInput.end(), touch.begin(), touch.end());
+    combinedInput.insert(combinedInput.end(), intern.begin(), intern.end());
+    combinedInput.insert(combinedInput.end(), proprio.begin(), proprio.end());
+    
+    sensoryInput.setData(combinedInput);
+    brain_->receiveSensoryInput(sensoryInput);
+    
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
         float totalDiff = 0.0f;
@@ -142,9 +156,14 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty and prediction error from brain
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        // Get prediction error from brain's prediction system
+        float predError = 0.0f;
+        if (brain_->getPredictionSystem()) {
+            predError = brain_->getPredictionSystem()->getPredictionError();
+        }
+        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predError) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
@@ -319,22 +338,51 @@ DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
 }
 
 float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
+    if (!brain_) return 0.0f;
+    
+    // Use brain's dopamine system
+    if (brain_->getDopamine()) {
+        return brain_->getDopamine()->getLevel();
+    }
+    
+    return 0.0f;
 }
 
 float AgentBrain::getCuriosityLevel() const {
-    return curiosityLevel_;
+    if (!brain_) return 0.0f;
+    
+    // Use brain's curiosity system
+    if (brain_->getCuriosity()) {
+        return brain_->getCuriosity()->getLevel();
+    }
+    
+    return 0.0f;
 }
 
 float AgentBrain::getNoveltyLevel() const {
-    return noveltyLevel_;
+    if (!brain_) return 0.0f;
+    
+    // Use brain's novelty system
+    if (brain_->getNovelty()) {
+        return brain_->getNovelty()->getLevel();
+    }
+    
+    return 0.0f;
 }
 
 float AgentBrain::getPredictionError() const {
-    return predictionError_;
+    if (!brain_) return 0.0f;
+    
+    // Use brain's prediction error system
+    if (brain_->getPredictionErrorSignal()) {
+        return brain_->getPredictionErrorSignal()->getError();
+    }
+    
+    return 0.0f;
 }
 
 void AgentBrain::reset() {
+    // Reset local state variables
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;

@@ -406,18 +406,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
+    // ========== STEP 5.5: Apply neuromodulation from prediction errors =========
+    // Apply prediction error signals to neuromodulation systems
+    if (pImpl->predictionError) {
+        // Apply prediction error to dopamine system
+        pImpl->dopamine->applyPredictionError(pImpl->predictionError->getError());
     }
     
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
+    // Update neuromodulators
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
@@ -511,8 +507,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state from working memory
+        std::vector<float> sensoryPattern;
+        if (pImpl->workingMemory) {
+            sensoryPattern = pImpl->workingMemory->retrieve();
+        }
+        
+        // Create SensoryInput from working memory pattern
+        SensoryInput currentSensory;
+        currentSensory.setData(sensoryPattern);
+        
+        // Make prediction for next state
+        auto prediction = pImpl->predictionSystem->predictNextState(currentSensory);
+        
+        // Compute prediction error between predicted and actual
+        if (prediction) {
+            pImpl->predictionSystem->updatePredictions(*prediction, currentSensory);
+            
+            // Apply prediction error to neuromodulation
+            float error = pImpl->predictionSystem->getPredictionError();
+            pImpl->predictionError->computeError(
+                pImpl->predictionSystem->getPredictionError(),
+                error
+            );
+            
+            // Apply prediction error to dopamine
+            if (pImpl->dopamine) {
+                pImpl->dopamine->applyPredictionError(error);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +551,49 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns from working memory
+        // to form concepts
+        
+        // Get current neural patterns from working memory
+        std::vector<float> currentPattern;
+        if (pImpl->workingMemory) {
+            currentPattern = pImpl->workingMemory->retrieve();
+        }
+        
+        // Extract features from the pattern (simple feature extraction)
+        std::vector<float> features;
+        if (!currentPattern.empty()) {
+            // Use average value as simple feature
+            float avg = 0.0f;
+            for (float val : currentPattern) avg += val;
+            avg /= currentPattern.size();
+            features.push_back(avg);
+            
+            // Add pattern statistics as features
+            float variance = 0.0f;
+            for (float val : currentPattern) {
+                float diff = val - avg;
+                variance += diff * diff;
+            }
+            variance /= currentPattern.size();
+            features.push_back(std::sqrt(variance));
+            
+            // Add pattern size as feature
+            features.push_back(static_cast<float>(currentPattern.size()));
+        }
+        
+        // Get reward signal from dopamine
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Present experience to concept formation
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentPattern, features, reward, currentStep
+        );
+        
+        // If new concept formed, log it
+        if (conceptId > 0) {
+            NLM_LOG_INFO("New concept formed with ID: " + std::to_string(conceptId));
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -546,34 +610,48 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
-            }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+    // ========== STEP 13: SLEEP/REST CYCLE ==========
+    // Allow for memory consolidation and replay during rest periods
+    if (!pImpl->isResting && currentStep > 100) {  // Start rest after initial learning
+        // Check if we should enter rest cycle
+        float restProbability = 0.05f;  // 5% chance to enter rest each step
+        if (pImpl->rng && pImpl->rng->uniformReal(0.0f, 1.0f) < restProbability) {
+            pImpl->isResting = true;
+            pImpl->restStartStep = currentStep;
+            NLM_LOG_INFO("Brain entering rest cycle for memory consolidation");
         }
+    }
+    
+    if (pImpl->isResting) {
+        pImpl->restElapsedSteps = currentStep - pImpl->restStartStep;
+        
+        // Rest cycle typically lasts 100-300 steps
+        if (pImpl->restElapsedSteps >= 200) {
+            // End rest cycle
+            pImpl->isResting = false;
+            
+            // Perform memory consolidation
+            if (pImpl->episodicMemory) {
+                pImpl->episodicMemory->consolidate(0.3f);
+                NLM_LOG_INFO("Rest cycle complete - memory consolidation finished");
+            }
+        } else {
+            // During rest, actively replay and consolidate memories
+            if (pImpl->restElapsedSteps % 50 == 0 && pImpl->episodicMemory) {
+                // Replay important memories during rest
+                size_t replayCount = 3;
+                auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(replayCount);
+                
+                NLM_LOG_INFO("Rest cycle replaying " + std::to_string(episodesToReplay.size()) + " episodes for consolidation");
+            }
+        }
+    }
+    
+    // Decrease developmental plasticity during rest
+    if (pImpl->isResting && pImpl->developmentSystem) {
+        // Rest allows developmental plasticity to stabilize
+        pImpl->developmentalStage = DevelopmentalStage::Adult;
+        pImpl->plasticityModifier_ = std::max(0.2f, pImpl->plasticityModifier_ * 0.95f);
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
@@ -690,9 +768,25 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Primary action selection from neural planner (if available)
+    if (pImpl->planner) {
+        // Get current neural state for planning
+        std::vector<float> currentState;
+        if (pImpl->workingMemory) {
+            currentState = pImpl->workingMemory->retrieve();
+        }
+        
+        // Plan best action
+        ActionType plannedAction = pImpl->planner->planAction(currentState);
+        
+        // Create and return planned action
+        auto action = std::make_unique<Action>(plannedAction);
+        
+        // Update planner with actual outcome (will be called elsewhere)
+        return action;
+    }
     
+    // Fallback to simple motor neuron activity selection
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
@@ -765,6 +859,10 @@ bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
+        CheckpointManager manager;
+        std::string checkpointDir = "./checkpoints";
+        manager.configure(checkpointDir, 10000, 5, true);
+        
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
@@ -858,46 +956,70 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Read neurons
-        NeuronCheckpointData neuronData;
-        if (!reader.readNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to read neurons from checkpoint");
-            return false;
-        }
-        
-        // Apply neuron states
-        size_t idx = 0;
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
-                        }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
-                        }
+    // Read neurons
+    NeuronCheckpointData neuronData;
+    if (!reader.readNeurons(neuronData)) {
+        NLM_LOG_ERROR("Failed to read neurons from checkpoint");
+        return false;
+    }
+    
+    // Apply neuron states
+    size_t idx = 0;
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                if (idx < neuronData.membranePotential.size()) {
+                    neuron->setMembranePotential(neuronData.membranePotential[idx]);
+                    neuron->setRestingPotential(neuronData.restingPotential[idx]);
+                    neuron->setThreshold(neuronData.threshold[idx]);
+                    neuron->setResetPotential(neuronData.resetPotential[idx]);
+                    neuron->setLeakConductance(neuronData.leakConductance[idx]);
+                    if (idx < neuronData.firingState.size()) {
+                        neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
                     }
-                    idx++;
+                    if (idx < neuronData.refractoryRemaining.size()) {
+                        neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                    }
                 }
+                idx++;
             }
         }
-        
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
-            return false;
+    }
+    
+    // Read synapses
+    SynapseCheckpointData synapseData;
+    if (!reader.readSynapses(synapseData)) {
+        NLM_LOG_ERROR("Failed to read synapses from checkpoint");
+        return false;
+    }
+    
+    // Apply synapse states
+    size_t synapseIdx = 0;
+    for (auto& region : pImpl->regions) {
+        auto& synapses = region->getSynapses();
+        for (size_t i = 0; i < synapseData.weight.size() && i < synapses.size(); ++i) {
+            auto* synapse = synapses[i];
+            if (synapseIdx < synapseData.weight.size()) {
+                synapse->addToWeight(synapseData.weight[synapseIdx] - synapse->getWeight());
+                synapse->setDelay(synapseData.delay[synapseIdx]);
+                ++synapseIdx;
+            }
         }
-        
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+    }
+    
+    // Read inter-region connections
+    if (synapseIdx < synapseData.weight.size()) {
+        size_t interRegionStart = synapseIdx;
+        for (size_t i = interRegionStart; i < synapseData.weight.size(); ++i) {
+            InterRegionConnection conn;
+            conn.weight = synapseData.weight[i];
+            conn.delay = synapseData.delay[i];
+            conn.plasticityFlags = PlasticityFlags();
+            pImpl->interRegionConnections.push_back(conn);
+        }
+    }
+    
+    NLM_LOG_INFO("Loaded " + std::to_string(pImpl->interRegionConnections.size() + idx) + " synapses");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

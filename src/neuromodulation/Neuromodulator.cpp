@@ -53,4 +53,16 @@ void Dopamine::signalRewardPredictionError(float error) {
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 
+void Dopamine::applyPredictionError(float error) {
+    // Apply prediction error to dopamine system
+    // Learn from prediction errors - this is the key mechanism for reward prediction error
+    if (error > 0) {
+        // Positive prediction error (better than expected) - increase dopamine
+        signalRewardPredictionError(error);
+    } else if (error < 0) {
+        // Negative prediction error (worse than expected) - decrease dopamine
+        pImpl->level = std::max(pImpl->baseline, pImpl->level + error * pImpl->releaseRate);
+    }
+}
+
 } // namespace nlm

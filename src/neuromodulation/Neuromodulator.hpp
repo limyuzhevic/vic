@@ -27,6 +27,9 @@ public:
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
+    // Apply prediction error to neuromodulator
+    virtual void applyPredictionError(float error) = 0;
+    
 protected:
     Neuromodulator() = default;
 };
@@ -43,6 +46,7 @@ public:
     void setLevel(float level) override;
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
+    void applyPredictionError(float error) override;
     
     // Reward signaling
     void signalReward(float reward);
@@ -62,6 +66,7 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    void applyPredictionError(float error) override {}
 };
 
 // Norepinephrine: Arousal and vigilance
@@ -73,6 +78,7 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    void applyPredictionError(float error) override {}
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
@@ -84,6 +90,7 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    void applyPredictionError(float error) override {}
 };
 
 } // namespace nlm

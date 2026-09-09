@@ -34,6 +34,14 @@ void PredictionError::computeError(float predicted, float actual) {
     pImpl->history.push_back(pImpl->error);
 }
 
+void PredictionError::applyToNeuromodulation(Dopamine* dopamine) {
+    if (!dopamine) return;
+    
+    // Prediction error as reward prediction error signal to dopamine
+    float error = getError();
+    dopamine->signalRewardPredictionError(error);
+}
+
 void PredictionError::updatePrediction(float newPrediction) {
     pImpl->predictedValue = newPrediction;
 }
