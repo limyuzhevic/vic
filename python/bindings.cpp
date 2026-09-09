@@ -363,7 +363,14 @@ PYBIND11_MODULE(pynlm, m) {
              "Get expected motor output size")
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
              py::arg("percept"),
-             "Process sensory percept and inject into brain")
+             "Process sensory percept and inject into brain (legacy API)")
+        .def("processSensoryInput", 
+             [](AgentBrain& self, const SensoryPercept& percept, SimulationStep currentStep, 
+                float energy, ActionType currentAction) {
+                 self.processSensoryInput(percept, currentStep, energy, currentAction);
+             },
+             py::arg("percept"), py::arg("currentStep"), py::arg("energy"), py::arg("currentAction"),
+             "Process sensory percept with full cognitive integration (Phase 6)")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,

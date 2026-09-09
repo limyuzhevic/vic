@@ -27,6 +27,7 @@ public:
     
     // Process sensory percept and inject into brain
     void processSensoryInput(const SensoryPercept& percept);
+    void processSensoryInput(const SensoryPercept& percept, SimulationStep currentStep, float energy, ActionType currentAction);
     
     // Decode brain motor activity into motor command
     MotorCommand decodeMotorCommand();

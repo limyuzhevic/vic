@@ -64,8 +64,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get observation
         SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
         
-        // Process sensory input
-        agent.processSensoryInput(percept);
+        // Process sensory input with episodic memory, prediction, and concept formation
+        // Pass current step, energy, and action for cognitive integration
+        float energy = world.getAgentBody().energy;
+        ActionType action = ActionType::Wait;  // Will be set after applying action
+        agent.processSensoryInput(percept, step, energy, action);
         
         // Brain step
         brain->step(step, step * 0.001);
@@ -75,6 +78,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         
         // Apply action to world
         world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        
+        // Update action for cognitive integration (after action taken)
+        action = world.getAgentBody().age > 0 ? static_cast<ActionType>(cmd) : ActionType::Wait;
+        agent.processSensoryInput(percept, step, energy, action);
         
         // Compute reward
         float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());

@@ -509,12 +509,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+// ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
     }
-    
+
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
@@ -525,11 +525,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->attention->processCompetition(competitors);
         }
     }
-    
+
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Extract patterns from working memory and sensory input
+        if (pImpl->workingMemory) {
+            // Extract active patterns from working memory
+            auto memoryTraces = pImpl->workingMemory->getActiveTraces();
+            // Form concepts from these patterns
+            pImpl->conceptFormation->update(this, memoryTraces);
+        }
+    }
+
+    // ========== STEP 11: Apply structural plasticity periodically ==========
+    if (currentStep % 100 == 0) {
+        pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1015,6 +1026,14 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+}
+
+NeuralAssociativeMemory* Brain::getSemanticMemory() {
+    return pImpl->associativeMemory.get();  // Semantic memory implemented via associative memory
+}
+
+NeuralAssociativeMemory* Brain::getProceduralMemory() {
+    return nullptr;  // Not implemented yet
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========

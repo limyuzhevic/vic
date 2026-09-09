@@ -1,5 +1,7 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Types/Types.hpp"  // For SimulationStep
+#include "../motor/Action.hpp"     // For ActionType
 #include <algorithm>
 #include <cmath>
 
@@ -85,6 +87,11 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
+    // For backward compatibility, call the extended version with default parameters
+    processSensoryInput(percept, 0, 1.0f, ActionType::Wait);
+}
+
+void AgentBrain::processSensoryInput(const SensoryPercept& percept, SimulationStep currentStep, float energy, ActionType currentAction) {
     if (!brain_) return;
     
     // Vision input (256 values -> sensoryVision_ neurons)
@@ -112,6 +119,14 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
+            
+            // Store in working memory for episodic storage
+            if (brain_ && brain_->getWorkingMemory()) {
+                brain_->getWorkingMemory()->storeToNeuron(
+                    sensoryInternal_[i]->getId(),
+                    std::abs(current) / 10.0f
+                );
+            }
         }
     }
     
@@ -122,6 +137,76 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
         }
+    }
+    
+    // Store experience in episodic memory if available
+    if (brain_ && brain_->getEpisodicMemory()) {
+        // Create episodic memory item from current sensory input
+        EpisodicMemoryItem episode;
+        episode.timestamp = currentStep;
+        episode.sensoryState = vision;
+        episode.positionX = percept.getPosition().first;
+        episode.positionY = percept.getPosition().second;
+        episode.orientation = percept.getOrientation();
+        episode.action = currentAction;
+        episode.reward = 0.0f;  // Will be set after action outcome
+        episode.energy = energy;
+        episode.novelty = noveltyLevel_;
+        episode.resultingSensoryState.clear();  // Set after action
+        episode.resultingReward = 0.0f;  // Set after action outcome
+        episode.age = 0;
+        
+        // Store neural pattern (record active neuron IDs and activations)
+        for (const auto& region : brain_->getRegions()) {
+            for (auto* neuron : region->getNeurons()) {
+                if (neuron->getState().isActive) {
+                    episode.activeNeurons.push_back(neuron->getId());
+                    episode.neuronActivations.push_back(
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential)
+                    );
+                }
+            }
+        }
+        
+        brain_->getEpisodicMemory()->storeEpisode(episode);
+    }
+    
+    // Train prediction system if available
+    if (brain_ && brain_->getPredictionSystem()) {
+        // Build complete sensory input for prediction training
+        std::vector<float> completeInput;
+        completeInput.insert(completeInput.end(), vision.begin(), vision.end());
+        completeInput.insert(completeInput.end(), touch.begin(), touch.end());
+        completeInput.insert(completeInput.end(), intern.begin(), intern.end());
+        completeInput.insert(completeInput.end(), proprio.begin(), proprio.end());
+        
+        brain_->getPredictionSystem()->train(completeInput);
+    }
+    
+    // Form concepts if concept formation is available
+    if (brain_ && brain_->getConceptFormation()) {
+        // Build complete sensory pattern for concept formation
+        std::vector<float> completePattern;
+        completePattern.insert(completePattern.end(), vision.begin(), vision.end());
+        completePattern.insert(completePattern.end(), touch.begin(), touch.end());
+        completePattern.insert(completePattern.end(), intern.begin(), intern.end());
+        completePattern.insert(completePattern.end(), proprio.begin(), proprio.end());
+        
+        // Extract features (simplified: use sensory input directly)
+        std::vector<float> features = completePattern;
+        
+        brain_->getConceptFormation()->presentExperience(
+            completePattern, features, 0.0f, currentStep  // reward will be set after action
+        );
+    }
+    
+    // Compute prediction error if prediction error signal is available
+    if (brain_ && brain_->getPredictionErrorSignal()) {
+        // Prediction error is computed by prediction system itself
+        // Here we could compute it based on discrepancy between predicted and actual sensory input
+        // For now, we'll get it from the prediction system
+        predictionError_ = brain_->getPredictionSystem() ? 
+            brain_->getPredictionSystem()->getPredictionError() : 0.0f;
     }
     
     // Compute novelty (difference from previous vision)

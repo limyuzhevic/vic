@@ -71,61 +71,59 @@ public:
             
             float episodeReward = 0.0f;
             
-            // Run steps
-            for (int step = 0; step < stepsPerEpisode; ++step) {
-                // 1. Get sensory percept from world
-                const SensoryPercept& percept = world.getSensoryPercept();
-                
-                // 2. Inject sensory input into brain
-                agentBrain.processSensoryInput(percept);
-                
-                // 3. Simulate brain (multiple steps per action)
-                for (int neuralStep = 0; neuralStep < 10; ++neuralStep) {
-                    brain->step(neuralStep);
-                }
-                
-                // 4. Decode motor command from brain activity
-                MotorCommand cmd = agentBrain.decodeMotorCommand();
-                
-                // 5. Apply motor command to world
-                ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
-                
-                // 6. Apply reward modulation
-                agentBrain.applyRewardModulation(result.reward, 0.0f);
-                
-                // 7. Update world
-                world.update(0.01);  // 10ms timestep
-                
-                // 8. Update development
-                agentBrain.updateDevelopment(0.01);
-                
-                // Track metrics
-                episodeReward += result.reward;
-                metrics.steps++;
-                metrics.totalReward += result.reward;
-                metrics.totalSpikes += brain->getFiringNeuronCount();
-                
-                // Count actions
-                switch (cmd) {
-                    case MotorCommand::MoveForward: metrics.forwardCount++; break;
-                    case MotorCommand::MoveBackward: metrics.backwardCount++; break;
-                    case MotorCommand::TurnLeft: metrics.turnLeftCount++; break;
-                    case MotorCommand::TurnRight: metrics.turnRightCount++; break;
-                    case MotorCommand::Interact: metrics.interactCount++; break;
-                    default: metrics.waitCount++; break;
-                }
-                
-                // Print periodic updates
-                if (step % 50 == 0) {
-                    std::cout << "  Step " << step 
-                              << ": reward=" << result.reward
-                              << ", action=" << motorCommandToString(cmd)
-                              << ", neuromod=" << agentBrain.getNeuromodulationLevel()
-                              << ", novelty=" << agentBrain.getNoveltyLevel()
-                              << ", energy=" << world.getAgentBody().energy
-                              << "\n";
-                }
+            // 1. Get sensory percept from world
+            const SensoryPercept& percept = world.getSensoryPercept();
+            
+            // 2. Inject sensory input into brain with cognitive integration
+            agentBrain.processSensoryInput(percept, step, 1.0f, ActionType::Wait);
+            
+            // 3. Simulate brain (multiple steps per action)
+            for (int neuralStep = 0; neuralStep < 10; ++neuralStep) {
+                brain->step(neuralStep);
             }
+            
+            // 4. Decode motor command from brain activity
+            MotorCommand cmd = agentBrain.decodeMotorCommand();
+            
+            // 5. Apply motor command to world
+            ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
+            
+            // 6. Apply reward modulation
+            agentBrain.applyRewardModulation(result.reward, 0.0f);
+            
+            // 7. Update world
+            world.update(0.01);  // 10ms timestep
+            
+            // 8. Update development
+            agentBrain.updateDevelopment(0.01);
+            
+            // Track metrics
+            episodeReward += result.reward;
+            metrics.steps++;
+            metrics.totalReward += result.reward;
+            metrics.totalSpikes += brain->getFiringNeuronCount();
+            
+            // Count actions
+            switch (cmd) {
+                case MotorCommand::MoveForward: metrics.forwardCount++; break;
+                case MotorCommand::MoveBackward: metrics.backwardCount++; break;
+                case MotorCommand::TurnLeft: metrics.turnLeftCount++; break;
+                case MotorCommand::TurnRight: metrics.turnRightCount++; break;
+                case MotorCommand::Interact: metrics.interactCount++; break;
+                default: metrics.waitCount++; break;
+            }
+            
+            // Print periodic updates
+            if (step % 50 == 0) {
+                std::cout << "  Step " << step 
+                          << ": reward=" << result.reward
+                          << ", action=" << motorCommandToString(cmd)
+                          << ", neuromod=" << agentBrain.getNeuromodulationLevel()
+                          << ", novelty=" << agentBrain.getNoveltyLevel()
+                          << ", energy=" << world.getAgentBody().energy
+                          << "\n";
+            }
+        }
             
             // Record final metrics
             metrics.finalNovelty = agentBrain.getNoveltyLevel();
