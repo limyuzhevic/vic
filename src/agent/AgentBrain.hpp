@@ -3,6 +3,7 @@
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
+#include "../cognition/NeuralPlanner.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
@@ -77,6 +78,7 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    std::unique_ptr<NeuralPlanner> planner_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;

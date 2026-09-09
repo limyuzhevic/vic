@@ -5,6 +5,7 @@
 
 namespace nlm {
 
+// Create a clean constructor
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
@@ -19,6 +20,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , planner_(nullptr)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -58,10 +60,15 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 }
             }
         }
+        
+        // Initialize neural planner for intelligent action selection
+        if (brain_->getPlanner()) {
+            planner_ = std::make_unique<NeuralPlanner>();
+            planner_->initialize(brain_.get());
+            planner_->setPlanningDepth(5);  // Medium planning depth
+        }
     }
 }
-
-AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
@@ -152,7 +159,40 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
+    // Try to get planned action from neural planner first
+    // This enables intelligent, goal-directed behavior
+    MotorCommand plannedAction = MotorCommand::Wait;
+    if (planner_) {
+        // Get current state for planning
+        std::vector<float> currentState = std::vector<float>(getSensoryInputSize(), 0.0f);
+        
+        // If we have previous vision, use it as part of state
+        if (!previousVision_.empty() && previousVision_.size() <= currentState.size()) {
+            for (size_t i = 0; i < previousVision_.size(); ++i) {
+                currentState[i] = previousVision_[i];
+            }
+        }
+        
+        // Set a target reward based on curiosity and novelty
+        float targetReward = 0.5f;
+        if (curiosityEnabled_) {
+            // Plan for exploration when curiosity is high
+            targetReward += curiosityLevel_ * 0.3f;
+        }
+        
+        // Use the neural planner to plan the next action
+        plannedAction = planner_->planAction(currentState, targetReward);
+        
+        // Log planning activity
+        if (plannedAction != MotorCommand::Wait) {
+            NLM_LOG_INFO("AgentBrain: Neural planner selected action " + 
+                         std::to_string(static_cast<int>(plannedAction)) +
+                         " (curiosity: " + std::to_string(curiosityLevel_) + ")");
+        }
+    }
+    
+    // Use planned action if available, otherwise fall back to neural activity decoding
+    MotorCommand decoded = (plannedAction != MotorCommand::Wait) ? plannedAction : decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {

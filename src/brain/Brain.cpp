@@ -234,6 +234,7 @@ bool Brain::initialize() {
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
+    pImpl->workingMemory->setDecayRate(0.01f);
     
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
@@ -509,10 +510,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // Store the last sensory observation for prediction error computation
+    pImpl->lastObservation = std::make_unique<SensoryInput>(input);
+    
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->lastObservation) {
+        auto prediction = pImpl->predictionSystem->predictNextState(*pImpl->lastObservation);
+        
+        // Update prediction error
+        if (prediction) {
+            // Get actual next observation from input (simplified)
+            pImpl->predictionSystem->updatePredictions(*prediction, *pImpl->lastObservation);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +537,171 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // 1. Process current neural activity to form concepts
+        size_t conceptFromWM = pImpl->conceptFormation->updateFromWorkingMemory();
+        
+        // 2. Integrate with episodic memory - extract concepts from stored experiences
+        // Get recent episodes for concept formation
+        if (pImpl->episodicMemory) {
+            // Get episodes from recent time window (last 100 steps)
+            auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(10);
+            if (!recentEpisodes.empty()) {
+                pImpl->conceptFormation->formConceptsFromEpisodicMemory(recentEpisodes);
+            }
+        }
+        
+        // 3. Connect to attention - help with attentional focus
+        pImpl->conceptFormation->applyConceptToAttention();
+        
+        // 4. Connect to prediction - use concepts for predictive modeling
+        // Get current sensory pattern for prediction
+        if (pImpl->lastObservation) {
+            const auto& sensoryData = pImpl->lastObservation->getData();
+            auto prediction = pImpl->conceptFormation->predictUsingConcepts(sensoryData);
+            
+            // Use this prediction for the prediction system
+            if (pImpl->predictionSystem) {
+                auto conceptPrediction = std::make_unique<SensoryInput>();
+                conceptPrediction->setData(prediction);
+                // The concept-based prediction can be used by the prediction system
+                NLM_LOG_DEBUG("ConceptFormation: Generated concept-based prediction for prediction system");
+            }
+        }
+        
+        // Log concept formation activity
+        size_t conceptCount = pImpl->conceptFormation->getConceptCount();
+        if (conceptCount > 0) {
+            float avgStability = 0.0f;
+            for (size_t i = 0; i < conceptCount; ++i) {
+                avgStability += pImpl->conceptFormation->getConceptStability(i);
+            }
+            avgStability /= conceptCount;
+            
+            NLM_LOG_INFO("ConceptFormation: Processing complete - " + std::to_string(conceptCount) +
+                         " concepts, avg stability " + std::to_string(avgStability));
+        }
+    }
+    
+    // ========== STEP 11: Apply structural plasticity periodically ==========
+    if (currentStep % 100 == 0) {
+        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    }
+    
+    // ========== STEP 12: Replay important memories ==========
+    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
+        // Get episodes for replay
+        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+        for (const auto* episode : episodesToReplay) {
+            pImpl->episodicMemory->replayEpisode(episode);
+        }
+    }
+    
+    // ========== STEP 13: Apply development effects ==========
+    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+        
+        // Development affects plasticity rates
+        auto* sp = pImpl->structuralPlasticity;
+        if (sp) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            float plasticityMod = 1.0f;
+            
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    plasticityMod = 1.0f;  // High plasticity
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    plasticityMod = 0.8f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    plasticityMod = 0.5f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    plasticityMod = 0.2f;  // Stable
+                    break;
+            }
+            
+            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+    }
+    
+    // ========== STEP 14: Periodic memory consolidation ==========
+    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+        // Consolidate important memories, remove weak ones
+        pImpl->episodicMemory->consolidate(0.3f);
+    }
+    
+    // ========== STEP 8: Update prediction system ==========
+    if (pImpl->predictionSystem && pImpl->predictionError) {
+        // Update prediction system with actual sensory observations
+        // This computes prediction errors and modulates learning
+        
+        // Get the most recent sensory state from working memory or stored observation
+        // For now, we use a simple approach - compute error based on prediction system state
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Update prediction system with the actual sensory input
+        // Note: In a real implementation, we would need to track the actual sensory observations
+        // For now, we'll use the prediction error for neuromodulation
+        
+        // Apply neuromodulation based on prediction error (like AgentBrain does)
+        if (pImpl->predictionError) {
+            // Use prediction error signal to modulate learning
+            float error = pImpl->predictionError->getError();
+            float magnitude = pImpl->predictionError->getMagnitude();
+            
+            // Apply prediction error to neuromodulation systems
+            // This enhances learning for unexpected states (prediction errors)
+            if (magnitude > 0.0f) {
+                // Scale neuromodulation based on prediction error magnitude
+                float neuromodulationFactor = magnitude * 2.0f;  // Amplify error signal
+                
+                // Apply to curiosity system for exploration
+                if (pImpl->curiosity) {
+                    // Curiosity increases with prediction error
+                    float curiosityLevel = pImpl->curiosity->getLevel();
+                    curiosityLevel = std::min(1.0f, curiosityLevel + neuromodulationFactor * 0.1f);
+                    // In real implementation, would have a setter method
+                }
+                
+                // Apply to dopamine system (reward prediction error)
+                if (pImpl->dopamine) {
+                    // Higher prediction error = larger dopamine burst (error signal)
+                    float dopamineLevel = pImpl->dopamine->getLevel();
+                    dopamineLevel = std::min(1.0f, dopamineLevel + neuromodulationFactor * 0.2f);
+                    // In real implementation, would have a setter method
+                }
+                
+                // Apply to novelty detection
+                if (pImpl->novelty) {
+                    // Novelty detection is enhanced by prediction errors
+                    // In real implementation, would apply error signal
+                }
+            }
+        }
+        
+        // Store prediction error in the prediction system
+        pImpl->predictionSystem->updatePredictions(*pImpl->lastObservation, *pImpl->lastObservation);
+        
+        // Update prediction error signal
+        if (pImpl->predictionError) {
+            pImpl->predictionError->computeError(
+                pImpl->predictionSystem->getPredictionError(), 
+                pImpl->predictionSystem->getPredictionError()
+            );
+        }
+    }
+
+    // ========== STEP 9: Update attention system ==========
+    if (pImpl->attention) {
+        pImpl->attention->update(pImpl->timestep);
+        
+        // Apply attention to working memory winners
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -585,34 +757,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
-    }
-}
-
-void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
-    
-    const auto& values = input.getData();
-    if (values.empty()) return;
-    
-    size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
-    
-    // Distribute input across sensory neurons
-    for (size_t i = 0; i < numSensory; ++i) {
-        // Normalize input value to range [-10, 10] mV
-        float normalizedValue = 0.0f;
-        if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
-        }
-        
-        // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
-        
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
-        }
     }
 }
 

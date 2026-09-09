@@ -1,8 +1,9 @@
-#include "ConceptFormation.hpp"
+#include "NeuralEpisodicMemory.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <cstdlib>
 
 namespace nlm {
 
@@ -291,10 +292,132 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
     return 1.0f - (totalVariance / concept->instances.size());
 }
 
-void ConceptFormation::clear() {
-    concepts_.clear();
-    nextConceptId_ = 1;
-}
+    // Update concept formation based on current working memory state
+    // Returns the concept ID for the most active pattern
+    size_t ConceptFormation::updateFromWorkingMemory() {
+        if (!brain_) return 0;
+        
+        // Get current working memory state
+        auto* workingMem = brain_->getWorkingMemory();
+        if (!workingMem) return 0;
+        
+        std::vector<float> currentPattern = workingMem->retrieve();
+        if (currentPattern.empty()) return 0;
+        
+        // Find or create concept for this pattern
+        size_t conceptId = presentExperience(currentPattern, currentPattern, 0.0f, 0);
+        
+        if (conceptId > 0) {
+            NLM_LOG_INFO("ConceptFormation: Updated from working memory, concept " + 
+                         std::to_string(conceptId));
+        }
+        
+        return conceptId;
+    }
+
+    // Form concepts from episodic memory experiences
+    // Analyzes stored episodes to discover recurring patterns
+    void ConceptFormation::formConceptsFromEpisodicMemory(const std::vector<const EpisodicMemoryItem*>& episodes) {
+        if (episodes.empty()) return;
+        
+        NLM_LOG_INFO("ConceptFormation: Forming concepts from " + 
+                     std::to_string(episodes.size()) + " episodic memories");
+        
+        for (const auto* episode : episodes) {
+            if (episode && !episode->sensoryState.empty()) {
+                // Convert reward to concept-relevant value
+                float reward = episode->reward;
+                
+                // Present experience to concept formation
+                size_t conceptId = presentExperience(
+                    episode->sensoryState, 
+                    episode->sensoryState,  // Use sensory state as features
+                    reward,
+                    episode->timestamp
+                );
+                
+                if (conceptId > 0) {
+                    NLM_LOG_DEBUG("ConceptFormation: Concept " + std::to_string(conceptId) +
+                                  " formed from episodic memory at time " +
+                                  std::to_string(episode->timestamp));
+                }
+            }
+        }
+    }
+
+    // Apply concept influence to attention system
+    // Boosts neurons associated with strong concepts
+    void ConceptFormation::applyConceptToAttention() {
+        if (!brain_) return;
+        
+        auto* attention = brain_->getAttention();
+        if (!attention) return;
+        
+        NLM_LOG_INFO("ConceptFormation: Applying concept influence to attention");
+        
+        // For each concept, apply top-down bias to attended regions
+        for (const auto& concept : concepts_) {
+            float conceptStrength = concept.avgStability;
+            if (conceptStrength < 0.5f) continue; // Only strong concepts influence attention
+            
+            // Apply category hint as attention bias
+            for (size_t i = 0; i < concept.instances.size(); ++i) {
+                const auto& instance = concept.instances[i];
+                
+                // Convert pattern to neuron index for biasing
+                // This is simplified - in practice would map pattern to actual neurons
+                size_t neuronIdx = i % 10000; // Map to neuron range
+                NeuronId neuronId(neuronIdx);
+                
+                // Apply top-down bias based on concept strength and category
+                float biasStrength = conceptStrength * (concept.categoryHint == "rewarding" ? 1.2f : 1.0f);
+                attention->applyTopDownBias(neuronId, biasStrength);
+            }
+        }
+    }
+
+    // Use concepts for predictive modeling
+    // Returns predicted sensory pattern based on learned concepts
+    std::vector<float> ConceptFormation::predictUsingConcepts(const std::vector<float>& currentPattern) const {
+        if (concepts_.empty()) return currentPattern;
+        
+        // Find the best matching concept
+        size_t bestConcept = getMatchingConcept(currentPattern, 0.3f); // Lower threshold for prediction
+        
+        if (bestConcept == 0) return currentPattern; // No matching concept
+        
+        const DiscoveredConcept* concept = getConcept(bestConcept);
+        if (!concept) return currentPattern;
+        
+        // Use concept prototype as prediction base
+        std::vector<float> prediction = concept->prototype;
+        
+        // Add some variation based on instance diversity
+        if (!concept->instances.empty()) {
+            // Compute average variation from prototype
+            float totalVariation = 0.0f;
+            for (const auto& instance : concept->instances) {
+                totalVariation += computeSimilarity(instance.pattern, concept->prototype);
+            }
+            
+            float avgSimilarity = totalVariation / concept->instances.size();
+            
+            // Apply variation based on similarity
+            if (avgSimilarity < 0.7f) {
+                // Low similarity = more variation in prediction
+                float variation = (0.7f - avgSimilarity) * 0.3f;
+                for (auto& v : prediction) {
+                    v += (std::rand() / (RAND_MAX + 1.0f) - 0.5f) * variation;
+                    v = std::clamp(v, 0.0f, 1.0f);
+                }
+            }
+        }
+        
+        NLM_LOG_DEBUG("ConceptFormation: Predicted using concept " + std::to_string(bestConcept) +
+                     " for current pattern");
+        
+        return prediction;
+    }
 
 // SpatialRepresentation Implementation
 struct SpatialRepresentation::Impl {

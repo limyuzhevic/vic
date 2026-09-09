@@ -131,6 +131,24 @@ public:
     // Clear all concepts
     void clear();
 
+    // Integration with other brain systems
+
+    // Update concept formation based on current working memory state
+    // Returns the concept ID for the most active pattern
+    size_t updateFromWorkingMemory();
+
+    // Form concepts from episodic memory experiences
+    // Analyzes stored episodes to discover recurring patterns
+    void formConceptsFromEpisodicMemory(const std::vector<const EpisodicMemoryItem*>& episodes);
+
+    // Apply concept influence to attention system
+    // Boosts neurons associated with strong concepts
+    void applyConceptToAttention();
+
+    // Use concepts for predictive modeling
+    // Returns predicted sensory pattern based on learned concepts
+    std::vector<float> predictUsingConcepts(const std::vector<float>& currentPattern) const;
+
     // Get generalization ability (can concept handle variations?)
     float getGeneralizationAbility(size_t conceptId) const;
 
