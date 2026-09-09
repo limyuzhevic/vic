@@ -865,23 +865,38 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply neuron states
+        // Apply neuron states - ensure we don't access out of bounds
         size_t idx = 0;
         for (auto& region : pImpl->regions) {
+            if (!region) continue;  // Defensive null check
+            
             for (auto& pop : region->getPopulations()) {
+                if (!pop) continue;  // Defensive null check
+                
                 for (auto* neuron : pop->getNeurons()) {
+                    if (!neuron) continue;  // Defensive null check
+                    
+                    // Bounds checking - apply all available data
                     if (idx < neuronData.membranePotential.size()) {
                         neuron->setMembranePotential(neuronData.membranePotential[idx]);
+                    }
+                    if (idx < neuronData.restingPotential.size()) {
                         neuron->setRestingPotential(neuronData.restingPotential[idx]);
+                    }
+                    if (idx < neuronData.threshold.size()) {
                         neuron->setThreshold(neuronData.threshold[idx]);
+                    }
+                    if (idx < neuronData.resetPotential.size()) {
                         neuron->setResetPotential(neuronData.resetPotential[idx]);
+                    }
+                    if (idx < neuronData.leakConductance.size()) {
                         neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
-                        }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
-                        }
+                    }
+                    if (idx < neuronData.firingState.size()) {
+                        neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
+                    }
+                    if (idx < neuronData.refractoryRemaining.size()) {
+                        neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
                     }
                     idx++;
                 }

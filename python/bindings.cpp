@@ -416,10 +416,69 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Constants for invalid IDs
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Factory function for convenience - creating a complete agent setup
+    m.def("createCompleteAgent", [](int neuronCount = 1000, int visionWidth = 16,
+                                   int visionHeight = 16) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("region_count", static_cast<int64_t>(1));
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20.0f, 20.0f, visionWidth, visionHeight);
+        world->reset();
+        
+        agent->initialize(*world);
+        
+        // Enable all advanced features by default
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("neuronCount") = 1000,
+       py::arg("visionWidth") = 16,
+       py::arg("visionHeight") = 16,
+       "Create a complete agent setup with brain, world, and agent interface");
+    
+    // Helper function for quick simulation
+    m.def("runQuickSimulation", [](std::shared_ptr<Brain> brain,
+                                   std::shared_ptr<SimpleWorld> world,
+                                   std::shared_ptr<AgentBrain> agent,
+                                   int steps = 100) {
+        if (!agent || !world) {
+            throw std::runtime_error("Agent and world must be provided");
+        }
+        
+        agent->initialize(*world);
+        
+        for (int step = 0; step < steps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getFiringNeuronCount(),
+            agent->getCuriosityLevel()
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps") = 100,
+       "Run a quick simulation with the provided agent in the world");
 }
 
 } // namespace nlm

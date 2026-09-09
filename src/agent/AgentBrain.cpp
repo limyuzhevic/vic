@@ -2,8 +2,23 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <functional>
 
 namespace nlm {
+
+// Helper function to find all neurons of a specific type
+static std::vector<Neuron*> getNeuronsByType(const Brain* brain, NeuronType type);
+
+// Template function to distribute neurons to groups based on modulo operation
+static void distributeNeurons(const std::vector<Neuron*>& neurons, std::vector<Neuron*>& group1,
+                              std::vector<Neuron*>& group2, std::vector<Neuron*>& group3,
+                              std::vector<Neuron*>& group4, std::vector<Neuron*>& group5,
+                              std::vector<Neuron*>& group6);
+
+// Specialized distribution for sensory neurons (4 groups)
+static void distributeSensoryNeurons(const std::vector<Neuron*>& neurons, std::vector<Neuron*>& group1,
+                                      std::vector<Neuron*>& group2, std::vector<Neuron*>& group3,
+                                      std::vector<Neuron*>& group4);
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
@@ -22,46 +37,79 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
-        }
+        // Helper function to find all neurons of a specific type
+        auto motorNeurons = getNeuronsByType(brain_.get(), NeuronType::Motor);
+        auto sensoryNeurons = getNeuronsByType(brain_.get(), NeuronType::Sensory);
+        
+        // Template function to distribute neurons to 6 action groups
+        distributeNeurons(motorNeurons, motorForward_, motorBackward_, motorTurnLeft_,
+                         motorTurnRight_, motorInteract_, motorWait_);
+        
+        // Specialized distribution for 4 sensory modality groups
+        distributeSensoryNeurons(sensoryNeurons, sensoryVision_, sensoryTouch_,
+                                sensoryInternal_, sensoryProprioception_);
     }
 }
 
 AgentBrain::~AgentBrain() = default;
+
+// Helper function implementation
+static std::vector<Neuron*> getNeuronsByType(const Brain* brain, NeuronType type) {
+    std::vector<Neuron*> neurons;
+    if (!brain) return neurons;
+    
+    for (const auto& region : brain->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == type) {
+                for (Neuron* n : pop->getNeurons()) {
+                    neurons.push_back(n);
+                }
+            }
+        }
+    }
+    
+    return neurons;
+}
+
+// Template function to distribute neurons to groups based on modulo operation
+static void distributeNeurons(const std::vector<Neuron*>& neurons, std::vector<Neuron*>& group1,
+                              std::vector<Neuron*>& group2, std::vector<Neuron*>& group3,
+                              std::vector<Neuron*>& group4, std::vector<Neuron*>& group5,
+                              std::vector<Neuron*>& group6) {
+    for (Neuron* n : neurons) {
+        // Calculate total number of neurons distributed so far
+        size_t idx = group1.size() + group2.size() + group3.size() + group4.size() +
+                     group5.size() + group6.size();
+        
+        // Distribute based on modulo operation
+        switch (idx % 6) {
+            case 0: group1.push_back(n); break;
+            case 1: group2.push_back(n); break;
+            case 2: group3.push_back(n); break;
+            case 3: group4.push_back(n); break;
+            case 4: group5.push_back(n); break;
+            case 5: group6.push_back(n); break;
+        }
+    }
+}
+
+// Specialized distribution for sensory neurons (4 groups)
+static void distributeSensoryNeurons(const std::vector<Neuron*>& neurons, std::vector<Neuron*>& group1,
+                                      std::vector<Neuron*>& group2, std::vector<Neuron*>& group3,
+                                      std::vector<Neuron*>& group4) {
+    for (Neuron* n : neurons) {
+        // Calculate total number of neurons distributed so far
+        size_t idx = group1.size() + group2.size() + group3.size() + group4.size();
+        
+        // Distribute based on modulo operation
+        switch (idx % 4) {
+            case 0: group1.push_back(n); break;
+            case 1: group2.push_back(n); break;
+            case 2: group3.push_back(n); break;
+            case 3: group4.push_back(n); break;
+        }
+    }
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
