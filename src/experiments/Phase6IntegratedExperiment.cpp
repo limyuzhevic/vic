@@ -61,8 +61,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get observation (sensory percept)
+        const SensoryPercept& percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -74,10 +74,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
-        
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        ActionResult result = world.applyMotorCommand(cmd, step * 0.001);
+        float reward = result.reward;
         totalReward += reward;
         
         // Apply reward modulation
@@ -137,13 +135,29 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
             
             if (brain2->load(config.checkpointPath)) {
                 NLM_LOG_INFO("Checkpoint loaded successfully");
-                result.checkpointingWorks = true;
+                
+                // Verify that loaded brain has integrated systems
+                bool memoryOK = (brain2->getWorkingMemory() != nullptr) && 
+                               (brain2->getEpisodicMemory() != nullptr);
+                bool neuromodOK = (brain2->getDopamine() != nullptr);
+                bool predictionOK = (brain2->getPredictionSystem() != nullptr);
+                
+                if (memoryOK && neuromodOK && predictionOK) {
+                    NLM_LOG_INFO("Loaded brain has all integrated systems");
+                    result.checkpointingWorks = true;
+                } else {
+                    NLM_LOG_ERROR("Loaded brain is missing integrated systems");
+                    NLM_LOG_ERROR("Working Memory: " + std::string(memoryOK ? "OK" : "FAIL"));
+                    NLM_LOG_ERROR("Neuromodulation: " + std::string(neuromOK ? "OK" : "FAIL"));
+                    NLM_LOG_ERROR("Prediction: " + std::string(predictionOK ? "OK" : "FAIL"));
+                }
             } else {
                 NLM_LOG_ERROR("Failed to load checkpoint");
             }
         } else {
             NLM_LOG_ERROR("Failed to save checkpoint");
         }
+    }
     }
     
     result.endTime = time(nullptr);
@@ -264,8 +278,15 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
         return false;
     }
     
-    // Run some steps
+    if (!wm || !em) {
+        NLM_LOG_ERROR("Memory systems not available");
+        return false;
+    }
+    
+    // Run some steps with sensory input to engage memory
     for (int i = 0; i < 100; ++i) {
+        // Inject some sensory activity to engage working memory
+        brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f);
         brain->step(i, i * 0.001);
     }
     
@@ -305,10 +326,32 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
         return false;
     }
     
-    // Run some steps with sensory input
+    // Get neuromodulation systems
+    auto* dopamine = brain->getDopamine();
+    auto* curiosity = brain->getCuriosity();
+    auto* novelty = brain->getNovelty();
+    auto* predictionError = brain->getPredictionErrorSignal();
+    
+    if (!dopamine || !curiosity || !novelty || !predictionError) {
+        NLM_LOG_ERROR("Neuromodulation systems not available");
+        return false;
+    }
+    
+    // Run some steps with sensory input to engage neuromodulation
     for (int i = 0; i < 50; ++i) {
         // Inject some sensory activity
         brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f);
+        
+        // Apply some reward to engage dopamine
+        if (i % 10 == 0) {
+            brain->applyNeuromodulation(*dopamine);
+        }
+        
+        // Apply prediction error to engage learning
+        if (i % 5 == 0) {
+            brain->applyNeuromodulation(*predictionError);
+        }
+        
         brain->step(i, i * 0.001);
     }
     
@@ -378,9 +421,27 @@ bool Phase6IntegratedExperiment::testReplay() {
         return false;
     }
     
-    // Run some steps
+    if (!em) {
+        NLM_LOG_ERROR("Episodic memory not available");
+        return false;
+    }
+    
+    // Run some steps with development enabled
     for (int i = 0; i < 200; ++i) {
+        // Inject sensory activity
+        brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f);
+        
+        // Apply reward to engage neuromodulation
+        if (i % 10 == 0) {
+            brain->applyRewardModulation(0.1f, 0.0f);
+        }
+        
         brain->step(i, i * 0.001);
+        
+        // Allow development to affect brain
+        if (i % 100 == 0) {
+            brain->develop();
+        }
     }
     
     // Check if episodes exist for replay

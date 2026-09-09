@@ -187,6 +187,8 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         {MotorCommand::MoveBackward, backwardAct},
         {MotorCommand::TurnLeft, leftAct},
         {MotorCommand::TurnRight, rightAct},
+        {MotorCommand::LookLeft, leftAct},  // Reuse turn activity for LookLeft
+        {MotorCommand::LookRight, rightAct}, // Reuse turn activity for LookRight
         {MotorCommand::Interact, interactAct},
         {MotorCommand::Wait, waitAct}
     };
@@ -201,8 +203,14 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         }
     }
     
+    // Allow higher thresholds for exploration when curiosity is high
+    float actionThreshold = 0.5f;
+    if (curiosityEnabled_ && curiosityLevel_ > 0.8f) {
+        actionThreshold = 0.3f;  // Lower threshold when very curious
+    }
+    
     // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    if (bestActivity < actionThreshold) {
         return MotorCommand::Wait;
     }
     
@@ -217,7 +225,24 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
+            // Better randomness: increase exploration rate and expand choice set
+            if (curiosityLevel_ > 0.3f) {  // Lowered threshold for more exploration
+                // Generate random motor command (0-8 covers all 9 options)
+                int choice = brain_->getRandomGenerator()->uniformInt(0, 8);
+                switch (choice) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::MoveBackward;
+                    case 2: return MotorCommand::TurnLeft;
+                    case 3: return MotorCommand::TurnRight;
+                    case 4: return MotorCommand::LookLeft;
+                    case 5: return MotorCommand::LookRight;
+                    case 6: return MotorCommand::Interact;
+                    case 7: return MotorCommand::Wait;
+                    case 8: return MotorCommand::Interact;  // One more choice for interact
+                }
+            }
+            
+            // Fallback: random choice from original options
             int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
