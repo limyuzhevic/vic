@@ -76,6 +76,10 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Neuron group enumeration for cleaner code
+    enum class MotorGroup { Forward, Backward, TurnLeft, TurnRight, Interact, Wait };
+    enum class SensoryGroup { Vision, Touch, Internal, Proprioception };
+    
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups

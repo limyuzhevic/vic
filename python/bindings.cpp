@@ -362,16 +362,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
              "Get expected motor output size")
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
+             py::arg("percept"), "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
+             py::arg("reward"), py::arg("predictedReward"), "Apply reward-based neuromodulation")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
+             py::arg("timestep"), "Update development system")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
@@ -385,8 +382,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+             py::return_value_policy::reference_internal, "Get the underlying brain")
+        // Configuration
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
@@ -395,31 +392,85 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
              py::arg("enable"))
+        // State checking
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Advanced Pythonic convenience methods
+        .def("createDefaultConfig", [](AgentBrain& self) -> std::shared_ptr<Config> {
+            return std::make_shared<Config>();
+        }, "Create a default configuration")
+        .def("createSimpleWorld", [](AgentBrain& self) -> std::shared_ptr<SimpleWorld> {
+            return std::make_shared<SimpleWorld>();
+        }, "Create a new simple world")
+        .def("createBrainFromConfig", [](AgentBrain& self, const Config& config) -> std::shared_ptr<Brain> {
+            return std::make_shared<Brain>(std::make_shared<Config>(config));
+        }, py::arg("config"), "Create a new brain with given configuration")
+        .def("runEpisode", [](AgentBrain& self, SimpleWorld& world, size_t maxSteps) {
+            self.initialize(world);
+            for (size_t step = 0; step < maxSteps; ++step) {
+                auto percept = world.getSensoryPercept();
+                self.processSensoryInput(percept);
+                auto action = self.decodeMotorCommand();
+                world.applyMotorCommand(action, world.getSimulationTime());
+                world.update(0.001);
+                self.applyRewardModulation(0.0f, 0.0f); // Default zero reward prediction
+                self.updateDevelopment(0.001);
+            }
+        }, py::arg("world"), py::arg("maxSteps"), "Run a complete episode")
+        .def("applyCuriosityReward", [](AgentBrain& self, float reward) {
+            float prediction = self.getNeuromodulationLevel();
+            self.applyRewardModulation(reward, prediction);
+        }, py::arg("reward"), "Apply reward with curiosity-driven prediction")
+        .def("getStateSummary", [](AgentBrain& self) {
+            std::stringstream ss;
+            ss << "AgentBrain State:\n";
+            ss << "  Developmental Stage: " << static_cast<int>(self.getDevelopmentalStage()) << "\n";
+            ss << "  Neuromodulation Level: " << self.getNeuromodulationLevel() << "\n";
+            ss << "  Curiosity Level: " << self.getCuriosityLevel() << "\n";
+            ss << "  Novelty Level: " << self.getNoveltyLevel() << "\n";
+            ss << "  Prediction Error: " << self.getPredictionError() << "\n";
+            ss << "  Reward Modulation: " << (self.isRewardModulationEnabled() ? "Enabled" : "Disabled") << "\n";
+            ss << "  Curiosity: " << (self.isCuriosityEnabled() ? "Enabled" : "Disabled") << "\n";
+            ss << "  Development: " << (self.isDevelopmentEnabled() ? "Enabled" : "Disabled") << "\n";
+            ss << "  Structural Plasticity: " << (self.isStructuralPlasticityEnabled() ? "Enabled" : "Disabled") << "\n";
+            return ss.str();
+        }, "Get a summary of current brain state")
+        .def("exportForPersistence", [](AgentBrain& self) {
+            return std::make_tuple(
+                self.getDevelopmentalStage(),
+                self.getNeuromodulationLevel(),
+                self.getCuriosityLevel(),
+                self.getNoveltyLevel(),
+                self.getPredictionError(),
+                self.getBrain()->getTotalSpikeCount()
+            );
+        }, "Export current state for persistence")
+        .def("getMotorCommandName", [](const MotorCommand cmd) {
+            switch (cmd) {
+                case MotorCommand::MoveForward: return std::string("MoveForward");
+                case MotorCommand::MoveBackward: return std::string("MoveBackward");
+                case MotorCommand::TurnLeft: return std::string("TurnLeft");
+                case MotorCommand::TurnRight: return std::string("TurnRight");
+                case MotorCommand::LookLeft: return std::string("LookLeft");
+                case MotorCommand::LookRight: return std::string("LookRight");
+                case MotorCommand::Interact: return std::string("Interact");
+                case MotorCommand::Wait: return std::string("Wait");
+                default: return std::string("Unknown");
+            }
+        }, py::arg("command"), "Get human-readable name for motor command")
+        .def("getActionFromType", [](const ActionType type) -> std::unique_ptr<Action> {
+            auto action = std::make_unique<Action>();
+            action->setType(type);
+            return action;
+        }, py::arg("type"), "Create an action from action type");
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    // Note: createDefaultConfig, createBrain, createSimpleWorld, and createAgentBrain
+    // are already defined as methods on AgentBrain class for convenience.
+    // The global versions above are kept for backward compatibility.
+    
+    m.attr("__version__") = "0.1.0";
 }
 
 } // namespace nlm
