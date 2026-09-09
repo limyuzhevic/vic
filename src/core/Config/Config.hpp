@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -28,7 +29,31 @@ enum class ConfigSource {
     Default,
     File,
     CommandLine,
+    Environment,
     Runtime
+};
+
+// Configuration validation result
+struct ValidationResult {
+    bool valid;
+    std::string errorMessage;
+    
+    ValidationResult() : valid(true), errorMessage() {}
+    ValidationResult(bool v, const std::string& msg) : valid(v), errorMessage(msg) {}
+};
+
+// Configuration schema definition
+struct ConfigSchema {
+    std::string key;
+    ConfigSource defaultSource;
+    std::string defaultValue;
+    std::string description;
+    bool required;
+    
+    ConfigSchema(const std::string& k = "", ConfigSource src = ConfigSource::Default,
+                 const std::string& defVal = "", const std::string& desc = "",
+                 bool req = false)
+        : key(k), defaultSource(src), defaultValue(defVal), description(desc), required(req) {}
 };
 
 // Configuration entry
@@ -61,7 +86,10 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Load from environment variables
+    void loadFromEnv(const std::string& prefix = "NLM_");
+    
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -71,7 +99,7 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
@@ -90,8 +118,20 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
+    // Get configuration summary with validation
     std::string summary() const;
+    
+    // Validate configuration against schema
+    bool validate() const;
+    
+    // Get configuration schema validation errors
+    std::string getValidationErrors() const;
+    
+    // Add default configuration schema entry
+    static void addDefault(const std::string& key, ConfigSource source, const std::string& value, const std::string& description);
+    
+    // Get all default keys
+    static std::vector<std::string> getDefaultKeys();
     
 private:
     struct Impl;
@@ -100,6 +140,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool parseJSONValue(const std::string& value, ConfigValue& outValue);
+    static std::string configValueToString(const ConfigValue& value);
 };
 
 } // namespace nlm
