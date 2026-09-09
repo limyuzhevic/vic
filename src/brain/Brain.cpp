@@ -32,6 +32,34 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<class NeuralSemanticMemory> semanticMemory;
+    std::unique_ptr<class NeuralProceduralMemory> proceduralMemory;
+    
+    // ========== REAL NEUROMODULATION SYSTEMS ==========
+    std::unique_ptr<class Acetylcholine> acetylcholine;
+    std::unique_ptr<class Norepinephrine> norepinephrine;
+    std::unique_ptr<class Serotonin> serotonin;
+    
+    // ========== INTEGRATED COGNITION SYSTEMS (Phase 6) ==========
+    std::unique_ptr<class MotorSystem> motorSystem;
+    std::unique_ptr<class AttentionalSelection> attention;
+    std::unique_ptr<class NeuralPlanner> planner;
+    std::unique_ptr<class ConceptFormation> conceptFormation;
+    
+    // ========== INTEGRATED PREDICTION SYSTEM ==========
+    std::unique_ptr<class PredictionSystem> predictionSystem;
+    
+    // ========== PHASES 3-5 EXPERIMENT SYSTEMS ==========
+    std::unique_ptr<class Phase3Experiment> phase3Experiment;
+    std::unique_ptr<class Phase4Experiment> phase4Experiment;
+    std::unique_ptr<class Phase5Experiment> phase5Experiment;
+    
+    // ========== PERFORMANCE AND PERSISTENCE ==========
+    std::unique_ptr<class SpikeSystem> spikeSystem;
+    std::unique_ptr<class STDP> stdp;
+    std::unique_ptr<class Hebbian> hebbian;
+    std::unique_ptr<class StructuralPlasticity> structuralPlasticity;
+    std::unique_ptr<class CheckpointManager> checkpointManager;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -830,12 +858,17 @@ bool Brain::save(const std::string& filepath) const {
         
         // Finalize
         if (!writer.finalize()) {
-            NLM_LOG_ERROR("Failed to finalize checkpoint");
+            NLM_LOG_ERROR("Failed to finalize checkpoint file");
             return false;
         }
         
-        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
+        NLM_LOG_INFO("Brain state saved successfully to " + filepath);
         return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+        return false;
+    }
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
