@@ -75,12 +75,28 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 2 Demo (Real Neural Computation Test)
 ```bash
-./nlm_phase6_demo
+./nlm
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs Phase 2 which demonstrates real LIF neuron dynamics, event-driven spike propagation, STDP and Hebbian plasticity, and structural plasticity.
+
+### Phase 3 Demo
+```bash
+./nlm_phase3_demo
+```
+
+This demonstrates world interaction with sensory input, motor output, and reward prediction error.
+
+### Phase 4 Demo
+```bash
+./nlm_phase4_demo
+```
+
+This demonstrates emerging cognition including attention, planning, working memory, episodic memory, concept formation, and self-model.
+
+**Note**: Phase 6 integration testing is implemented in the Phase4Experiment framework and can be run through the experiment API.
 
 ## Project Structure
 
