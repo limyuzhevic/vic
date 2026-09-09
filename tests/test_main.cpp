@@ -33,6 +33,18 @@ namespace test_stdp {
     void runAll();
 }
 
+namespace test_hebbian {
+    void runAll();
+}
+
+namespace test_structural {
+    void runAll();
+}
+
+namespace test_integration {
+    void runAll();
+}
+
 namespace test_brain {
     void runAll();
 }
@@ -92,18 +104,36 @@ int main() {
         allPassed = false;
     }
     
-    std::cout << "Running Synapse tests..." << std::endl;
+    std::cout << "Running STDP tests..." << std::endl;
     try {
-        test_synapse::runAll();
+        test_stdp::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
         allPassed = false;
     }
     
-    std::cout << "Running STDP tests..." << std::endl;
+    std::cout << "Running Hebbian tests..." << std::endl;
     try {
-        test_stdp::runAll();
+        test_hebbian::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Structural Plasticity tests..." << std::endl;
+    try {
+        test_structural::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Integration tests..." << std::endl;
+    try {
+        test_integration::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

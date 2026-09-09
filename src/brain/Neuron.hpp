@@ -122,6 +122,9 @@ public:
     const std::vector<SynapseHandle>& getIncomingSynapses() const;
     const std::vector<SynapseHandle>& getOutgoingSynapses() const;
     
+    // Membrane capacitance (constant for LIF)
+    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
+    
     // Plasticity state
     const PlasticityFlags& getPlasticityFlags() const;
     PlasticityFlags& getPlasticityFlags();
@@ -134,7 +137,6 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state

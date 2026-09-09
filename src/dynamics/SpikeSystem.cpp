@@ -49,8 +49,24 @@ void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
 }
 
 void SpikeSystem::processSpikes(SimulationStep currentStep) {
-    // Process all pending immediate spikes
-    while (!pImpl->pendingSpikes.empty()) {
+    // Batch process all pending spikes - minimize queue operations
+    if (pImpl->pendingSpikes.empty()) {
+        return;
+    }
+    
+    // Pre-allocate temporary buffers for better memory locality
+    std::vector<DetailedSpikeEvent> detailedEvents;
+    std::vector<std::pair<uint64_t, size_t>> countsToProcess;
+    detailedEvents.reserve(std::min(pImpl->pendingSpikes.size(), 
+                                    static_cast<size_t>(pImpl->maxHistorySize)));
+    countsToProcess.reserve(pImpl->pendingSpikes.size());
+    
+    // Extract all events at once to minimize queue pops
+    size_t maxEventsToProcess = std::min(pImpl->pendingSpikes.size(), 
+                                        static_cast<size_t>(pImpl->maxHistorySize - pImpl->spikeHistory.size()));
+    
+    // Process events in batches
+    for (size_t i = 0; i < maxEventsToProcess; ++i) {
         SpikeEvent event = pImpl->pendingSpikes.front();
         pImpl->pendingSpikes.pop();
         
@@ -60,35 +76,80 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         detailed.timestamp = event.timestamp;
         detailed.step = event.step;
         
-        // Add to history
-        pImpl->spikeHistory.push_back(detailed);
-        
-        // Track spike count per neuron
-        pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
-        
-        // Trim history if needed
-        if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+        detailedEvents.push_back(detailed);
+        countsToProcess.push_back(std::make_pair(event.source_neuron.value, 1));
+    }
+    
+    // Update statistics and history in batch - use vector insert for contiguous memory
+    pImpl->spikeHistory.insert(pImpl->spikeHistory.end(), 
+                              detailedEvents.begin(), detailedEvents.end());
+    
+    // Merge spike counts efficiently - use optimized merging for small datasets
+    if (countsToProcess.size() <= 32) {
+        // For small numbers, use simple loop for better performance
+        for (const auto& pair : countsToProcess) {
+            pImpl->spikeCountPerNeuron[pair.first] += pair.second;
         }
+    } else {
+        // For larger numbers, sort and merge duplicates if any
+        std::sort(countsToProcess.begin(), countsToProcess.end());
+        uint64_t currentNeuron = UINT64_MAX;
+        size_t countSum = 0;
         
-        // Call handlers
-        for (auto& handler : pImpl->handlers) {
-            handler(detailed);
+        for (const auto& pair : countsToProcess) {
+            if (pair.first != currentNeuron) {
+                if (currentNeuron != UINT64_MAX) {
+                    pImpl->spikeCountPerNeuron[currentNeuron] += countSum;
+                }
+                currentNeuron = pair.first;
+                countSum = pair.second;
+            } else {
+                countSum += pair.second;
+            }
+        }
+        if (currentNeuron != UINT64_MAX) {
+            pImpl->spikeCountPerNeuron[currentNeuron] += countSum;
+        }
+    }
+    
+    // Trim history if needed - use efficient erase with move operations
+    if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
+        size_t excess = pImpl->spikeHistory.size() - pImpl->maxHistorySize;
+        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin(), 
+                                 pImpl->spikeHistory.begin() + excess);
+    }
+    
+    // Call handlers - batch processing for better cache locality
+    for (auto& handler : pImpl->handlers) {
+        for (const auto& event : detailedEvents) {
+            handler(event);
         }
     }
 }
 
 void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime) {
-    // Find and process all delayed spikes scheduled for this step
+    // Batch process delayed spikes for better cache performance
     auto it = pImpl->delayedSpikes.find(currentStep);
     if (it != pImpl->delayedSpikes.end()) {
-        // Process all spikes scheduled for this step
-        for (const auto& delayedEvent : it->second) {
-            // Call delayed spike handlers (these will deliver synaptic input)
-            for (auto& handler : pImpl->delayedHandlers) {
+        // Pre-load handler lists for better locality
+        const std::vector<DelayedSpikeHandler>& delayedHandlers = pImpl->delayedHandlers;
+        
+        // Process all spikes scheduled for this step in batch
+        if (it->second.size() == 1) {
+            // Single spike optimization - direct access
+            const DelayedSpikeEvent& delayedEvent = it->second[0];
+            for (const auto& handler : delayedHandlers) {
                 handler(delayedEvent);
             }
+        } else {
+            // Multiple spikes - process in batch
+            for (const auto& delayedEvent : it->second) {
+                for (const auto& handler : delayedHandlers) {
+                    handler(delayedEvent);
+                }
+            }
         }
+        
         // Remove processed spikes
         pImpl->delayedSpikes.erase(it);
     }
