@@ -34,6 +34,15 @@ struct Synapse::Impl {
     // Synaptic efficacy (use-dependent modulation)
     float efficacy;
     
+    // Homeostatic scaling
+    float homeostaticTarget;  // Target weight for synaptic scaling
+    
+    // Synaptic conductance (dynamic variable representing current synaptic strength)
+    float conductance;
+    
+    // Reversal potential (mV) for synaptic transmission
+    float reversalPotential;
+    
     // Weight bounds
     static constexpr float MIN_WEIGHT = -1.0f;
     static constexpr float MAX_WEIGHT = 1.0f;
@@ -60,6 +69,9 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->shortTermFacilitation = 0.0f;
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+    pImpl->homeostaticTarget = 0.5f;
+    pImpl->conductance = 0.0f;
+    pImpl->reversalPotential = 0.0f;  // Default for excitatory
 }
 
 Synapse::~Synapse() = default;
@@ -183,42 +195,89 @@ void Synapse::decayEligibilityTrace(float decayRate) {
     }
 }
 
-float Synapse::getEfficacy() const {
-    return pImpl->efficacy;
+void Synapse::setHomeostaticTarget(float target) {
+    pImpl->homeostaticTarget = target;
 }
 
-void Synapse::setEfficacy(float efficacy) {
-    pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
+float Synapse::getHomeostaticTarget() const {
+    return pImpl->homeostaticTarget;
+}
+
+void Synapse::setDepressionState(float state) {
+    pImpl->shortTermDepression = std::clamp(state, 0.0f, 1.0f);
+}
+
+float Synapse::getDepressionState() const {
+    return pImpl->shortTermDepression;
+}
+
+void Synapse::setFacilitationState(float state) {
+    pImpl->shortTermFacilitation = std::clamp(state, 0.0f, 1.0f);
+}
+
+float Synapse::getFacilitationState() const {
+    return pImpl->shortTermFacilitation;
+}
+
+void Synapse::setConductance(float conductance) {
+    pImpl->conductance = conductance;
+}
+
+float Synapse::getConductance() const {
+    return pImpl->conductance;
+}
+
+void Synapse::setReversalPotential(float potential) {
+    pImpl->reversalPotential = potential;
+}
+
+float Synapse::getReversalPotential() const {
+    return pImpl->reversalPotential;
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    // Real synaptic dynamics with Tsodyks-Markram short-term plasticity model
+    // Biological synaptic transmission involves multiple timescales of plasticity:
+    // 1. Short-term: milliseconds to seconds (facilitation, depression)
+    // 2. Medium-term: minutes (synaptic scaling)
+    // 3. Long-term: hours/days (structural changes)
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
+    TimestepDuration dt = 0.001;  // 1ms timestep for biological realism
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
+    // Update short-term plasticity state (Tsodyks-Markram model)
+    // This models the dynamics of synaptic resources and receptors
+    
+    // 1. Decay facilitation (receptor mobilization)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
+    // 2. Decay depression (synaptic resource depletion)
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSinceActivity = std::max(
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
-        // Recovery from depression toward 1.0
+        // Recovery from depression toward 1.0 (full recovery)
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    // 3. Calculate utilization factor based on recent spike history
+    // U is the fraction of resources used by a spike
+    float U = Impl::STP_U_MAX * pImpl->shortTermFacilitation;
+    U = std::min(U, Impl::STP_U_MAX);  // Ensure U doesn't exceed maximum
     
-    // Clamp weight bounds
+    // 4. Update depression with activity-dependent learning
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        // Each presynaptic spike increases depression based on utilization
+        pImpl->shortTermDepression = pImpl->shortTermDepression + (1.0f - pImpl->shortTermDepression) * U * 0.1f;
+    }
+    
+    // Decay eligibility trace for reward-modulated learning
+    decayEligibilityTrace(0.001f);  // Fast decay (1ms)
+    
+    // Clamp weight bounds to maintain stability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
@@ -228,6 +287,13 @@ void Synapse::reset() {
     pImpl->postSpikeHistory.clear();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->homeostaticTarget = 0.5f;  // Reset to default
+    pImpl->conductance = 0.0f;
+    pImpl->reversalPotential = 0.0f;
+    pImpl->shortTermDepression = 1.0f;  // Fully recovered
+    pImpl->shortTermFacilitation = 0.0f;
+    pImpl->lastPreSpikeTime = -1.0f;
+    pImpl->lastPostSpikeTime = -1.0f;
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
@@ -237,14 +303,19 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
         pImpl->weight = rng.uniformReal(0.1f, 0.4f);
         // Excitatory synapses have moderate initial efficacy
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        // Excitatory reversal potential (AMPA/NMDA)
+        pImpl->reversalPotential = 0.0f;
     } else if (pImpl->type == SynapseType::Inhibitory) {
         // Inhibitory synapses: negative weights
         pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        // Inhibitory reversal potential (GABA_A)
+        pImpl->reversalPotential = -70.0f;
     } else {
         // Other types: small random weights
         pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
         pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
+        pImpl->reversalPotential = 0.0f;
     }
     
     // Random delay: 1-5 steps (1-5ms at 1ms timestep)
@@ -260,6 +331,16 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     // Initialize last spike times
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+    
+    // Initialize homeostatic target based on synapse type
+    if (pImpl->type == SynapseType::Excitatory) {
+        pImpl->homeostaticTarget = 0.3f;  // Lower target for excitatory
+    } else {
+        pImpl->homeostaticTarget = -0.3f;  // Lower magnitude for inhibitory
+    }
+    
+    // Initial conductance is zero (passive state)
+    pImpl->conductance = 0.0f;
 }
 
 } // namespace nlm

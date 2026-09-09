@@ -1,4 +1,5 @@
 #include "PlasticityRule.hpp"
+#include <cmath>
 
 namespace nlm {
 
@@ -24,26 +25,34 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
+    // Implement real Hebbian learning based on spike timing
+    // Delta w ∝ pre_spike × post_spike (correlational learning)
     
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
+    // Calculate spike correlation with temporal precision
+    float correlation = 0.0f;
     for (Timestamp pre : preSpikes) {
         for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
-            }
+            // Exponential decay of correlation with time difference
+            float timeDiff = static_cast<float>(std::abs(post - pre));
+            float temporalFactor = std::exp(-timeDiff / 20.0f);  // 20ms time constant
+            correlation += temporalFactor;
         }
     }
     
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
+    // Normalize by total possible correlations
+    float maxCorrelations = static_cast<float>(preSpikes.size()) * static_cast<float>(postSpikes.size());
+    if (maxCorrelations > 0.0f) {
+        correlation /= maxCorrelations;
+    }
+    
+    // Apply weight change based on correlation
+    if (correlation > 0.0f) {
+        float weightChange = pImpl->learningRate * correlation * dt;
+        applyWeightChange(synapse, weightChange);
     }
 }
 

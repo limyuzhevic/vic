@@ -1,5 +1,4 @@
-#pragma once
-
+#include "../core/checkpoint_validation.h"
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
@@ -8,6 +7,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <chrono>
 
 namespace nlm {
 
@@ -196,6 +196,14 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Private helper methods for checkpointing
+    bool saveNeuronsToCheckpoint(NeuronCheckpointData& data) const;
+    bool saveSynapsesToCheckpoint(SynapseCheckpointData& data) const;
+    bool applyCheckpointNeurons(const NeuronCheckpointData& data);
+    bool applyCheckpointSynapses(const SynapseCheckpointData& data);
+    bool validateCheckpointConfiguration() const;
+    uint64_t estimateCheckpointSize() const;
 };
 
 } // namespace nlm

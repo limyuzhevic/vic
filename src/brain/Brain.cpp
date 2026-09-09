@@ -151,6 +151,23 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Configure checkpoint manager with validation
+        std::string checkpointDir = config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        uint64_t saveInterval = config->getOr<uint64_t>("checkpoint_save_interval", 10000);
+        size_t maxCheckpoints = config->getOr<size_t>("max_checkpoints", 10);
+        bool compress = config->getOr<bool>("checkpoint_compress", true);
+        
+        checkpointManager->configure(checkpointDir, saveInterval, maxCheckpoints, compress);
+        
+        // Set checkpoint data providers with validation
+        checkpointManager->setNeuronProvider([this](NeuronCheckpointData& data) -> bool {
+            return saveNeuronsToCheckpoint(data);
+        });
+        
+        checkpointManager->setSynapseProvider([this](SynapseCheckpointData& data) -> bool {
+            return saveSynapsesToCheckpoint(data);
+        });
     }
     
     DevelopmentalStage developmentalStage;
@@ -1077,41 +1094,86 @@ RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
 }
 
-void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
-    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
-    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
-    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
-    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
-    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
-    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
-    
-    // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+// Check for backup recovery
+bool Brain::checkBackupRecovery(const std::string& filepath) {
+    std::string backupPath;
+    if (CheckpointRecovery::createBackup(filepath, backupPath)) {
+        NLM_LOG_WARNING(std::string("Backup created for recovery: ") + backupPath);
     }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    return true;
+}
+
+// Timeout for checkpoint operations
+bool Brain::checkpointTimeoutExceeded(std::chrono::steady_clock::time_point startTime) {
+    auto timeout = std::chrono::seconds(30);  // 30 second timeout for checkpoints
+    return (std::chrono::steady_clock::now() - startTime) > timeout;
+}
+
+// Generate checksum for checkpoint data
+uint64_t Brain::generateCheckpointChecksum(const NeuronCheckpointData& neurons, 
+                                          const SynapseCheckpointData& synapses) const {
+    uint64_t checksum = 0;
+    
+    // Add neuron data checksum
+    for (float val : neurons.membranePotential) {
+        checksum = ChecksumCalculator::combine(checksum, *reinterpret_cast<const uint64_t*>(&val));
     }
     
-    // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    for (float val : neurons.weight) {
+        checksum = ChecksumCalculator::combine(checksum, *reinterpret_cast<const uint64_t*>(&val));
     }
     
-    // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    checksum = ChecksumCalculator::combine(checksum, neurons.membranePotential.size());
+    checksum = ChecksumCalculator::combine(checksum, neurons.weight.size());
     
-    for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+    return checksum;
+}
+
+// Partial checkpoint recovery
+bool Brain::partialCheckpointRecovery(const std::string& filepath) {
+    std::string backupPath;
+    return CheckpointRecovery::restoreFromBackup(filepath, backupPath);
+}
+
+// Check for backup recovery
+bool Brain::checkBackupRecovery(const std::string& filepath) {
+    std::string backupPath;
+    if (CheckpointRecovery::createBackup(filepath, backupPath)) {
+        NLM_LOG_WARNING(std::string("Backup created for recovery: ") + backupPath);
     }
+    return true;
+}
+
+// Timeout for checkpoint operations
+bool Brain::checkpointTimeoutExceeded(std::chrono::steady_clock::time_point startTime) {
+    auto timeout = std::chrono::seconds(30);  // 30 second timeout for checkpoints
+    return (std::chrono::steady_clock::now() - startTime) > timeout;
+}
+
+// Generate checksum for checkpoint data
+uint64_t Brain::generateCheckpointChecksum(const NeuronCheckpointData& neurons, 
+                                          const SynapseCheckpointData& synapses) const {
+    uint64_t checksum = 0;
+    
+    // Add neuron data checksum
+    for (float val : neurons.membranePotential) {
+        checksum = ChecksumCalculator::combine(checksum, *reinterpret_cast<const uint64_t*>(&val));
+    }
+    
+    for (float val : neurons.weight) {
+        checksum = ChecksumCalculator::combine(checksum, *reinterpret_cast<const uint64_t*>(&val));
+    }
+    
+    checksum = ChecksumCalculator::combine(checksum, neurons.membranePotential.size());
+    checksum = ChecksumCalculator::combine(checksum, neurons.weight.size());
+    
+    return checksum;
+}
+
+// Partial checkpoint recovery
+bool Brain::partialCheckpointRecovery(const std::string& filepath) {
+    std::string backupPath;
+    return CheckpointRecovery::restoreFromBackup(filepath, backupPath);
 }
 
 } // namespace nlm

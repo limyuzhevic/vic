@@ -70,6 +70,25 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
+    // Synaptic homeostasis parameters
+    float getHomeostaticTarget() const;
+    void setHomeostaticTarget(float target);
+    
+    // Short-term plasticity states
+    float getDepressionState() const;
+    void setDepressionState(float state);
+    
+    float getFacilitationState() const;
+    void setFacilitationState(float state);
+    
+    // Synaptic conductance (dynamic variable)
+    float getConductance() const;
+    void setConductance(float conductance);
+    
+    // Synaptic reversal potential (mV)
+    float getReversalPotential() const;
+    void setReversalPotential(float potential);
+    
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);

@@ -22,56 +22,48 @@ void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& preSpikes,
                       const std::vector<Timestamp>& postSpikes,
                       TimestepDuration dt) {
-    /*
-     * Real Hebbian learning implementation
-     * 
-     * Mathematical formulation (Covariance rule):
-     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
-     * 
-     * Simplified version for spike-based systems:
-     * Δw = η * (coactivity - baseline)
-     * 
-     * Where:
-     *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
-     * 
-     * Biological inspiration:
-     *   - Reflects AMPA receptor trafficking
-     *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
-     *   - Correlation-based learning in visual cortex
-     *   
-     * Limitations:
-     *   - Doesn't account for STDP timing details
-     *   - Single learning rate (no separate potentiation/depression rates)
-     *   - Assumes stationary statistics
-     */
+    // Implement real Hebbian learning based on spike timing
+    // Delta w ∝ pre_spike × post_spike (correlational learning)
     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
-            }
+    // Calculate spike correlation with temporal precision
+    float correlation = 0.0f;
+    for (Timestamp pre : preSpikes) {
+        for (Timestamp post : postSpikes) {
+            // Exponential decay of correlation with time difference
+            float timeDiff = static_cast<float>(std::abs(post - pre));
+            float temporalFactor = std::exp(-timeDiff / 20.0f);  // 20ms time constant
+            correlation += temporalFactor;
         }
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    // Normalize by total possible correlations
+    float maxCorrelations = static_cast<float>(preSpikes.size()) * static_cast<float>(postSpikes.size());
+    if (maxCorrelations > 0.0f) {
+        correlation /= maxCorrelations;
+    }
     
-    // Apply with bounds
-    if (std::abs(delta) > 1e-6f) {
-        applyWeightChange(synapse, delta);
+    // Apply weight change based on correlation
+    if (correlation > 0.0f) {
+        float weightChange = pImpl->learningRate * correlation * dt;
+        applyWeightChange(synapse, weightChange);
+    }
+    
+    // Apply homeostatic scaling to prevent runaway potentiation
+    float currentWeight = std::abs(synapse->getWeight());
+    float targetWeight = pImpl->covarianceThreshold > 0.0f ? pImpl->covarianceThreshold : 0.5f;
+    
+    // Scale if current weight deviates too much from target
+    if (currentWeight > 0.0f) {
+        float scaleFactor = targetWeight / currentWeight;
+        if (scaleFactor < 0.8f || scaleFactor > 1.2f) {
+            // Apply synaptic scaling with learning rate
+            float homeostaticDelta = (targetWeight - currentWeight) * 0.01f * dt;
+            applyWeightChange(synapse, homeostaticDelta);
+        }
     }
 }
 
