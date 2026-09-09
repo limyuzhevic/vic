@@ -31,16 +31,17 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
+// Statistics structure for configuration analysis
+struct ConfigStats {
+    size_t totalEntries = 0;
+    std::map<int, size_t> entriesBySource;  // Source -> count
+    std::map<std::string, size_t> typeCounts;  // Type name -> count
+};
+
+// Batch operations struct for efficient key-value operations
+struct BatchOperation {
+    std::vector<std::pair<std::string, ConfigValue>> keyValues;
     ConfigSource source;
-    std::string description;
-    
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
 };
 
 // Main configuration class
@@ -90,8 +91,14 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Batch operations
+    void batch_set(const std::vector<std::pair<std::string, ConfigValue>>& keyValues, 
+                  ConfigSource source = ConfigSource::Runtime);
+    std::vector<std::optional<ConfigValue>> batch_get(const std::vector<std::string>& keys) const;
+    void batch_remove(const std::vector<std::string>& keys);
+    
+    // Configuration statistics
+    ConfigStats get_batch_stats() const;
     
 private:
     struct Impl;

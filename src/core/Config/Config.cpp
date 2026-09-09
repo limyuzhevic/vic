@@ -12,11 +12,27 @@ struct Config::Impl {
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
-Config::~Config() = default;
+// Move constructor with proper resource transfer
+Config::Config(Config&& other) noexcept : pImpl(std::move(other.pImpl)) {
+    other.pImpl = nullptr;
+}
 
-Config::Config(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept {
+    if (this != &other) {
+        // Clear current resources first
+        clear();
+        
+        // Move resources from other
+        pImpl = std::move(other.pImpl);
+        other.pImpl = nullptr;
+    }
+    return *this;
+}
 
-Config& Config::operator=(Config&&) noexcept = default;
+// Explicit destructor to ensure cleanup
+Config::~Config() {
+    clear();
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
@@ -38,8 +54,8 @@ bool Config::loadFromFile(const std::string& filepath) {
         // Parse simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+            std::string key = Config::trim(line.substr(0, pos));
+            std::string value = Config::trim(line.substr(pos + 1));
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -147,25 +163,63 @@ bool Config::has(const std::string& key) const {
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+// Add batch_set method for efficient setting of multiple values
+void Config::batch_set(const std::vector<std::pair<std::string, ConfigValue>>& keyValues, ConfigSource source) {
+    for (const auto& kv : keyValues) {
+        set(kv.first, kv.second, source);
     }
-    return keys;
 }
 
-void Config::clear() {
-    pImpl->entries.clear();
+// Add batch_get method for efficient retrieval of multiple values
+std::vector<std::optional<ConfigValue>> Config::batch_get(const std::vector<std::string>& keys) const {
+    std::vector<std::optional<ConfigValue>> results;
+    results.reserve(keys.size());
+    
+    for (const auto& key : keys) {
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it != pImpl->entries.end()) {
+            results.push_back(it->value);
+        } else {
+            results.push_back(std::nullopt);
+        }
+    }
+    
+    return results;
+}
+
+// Add batch_remove method for efficient removal of multiple keys
+void Config::batch_remove(const std::vector<std::string>& keys) {
+    for (const auto& key : keys) {
+        remove(key);
+    }
+}
+
+// Add get_batch_stats method to get statistics about configuration
+ConfigStats Config::get_batch_stats() const {
+    ConfigStats stats;
+    stats.totalEntries = pImpl->entries.size();
+    
+    // Count by source
+    for (const auto& entry : pImpl->entries) {
+        stats.entriesBySource[static_cast<int>(entry.source)]++;
+        
+        // Type counts
+        if (std::holds_alternative<int>(entry.value)) {
+            stats.typeCounts["int"]++;
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            stats.typeCounts["int64_t"]++;
+        } else if (std::holds_alternative<double>(entry.value)) {
+            stats.typeCounts["double"]++;
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            stats.typeCounts["bool"]++;
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            stats.typeCounts["std::string"]++;
+        }
+    }
+    
+    return stats;
 }
 
 std::string Config::summary() const {
