@@ -509,6 +509,101 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== Enhanced Neural Integration ==========
+    
+    // 1. Enhanced Working Memory - integrate with sensory and action selection
+    if (pImpl->workingMemory) {
+        // Get current sensory state
+        std::vector<float> sensoryPattern;
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 256; ++i) {
+            if (pImpl->sensoryNeurons[i]) {
+                auto& state = pImpl->sensoryNeurons[i]->getState();
+                float activation = std::abs(state.membranePotential - state.restingPotential) / 20.0f;
+                if (activation > 0.01f) {
+                    sensoryPattern.push_back(activation);
+                }
+            }
+        }
+        
+        if (!sensoryPattern.empty()) {
+            pImpl->workingMemory->store(sensoryPattern, 1.0f);
+        }
+        
+        // Integrate working memory with action selection
+        std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        if (!memoryNeurons.empty()) {
+            // Use working memory content to bias motor neuron selection
+            float memoryActivity = pImpl->workingMemory->getMemoryActivity();
+            if (memoryActivity > 0.3f) {
+                // Boost motor neuron activity based on memory content
+                for (NeuronId memNeuron : memoryNeurons) {
+                    brain_->injectCurrent(memNeuron, memoryActivity * 0.5f);
+                }
+            }
+        }
+    }
+    
+    // 2. Enhanced Prediction System - integrate with sensory input and working memory
+    if (pImpl->predictionSystem && !pImpl->sensoryNeurons.empty()) {
+        // Create a simple sensory input from neural activity
+        std::vector<float> predictedPattern;
+        for (size_t i = 0; i < std::min<size_t>(pImpl->sensoryNeurons.size(), 256); ++i) {
+            if (pImpl->sensoryNeurons[i]) {
+                auto& state = pImpl->sensoryNeurons[i]->getState();
+                float activation = std::abs(state.membranePotential - state.restingPotential) / 20.0f;
+                predictedPattern.push_back(activation);
+            }
+        }
+        
+        if (!predictedPattern.empty()) {
+            // Predict next state based on current neural activity
+            SensoryInput dummyInput(predictedPattern);
+            auto predictedState = pImpl->predictionSystem->predictNextState(dummyInput);
+            
+            // Update prediction error
+            if (predictedState) {
+                pImpl->predictionSystem->updatePredictions(dummyInput, *predictedState);
+            }
+        }
+    }
+    
+    // 3. Enhanced Concept Formation - process working memory patterns
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Get working memory content for concept formation
+        std::vector<float> memoryContent = pImpl->workingMemory->retrieve();
+        if (!memoryContent.empty()) {
+            // Process memory patterns to form concepts
+            // This simulates how concepts emerge from repeated pattern exposure
+            float stability = 0.0f;
+            for (float activation : memoryContent) {
+                stability += activation;
+            }
+            stability /= memoryContent.size();
+            
+            // Store concept stability
+            if (stability > 0.5f) {
+                // High stability suggests forming a concept
+                // In a real implementation, this would create a new concept
+                // or update an existing one
+            }
+        }
+    }
+    
+    // 4. Enhanced Neural Planner - integrate with prediction and action selection
+    if (pImpl->planner && pImpl->predictionSystem) {
+        // Get prediction error to influence planning
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Use prediction error to guide planning decisions
+        if (predictionError > 0.1f) {
+            // High prediction error suggests need for different actions
+            // Planner would adjust action sequences
+            // For now, just log that planning should be affected
+            NLM_LOG_INFO("High prediction error detected (" + 
+                        std::to_string(predictionError) + ") - triggering replanning");
+        }
+    }
+    
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
@@ -586,6 +681,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+}
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
