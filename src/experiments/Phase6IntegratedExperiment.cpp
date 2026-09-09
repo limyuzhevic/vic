@@ -1,3 +1,4 @@
+// Include SimpleWorld.hpp and additional headers for methods used
 #include "Phase6IntegratedExperiment.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
@@ -6,6 +7,39 @@
 #include "../agent/AgentBrain.hpp"
 #include <chrono>
 #include <cmath>
+
+// Include additional headers for methods used
+#include "../agent/SensoryPercept.hpp"
+#include "../agent/AgentBody.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../motor/Action.hpp"
+
+// Define helper functions for world integration
+double SimpleWorldGetCurrentTime(const SimpleWorld& world) {
+    return world.getSimulationTime();
+}
+
+MotorCommand AgentBrainDecodeMotorCommand(AgentBrain& agent) {
+    return agent.decodeMotorCommand();
+}
+
+float SimpleWorldGetSensoryInputValue(const SimpleWorld& world, const Brain* brain) {
+    const auto& percept = world.getSensoryPercept();
+    const auto& vision = percept.getVision();
+    
+    if (vision.empty()) {
+        return 0.0f;
+    }
+    
+    float total = 0.0f;
+    for (float v : vision) {
+        total += v;
+    }
+    
+    return total / vision.size();
+}
+#include "../agent/AgentBody.hpp"
+#include "../sensory/SensoryInput.hpp"
 
 namespace nlm {
 

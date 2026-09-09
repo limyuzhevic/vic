@@ -6,14 +6,17 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Dopamine.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -99,6 +102,7 @@ struct Brain::Impl {
             seed = *seedOpt;
         }
         rng = std::make_unique<RandomGenerator>(seed);
+        developmentalStage = DevelopmentalStage::Initial;
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
