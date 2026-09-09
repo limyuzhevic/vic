@@ -111,13 +111,27 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
+    // Test individual integration components
+    bool integrationVerified = verifyIntegration();
+    bool memoryTested = testMemoryIntegration();
+    bool neuromodulationTested = testNeuromodulationIntegration();
+    bool checkpointTested = testCheckpointing();
+    bool replayTested = testReplay();
+    
+    // Log test results
+    NLM_LOG_INFO("Integration verification: " + std::string(integrationVerified ? "PASS" : "FAIL"));
+    NLM_LOG_INFO("Memory integration test: " + std::string(memoryTested ? "PASS" : "FAIL"));
+    NLM_LOG_INFO("Neuromodulation test: " + std::string(neuromodulationTested ? "PASS" : "FAIL"));
+    NLM_LOG_INFO("Checkpointing test: " + std::string(checkpointTested ? "PASS" : "FAIL"));
+    NLM_LOG_INFO("Replay test: " + std::string(replayTested ? "PASS" : "FAIL"));
+
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
-    
+
     NLM_LOG_INFO("=== Integration Verification ===");
     NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
