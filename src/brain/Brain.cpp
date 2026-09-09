@@ -406,6 +406,130 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
+    // ========== STEP 5: Update prediction system ==========
+    if (pImpl->predictionSystem && pImpl->sensoryNeurons.size() > 0) {
+        // Get current sensory state by extracting input from sensory neurons
+        std::vector<float> sensoryData;
+        for (size_t i = 0; i < std::min(pImpl->sensoryNeurons.size(), static_cast<size_t>(3)); ++i) {
+            float current = pImpl->sensoryNeurons[i]->getState().membranePotential;
+            // Normalize to reasonable range
+            current = (current + 10.0f) / 20.0f * 2.0f - 1.0f;
+            sensoryData.push_back(current);
+        }
+        
+        // Make prediction for next state
+        auto predictedInput = pImpl->predictionSystem->predictNextState(
+            SensoryInput(sensoryData)
+        );
+        
+        // Store prediction for error computation
+        static std::unique_ptr<SensoryInput> lastPrediction;
+        if (lastPrediction) {
+            // Compute prediction error
+            pImpl->predictionSystem->updatePredictions(*lastPrediction, *predictedInput);
+            
+            // Get prediction error for neuromodulation
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // Integrate prediction error into neuromodulation systems
+            if (pImpl->predictionError) {
+                // Use first sensory dimension as prediction value
+                float predictedValue = lastPrediction->getData().empty() ? 0.0f : lastPrediction->getData()[0];
+                float actualValue = predictedInput->getData().empty() ? 0.0f : predictedInput->getData()[0];
+                pImpl->predictionError->computeError(predictedValue, actualValue);
+            }
+            
+            // Update curiosity with prediction error
+            if (pImpl->curiosity) {
+                float novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+                pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
+            }
+            
+            // Update dopamine with prediction error (reward prediction error)
+            if (pImpl->dopamine) {
+                pImpl->dopamine->signalRewardPredictionError(predictionError);
+            }
+        }
+        
+        lastPrediction = std::move(predictedInput);
+    }
+    
+    // ========== STEP 5: Apply neuromodulation effects ==========
+    // Update novelty detection
+    if (pImpl->novelty) {
+        pImpl->novelty->update(pImpl->timestep);
+    }
+    
+    // Update curiosity
+    if (pImpl->curiosity) {
+        pImpl->curiosity->update(pImpl->timestep);
+    }
+    
+    // Update dopamine (reward prediction error)
+    if (pImpl->dopamine) {
+        pImpl->dopamine->update(pImpl->timestep);
+        
+        // Apply dopamine effects on neural excitability
+        // Dopamine modulates neural excitability by adjusting effective current injection
+        // Higher dopamine increases excitability (lower effective threshold)
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Dopamine modulates excitability by injecting additional current
+                    // Positive dopamine adds excitatory bias
+                    float excitabilityMod = dopamineLevel * 0.5f;
+                    if (excitabilityMod > 0.0f) {
+                        neuron->injectCurrent(excitabilityMod);
+                    }
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+    // Calculate neuromodulation factor for plasticity
+    float plasticityMod = 1.0f;
+    if (pImpl->dopamine) {
+        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    for (auto& region : pImpl->regions) {
+        for (auto& syn : region->getSynapses()) {
+            // Apply STDP with neuromodulation
+            if (syn->getPlasticityFlags().stdp) {
+                const auto& preSpikes = syn->getPreSpikeHistory();
+                const auto& postSpikes = syn->getPostSpikeHistory();
+                
+                if (!preSpikes.empty() && !postSpikes.empty()) {
+                    // Modify weight change based on dopamine
+                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    float weight = syn->getWeight();
+                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    syn->setWeight(weight);
+                }
+            }
+            
+            // Apply Hebbian learning
+            if (syn->getPlasticityFlags().hebbian) {
+                const auto& preSpikes = syn->getPreSpikeHistory();
+                const auto& postSpikes = syn->getPostSpikeHistory();
+                
+                if (!preSpikes.empty() && !postSpikes.empty()) {
+                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                }
+            }
+            
+            // Update synapse state
+            syn->step(currentTime);
+        }
+    }
+    
+    // ========== STEP 4: Update working memory ==========
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->update(pImpl->timestep);
+    }
+    
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
@@ -488,6 +612,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Store prediction error from prediction system
+            if (pImpl->predictionSystem) {
+                episode.predictionError = pImpl->predictionSystem->getPredictionError();
+            }
+            
             // Store active neurons
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
@@ -509,10 +638,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    // ========== STEP 8: Apply prediction-based action selection ==========
+    if (pImpl->predictionSystem && pImpl->getPredictionSystem()) {
+        // Get prediction error for action selection
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Update planning based on prediction
+        if (pImpl->planner) {
+            pImpl->planner->updateWithPredictionError(predictionError);
+        }
+        
+        // Modify action selection based on prediction error
+        // High prediction error encourages exploration
+        if (predictionError > 0.5f && pImpl->curiosity) {
+            float curiosityBoost = (predictionError - 0.5f) * 2.0f;
+            curiosityBoost = std::min(curiosityBoost, 1.0f);
+            
+            // Temporarily boost curiosity level
+            float currentCuriosity = pImpl->curiosity->getLevel();
+            pImpl->curiosity->update(0.0f, curiosityBoost, pImpl->timestep);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -530,6 +675,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
+        if (pImpl->predictionSystem) {
+            // Update concepts based on prediction error
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (predictionError > 0.1f) {
+                pImpl->conceptFormation->updateWithPredictionError(predictionError);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -586,6 +738,87 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+    
+    // ========== STEP 16: Update prediction system with current observations ==========
+    if (pImpl->predictionSystem) {
+        // Generate sensory observations for prediction system
+        // This would typically come from the actual sensory inputs
+        // For now, we update with current brain state
+        
+        // Create a simple sensory state representation
+        std::vector<float> sensoryState;
+        if (pImpl->sensoryNeurons.size() > 0) {
+            for (size_t i = 0; i < std::min(pImpl->sensoryNeurons.size(), static_cast<size_t>(4)); ++i) {
+                float potential = pImpl->sensoryNeurons[i]->getState().membranePotential;
+                // Normalize to reasonable range
+                float normalized = (potential + 10.0f) / 20.0f * 2.0f - 1.0f;
+                sensoryState.push_back(normalized);
+            }
+        }
+        
+        // Create a placeholder sensory input for the prediction system
+        // In a real implementation, we would create Vision, Audio, or InternalSignals objects
+        // based on the actual sensory data received via receiveSensoryInput()
+        class PlaceholderSensoryInput : public SensoryInput {
+        public:
+            PlaceholderSensoryInput(const std::vector<float>& data) {
+                for (float value : data) {
+                    addSignal(value);
+                }
+            }
+            
+            const char* getType() const override { return "Placeholder"; }
+            const std::vector<float>& getData() const override { return pImpl->signals; }
+            size_t getDimensions() const override { return pImpl->signals.size(); }
+            std::unique_ptr<SensoryInput> clone() const override {
+                auto clone = std::make_unique<PlaceholderSensoryInput>(pImpl->signals);
+                return clone;
+            }
+            
+        private:
+            struct Impl {
+                std::vector<float> signals;
+            };
+            std::unique_ptr<Impl> pImpl;
+        };
+        
+        // Update prediction system with current state
+        PlaceholderSensoryInput currentSensory(sensoryState);
+        pImpl->predictionSystem->train(currentSensory);
+        
+        // Store the prediction for next iteration's error computation
+        static std::unique_ptr<SensoryInput> lastPrediction;
+        if (lastPrediction) {
+            // Compute prediction error between last prediction and current observation
+            pImpl->predictionSystem->updatePredictions(*lastPrediction, currentSensory);
+            
+            // Get prediction error for neuromodulation
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // Integrate prediction error into neuromodulation systems
+            if (pImpl->predictionError) {
+                // Use first sensory dimension as prediction value
+                float predictedValue = lastPrediction->getData().empty() ? 0.0f : lastPrediction->getData()[0];
+                float actualValue = currentSensory.getData().empty() ? 0.0f : currentSensory.getData()[0];
+                pImpl->predictionError->computeError(predictedValue, actualValue);
+            }
+            
+            // Update curiosity with prediction error
+            if (pImpl->curiosity) {
+                float novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+                pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
+            }
+            
+            // Update dopamine with prediction error (reward prediction error)
+            if (pImpl->dopamine) {
+                pImpl->dopamine->signalRewardPredictionError(predictionError);
+            }
+        }
+        
+        // Store current prediction for next iteration
+        lastPrediction = std::make_unique<PlaceholderSensoryInput>(sensoryState);
+    }
+}
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
