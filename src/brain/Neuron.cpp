@@ -2,10 +2,12 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <random>
 
 namespace nlm {
 
 struct Neuron::Impl {
+    std::shared_ptr<RandomGenerator> rng;  // Add random generator for stochasticity
     NeuronId id;
     NeuronType type;
     NeuronState state;
@@ -24,7 +26,14 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f) {
+        // Each neuron gets its own random generator for biological stochasticity
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        // Use neuron ID as seed for reproducible but varied behavior across neurons
+        std::seed_seq seed{static_cast<unsigned int>(id.index())};
+        pImpl->rng = std::make_shared<RandomGenerator>(seed);
+    };
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -262,7 +271,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
     TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    step(currentTime, dt);
 }
 
 void Neuron::reset() {
