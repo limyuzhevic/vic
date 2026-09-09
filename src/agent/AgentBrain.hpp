@@ -13,23 +13,23 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
+    explicit AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
     
     // Initialize with world
     void initialize(const SimpleWorld& world);
     
     // Get sensory input size expected by brain
-    size_t getSensoryInputSize() const;
+    [[nodiscard]] size_t getSensoryInputSize() const noexcept;
     
     // Get motor output size expected
-    size_t getMotorOutputSize() const;
+    [[nodiscard]] size_t getMotorOutputSize() const noexcept;
     
     // Process sensory percept and inject into brain
     void processSensoryInput(const SensoryPercept& percept);
     
     // Decode brain motor activity into motor command
-    MotorCommand decodeMotorCommand();
+    [[nodiscard]] MotorCommand decodeMotorCommand();
     
     // Apply neuromodulation based on reward
     void applyRewardModulation(float reward, float predictedReward);
@@ -38,47 +38,78 @@ public:
     void updateDevelopment(double timestep);
     
     // Get current developmental stage
-    DevelopmentalStage getDevelopmentalStage() const;
+    [[nodiscard]] DevelopmentalStage getDevelopmentalStage() const;
     
     // Get neuromodulation level
-    float getNeuromodulationLevel() const;
+    [[nodiscard]] float getNeuromodulationLevel() const noexcept;
     
     // Get curiosity level
-    float getCuriosityLevel() const;
+    [[nodiscard]] float getCuriosityLevel() const noexcept;
     
     // Get novelty level
-    float getNoveltyLevel() const;
+    [[nodiscard]] float getNoveltyLevel() const noexcept;
     
     // Get prediction error
-    float getPredictionError() const;
+    [[nodiscard]] float getPredictionError() const noexcept;
     
     // Reset agent for new episode
-    void reset();
+    void reset() noexcept;
     
     // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    [[nodiscard]] Brain* getBrain() noexcept { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Configuration methods
+    void enableRewardModulation(bool enable) noexcept { rewardModulationEnabled_ = enable; }
+    void enableStructuralPlasticity(bool enable) noexcept { structuralPlasticityEnabled_ = enable; }
+    void enableDevelopment(bool enable) noexcept { developmentEnabled_ = enable; }
+    void enableCuriosity(bool enable) noexcept { curiosityEnabled_ = enable; }
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Configuration getters
+    [[nodiscard]] bool isRewardModulationEnabled() const noexcept { return rewardModulationEnabled_; }
+    [[nodiscard]] bool isStructuralPlasticityEnabled() const noexcept { return structuralPlasticityEnabled_; }
+    [[nodiscard]] bool isDevelopmentEnabled() const noexcept { return developmentEnabled_; }
+    [[nodiscard]] bool isCuriosityEnabled() const noexcept { return curiosityEnabled_; }
+    
+    // Statistical getters
+    [[nodiscard]] float getExpectedReward() const noexcept { return expectedReward_; }
+    [[nodiscard]] float getPlasticityModifier() const noexcept { return plasticityModifier_; }
+    [[nodiscard]] double getDevelopmentalAge() const noexcept { return developmentalAge_; }
+    
+    // Utility methods
+    [[nodiscard]] size_t getVisionNeuronsCount() const noexcept { return sensoryVision_.size(); }
+    [[nodiscard]] size_t getTouchNeuronsCount() const noexcept { return sensoryTouch_.size(); }
+    [[nodiscard]] size_t getInternalNeuronsCount() const noexcept { return sensoryInternal_.size(); }
+    [[nodiscard]] size_t getProprioceptiveNeuronsCount() const noexcept { return sensoryProprioception_.size(); }
+    [[nodiscard]] size_t getMotorNeuronsCount() const noexcept { return getTotalMotorNeurons(); }
+    
+    // Advanced configuration
+    void setSensoryNoveltyDecay(float decay) noexcept { sensoryNoveltyDecay_ = decay; }
+    void setDevelopmentEnabled(bool enabled) noexcept { developmentEnabled_ = enabled; }
+    
+    // State update
+    void updateNeuromodulation(double timestep);
+    
+    // Validate agent brain is properly initialized
+    [[nodiscard]] bool isValid() const noexcept;
     
 private:
+    // Helper methods
+    void distributeMotorNeurons();
+    void distributeSensoryNeurons();
+    
     // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    [[nodiscard]] MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    [[nodiscard]] MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Statistics helpers
+    [[nodiscard]] size_t getTotalMotorNeurons() const noexcept;
+    [[nodiscard]] size_t getTotalSensoryNeurons() const noexcept;
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
+    // Motor neuron groups (organized by action type)
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
@@ -86,7 +117,7 @@ private:
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
-    // Sensory neuron groups
+    // Sensory neuron groups (organized by modality)
     std::vector<Neuron*> sensoryVision_;
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;

@@ -134,6 +134,21 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Wait", MotorCommand::Wait)
         .export_values();
 
+    // Advanced command types for Python bindings
+    py::enum_<AdvancedCommand>(m, "AdvancedCommand", R"pbdoc(Advanced command types for agent behavior)pbdoc")
+        .value("NoOp", AdvancedCommand::NoOp)
+        .value("MoveToTarget", AdvancedCommand::MoveToTarget)
+        .value("FollowPath", AdvancedCommand::FollowPath)
+        .value("ExploreArea", AdvancedCommand::ExploreArea)
+        .value("AvoidDanger", AdvancedCommand::AvoidDanger)
+        .value("SeekResource", AdvancedCommand::SeekResource)
+        .value("SocialInteraction", AdvancedCommand::SocialInteraction)
+        .value("LearnFromDemonstration", AdvancedCommand::LearnFromDemonstration)
+        .value("PlanAction", AdvancedCommand::PlanAction)
+        .value("ExecuteSequence", AdvancedCommand::ExecuteSequence)
+        .value("AdaptiveResponse", AdvancedCommand::AdaptiveResponse)
+        .export_values();
+
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
         .value("Empty", WorldObjectType::Empty)
         .value("Resource", WorldObjectType::Resource)
@@ -141,6 +156,25 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Wall", WorldObjectType::Wall)
         .value("Marker", WorldObjectType::Marker)
         .export_values();
+
+    // Navigation node for Python bindings
+    py::class_<NavigationNode>(m, "NavigationNode", R"pbdoc(Pathfinding node for navigation)pbdoc")
+        .def(py::init<>())  // Default constructor
+        .def(py::init<float, float>(), py::arg("x"), py::arg("y"))
+        .def_readwrite("x", &NavigationNode::x)
+        .def_readwrite("y", &NavigationNode::y)
+        .def_readwrite("cost", &NavigationNode::cost)
+        .def("distanceTo", &NavigationNode::distanceTo, py::arg("other"),
+             "Calculate distance to another navigation node");
+
+    // Learning record for Python bindings
+    py::class_<LearningRecord>(m, "LearningRecord", R"pbdoc(Learning record for demonstration learning)pbdoc")
+        .def(py::init<>())
+        .def("getContext", &LearningRecord::context, py::return_value_policy::reference_internal)
+        .def("setContext", &LearningRecord::context, py::arg("context"))
+        .def("getReward", &LearningRecord::reward)
+        .def("getAction", [](const LearningRecord& self) { return static_cast<int>(self.action); })
+        .def("getTimestamp", &LearningRecord::timestamp);
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
@@ -412,14 +446,129 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
+    // Create a new agent brain interface with advanced options
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain, bool enableRewardModulation, 
+                               bool enableStructuralPlasticity, bool enableDevelopment,
+                               bool enableCuriosity) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->enableRewardModulation(enableRewardModulation);
+        agent->enableStructuralPlasticity(enableStructuralPlasticity);
+        agent->enableDevelopment(enableDevelopment);
+        agent->enableCuriosity(enableCuriosity);
+        return agent;
+    }, py::arg("brain"), py::arg("enableRewardModulation") = true,
+        py::arg("enableStructuralPlasticity") = true,
+        py::arg("enableDevelopment") = true,
+        py::arg("enableCuriosity") = true,
+        "Create a new agent brain interface with subsystem options");
+
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create a new agent brain interface (legacy)");
+
+    // Create Advanced AgentBrain for enhanced capabilities
+    m.def("createAdvancedAgentBrain", [](std::shared_ptr<Brain> brain, bool enableRewardModulation, 
+                                          bool enableStructuralPlasticity, bool enableDevelopment,
+                                          bool enableCuriosity) -> std::shared_ptr<AgentBrainAdvanced> {
+        auto agent = std::make_shared<AgentBrainAdvanced>(brain);
+        agent->enableRewardModulation(enableRewardModulation);
+        agent->enableStructuralPlasticity(enableStructuralPlasticity);
+        agent->enableDevelopment(enableDevelopment);
+        agent->enableCuriosity(enableCuriosity);
+        return agent;
+    }, py::arg("brain"), py::arg("enableRewardModulation") = true,
+        py::arg("enableStructuralPlasticity") = true,
+        py::arg("enableDevelopment") = true,
+        py::arg("enableCuriosity") = true,
+        "Create an advanced agent brain interface with enhanced capabilities");
+
+    m.def("createAdvancedAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrainAdvanced> {
+        return std::make_shared<AgentBrainAdvanced>(brain);
+    }, py::arg("brain"), "Create an advanced agent brain interface (legacy)");
+
+    // Basic AgentBrainAdvanced bindings
+    py::class_<AgentBrainAdvanced>(m, "AgentBrainAdvanced", 
+        R"pbdoc(Advanced agent brain interface with enhanced capabilities)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("initialize", &AgentBrainAdvanced::initialize, 
+             py::arg("world"), py::arg("body"),
+             "Initialize with world and body")
+        .def("update", &AgentBrainAdvanced::update, 
+             py::arg("timestep"), "Update agent with timestep")
+        .def("selectAdvancedAction", &AgentBrainAdvanced::selectAdvancedAction,
+             "Select advanced action")
+        .def("learnFromExperience", &AgentBrainAdvanced::learnFromExperience,
+             py::arg("state"), py::arg("action"), py::arg("reward"),
+             "Learn from experience")
+        .def("setTargetPosition", &AgentBrainAdvanced::setTargetPosition,
+             py::arg("x"), py::arg("y"), "Set target position for navigation")
+        .def("addWaypoint", &AgentBrainAdvanced::addWaypoint,
+             py::arg("x"), py::arg("y"), "Add waypoint to path")
+        .def("clearPath", &AgentBrainAdvanced::clearPath,
+             "Clear current path")
+        .def("getDistanceToTarget", &AgentBrainAdvanced::getDistanceToTarget,
+             "Get distance to target")
+        .def("enableDemonstrationLearning", &AgentBrainAdvanced::enableDemonstrationLearning,
+             py::arg("enable"), "Enable/disable demonstration learning")
+        .def("enablePathfinding", &AgentBrainAdvanced::enablePathfinding,
+             py::arg("enable"), "Enable/disable pathfinding")
+        .def("enableSocialLearning", &AgentBrainAdvanced::enableSocialLearning,
+             py::arg("enable"), "Enable/disable social learning")
+        .def("addCustomCommand", &AgentBrainAdvanced::addCustomCommand,
+             py::arg("name"), py::arg("command"), "Add custom command")
+        .def("removeCommand", &AgentBrainAdvanced::removeCommand,
+             py::arg("command"), "Remove command")
+        .def("getAvailableCommands", &AgentBrainAdvanced::getAvailableCommands,
+             "Get list of available commands")
+        .def("getCuriosityLevelAdvanced", &AgentBrainAdvanced::getCuriosityLevelAdvanced,
+             "Get advanced curiosity level")
+        .def("getExplorationRate", &AgentBrainAdvanced::getExplorationRate,
+             "Get exploration rate")
+        .def("getExperienceMemorySize", &AgentBrainAdvanced::getExperienceMemorySize,
+             "Get experience memory size")
+        .def("setExplorationBias", &AgentBrainAdvanced::setExplorationBias,
+             py::arg("bias"), "Set exploration bias")
+        .def("setRiskAversion", &AgentBrainAdvanced::setRiskAversion,
+             py::arg("aversion"), "Set risk aversion")
+        .def("setSocialInfluence", &AgentBrainAdvanced::setSocialInfluence,
+             py::arg("influence"), "Set social influence")
+        .def("compressMemory", &AgentBrainAdvanced::compressMemory,
+             "Compress memory")
+        .def("pruneOldExperiences", &AgentBrainAdvanced::pruneOldExperiences,
+             py::arg("maxKeep"), "Prune old experiences")
+        .def("exportExperiences", &AgentBrainAdvanced::exportExperiences,
+             py::arg("filename"), "Export experiences to file")
+        .def("importExperiences", &AgentBrainAdvanced::importExperiences,
+             py::arg("filename"), "Import experiences from file")
+        .def("setDecisionConfidenceThreshold", &AgentBrainAdvanced::setDecisionConfidenceThreshold,
+             py::arg("threshold"), "Set decision confidence threshold")
+        .def("setActionSelectionMethod", &AgentBrainAdvanced::setActionSelectionMethod,
+             py::arg("method"), "Set action selection method (0: greedy, 1: epsilon-greedy, 2: softmax)")
+        .def("getCurrentPath", &AgentBrainAdvanced::getCurrentPath,
+             "Get current navigation path")
+        .def("getRecentExperiences", &AgentBrainAdvanced::getRecentExperiences,
+             "Get recent experiences")
+        .def("isDemonstrationLearningEnabled", &AgentBrainAdvanced::isDemonstrationLearningEnabled,
+             "Check if demonstration learning is enabled")
+        .def("isPathfindingEnabled", &AgentBrainAdvanced::isPathfindingEnabled,
+             "Check if pathfinding is enabled")
+        .def("isSocialLearningEnabled", &AgentBrainAdvanced::isSocialLearningEnabled,
+             "Check if social learning is enabled")
+        .def("updateNeuromodulation", &AgentBrainAdvanced::updateNeuromodulation,
+             py::arg("timestep"), "Update neuromodulation (advanced)")
+        .def("isValid", &AgentBrainAdvanced::isValid,
+             "Validate agent brain is properly initialized")
+        .def("processSensoryInput", &AgentBrainAdvanced::processSensoryInput,
+             py::arg("percept"), "Process sensory input (advanced)")
+        .def("decodeMotorCommand", &AgentBrainAdvanced::decodeMotorCommand,
+             "Decode motor command (advanced)");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
+
+} // namespace nlm
 
 } // namespace nlm
