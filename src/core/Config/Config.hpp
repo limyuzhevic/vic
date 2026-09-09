@@ -55,6 +55,12 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
+    // Create default configuration with all parameters
+    static Config createDefaultConfig();
+    
+    // Get configuration schema for validation
+    static std::string getConfigSchema();
+    
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
