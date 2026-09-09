@@ -13,9 +13,11 @@ namespace nlm {
 // NOT a textual record - stores neural activity patterns and associations
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
+    SimulationStep simulationStep;
     
     // Sensory state at time of experience (encoded as activity pattern)
     std::vector<float> sensoryState;
+    std::vector<float> resultingSensoryState;
     
     // Location/position information
     float positionX;
@@ -27,25 +29,49 @@ struct EpisodicMemoryItem {
     
     // Internal state (energy, reward, etc.)
     float reward;
+    float resultingReward;
     float energy;
     float novelty;
-    
-    // Consequence of action
-    std::vector<float> resultingSensoryState;
-    float resultingReward;
     
     // Associated neural activity pattern (who was firing)
     std::vector<NeuronId> activeNeurons;
     std::vector<float> neuronActivations;
     
+    // Context information for richer storage
+    std::string context;
+    
     // Time since this episode
     SimulationStep age;
     
-    EpisodicMemoryItem()
-        : timestamp(0), positionX(0), positionY(0), orientation(0)
+    // Relevance and strength scores for consolidation
+    float relevance;
+    float strength;
+    
+    // Comparison operators for sorting and searching
+    bool operator<(const EpisodicMemoryItem& other) const {
+        return timestamp < other.timestamp;
+    }
+    
+    bool operator==(const EpisodicMemoryItem& other) const {
+        return timestamp == other.timestamp && 
+               positionX == other.positionX && positionY == other.positionY &&
+               action == other.action && reward == other.reward;
+    }
+    
+    EpisodicMemoryItem() 
+        : timestamp(0), simulationStep(0)
+        , positionX(0), positionY(0), orientation(0)
         , action(ActionType::Wait)
-        , reward(0), energy(0), novelty(0)
-        , resultingReward(0), age(0) {}
+        , reward(0), resultingReward(0), energy(0), novelty(0)
+        , age(0), relevance(0), strength(0) {}
+    
+    EpisodicMemoryItem(SimulationStep simStep, float px, float py, float ori,
+                      ActionType act, float rew, float resRew)
+        : timestamp(simStep), simulationStep(simStep)
+        , positionX(px), positionY(py), orientation(ori)
+        , action(act), reward(rew), resultingReward(resRew)
+        , energy(1.0f), novelty(0.0f)
+        , age(0), relevance(1.0f), strength(1.0f) {}
 };
 
 // NeuralEpisodicMemory: Stores experiences in a way that interacts with neural substrate
@@ -129,18 +155,12 @@ private:
     float computeSimilarity(const std::vector<float>& query,
                           const EpisodicMemoryItem& episode) const;
 
-    // Check if episode matches criteria
-    bool matchesCriteria(const EpisodicMemoryItem& episode,
-                        const std::vector<float>* sensoryQuery,
-                        SimulationStep* startTime,
-                        SimulationStep* endTime,
-                        ActionType* actionQuery) const;
-
-    struct Impl;
+struct Impl;
     std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
     std::deque<EpisodicMemoryItem> episodes_;
+    std::vector<NeuronId> episodeNeurons_;  // Neurons used for pattern completion
     size_t maxEpisodes_;
     bool replayEnabled_;
 };

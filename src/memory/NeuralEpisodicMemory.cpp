@@ -9,9 +9,6 @@ namespace nlm {
 struct NeuralEpisodicMemory::Impl {
     Brain* brain;
     
-    // Pattern neurons for episodic recall
-    std::vector<NeuronId> episodeNeurons;
-    
     Impl() : brain(nullptr) {}
 };
 
@@ -32,16 +29,18 @@ void NeuralEpisodicMemory::initialize(Brain* brain) {
 }
 
 void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
-    // Create episode copy with age 0
+    // Create episode copy with age 0 and initialize relevance/strength
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
+    stored.relevance = 1.0f;  // Initial relevance
+    stored.strength = 1.0f;   // Initial strength
     
     episodes_.push_back(stored);
     
     // Create episode neuron for pattern completion
     if (brain_ && !episode.sensoryState.empty()) {
-        NeuronId epNeuron(episodes_.size() + 20000);
-        pImpl->episodeNeurons.push_back(epNeuron);
+        NeuronId epNeuron(episodeNeurons_.size() + 20000);
+        episodeNeurons_.push_back(epNeuron);
         
         // Store episode index in the neuron
         // (This is a simplified approach - real implementation would use more distributed encoding)
@@ -50,8 +49,8 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     // Remove old episodes if over capacity
     while (episodes_.size() > maxEpisodes_) {
         episodes_.erase(episodes_.begin());
-        if (!pImpl->episodeNeurons.empty()) {
-            pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
+        if (!episodeNeurons_.empty()) {
+            episodeNeurons_.erase(episodeNeurons_.begin());
         }
     }
     
@@ -220,16 +219,21 @@ float NeuralEpisodicMemory::getAverageReward() const {
 
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
     // Remove episodes below relevance threshold
-    // In a full implementation, episodes would have relevance scores
-    // For now, just enforce max capacity
-    while (episodes_.size() > maxEpisodes_ * 0.8f) {
+    auto newEnd = std::remove_if(episodes_.begin(), episodes_.end(),
+        [relevanceThreshold](const EpisodicMemoryItem& ep) {
+            return ep.relevance < relevanceThreshold;
+        });
+    episodes_.erase(newEnd, episodes_.end());
+    
+    // Also enforce max capacity
+    while (episodes_.size() > maxEpisodes_) {
         episodes_.erase(episodes_.begin());
     }
 }
 
 void NeuralEpisodicMemory::clear() {
     episodes_.clear();
-    pImpl->episodeNeurons.clear();
+    episodeNeurons_.clear();
 }
 
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForReplay(

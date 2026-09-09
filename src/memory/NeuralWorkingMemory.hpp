@@ -6,6 +6,8 @@
 #include <memory>
 #include <functional>
 #include <unordered_map>
+#include <set>
+#include <string>
 
 namespace nlm {
 
@@ -17,6 +19,8 @@ namespace nlm {
 // - Recurrent synaptic connections for maintaining information
 // - Activity-dependent short-term plasticity
 // - Neural competition for selective retention
+// - Contextual tagging and temporal dynamics
+// - Rehearsal-based strengthening
 
 class NeuralWorkingMemory {
 public:
@@ -26,21 +30,38 @@ public:
     // Initialize with brain reference
     void initialize(Brain* brain);
 
-    // Store information in working memory
+    // Store information in working memory with context support
     // The information is encoded as neural activity pattern
     void store(const std::vector<float>& pattern, float strength = 1.0f);
-
+    
     // Store specific neuron activation
     void storeToNeuron(NeuronId neuron, float activation);
-
-    // Retrieve current working memory content as activity levels
-    std::vector<float> retrieve() const;
+    
+    // Enhanced store methods with context support
+    void store(NeuronId neuron, float activation, const std::string& context = "");
+    void store(const std::vector<float>& pattern, float strength, const std::string& context);
+    
+    // Store with temporal tagging
+    void storeTimed(const std::vector<float>& pattern, float strength, 
+                   SimulationStep timestamp, const std::string& context = "");
 
     // Check if specific neuron is part of working memory
     bool contains(NeuronId neuron) const;
+    
+    // Check if working memory contains items with specific context
+    bool contains(const std::string& context) const;
 
     // Get activation level of a specific neuron in working memory
     float getNeuronActivation(NeuronId neuron) const;
+    
+    // Get context for a specific neuron
+    std::string getContext(NeuronId neuron) const;
+    
+    // Update context for a neuron
+    void updateContext(NeuronId neuron, const std::string& newContext);
+    
+    // Get age of a memory trace
+    SimulationStep getAge(NeuronId neuron) const;
 
     // Update working memory (maintenance and decay)
     void update(TimestepDuration dt);
@@ -64,6 +85,9 @@ public:
 
     // Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);
+    
+    // Rehearse a memory to strengthen it
+    void rehearse(NeuronId neuron);
 
     // Competition between memory traces
     void runCompetition();
@@ -73,6 +97,21 @@ public:
 
     // Get overall memory activity level
     float getMemoryActivity() const;
+    
+    // Get number of memory traces older than threshold
+    size_t getTraceCountOlderThan(SimulationStep threshold) const;
+    
+    // Get all unique contexts
+    std::set<std::string> getAllContexts() const;
+
+    // Retrieve current working memory content as activity levels
+    std::vector<float> retrieve() const;
+    
+    // Retrieve with context filtering
+    std::vector<float> retrieve(const std::string& context) const;
+    
+    // Retrieve with timestamps
+    std::vector<float> retrieveWithTimestamps() const;
 
 private:
     // Create recurrent connection for maintenance
