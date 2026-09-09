@@ -81,8 +81,6 @@ struct Brain::Impl {
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
-        , developmentalStage(DevelopmentalStage::Initial)
-        , nextRegionId(1)
         , timestep(0.001)
         , currentStep(0)
         , currentTime(0.0)
