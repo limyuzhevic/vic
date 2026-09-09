@@ -6,57 +6,88 @@
 
 namespace nlm {
 
-// Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// NeuralWorkingMemory: Temporary neural activity patterns for active maintenance
+// Phase 3+: Implements persistent activity using recurrent connections
+// Compatible with Brain::Impl workingMemory member
 
-class WorkingMemory {
+class NeuralWorkingMemory {
 public:
-    WorkingMemory();
-    ~WorkingMemory();
+    NeuralWorkingMemory();
+    ~NeuralWorkingMemory();
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
-    void store(NeuronId neuron, float value);
+    // Initialize with brain reference
+    void initialize(Brain* brain);
     
-    // Retrieve item
-    float retrieve(NeuronId neuron) const;
+    // Store information in working memory
+    void store(const std::vector<float>& pattern, float strength = 1.0f);
     
-    // Check if item exists
+    // Store specific neuron activation
+    void storeToNeuron(NeuronId neuron, float activation);
+    
+    // Retrieve current working memory content
+    std::vector<float> retrieve() const;
+    
+    // Check if neuron is in working memory
     bool contains(NeuronId neuron) const;
     
-    // Clear all
+    // Get neuron activation
+    float getNeuronActivation(NeuronId neuron) const;
+    
+    // Update working memory
+    void update(TimestepDuration dt);
+    
+    // Clear working memory
     void clear();
     
-    // Get capacity
-    size_t getCapacity() const;
-    size_t getCurrentSize() const;
+    // Get statistics
+    size_t getActiveTraces() const { return activeTraces_.size(); }
+    size_t getCapacity() const { return capacity_; }
+    float getDecayRate() const { return decayRate_; }
     
-    // Decay all items
-    void decay(float decayRate);
+    // Get memory neurons
+    const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
+    
+    // Competition
+    void runCompetition();
+    bool isWinning(NeuronId neuron) const;
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
+    
+    Brain* brain_;
+    size_t capacity_;
+    float decayRate_;
+    std::vector<NeuronId> memoryNeurons_;
+    std::vector<float> memoryActivations_;
+    std::vector<SimulationStep> memoryTimestamps_;
+    std::vector<size_t> activeTraces_;
+    std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
+    std::vector<NeuronId> winners_;
 };
 
-// Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
+// NeuralEpisodicMemory: Persistent experience storage and replay
+// Phase 3+: Stores neural patterns of experiences with temporal indexing
+// Compatible with Brain::Impl episodicMemory member
 
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
     std::vector<NeuronId> neurons;
-    std::vector<float> values;
+    std::vector<float> activations;
     std::string metadata;
     
     EpisodicMemoryItem() : timestamp(0) {}
 };
 
-class EpisodicMemory {
+class NeuralEpisodicMemory {
 public:
-    EpisodicMemory();
-    ~EpisodicMemory();
+    NeuralEpisodicMemory();
+    ~NeuralEpisodicMemory();
     
-    // Store episode
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
+    // Store experience
     void storeEpisode(const EpisodicMemoryItem& episode);
     
     // Retrieve episode
@@ -68,96 +99,48 @@ public:
     // Get recent episodes
     std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
     
-    // Clear all
+    // Get episodes for replay
+    std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
+    
+    // Replay an episode
+    void replayEpisode(const EpisodicMemoryItem* episode);
+    
+    // Clear memory
     void clear();
     
-    // Memory consolidation (move to long-term)
+    // Consolidation
     void consolidate(float relevanceThreshold);
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-// Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
-
-class SemanticMemory {
-public:
-    SemanticMemory();
-    ~SemanticMemory();
+    // Set capacity
+    void setMaxEpisodes(size_t max) { maxEpisodes_ = max; }
     
-    // Store fact
-    void storeFact(const std::string& key, const std::string& value);
-    
-    // Retrieve fact
-    std::string retrieveFact(const std::string& key) const;
-    
-    // Check if fact exists
-    bool hasFact(const std::string& key) const;
-    
-    // Get all facts
-    std::vector<std::pair<std::string, std::string>> getAllFacts() const;
-    
-    // Clear all
-    void clear();
+    size_t getMaxEpisodes() const { return maxEpisodes_; }
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
+    size_t maxEpisodes_;
 };
 
-// Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
+// NeuralAssociativeMemory: Pattern relationship storage
+// Phase 4+: Stores Hebbian associations between neural patterns
+// Compatible with Brain::Impl associativeMemory member (implemented separately)
 
-struct Skill {
-    std::string name;
-    std::vector<NeuronId> neuralPattern;
-    float proficiency;
-    
-    Skill() : proficiency(0.0f) {}
-};
-
-class ProceduralMemory {
+class NeuralAssociativeMemory {
 public:
-    ProceduralMemory();
-    ~ProceduralMemory();
+    NeuralAssociativeMemory();
+    ~NeuralAssociativeMemory();
     
-    // Learn skill
-    void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
-    
-    // Retrieve skill
-    Skill* getSkill(const std::string& name);
-    
-    // Get all skills
-    std::vector<Skill*> getAllSkills();
-    
-    // Update proficiency
-    void updateProficiency(const std::string& name, float delta);
-    
-    // Clear all
-    void clear();
-    
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-// Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
-
-class AssociativeMemory {
-public:
-    AssociativeMemory();
-    ~AssociativeMemory();
+    // Initialize with brain reference
+    void initialize(Brain* brain);
     
     // Create association
     void associate(NeuronId a, NeuronId b, float strength);
     
-    // Get associated neurons
+    // Get associations
     std::vector<NeuronId> getAssociations(NeuronId neuron) const;
     
-    // Get association strength
+    // Get strength
     float getAssociationStrength(NeuronId a, NeuronId b) const;
     
     // Update association
@@ -166,9 +149,23 @@ public:
     // Clear all
     void clear();
     
+    // Update dynamics
+    void update(TimestepDuration dt);
+    
+    // Pattern-based operations (Phase 6)
+    void associatePattern(const std::vector<NeuronId>& neurons,
+                         const std::vector<float>& activations,
+                         float strength);
+    void retrievePattern(const std::vector<NeuronId>& pattern,
+                        std::vector<float>& activations,
+                        float& strength) const;
+    
+    size_t getTotalAssociations() const { return totalAssociations_; }
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
+    size_t totalAssociations_;
 };
 
 } // namespace nlm

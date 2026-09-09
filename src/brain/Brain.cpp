@@ -1003,79 +1003,79 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
+    // ========== MEMORY SYSTEM ACCESSORS ==========
 
-NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
-}
+    NeuralWorkingMemory* Brain::getWorkingMemory() {
+        return pImpl->workingMemory.get();
+    }
 
-NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
-}
+    NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+        return pImpl->episodicMemory.get();
+    }
 
-NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
-}
+    NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+        return pImpl->associativeMemory.get();
+    }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
+    // ========== PREDICTION SYSTEM ACCESSOR ==========
 
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
-}
+    PredictionSystem* Brain::getPredictionSystem() {
+        return pImpl->predictionSystem.get();
+    }
 
-// ========== COGNITION SYSTEM ACCESSORS ==========
+    // ========== COGNITION SYSTEM ACCESSORS ==========
 
-NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
-}
+    NeuralPlanner* Brain::getPlanner() {
+        return pImpl->planner.get();
+    }
 
-ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
-}
+    ConceptFormation* Brain::getConceptFormation() {
+        return pImpl->conceptFormation.get();
+    }
 
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
-}
+    AttentionalSelection* Brain::getAttention() {
+        return pImpl->attention.get();
+    }
 
-// ========== DEVELOPMENT SYSTEM ==========
+    // ========== DEVELOPMENT SYSTEM ==========
 
-DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
-}
+    DevelopmentSystem* Brain::getDevelopmentSystem() {
+        return pImpl->developmentSystem.get();
+    }
 
-DevelopmentalStage Brain::getDevelopmentalStage() const {
-    return pImpl->developmentalStage;
-}
+    DevelopmentalStage Brain::getDevelopmentalStage() const {
+        return pImpl->developmentalStage;
+    }
 
-void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
-    pImpl->developmentalStage = stage;
-}
+    void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
+        pImpl->developmentalStage = stage;
+    }
 
-// ========== NEUROMODULATION SYSTEMS ==========
+    // ========== NEUROMODULATION SYSTEMS ==========
 
-Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
-}
+    Dopamine* Brain::getDopamine() {
+        return pImpl->dopamine.get();
+    }
 
-Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
-}
+    Curiosity* Brain::getCuriosity() {
+        return pImpl->curiosity.get();
+    }
 
-Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
-}
+    Novelty* Brain::getNovelty() {
+        return pImpl->novelty.get();
+    }
 
-PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
-}
+    PredictionError* Brain::getPredictionErrorSignal() {
+        return pImpl->predictionError.get();
+    }
 
-std::shared_ptr<const Config> Brain::getConfig() const {
-    return pImpl->config;
-}
+    std::shared_ptr<const Config> Brain::getConfig() const {
+        return pImpl->config;
+    }
 
-RandomGenerator* Brain::getRandomGenerator() {
-    return pImpl->rng.get();
-}
+    RandomGenerator* Brain::getRandomGenerator() {
+        return pImpl->rng.get();
+    }
 
 void Brain::logStatus() const {
     NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");

@@ -7,9 +7,16 @@
 #include <chrono>
 #include <cmath>
 
-namespace nlm {
-
-Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
+Phase6IntegratedExperiment::Phase6IntegratedExperiment() {
+    stepCount_ = 0;
+    episodeCount_ = 0;
+    avgFiringRate_ = 0.0f;
+    totalReward_ = 0.0f;
+    status_ = "Initialized";
+    
+    // Initialize all Phase 6 integrated systems
+    pImpl = std::make_unique<Impl>();
+}
 
 Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
 
