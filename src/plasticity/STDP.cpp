@@ -65,13 +65,13 @@ void STDP::update(Synapse* synapse,
             
             if (dt > 0) {
                 // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
+                // Stronger when spikes are closer together (causal order)
                 float delta = pImpl->ltpWeight * std::exp(-dt / tau);
                 totalDelta += delta;
             } else if (dt < 0) {
                 // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                // Stronger when post fires just before pre (anti-causal)
+                float delta = -pImpl->ltdWeight * std::exp(dt / tau);
                 totalDelta += delta;
             }
             // dt == 0: no change (simultaneous spikes - rare in practice)
