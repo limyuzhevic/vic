@@ -5,15 +5,15 @@
 #include "../core/SimulationClock/SimulationClock.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
+#include "../development/DevelopmentManager.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
+#include "../memory/MemorySystemManager.hpp"
+#include "../prediction/PredictionSystemManager.hpp"
+#include "../cognition/CognitionSystemManager.hpp"
+#include "../neuromodulation/NeuromodulationManager.hpp"
+#include "../plasticity/PlasticitySystemManager.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -22,44 +22,125 @@
 
 namespace nlm {
 
+// Update includes to remove old system includes
+#include "Brain.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/SimulationClock/SimulationClock.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../motor/Action.hpp"
+#include "../development/DevelopmentManager.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../memory/MemorySystemManager.hpp"
+#include "../prediction/PredictionSystemManager.hpp"
+#include "../cognition/CognitionSystemManager.hpp"
+#include "../neuromodulation/NeuromodulationManager.hpp"
+#include "../plasticity/PlasticitySystemManager.hpp"
+#include "../performance/CheckpointSystem.hpp"
+#include "../brain/BrainStepManager.hpp"
+#include <fstream>
+#include <algorithm>
+#include <cmath>
+#include <sstream>
+
+namespace nlm {
+
+#include "Brain.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/SimulationClock/SimulationClock.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../motor/Action.hpp"
+#include "../development/DevelopmentManager.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../memory/MemorySystemManager.hpp"
+#include "../prediction/PredictionSystemManager.hpp"
+#include "../cognition/CognitionSystemManager.hpp"
+#include "../neuromodulation/NeuromodulationManager.hpp"
+#include "../plasticity/PlasticitySystemManager.hpp"
+#include "../performance/CheckpointSystem.hpp"
+#include "../brain/BrainStepManager.hpp"
+#include <fstream>
+#include <algorithm>
+#include <cmath>
+#include <sstream>
+
+namespace nlm {
+
+// Helper method to initialize systems using new manager classes
+static bool initializeIntegratedSystems(Brain::Impl& pImpl) {
+    try {
+        // Initialize memory systems manager
+        pImpl.memorySystemManager->initialize(nullptr);  // Will be set later with brain reference
+        
+        // Initialize prediction system manager
+        pImpl.predictionSystemManager->initialize(nullptr);
+        
+        // Initialize cognition system manager
+        pImpl.cognitionSystemManager->initialize(nullptr);
+        
+        // Initialize neuromodulation manager
+        pImpl.neuromodulationManager->initialize(nullptr);
+        
+        // Initialize plasticity system manager
+        pImpl.plasticitySystemManager->initialize(nullptr);
+        
+        // Initialize development manager
+        pImpl.developmentManager->initialize(nullptr);
+        
+        // Initialize step manager
+        pImpl.stepManager = std::make_unique<BrainStepManager>(nullptr);  // Will be set later with brain reference
+        
+        NLM_LOG_INFO("All integrated systems initialized successfully");
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to initialize integrated systems: " + std::string(e.what()));
+        return false;
+    }
+}
+
+// Helper method to configure systems from config
+static void configureSystemsFromConfig(Brain::Impl& pImpl, const Config& config) {
+    pImpl.memorySystemManager->configureFromConfig(config);
+    pImpl.predictionSystemManager->configureFromConfig(config);
+    pImpl.cognitionSystemManager->configureFromConfig(config);
+    pImpl.neuromodulationManager->configureFromConfig(config);
+    pImpl.plasticitySystemManager->configureFromConfig(config);
+    pImpl.developmentManager->configureFromConfig(config);
+    pImpl.stepManager->configureFromConfig(config);
+}
+
+// Helper method to reset systems
+static void resetSystems(Brain::Impl& pImpl) {
+    pImpl.memorySystemManager->reset();
+    pImpl.predictionSystemManager->reset();
+    pImpl.cognitionSystemManager->reset();
+    pImpl.neuromodulationManager->reset();
+    pImpl.plasticitySystemManager->reset();
+    pImpl.developmentManager->reset();
+    pImpl.stepManager->reset();
+}
+
 struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
-    // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
-    
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
-    
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
-    std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
-    
-    // Phase 2: Real neural computation components
-    std::unique_ptr<SpikeSystem> spikeSystem;
-    std::unique_ptr<STDP> stdp;
-    std::unique_ptr<Hebbian> hebbian;
-    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
-    
-    // Simulation parameters
-    TimestepDuration timestep;
-    SimulationStep currentStep;
-    Timestamp currentTime;
+    // NEW: Use manager classes instead of direct system management
+    std::unique_ptr<MemorySystemManager> memorySystemManager;
+    std::unique_ptr<PredictionSystemManager> predictionSystemManager;
+    std::unique_ptr<CognitionSystemManager> cognitionSystemManager;
+    std::unique_ptr<NeuromodulationManager> neuromodulationManager;
+    std::unique_ptr<PlasticitySystemManager> plasticitySystemManager;
+    std::unique_ptr<DevelopmentManager> developmentManager;
+    std::unique_ptr<BrainStepManager> stepManager;
     
     // Statistics
     size_t totalSpikesThisStep;
@@ -70,7 +151,7 @@ struct Brain::Impl {
     std::vector<Neuron*> motorNeurons;
     
     // Integration state
-    bool isResting;  // For sleep/rest cycle
+    bool isResting;
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
@@ -90,67 +171,25 @@ struct Brain::Impl {
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(100)
+        , consolidationInterval(1000)
     {
         // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
+        uint64_t seed = 42;
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
+        // Create manager instances
+        memorySystemManager = std::make_unique<MemorySystemManager>();
+        predictionSystemManager = std::make_unique<PredictionSystemManager>();
+        cognitionSystemManager = std::make_unique<CognitionSystemManager>();
+        neuromodulationManager = std::make_unique<NeuromodulationManager>();
+        plasticitySystemManager = std::make_unique<PlasticitySystemManager>();
+        developmentManager = std::make_unique<DevelopmentManager>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
-        
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+        // Step manager will be initialized later with brain reference
     }
     
     DevelopmentalStage developmentalStage;
@@ -185,7 +224,6 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
-    // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
         addRegion("Region_" + std::to_string(i + 1));
     }
@@ -243,7 +281,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);

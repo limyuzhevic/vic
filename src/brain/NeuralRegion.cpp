@@ -295,22 +295,162 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
     }
 }
 
-std::vector<Neuron*> NeuralRegion::getAllNeurons() {
-    std::vector<Neuron*> result;
+}
+
+// Phase 2: Region-level dynamics implementation
+
+void NeuralRegion::updateRegionDynamics(float timestep) {
+    // Update region-wide dynamics based on neural activity
+    // This represents phase 2 implementation that was in the header
+    
+    // Calculate global region activation from all neurons
+    float globalActivation = 0.0f;
+    size_t neuronCount = 0;
+    
     for (auto& pop : pImpl->populations) {
-        auto popNeurons = pop->getNeurons();
-        result.insert(result.end(), popNeurons.begin(), popNeurons.end());
+        for (Neuron* neuron : pop->getNeurons()) {
+            const auto& state = neuron->getState();
+            if (state.firingState == FiringState::Refractory || 
+                (state.firingState == FiringState::Active && 
+                 std::abs(state.membranePotential - state.restingPotential) > 5.0f)) {
+                globalActivation += std::abs(state.membranePotential - state.restingPotential) / 20.0f;
+            }
+            neuronCount++;
+        }
     }
-    return result;
+    
+    if (neuronCount > 0) {
+        globalActivation /= static_cast<float>(neuronCount);
+    }
+    
+    // Update region synaptic dynamics based on activation
+    for (auto& syn : pImpl->synapses) {
+        // Adaptive synaptic modification based on regional activity
+        float activityFactor = globalActivation * 0.1f;
+        float weightChange = activityFactor * (1.0f - std::abs(syn->getWeight())) * 0.001f;
+        syn->addToWeight(weightChange);
+    }
 }
 
-std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
-    std::vector<const Neuron*> result;
+void NeuralRegion::applyNeuromodulation(float dopamine, float serotonin, float acetylcholine) {
+    // Apply neuromodulation effects on all neurons in region
+    for (auto& pop : pImpl->populations) {
+        for (Neuron* neuron : pop->getNeurons()) {
+            // Dopamine increases excitability
+            if (dopamine > 0.0f) {
+                neuron->injectCurrent(dopamine * 0.5f);
+            }
+            
+            // Serotonin modulates firing thresholds
+            if (serotonin != 0.0f) {
+                float thresholdAdjustment = serotonin * 0.2f;  // Increase threshold
+                neuron->setThreshold(neuron->getThreshold() + thresholdAdjustment);
+            }
+            
+            // Acetylcholine enhances synaptic plasticity
+            if (acetylcholine > 0.0f) {
+                auto& flags = neuron->getPlasticityFlags();
+                flags.stdp = true;  // Enhance STDP
+                flags.hebbian = true;  // Enhance Hebbian
+            }
+        }
+    }
+}
+
+float NeuralRegion::getRegionActivation() const {
+    // Calculate region activation as average membrane potential deviation from rest
+    float totalActivation = 0.0f;
+    size_t activeCount = 0;
+    
     for (const auto& pop : pImpl->populations) {
-        auto popNeurons = pop->getNeurons();
-        result.insert(result.end(), popNeurons.begin(), popNeurons.end());
+        for (const Neuron* neuron : pop->getNeurons()) {
+            const auto& state = neuron->getState();
+            if (state.firingState == FiringState::Refractory || 
+                (state.firingState == FiringState::Active && 
+                 std::abs(state.membranePotential - state.restingPotential) > 5.0f)) {
+                totalActivation += std::abs(state.membranePotential - state.restingPotential) / 20.0f;
+                activeCount++;
+            }
+        }
     }
-    return result;
+    
+    if (activeCount == 0) return 0.0f;
+    return totalActivation / static_cast<float>(activeCount);
 }
 
-} // namespace nlm
+void NeuralRegion::setRegionActivation(float activation) {
+    // Set target activation and adjust global neuronal parameters
+    // This could be used for targeted region activation in experiments
+    activation = std::clamp(activation, 0.0f, 1.0f);
+    
+    // If activation is high, increase excitability across the region
+    if (activation > 0.5f) {
+        for (auto& pop : pImpl->populations) {
+            for (Neuron* neuron : pop->getNeurons()) {
+                // Increase leak conductance to make neurons more excitable
+                neuron->setLeakConductance(neuron->getLeakConductance() + activation * 5.0f);
+                // Decrease threshold to promote firing
+                neuron->setThreshold(neuron->getThreshold() - activation * 10.0f);
+            }
+        }
+    }
+}
+
+void NeuralRegion::integrateWithGlobalPrediction(const std::vector<float>& prediction) {
+    // Integrate with global prediction system (Phase 2 feature)
+    // This allows regions to participate in global predictive coding
+    
+    if (prediction.empty()) return;
+    
+    // Use prediction to modulate regional connectivity
+    size_t predictionIndex = 0;
+    for (auto& syn : pImpl->synapses) {
+        if (predictionIndex < prediction.size()) {
+            // Prediction-driven synaptic modification
+            float predEffect = prediction[predictionIndex] * 0.01f;
+            
+            // Apply prediction to synaptic weight with temporal decay
+            float weight = syn->getWeight();
+            weight += predEffect * (1.0f - std::abs(weight)) * 0.005f;
+            syn->setWeight(weight);
+            
+            predictionIndex++;
+        }
+    }
+}
+
+void NeuralRegion::applyDevelopment(float plasticityModifier, DevelopmentalStage stage) {
+    // Apply developmental effects to the region
+    // This represents phase 2 developmental implementation
+    
+    for (auto& pop : pImpl->populations) {
+        for (Neuron* neuron : pop->getNeurons()) {
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // High plasticity, rapid synaptogenesis
+                    neuron->setRefractoryPeriod(static_cast<uint32_t>(5.0f / plasticityModifier));
+                    break;
+                    
+                case DevelopmentalStage::CriticalPeriod:
+                    // Moderate plasticity, specialization begins
+                    neuron->setRefractoryPeriod(static_cast<uint32_t>(10.0f * plasticityModifier));
+                    break;
+                    
+                case DevelopmentalStage::Maturation:
+                    // Lower plasticity, stabilization
+                    neuron->setRefractoryPeriod(static_cast<uint32_t>(15.0f * plasticityModifier));
+                    break;
+                    
+                case DevelopmentalStage::Adult:
+                    // Low plasticity, homeostatic maintenance
+                    neuron->setRefractoryPeriod(static_cast<uint32_t>(20.0f * plasticityModifier));
+                    break;
+                    
+                case DevelopmentalStage::Aging:
+                    // Further reduction in plasticity
+                    neuron->setRefractoryPeriod(static_cast<uint32_t>(25.0f * plasticityModifier));
+                    break;
+            }
+        }
+    }
+}

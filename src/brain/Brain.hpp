@@ -6,6 +6,13 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../prediction/PredictionSystemManager.hpp"
+#include "../cognition/CognitionSystemManager.hpp"
+#include "../neuromodulation/NeuromodulationManager.hpp"
+#include "../plasticity/PlasticitySystemManager.hpp"
+#include "../development/DevelopmentManager.hpp"
+#include "../memory/MemorySystemManager.hpp"
+#include "../brain/BrainStepManager.hpp"
 #include <memory>
 #include <string>
 
