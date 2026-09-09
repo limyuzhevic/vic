@@ -18,10 +18,80 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+std::string Config::trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
+
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Implement proper JSON/YAML parser (Phase 2)
+    // For now, support both JSON and key=value formats
     
+    // Try to detect if it's a JSON file (contains { or starts with [)
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Read entire file
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Check if it looks like JSON (contains {, [, or " followed by :, at beginning or around content)
+    bool looksLikeJSON = false;
+    
+    // Remove whitespace for checking
+    std::string compact;
+    for (char c : content) {
+        if (!std::isspace(c)) compact += c;
+    }
+    
+    // Check for JSON patterns
+    if (!compact.empty()) {
+        if (compact[0] == '{' || compact[0] == '[') {
+            looksLikeJSON = true;
+        } else {
+            // Check for key:value pairs (JSON style)
+            size_t pos = compact.find('"');
+            while (pos != std::string::npos) {
+                size_t endQuote = compact.find('"', pos + 1);
+                if (endQuote != std::string::npos) {
+                    std::string key = compact.substr(pos + 1, endQuote - pos - 1);
+                    size_t colonPos = compact.find(':', endQuote);
+                    if (colonPos != std::string::npos) {
+                        // Check if next non-whitespace is { or [
+                        size_t next = colonPos + 1;
+                        while (next < compact.size() && std::isspace(compact[next])) next++;
+                        if (next < compact.size() && (compact[next] == '{' || compact[next] == '[')) {
+                            looksLikeJSON = true;
+                            break;
+                        }
+                    }
+                }
+                pos = compact.find('"', endQuote + 1);
+            }
+        }
+    }
+    
+    if (looksLikeJSON) {
+        // Try to parse as JSON
+        return loadFromJSONFile(filepath);
+    } else {
+        // Parse as simple key=value format (Phase 1)
+        return loadFromKeyValueFile(filepath);
+    }
+}
+
+bool Config::loadFromKeyValueFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -53,6 +123,126 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
+}
+
+// Simple JSON parser placeholder (Phase 2)
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    // TODO: Implement proper JSON parsing with nlohmann/json or similar
+    // For now, return false to fall back to key=value format
+    // This is a placeholder implementation
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Read entire file
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Simple heuristic check for JSON structure
+    // This is a very basic implementation - real JSON parsing should be done with a proper library
+    bool isValidJSON = false;
+    
+    // Basic JSON structure checks
+    if (!content.empty()) {
+        // Check for balanced braces/brackets
+        int braceCount = 0;
+        int bracketCount = 0;
+        bool inString = false;
+        char prevChar = '\0';
+        
+        for (char c : content) {
+            if (c == '"' && prevChar != '\\') {
+                inString = !inString;
+            } else if (!inString) {
+                if (c == '{') braceCount++;
+                else if (c == '}') braceCount--;
+                else if (c == '[') bracketCount++;
+                else if (c == ']') bracketCount--;
+            }
+            prevChar = c;
+        }
+        
+        if ((braceCount == 0 && bracketCount == 0) || (braceCount == 1 && bracketCount == 0) || 
+            (braceCount == 0 && bracketCount == 1)) {
+            isValidJSON = true;
+        }
+    }
+    
+    if (!isValidJSON) {
+        // Fall back to key=value format
+        return loadFromKeyValueFile(filepath);
+    }
+    
+    // TODO: Implement actual JSON parsing
+    // For now, just log and treat as plain text
+    NLM_LOG_WARNING("JSON file loaded but parser not fully implemented: " + filepath);
+    
+    // For now, try to extract key-value pairs from JSON-like content
+    // This is a very simple approach and won't work for all JSON
+    
+    // Extract key-value pairs from content
+    size_t pos = 0;
+    while (pos < content.size()) {
+        // Find a key (string in quotes followed by :)
+        pos = content.find('"', pos);
+        if (pos == std::string::npos) break;
+        
+        size_t endKey = content.find('"', pos + 1);
+        if (endKey == std::string::npos) break;
+        
+        std::string key = content.substr(pos + 1, endKey - pos - 1);
+        pos = endKey + 1;
+        
+        // Skip whitespace
+        while (pos < content.size() && std::isspace(content[pos])) pos++;
+        
+        // Check for colon
+        if (pos < content.size() && content[pos] == ':') {
+            pos++;
+            
+            // Skip whitespace
+            while (pos < content.size() && std::isspace(content[pos])) pos++;
+            
+            // Extract value
+            if (content[pos] == '"') {
+                // String value
+                size_t endValue = content.find('"', pos + 1);
+                if (endValue != std::string::npos) {
+                    std::string value = content.substr(pos + 1, endValue - pos - 1);
+                    set(key, value, ConfigSource::File);
+                    pos = endValue + 1;
+                }
+            } else if (content[pos] == '{' || content[pos] == '[') {
+                // Complex value - for now skip
+                pos++;
+                // Skip until matching closing brace/bracket
+                int depth = 1;
+                while (pos < content.size() && depth > 0) {
+                    if (content[pos] == '{' || content[pos] == '[') depth++;
+                    else if (content[pos] == '}' || content[pos] == ']') depth--;
+                    pos++;
+                }
+            } else {
+                // Simple value (number, boolean, null)
+                size_t endValue = pos;
+                while (endValue < content.size() && content[endValue] != ',' && content[endValue] != '}' && content[endValue] != ']') {
+                    endValue++;
+                }
+                std::string value = content.substr(pos, endValue - pos);
+                trim(value);
+                set(key, value, ConfigSource::File);
+                pos = endValue;
+            }
+            
+            // Skip comma
+            while (pos < content.size() && (std::isspace(content[pos]) || content[pos] == ',')) pos++;
+        }
+    }
+    
+    return !pImpl->entries.empty();
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

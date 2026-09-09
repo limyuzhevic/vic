@@ -610,8 +610,8 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
         // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), std::abs(normalizedValue) / 10.0f);
         }
     }
 }

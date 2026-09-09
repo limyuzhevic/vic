@@ -100,6 +100,15 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File format parsers
+    bool loadFromKeyValueFile(const std::string& filepath);
+    bool loadFromJSONFile(const std::string& filepath);
+    
+    // JSON parsing helpers
+    std::string extractStringValue(const std::string& content, size_t startPos);
+    std::string extractNumberValue(const std::string& content, size_t startPos);
+    std::string extractBooleanValue(const std::string& content, size_t startPos);
 };
 
 } // namespace nlm
