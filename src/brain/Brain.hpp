@@ -137,32 +137,42 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
-    
+// ========== MEMORY SYSTEMS ==========
+
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
-    
+
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
+
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
-    
+
     // ========== PREDICTION SYSTEM ==========
-    
+
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
-    
+
     // ========== COGNITION SYSTEMS ==========
-    
+
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
-    
+
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
-    
+
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+
+    // ========== AUDIO SYSTEM ==========
+
+    // Audio processing for auditory input
+    Audio* getAudio();
+
+    // ========== VISUAL SYSTEM ==========
+
+    // Vision processing for visual input
+    Vision* getVision();
     
     // ========== DEVELOPMENT SYSTEM ==========
     

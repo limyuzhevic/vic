@@ -1023,6 +1023,24 @@ PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
 
+// ========== AUDIO SYSTEM ACCESSOR ==========
+
+Audio* Brain::getAudio() {
+    if (pImpl->attention) {
+        return pImpl->attention->getAudio();
+    }
+    return nullptr;
+}
+
+// ========== VISUAL SYSTEM ACCESSOR ==========
+
+Vision* Brain::getVision() {
+    if (pImpl->attention) {
+        return pImpl->attention->getVision();
+    }
+    return nullptr;
+}
+
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
