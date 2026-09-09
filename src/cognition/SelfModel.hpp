@@ -8,91 +8,6 @@
 
 namespace nlm {
 
-// PlanningCandidate: A possible action sequence considered during planning
-struct PlanningCandidate {
-    std::vector<ActionType> actions;
-    std::vector<std::vector<float>> predictedStates;
-    float expectedReward;
-    float confidence;
-    size_t depth;
-    
-    PlanningCandidate() 
-        : expectedReward(0), confidence(0), depth(0) {}
-};
-
-// NeuralPlanner: Uses learned predictions to plan multi-step actions
-// NOT a search engine - planning emerges from predictive neural dynamics
-//
-// Key mechanisms:
-// - Uses action-consequence predictions
-// - Evaluates potential futures through simulation
-// - Selects actions leading to high-value outcomes
-// - Adapts plans based on prediction confidence
-
-// Get the best action to take now
-    ActionType planAction(const std::vector<float>& currentState,
-                         float targetReward = 0.5f);
-
-    // Evaluate a potential action sequence
-    // Returns expected total reward and confidence
-    PlanningCandidate evaluateSequence(const std::vector<ActionType>& actions,
-                                      const std::vector<float>& startState);
-
-    // Get number of steps to look ahead
-    size_t getPlanningDepth() const { return planningDepth_; }
-    void setPlanningDepth(size_t depth) { planningDepth_ = depth; }
-
-    // Get planning confidence
-    float getPlanningConfidence() const { return planningConfidence_; }
-
-    // Update plans based on actual outcome
-    void updatePlanQuality(const std::vector<ActionType>& plannedActions,
-                          const std::vector<ActionType>& actualActions,
-                          float actualReward);
-
-    // Clear planning cache
-    void clearCache();
-
-    // Set action quality function (from experience)
-    void setActionQuality(ActionType action, float quality) {
-        actionQuality_[static_cast<size_t>(action)] = quality;
-    }
-
-    // Get current goal
-    std::vector<float> getCurrentGoal() const { return currentGoal_; }
-    void setCurrentGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
-
-    // Has recent planning been successful?
-    bool wasRecentPlanSuccessful() const {
-        return !recentPlanSuccess_.empty() && 
-               std::all_of(recentPlanSuccess_.begin(), recentPlanSuccess_.end(), 
-                         [](bool success) { return success; });
-    }
-
-private:
-    // Generate possible action sequences
-    std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
-
-    // Evaluate single action from state
-    float evaluateAction(ActionType action, const std::vector<float>& state);
-
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    size_t planningDepth_;
-    float planningConfidence_;
-    
-    // Current goal state
-    std::vector<float> currentGoal_;
-    
-    // Action quality from experience
-    std::vector<float> actionQuality_;
-    
-    // Recent plan success history
-    std::deque<bool> recentPlanSuccess_;
-};
-
 // SelfModel: Represents the agent's internal model of itself
 // NOT consciousness - sensorimotor self-awareness through experience
 //
@@ -159,7 +74,7 @@ private:
 
     Brain* brain_;
     float capabilityLevel_;
-    
+
     // Action -> (beforeState -> afterState) mappings
     struct ActionEffect {
         std::vector<float> beforeState;
@@ -167,7 +82,7 @@ private:
         float confidence;
         size_t observationCount;
     };
-    
+
     std::vector<std::vector<ActionEffect>> actionEffects_;  // Indexed by ActionType
 };
 
@@ -202,7 +117,7 @@ public:
     // Learn simple communication signal from another agent
     // Signal is a neural pattern that predicts reward from other agent
     void learnCommunicationSignal(const std::vector<float>& signalPattern,
-                                  float signalReward);
+                                 float signalReward);
 
     // Detect if another agent is signaling
     bool detectSignal(const std::vector<float>& neuralPattern) const;
@@ -231,16 +146,16 @@ private:
 
     Brain* brain_;
     size_t observationCount_;
-    
+
     // Observed action effects (other agent's actions)
     struct ObservedEffect {
         std::vector<float> state;
         std::vector<float> resultingState;
         float reward;
     };
-    
+
     std::vector<std::pair<ActionType, ObservedEffect>> observedActions_;
-    
+
     // Communication signal
     std::vector<float> signalPattern_;
     float signalMeaning_;

@@ -343,8 +343,59 @@ void AgentBrain::reset() {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+// ========== MEMORY SYSTEMS ==========
+
+NeuralWorkingMemory* AgentBrain::getWorkingMemory() {
+    if (brain_) {
+        return brain_->getWorkingMemory();
+    }
+    return nullptr;
+}
+
+NeuralEpisodicMemory* AgentBrain::getEpisodicMemory() {
+    if (brain_) {
+        return brain_->getEpisodicMemory();
+    }
+    return nullptr;
+}
+
+NeuralAssociativeMemory* AgentBrain::getAssociativeMemory() {
+    if (brain_) {
+        return brain_->getAssociativeMemory();
+    }
+    return nullptr;
+}
+
+// ========== PREDICTION SYSTEM ==========
+
+PredictionSystem* AgentBrain::getPredictionSystem() {
+    if (brain_) {
+        return brain_->getPredictionSystem();
+    }
+    return nullptr;
+}
+
+// ========== COGNITION SYSTEMS ==========
+
+NeuralPlanner* AgentBrain::getPlanner() {
+    if (brain_) {
+        return brain_->getPlanner();
+    }
+    return nullptr;
+}
+
+ConceptFormation* AgentBrain::getConceptFormation() {
+    if (brain_) {
+        return brain_->getConceptFormation();
+    }
+    return nullptr;
+}
+
+AttentionalSelection* AgentBrain::getAttention() {
+    if (brain_) {
+        return brain_->getAttention();
+    }
+    return nullptr;
 }
 
 } // namespace nlm

@@ -12,6 +12,21 @@ struct ConceptFormation::Impl {
     Impl() : brain(nullptr) {}
 };
 
+    DiscoveredConcept::DiscoveredConcept()
+        : id(0)
+        , totalObservations(0)
+        , avgStability(0.0f) {}
+    
+    DiscoveredConcept::~DiscoveredConcept() = default;
+    
+    ConceptInstance::ConceptInstance()
+        : observationCount(0)
+        , lastObserved(0)
+        , avgReward(0.0f)
+        , stability(0.0f) {}
+    
+    ConceptInstance::~ConceptInstance() = default;
+
 ConceptFormation::ConceptFormation()
     : pImpl(new Impl)
     , brain_(nullptr)
@@ -19,6 +34,7 @@ ConceptFormation::ConceptFormation()
     , formationThreshold_(0.75f)
     , stabilityThreshold_(0.7f)
     , stabilityWindow_(5)
+    , concepts_()
 {
 }
 

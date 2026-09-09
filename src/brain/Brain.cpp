@@ -758,6 +758,38 @@ void Brain::reset() {
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
     
+    // Reset all integrated memory systems
+    if (pImpl->workingMemory) pImpl->workingMemory->clear();
+    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
+    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+    if (pImpl->attention) pImpl->attention->reset();
+    
+    // Reset prediction system if available
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->clearHistory();
+    }
+    
+    // Reset neuromodulation systems
+    if (pImpl->dopamine) pImpl->dopamine->reset();
+    if (pImpl->curiosity) pImpl->curiosity->reset();
+    if (pImpl->novelty) pImpl->novelty->reset();
+    if (pImpl->predictionError) pImpl->predictionError->reset();
+    
+    // Reset development system
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->reset();
+    }
+    
+    // Reset spike system
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->reset();
+    }
+    
+    // Reset structural plasticity
+    if (pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->reset();
+    }
+    
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
@@ -828,6 +860,99 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write working memory state
+        WorkingMemoryCheckpoint workingMemData;
+        if (pImpl->workingMemory) {
+            // Collect active memory traces
+            workingMemData.numTraces = pImpl->workingMemory->getActiveTraces();
+            workingMemData.neuronActivations.reserve(workingMemData.numTraces);
+            
+            for (size_t i = 0; i < workingMemData.numTraces && i < pImpl->workingMemory->getMemoryNeurons().size(); ++i) {
+                workingMemData.neuronActivations.push_back(pImpl->workingMemory->getNeuronActivation(pImpl->workingMemory->getMemoryNeurons()[i]));
+            }
+        }
+        if (!writer.writeWorkingMemory(workingMemData)) {
+            NLM_LOG_ERROR("Failed to write working memory to checkpoint");
+            return false;
+        }
+        
+        // Write episodic memory
+        EpisodicMemoryCheckpoint episodicMemData;
+        if (pImpl->episodicMemory) {
+            episodicMemData.numEpisodes = pImpl->episodicMemory->getEpisodeCount();
+            episodicMemData.episodes.reserve(episodicMemData.numEpisodes);
+            
+            for (size_t i = 0; i < episodicMemData.numEpisodes; ++i) {
+                const auto* episode = pImpl->episodicMemory->getEpisode(i);
+                if (episode) {
+                    episodicMemData.episodes.push_back(*episode);
+                }
+            }
+        }
+        if (!writer.writeEpisodicMemory(episodicMemData)) {
+            NLM_LOG_ERROR("Failed to write episodic memory to checkpoint");
+            return false;
+        }
+        
+        // Write associative memory
+        AssociativeMemoryCheckpoint assocMemData;
+        if (pImpl->associativeMemory) {
+            assocMemData.numAssociations = pImpl->associativeMemory->getAssociationCount();
+            // (In real implementation, would write actual associations)
+        }
+        if (!writer.writeAssociativeMemory(assocMemData)) {
+            NLM_LOG_ERROR("Failed to write associative memory to checkpoint");
+            return false;
+        }
+        
+        // Write prediction system
+        PredictionSystemCheckpoint predSysData;
+        if (pImpl->predictionSystem) {
+            predSysData.error = pImpl->predictionSystem->getPredictionError();
+            predSysData.confidence = pImpl->predictionSystem->getConfidence();
+            predSysData.errorHistory = pImpl->predictionSystem->getErrorHistory();
+        }
+        if (!writer.writePredictionSystem(predSysData)) {
+            NLM_LOG_ERROR("Failed to write prediction system to checkpoint");
+            return false;
+        }
+        
+        // Write cognitive systems
+        CognitiveSystemsCheckpoint cognitiveData;
+        if (pImpl->planner) {
+            // (In real implementation, would write planner state)
+        }
+        if (pImpl->conceptFormation) {
+            // (In real implementation, would write concept formation state)
+        }
+        if (pImpl->attention) {
+            // (In real implementation, would write attention state)
+        }
+        if (!writer.writeCognitiveSystems(cognitiveData)) {
+            NLM_LOG_ERROR("Failed to write cognitive systems to checkpoint");
+            return false;
+        }
+        
+        // Write neuromodulation systems
+        NeuromodulationCheckpoint neuromodData;
+        if (pImpl->dopamine) {
+            neuromodData.dopamineLevel = pImpl->dopamine->getLevel();
+            neuromodData.plasticityFactor = pImpl->dopamine->getPlasticityFactor();
+        }
+        if (pImpl->curiosity) {
+            neuromodData.curiosityLevel = pImpl->curiosity->getLevel();
+        }
+        if (pImpl->novelty) {
+            neuromodData.noveltyLevel = pImpl->novelty->getLevel();
+        }
+        if (pImpl->predictionError) {
+            neuromodData.predictionErrorLevel = pImpl->predictionError->getLevel();
+        }
+        if (!writer.writeNeuromodulation(neuromData)) {
+            NLM_LOG_ERROR("Failed to write neuromodulation systems to checkpoint");
+            return false;
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -842,8 +967,6 @@ bool Brain::save(const std::string& filepath) const {
         return false;
     }
 }
-
-bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
     try {
@@ -888,16 +1011,40 @@ bool Brain::load(const std::string& filepath) {
             }
         }
         
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
+        // Load episodic memory
+        EpisodicMemoryCheckpoint episodicMemData;
+        if (!reader.readEpisodicMemory(episodicMemData)) {
+            NLM_LOG_ERROR("Failed to read episodic memory from checkpoint");
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Load associative memory
+        AssociativeMemoryCheckpoint assocMemData;
+        if (!reader.readAssociativeMemory(assocMemData)) {
+            NLM_LOG_ERROR("Failed to read associative memory from checkpoint");
+            return false;
+        }
+        
+        // Load prediction system
+        PredictionSystemCheckpoint predSysData;
+        if (!reader.readPredictionSystem(predSysData)) {
+            NLM_LOG_ERROR("Failed to read prediction system from checkpoint");
+            return false;
+        }
+        
+        // Load cognitive systems
+        CognitiveSystemsCheckpoint cognitiveData;
+        if (!reader.readCognitiveSystems(cognitiveData)) {
+            NLM_LOG_ERROR("Failed to read cognitive systems from checkpoint");
+            return false;
+        }
+        
+        // Load neuromodulation systems
+        NeuromodulationCheckpoint neuromodData;
+        if (!reader.readNeuromodulation(neuromData)) {
+            NLM_LOG_ERROR("Failed to read neuromodulation systems from checkpoint");
+            return false;
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -908,7 +1055,7 @@ bool Brain::load(const std::string& filepath) {
     }
 }
 
-RegionId Brain::addRegion(const std::string& name) {
+} // namespace nlm
     RegionId id(pImpl->nextRegionId++);
     auto region = std::make_unique<NeuralRegion>(id, name);
     pImpl->regions.push_back(std::move(region));
