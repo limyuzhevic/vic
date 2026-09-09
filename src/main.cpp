@@ -28,6 +28,7 @@
 
 using namespace nlm;
 
+// Print NLM project banner
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -48,7 +49,7 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+// Record initial state of a brain for learning experiments
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -57,14 +58,16 @@ struct LearningExperiment {
     std::vector<float> finalWeights;
     std::vector<NeuronId> mostActiveNeurons;
     
+    // Initialize experiment with a brain and seed
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
         : brain(b), seed(s), initialSynapseCount(0) {}
     
+    // Record initial brain state
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
-        // Record initial weights from first region
+        // Record initial weights from first region for analysis
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
                 initialWeights.push_back(syn->getWeight());
@@ -80,6 +83,7 @@ struct LearningExperiment {
         }
     }
     
+    // Record final brain state after learning
     void recordFinalState() {
         finalWeights.clear();
         
@@ -101,6 +105,7 @@ struct LearningExperiment {
         }
     }
     
+    // Compute and display learning statistics
     void computeStatistics() {
         NLM_LOG_INFO("");
         NLM_LOG_INFO("=== Learning Experiment Results ===");
@@ -122,7 +127,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
         NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
         
-        // Count synapses that changed significantly
+        // Count synapses that changed significantly (>1% change)
         size_t strengthened = 0;
         size_t weakened = 0;
         size_t unchanged = 0;

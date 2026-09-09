@@ -75,12 +75,27 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Main NLM Executable (Phase 2)
+```bash
+./nlm
+```
+
+This runs the Phase 2 real neural computation demo, demonstrating LIF neuron dynamics, STDP learning, and structural plasticity.
+
+### Phase 6 Integration Demo
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs a comprehensive integration test verifying all brain systems are connected. It tests:
+- Integration verification of all 6 major brain systems
+- Memory integration (working and episodic memory)
+- Neuromodulation integration (dopamine, curiosity, novelty)
+- Checkpoint save/load functionality
+- Memory replay system
+- Full integration experiment with configurable parameters
+
+The main `nlm` executable also supports integration testing when run with `--integration` flag.
 
 ## Project Structure
 
