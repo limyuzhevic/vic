@@ -61,7 +61,120 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
+AgentBrain::AgentBrain(AgentBrain&& other) noexcept
+    : brain_(std::move(other.brain_))
+    , dopamineLevel_(other.dopamineLevel_)
+    , noveltyLevel_(other.noveltyLevel_)
+    , curiosityLevel_(other.curiosityLevel_)
+    , predictionError_(other.predictionError_)
+    , expectedReward_(other.expectedReward_)
+    , developmentalAge_(other.developmentalAge_)
+    , plasticityModifier_(other.plasticityModifier_)
+    , rewardModulationEnabled_(other.rewardModulationEnabled_)
+    , structuralPlasticityEnabled_(other.structuralPlasticityEnabled_)
+    , developmentEnabled_(other.developmentEnabled_)
+    , curiosityEnabled_(other.curiosityEnabled_)
+    , sensoryNoveltyDecay_(other.sensoryNoveltyDecay_)
+{
+    // Transfer ownership of neuron vectors (move assignment)
+    motorForward_ = std::move(other.motorForward_);
+    motorBackward_ = std::move(other.motorBackward_);
+    motorTurnLeft_ = std::move(other.motorTurnLeft_);
+    motorTurnRight_ = std::move(other.motorTurnRight_);
+    motorInteract_ = std::move(other.motorInteract_);
+    motorWait_ = std::move(other.motorWait_);
+    
+    sensoryVision_ = std::move(other.sensoryVision_);
+    sensoryTouch_ = std::move(other.sensoryTouch_);
+    sensoryInternal_ = std::move(other.sensoryInternal_);
+    sensoryProprioception_ = std::move(other.sensoryProprioception_);
+    
+    // Clear source object's vectors to avoid double deletion
+    other.motorForward_.clear();
+    other.motorBackward_.clear();
+    other.motorTurnLeft_.clear();
+    other.motorTurnRight_.clear();
+    other.motorInteract_.clear();
+    other.motorWait_.clear();
+    
+    other.sensoryVision_.clear();
+    other.sensoryTouch_.clear();
+    other.sensoryInternal_.clear();
+    other.sensoryProprioception_.clear();
+    
+    previousVision_ = std::move(other.previousVision_);
+    other.previousVision_.clear();
+}
+
 AgentBrain::~AgentBrain() = default;
+
+AgentBrain& AgentBrain::operator=(AgentBrain&& other) noexcept {
+    if (this != &other) {
+        // Clear current state first
+        motorForward_.clear();
+        motorBackward_.clear();
+        motorTurnLeft_.clear();
+        motorTurnRight_.clear();
+        motorInteract_.clear();
+        motorWait_.clear();
+        
+        sensoryVision_.clear();
+        sensoryTouch_.clear();
+        sensoryInternal_.clear();
+        sensoryProprioception_.clear();
+        
+        previousVision_.clear();
+        
+        // Transfer ownership of brain pointer (shared_ptr move)
+        brain_ = std::move(other.brain_);
+        
+        // Transfer all state variables
+        dopamineLevel_ = other.dopamineLevel_;
+        noveltyLevel_ = other.noveltyLevel_;
+        curiosityLevel_ = other.curiosityLevel_;
+        predictionError_ = other.predictionError_;
+        expectedReward_ = other.expectedReward_;
+        developmentalAge_ = other.developmentalAge_;
+        plasticityModifier_ = other.plasticityModifier_;
+        
+        rewardModulationEnabled_ = other.rewardModulationEnabled_;
+        structuralPlasticityEnabled_ = other.structuralPlasticityEnabled_;
+        developmentEnabled_ = other.developmentEnabled_;
+        curiosityEnabled_ = other.curiosityEnabled_;
+        sensoryNoveltyDecay_ = other.sensoryNoveltyDecay_;
+        
+        // Move all neuron vectors
+        motorForward_ = std::move(other.motorForward_);
+        motorBackward_ = std::move(other.motorBackward_);
+        motorTurnLeft_ = std::move(other.motorTurnLeft_);
+        motorTurnRight_ = std::move(other.motorTurnRight_);
+        motorInteract_ = std::move(other.motorInteract_);
+        motorWait_ = std::move(other.motorWait_);
+        
+        sensoryVision_ = std::move(other.sensoryVision_);
+        sensoryTouch_ = std::move(other.sensoryTouch_);
+        sensoryInternal_ = std::move(other.sensoryInternal_);
+        sensoryProprioception_ = std::move(other.sensoryProprioception_);
+        
+        previousVision_ = std::move(other.previousVision_);
+        
+        // Clear source object's vectors
+        other.motorForward_.clear();
+        other.motorBackward_.clear();
+        other.motorTurnLeft_.clear();
+        other.motorTurnRight_.clear();
+        other.motorInteract_.clear();
+        other.motorWait_.clear();
+        
+        other.sensoryVision_.clear();
+        other.sensoryTouch_.clear();
+        other.sensoryInternal_.clear();
+        other.sensoryProprioception_.clear();
+        
+        other.previousVision_.clear();
+    }
+    return *this;
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
@@ -89,38 +202,46 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+    if (!sensoryVision_.empty() && !vision.empty()) {
+        for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+            if (sensoryVision_[i] != nullptr) {
+                // Inject current proportional to vision intensity
+                float current = vision[i] * 5.0f;  // Scale factor
+                sensoryVision_[i]->injectCurrent(current);
+            }
         }
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+    if (!sensoryTouch_.empty() && !touch.empty()) {
+        for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
+            if (sensoryTouch_[i] != nullptr) {
+                float current = touch[i] * 8.0f;  // Collision signal
+                sensoryTouch_[i]->injectCurrent(current);
+            }
         }
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+    if (!sensoryInternal_.empty() && !intern.empty()) {
+        for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+            if (sensoryInternal_[i] != nullptr) {
+                float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+                sensoryInternal_[i]->injectCurrent(current);
+            }
         }
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+    if (!sensoryProprioception_.empty() && !proprio.empty()) {
+        for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
+            if (sensoryProprioception_[i] != nullptr) {
+                float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+                sensoryProprioception_[i]->injectCurrent(current);
+            }
         }
     }
     

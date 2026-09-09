@@ -1,4 +1,6 @@
-#pragma once
+// Complete AgentBrain implementation with move constructor and move assignment operator
+#ifndef AGENTBRAIN_HPP
+#define AGENTBRAIN_HPP
 
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
@@ -9,12 +11,12 @@
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
+    AgentBrain(AgentBrain&& other) noexcept;  // Move constructor
     ~AgentBrain();
+    AgentBrain& operator=(AgentBrain&& other) noexcept;  // Move assignment operator
     
     // Initialize with world
     void initialize(const SimpleWorld& world);
@@ -115,3 +117,5 @@ private:
 };
 
 } // namespace nlm
+
+#endif // AGENTBRAIN_HPP

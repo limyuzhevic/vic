@@ -174,6 +174,10 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
+Brain::~Brain() {
+    delete pImpl;
+}
+
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
@@ -205,12 +209,16 @@ bool Brain::initialize() {
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
                 for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
+                    if (neuron) {
+                        pImpl->sensoryNeurons.push_back(neuron);
+                    }
                 }
             }
             if (motorPop) {
                 for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
+                    if (neuron) {
+                        pImpl->motorNeurons.push_back(neuron);
+                    }
                 }
             }
             
@@ -267,24 +275,28 @@ bool Brain::initialize() {
     });
     
     // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+            // Find destination neuron and deliver synaptic input
+            for (auto& region : pImpl->regions) {
+                if (!region) continue;
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (!neuron) continue;
+                    if (neuron->getId() == event.destination_neuron) {
+                        // Apply synaptic weight as current
+                        MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                        if (event.is_excitatory) {
+                            neuron->receiveExcitatoryInput(synapticCurrent);
+                        } else {
+                            neuron->receiveInhibitoryInput(-synapticCurrent);
+                        }
+                        return;
                     }
-                    return;
                 }
             }
-        }
-    });
+        });
+    }
     
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
@@ -334,8 +346,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
     for (auto& region : pImpl->regions) {
+        if (!region) continue;
         for (auto& pop : region->getPopulations()) {
+            if (!pop) continue;
             for (auto* neuron : pop->getNeurons()) {
+                if (!neuron) continue;
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }
@@ -343,8 +358,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
     for (auto& region : pImpl->regions) {
+        if (!region) continue;
         for (auto& pop : region->getPopulations()) {
+            if (!pop) continue;
             for (auto* neuron : pop->getNeurons()) {
+                if (!neuron) continue;
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
@@ -354,17 +372,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 if (justFired) {
                     // Neuron fired this step - queue the spike
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
-                    pImpl->spikeSystem->queueSpike(event);
+                    if (pImpl->spikeSystem) {
+                        pImpl->spikeSystem->queueSpike(event);
+                    }
 
                     // Record post-synaptic spike for incoming synapses (plasticity)
                     auto incomingSynapses = region->getSynapsesTo(neuron->getId());
                     for (Synapse* syn : incomingSynapses) {
+                        if (!syn) continue;
                         syn->recordPostSpike(currentTime);
                     }
 
                     // Get outgoing synapses and schedule delayed spike events
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
+                        if (!syn) continue;
                         // Create delayed spike event
                         Delay delay = syn->getDelay();
                         SimulationStep deliveryStep = currentStep + delay;
@@ -382,7 +404,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                             deliveryStep
                         );
 
-                        pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
+                        if (pImpl->spikeSystem) {
+                            pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
+                        }
 
                         // Record pre-synaptic spike for plasticity
                         syn->recordPreSpike(currentTime);
@@ -399,7 +423,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->processSpikes(currentStep);
+    }
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
@@ -447,7 +473,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     for (auto& region : pImpl->regions) {
+        if (!region) continue;
         for (auto& syn : region->getSynapses()) {
+            if (!syn) continue;
             // Apply STDP with neuromodulation
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
@@ -455,7 +483,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
                     // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    if (pImpl->stdp) {
+                        pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    }
                     float weight = syn->getWeight();
                     weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
                     syn->setWeight(weight);
@@ -468,7 +498,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    if (pImpl->hebbian) {
+                        pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    }
                 }
             }
             
@@ -490,8 +522,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             // Store active neurons
             for (auto& region : pImpl->regions) {
+                if (!region) continue;
                 for (auto& pop : region->getPopulations()) {
+                    if (!pop) continue;
                     for (auto* neuron : pop->getNeurons()) {
+                        if (!neuron) continue;
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());
@@ -534,7 +569,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+        if (pImpl->structuralPlasticity) {
+            pImpl->structuralPlasticity->update(this, *pImpl->rng);
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========
@@ -542,37 +579,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
+            if (!episode) continue;
             pImpl->episodicMemory->replayEpisode(episode);
         }
     }
     
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+        if (pImpl->developmentSystem) {
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
             
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+            // Development affects plasticity rates
+            auto* sp = pImpl->structuralPlasticity;
+            if (sp) {
+                DevelopmentalStage stage = pImpl->developmentalStage;
+                float plasticityMod = 1.0f;
+                
+                switch (stage) {
+                    case DevelopmentalStage::Initial:
+                        plasticityMod = 1.0f;  // High plasticity
+                        break;
+                    case DevelopmentalStage::CriticalPeriod:
+                        plasticityMod = 0.8f;
+                        break;
+                    case DevelopmentalStage::Maturation:
+                        plasticityMod = 0.5f;
+                        break;
+                    case DevelopmentalStage::Adult:
+                        plasticityMod = 0.2f;  // Stable
+                        break;
+                }
+                
+                sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+                sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
             }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
     
@@ -607,11 +647,13 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         }
         
         // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
-        
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        if (i < pImpl->sensoryNeurons.size()) {
+            pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+            
+            // Also store in working memory
+            if (pImpl->workingMemory && normalizedValue > 0.5f) {
+                pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+            }
         }
     }
 }
@@ -630,9 +672,12 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
     for (auto& region : pImpl->regions) {
+        if (!region) continue;
         for (auto& pop : region->getPopulations()) {
+            if (!pop) continue;
             if (pop->getNeuronType() == type) {
                 for (auto* neuron : pop->getNeurons()) {
+                    if (!neuron) continue;
                     neuron->injectCurrent(current);
                 }
             }
