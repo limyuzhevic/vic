@@ -8,26 +8,39 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+#include <numeric>
 
 namespace nlm {
 
-// Forward declarations
+// Core configuration and utility classes
 class Config;
 class RandomGenerator;
-class SimulationClock;
-class Logger;
+
+// Memory systems
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+
+// Prediction and cognition
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
+
+// Development system
 class DevelopmentSystem;
+
+// Neuromodulation systems
 class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+
+// External system interfaces (defined in other headers)
+class SensoryInput;
+class Action;
+class Neuromodulator;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -36,9 +49,6 @@ struct InterRegionConnection {
     float weight;
     Delay delay;
     PlasticityFlags plasticityFlags;
-    
-    InterRegionConnection()
-        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
     
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
@@ -72,7 +82,7 @@ public:
     
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern
-    void receiveSensoryInput(const class SensoryInput& input);
+    void receiveSensoryInput(const SensoryInput& input);
     
     // Inject current directly into a specific neuron
     void injectCurrent(NeuronId neuron, MembranePotential current);
@@ -95,10 +105,10 @@ public:
     size_t getPendingSpikeEventCount() const;
     
     // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    std::unique_ptr<Action> produceAction();
     
     // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    void applyNeuromodulation(const Neuromodulator& signal);
     
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();

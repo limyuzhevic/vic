@@ -15,6 +15,7 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "NeuralRegion.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -588,7 +589,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
 }
 
-void Brain::receiveSensoryInput(const class SensoryInput& input) {
+void Brain::receiveSensoryInput(const SensoryInput& input) {
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     
@@ -689,7 +690,7 @@ size_t Brain::getPendingSpikeEventCount() const {
     return pImpl->spikeSystem->getPendingSpikeCount() + pImpl->spikeSystem->getPendingDelayedCount();
 }
 
-std::unique_ptr<class Action> Brain::produceAction() {
+std::unique_ptr<Action> Brain::produceAction() {
     // Simple action selection based on motor neuron activity
     // The motor neuron population with highest average activity determines action
     
