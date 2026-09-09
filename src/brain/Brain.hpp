@@ -94,7 +94,7 @@ public:
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
-    // Produce motor/action output based on motor neuron activity
+    // Produce action based on planned actions and motor neurons
     std::unique_ptr<class Action> produceAction();
     
     // Apply neuromodulatory signals
