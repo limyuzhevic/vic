@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,9 +20,24 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PHASE 2: Implement proper JSON/YAML parser
+    // Supports both JSON (.json) and simple key=value formats (.cfg)
     
+    // Check file extension
+    std::string ext = ".";
+    size_t pos = filepath.rfind('.');
+    if (pos != std::string::npos && pos < filepath.length() - 1) {
+        ext = filepath.substr(pos);
+    }
+    
+    if (ext == ".json") {
+        return loadFromJson(filepath);
+    } else {
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -55,6 +71,186 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
+bool Config::loadFromJson(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Parse JSON data
+        if (jsonData.is_object()) {
+            for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+                std::string key = it.key();
+                
+                // Convert JSON value to ConfigValue
+                ConfigValue configValue;
+                const auto& jsonValue = it.value();
+                
+                if (jsonValue.is_number_integer()) {
+                    configValue = jsonValue.get<int64_t>();
+                } else if (jsonValue.is_number_unsigned()) {
+                    configValue = jsonValue.get<size_t>();
+                } else if (jsonValue.is_number_float()) {
+                    configValue = jsonValue.get<double>();
+                } else if (jsonValue.is_boolean()) {
+                    configValue = jsonValue.get<bool>();
+                } else if (jsonValue.is_string()) {
+                    configValue = jsonValue.get<std::string>();
+                } else if (jsonValue.is_array()) {
+                    // Try to infer array type
+                    const auto& arr = jsonValue.get<std::vector<nlohmann::json>>();
+                    if (!arr.empty()) {
+                        if (arr[0].is_number_integer()) {
+                            std::vector<int64_t> intArray;
+                            intArray.reserve(arr.size());
+                            for (const auto& item : arr) {
+                                intArray.push_back(item.get<int64_t>());
+                            }
+                            configValue = intArray;
+                        } else if (arr[0].is_number_float()) {
+                            std::vector<double> doubleArray;
+                            doubleArray.reserve(arr.size());
+                            for (const auto& item : arr) {
+                                doubleArray.push_back(item.get<double>());
+                            }
+                            configValue = doubleArray;
+                        } else if (arr[0].is_string()) {
+                            std::vector<std::string> stringArray;
+                            stringArray.reserve(arr.size());
+                            for (const auto& item : arr) {
+                                stringArray.push_back(item.get<std::string>());
+                            }
+                            configValue = stringArray;
+                        } else {
+                            // Fallback to string representation
+                            std::vector<int> genericArray;
+                            genericArray.reserve(arr.size());
+                            for (const auto& item : arr) {
+                                genericArray.push_back(item.get<int>());
+                            }
+                            configValue = genericArray;
+                        }
+                    } else {
+                        // Empty array - use int vector
+                        configValue = std::vector<int64_t>();
+                    }
+                } else {
+                    // Unknown type, store as string
+                    configValue = jsonValue.dump();
+                }
+                
+                // Add to config with description from JSON comment (if available)
+                std::string description = "";
+                // Note: JSON doesn't have comments, so we could parse them if needed
+                pImpl->entries.emplace_back(key, configValue, ConfigSource::File, description);
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON config file: " + std::string(e.what()) + " in " + filepath);
+        return false;
+    }
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Check file extension
+    std::string ext = ".";
+    size_t pos = filepath.rfind('.');
+    if (pos != std::string::npos && pos < filepath.length() - 1) {
+        ext = filepath.substr(pos);
+    }
+    
+    if (ext == ".json") {
+        return saveToJson(filepath);
+    } else {
+        return saveToSimpleFormat(filepath);
+    }
+}
+
+bool Config::saveToSimpleFormat(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    for (const auto& entry : pImpl->entries) {
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        file << entry.key << " = ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
+    }
+    
+    return true;
+}
+
+bool Config::saveToJson(const std::string& filepath) const {
+    nlohmann::json jsonData;
+    
+    for (const auto& entry : pImpl->entries) {
+        // Convert ConfigValue to JSON
+        std::visit([&jsonData, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int64_t>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, int>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, size_t>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                jsonData[entry.key] = arg;
+            } else {
+                // Unknown type, store as string
+                jsonData[entry.key] = std::to_string(arg);
+            }
+        }, entry.value);
+    }
+    
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << jsonData.dump(2); // Pretty print with 2-space indentation
+    return true;
+}
+
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -75,20 +271,6 @@ bool Config::loadFromArgs(int argc, char** argv) {
             set(key, value, ConfigSource::CommandLine);
         }
     }
-    return true;
-}
-
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
     return true;
 }
 

@@ -245,79 +245,151 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
-void runStdpVerification(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 3: STDP Verification ===");
+void runStdpVerification(std::shared_ptr<Brain> brain);
+
+// New command-line interface for Phase 2
+void printHelp() {
+    std::cout << R"(
+NLM Phase 2 Test Runner
+======================
+
+Usage: nlm [OPTIONS]
+
+Options:
+  --config <file>      Configuration file (default: configs/default.cfg)
+  --test <name>        Run specific test (can be repeated)
+  --verbose            Enable verbose logging
+  --profile            Enable performance profiling
+  --help               Show this help message
+
+Available tests:
+  basic               Run basic neural connectivity test
+  plasticity         Run plasticity learning experiment
+  stdp               Run STDP verification test
+  all                Run all tests (default)
+
+Examples:
+  nlm --test basic --test plasticity
+  nlm --verbose --config my_config.cfg
+  nlm --test stdp
+
+)" << std::endl;
+}
+
+bool parseCommandLineArgs(int argc, char** argv, std::string& configFile, 
+                          std::vector<std::string>& testNames, bool& verbose, bool& profile) {
+    configFile = "configs/default.cfg";
+    testNames.push_back("all"); // Default to run all tests
+    verbose = false;
+    profile = false;
     
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
-    
-    // Get first few synapses
-    auto& synapses = region->getSynapses();
-    if (synapses.size() < 5) {
-        NLM_LOG_INFO("  Not enough synapses for STDP test");
-        return;
-    }
-    
-    NLM_LOG_INFO("  Testing STDP on 5 synapses:");
-    
-    // Record initial weights
-    std::vector<float> beforeWeights;
-    for (size_t i = 0; i < 5; ++i) {
-        beforeWeights.push_back(synapses[i]->getWeight());
-        synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
-    }
-    
-    // Create correlated activity: fire pre then post to trigger LTP
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-    
-    for (int trial = 0; trial < 50; ++trial) {
-        // Fire pre-synaptic neuron
-        Neuron* preNeuron = nullptr;
-        Neuron* postNeuron = nullptr;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
         
-        auto neurons = region->getAllNeurons();
-        if (neurons.size() >= 2) {
-            preNeuron = neurons[0];
-            postNeuron = neurons[1];
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return false; // Signal to exit after printing help
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        } else if (arg.substr(0, 6) == "--test") {
+            if (arg.find('=') != std::string::npos) {
+                testNames.push_back(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                testNames.push_back(argv[++i]);
+            }
+        } else if (arg == "--verbose") {
+            verbose = true;
+        } else if (arg == "--profile") {
+            profile = true;
+        } else if (arg[0] == '-') {
+            // Unknown option
+            std::cerr << "Unknown option: " << arg << std::endl;
+            printHelp();
+            return false;
+        }
+    }
+    
+    // Remove "all" if other tests were specified
+    if (testNames.size() > 1 || (testNames.size() == 1 && testNames[0] != "all")) {
+        // Clear "all" if present
+        if (!testNames.empty() && testNames[0] == "all") {
+            testNames.erase(testNames.begin());
+        }
+    }
+    
+    return true;
+}
+
+bool runSpecifiedTests(std::shared_ptr<Brain> brain, const std::vector<std::string>& testNames, 
+                       bool verbose, bool profile) {
+    bool anyTestFailed = false;
+    
+    for (const auto& testName : testNames) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Running Test: " + testName + " ===");
+        NLM_LOG_INFO("");
+        
+        bool testSuccess = runSingleTest(brain, testName, verbose, profile);
+        if (!testSuccess) {
+            anyTestFailed = true;
+            NLM_LOG_ERROR("Test '" + testName + "' FAILED");
+        } else {
+            NLM_LOG_INFO("Test '" + testName + "' completed successfully");
         }
         
-        if (preNeuron && postNeuron) {
-            // Pre fires first
-            preNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2, trial * 2 * 0.001);
-            
-            // Then post fires
-            postNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+        // Reset brain for next test if not the last one
+        if (&testName != &testNames.back()) {
+            brain->reset();
+            brain->initialize();
         }
     }
     
-    // Record after weights
-    NLM_LOG_INFO("  After correlated activity:");
-    for (size_t i = 0; i < 5; ++i) {
-        float delta = synapses[i]->getWeight() - beforeWeights[i];
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
-    }
+    return !anyTestFailed;
+}
+
+void runAllTests(std::shared_ptr<Brain> brain, bool verbose, bool profile) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Running All Tests (Comprehensive Suite) ===");
+    NLM_LOG_INFO("");
     
-    // Check if weights increased (LTP)
-    float totalDelta = 0.0f;
-    for (size_t i = 0; i < 5; ++i) {
-        totalDelta += synapses[i]->getWeight() - beforeWeights[i];
-    }
+    runBasicConnectivityTest(brain);
+    
+    // Reset between tests
+    brain->reset();
+    brain->initialize();
+    
+    runPlasticityExperiment(brain);
+    
+    brain->reset();
+    brain->initialize();
+    
+    runStdpVerification(brain);
     
     NLM_LOG_INFO("");
-    if (totalDelta > 0.001f) {
-        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
-    } else if (totalDelta < -0.001f) {
-        NLM_LOG_INFO("  ! STDP reversed: Check parameters");
+    NLM_LOG_INFO("=== All Tests Completed ===");
+}
+
+bool runSingleTest(std::shared_ptr<Brain> brain, const std::string& testName, 
+                   bool verbose, bool profile) {
+    if (testName == "basic") {
+        runBasicConnectivityTest(brain);
+        return true;
+    } else if (testName == "plasticity") {
+        runPlasticityExperiment(brain);
+        return true;
+    } else if (testName == "stdp") {
+        runStdpVerification(brain);
+        return true;
+    } else if (testName == "all") {
+        runAllTests(brain, verbose, profile);
+        return true;
     } else {
-        NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+        NLM_LOG_ERROR("Unknown test name: '" + testName + "'");
+        return false;
     }
 }
 
@@ -343,22 +415,32 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Parse command line arguments
     std::string configFile = "configs/default.cfg";
+    std::vector<std::string> testNames;
+    bool verbose = false;
+    bool profile = false;
+    
+    if (!parseCommandLineArgs(argc, argv, configFile, testNames, verbose, profile)) {
+        return 0; // Help was printed, exit gracefully
+    }
+    
+    // Try to load from file if provided
+    std::string loadedConfigFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
+                loadedConfigFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
-                configFile = argv[++i];
+                loadedConfigFile = argv[++i];
             }
         }
     }
     
     // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    if (config->loadFromFile(loadedConfigFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + loadedConfigFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
@@ -409,20 +491,11 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run specified tests
+    if (!runSpecifiedTests(brain, testNames, verbose, profile)) {
+        NLM_LOG_ERROR("Some tests failed");
+        return 1;
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -447,3 +520,4 @@ int main(int argc, char** argv) {
     
     return 0;
 }
+} // namespace nlm

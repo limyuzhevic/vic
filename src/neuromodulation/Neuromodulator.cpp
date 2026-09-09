@@ -47,10 +47,18 @@ void Dopamine::signalReward(float reward) {
     pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
 }
 
-void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+bool Dopamine::initializeFromConfig(const Config& config) {
+    // Initialize from configuration file
+    pImpl->baseline = config.getOr<float>("dopamine_baseline", 0.0f);
+    pImpl->decayRate = config.getOr<float>("dopamine_decay_rate", 0.1f);
+    pImpl->releaseRate = config.getOr<float>("dopamine_release_rate", 1.0f);
+    pImpl->peak = config.getOr<float>("dopamine_peak_level", 1.0f);
+    
+    // Set initial level to baseline
+    setLevel(pImpl->baseline);
+    
+    NLM_LOG_INFO("Dopamine system initialized: baseline=" + std::to_string(pImpl->baseline) +
+                 ", decay_rate=" + std::to_string(pImpl->decayRate) +
+                 ", release_rate=" + std::to_string(pImpl->releaseRate));
+    return true;
 }
-
-} // namespace nlm

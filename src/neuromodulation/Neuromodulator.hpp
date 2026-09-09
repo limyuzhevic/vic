@@ -1,11 +1,3 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include <string>
-#include <vector>
-
-namespace nlm {
-
 // Neuromodulator: Abstract base for neuromodulatory signals
 // PLACEHOLDER - Phase 2 will implement real neuromodulation effects
 
@@ -32,7 +24,7 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Real implementation with proper dynamics
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -43,6 +35,9 @@ public:
     void setLevel(float level) override;
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
+    
+    // Initialize from configuration
+    bool initializeFromConfig(const class Config& config);
     
     // Reward signaling
     void signalReward(float reward);
