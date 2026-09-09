@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Action.hpp"
+#include "../core/Types/MotorCommand.hpp"
 #include <memory>
 #include <vector>
 

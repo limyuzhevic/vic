@@ -131,6 +131,41 @@ enum class DevelopmentalStage : uint8_t {
     Aging
 };
 
+// Motor commands for action selection
+enum class MotorCommand : uint8_t {
+    MoveForward,
+    MoveBackward,
+    TurnLeft,
+    TurnRight,
+    LookLeft,
+    LookRight,
+    Interact,
+    Wait,
+    Eat,
+    Drink,
+    Rest,
+    Custom
+};
+
+// Action types for motor output
+enum class ActionType : uint8_t {
+    MoveForward,
+    MoveBackward,
+    MoveLeft,
+    MoveRight,
+    TurnLeft,
+    TurnRight,
+    Look,
+    LookUp,
+    LookDown,
+    Interact,
+    Eat,
+    Drink,
+    Rest,
+    Wait,
+    Custom
+};
+
 // Spike event for event-driven computation
 struct SpikeEvent {
     NeuronId source_neuron;

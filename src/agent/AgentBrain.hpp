@@ -4,6 +4,7 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../core/Types/Types.hpp"
 #include <memory>
 #include <vector>
 
@@ -75,7 +76,7 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
+
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups
@@ -83,7 +84,12 @@ private:
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
     std::vector<Neuron*> motorTurnRight_;
+    std::vector<Neuron*> motorLookLeft_;
+    std::vector<Neuron*> motorLookRight_;
     std::vector<Neuron*> motorInteract_;
+    std::vector<Neuron*> motorEat_;
+    std::vector<Neuron*> motorDrink_;
+    std::vector<Neuron*> motorRest_;
     std::vector<Neuron*> motorWait_;
     
     // Sensory neuron groups
@@ -112,6 +118,25 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Advanced configuration parameters
+    struct Configuration {
+        float noveltyThreshold_ = 0.3f;
+        float curiosityThreshold_ = 0.5f;
+        float explorationRate_ = 0.2f;
+        float actionSelectionTemperature_ = 1.0f;
+        float developmentalTimeScale_ = 1.0f;
+        bool enableMetaCuriosity_ = false;
+        bool enableActionSelection_ = true;
+    };
+    
+    Configuration config_;
+    
+    // Performance and state tracking
+    size_t lastSelectedAction_;
+    float actionEntropy_;
+    float metaCuriosityLevel_;
+    Timestamp lastActionTime_;
 };
 
 } // namespace nlm
