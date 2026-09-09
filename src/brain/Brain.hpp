@@ -1,13 +1,16 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "../performance/BrainCheckpointData.hpp"
+#include "../performance/CheckpointSystem.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+#include <fstream>
+#include <algorithm>
+#include <cmath>
+#include <sstream>
 
 namespace nlm {
 
@@ -18,6 +21,8 @@ class SimulationClock;
 class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
+class NeuralSemanticMemory;
+class NeuralProceduralMemory;
 class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
@@ -28,6 +33,8 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class CheckpointWriter;
+class CheckpointReader;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -43,6 +50,48 @@ struct InterRegionConnection {
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
+
+// Checkpoints
+class CheckpointManager;
+
+// Checkpoint helper functions
+bool writeWorkingMemory(CheckpointWriter& writer, const NeuralWorkingMemory* workingMemory);
+bool readWorkingMemory(CheckpointReader& reader, NeuralWorkingMemory* workingMemory);
+
+bool writeEpisodicMemory(CheckpointWriter& writer, const NeuralEpisodicMemory* episodicMemory);
+bool readEpisodicMemory(CheckpointReader& reader, NeuralEpisodicMemory* episodicMemory);
+
+bool writeAssociativeMemory(CheckpointWriter& writer, const NeuralAssociativeMemory* associativeMemory);
+bool readAssociativeMemory(CheckpointReader& reader, NeuralAssociativeMemory* associativeMemory);
+
+bool writePredictionSystem(CheckpointWriter& writer, const PredictionSystem* predictionSystem);
+bool readPredictionSystem(CheckpointReader& reader, PredictionSystem* predictionSystem);
+
+bool writeNeuralPlanner(CheckpointWriter& writer, const NeuralPlanner* neuralPlanner);
+bool readNeuralPlanner(CheckpointReader& reader, NeuralPlanner* neuralPlanner);
+
+bool writeConceptFormation(CheckpointWriter& writer, const ConceptFormation* conceptFormation);
+bool readConceptFormation(CheckpointReader& reader, ConceptFormation* conceptFormation);
+
+bool writeAttentionalSelection(CheckpointWriter& writer, const AttentionalSelection* attention);
+bool readAttentionalSelection(CheckpointReader& reader, AttentionalSelection* attention);
+
+bool writeDevelopmentSystem(CheckpointWriter& writer, const DevelopmentSystem* developmentSystem);
+bool readDevelopmentSystem(CheckpointReader& reader, DevelopmentSystem* developmentSystem);
+
+bool writeNeuromodulation(CheckpointWriter& writer, const Dopamine* dopamine, const Curiosity* curiosity,
+                         const PredictionError* predictionError, const Novelty* novelty);
+bool readNeuromodulation(CheckpointReader& reader, Dopamine* dopamine, Curiosity* curiosity,
+                        PredictionError* predictionError, Novelty* novelty);
+
+bool writeStructuralPlasticity(CheckpointWriter& writer, const StructuralPlasticity* structuralPlasticity);
+bool readStructuralPlasticity(CheckpointReader& reader, StructuralPlasticity* structuralPlasticity);
+
+bool writeSpikeSystem(CheckpointWriter& writer, const SpikeSystem* spikeSystem);
+bool readSpikeSystem(CheckpointReader& reader, SpikeSystem* spikeSystem);
+
+// Reinitialize integrated systems
+void reinitializeIntegratedSystems(Brain* brain);
 
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
@@ -144,6 +193,12 @@ public:
     
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
+    
+    // Semantic memory - knowledge base
+    NeuralSemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - skills and habits
+    NeuralProceduralMemory* getProceduralMemory();
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();

@@ -25,31 +25,30 @@ void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
     /*
-     * Real STDP implementation based on spike-timing correlation
+     * Real STDP implementation based on synaptic biology
      * 
-     * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
+     * This implements the classic STDP learning rule derived from 
+     * experimental observations in biological synapses.
      * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
+     * Mathematical formulation (derived from empirical data):
+     * 
+     * For pre-before-post spike pairs (Δt = t_post - t_pre > 0):
+     *   Δw = A+ * f(Δt) where f(Δt) = exp(-Δt / τ+)
+     *   - This reflects LTP (long-term potentiation)
+     *   - Mediated by Ca²⁺ influx through NMDA receptors
+     *   - Typically A+ = 0.01-0.05, τ+ = 15-35ms
      *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
-     * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
-     * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
+     * For post-before-pre spike pairs (Δt < 0):
+     *   Δw = -A- * g(-Δt) where g(-Δt) = exp(-|Δt| / τ-)
+     *   - This reflects LTD (long-term depression)
+     *   - Mediated by backpropagating action potentials and Ca²⁺ spikes
+     *   - Typically A- = 0.012-0.025, τ- = 30-40ms
      *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
+     * Key biological features:
+     *   - Asymmetric learning windows
+     *   - Spike timing dependence (not just coincidence)
+     *   - Activity-dependent modulation (dopamine, etc.)
+     *   - Limited range of effectiveness
      */
     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
@@ -59,26 +58,34 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
+    // Process all spike pairs
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
             
             if (dt > 0) {
                 // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
+                // NMDA receptor activation: more effective when pre fires before post
+                // Time window: typically up to 50-100ms
+                if (dt <= 100.0f) {  // Limit to biologically realistic window
+                    float delta = pImpl->ltpWeight * std::exp(-dt / tau);
+                    totalDelta += delta;
+                }
             } else if (dt < 0) {
                 // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
+                // Backpropagating action potentials cause LTD
+                // Time window: typically up to 50-100ms
+                float negDt = -dt;
+                if (negDt <= 100.0f) {  // Limit to biologically realistic window
+                    float delta = -pImpl->ltdWeight * std::exp(negDt / tau);
+                    totalDelta += delta;
+                }
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+            // dt == 0: no change (simultaneous spikes - minimal effect)
         }
     }
     
-    // Apply weight change with bounds
+    // Apply weight change with biological constraints
     if (std::abs(totalDelta) > 1e-6f) {
         // Scale by synaptic efficacy if available
         float efficacy = synapse->getEfficacy();

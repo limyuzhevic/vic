@@ -35,10 +35,20 @@ void Novelty::setLevel(float level) {
 
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
-    // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
-    pImpl->history.push_back(pImpl->level);
+    // Compute novelty from comparison with previous observations
+    // Novelty is based on prediction error and surprise
+    // Higher difference means higher novelty
+    
+    // Extract features from observations
+    std::vector<float> currentFeatures;
+    std::vector<float> previousFeatures;
+    
+    // In real implementation, features would be extracted using neural networks
+    // For now, use raw observation data
+    currentFeatures = observation.getData();
+    previousFeatures = previousObservation.getData();
+    
+    detectNovelty(currentFeatures, previousFeatures);
 }
 
 void Novelty::detectNovelty(const std::vector<float>& currentPattern,

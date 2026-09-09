@@ -23,55 +23,57 @@ void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& postSpikes,
                       TimestepDuration dt) {
     /*
-     * Real Hebbian learning implementation
+     * Real Hebbian learning implementation with spike-coincidence detection
      * 
-     * Mathematical formulation (Covariance rule):
-     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
-     * 
-     * Simplified version for spike-based systems:
-     * Δw = η * (coactivity - baseline)
-     * 
+     * Mathematical formulation (Realistic spike-based Hebbian):
+     * Δw = η * Σ_t (pre(t) * post(t - Δt))
      * Where:
-     *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
+     *   - pre(t) = pre-synaptic spike at time t (1 if spiked, 0 otherwise)
+     *   - post(t - Δt) = post-synaptic spike Δt time after pre spike
+     *   - η = learningRate (typically 0.001 - 0.01)
+     *   - Δt = optimal spike timing window (10-30ms for biological realism)
      * 
      * Biological inspiration:
-     *   - Reflects AMPA receptor trafficking
-     *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
-     *   - Correlation-based learning in visual cortex
+     *   - Reflects NMDA receptor-dependent Hebbian plasticity
+     *   - Spike-timing dependent but broader window than STDP
+     *   - Implemented at excitatory synapses in cortex
      *   
-     * Limitations:
-     *   - Doesn't account for STDP timing details
-     *   - Single learning rate (no separate potentiation/depression rates)
-     *   - Assumes stationary statistics
+     * Learning window shape:
+     *   - Peak at Δt = 0 (simultaneous spikes)
+     *   - Decay with time lag
+     *   - Can include both pre->post and post->pre components
      */
     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
+    // Optimized spike coincidence detection
+    float totalDelta = 0.0f;
+    float optimalWindow = 20.0f;  // ms - optimal spike timing window
+    
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
             float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
+            
+            // Spike coincidence within optimal window
+            if (std::abs(dt) <= optimalWindow) {
+                // Gaussian learning window centered at dt=0
+                float weight = std::exp(-(dt * dt) / (2.0f * optimalWindow * optimalWindow));
+                totalDelta += weight;
             }
         }
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    // Apply weight change based on spike coincidence
+    float delta = pImpl->learningRate * totalDelta;
     
-    // Apply with bounds
-    if (std::abs(delta) > 1e-6f) {
-        applyWeightChange(synapse, delta);
+    // Apply with bounds and ensure biological realism
+    if (std::abs(delta) > 1e-8f) {
+        // Scale by current weight to prevent runaway potentiation
+        float currentWeight = synapse->getWeight();
+        float normalizedDelta = delta * (1.0f - std::abs(currentWeight) / (pImpl->maxWeight + 0.01f));
+        applyWeightChange(synapse, normalizedDelta);
     }
 }
 
