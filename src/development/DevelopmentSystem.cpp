@@ -65,21 +65,8 @@ void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
     age_ += 0.001;  // Approximate timestep
     pImpl->stageAge += 0.001;
     
-    // Auto-advance stage based on time in stage
-    // Initial: 60 steps, CriticalPeriod: 300 steps, Maturation: 600 steps
-    if (pImpl->stage == DevelopmentalStage::Initial && pImpl->stageAge > 60.0) {
-        advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::CriticalPeriod && pImpl->stageAge > 300.0) {
-        advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::Maturation && pImpl->stageAge > 600.0) {
-        advanceStage();
-    }
-}
-
-void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDuration dt) {
-    age_ += dt;
-    pImpl->stageAge += dt;
-    ++pImpl->stepsInCurrentStage;
+    age_ += 0.001;  // Approximate timestep
+    pImpl->stageAge += 0.001;
     
     // Auto-advance stage based on developmental age
     // These thresholds are in simulation seconds

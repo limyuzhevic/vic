@@ -85,7 +85,10 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_WARNING("AgentBrain::processSensoryInput: brain_ is null");
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();

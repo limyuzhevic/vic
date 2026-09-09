@@ -9,13 +9,6 @@
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
-class AgentBrain {
-public:
-    AgentBrain(std::shared_ptr<Brain> brain);
-    ~AgentBrain();
-    
     // Initialize with world
     void initialize(const SimpleWorld& world);
     
@@ -56,7 +49,7 @@ public:
     void reset();
     
     // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    Brain* getBrain();
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
