@@ -5,6 +5,21 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
+
+// Try to include JSON and YAML libraries if available
+#if __has_include(<nlohmann/json.hpp>)
+#include <nlohmann/json.hpp>
+#endif
+
+#if __has_include(<yaml-cpp/yaml.h>)
+#include <yaml-cpp/yaml.h>
+#endif
 
 namespace nlm {
 
@@ -22,6 +37,24 @@ using ConfigValue = std::variant<
     std::vector<double>,
     std::vector<std::string>
 >;
+
+// JSON to ConfigValue conversion helpers
+namespace json_helpers {
+    template<typename T>
+    ConfigValue jsonToConfigValue(const T& value);
+    
+    template<typename T>
+    T configValueToJson(const ConfigValue& configVal);
+}
+
+// YAML to ConfigValue conversion helpers  
+namespace yaml_helpers {
+    template<typename T>
+    ConfigValue yamlToConfigValue(const T& value);
+    
+    template<typename T>
+    T configValueToYaml(const ConfigValue& configVal);
+}
 
 // Configuration source
 enum class ConfigSource {
@@ -55,13 +88,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON and YAML)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,6 +126,30 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Parse JSON string to config values
+    static std::map<std::string, ConfigValue> parseJsonString(const std::string& jsonString);
+    
+    // Parse YAML string to config values
+    static std::map<std::string, ConfigValue> parseYamlString(const std::string& yamlString);
+    
+    // Validate config value against expected type
+    static bool validateConfigValue(const ConfigValue& value, const std::string& expectedType);
+    
+    // Import config from JSON string
+    bool importFromJsonString(const std::string& jsonString, ConfigSource source = ConfigSource::Runtime);
+    
+    // Export config to JSON string
+    std::string exportToJsonString() const;
+    
+    // Import config from YAML string
+    bool importFromYamlString(const std::string& yamlString, ConfigSource source = ConfigSource::Runtime);
+    
+    // Merge another config into this one
+    void merge(const Config& other, ConfigSource source = ConfigSource::Runtime);
+    
+    // Validate all config values
+    std::vector<std::string> validateAll() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +157,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool endsWith(const std::string& str, const std::string& suffix);
+    static std::string valueToString(const ConfigValue& value);
+    static ConfigSource resolveSource(ConfigSource source) const;
 };
-
-} // namespace nlm

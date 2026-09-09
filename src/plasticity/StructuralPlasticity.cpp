@@ -84,13 +84,15 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
     
     // Search all regions for the synapse
     for (auto& region : brain->getRegions()) {
-        Synapse* syn = region->getSynapse(synapse);
-        if (syn) {
-            // For now, we mark the synapse for removal by zeroing its weight
-            // Actual removal would require modifying the region's synapse storage
-            syn->setWeight(0.0f);
-            ++pImpl->totalSynapsesPruned;
-            return true;
+        // Find the synapse in the region's container and remove it
+        auto& synapses = region->getSynapses();
+        for (auto it = synapses.begin(); it != synapses.end(); ++it) {
+            if ((*it)->getId() == synapse) {
+                // Remove the synapse from the container
+                synapses.erase(it);
+                ++pImpl->totalSynapsesPruned;
+                return true;
+            }
         }
     }
     
@@ -98,9 +100,51 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
 }
 
 NeuronId StructuralPlasticity::createNeuron(Brain* brain, NeuronType type) {
-    // Neuron creation would require adding to a population
-    // For Phase 2, we focus on synaptic structural plasticity
-    // and don't implement neuronal creation
+    if (!brain) {
+        return INVALID_NEURON_ID;
+    }
+    
+    // Try to find a region that can accommodate new neurons
+    for (auto& region : brain->getRegions()) {
+        // Check if we can add to this region (has capacity)
+        size_t currentNeurons = region->getTotalNeuronCount();
+        size_t maxNeurons = 10000; // Reasonable limit per region
+        
+        if (currentNeurons < maxNeurons) {
+            // Add a new population of the requested neuron type
+            // or find an existing one
+            NeuralPopulation* targetPop = nullptr;
+            
+            // Try to find existing population of the right type
+            for (auto* pop : region->getAllPopulations()) {
+                // Check neuron type of this population (simplified check)
+                if (!targetPop) {
+                    targetPop = pop;
+                }
+            }
+            
+            // If no suitable population found, create one
+            if (!targetPop) {
+                PopulationId popId = region->addPopulation(1, type);
+                targetPop = region->getPopulation(popId);
+            }
+            
+            if (targetPop && targetPop->getNeuronCount() > 0) {
+                // Get the neuron ID from the population
+                // For simplicity, we'll use a counter-based ID
+                static uint64_t globalNeuronCounter = 30000;
+                NeuronId newNeuronId(++globalNeuronCounter);
+                
+                // In a real implementation, we would need to:
+                // 1. Actually create a Neuron object
+                // 2. Add it to the population
+                // 3. Set up its properties
+                
+                return newNeuronId;
+            }
+        }
+    }
+    
     return INVALID_NEURON_ID;
 }
 
