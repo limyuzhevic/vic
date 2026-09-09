@@ -42,6 +42,8 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
+**Note:** This is the simplest possible example that just creates a brain and runs it. For more complex use cases involving world interaction and learning, see Example 2 below.
+
 ### Example 2: Brain in a Simple World
 
 ```python
@@ -293,5 +295,6 @@ When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Build from source using the build instructions in README.md
 
 That's it! You're now ready to use NLM.
