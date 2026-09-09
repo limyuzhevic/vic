@@ -896,9 +896,83 @@ bool Brain::load(const std::string& filepath) {
         }
         
         // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Create lookup table from neuron index to actual neuron pointer
+        std::vector<Neuron*> neuronIndexToPtr;
+        neuronIndexToPtr.reserve(neuronData.membranePotential.size());
         
+        size_t neuronIdx = 0;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    neuronIndexToPtr.push_back(const_cast<Neuron*>(neuron));
+                    neuronIdx++;
+                }
+            }
+        }
+        
+        // Match synapses by source and destination neuron indices
+        size_t matchedSynapses = 0;
+        size_t totalSynapses = synapseData.weight.size();
+        
+        for (size_t i = 0; i < totalSynapses; ++i) {
+            // Find source and destination neurons
+            Neuron* sourceNeuron = nullptr;
+            Neuron* destNeuron = nullptr;
+            
+            if (i < synapseData.sourceNeuron.size()) {
+                uint64_t srcIdx = synapseData.sourceNeuron[i];
+                if (srcIdx < neuronIndexToPtr.size()) {
+                    sourceNeuron = neuronIndexToPtr[srcIdx];
+                }
+            }
+            
+            if (i < synapseData.destinationNeuron.size()) {
+                uint64_t destIdx = synapseData.destinationNeuron[i];
+                if (destIdx < neuronIndexToPtr.size()) {
+                    destNeuron = neuronIndexToPtr[destIdx];
+                }
+            }
+            
+            // Only restore if both neurons exist and have valid indices
+            if (sourceNeuron && destNeuron) {
+                // Try to find existing synapse between these neurons
+                // This is a simplified approach - in practice, we'd need more sophisticated matching
+                bool synapseRestored = false;
+                
+                // Look through all populations and neurons for synapses
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        // Check outgoing synapses from source neuron
+                        for (auto* syn : sourceNeuron->getOutgoingSynapses()) {
+                            if (syn && syn->getDestinationNeuron() == destNeuron) {
+                                                // Restore synapse properties
+                if (i < synapseData.weight.size()) {
+                    syn->setWeight(synapseData.weight[i]);
+                }
+                if (i < synapseData.delay.size()) {
+                    syn->setDelay(synapseData.delay[i]);
+                }
+                if (i < synapseData.synapseType.size()) {
+                    syn->setType(static_cast<SynapseType>(synapseData.synapseType[i]));
+                }
+                if (i < synapseData.eligibilityTrace.size()) {
+                    syn->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                }
+                matchedSynapses++;
+                synapseRestored = true;
+                break;
+                            }
+                        }
+                        
+                        if (synapseRestored) break;
+                    }
+                    if (synapseRestored) break;
+                }
+            }
+        }
+        
+        NLM_LOG_INFO("Restored " + std::to_string(matchedSynapses) + " out of " + 
+                    std::to_string(totalSynapses) + " synapses from checkpoint");
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
         
