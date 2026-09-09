@@ -1,17 +1,17 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
+#include "PlasticityRule.hpp"
 
 namespace nlm {
 
 // Structural plasticity: creation and removal of synapses and neurons
 // PLACEHOLDER - Phase 2 will implement real structural plasticity
 
-class StructuralPlasticity {
+class StructuralPlasticity : public PlasticityRule {
 public:
     StructuralPlasticity();
-    ~StructuralPlasticity();
+    ~StructuralPlasticity() override;
     
     // Create new synapse
     // TODO PHASE 2: Implement real synapse creation
