@@ -229,18 +229,24 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
+// ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
+
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
-    
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    }
+
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
-    
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    }
+
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -414,7 +420,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        pImpl->curiosity->update(pImpl->novelty->getLevel(), pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -438,6 +444,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
+    
+    // TODO PHASE 2: Implement acetylcholine effects on attention and memory
+    // ACh should modulate attention focus and memory consolidation
+    if (pImpl->attention) {
+        // ACh typically increases attentional focus and facilitates memory encoding
+        // For now, just apply a small bias
+        pImpl->attention->applyTopDownBias(0, 0.1f);
+    }
+    
+    // TODO PHASE 2: Implement norepinephrine effects on arousal
+    // NE should increase overall arousal and vigilance
+    // For now, just increase baseline excitability
+    float arousalFactor = 1.0f;
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                if (arousalFactor > 1.0f) {
+                    neuron->injectCurrent((arousalFactor - 1.0f) * 0.1f);
+                }
+            }
+        }
+    }
+    
+    // TODO PHASE 2: Implement serotonin effects on mood and impulsivity
+    // 5-HT should modulate mood, impulsivity, and social behavior
+    // For now, just apply a baseline effect
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
@@ -510,9 +542,53 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->attention) {
+        // Make predictions based on current sensory state
+        // Use prediction system to generate next state prediction
+        std::unique_ptr<SensoryInput> predictedState;
+        
+        // Collect current sensory input for prediction
+        std::vector<float> currentSensoryData;
+        if (!pImpl->sensoryNeurons.empty()) {
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                if (neuron->isFiring() || 
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 10.0f) {
+                    currentSensoryData.push_back(
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 50.0f);
+                } else {
+                    currentSensoryData.push_back(0.0f);
+                }
+            }
+        }
+        
+        // Create current sensory input
+        SensoryInput currentSensoryInput;
+        currentSensoryInput.setData(currentSensoryData);
+        
+        // Get prediction from prediction system
+        predictedState = pImpl->predictionSystem->predictNextState(currentSensoryInput);
+        
+        if (predictedState) {
+            // Compute prediction error between predicted and actual sensory state
+            float predictionError = 0.0f;
+            const auto& predData = predictedState->getData();
+            const auto& actData = currentSensoryData;
+            
+            if (predData.size() == actData.size() && !actData.empty()) {
+                float sumError = 0.0f;
+                for (size_t i = 0; i < predData.size(); ++i) {
+                    float diff = predData[i] - actData[i];
+                    sumError += diff * diff;
+                }
+                predictionError = sumError / predData.size();
+                
+                // Update prediction system with actual observation
+                pImpl->predictionSystem->updatePredictions(*predictedState, currentSensoryInput);
+                
+                // Feed prediction error to attention system for saliency
+                pImpl->attention->applyBottomUpSalience(0, predictionError * 10.0f);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
