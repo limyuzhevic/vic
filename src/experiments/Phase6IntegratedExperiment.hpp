@@ -47,6 +47,11 @@ struct Phase6IntegrationResult {
     float curiosityLevel;
     float dopamineLevel;
     
+    // Performance metrics for neural planner
+    float plannerConfidence;
+    float plannerSuccessRate;
+    float plannerAverageReward;
+    
     // Timestamps
     time_t startTime;
     time_t endTime;
@@ -67,6 +72,9 @@ struct Phase6IntegrationResult {
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
         , dopamineLevel(0.0f)
+        , plannerConfidence(0.0f)
+        , plannerSuccessRate(0.0f)
+        , plannerAverageReward(0.0f)
         , startTime(0)
         , endTime(0)
         , totalWallClockTime(0.0) {}
@@ -85,6 +93,10 @@ struct Phase6Config {
     bool enableDevelopment;
     std::string checkpointPath;
     
+    // Planner integration
+    size_t plannerDepth;
+    float targetReward;
+    
     Phase6Config()
         : maxSteps(10000)
         , neuronCount(1000)
@@ -93,7 +105,9 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , checkpointPath("./checkpoint_test.bin")
+        , plannerDepth(5)
+        , targetReward(0.5f) {}
 };
 
 /**

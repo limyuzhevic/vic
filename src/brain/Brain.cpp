@@ -502,6 +502,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
+            // Connect to working memory for persistent activity
+            if (pImpl->workingMemory) {
+                // Store sensory-related activity in working memory
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        if (pop->getNeuronType() == NeuronType::Sensory) {
+                            for (auto* neuron : pop->getNeurons()) {
+                                if (neuron->isFiring()) {
+                                    float activation = neuron->getState().membranePotential - neuron->getState().restingPotential;
+                                    pImpl->workingMemory->storeToNeuron(neuron->getId(), activation);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Also store the complete episode pattern in working memory for retrieval
+                if (!episode.activeNeurons.empty()) {
+                    std::vector<float> episodePattern;
+                    for (float activation : episode.neuronActivations) {
+                        episodePattern.push_back(activation);
+                    }
+                    if (!episodePattern.empty()) {
+                        pImpl->workingMemory->store(episodePattern, 0.5f);
+                    }
+                }
+            }
+            
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
