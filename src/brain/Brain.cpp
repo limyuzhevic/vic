@@ -5,19 +5,16 @@
 #include "../core/SimulationClock/SimulationClock.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../environment/Environment.hpp"
+#include "../experiments/ExperimentRunner.hpp"
+#include "../memory/Memory.hpp"  // For NeuralWorkingMemory, NeuralEpisodicMemory, etc.
+#include "../neuromodulation/Neuromodulator.hpp"  // For Neuromodulator, Dopamine, etc.
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../development/DevelopmentSystem.hpp"
 #include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
 #include <sstream>
 
 namespace nlm {
@@ -159,7 +156,9 @@ struct Brain::Impl {
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
-Brain::~Brain() = default;
+Brain::~Brain() {
+    delete pImpl;
+}
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -174,8 +173,30 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
+// Deep copy constructor implementation
+Brain::Brain(const Brain& other) : pImpl(nullptr) {
+    if (other.pImpl) {
+        pImpl = new Impl(*other.pImpl);
+    }
+}
+
+Brain& Brain::operator=(const Brain& other) {
+    if (this != &other) {
+        delete pImpl;
+        pImpl = other.pImpl ? new Impl(*other.pImpl) : nullptr;
+    }
+    return *this;
+}
+
+// Initialize brain with configuration
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+    
+    // Check if pImpl is valid before proceeding
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain not properly initialized");
+        return false;
+    }
     
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
@@ -215,8 +236,8 @@ bool Brain::initialize() {
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
     

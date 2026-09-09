@@ -143,11 +143,14 @@ private:
     Impl* pImpl;
 };
 
-// Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
-
-class AssociativeMemory {
-public:
+  // Associative memory: relationships between representations
+  // PLACEHOLDER - Phase 2 will implement real associative memory
+ 
+  // Note: NeuralAssociativeMemory is now implemented in src/brain/Brain.cpp
+  // This placeholder is kept for compatibility
+  
+  class AssociativeMemory {
+  public:
     AssociativeMemory();
     ~AssociativeMemory();
     
@@ -166,9 +169,9 @@ public:
     // Clear all
     void clear();
     
-private:
+  private:
     struct Impl;
     Impl* pImpl;
-};
+  };
 
 } // namespace nlm

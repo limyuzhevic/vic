@@ -61,7 +61,8 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
-    // Initialize brain with configuration
+    // Merge another brain into this one
+    bool merge(const Brain& other);
     bool initialize();
     
     // Main simulation step

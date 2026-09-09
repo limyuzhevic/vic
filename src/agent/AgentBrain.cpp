@@ -343,6 +343,19 @@ void AgentBrain::reset() {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Clear all neuron group vectors
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
