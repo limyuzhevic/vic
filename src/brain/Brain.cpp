@@ -1013,6 +1013,14 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
 }
 
+NeuralAssociativeMemory* Brain::getSemanticMemory() {
+    return pImpl->associativeMemory.get();
+}
+
+NeuralAssociativeMemory* Brain::getProceduralMemory() {
+    return pImpl->associativeMemory.get();
+}
+
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }

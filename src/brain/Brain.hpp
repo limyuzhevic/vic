@@ -137,16 +137,22 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
-    
+// ========== MEMORY SYSTEMS ==========
+
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
     
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
     
-    // Associative memory - pattern associations
+    // Associative memory - pattern associations (also serves as semantic and procedural memory)
     NeuralAssociativeMemory* getAssociativeMemory();
+    
+    // Semantic memory - knowledge about the world (alias for associative memory)
+    NeuralAssociativeMemory* getSemanticMemory();
+    
+    // Procedural memory - skills and habits (alias for associative memory)
+    NeuralAssociativeMemory* getProceduralMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
