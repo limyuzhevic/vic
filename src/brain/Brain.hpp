@@ -6,6 +6,13 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "BrainIntegration.hpp"
+#include "BrainInitializer.hpp"
+#include "BrainMemoryInitializer.hpp"
+#include "BrainPredictionInitializer.hpp"
+#include "BrainCognitionInitializer.hpp"
+#include "BrainNeuromodulationInitializer.hpp"
+#include "BrainDevelopmentInitializer.hpp"
 #include <memory>
 #include <string>
 

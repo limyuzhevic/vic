@@ -49,8 +49,16 @@ cmake.args = [
     "-DPYTHON_EXECUTABLE={python}",
 ]
 
-[tool.scikit-build.cmake.define]
-NLM_SOURCE_DIR = "src"
+ [tool.scikit-build.cmake.define]
+ NLM_SOURCE_DIR = "src"
+ NLM_MODE = "demo"
+
+ [tool.scikit-build.cmake.define]
+ NLM_BUILD_MODE = "minimal"  # Use minimal build for faster compilation
+
+ [tool.pytest.ini_options]
+ testpaths = ["tests"]
+ python_files = ["test_*.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
