@@ -400,26 +400,295 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Add loadFromArgs wrapper for command line configuration
+    m.def("loadConfigFromArgs", [](std::shared_ptr<Config> config, int argc, char** argv) {
+        return config->loadFromArgs(argc, argv);
+    }, py::arg("config"), py::arg("argc"), py::arg("argv"), "Load configuration from command line arguments");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Enhanced configuration creation with environment-specific presets
+    m.def("createConfigForEnvironment", [](const std::string& environment, const std::string& mode) {
+        auto config = std::make_shared<Config>();
+        
+        if (environment == "gridworld" || environment == "GridWorld") {
+            config->set("environment_name", std::string("GridWorld"));
+            config->set("environment_width", 20);
+            config->set("environment_height", 20);
+            config->set("connection_probability", 0.05f);
+        } else if (environment == "maze") {
+            config->set("environment_name", std::string("Maze"));
+            config->set("environment_width", 30);
+            config->set("environment_height", 30);
+            config->set("connection_probability", 0.03f);
+        }
+        
+        if (mode == "exploration") {
+            config->set("curiosity_enabled", true);
+            config->set("novelty_detection", 0.8f);
+            config->set("max_simulation_steps", static_cast<int64_t>(50000));
+        } else if (mode == "memory") {
+            config->set("episodic_memory_max_episodes", static_cast<int64_t>(5000));
+            config->set("working_memory_capacity", static_cast<int64_t>(2000));
+            config->set("max_simulation_steps", static_cast<int64_t>(100000));
+        } else if (mode == "learning") {
+            config->set("reward_modulation_enabled", true);
+            config->set("plasticity_learning_rate", 0.05f);
+            config->set("max_simulation_steps", static_cast<int64_t>(20000));
+        }
+        
+        // Set core parameters
+        config->set("random_seed", int64_t(42 + std::hash<std::string>{}(environment) % 1000));
+        config->set("simulation_timestep", 0.001);
+        config->set("neuron_count", static_cast<int64_t>(2000));
+        config->set("region_count", static_cast<int64_t>(3));
+        
+        return config;
+    }, py::arg("environment"), py::arg("mode"), 
+         R"pbdoc(
+        Create a configuration optimized for a specific environment and mode.
+        
+        Args:
+            environment: Environment type ("gridworld", "maze", etc.)
+            mode: Operating mode ("exploration", "memory", "learning", "default")
+        
+        Returns:
+            Config: Pre-configured NLM configuration
+        
+        This provides preset configurations for different use cases, adjusting
+        network size, connectivity, and system parameters based on the target
+        environment and desired mode of operation.
+    )pbdoc");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Quick setup for common experiment scenarios
+    m.def("quickSetupExploration", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Exploration-focused settings
+        config->set("random_seed", int64_t(42));
+        config->set("simulation_timestep", 0.001);
+        config->set("neuron_count", static_cast<int64_t>(1500));
+        config->set("region_count", static_cast<int64_t>(2));
+        config->set("connection_probability", 0.08f);
+        
+        // Enable exploration features
+        config->set("curiosity_enabled", true);
+        config->set("novelty_detection", 0.7f);
+        config->set("exploration_rate", 0.3f);
+        config->set("reward_modulation_enabled", true);
+        config->set("structural_plasticity_enabled", true);
+        config->set("development_enabled", true);
+        
+        // Set up world for exploration
+        config->set("environment_name", std::string("GridWorld"));
+        config->set("environment_width", 15);
+        config->set("environment_height", 15);
+        config->set("vision_width", 8);
+        config->set("vision_height", 8);
+        
+        // Configure for long exploration
+        config->set("max_simulation_steps", static_cast<int64_t>(100000));
+        config->set("simulation_time_limit", 0.0);
+        
+        return std::make_shared<Brain>(config);
+    }, R"pbdoc(
+        Quick setup for exploration experiments.
+        
+        Returns:
+            Brain: A pre-configured NLM brain ready for exploration experiments.
+        
+        This is a convenience function that creates a complete, ready-to-use
+        NLM brain configured for exploration and discovery behavior, including
+        curiosity-driven exploration and reward-based learning.
+    )pbdoc");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("quickSetupMemory", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Memory-focused settings
+        config->set("random_seed", int64_t(123));
+        config->set("simulation_timestep", 0.001);
+        config->set("neuron_count", static_cast<int64_t>(3000));
+        config->set("region_count", static_cast<int64_t>(4));
+        config->set("connection_probability", 0.06f);
+        
+        // Enable memory features
+        config->set("episodic_memory_max_episodes", static_cast<int64_t>(3000));
+        config->set("working_memory_capacity", static_cast<int64_t>(1500));
+        config->set("associative_memory_enabled", true);
+        config->set("reward_modulation_enabled", true);
+        config->set("plasticity_learning_rate", 0.03f);
+        
+        // Configure environment
+        config->set("environment_name", std::string("GridWorld"));
+        config->set("environment_width", 25);
+        config->set("environment_height", 25);
+        config->set("vision_width", 10);
+        config->set("vision_height", 10);
+        
+        // Configure for memory-intensive experiments
+        config->set("max_simulation_steps", static_cast<int64_t>(200000));
+        config->set("consolidation_interval", static_cast<int64_t>(2000));
+        
+        return std::make_shared<Brain>(config);
+    }, R"pbdoc(
+        Quick setup for memory experiments.
+        
+        Returns:
+            Brain: A pre-configured NLM brain ready for memory experiments.
+        
+        This creates a brain optimized for episodic and working memory experiments,
+        with larger network capacity and memory system configuration for
+        studying memory formation, consolidation, and retrieval.
+    )pbdoc");
 
-} // namespace nlm
+    m.def("quickSetupLearning", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Learning-focused settings
+        config->set("random_seed", int64_t(456));
+        config->set("simulation_timestep", 0.001);
+        config->set("neuron_count", static_cast<int64_t>(2000));
+        config->set("region_count", static_cast<int64_t>(3));
+        config->set("connection_probability", 0.12f);
+        
+        // Enable learning features
+        config->set("reward_modulation_enabled", true);
+        config->set("structural_plasticity_enabled", true);
+        config->set("plasticity_learning_rate", 0.08f);
+        config->set("stdp_ltp_weight", 0.03f);
+        config->set("stdp_ltd_weight", 0.028f);
+        config->set("development_enabled", true);
+        config->set("curiosity_enabled", true);
+        
+        // Configure for RL-style learning
+        config->set("environment_name", std::string("GridWorld"));
+        config->set("environment_width", 20);
+        config->set("environment_height", 20);
+        config->set("vision_width", 6);
+        config->set("vision_height", 6);
+        
+        // Configure for intensive learning
+        config->set("max_simulation_steps", static_cast<int64_t>(50000));
+        config->set("reward_discount_factor", 0.95f);
+        
+        return std::make_shared<Brain>(config);
+    }, R"pbdoc(
+        Quick setup for reinforcement learning experiments.
+        
+        Returns:
+            Brain: A pre-configured NLM brain ready for reinforcement learning.
+        
+        This creates a brain optimized for reward-based learning and
+        reinforcement learning experiments, with strong plasticity and
+        neuromodulation for value-based learning.
+    )pbdoc");
+
+    // Batch simulation utilities
+    m.def("runMultipleSimulations", [](const std::vector<std::shared_ptr<Config>>& configs, 
+                                       const std::vector<int>& stepsPerConfig,
+                                       bool runInParallel = false) {
+        std::vector<std::shared_ptr<Brain>> brains;
+        std::vector<std::vector<double>> results;
+        
+        for (size_t i = 0; i < configs.size(); ++i) {
+            auto brain = std::make_shared<Brain>(configs[i]);
+            if (!brain->initialize()) {
+                throw std::runtime_error("Failed to initialize brain for simulation " + std::to_string(i));
+            }
+            brains.push_back(brain);
+            
+            // Run simulation
+            for (int step = 0; step < stepsPerConfig[i]; ++step) {
+                brain->step(step);
+            }
+            
+            // Collect results
+            std::vector<double> simulationResults;
+            simulationResults.push_back(static_cast<double>(brain->getTotalSpikeCount()));
+            simulationResults.push_back(static_cast<double>(brain->getAverageFiringRate()));
+            
+            if (auto episodicMemory = brain->getEpisodicMemory()) {
+                simulationResults.push_back(static_cast<double>(episodicMemory->getEpisodeCount()));
+            }
+            
+            results.push_back(simulationResults);
+        }
+        
+        return std::make_tuple(brains, results);
+    }, py::arg("configs"), py::arg("stepsPerConfig"), py::arg("runInParallel"), 
+         R"pbdoc(
+        Run multiple simulations with different configurations.
+        
+        Args:
+            configs: List of configuration objects
+            stepsPerConfig: Number of steps for each simulation
+            runInParallel: Whether to run simulations in parallel (if supported)
+        
+        Returns:
+            tuple: (brains, results) where brains is list of brain objects and
+                   results contains performance metrics for each simulation
+        
+        This utility is useful for running comparative experiments or
+        parameter sweeps across different configuration settings.
+    )pbdoc");
+
+    // Create default config with all standard parameters initialized
+    m.def("createDefaultConfig", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Set all standard configuration parameters with proper defaults
+        config->set("random_seed", int64_t(42));
+        config->set("simulation_timestep", 0.001);
+        config->set("neuron_count", static_cast<int64_t>(1000));
+        config->set("region_count", static_cast<int64_t>(2));
+        config->set("connection_probability", 0.1f);
+        
+        // STDP parameters
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        config->set("stdp_time_constant", 20.0f);
+        
+        // Structural plasticity
+        config->set("synaptogenesis_rate", 0.001f);
+        config->set("pruning_rate", 0.0001f);
+        
+        // Neuromodulation
+        config->set("dopamine_baseline", 0.1f);
+        config->set("reward_discount_factor", 0.99f);
+        
+        // Environment
+        config->set("environment_name", std::string("GridWorld"));
+        config->set("environment_width", 10);
+        config->set("environment_height", 10);
+        
+        // Logging
+        config->set("log_level", std::string("INFO"));
+        config->set("log_to_file", false);
+        config->set("log_filename", std::string("nlm.log"));
+        
+        // Simulation
+        config->set("max_simulation_steps", static_cast<int64_t>(10000));
+        config->set("simulation_time_limit", 0.0);
+        
+        // Visualization
+        config->set("visualization_enabled", false);
+        config->set("visualization_update_rate", 30.0f);
+        
+        return config;
+    }, R"pbdoc(
+        Create a default NLM configuration with all standard parameters initialized.
+        
+        Returns:
+            Config: A configuration object with sensible defaults for Phase 2 simulation.
+        
+        The configuration includes:
+        - 1000 neurons across 2 regions
+        - Standard STDP parameters for learning
+        - Structural plasticity settings
+        - Neuromodulation baseline
+        - Environment parameters for GridWorld
+        - Logging configuration
+    )pbdoc");
