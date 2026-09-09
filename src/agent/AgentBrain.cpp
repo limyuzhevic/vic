@@ -64,6 +64,15 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
+    if (!brain_) {
+        NLM_LOG_WARNING("Cannot initialize AgentBrain: brain pointer is null");
+        return;
+    }
+    if (world.getVisionWidth() == 0 || world.getVisionHeight() == 0) {
+        NLM_LOG_WARNING("Invalid world dimensions: visionWidth=" + std::to_string(world.getVisionWidth()) + ", visionHeight=" + std::to_string(world.getVisionHeight()));
+        return;
+    }
+    
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
@@ -75,8 +84,8 @@ void AgentBrain::initialize(const SimpleWorld& world) {
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
+    if (!brain_) return 0;
+    return 256 + 8 + 4 + 6;  // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
@@ -86,6 +95,16 @@ size_t AgentBrain::getMotorOutputSize() const {
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
+    
+    // Validate input percept
+    if (!percept.getVision().empty() && percept.getVision().size() != 256) {
+        NLM_LOG_WARNING("Vision data size mismatch: expected 256 values, got " + std::to_string(percept.getVision().size()));
+        return;
+    }
+    if (!percept.getTouch().empty() && percept.getTouch().size() != 8) {
+        NLM_LOG_WARNING("Touch data size mismatch: expected 8 values, got " + std::to_string(percept.getTouch().size()));
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -215,10 +234,10 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
         
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+        float r = brain_->getRandomFloat(0.0f, 1.0f);
         if (r < exploreChance) {
             // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            int choice = brain_->getRandomInt(0, 7);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -237,6 +256,12 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
+    
+    // Validate inputs
+    if (std::isnan(reward) || std::isnan(predictedReward)) {
+        NLM_LOG_WARNING("Invalid reward values: reward=" + std::to_string(reward) + ", predictedReward=" + std::to_string(predictedReward));
+        return;
+    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;

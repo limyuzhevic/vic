@@ -55,10 +55,10 @@ public:
     // Reset agent for new episode
     void reset();
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Get brain pointer (inline)
+    Brain* getBrain() const { return brain_ ? brain_.get() : nullptr; }
     
-    // Configuration
+    // Configuration (inline)
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }

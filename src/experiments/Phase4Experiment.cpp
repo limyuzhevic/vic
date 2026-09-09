@@ -238,7 +238,7 @@ Phase4Results ConceptFormationExperiment::run(Brain* brain, size_t numTrials) {
         // Create variation
         std::vector<float> variation = basePattern;
         for (auto& v : variation) {
-            v += (brain->getRandomGenerator()->uniformReal(-0.1f, 0.1f));
+            v += (brain->getRandomFloat(-0.1f, 0.1f));
             v = std::clamp(v, 0.0f, 1.0f);
         }
         
@@ -595,7 +595,7 @@ Phase4Results Phase4IntegratedExperiment::run(Brain* brain, size_t numEpisodes, 
             // Create next state (simplified)
             std::vector<float> nextState = currentState;
             for (size_t i = 0; i < nextState.size(); ++i) {
-                nextState[i] = nextState[i] * 0.95f + brain->getRandomGenerator()->uniformReal(0, 0.1f);
+                nextState[i] = nextState[i] * 0.95f + brain->getRandomFloat(0, 0.1f);
             }
             
             // Store episode
@@ -604,7 +604,7 @@ Phase4Results Phase4IntegratedExperiment::run(Brain* brain, size_t numEpisodes, 
             episodeItem.sensoryState = currentState;
             episodeItem.resultingSensoryState = nextState;
             episodeItem.action = plannedAction;
-            episodeItem.reward = brain->getRandomGenerator()->uniformReal(-0.1f, 0.2f);
+            episodeItem.reward = brain->getRandomFloat(-0.1f, 0.2f);
             episodicMem.storeEpisode(episodeItem);
             
             // Update concepts

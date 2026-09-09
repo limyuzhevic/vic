@@ -187,8 +187,9 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Get random number (interface to avoid exposing internal rng)
+    float getRandomFloat(float min = 0.0f, float max = 1.0f);
+    int getRandomInt(int min = 0, int max = 7);
     
     // Logging
     void logStatus() const;

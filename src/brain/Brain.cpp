@@ -1073,8 +1073,14 @@ std::shared_ptr<const Config> Brain::getConfig() const {
     return pImpl->config;
 }
 
-RandomGenerator* Brain::getRandomGenerator() {
-    return pImpl->rng.get();
+float Brain::getRandomFloat(float min, float max) {
+    if (!pImpl->rng) return min;
+    return pImpl->rng->uniformReal(min, max);
+}
+
+int Brain::getRandomInt(int min, int max) {
+    if (!pImpl->rng) return min;
+    return static_cast<int>(pImpl->rng->uniformInt(static_cast<uint32_t>(min), static_cast<uint32_t>(max)));
 }
 
 void Brain::logStatus() const {

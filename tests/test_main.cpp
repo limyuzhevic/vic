@@ -1,5 +1,6 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
+// Enhanced with comprehensive test coverage for all improvements
 
 #include <iostream>
 #include <cassert>
@@ -34,6 +35,26 @@ namespace test_stdp {
 }
 
 namespace test_brain {
+    void runAll();
+}
+
+namespace test_agentbrain {
+    void runAll();
+}
+
+namespace test_python_bindings {
+    void runAll();
+}
+
+namespace test_config_improvements {
+    void runAll();
+}
+
+namespace test_phase6demo {
+    void runAll();
+}
+
+namespace test_integration {
     void runAll();
 }
 
