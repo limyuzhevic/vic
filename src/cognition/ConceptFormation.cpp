@@ -30,11 +30,29 @@ void ConceptFormation::initialize(Brain* brain) {
     NLM_LOG_INFO("ConceptFormation initialized");
 }
 
-size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
+void ConceptFormation::presentExperience(const std::vector<float>& pattern,
                                           const std::vector<float>& features,
                                           float reward,
                                           SimulationStep currentTime) {
-    if (pattern.empty()) return 0;
+    // Validate input pattern size (prevent DoS attacks and memory issues)
+    const size_t MAX_PATTERN_SIZE = 1000;  // Maximum allowed pattern size
+    if (pattern.size() > MAX_PATTERN_SIZE) {
+        NLM_LOG_WARNING("ConceptFormation: Pattern size " + 
+                       std::to_string(pattern.size()) + 
+                       " exceeds maximum " + std::to_string(MAX_PATTERN_SIZE));
+        return;
+    }
+    
+    // Validate features size
+    const size_t MAX_FEATURES_SIZE = 100;  // Maximum allowed features size
+    if (features.size() > MAX_FEATURES_SIZE) {
+        NLM_LOG_WARNING("ConceptFormation: Features size " + 
+                       std::to_string(features.size()) + 
+                       " exceeds maximum " + std::to_string(MAX_FEATURES_SIZE));
+        return;
+    }
+    
+    if (pattern.empty()) return;
     
     // Check if this pattern matches any existing concept
     size_t matchingConcept = findConceptForPattern(pattern);
@@ -57,9 +75,33 @@ size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
     return 0;  // Not yet classifiable
 }
 
-size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
+void ConceptFormation::createConcept(const std::vector<float>& pattern,
                                        const std::vector<float>& features,
                                        float reward) {
+    // Validate input parameters
+    const size_t MAX_PATTERN_SIZE = 1000;
+    const size_t MAX_FEATURES_SIZE = 100;
+    const float MAX_REWARD = 100.0f;
+    
+    if (pattern.size() > MAX_PATTERN_SIZE) {
+        NLM_LOG_WARNING("ConceptFormation: Pattern size " + std::to_string(pattern.size()) + 
+                       " exceeds maximum " + std::to_string(MAX_PATTERN_SIZE));
+        return;
+    }
+    
+    if (features.size() > MAX_FEATURES_SIZE) {
+        NLM_LOG_WARNING("ConceptFormation: Features size " + std::to_string(features.size()) + 
+                       " exceeds maximum " + std::to_string(MAX_FEATURES_SIZE));
+        return;
+    }
+    
+    if (reward > MAX_REWARD || reward < -MAX_REWARD) {
+        NLM_LOG_WARNING("ConceptFormation: Reward " + std::to_string(reward) + 
+                       " outside reasonable bounds (-" + std::to_string(MAX_REWARD) + 
+                       " to " + std::to_string(MAX_REWARD) + ")");
+        return;
+    }
+    
     DiscoveredConcept concept;
     concept.id = nextConceptId_++;
     concept.prototype = pattern;
@@ -140,15 +182,34 @@ void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>&
 }
 
 void ConceptFormation::updatePrototype(size_t conceptId, const std::vector<float>& newInstance) {
+    // Validate new instance size
+    const size_t MAX_PATTERN_SIZE = 1000;
+    if (newInstance.size() > MAX_PATTERN_SIZE) {
+        NLM_LOG_WARNING("ConceptFormation: updatePrototype - Instance size " + 
+                       std::to_string(newInstance.size()) + 
+                       " exceeds maximum " + std::to_string(MAX_PATTERN_SIZE));
+        return;
+    }
+    
     for (auto& concept : concepts_) {
         if (concept.id == conceptId) {
+            // Validate prototype size before update
+            if (concept.prototype.size() != newInstance.size()) {
+                NLM_LOG_WARNING("ConceptFormation: Prototype size mismatch for concept " + 
+                               std::to_string(conceptId) + ". Stopping update.");
+                return;
+            }
+            
             // Hebbian update: weight prototype towards new instance
             float alpha = 0.2f;  // Learning rate
             
-            if (concept.prototype.size() == newInstance.size()) {
-                for (size_t i = 0; i < concept.prototype.size(); ++i) {
-                    concept.prototype[i] = concept.prototype[i] * (1.0f - alpha) + 
-                                          newInstance[i] * alpha;
+            for (size_t i = 0; i < concept.prototype.size(); ++i) {
+                concept.prototype[i] = concept.prototype[i] * (1.0f - alpha) + 
+                                      newInstance[i] * alpha;
+                
+                // Clamp values to prevent overflow
+                if (concept.prototype[i] > 1.0f || concept.prototype[i] < -1.0f) {
+                    concept.prototype[i] = std::clamp(concept.prototype[i], -1.0f, 1.0f);
                 }
             }
             break;

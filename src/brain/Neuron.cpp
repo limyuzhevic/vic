@@ -1,7 +1,4 @@
-#include "Neuron.hpp"
-#include "../core/Random/Random.hpp"
-#include <cmath>
-#include <algorithm>
+#include "../core/Logger/Logger.hpp"
 
 namespace nlm {
 
@@ -24,7 +21,10 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f) {
+        // Initialize with safety defaults
+        static_assert(MAX_SPIKE_HISTORY > 0, "MAX_SPIKE_HISTORY must be positive");
+    }
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -145,13 +145,6 @@ void Neuron::injectCurrent(MembranePotential current) {
 
 void Neuron::clearTotalCurrent() {
     pImpl->synapticInput = 0.0f;
-}
-
-void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
-    }
 }
 
 void Neuron::clearSpikeHistory() {

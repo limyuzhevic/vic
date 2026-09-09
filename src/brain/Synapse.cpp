@@ -1,5 +1,6 @@
 #include "Synapse.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -31,10 +32,7 @@ struct Synapse::Impl {
     // Eligibility trace for reward-modulated learning
     float eligibilityTrace;
     
-    // Synaptic efficacy (use-dependent modulation)
-    float efficacy;
-    
-    // Weight bounds
+    // Weight bounds for stability
     static constexpr float MIN_WEIGHT = -1.0f;
     static constexpr float MAX_WEIGHT = 1.0f;
     
@@ -128,8 +126,22 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    // Validate input timestamp
+    if (timestamp < 0) {
+        NLM_LOG_WARNING("Synapse " + std::to_string(pImpl->id) + 
+                       " recording negative pre-spike timestamp: " + 
+                       std::to_string(timestamp));
+        return;
+    }
+    
     pImpl->preSpikeHistory.push_back(timestamp);
+    
+    // Check bounds and apply limit
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        NLM_LOG_WARNING("Synapse " + std::to_string(pImpl->id) + 
+                       " pre-spike history at capacity (" + 
+                       std::to_string(pImpl->preSpikeHistory.size()) + "/" + 
+                       std::to_string(Impl::MAX_SPIKE_HISTORY) + ")");
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
     }
 }

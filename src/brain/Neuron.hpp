@@ -47,16 +47,13 @@ public:
     // Create neuron with ID
     explicit Neuron(NeuronId id);
     
-    ~Neuron();
+    virtual ~Neuron();
     
     // Disable copying, enable moving
     Neuron(const Neuron&) = delete;
     Neuron& operator=(const Neuron&) = delete;
     Neuron(Neuron&&) noexcept;
     Neuron& operator=(Neuron&&) noexcept;
-    
-    // Identity
-    NeuronId getId() const;
     
     // Type
     NeuronType getType() const;

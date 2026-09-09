@@ -1,56 +1,75 @@
 #include "Neuromodulator.hpp"
-#include <algorithm>
 
 namespace nlm {
 
-struct Dopamine::Impl {
+struct SimpleNeuromodulator::Impl {
+    const char* name;
     float level;
-    float baseline;
-    float peak;
-    float decayRate;
-    float releaseRate;
     
-    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
+    Impl(const char* n) : name(n), level(0.0f) {}
 };
 
-Dopamine::Dopamine() : pImpl(new Impl) {}
+SimpleNeuromodulator::SimpleNeuromodulator(const char* name) : pImpl(new Impl(name)) {}
 
-Dopamine::~Dopamine() = default;
+SimpleNeuromodulator::~SimpleNeuromodulator() = default;
 
-const char* Dopamine::getName() const {
-    return "DA";
+const char* SimpleNeuromodulator::getName() const {
+    return pImpl->name;
 }
 
-float Dopamine::getLevel() const {
+float SimpleNeuromodulator::getLevel() const {
     return pImpl->level;
 }
 
-void Dopamine::setLevel(float level) {
-    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+void SimpleNeuromodulator::setLevel(float level) {
+    pImpl->level = level;
 }
 
-float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
-    return 0.5f + 0.5f * pImpl->level;
+float SimpleNeuromodulator::getPlasticityFactor() const {
+    return 1.0f;  // Default no modulation
 }
 
-void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+void SimpleNeuromodulator::update(TimestepDuration dt) {
+    // Default implementation: no dynamics
 }
 
-void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+struct Acetylcholine::Impl {
+    Acetylcholine::Impl() {}
+};
+
+Acetylcholine::Acetylcholine() : pImpl(new Impl) {}
+
+Acetylcholine::~Acetylcholine() = default;
+
+float Acetylcholine::getPlasticityFactor() const {
+    // ACh modulates attention and working memory
+    return 1.2f;  // Slight enhancement
 }
 
-void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+struct Norepinephrine::Impl {
+    Norepinephrine::Impl() {}
+};
+
+Norepinephrine::Norepinephrine() : pImpl(new Impl) {}
+
+Norepinephrine::~Norepinephrine() = default;
+
+float Norepinephrine::getPlasticityFactor() const {
+    // NE modulates arousal and vigilance
+    return 1.1f;  // Mild enhancement
+}
+
+struct Serotonin::Impl {
+    Serotonin::Impl() {}
+};
+
+Serotonin::Serotonin() : pImpl(new Impl) {}
+
+Serotonin::~Serotonin() = default;
+
+float Serotonin::getPlasticityFactor() const {
+    // 5-HT modulates mood and impulsivity
+    return 1.0f;  // Neutral baseline
 }
 
 } // namespace nlm

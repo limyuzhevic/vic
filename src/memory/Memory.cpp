@@ -1,4 +1,5 @@
 #include "Memory.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <algorithm>
 
 namespace nlm {
@@ -16,6 +17,19 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
+    // Validate input parameters
+    if (value < -1000.0f || value > 1000.0f) {
+        NLM_LOG_WARNING("WorkingMemory: Attempt to store value " + 
+                       std::to_string(value) + " outside safe bounds (-1000 to 1000)");
+        value = std::clamp(value, -1000.0f, 1000.0f);
+    }
+    
+    // Check if neuron ID is valid
+    if (neuron == INVALID_NEURON_ID) {
+        NLM_LOG_WARNING("WorkingMemory: Attempt to store with invalid neuron ID");
+        return;
+    }
+    
     // TODO PHASE 2: Implement real storage with capacity limits
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
@@ -25,6 +39,12 @@ void WorkingMemory::store(NeuronId neuron, float value) {
     }
     if (pImpl->items.size() < pImpl->capacity) {
         pImpl->items.emplace_back(neuron, value);
+    } else {
+        // Implement LRU replacement or capacity enforcement
+        NLM_LOG_WARNING("WorkingMemory: Capacity exceeded (" + 
+                       std::to_string(pImpl->items.size()) + "/" + 
+                       std::to_string(pImpl->capacity) + ")");
+        // For now, just don't store - real implementation would replace least recently used
     }
 }
 

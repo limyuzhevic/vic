@@ -53,7 +53,7 @@ public:
     // Create brain with configuration
     explicit Brain(std::shared_ptr<Config> config);
     
-    ~Brain();
+    virtual ~Brain();
     
     // Disable copying, enable moving
     Brain(const Brain&) = delete;
@@ -178,11 +178,14 @@ public:
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
     
-    // Novelty - novelty detection
+        // Novelty - novelty detection
     Novelty* getNovelty();
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Reward - reinforcement learning
+    Reward* getReward();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

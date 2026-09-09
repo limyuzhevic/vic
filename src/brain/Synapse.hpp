@@ -15,7 +15,7 @@ public:
     // Create synapse with IDs
     Synapse(SynapseId id, NeuronId source, NeuronId destination);
     
-    ~Synapse();
+    virtual ~Synapse();
     
     // Disable copying, enable moving
     Synapse(const Synapse&) = delete;

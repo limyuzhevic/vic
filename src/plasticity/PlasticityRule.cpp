@@ -10,23 +10,10 @@ void PlasticityRule::setEnabled(bool enabled) {
     enabled_ = enabled;
 }
 
-struct HebbianRule::Impl {
-    float learningRate;
-    
-    Impl() : learningRate(0.01f) {}
-};
-
-HebbianRule::HebbianRule() : pImpl(new Impl) {}
-
-HebbianRule::~HebbianRule() = default;
-
-void HebbianRule::update(Synapse* synapse,
-                          const std::vector<Timestamp>& preSpikes,
-                          const std::vector<Timestamp>& postSpikes,
-                          TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
-    
+void AntiHebbianRule::update(Synapse* synapse,
+                              const std::vector<Timestamp>& preSpikes,
+                              const std::vector<Timestamp>& postSpikes,
+                              TimestepDuration dt) {
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
@@ -41,25 +28,68 @@ void HebbianRule::update(Synapse* synapse,
         }
     }
     
-    // Apply weight change proportional to coincidences
+    // Apply negative weight change proportional to coincidences
     if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
+        applyWeightChange(synapse, -0.01f * static_cast<float>(coincidences));
     }
 }
 
-void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
+void AntiHebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     synapse->addToWeight(delta);
 }
 
-const char* HebbianRule::getName() const {
-    return "Hebbian";
+struct BCMRule::Impl {
+    float threshold;
+    float learningRate;
+    
+    Impl() : threshold(0.5f), learningRate(0.01f) {}
+};
+
+BCMRule::BCMRule() : pImpl(new Impl) {}
+
+BCMRule::~BCMRule() = default;
+
+void BCMRule::update(Synapse* synapse,
+                     const std::vector<Timestamp>& preSpikes,
+                     const std::vector<Timestamp>& postSpikes,
+                     TimestepDuration dt) {
+    if (preSpikes.empty() || postSpikes.empty()) {
+        return;
+    }
+    
+    // Calculate average postsynaptic firing rate
+    float postFiringRate = static_cast<float>(postSpikes.size()) / dt;
+    
+    // BCM rule: weight change depends on postsynaptic activity
+    // LTP if post activity exceeds threshold, LTD otherwise
+    if (postFiringRate > pImpl->threshold) {
+        // Long-term potentiation
+        float delta = pImpl->learningRate * static_cast<float>(postSpikes.size());
+        applyWeightChange(synapse, delta);
+    } else {
+        // Long-term depression
+        float delta = -pImpl->learningRate * static_cast<float>(postSpikes.size());
+        applyWeightChange(synapse, delta);
+    }
 }
 
-void HebbianRule::setLearningRate(float rate) {
-    pImpl->learningRate = rate;
+void BCMRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
+    synapse->addToWeight(delta);
 }
 
-float HebbianRule::getLearningRate() const {
+void BCMRule::setThreshold(float threshold) {
+    pImpl->threshold = std::clamp(threshold, 0.0f, 1.0f);
+}
+
+float BCMRule::getThreshold() const {
+    return pImpl->threshold;
+}
+
+void BCMRule::setLearningRate(float rate) {
+    pImpl->learningRate = std::clamp(rate, 0.0f, 0.1f);
+}
+
+float BCMRule::getLearningRate() const {
     return pImpl->learningRate;
 }
 
