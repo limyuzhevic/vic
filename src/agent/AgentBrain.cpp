@@ -18,7 +18,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , planningEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , neuralPlanner_(nullptr)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -67,6 +69,15 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Initialize NeuralPlanner if available
+    if (brain_) {
+        neuralPlanner_ = brain_->getPlanner();
+        if (neuralPlanner_) {
+            neuralPlanner_->initialize(brain_.get());
+            NLM_LOG_INFO("NeuralPlanner integrated into AgentBrain");
+        }
+    }
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -334,6 +345,40 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+float AgentBrain::getPlanningConfidence() const {
+    if (neuralPlanner_) {
+        return neuralPlanner_->getPlanningConfidence();
+    }
+    return 0.0f;
+}
+
+ActionType AgentBrain::planAction(const std::vector<float>& currentState, float targetReward) {
+    if (neuralPlanner_ && planningEnabled_) {
+        return neuralPlanner_->planAction(currentState, targetReward);
+    }
+    return MotorCommand::Wait;
+}
+
+ActionType AgentBrain::getPlannedAction(const std::vector<float>& currentState, 
+                                      ActionType fallback) {
+    if (neuralPlanner_ && planningEnabled_) {
+        return planAction(currentState, 0.5f);
+    }
+    return fallback;
+}
+
+std::vector<ActionType> AgentBrain::planSequence(const std::vector<float>& currentState,
+                                               size_t depth) {
+    std::vector<ActionType> sequence;
+    if (neuralPlanner_ && planningEnabled_) {
+        neuralPlanner_->setPlanningDepth(depth);
+        for (size_t i = 0; i < depth; ++i) {
+            sequence.push_back(neuralPlanner_->planAction(currentState));
+        }
+    }
+    return sequence;
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
@@ -343,8 +388,14 @@ void AgentBrain::reset() {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    // Clear previous vision
+    // Clear previous vision and sensory state
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    previousSensoryState_.clear();
+    
+    // Reset neural planner
+    if (neuralPlanner_) {
+        neuralPlanner_->clearCache();
+    }
 }
 
 } // namespace nlm

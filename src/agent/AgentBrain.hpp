@@ -4,6 +4,7 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
 #include <memory>
 #include <vector>
 
@@ -63,13 +64,41 @@ public:
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void enablePlanning(bool enable) { planningEnabled_ = enable; }
     
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    bool isPlanningEnabled() const { return planningEnabled_; }
     
+    // Neural planning integration
+    float getPlanningConfidence() const;
+    
+    // Advanced features for advanced users
+    // Action planning using NeuralPlanner
+    ActionType planAction(const std::vector<float>& currentState, float targetReward = 0.5f);
+    
+    // Get planned action with optional override
+    ActionType getPlannedAction(const std::vector<float>& currentState, 
+                               ActionType fallback = MotorCommand::Wait);
+    
+    // Plan multi-step sequences
+    std::vector<ActionType> planSequence(const std::vector<float>& currentState,
+                                        size_t depth = 3);
+
 private:
+    // Neural planning integration
+    std::unique_ptr<NeuralPlanner> neuralPlanner_;
+    bool planningEnabled_;
+    
+    // Cache planned actions
+    std::vector<ActionType> recentPlans_;
+    std::vector<std::vector<float>> planStates_;
+    
+    // Previous sensory state for planning
+    std::vector<float> previousSensoryState_;
+    
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     

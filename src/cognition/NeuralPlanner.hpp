@@ -31,54 +31,130 @@ struct PlanningCandidate {
 
 class NeuralPlanner {
 public:
+    /**
+     * @brief Construct a new Neural Planner object
+     * 
+     * Initializes neural planner with default planning depth and confidence.
+     * Sets up action quality tracking for 10 action types.
+     */
     NeuralPlanner();
+    
+    /**
+     * @brief Destroy the Neural Planner object
+     */
     ~NeuralPlanner();
 
-    // Initialize with brain reference
+    /**
+     * @brief Initialize neural planner with brain reference
+     * 
+     * @param brain Pointer to brain that provides neural substrate for planning
+     */
     void initialize(Brain* brain);
 
-    // Plan next action given current state and goal
-    // Returns the best action to take now
+    /**
+     * @brief Plan next action given current state and goal
+     * 
+     * @param currentState Current neural state representation
+     * @param targetReward Target reward value for planning (default: 0.5f)
+     * @return ActionType Best action to take now based on predictive evaluation
+     */
     ActionType planAction(const std::vector<float>& currentState,
                          float targetReward = 0.5f);
 
-    // Evaluate a potential action sequence
-    // Returns expected total reward and confidence
+    /**
+     * @brief Evaluate a potential action sequence
+     * 
+     * @param actions Action sequence to evaluate
+     * @param startState Starting neural state
+     * @return PlanningCandidate Contains sequence, predicted states, reward, and confidence
+     */
     PlanningCandidate evaluateSequence(const std::vector<ActionType>& actions,
                                       const std::vector<float>& startState);
 
-    // Get number of steps to look ahead
+    /**
+     * @brief Get number of steps to look ahead in planning
+     * 
+     * @return size_t Planning depth (default: 3)
+     */
     size_t getPlanningDepth() const { return planningDepth_; }
+    
+    /**
+     * @brief Set planning depth
+     * 
+     * @param depth Number of steps to look ahead
+     */
     void setPlanningDepth(size_t depth) { planningDepth_ = depth; }
 
-    // Get planning confidence
+    /**
+     * @brief Get planning confidence
+     * 
+     * @return float Confidence in planning predictions (0.0 to 1.0)
+     */
     float getPlanningConfidence() const { return planningConfidence_; }
 
-    // Update plans based on actual outcome
+    /**
+     * @brief Update plans based on actual outcome
+     * 
+     * @param plannedActions Actions that were planned
+     * @param actualActions Actions that were actually taken
+     * @param actualReward Reward received from execution
+     */
     void updatePlanQuality(const std::vector<ActionType>& plannedActions,
                           const std::vector<ActionType>& actualActions,
                           float actualReward);
 
-    // Clear planning cache
+    /**
+     * @brief Clear planning cache
+     */
     void clearCache();
 
-    // Set action quality function (from experience)
+    /**
+     * @brief Set action quality function (from experience)
+     * 
+     * @param action Action type
+     * @param quality Quality/importance of this action (from -1.0 to 1.0)
+     */
     void setActionQuality(ActionType action, float quality) {
         actionQuality_[static_cast<size_t>(action)] = quality;
     }
 
-    // Get current goal
+    /**
+     * @brief Get current goal
+     * 
+     * @return std::vector<float> Current goal state
+     */
     std::vector<float> getCurrentGoal() const { return currentGoal_; }
+    
+    /**
+     * @brief Set current goal
+     * 
+     * @param goal Target goal state
+     */
     void setCurrentGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
 
-    // Has recent planning been successful?
+    /**
+     * @brief Check if recent planning has been successful
+     * 
+     * @return bool True if majority of recent plans were successful
+     */
     bool wasRecentPlanSuccessful() const;
 
 private:
-    // Generate possible action sequences
+    /**
+     * @brief Generate possible action sequences
+     * 
+     * @param depth Planning depth
+     * @return std::vector<std::vector<ActionType>> Possible action sequences
+     */
     std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
 
-    // Evaluate single action from state
+    /**
+     * @brief Evaluate single action from state
+     * 
+     * @param action Action to evaluate
+     * @param state Current neural state
+     * @return float Expected value of taking this action
+     */
     float evaluateAction(ActionType action, const std::vector<float>& state);
 
     struct Impl;
@@ -109,53 +185,117 @@ private:
 
 class SelfModel {
 public:
+    /**
+     * @brief Construct a new Self Model object
+     */
     SelfModel();
+    
+    /**
+     * @brief Destroy the Self Model object
+     */
     ~SelfModel();
 
-    // Initialize with brain reference
+    /**
+     * @brief Initialize with brain reference
+     * 
+     * @param brain Pointer to brain that provides neural substrate
+     */
     void initialize(Brain* brain);
 
-    // Record that taking an action caused a specific sensory change
+    /**
+     * @brief Record that taking an action caused a specific sensory change
+     * 
+     * @param action Action taken
+     * @param beforeState Neural state before action
+     * @param afterState Neural state after action
+     */
     void recordSelfAction(ActionType action,
                          const std::vector<float>& beforeState,
                          const std::vector<float>& afterState);
 
-    // Predict sensory consequence of an action
-    // This is the "forward model" of the self
+    /**
+     * @brief Predict sensory consequence of an action
+     * 
+     * @param action Action to predict for
+     * @param currentState Current neural state
+     * @return std::vector<float> Predicted state after action
+     */
     std::vector<float> predictActionConsequence(ActionType action,
                                                 const std::vector<float>& currentState);
 
-    // Get confidence in self-model for a given action
+    /**
+     * @brief Get confidence in self-model for a given action
+     * 
+     * @param action Action type
+     * @return float Confidence level (0.0 to 1.0)
+     */
     float getSelfModelConfidence(ActionType action) const;
 
-    // Is this change likely caused by self (action) vs external?
-    float computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+    /**
+     * @brief Check if change is likely caused by self (action) vs external
+     * 
+     * @param beforeState State before change
+     * @param afterState State after change
+     * @param action Action taken
+     * @return float Similarity score (0.0 to 1.0)
+     */
+    float computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                        const std::vector<float>& afterState,
                                        ActionType action) const;
 
-    // Get the body schema (preferred actions in different states)
-    // Returns map of state -> preferred action
+    /**
+     * @brief Get the body schema (preferred actions in different states)
+     * 
+     * @param state Neural state
+     * @return ActionType Best action for given state
+     */
     ActionType getPreferredAction(const std::vector<float>& state);
 
-    // Update self-model based on prediction error
+    /**
+     * @brief Update self-model based on prediction error
+     * 
+     * @param predicted Predicted state
+     * @param actual Actual state
+     * @param action Action that caused change
+     */
     void updateSelfModel(const std::vector<float>& predicted,
                         const std::vector<float>& actual,
                         ActionType action);
 
-    // Get current capability level (0-1)
+    /**
+     * @brief Get current capability level
+     * 
+     * @return float Capability level (0.0 to 1.0)
+     */
     float getCapabilityLevel() const { return capabilityLevel_; }
 
-    // Get body awareness (how accurately can predict consequences)
+    /**
+     * @brief Get body awareness (how accurately can predict consequences)
+     * 
+     * @return float Body awareness level (0.0 to 1.0)
+     */
     float getBodyAwareness() const;
 
-    // Clear self-model
+    /**
+     * @brief Clear self-model
+     */
     void clear();
 
-    // Has self-model formed?
+    /**
+     * @brief Check if self-model has been formed
+     * 
+     * @return bool True if any action effects have been recorded
+     */
     bool hasSelfModel() const { return !actionEffects_.empty(); }
 
 private:
-    // Find best matching previous experience
+    /**
+     * @brief Find best matching previous experience
+     * 
+     * @param action Action type
+     * @param beforeState Neural state before action
+     * @return std::vector<float> Predicted state after action
+     */
     std::vector<float> findMatchingEffect(ActionType action,
                                           const std::vector<float>& beforeState) const;
 
@@ -187,47 +327,105 @@ private:
 
 class SocialLearning {
 public:
+    /**
+     * @brief Construct a new Social Learning object
+     */
     SocialLearning();
+    
+    /**
+     * @brief Destroy the Social Learning object
+     */
     ~SocialLearning();
 
-    // Initialize with brain reference
+    /**
+     * @brief Initialize with brain reference
+     * 
+     * @param brain Pointer to brain that provides neural substrate
+     */
     void initialize(Brain* brain);
 
-    // Record observation of another agent's action and effect
+    /**
+     * @brief Record observation of another agent's action and effect
+     * 
+     * @param observedAction Action observed from other agent
+     * @param observerState Observer's state before observation
+     * @param resultingState State after observed action
+     */
     void observeAgentAction(ActionType observedAction,
                            const std::vector<float>& observerState,
                            const std::vector<float>& resultingState);
 
-    // Can I imitate this observed action?
+    /**
+     * @brief Check if can imitate this observed action
+     * 
+     * @param observedAction Action type to check
+     * @return bool True if action has been observed previously
+     */
     bool canImitate(ActionType observedAction) const;
 
-    // Get the best action to imitate given current state
+    /**
+     * @brief Get the best action to imitate given current state
+     * 
+     * @param currentState Observer's current state
+     * @return ActionType Best action to imitate
+     */
     ActionType getImitationAction(const std::vector<float>& currentState);
 
-    // Learn simple communication signal from another agent
-    // Signal is a neural pattern that predicts reward from other agent
+    /**
+     * @brief Learn simple communication signal from another agent
+     * 
+     * @param signalPattern Neural pattern that predicts reward
+     * @param signalReward Associated reward value
+     */
     void learnCommunicationSignal(const std::vector<float>& signalPattern,
                                   float signalReward);
 
-    // Detect if another agent is signaling
+    /**
+     * @brief Detect if another agent is signaling
+     * 
+     * @param neuralPattern Neural pattern to check
+     * @return bool True if pattern matches learned signal
+     */
     bool detectSignal(const std::vector<float>& neuralPattern) const;
 
-    // Get learned signal pattern
+    /**
+     * @brief Get learned signal pattern
+     * 
+     * @return std::vector<float> Learned signal pattern
+     */
     std::vector<float> getSignalPattern() const;
 
-    // Get signal meaning (associated reward)
+    /**
+     * @brief Get signal meaning (associated reward)
+     * 
+     * @return float Signal meaning (reward value)
+     */
     float getSignalMeaning() const;
 
-    // Update social knowledge based on interactions
+    /**
+     * @brief Update social knowledge based on interactions
+     * 
+     * @param interactionReward Reward from social interaction
+     */
     void updateSocialKnowledge(float interactionReward);
 
-    // Clear social learning
+    /**
+     * @brief Clear social learning
+     */
     void clear();
 
-    // Has learned from others?
+    /**
+     * @brief Check if has learned from others
+     * 
+     * @return bool True if any observations have been recorded
+     */
     bool hasSocialKnowledge() const { return observationCount_ > 0; }
 
-    // Get observation count
+    /**
+     * @brief Get observation count
+     * 
+     * @return size_t Number of social observations recorded
+     */
     size_t getObservationCount() const { return observationCount_; }
 
 private:
