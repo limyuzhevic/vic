@@ -27,12 +27,14 @@ public:
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
+    // Initialize neuromodulator with brain reference
+    virtual void initialize(class Brain* brain) {}
+    
 protected:
     Neuromodulator() = default;
 };
 
-// Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Real implementation - implements reward prediction, reinforcement learning, working memory modulation
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -44,9 +46,24 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
+    // Initialize with brain reference
+    void initialize(class Brain* brain) override;
+    
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    
+    // Real dopamine dynamics
+    void setBaseline(float baseline);
+    float getBaseline() const;
+    void setReleaseRate(float rate);
+    float getReleaseRate() const;
+    void setDecayRate(float rate);
+    float getDecayRate() const;
+    
+    // History tracking
+    const std::vector<float>& getHistory() const;
+    void clearHistory();
     
 private:
     struct Impl;
@@ -54,36 +71,78 @@ private:
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
+// Real implementation - modulates attention, memory consolidation, cortical plasticity
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain) override;
+    
+    // Get ACh level
+    float getLevel() const override;
+    void setLevel(float level) override;
+    
+    // Update ACh dynamics
+    void update(TimestepDuration dt) override;
+    
+    // Get ACh effects on plasticity
+    float getPlasticityFactor() const override;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
+// Real implementation - modulates arousal, vigilance, signal-to-noise ratio in neural processing
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain) override;
+    
+    // Get NE level
+    float getLevel() const override;
+    void setLevel(float level) override;
+    
+    // Update NE dynamics
+    void update(TimestepDuration dt) override;
+    
+    // Get NE effects on plasticity
+    float getPlasticityFactor() const override;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
+// Real implementation - modulates mood regulation, impulsivity control, social behavior
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain) override;
+    
+    // Get 5-HT level
+    float getLevel() const override;
+    void setLevel(float level) override;
+    
+    // Update 5-HT dynamics
+    void update(TimestepDuration dt) override;
+    
+    // Get 5-HT effects on plasticity
+    float getPlasticityFactor() const override;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

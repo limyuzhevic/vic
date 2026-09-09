@@ -16,7 +16,6 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
@@ -25,6 +24,14 @@ void WorkingMemory::store(NeuronId neuron, float value) {
     }
     if (pImpl->items.size() < pImpl->capacity) {
         pImpl->items.emplace_back(neuron, value);
+    }
+    else {
+        // Replace least recently used item
+        std::sort(pImpl->items.begin(), pImpl->items.end(),
+                  [](const auto& a, const auto& b) {
+                      return a.second < b.second; // Simple replacement by value
+                  });
+        pImpl->items[0] = std::make_pair(neuron, value);
     }
 }
 
@@ -109,6 +116,11 @@ void EpisodicMemory::clear() {
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
     // TODO PHASE 2: Implement real consolidation
+    // In a full implementation, episodes would have relevance scores
+    // For now, just enforce capacity limits
+    while (pImpl->episodes.size() > pImpl->maxEpisodes * 0.8f) {
+        pImpl->episodes.erase(pImpl->episodes.begin());
+    }
 }
 
 // Semantic Memory Implementation
