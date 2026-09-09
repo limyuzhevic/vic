@@ -26,6 +26,46 @@ void NeuralPlanner::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralPlanner initialized");
+    
+    // Create initial action quality values
+    if (brain_) {
+        size_t totalActions = static_cast<size_t>(ActionType::Custom) + 1;
+        actionQuality_.resize(totalActions, 0.0f);
+        
+        // Initialize action quality based on action type
+        // This could be based on developmental stage or initial capabilities
+        actionQuality_[static_cast<size_t>(ActionType::Wait)] = 0.5f;
+        actionQuality_[static_cast<size_t>(ActionType::MoveForward)] = 0.4f;
+        actionQuality_[static_cast<size_t>(ActionType::MoveBackward)] = 0.3f;
+        actionQuality_[static_cast<size_t>(ActionType::TurnLeft)] = 0.3f;
+        actionQuality_[static_cast<size_t>(ActionType::TurnRight)] = 0.3f;
+        actionQuality_[static_cast<size_t>(ActionType::Interact)] = 0.2f;
+        
+        // Set a goal based on planner's purpose
+        // Convert string to vector of floats for neural representation
+        currentGoal_.resize(8, 0.0f);
+        currentGoal_[0] = 1.0f;  // navigate = 1
+        currentGoal_[1] = 0.0f;  // not retreat
+        currentGoal_[2] = 0.0f;  // not explore
+        currentGoal_[3] = 0.0f;  // not rest
+        currentGoal_[4] = 0.0f;  // not consume
+        currentGoal_[5] = 0.0f;  // not avoid
+        currentGoal_[6] = 1.0f;  // want to achieve goal
+        currentGoal_[7] = 0.5f;  // medium confidence
+        
+        // Connect to other systems
+        // The planner can access working memory for state
+        workingMemory_ = brain->getWorkingMemory();
+        // The planner can access episodic memory for experience
+        episodicMemory_ = brain->getEpisodicMemory();
+        // The planner can access prediction system for forward model
+        predictionSystem_ = brain->getPredictionSystem();
+        // The planner can access attention for focus
+        attention_ = brain->getAttention();
+        
+        // Initialize concept formation for pattern matching
+        conceptFormation_ = brain->getConceptFormation();
+    }
 }
 
 ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,

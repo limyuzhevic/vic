@@ -28,6 +28,21 @@ void ConceptFormation::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("ConceptFormation initialized");
+    
+    // Create a work buffer for pattern processing
+    patternBuffer_.resize(10, std::vector<float>(256, 0.0f));
+    
+    // Connect to integrated systems for brain loop
+    if (brain_) {
+        // Access working memory for pattern storage
+        workingMemory_ = brain->getWorkingMemory();
+        // Access episodic memory for experience storage
+        episodicMemory_ = brain->getEpisodicMemory();
+        // Access prediction system for pattern prediction
+        predictionSystem_ = brain->getPredictionSystem();
+        // Access attentional system for focus
+        attention_ = brain->getAttention();
+    }
 }
 
 size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,

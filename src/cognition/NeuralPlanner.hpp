@@ -74,6 +74,16 @@ public:
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
 
+    // Get integrated system pointers (for access by brain loop)
+    NeuralWorkingMemory* getWorkingMemory() const { return workingMemory_; }
+    NeuralEpisodicMemory* getEpisodicMemory() const { return episodicMemory_; }
+    PredictionSystem* getPredictionSystem() const { return predictionSystem_; }
+    AttentionalSelection* getAttention() const { return attention_; }
+    ConceptFormation* getConceptFormation() const { return conceptFormation_; }
+
+    // Apply learned actions to motor system
+    void applyActionToMotor(ActionType action, Brain* brain);
+
 private:
     // Generate possible action sequences
     std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
@@ -96,6 +106,13 @@ private:
     
     // Recent plan success history
     std::deque<bool> recentPlanSuccess_;
+    
+    // Integrated memory and cognition systems
+    NeuralWorkingMemory* workingMemory_;
+    NeuralEpisodicMemory* episodicMemory_;
+    PredictionSystem* predictionSystem_;
+    AttentionalSelection* attention_;
+    ConceptFormation* conceptFormation_;
 };
 
 // SelfModel: Represents the agent's internal model of itself
