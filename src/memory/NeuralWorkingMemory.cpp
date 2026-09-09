@@ -183,6 +183,232 @@ void NeuralWorkingMemory::runCompetition() {
     }
 }
 
+void NeuralWorkingMemory::storePattern(const std::vector<float>& pattern, float strength) {
+    if (pattern.empty() || !brain_) return;
+    
+    // Find or create neurons to encode this pattern
+    std::vector<NeuronId> patternNeurons;
+    patternNeurons.reserve(pattern.size());
+    
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        float activation = pattern[i] * strength;
+        
+        // Find existing neuron with similar activity, or create new one
+        NeuronId neuronToUse;
+        bool neuronFound = false;
+        
+        for (size_t j = 0; j < memoryNeurons_.size(); ++j) {
+            float existingAct = memoryActivations_[j];
+            float similarity = 1.0f - std::abs(existingAct - activation) / (std::max(std::abs(existingAct), std::abs(activation)) + 0.001f);
+            
+            if (similarity > 0.8f) {
+                neuronToUse = memoryNeurons_[j];
+                neuronFound = true;
+                break;
+            }
+        }
+        
+        if (!neuronFound && memoryNeurons_.size() < capacity_) {
+            // Create new neuron for this pattern
+            uint64_t neuronId = static_cast<uint64_t>(memoryNeurons_.size() + 1000);
+            NeuronId newNeuron(neuronId);
+            memoryNeurons_.push_back(newNeuron);
+            neuronToUse = newNeuron;
+            
+            // Inject current to establish neuron
+            if (brain_) {
+                brain_->injectCurrent(newNeuron, activation * 5.0f);
+            }
+        }
+        
+        if (neuronFound || !neuronToUse.isValid()) continue;
+        
+        // Update the neuron's activation and timestamp
+        auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuronToUse);
+        if (it != memoryNeurons_.end()) {
+            size_t idx = std::distance(memoryNeurons_.begin(), it);
+            memoryActivations_[idx] = activation;
+            memoryTimestamps_[idx] = 0;
+            
+            // Maintain activations vector
+            patternNeurons.push_back(neuronToUse);
+        }
+    }
+}
+
+void NeuralWorkingMemory::trainPattern(const std::vector<float>& pattern, float strength) {
+    if (pattern.empty() || !brain_) return;
+    
+    // Find neurons that are already active for this pattern
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        float targetActivation = pattern[i] * strength;
+        
+        // Find best matching neuron
+        float bestMatch = 0.0f;
+        NeuronId bestNeuron;
+        bool found = false;
+        
+        for (size_t j = 0; j < memoryNeurons_.size(); ++j) {
+            float existingAct = memoryActivations_[j];
+            float similarity = 1.0f - std::abs(existingAct - targetActivation) / (std::max(std::abs(existingAct), std::abs(targetActivation)) + 0.001f);
+            
+            if (similarity > bestMatch) {
+                bestMatch = similarity;
+                bestNeuron = memoryNeurons_[j];
+                found = true;
+            }
+        }
+        
+        if (found) {
+            // Weaken or strengthen based on match quality
+            auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), bestNeuron);
+            if (it != memoryNeurons_.end()) {
+                size_t idx = std::distance(memoryNeurons_.begin(), it);
+                
+                if (bestMatch > 0.8f) {
+                    // Good match - maintain activation
+                    memoryActivations_[idx] = (memoryActivations_[idx] + targetActivation) * 0.5f;
+                } else {
+                    // Poor match - update with new pattern
+                    memoryActivations_[idx] = targetActivation;
+                }
+                
+                memoryTimestamps_[idx] = 0;
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::updateMemoryTrace(NeuronId neuron, float activation) {
+    if (!brain_) return;
+    
+    // Find neuron in memory
+    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    if (it != memoryNeurons_.end()) {
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        memoryActivations_[idx] = activation;
+        memoryTimestamps_[idx] = 0;
+        
+        // Maintain current activation with maintenance connections
+        if (activation > 0.1f) {
+            brain_->injectCurrent(neuron, activation * 2.0f);
+        }
+    }
+}
+
+void NeuralWorkingMemory::storePattern(const std::vector<float>& pattern, float strength) {
+    if (pattern.empty() || !brain_) return;
+    
+    // Find or create neurons to encode this pattern
+    std::vector<NeuronId> patternNeurons;
+    patternNeurons.reserve(pattern.size());
+    
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        float activation = pattern[i] * strength;
+        
+        // Find existing neuron with similar activity, or create new one
+        NeuronId neuronToUse;
+        bool neuronFound = false;
+        
+        for (size_t j = 0; j < memoryNeurons_.size(); ++j) {
+            float existingAct = memoryActivations_[j];
+            float similarity = 1.0f - std::abs(existingAct - activation) / (std::max(std::abs(existingAct), std::abs(activation)) + 0.001f);
+            
+            if (similarity > 0.8f) {
+                neuronToUse = memoryNeurons_[j];
+                neuronFound = true;
+                break;
+            }
+        }
+        
+        if (!neuronFound && memoryNeurons_.size() < capacity_) {
+            // Create new neuron for this pattern
+            NeuronId newNeuron(static_cast<uint64_t>(pImpl->nextNeuronId++));
+            memoryNeurons_.push_back(newNeuron);
+            neuronToUse = newNeuron;
+            
+            // Inject current to establish neuron
+            if (brain_) {
+                brain_->injectCurrent(newNeuron, activation * 5.0f);
+            }
+        }
+        
+        if (neuronFound || !neuronToUse.isValid()) continue;
+        
+        // Update the neuron's activation and timestamp
+        auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuronToUse);
+        if (it != memoryNeurons_.end()) {
+            size_t idx = std::distance(memoryNeurons_.begin(), it);
+            memoryActivations_[idx] = activation;
+            memoryTimestamps_[idx] = 0;
+            
+            // Maintain activations vector
+            patternNeurons.push_back(neuronToUse);
+        }
+    }
+}
+
+void NeuralWorkingMemory::trainPattern(const std::vector<float>& pattern, float strength) {
+    if (pattern.empty() || !brain_) return;
+    
+    // Find neurons that are already active for this pattern
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        float targetActivation = pattern[i] * strength;
+        
+        // Find best matching neuron
+        float bestMatch = 0.0f;
+        NeuronId bestNeuron;
+        bool found = false;
+        
+        for (size_t j = 0; j < memoryNeurons_.size(); ++j) {
+            float existingAct = memoryActivations_[j];
+            float similarity = 1.0f - std::abs(existingAct - targetActivation) / (std::max(std::abs(existingAct), std::abs(targetActivation)) + 0.001f);
+            
+            if (similarity > bestMatch) {
+                bestMatch = similarity;
+                bestNeuron = memoryNeurons_[j];
+                found = true;
+            }
+        }
+        
+        if (found) {
+            // Weaken or strengthen based on match quality
+            auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), bestNeuron);
+            if (it != memoryNeurons_.end()) {
+                size_t idx = std::distance(memoryNeurons_.begin(), it);
+                
+                if (bestMatch > 0.8f) {
+                    // Good match - maintain activation
+                    memoryActivations_[idx] = (memoryActivations_[idx] + targetActivation) * 0.5f;
+                } else {
+                    // Poor match - update with new pattern
+                    memoryActivations_[idx] = targetActivation;
+                }
+                
+                memoryTimestamps_[idx] = 0;
+                patternNeurons.push_back(bestNeuron);
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::updateMemoryTrace(NeuronId neuron, float activation) {
+    if (!brain_) return;
+    
+    // Find neuron in memory
+    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    if (it != memoryNeurons_.end()) {
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        memoryActivations_[idx] = activation;
+        memoryTimestamps_[idx] = 0;
+        
+        // Maintain current activation with maintenance connections
+        if (activation > 0.1f) {
+            brain_->injectCurrent(neuron, activation * 2.0f);
+        }
+    }
+}
+
 bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
     return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
 }

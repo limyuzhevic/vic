@@ -33,6 +33,15 @@ public:
     // Store specific neuron activation
     void storeToNeuron(NeuronId neuron, float activation);
 
+    // Store a pattern for training and learning
+    void storePattern(const std::vector<float>& pattern, float strength = 1.0f);
+
+    // Train the pattern system with new experience
+    void trainPattern(const std::vector<float>& pattern, float strength = 1.0f);
+
+    // Update an existing memory trace with new activation
+    void updateMemoryTrace(NeuronId neuron, float activation);
+
     // Retrieve current working memory content as activity levels
     std::vector<float> retrieve() const;
 

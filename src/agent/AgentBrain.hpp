@@ -76,6 +76,26 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+        // Attention control
+    void enableAttention(bool enable) { attentionEnabled_ = enable; }
+    
+    // Planning control  
+    void enablePlanning(bool enable) { planningEnabled_ = enable; }
+    
+    // Concept formation control
+    void enableConceptFormation(bool enable) { conceptFormationEnabled_ = enable; }
+    
+    bool isAttentionEnabled() const { return attentionEnabled_; }
+    bool isPlanningEnabled() const { return planningEnabled_; }
+    bool isConceptFormationEnabled() const { return conceptFormationEnabled_; }
+    
+private:
+    // Motor decoding: convert neural activity to motor command
+    MotorCommand decodeFromMotorNeurons();
+    
+    // Motor command selection with curiosity/exploration
+    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups
@@ -108,6 +128,9 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool attentionEnabled_;
+    bool planningEnabled_;
+    bool conceptFormationEnabled_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;

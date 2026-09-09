@@ -6,6 +6,9 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../performance/EventQueue.hpp"
+#include "../performance/SIMDVectorization.hpp"
+#include "../performance/MemoryPool.hpp"
 #include <memory>
 #include <string>
 

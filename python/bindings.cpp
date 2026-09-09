@@ -393,12 +393,15 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
              py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+    .def("enableAttention", &AgentBrain::enableAttention,
+              py::arg("enable"))
+    .def("enablePlanning", &AgentBrain::enablePlanning,
+              py::arg("enable"))
+    .def("enableConceptFormation", &AgentBrain::enableConceptFormation,
+              py::arg("enable"))
+    .def("isAttentionEnabled", &AgentBrain::isAttentionEnabled)
+    .def("isPlanningEnabled", &AgentBrain::isPlanningEnabled)
+    .def("isConceptFormationEnabled", &AgentBrain::isConceptFormationEnabled);
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
