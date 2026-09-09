@@ -167,8 +167,9 @@ Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        // First transfer ownership
         pImpl = other.pImpl;
+        // Then nullify source to prevent double delete
         other.pImpl = nullptr;
     }
     return *this;
@@ -398,15 +399,111 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
+    // ========== STEP 4c: Retrieve working memory patterns and apply to neurons ==========
+    // Apply stored working memory patterns to influence neural activity
+    std::vector<float> memoryPattern = pImpl->workingMemory->retrieve();
     
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
+    if (!memoryPattern.empty() && !pImpl->regions.empty()) {
+        // Apply memory patterns to neural populations
+        size_t neuronIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                // Apply memory influence to neurons in this population
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuronIdx < memoryPattern.size()) {
+                        float memoryInfluence = memoryPattern[neuronIdx];
+                        if (memoryInfluence > 0.1f) {  // Only apply significant memory traces
+                            // Inject current based on memory pattern
+                            injectCurrent(neuron, memoryInfluence * 1.5f);
+                        }
+                        ++neuronIdx;
+                    }
+                }
+            }
+        }
     }
-    
-    // ========== STEP 5: Apply neuromodulation effects ==========
+
+    // ========== STEP 4e: Transfer working memory content to episodic memory ==========
+    if (pImpl->workingMemory && pImpl->episodicMemory) {
+        // Transfer working memory patterns to episodic memory when they contain meaningful information
+        if (pImpl->workingMemory->getMemoryActivity() > 0.5f) {
+            // Create an episodic memory item from working memory content
+            EpisodicMemoryItem episode;
+            episode.timestamp = currentStep;
+            
+            // Store working memory trace as sensory state
+            std::vector<float> memoryTrace = pImpl->workingMemory->retrieve();
+            episode.sensoryState = memoryTrace;
+            
+            // Also store in resultingSensoryState for comparison
+            episode.resultingSensoryState = memoryTrace;
+            
+            // Store active neurons and their activations
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            if (!memoryNeurons.empty()) {
+                episode.activeNeurons.reserve(memoryNeurons.size());
+                episode.neuronActivations.reserve(memoryNeurons.size());
+                
+                for (size_t i = 0; i < std::min(memoryNeurons.size(), memoryTrace.size()); ++i) {
+                    episode.activeNeurons.push_back(memoryNeurons[i]);
+                    episode.neuronActivations.push_back(memoryTrace[i]);
+                }
+            }
+            
+            // Store reward from neuromodulation
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Store energy from novelty/curiosity
+            float noveltyLevel = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+            float curiosityLevel = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+            episode.energy = noveltyLevel + curiosityLevel;
+            episode.novelty = noveltyLevel;
+            
+            // Set position (simplified - all memories are from same location)
+            episode.positionX = 0.0f;
+            episode.positionY = 0.0f;
+            episode.orientation = 0.0f;
+            
+            // Set age
+            episode.age = 0;
+            
+            // Store in episodic memory
+            pImpl->episodicMemory->storeEpisode(episode);
+        }
+    }
+
+    // ========== STEP 4f: Integrate episodic memory with working memory ==========
+    if (pImpl->episodicMemory && pImpl->workingMemory) {
+        // Retrieve relevant episodes based on current brain state
+        // This creates bidirectional integration between episodic and working memory
+        std::vector<const EpisodicMemoryItem*> recentEpisodes = 
+            pImpl->episodicMemory->getRecentEpisodes(3);
+            
+        if (!recentEpisodes.empty()) {
+            // Use episodic memory to influence working memory content
+            // This allows episodic memory to provide context for working memory
+            std::vector<float> episodicContext(100, 0.0f);  // Simplified context vector
+            
+            for (size_t i = 0; i < recentEpisodes.size() && i < episodicContext.size(); ++i) {
+                if (recentEpisodes[i]->neuronActivations.size() > 0) {
+                    // Integrate episode neuron activations
+                    for (size_t j = 0; j < std::min(recentEpisodes[i]->neuronActivations.size(), episodicContext.size()); ++j) {
+                        episodicContext[j] += recentEpisodes[i]->neuronActivations[j];
+                    }
+                }
+            }
+            
+            // Normalize context
+            for (float& val : episodicContext) {
+                val /= recentEpisodes.size();
+            }
+            
+            // Apply episodic context to working memory
+            if (!episodicContext.empty()) {
+                pImpl->workingMemory->store(episodicContext, 0.3f);  // Lighter weight for episodic influence
+            }
+        }
+    }
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
@@ -1006,41 +1103,41 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
+    return pImpl->workingMemory ? pImpl->workingMemory.get() : nullptr;
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
+    return pImpl->episodicMemory ? pImpl->episodicMemory.get() : nullptr;
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
+    return pImpl->associativeMemory ? pImpl->associativeMemory.get() : nullptr;
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
+    return pImpl->predictionSystem ? pImpl->predictionSystem.get() : nullptr;
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
+    return pImpl->planner ? pImpl->planner.get() : nullptr;
 }
 
 ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
+    return pImpl->conceptFormation ? pImpl->conceptFormation.get() : nullptr;
 }
 
 AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
+    return pImpl->attention ? pImpl->attention.get() : nullptr;
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
+    return pImpl->developmentSystem ? pImpl->developmentSystem.get() : nullptr;
 }
 
 DevelopmentalStage Brain::getDevelopmentalStage() const {
@@ -1054,19 +1151,19 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 // ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
+    return pImpl->dopamine ? pImpl->dopamine.get() : nullptr;
 }
 
 Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
+    return pImpl->curiosity ? pImpl->curiosity.get() : nullptr;
 }
 
 Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
+    return pImpl->novelty ? pImpl->novelty.get() : nullptr;
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
+    return pImpl->predictionError ? pImpl->predictionError.get() : nullptr;
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {

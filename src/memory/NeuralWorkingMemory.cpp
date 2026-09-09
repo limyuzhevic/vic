@@ -30,7 +30,22 @@ NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("NeuralWorkingMemory initialized");
+    
+    // Initialize memory data structures
+    memoryNeurons_.clear();
+    memoryActivations_.clear();
+    memoryTimestamps_.clear();
+    activeTraces_.clear();
+    
+    // Initialize with sensory neurons if brain is available
+    if (brain_) {
+        // Reserve space for future memory traces
+        memoryNeurons_.reserve(capacity_);
+        memoryActivations_.reserve(capacity_);
+        memoryTimestamps_.reserve(capacity_);
+        
+        NLM_LOG_INFO("NeuralWorkingMemory initialized with brain reference");
+    }
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
