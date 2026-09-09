@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <vector>
 
 namespace nlm {
 
@@ -86,12 +87,17 @@ public:
     // Operator for compatibility with std functions
     result_type operator()() { return static_cast<result_type>(engine()()); }
     
+    // Get current time step
+    SimulationStep getStep() const;
+    void setStep(SimulationStep step);
+    
 private:
-    struct Impl;
-    Impl* pImpl;
+    class Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Template implementations
+
 template<typename Container>
 void RandomGenerator::shuffle(Container& container) {
     std::shuffle(container.begin(), container.end(), engine());

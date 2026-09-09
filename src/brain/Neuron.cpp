@@ -11,7 +11,6 @@ struct Neuron::Impl {
     NeuronState state;
     RegionId regionId;
     PopulationId populationId;
-    MembranePotential totalCurrent;  // Total synaptic current input this step
     MembranePotential synapticInput;  // Accumulated synaptic input
     std::vector<Timestamp> spikeHistory;
     std::vector<SynapseHandle> incomingSynapses;
@@ -24,28 +23,23 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             synapticInput(0.0f) {}
 };
 
-Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+Neuron::Neuron(NeuronId id) : pImpl(std::make_unique<Impl>()) {
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
-    pImpl->totalCurrent = 0.0f;
 }
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -120,14 +114,10 @@ float Neuron::getLastSpikeTime() const {
 }
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
-    // Real synaptic input: excitatory currents add to total current
-    // amplitude represents synaptic conductance * reversal potential contribution
     pImpl->synapticInput += amplitude;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
-    // Real inhibitory input: subtract from total current
-    // Inhibitory synaptic currents hyperpolarize the neuron
     pImpl->synapticInput -= amplitude;
 }
 
@@ -138,8 +128,6 @@ void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
-    // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
     pImpl->synapticInput += current;
 }
 
@@ -260,8 +248,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    const TimestepDuration dt = 0.001;  // 1ms default
     stepLIF(currentTime, dt);
 }
 
@@ -272,29 +259,15 @@ void Neuron::reset() {
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
-    
-    // Threshold is typically -55mV with small variation
     pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
-    
-    // Resting potential typically -70mV
     pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
-    
-    // Reset potential is usually close to resting
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
-    
-    // Refractory period: 2-10ms typical
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
-    
-    // Initial state
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
-    
-    // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
 }

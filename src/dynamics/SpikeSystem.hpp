@@ -73,8 +73,8 @@ public:
     void reset();
     
 private:
-    struct Impl;
-    Impl* pImpl;
+    class Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

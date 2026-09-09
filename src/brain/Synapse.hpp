@@ -4,9 +4,6 @@
 
 namespace nlm {
 
-// Forward declaration
-class Neuron;
-
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
 
@@ -71,7 +68,6 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -82,7 +78,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

@@ -47,12 +47,12 @@ struct Synapse::Impl {
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
-    : pImpl(new Impl) {
+    : pImpl(std::make_unique<Impl>()) {
     pImpl->id = id;
     pImpl->sourceNeuron = source;
     pImpl->destinationNeuron = destination;
     pImpl->weight = 0.0f;
-    pImpl->delay = 1;  // Default: 1 step delay
+    pImpl->delay = 1;
     pImpl->type = SynapseType::Excitatory;
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
@@ -64,15 +64,11 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
 
 Synapse::~Synapse() = default;
 
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Synapse::Synapse(Synapse&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -192,33 +188,22 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    TimestepDuration dt = 0.001;
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
-    
-    // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSinceActivity = std::max(
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
-        // Recovery from depression toward 1.0
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
-    
-    // Clamp weight bounds
+    decayEligibilityTrace(0.001f);
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 

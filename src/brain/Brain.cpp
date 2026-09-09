@@ -80,7 +80,7 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
+        , rng()
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -90,8 +90,8 @@ struct Brain::Impl {
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(100)
+        , consolidationInterval(1000)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -155,21 +155,77 @@ struct Brain::Impl {
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
+    
+    // Add destructor to clean up resources
+    ~Impl() {
+        // All unique_ptr members will be automatically cleaned up
+        // No need for manual cleanup since they're smart pointers
+    }
+    
+    // Add reset() method to clean up resources
+    void reset() {
+        developmentalStage = DevelopmentalStage::Initial;
+        nextRegionId = 1;
+        currentStep = 0;
+        currentTime = 0.0;
+        totalSpikesThisStep = 0;
+        totalSpikesTotal = 0;
+        isResting = false;
+        stepsSinceLastEpisode = 0;
+        replayInterval = 100;
+        consolidationInterval = 1000;
+        timestep = 0.001;
+        
+        // Reset spike system
+        if (spikeSystem) spikeSystem->reset();
+        
+        // Reset memory systems
+        if (workingMemory) workingMemory->clear();
+        if (episodicMemory) episodicMemory->clear();
+        if (associativeMemory) associativeMemory->clear();
+        
+        // Reset development system
+        if (developmentSystem) {
+            developmentSystem->update(nullptr, *rng, 0.0);
+        }
+        
+        // Reset attention
+        if (attention) attention->reset();
+        
+        // Reset neuromodulation systems
+        if (dopamine) dopamine->reset();
+        if (curiosity) curiosity->reset();
+        if (predictionError) predictionError->reset();
+        if (novelty) novelty->reset();
+        
+        // Reset plasticity systems
+        if (spikeSystem) spikeSystem->reset();
+        if (stdp) stdp->reset();
+        if (hebbian) hebbian->reset();
+        if (structuralPlasticity) structuralPlasticity->reset();
+        
+        // Clear regions
+        regions.clear();
+        interRegionConnections.clear();
+        
+        // Clear sensory and motor neuron pointers
+        sensoryNeurons.clear();
+        motorNeurons.clear();
+    }
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+Brain::Brain(std::shared_ptr<Config> config) : pImpl(std::make_unique<Impl>(config)) {}
 
-Brain::~Brain() = default;
-
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Brain::~Brain() {
+    // pImpl will be automatically destroyed since it's a std::unique_ptr
+    // No need for manual cleanup
 }
+
+Brain::Brain(Brain&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -909,7 +965,8 @@ bool Brain::load(const std::string& filepath) {
 }
 
 RegionId Brain::addRegion(const std::string& name) {
-    RegionId id(pImpl->nextRegionId++);
+    RegionId id(pImpl->nextRegionId);
+    ++pImpl->nextRegionId;
     auto region = std::make_unique<NeuralRegion>(id, name);
     pImpl->regions.push_back(std::move(region));
     return id;

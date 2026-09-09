@@ -1,5 +1,3 @@
-#pragma once
-
 #include "../core/Types/Types.hpp"
 #include "NeuralPopulation.hpp"
 #include "Synapse.hpp"
@@ -70,7 +68,7 @@ public:
     void reset();
     
     // Initialize connectivity
-    void initializeRandomConnectivity(class RandomGenerator& rng, 
+    void initializeRandomConnectivity(RandomGenerator& rng, 
                                       float connectionProbability,
                                       float meanWeight,
                                       float weightVariance);
@@ -81,7 +79,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
