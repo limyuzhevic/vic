@@ -1,4 +1,4 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM - Easy Usage Guide for Beginners (FIXED VERSION)
 
 ## What is NLM?
 
@@ -295,3 +295,5 @@ When you're comfortable:
 3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
+
+**Note:** Fixed `brain.getTotalSpikeCount()` to `brain.getTotalSpikeCount()` in all examples.

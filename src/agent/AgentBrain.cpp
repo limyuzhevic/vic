@@ -2,6 +2,7 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 
 namespace nlm {
 
@@ -348,3 +349,9 @@ void AgentBrain::reset() {
 }
 
 } // namespace nlm
+
+// Note: There was a duplicate getTotalSpikeCount() function in this file earlier that
+// returned 0. This is now fixed - the AgentBrain no longer has getTotalSpikeCount()
+// method as that belongs to the Brain class. The AgentBrain uses brain_->getTotalSpikeCount()
+// when needed.
+

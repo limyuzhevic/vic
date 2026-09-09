@@ -1,88 +1,74 @@
-#pragma once
+#ifndef NLM_AGENTBODY_HPP
+#define NLM_AGENTBODY_HPP
 
-#include <cstdint>
+#include <vector>
 #include <string>
+#include "Brain.hpp"
+#include "SensoryPercept.hpp"
+#include "Action.hpp"
 
 namespace nlm {
 
-// Agent body state - contains physical properties and internal state
-// This is part of the environment, not the brain
-struct AgentBody {
-    // Position in world
-    float x;
-    float y;
+class AgentBody {
+public:
+    AgentBody(std::shared_ptr<Brain> brain);
+    ~AgentBody();
     
-    // Orientation (radians)
-    float orientation;
+    void initialize();
+    void update(double timestep);
     
-    // Velocity
-    float velocityX;
-    float velocityY;
-    float angularVelocity;
+    // Sensory processing
+    void processSensoryInput(const SensoryPercept& percept);
+    const SensoryPercept& getCurrentPercept() const;
     
-    // Internal state
-    float energy;          // Energy level (0-1)
-    float health;          // Health (0-1)
-    float age;             // Developmental age in simulation steps
+    // Motor output
+    Action getAction() const;
+    void setAction(Action action);
     
-    // Movement state
-    bool isMoving;
-    bool isTurning;
-    float lastActionTime;
+    // State
+    float getEnergy() const;
+    void setEnergy(float energy);
+    bool isAlive() const;
+    void setAlive(bool alive);
     
-    AgentBody()
-        : x(0.0f), y(0.0f), orientation(0.0f)
-        , velocityX(0.0f), velocityY(0.0f), angularVelocity(0.0f)
-        , energy(1.0f), health(1.0f), age(0.0f)
-        , isMoving(false), isTurning(false), lastActionTime(0.0f) {}
+    // Reward and learning
+    float getTotalReward() const;
+    void addReward(float reward);
+    float getLearningRate() const;
+    void setLearningRate(float rate);
     
-    void reset() {
-        x = 0.0f;
-        y = 0.0f;
-        orientation = 0.0f;
-        velocityX = 0.0f;
-        velocityY = 0.0f;
-        angularVelocity = 0.0f;
-        energy = 1.0f;
-        health = 1.0f;
-        age = 0.0f;
-        isMoving = false;
-        isTurning = false;
-        lastActionTime = 0.0f;
-    }
-};
-
-// Low-level motor commands that the brain can produce
-// These are innate muscle-like signals, not semantic actions
-enum class MotorCommand {
-    MoveForward = 0,   // Propel forward
-    MoveBackward = 1,  // Propel backward  
-    TurnLeft = 2,      // Rotate left
-    TurnRight = 3,     // Rotate right
-    LookLeft = 4,      // Pan sensor left
-    LookRight = 5,     // Pan sensor right
-    Interact = 6,      // Interact with nearby object
-    Wait = 7           // No movement
-};
-
-// Action result from the world's perspective
-struct ActionResult {
-    float reward;
-    bool success;
-    std::string message;
+    // Development
+    double getDevelopmentalStage() const;
+    void setDevelopmentalStage(double stage);
     
-    ActionResult() : reward(0.0f), success(false), message("") {}
-    ActionResult(float r, bool s, const std::string& m = "") 
-        : reward(r), success(s), message(m) {}
-};
-
-// Object types in the world (for rendering/debug only, NOT given to brain)
-enum class WorldObjectType {
-    Empty = 0,
-    Resource = 1,      // Positive reward
-    Hazard = 2,        // Negative reward
-    Wall = 3,         // Boundary
-    Marker = 4        // Navigation aid
+    // Statistics
+    size_t getStepCount() const;
+    void incrementStepCount();
+    float getCuriosityLevel() const;
+    void setCuriosityLevel(float level);
+    
+    // Configuration
+    void configure(const std::string& key, const std::string& value);
+    std::string getConfig(const std::string& key) const;
+    
+private:
+    std::shared_ptr<Brain> brain_;
+    
+    // State
+    SensoryPercept currentPercept_;
+    Action currentAction_;
+    float energy_;
+    bool alive_;
+    float totalReward_;
+    float learningRate_;
+    double developmentalStage_;
+    size_t stepCount_;
+    float curiosityLevel_;
+    
+    // Configuration
+    std::map<std::string, std::string> config_;
 };
 
 } // namespace nlm
+
+#endif // NLM_AGENTBODY_HPP
