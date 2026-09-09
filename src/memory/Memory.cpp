@@ -16,16 +16,37 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
-    for (auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            item.second = value;
+    // Store or update neuron value
+    for (size_t i = 0; i < pImpl->items.size(); ++i) {
+        if (pImpl->items[i].first == neuron) {
+            pImpl->items[i].second = value;
+            // Initialize eligibility trace
+            if (i < pImpl->eligibilityTraces.size()) {
+                pImpl->eligibilityTraces[i] = 1.0f;
+            }
             return;
         }
     }
-    if (pImpl->items.size() < pImpl->capacity) {
-        pImpl->items.emplace_back(neuron, value);
+    
+    // Evict weakest trace if at capacity
+    if (pImpl->items.size() >= pImpl->capacity) {
+        size_t weakestIdx = 0;
+        float weakestValue = pImpl->items[0].second;
+        for (size_t i = 1; i < pImpl->items.size(); ++i) {
+            if (pImpl->items[i].second < weakestValue) {
+                weakestValue = pImpl->items[i].second;
+                weakestIdx = i;
+            }
+        }
+        pImpl->items.erase(pImpl->items.begin() + weakestIdx);
+        if (weakestIdx < pImpl->eligibilityTraces.size()) {
+            pImpl->eligibilityTraces.erase(pImpl->eligibilityTraces.begin() + weakestIdx);
+        }
     }
+    
+    // Add new entry
+    pImpl->items.emplace_back(neuron, value);
+    pImpl->eligibilityTraces.push_back(1.0f);
 }
 
 float WorkingMemory::retrieve(NeuronId neuron) const {
