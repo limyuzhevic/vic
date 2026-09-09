@@ -14,11 +14,14 @@
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
+#include "agent/AgentBrain.hpp"
+#include "agent/SensoryPercept.hpp"
+#include "agent/AgentBody.hpp"
 #include "sensory/SensoryInput.hpp"
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
-
+#include "world/SimpleWorld.hpp"
 #include <iostream>
 #include <memory>
 #include <string>
@@ -360,11 +363,27 @@ int main(int argc, char** argv) {
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Configuration file not found: " + configFile + " - using defaults");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Validate configuration
+    if (!validateConfig(config)) {
+        NLM_LOG_WARNING("Configuration validation failed - using defaults for invalid values");
+    }
+    
+    // Display configuration help if requested
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printConfigHelp();
+            return 0;
+        } else if (arg == "--version") {
+            std::cout << "NLM Phase 2 - Real Neural Computation\n";
+            std::cout << "Version: 2.0.0\n";
+            std::cout << "Build: " << __DATE__ << " " << __TIME__ << "\n";
+            return 0;
+        }
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -382,6 +401,27 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Agent-specific configuration
+    config->set("agent.enable_reward_modulation", true, ConfigSource::Default);
+    config->set("agent.enable_structural_plasticity", true, ConfigSource::Default);
+    config->set("agent.enable_development", true, ConfigSource::Default);
+    config->set("agent.enable_curiosity", true, ConfigSource::Default);
+    
+    // Advanced neuromodulation parameters
+    config->set("agent.curiosity_threshold", 0.3f, ConfigSource::Default);
+    config->set("agent.exploration_rate", 0.2f, ConfigSource::Default);
+    config->set("agent.novelty_decay", 0.99f, ConfigSource::Default);
+    
+    // Memory system configuration
+    config->set("agent.memory.working_memory_capacity", 1000, ConfigSource::Default);
+    config->set("agent.memory.episodic_max_episodes", 100, ConfigSource::Default);
+    config->set("agent.memory.associative_strength", 0.8f, ConfigSource::Default);
+    
+    // Development system parameters
+    config->set("agent.development.initial_plasticity", 1.0f, ConfigSource::Default);
+    config->set("agent.development.critical_period_end", 300.0f, ConfigSource::Default);
+    config->set("agent.development.maturation_end", 900.0f, ConfigSource::Default);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -390,6 +430,14 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("");
+    
+    // Log agent configuration
+    NLM_LOG_INFO("Agent Configuration:");
+    NLM_LOG_INFO("  reward_modulation_enabled: " + std::to_string(config->getOr<bool>("agent.enable_reward_modulation", true)));
+    NLM_LOG_INFO("  structural_plasticity_enabled: " + std::to_string(config->getOr<bool>("agent.enable_structural_plasticity", true)));
+    NLM_LOG_INFO("  development_enabled: " + std::to_string(config->getOr<bool>("agent.enable_development", true)));
+    NLM_LOG_INFO("  curiosity_enabled: " + std::to_string(config->getOr<bool>("agent.enable_curiosity", true)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

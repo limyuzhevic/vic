@@ -215,19 +215,22 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
         
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+        auto* rng = brain_->getRandomGenerator();
+        if (rng) {
+            float r = rng->uniformReal(0.0f, 1.0f);
+            if (r < exploreChance) {
+                // Random motor command
+                int choice = rng->uniformInt(0, 7);
+                switch (choice) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::MoveBackward;
+                    case 2: return MotorCommand::TurnLeft;
+                    case 3: return MotorCommand::TurnRight;
+                    case 4: return MotorCommand::LookLeft;
+                    case 5: return MotorCommand::LookRight;
+                    case 6: return MotorCommand::Interact;
+                    default: return MotorCommand::Wait;
+                }
             }
         }
     }
@@ -277,6 +280,12 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
     }
+    
+    // Update curiosity based on prediction error
+    if (curiosityEnabled_) {
+        curiosityLevel_ = std::abs(predictionError_) * 0.5f + noveltyLevel_ * 0.5f;
+        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
@@ -310,6 +319,12 @@ void AgentBrain::updateDevelopment(double timestep) {
             sp->setSynaptogenesisRate(synRate);
             sp->setPruningRate(pruneRate);
         }
+    }
+    
+    // Update development system if available
+    auto* devSystem = brain_->getDevelopmentSystem();
+    if (devSystem) {
+        devSystem->update(brain_.get(), *brain_->getRandomGenerator(), timestep);
     }
 }
 

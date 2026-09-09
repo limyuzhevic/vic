@@ -28,6 +28,10 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class AgentBrain;
+class AgentBody;
+class SensoryPercept;
+class SimpleWorld;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -183,6 +187,24 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // ========== ADVANCED AGENT FEATURES =========
+    
+    // Agent brain integration
+    AgentBrain* getAgentBrain();
+    
+    // World integration
+    SimpleWorld* getWorld();
+    
+    // Get agent state
+    const AgentBody& getAgentBody() const;
+    const SensoryPercept& getSensoryPercept() const;
+    
+    // Apply agent sensory input
+    void receiveAgentSensoryInput(const SensoryPercept& input);
+    
+    // Process agent actions and world feedback
+    void updateAgent(double timestep);
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
