@@ -29,6 +29,26 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Forward declare step methods to avoid circular includes
+class Brain {
+public:
+    void step(SimulationStep currentStep, Timestamp currentTime);
+private:
+    void updateNeurons(Timestamp currentTime);
+    void processSpikes(Timestamp currentTime, SimulationStep currentStep);
+    void updateWorkingMemory();
+    void updateNeuromodulation(Timestamp currentTime);
+    void updatePlasticity(Timestamp currentTime);
+    void updateEpisodicMemory();
+    void updatePredictionSystem();
+    void updateAttention();
+    void updateConceptFormation();
+    void updateStructuralPlasticity(Timestamp currentTime);
+    void replayMemories();
+    void updateDevelopment(Timestamp currentTime);
+    void collectStatistics();
+};
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;

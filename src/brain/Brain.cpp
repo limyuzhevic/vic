@@ -242,8 +242,10 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // Initialize prediction system - add proper initialization with Brain reference
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->initialize(this);
+    }
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -511,8 +513,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        pImpl->predictionSystem->update(pImpl->timestep);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +529,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        pImpl->conceptFormation->update(pImpl->timestep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
