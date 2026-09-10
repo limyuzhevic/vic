@@ -7,17 +7,7 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
-#include "brain/Brain.hpp"
-#include "brain/Neuron.hpp"
-#include "brain/Synapse.hpp"
-#include "sensory/SensoryInput.hpp"
-#include "motor/Action.hpp"
-#include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
+#include "core/Constants.hpp"
 
 #include <iostream>
 #include <memory>
@@ -179,7 +169,7 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        neurons[i]->injectCurrent(CONNECTIVITY_INJECT_CURRENT);  // Strong excitatory input
     }
     
     // Run a few steps
@@ -222,16 +212,15 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
-    for (SimulationStep step = 0; step < 1000; ++step) {
+    for (SimulationStep step = 0; step < PLASTICITY_STEPS; ++step) {
         // Create input pattern - inject current into sensory neurons
-        for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+        for (size_t i = 0; i < PLASTICITY_INPUTS_PER_STEP && i < brain->getTotalNeuronCount() / 4; ++i) {
+            brain->injectCurrentToNeurons(NeuronType::Sensory, PLASTICITY_INPUT_CURRENT);
         }
         
         brain->step(step, step * 0.001);
         
-        // Log progress every 100 steps
-        if (step % 100 == 0) {
+        if (step % PLASTICITY_LOG_EVERY_N_STEPS == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
@@ -259,11 +248,11 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         return;
     }
     
-    NLM_LOG_INFO("  Testing STDP on 5 synapses:");
+    NLM_LOG_INFO("  Testing STDP on " + std::to_string(STDP_SYNAPSE_TEST_COUNT) + " synapses:");
     
     // Record initial weights
     std::vector<float> beforeWeights;
-    for (size_t i = 0; i < 5; ++i) {
+    for (size_t i = 0; i < STDP_SYNAPSE_TEST_COUNT; ++i) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
@@ -274,7 +263,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
     
-    for (int trial = 0; trial < 50; ++trial) {
+    for (int trial = 0; trial < STDP_SPIKE_PAIR_COUNT; ++trial) {
         // Fire pre-synaptic neuron
         Neuron* preNeuron = nullptr;
         Neuron* postNeuron = nullptr;
@@ -287,11 +276,11 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         
         if (preNeuron && postNeuron) {
             // Pre fires first
-            preNeuron->injectCurrent(60.0f);
+            preNeuron->injectCurrent(STDP_CORRELATED_CURRENT);
             brain->step(trial * 2, trial * 2 * 0.001);
             
             // Then post fires
-            postNeuron->injectCurrent(60.0f);
+            postNeuron->injectCurrent(STDP_CORRELATED_CURRENT);
             brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
         }
     }
