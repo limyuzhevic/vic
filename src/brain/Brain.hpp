@@ -1,11 +1,8 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "BrainComponentBase.h"
 #include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
 
@@ -16,18 +13,16 @@ class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+
+// Component system headers
+class MemorySystem;
+class PredictionComponent;
+class CognitionSystem;
+class NeuromodulationSystem;
+class PlasticitySystem;
+class DevelopmentComponent;
+class CheckpointManager;
+class ConfigurationManager;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -137,7 +132,33 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
+    // ========== COMPONENT ACCESSORS ==========
+    
+    // Memory system accessor
+    MemorySystem* getMemorySystem();
+    
+    // Prediction component accessor
+    PredictionComponent* getPredictionComponent();
+    
+    // Cognition system accessor
+    CognitionSystem* getCognitionSystem();
+    
+    // Neuromodulation system accessor
+    NeuromodulationSystem* getNeuromodulationSystem();
+    
+    // Plasticity system accessor
+    PlasticitySystem* getPlasticitySystem();
+    
+    // Development component accessor
+    DevelopmentComponent* getDevelopmentComponent();
+    
+    // Checkpoint manager accessor
+    CheckpointManager* getCheckpointManager();
+    
+    // Configuration manager accessor
+    ConfigurationManager* getConfigurationManager();
+    
+    // ========== LEGACY ACCESSORS (for backward compatibility) ==========
     
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
@@ -148,12 +169,8 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
-    // ========== PREDICTION SYSTEM ==========
-    
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
@@ -164,24 +181,13 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
-    // ========== DEVELOPMENT SYSTEM ==========
-    
+    // Development system
     DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
+    // Neuromodulation systems
     Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
     Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
     Novelty* getNovelty();
-    
-    // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
     // Get current configuration
