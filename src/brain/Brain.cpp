@@ -511,8 +511,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural state for predictive coding
+        // This helps create predictions of next sensory states
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Use prediction errors for learning via neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (pImpl->predictionError) {
+            pImpl->predictionError->setLevel(predictionError);
+        }
+        
+        // Apply prediction error signals to attention and plasticity
+        if (pImpl->predictionError && pImpl->attention) {
+            float errorLevel = pImpl->predictionError->getLevel();
+            pImpl->attention->applyBottomUpSalience(PredictionErrorNeuronId(0), 
+                                                  std::abs(errorLevel) * 0.5f);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -522,14 +536,68 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Apply attention to working memory winners
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+            auto winners = pImpl->attention->processCompetition(competitors);
+            
+            // Apply attention modulation to winners via neuromodulation
+            if (pImpl->curiosity) {
+                float curiosityLevel = pImpl->curiosity->getLevel();
+                if (curiosityLevel > 0.3f) {
+                    // High curiosity increases attention focus
+                    for (const auto& neuronId : winners) {
+                        pImpl->attention->applyTopDownBias(neuronId, curiosityLevel * 0.5f);
+                    }
+                }
+            }
+        }
+        
+        // Apply prediction error to attention
+        if (pImpl->predictionError) {
+            float errorLevel = pImpl->predictionError->getLevel();
+            // High prediction error increases attention to prediction-related neurons
+            if (std::abs(errorLevel) > 0.01f) {
+                for (auto& region : pImpl->regions) {
+                    auto neurons = region->getAllNeurons();
+                    for (auto* neuron : neurons) {
+                        if (neuron->getType() == NeuronType::Sensory) {
+                            pImpl->attention->applyBottomUpSalience(neuron->getId(), 
+                                                                  std::abs(errorLevel) * 0.3f);
+                        }
+                    }
+                }
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Update concept formation with current neural activity patterns
+        // Extract patterns from working memory and episodic memory
+        
+        // Get current sensory patterns from working memory
+        std::vector<float> currentPattern;
+        if (pImpl->workingMemory) {
+            currentPattern = pImpl->workingMemory->retrieve();
+        }
+        
+        // Get recent episodic sequences for concept learning
+        std::vector<EpisodicMemoryItem> recentEpisodes;
+        if (pImpl->episodicMemory) {
+            recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(10);
+        }
+        
+        // Process patterns and episodes to form/update concepts
+        if (!currentPattern.empty() || !recentEpisodes.empty()) {
+            pImpl->conceptFormation->update(pImpl->timestep, currentPattern, recentEpisodes);
+        }
+        
+        // Integrate concepts into attention via top-down bias
+        if (pImpl->conceptFormation && pImpl->attention) {
+            auto concepts = pImpl->conceptFormation->getActiveConcepts();
+            for (const auto& concept : concepts) {
+                // Apply concept knowledge to guide attention
+                pImpl->attention->applyTopDownBias(concept.guidingNeuron, concept.strength);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -689,6 +757,59 @@ size_t Brain::getPendingSpikeEventCount() const {
     return pImpl->spikeSystem->getPendingSpikeCount() + pImpl->spikeSystem->getPendingDelayedCount();
 }
 
+// ========== MEMORY SYSTEM GETTERS ==========
+NeuralWorkingMemory* Brain::getWorkingMemory() {
+    return pImpl->workingMemory.get();
+}
+
+NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    return pImpl->episodicMemory.get();
+}
+
+NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    return pImpl->associativeMemory.get();
+}
+
+// ========== PREDICTION SYSTEM GETTERS ==========
+PredictionSystem* Brain::getPredictionSystem() {
+    return pImpl->predictionSystem.get();
+}
+
+// ========== COGNITION SYSTEM GETTERS ==========
+NeuralPlanner* Brain::getPlanner() {
+    return pImpl->planner.get();
+}
+
+ConceptFormation* Brain::getConceptFormation() {
+    return pImpl->conceptFormation.get();
+}
+
+AttentionalSelection* Brain::getAttention() {
+    return pImpl->attention.get();
+}
+
+// ========== DEVELOPMENT SYSTEM GETTERS ==========
+DevelopmentSystem* Brain::getDevelopmentSystem() {
+    return pImpl->developmentSystem.get();
+}
+
+// ========== NEUROMODULATION SYSTEM GETTERS ==========
+Dopamine* Brain::getDopamine() {
+    return pImpl->dopamine.get();
+}
+
+Curiosity* Brain::getCuriosity() {
+    return pImpl->curiosity.get();
+}
+
+Novelty* Brain::getNovelty() {
+    return pImpl->novelty.get();
+}
+
+PredictionError* Brain::getPredictionErrorSignal() {
+    return pImpl->predictionError.get();
+}
+
 std::unique_ptr<class Action> Brain::produceAction() {
     // Simple action selection based on motor neuron activity
     // The motor neuron population with highest average activity determines action
@@ -731,8 +852,110 @@ void Brain::updatePlasticity() {
 }
 
 void Brain::develop() {
-    // Development updates structural plasticity
-    pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    // Update development system
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->update(this, pImpl->rng, pImpl->timestep * 1000);
+    }
+    
+    // Apply developmental changes to all systems
+    DevelopmentalStage stage = getDevelopmentalStage();
+    
+    // 1. Development affects plasticity rates
+    auto* sp = pImpl->structuralPlasticity;
+    if (sp) {
+        float plasticityMod = 1.0f;
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                plasticityMod = 1.0f;  // High plasticity
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                plasticityMod = 0.8f;
+                break;
+            case DevelopmentalStage::Maturation:
+                plasticityMod = 0.5f;
+                break;
+            case DevelopmentalStage::Adult:
+                plasticityMod = 0.2f;  // Stable
+                break;
+        }
+        
+        sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+        sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+    }
+    
+    // 2. Development affects neuromodulation levels
+    if (pImpl->curiosity) {
+        // Curiosity peaks during critical period, declines in adulthood
+        float curiosityMod = 1.0f;
+        if (stage == DevelopmentalStage::Adult || stage == DevelopmentalStage::Aging) {
+            curiosityMod = 0.5f;
+        }
+        pImpl->curiosity->setExplorationDrive(1.0f - curiosityMod * 0.5f);
+    }
+    
+    if (pImpl->novelty) {
+        // Novelty detection varies with development
+        float noveltyMod = 1.0f;
+        if (stage == DevelopmentalStage::Adult) {
+            noveltyMod = 0.7f;
+        }
+        // Update novelty levels
+        float currentNovelty = pImpl->novelty->getLevel();
+        pImpl->novelty->setLevel(currentNovelty * noveltyMod);
+    }
+    
+    // 3. Development affects memory consolidation
+    if (pImpl->episodicMemory) {
+        // Consolidation efficiency varies with development
+        float consolidationRate = 1.0f;
+        if (stage == DevelopmentalStage::Initial) {
+            consolidationRate = 0.8f;  // High initial consolidation
+        } else if (stage == DevelopmentalStage::Adult) {
+            consolidationRate = 0.6f;  // Moderate consolidation
+        }
+        pImpl->episodicMemory->setConsolidationRate(consolidationRate);
+    }
+    
+    // 4. Development affects attention system
+    if (pImpl->attention) {
+        // Attention span and filtering improves with development
+        float attentionStrength = 1.0f;
+        if (stage == DevelopmentalStage::Initial) {
+            attentionStrength = 0.7f;  // Limited attention span
+        } else if (stage == DevelopmentalStage::Adult) {
+            attentionStrength = 1.0f;  // Mature attention
+        }
+        // Apply to competition threshold
+        pImpl->attention->setCompetitionThreshold(0.3f * attentionStrength);
+    }
+    
+    // 5. Development affects prediction system
+    if (pImpl->predictionSystem) {
+        // Prediction accuracy improves with development
+        float predictionMod = 1.0f;
+        if (stage == DevelopmentalStage::Initial) {
+            predictionMod = 0.6f;  // Limited predictive ability
+        } else if (stage == DevelopmentalStage::Adult) {
+            predictionMod = 1.0f;  // Mature prediction
+        }
+        // Could apply prediction modulation here
+    }
+    
+    // 6. Development affects sensory processing
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                if (neuron->getType() == NeuronType::Sensory) {
+                    // Development affects sensory sensitivity
+                    float sensitivityMod = 1.0f;
+                    if (stage == DevelopmentalStage::Initial) {
+                        sensitivityMod = 1.2f;  // Over-sensitive early development
+                    }
+                    // Could modulate sensory neuron parameters
+                }
+            }
+        }
+    }
 }
 
 void Brain::reset() {

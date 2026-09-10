@@ -5,13 +5,13 @@
 
 namespace nlm {
 
-// Curiosity system: Motivation and exploration drive
-class Curiosity : public Neuromodulator {
+// Acetylcholine: Attention and memory consolidation neuromodulator
+class Acetylcholine : public Neuromodulator {
 public:
-    Curiosity();
-    ~Curiosity() override;
+    Acetylcholine();
+    ~Acetylcholine() override;
     
-    const char* getName() const override { return "Curiosity"; }
+    const char* getName() const override { return "ACh"; }
     float getLevel() const override;
     void setLevel(float level) override;
     float getPlasticityFactor() const override;
@@ -21,16 +21,11 @@ public:
     float getAttentionModulator() const override;
     float getMemoryModulator() const override;
     
-    // Get exploration drive
-    float getExplorationDrive() const;
+    // Attention signaling
+    void enhanceAttention(float strength);
     
-    // Configure weights
-    void setNoveltyWeight(float weight);
-    void setPredictionErrorWeight(float weight);
-    void setRewardWeight(float weight);
-    
-    // Reset system
-    void reset();
+    // Memory consolidation signaling
+    void promoteMemoryConsolidation(float strength);
     
 private:
     struct Impl;

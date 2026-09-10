@@ -5,13 +5,13 @@
 
 namespace nlm {
 
-// Curiosity system: Motivation and exploration drive
-class Curiosity : public Neuromodulator {
+// Dopamine neuromodulator
+class Dopamine : public Neuromodulator {
 public:
-    Curiosity();
-    ~Curiosity() override;
+    Dopamine();
+    ~Dopamine() override;
     
-    const char* getName() const override { return "Curiosity"; }
+    const char* getName() const override { return "DA"; }
     float getLevel() const override;
     void setLevel(float level) override;
     float getPlasticityFactor() const override;
@@ -21,16 +21,12 @@ public:
     float getAttentionModulator() const override;
     float getMemoryModulator() const override;
     
-    // Get exploration drive
-    float getExplorationDrive() const;
+    // Reward signaling
+    void signalReward(float reward);
+    void signalRewardPredictionError(float error);
     
-    // Configure weights
-    void setNoveltyWeight(float weight);
-    void setPredictionErrorWeight(float weight);
-    void setRewardWeight(float weight);
-    
-    // Reset system
-    void reset();
+    // Prediction error tracking
+    void recordPredictionError(float error);
     
 private:
     struct Impl;

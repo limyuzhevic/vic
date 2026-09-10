@@ -3,11 +3,12 @@
 #include "../core/Types/Types.hpp"
 #include <string>
 #include <vector>
+#include <cmath>
 
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Real neuromodulation effects for attention, arousal, learning, and behavior
 
 class Neuromodulator {
 public:
@@ -21,11 +22,21 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    // Returns factor to multiply learning rates by
     virtual float getPlasticityFactor() const = 0;
     
-    // Update neuromodulator state
-    virtual void update(TimestepDuration dt) = 0;
+    // Update neuromodulator state based on brain activity
+    virtual void update(TimestepDuration dt, float novelty = 0.0f, 
+                       float predictionError = 0.0f, float reward = 0.0f) = 0;
+    
+    // Get effect on neural excitability (0.0 = no effect, 1.0 = strong effect)
+    virtual float getExcitabilityModulator() const = 0;
+    
+    // Get effect on attention/salience (0.0 = no effect, 1.0 = strong effect)
+    virtual float getAttentionModulator() const = 0;
+    
+    // Get effect on memory consolidation (0.0 = no effect, 1.0 = strong effect)
+    virtual float getMemoryModulator() const = 0;
     
 protected:
     Neuromodulator() = default;
