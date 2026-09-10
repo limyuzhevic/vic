@@ -1,0 +1,13 @@
+# Simple test config for YAML format
+int_value: 42
+string_value: "hello"
+double_value: 3.14
+bool_value: true
+int_array:
+  - 1
+  - 2
+  - 3
+string_array:
+  - "a"
+  - "b"
+  - "c"

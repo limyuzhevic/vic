@@ -1,0 +1,7 @@
+// Simple test config for JSON format
+test_int = 42
+test_string = "hello"
+test_double = 3.14
+test_bool = true
+int_array = [1, 2, 3]
+string_array = ["a", "b", "c"]

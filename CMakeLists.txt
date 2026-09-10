@@ -4,7 +4,7 @@ project(NLM VERSION 0.1.0 LANGUAGES CXX)
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -17,6 +17,12 @@ if(MSVC)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
+
+# Find nlohmann_json
+find_package(nlohmann_json REQUIRED)
+
+# Find yaml-cpp
+find_package(yaml-cpp REQUIRED)
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")

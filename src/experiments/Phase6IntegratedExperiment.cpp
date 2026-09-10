@@ -111,12 +111,23 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
-    // Verify integration
-    result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
-    result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
-    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
-    result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
-    result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
+    // Verify integration - check that systems are properly instantiated and functional
+    auto* wm = brain->getWorkingMemory();
+    auto* em = brain->getEpisodicMemory();
+    auto* dopamine = brain->getDopamine();
+    auto* curiosity = brain->getCuriosity();
+    auto* novelty = brain->getNovelty();
+    auto* prediction = brain->getPredictionSystem();
+    auto* planner = brain->getPlanner();
+    auto* concept = brain->getConceptFormation();
+    auto* attention = brain->getAttention();
+    auto* devSystem = brain->getDevelopmentSystem();
+    
+    result.memoryWorkingMemoryIntegrated = (wm != nullptr && wm->getActiveTraces() > 0);
+    result.memoryEpisodicMemoryIntegrated = (em != nullptr && em->getEpisodeCount() > 0);
+    result.neuromodulationIntegrated = (dopamine != nullptr && curiosity != nullptr && novelty != nullptr);
+    result.predictionIntegrated = (prediction != nullptr);
+    result.developmentIntegrated = (devSystem != nullptr);
     
     NLM_LOG_INFO("=== Integration Verification ===");
     NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
