@@ -21,18 +21,14 @@ public:
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
-    // Get prediction error
-    float getPredictionError() const;
+    // Connect episodic memory for pattern completion and prediction
+    void setEpisodicMemory(NeuralEpisodicMemory* episodicMemory);
     
-    // Get prediction confidence
-    float getConfidence() const;
+    // Get episodes similar to current pattern for prediction
+    std::vector<const EpisodicMemoryItem*> getSimilarEpisodes(const std::vector<float>& pattern, size_t maxResults = 5) const;
     
-    // Get prediction history
-    const std::vector<float>& getErrorHistory() const;
-    void clearHistory();
-    
-    // Train prediction model
-    void train(const SensoryInput& observation);
+    // Make prediction based on episodic memory patterns
+    std::unique_ptr<SensoryInput> predictFromEpisodicMemory(const std::vector<float>& currentPattern) const;
     
 private:
     struct Impl;

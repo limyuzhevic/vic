@@ -23,6 +23,14 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    // Initialize member vectors with empty state
+    // Memory will be populated during initialize() when Brain is available
+    memoryNeurons_.clear();
+    memoryActivations_.clear();
+    memoryTimestamps_.clear();
+    activeTraces_.clear();
+    winners_.clear();
+    pImpl->maintenanceSynapses.clear();
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
@@ -30,7 +38,38 @@ NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
+    
+    if (brain) {
+        // Populate working memory with neurons from brain regions
+        // This creates the initial memory trace for the working memory system
+        populateFromBrain(brain);
+    }
+    
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
+}
+
+void NeuralWorkingMemory::populateFromBrain(Brain* brain) {
+    // Get all regions and their neurons
+    for (const auto& region : brain->getRegions()) {
+        for (const auto& pop : region->getPopulations()) {
+            // Add neurons from each population to working memory
+            // Only include certain neuron types (e.g., internal and motor)
+            if (pop->getNeuronType() == NeuronType::Internal || 
+                pop->getNeuronType() == NeuronType::Motor) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Store neuron with initial activation
+                    memoryNeurons_.push_back(neuron->getId());
+                    memoryActivations_.push_back(0.1f);
+                    memoryTimestamps_.push_back(0);
+                    activeTraces_.push_back(memoryNeurons_.size() - 1);
+                }
+            }
+        }
+    }
+}
+            }
+        }
+    }
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
@@ -56,10 +95,14 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         // Update stored activation
         if (i < memoryActivations_.size()) {
             memoryActivations_[i] = activation;
+            // Add to active traces
+            activeTraces_.push_back(i);
         } else {
             memoryActivations_.push_back(activation);
             memoryTimestamps_.push_back(0);
             memoryNeurons_.push_back(neuron);
+            // Add to active traces
+            activeTraces_.push_back(i);
         }
     }
     

@@ -21,6 +21,9 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
     , maxEpisodes_(1000)
     , replayEnabled_(true)
 {
+    // Initialize member vectors
+    episodes_.clear();
+    pImpl->episodeNeurons.clear();
 }
 
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
@@ -28,6 +31,7 @@ NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
 void NeuralEpisodicMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
+    
     NLM_LOG_INFO("NeuralEpisodicMemory initialized");
 }
 

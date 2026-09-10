@@ -112,6 +112,10 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Helper functions
+    const char* actionTypeToString(ActionType action);
+    MotorCommand ActionTypeToMotorCommand(ActionType action);
 };
 
 } // namespace nlm

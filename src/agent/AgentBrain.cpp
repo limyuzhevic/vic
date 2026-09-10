@@ -149,9 +149,89 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
 }
 
+namespace nlm {
+
+const char* actionTypeToString(ActionType action) {
+    switch (action) {
+        case ActionType::MoveForward: return "MoveForward";
+        case ActionType::MoveBackward: return "MoveBackward";
+        case ActionType::MoveLeft: return "MoveLeft";
+        case ActionType::MoveRight: return "MoveRight";
+        case ActionType::TurnLeft: return "TurnLeft";
+        case ActionType::TurnRight: return "TurnRight";
+        case ActionType::Look: return "Look";
+        case ActionType::LookUp: return "LookUp";
+        case ActionType::LookDown: return "LookDown";
+        case ActionType::Interact: return "Interact";
+        case ActionType::Eat: return "Eat";
+        case ActionType::Drink: return "Drink";
+        case ActionType::Rest: return "Rest";
+        case ActionType::Wait: return "Wait";
+        case ActionType::Custom: return "Custom";
+        default: return "Unknown";
+    }
+}
+
+MotorCommand ActionTypeToMotorCommand(ActionType action) {
+    // Map ActionType to MotorCommand based on semantic similarity
+    switch (action) {
+        case ActionType::MoveForward:
+        case ActionType::MoveLeft:
+        case ActionType::MoveRight:
+            return MotorCommand::MoveForward;
+        case ActionType::MoveBackward:
+            return MotorCommand::MoveBackward;
+        case ActionType::TurnLeft:
+            return MotorCommand::TurnLeft;
+        case ActionType::TurnRight:
+            return MotorCommand::TurnRight;
+        case ActionType::Look:
+        case ActionType::LookUp:
+        case ActionType::LookDown:
+            return MotorCommand::LookRight;
+        case ActionType::Interact:
+            return MotorCommand::Interact;
+        case ActionType::Eat:
+        case ActionType::Drink:
+            return MotorCommand::Interact;
+        case ActionType::Rest:
+        case ActionType::Wait:
+        default:
+            return MotorCommand::Wait;
+    }
+}
+
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // Try neural planner first if available
+    if (brain_->getPlanner() && !previousVision_.empty()) {
+        // Create state vector from sensory input
+        std::vector<float> currentState;
+        const auto& vision = percept.getVision();
+        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
+            float novelty = std::abs(vision[i] - previousVision_[i]);
+            currentState.push_back(vision[i]);
+            currentState.push_back(novelty);
+        }
+        
+        // Plan action based on episodic memory and predictions
+        ActionType plannedAction = brain_->getPlanner()->planAction(currentState);
+        
+        // Convert ActionType to MotorCommand
+        MotorCommand plannedCommand = ActionTypeToMotorCommand(plannedAction);
+        
+        // Update planned action in planner
+        brain_->getPlanner()->updatePlanQuality(
+            std::vector<ActionType>{plannedAction}, 
+            std::vector<ActionType>{plannedAction}, 
+            brain_->getDopamine() ? brain_->getDopamine()->getLevel() : 0.0f
+        );
+        
+        return plannedCommand;
+    }
+    
+    // Fall back to motor neuron decoding if no planner
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
