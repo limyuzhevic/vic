@@ -82,6 +82,121 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Python Integration
+
+### Installation
+
+From source (Recommended for Development):
+
+```bash
+# Install build dependencies
+pip install pybind11 scikit-build-core pytest numpy
+
+# Build and install the Python bindings
+pip install -e .
+
+# Or build only (without installing)
+pip install build
+python -m build
+
+# Install from wheel
+pip install dist/*.whl
+```
+
+### Basic Usage
+
+```python
+import pynlm
+
+# Create a brain with default configuration
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for step in range(1000):
+    brain.step(step)
+    if step % 100 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+
+print(f"Simulation complete! Total spikes: {brain.getTotalSpikeCount()}")
+```
+
+### Creating a Complete Agent
+
+```python
+import pynlm
+
+# Create brain and initialize
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Create world and agent
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning and development features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run complete agent simulation
+for step in range(1000):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Get reward and apply neuromodulation
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    agent.updateDevelopment(0.1)
+
+print(f"Agent simulation complete!")
+print(f"Final curiosity: {agent.getCuriosityLevel():.3f}")
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+```
+
+### Advanced Configuration
+
+```python
+def create_advanced_brain(neuron_count=1000, learning_rate=0.01):
+    """Create a brain with advanced configuration."""
+    config = pynlm.createDefaultConfig()
+    
+    # Configure advanced parameters
+    config.set("brain.neuron_count", neuron_count)
+    config.set("plasticity.stdp.learning_rate", learning_rate)
+    config.set("plasticity.hebbian.enable", True)
+    config.set("plasticity.structural.enable", True)
+    
+    # Create brain and agent
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable all features
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    return brain, agent, world
+```
+
 ## Project Structure
 
 ```
