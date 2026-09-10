@@ -105,12 +105,17 @@ pip install dist/*.whl
 import pynlm
 
 # Check version
-print(pynlm.__version__)
+print(f"NLM Python version: {pynlm.__version__}")
 
 # Create a simple brain
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
-print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+
+# Test basic functionality
+brain.initialize()
+brain.step(0)
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
 ```
 
 ---

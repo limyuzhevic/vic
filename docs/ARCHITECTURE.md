@@ -39,14 +39,20 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 │                    └─────────────┘                              │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │              PHASE 4: EMERGING COGNITION                    ││
+│  │              PHASE 6: FINAL INTEGRATION                      ││
 │  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       ││
-│  │  │Attention│  │Planning │  │Self-Model│ │ Social  │       ││
-│  │  │         │  │         │  │         │  │Learning │       ││
+│  │  │   All   │  │   All   │  │   All   │  │   All   │       ││
+│  │  │  Systems│  │  Systems│  │  Systems│  │  Systems│       ││
+│  │  │Integrated│  │Connected│  │Complete│  │Working │       ││
+│  │  │   Brain  │  │   Brain  │  │   Brain │  │   Brain │       ││
 │  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘       ││
 │  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+**Note**: The main build target `nlm` now represents Phase 6: Final Integration,
+not Phase 2: Real Neural Computation. Phase 2 is archived in the source code
+but Phase 6 is the current working brain implementation.
 
 ## Core Components
 
@@ -87,20 +93,19 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **Curiosity**: Exploration motivation
 - **PredictionError**: Error signals
 
-### 7. Memory Layer (Phase 4)
-- **NeuralWorkingMemory**: Persistent activity for temporary storage
-- **NeuralEpisodicMemory**: Experience encoding in neural patterns
-- **NeuralAssociativeMemory**: Experience-based associations
-- **ConceptFormation**: Pattern discovery without labels
-- **SpatialRepresentation**: Learned spatial relationships
-- **TemporalRelation**: Before/after/sequence encoding
+### 7. Memory Layer (Phase 4+)
+- **WorkingMemory**: Temporary active storage of information
+- **EpisodicMemory**: Storage of events and experiences
+- **SemanticMemory**: Gradually acquired knowledge
+- **ProceduralMemory**: Learned skills and habits
+- **AssociativeMemory**: Relationships between representations
 
-### 8. Prediction Layer (Phase 4)
+### 8. Prediction Layer (Phase 4+)
 - **NeuralPrediction**: Temporal sequence learning
 - **ActionConsequencePredictor**: Action effect prediction
 - **PredictionErrorSignal**: Error computation for learning
 
-### 9. Cognitive Layer (Phase 4)
+### 9. Cognitive Layer (Phase 4+)
 - **AttentionalSelection**: Competition-based attention (NOT Transformer QKV)
 - **NeuralPlanner**: Predictive action selection
 - **SelfModel**: Sensorimotor self-awareness
@@ -129,7 +134,7 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 
 ## Data Flow
 
-### Phase 2: Neural Computation
+### Phase 2: Neural Computation (ARCHIVED)
 ```
 Sensory Input (test signals)
       ↓
@@ -145,6 +150,176 @@ Structural Plasticity (synaptogenesis/pruning)
 ```
 
 ### Phase 3: World Interaction
+```
+WORLD (SimpleWorld)
+      ↓
+SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
+      ↓
+AgentBrain.processSensoryInput()
+      ↓
+Brain.receiveSensoryInput() → Sensory Neurons
+      ↓
+Neural Computation (LIF dynamics)
+      ↓
+Spike Processing (event-driven)
+      ↓
+Motor Decoding → MotorCommand
+      ↓
+AgentBrain.decodeMotorCommand()
+      ↓
+WORLD.applyMotorCommand()
+      ↓
+ACTION RESULT (reward, success)
+      ↓
+Reward Prediction Error
+      ↓
+Neuromodulation (dopamine-like signal)
+      ↓
+Eligibility Trace Update
+      ↓
+Plasticity (STDP, Hebbian, Reward-Modulated)
+      ↓
+Structural Plasticity (synaptogenesis/pruning)
+      ↓
+Development System (stage progression)
+```
+
+### Phase 6: Final Integration (CURRENT)
+```
+WORLD (SimpleWorld)
+      ↓
+SENSORY PERCEPT
+      ↓
+ATTENTION (competitive selection)
+      ↓
+NEURAL PROCESSING
+      ↓
+PREDICTION (temporal sequence learning)
+      ↓
+WORKING MEMORY (persistent activity)
+      ↓
+EPISODIC MEMORY (experience storage)
+      ↓
+CONCEPT FORMATION (pattern discovery)
+      ↓
+PLANNING (multi-step prediction)
+      ↓
+SELF-MODEL (sensorimotor learning)
+      ↓
+MOTOR ACTION
+      ↓
+WORLD.applyMotorCommand()
+      ↓
+ACTION RESULT
+      ↓
+REWARD / ERROR
+      ↓
+NEUROMODULATION
+      ↓
+PLASTICITY
+      ↓
+SOCIAL LEARNING (observation/imitation)
+```
+
+## Agent-Brain Interface
+
+Phase 3/4 introduces the AgentBrain class that connects the NLM brain to the world:
+
+- **SensoryTransduction**: Converts world percepts to neural input
+- **MotorDecoding**: Converts neural activity to motor commands
+- **Neuromodulation**: Applies reward signals to plasticity
+- **Development**: Updates developmental stage
+- **Attention**: Selective processing through competition
+- **Planning**: Uses predictions to select actions
+
+## Key Design Principles
+
+1. **No ML Frameworks**: NLM implements its own neural computation
+2. **No Transformer Architecture**: Uses spiking dynamics and competitive attention
+3. **Biological Inspiration**: Designed to be incrementally more biologically accurate
+4. **Modularity**: Clear interfaces between components
+5. **Determinism**: Reproducible experiments via explicit random seeds
+6. **Performance**: Data-oriented design for large-scale simulation
+7. **Extensibility**: Clear patterns for adding new components
+8. **No Predefined Knowledge**: All learning from experience
+
+## Phase 4/6 Key Innovations
+
+### Prediction System
+- Learns temporal sequences from experience
+- Predicts action consequences
+- Multi-step prediction capability
+- Error signals modulate learning
+
+### Working Memory
+- Persistent neural activity
+- Recurrent connections for maintenance
+- Competition for selective retention
+- Neural-grounded (not a vector store)
+
+### Episodic Memory
+- Experience encoded as neural patterns
+- Pattern completion retrieval
+- Temporal and spatial indexing
+- Replay during consolidation
+
+### Concept Formation
+- Discovers patterns without labels
+- Prototype formation through averaging
+- Stability measurement
+- Category hints from properties
+
+### Attention
+- Lateral inhibition competition
+- Winner-take-more dynamics
+- Top-down and bottom-up bias
+- NOT Transformer QKV attention
+
+### Planning
+- Uses learned predictions
+- Evaluates potential futures
+- Selects actions leading to goals
+- Adapts based on outcomes
+
+### Self-Model
+- Learns body schema
+- Predicts action consequences
+- Self vs external distinction
+- Capability representation
+
+### Social Learning
+- Observes other agents
+- Learns action effects
+- Imitation capability
+- Simple communication signals
+
+## Build System
+
+### Main Executable
+- **Target**: `nlm` (Phase 6 Final Integration)
+- **Includes**: All brain systems integrated
+- **Purpose**: Comprehensive integration test
+- **Features**: Memory systems, neuromodulation, prediction, cognition
+
+### Phase 3 Demo
+- **Target**: `nlm_phase3_demo`
+- **Includes**: Phase 3 world interaction
+
+### Phase 4 Demo
+- **Target**: `nlm_phase4_demo`
+- **Includes**: Phase 4 cognitive systems
+
+### Libraries
+- **nlm_core**: Core neural computation
+- **nlm_agent**: Agent-brain interface
+- **nlm_world**: World simulation
+- **nlm_phase3**: Phase 3 experiments
+- **nlm_phase4**: Phase 4 cognitive experiments
+
+## Testing
+
+The CMakeLists.txt correctly references all source files that exist.
+All phase demo executables are properly linked with their required libraries.
 ```
 WORLD (SimpleWorld)
       ↓
