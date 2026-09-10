@@ -142,7 +142,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
@@ -160,6 +160,26 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("set", py::overload_cast<const std::string&, const std::string&, ConfigSource>(
+                  &Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value (string)")
+        .def("set", py::overload_cast<const std::string&, int, ConfigSource>(
+                  &Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value (int)")
+        .def("set", py::overload_cast<const std::string&, double, ConfigSource>(
+                  &Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value (float)")
+        .def("set", py::overload_cast<const std::string&, bool, ConfigSource>(
+                  &Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a configuration value (bool)")
+        .def("get", [](const Config& self, const std::string& key) {
+            return self.getOr<std::string>(key, "");
+        }, py::arg("key"),
+             "Get configuration value as string (helper)")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -279,6 +299,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
         .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
         .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
+        .def("getObjectAt", &SimpleWorld::getObjectAt, py::arg("x"), py::arg("y"))
         .def("getWidth", &SimpleWorld::getWidth)
         .def("getHeight", &SimpleWorld::getHeight)
         .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
@@ -289,7 +310,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+    py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
@@ -342,6 +363,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,

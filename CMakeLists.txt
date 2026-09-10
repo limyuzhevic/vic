@@ -21,7 +21,7 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
+# Core library - only one definition needed
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
