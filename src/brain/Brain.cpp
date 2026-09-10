@@ -151,11 +151,40 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // ========== CONNECT SYSTEMS ==========
+        
+        // Connect working memory to brain
+        workingMemory->initialize(this);
+        
+        // Connect episodic memory to brain
+        episodicMemory->initialize(this);
+        
+        // Connect associative memory to brain
+        associativeMemory->initialize(this);
+        
+        // Connect prediction system to brain
+        // predictionSystem->initialize(this); // PredictionSystem doesn't have initialize method
+        
+        // Connect cognition systems to brain
+        planner->initialize(this);
+        conceptFormation->initialize(this);
+        attention->initialize(this);
+        
+        // Connect development system to brain
+        developmentSystem->initialize(this);
+        
+        // Connect neuromodulation systems to brain
+        // (Individual neuromodulators don't have initialize methods)
+        
+        NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
+        NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
+        NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
+        NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
+        NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+        
+        return true;
     }
-    
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
-};
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
@@ -1015,6 +1044,42 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+}
+
+PredictionSystem* Brain::getPredictionSystem() {
+    return pImpl->predictionSystem.get();
+}
+
+NeuralPlanner* Brain::getPlanner() {
+    return pImpl->planner.get();
+}
+
+ConceptFormation* Brain::getConceptFormation() {
+    return pImpl->conceptFormation.get();
+}
+
+AttentionalSelection* Brain::getAttention() {
+    return pImpl->attention.get();
+}
+
+DevelopmentSystem* Brain::getDevelopmentSystem() {
+    return pImpl->developmentSystem.get();
+}
+
+Dopamine* Brain::getDopamine() {
+    return pImpl->dopamine.get();
+}
+
+Curiosity* Brain::getCuriosity() {
+    return pImpl->curiosity.get();
+}
+
+Novelty* Brain::getNovelty() {
+    return pImpl->novelty.get();
+}
+
+PredictionError* Brain::getPredictionErrorSignal() {
+    return pImpl->predictionError.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
