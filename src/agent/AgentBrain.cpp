@@ -22,38 +22,24 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
+        size_t idx = 0;
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
+                        // Assign to motor group based on neuron type
+                        MotorGroup group = static_cast<MotorGroup>(idx % 6);
+                        assignToMotorGroup(n, group);
+                        idx++;
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
+                        // Assign to sensory group based on neuron type
+                        SensoryGroup group = static_cast<SensoryGroup>(idx % 4);
+                        assignToSensoryGroup(n, group);
+                        idx++;
                     }
                 }
             }
@@ -62,6 +48,94 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 }
 
 AgentBrain::~AgentBrain() = default;
+
+void AgentBrain::assignToMotorGroup(Neuron* neuron, MotorGroup group) {
+    if (!neuron) return;
+    
+    switch (group) {
+        case MotorGroup::Forward:
+            motorForward_.push_back(neuron);
+            break;
+        case MotorGroup::Backward:
+            motorBackward_.push_back(neuron);
+            break;
+        case MotorGroup::TurnLeft:
+            motorTurnLeft_.push_back(neuron);
+            break;
+        case MotorGroup::TurnRight:
+            motorTurnRight_.push_back(neuron);
+            break;
+        case MotorGroup::Interact:
+            motorInteract_.push_back(neuron);
+            break;
+        case MotorGroup::Wait:
+            motorWait_.push_back(neuron);
+            break;
+    }
+}
+
+void AgentBrain::assignToSensoryGroup(Neuron* neuron, SensoryGroup group) {
+    if (!neuron) return;
+    
+    switch (group) {
+        case SensoryGroup::Vision:
+            sensoryVision_.push_back(neuron);
+            break;
+        case SensoryGroup::Touch:
+            sensoryTouch_.push_back(neuron);
+            break;
+        case SensoryGroup::Internal:
+            sensoryInternal_.push_back(neuron);
+            break;
+        case SensoryGroup::Proprioception:
+            sensoryProprioception_.push_back(neuron);
+            break;
+    }
+}
+
+AgentBrain::MotorGroup AgentBrain::getMotorGroup(Neuron* neuron) const {
+    if (!neuron) return MotorGroup::Wait;
+    
+    for (size_t i = 0; i < motorForward_.size(); ++i) {
+        if (motorForward_[i] == neuron) return MotorGroup::Forward;
+    }
+    for (size_t i = 0; i < motorBackward_.size(); ++i) {
+        if (motorBackward_[i] == neuron) return MotorGroup::Backward;
+    }
+    for (size_t i = 0; i < motorTurnLeft_.size(); ++i) {
+        if (motorTurnLeft_[i] == neuron) return MotorGroup::TurnLeft;
+    }
+    for (size_t i = 0; i < motorTurnRight_.size(); ++i) {
+        if (motorTurnRight_[i] == neuron) return MotorGroup::TurnRight;
+    }
+    for (size_t i = 0; i < motorInteract_.size(); ++i) {
+        if (motorInteract_[i] == neuron) return MotorGroup::Interact;
+    }
+    for (size_t i = 0; i < motorWait_.size(); ++i) {
+        if (motorWait_[i] == neuron) return MotorGroup::Wait;
+    }
+    
+    return MotorGroup::Wait;
+}
+
+AgentBrain::SensoryGroup AgentBrain::getSensoryGroup(Neuron* neuron) const {
+    if (!neuron) return SensoryGroup::Vision;
+    
+    for (size_t i = 0; i < sensoryVision_.size(); ++i) {
+        if (sensoryVision_[i] == neuron) return SensoryGroup::Vision;
+    }
+    for (size_t i = 0; i < sensoryTouch_.size(); ++i) {
+        if (sensoryTouch_[i] == neuron) return SensoryGroup::Touch;
+    }
+    for (size_t i = 0; i < sensoryInternal_.size(); ++i) {
+        if (sensoryInternal_[i] == neuron) return SensoryGroup::Internal;
+    }
+    for (size_t i = 0; i < sensoryProprioception_.size(); ++i) {
+        if (sensoryProprioception_[i] == neuron) return SensoryGroup::Proprioception;
+    }
+    
+    return SensoryGroup::Vision;
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);

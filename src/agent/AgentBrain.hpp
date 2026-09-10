@@ -70,27 +70,33 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
-    std::shared_ptr<Brain> brain_;
-    
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
-    
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    /**
+     * Motor group enumeration for action selection
+     */
+    enum class MotorGroup {
+        Forward = 0,
+        Backward = 1,
+        TurnLeft = 2,
+        TurnRight = 3,
+        Interact = 4,
+        Wait = 5
+    };
+
+    /**
+     * Sensory group enumeration for perception
+     */
+    enum class SensoryGroup {
+        Vision = 0,
+        Touch = 1,
+        Internal = 2,
+        Proprioception = 3
+    };
+
+    // Helper functions for neuron distribution
+    void assignToMotorGroup(Neuron* neuron, MotorGroup group);
+    void assignToSensoryGroup(Neuron* neuron, SensoryGroup group);
+    MotorGroup getMotorGroup(Neuron* neuron) const;
+    SensoryGroup getSensoryGroup(Neuron* neuron) const;
     
     // Neuromodulation state
     float dopamineLevel_;

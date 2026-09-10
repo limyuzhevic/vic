@@ -761,13 +761,13 @@ void Brain::reset() {
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
-bool Brain::save(const std::string& filepath) const {
-    NLM_LOG_INFO("Saving brain state to " + filepath);
-    
     try {
+        // Create temporary file path for atomic write
+        std::string tempPath = filepath + ".tmp";
+        
         CheckpointWriter writer;
-        if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+        if (!writer.create(tempPath, CompressionLevel::Balanced)) {
+            NLM_LOG_ERROR("Failed to create temporary checkpoint file: " + tempPath);
             return false;
         }
         
@@ -807,6 +807,7 @@ bool Brain::save(const std::string& filepath) const {
         
         if (!writer.writeNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to write neurons to checkpoint");
+            writer.abort();
             return false;
         }
         
@@ -825,16 +826,70 @@ bool Brain::save(const std::string& filepath) const {
         
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+            writer.abort();
             return false;
+        }
+        
+        // Write integration state
+        if (!pImpl->spikeSystem->save(writer)) {
+            NLM_LOG_ERROR("Failed to write spike system to checkpoint");
+            writer.abort();
+            return false;
+        }
+        
+        // Write neuromodulation systems
+        if (pImpl->dopamine) {
+            if (!pImpl->dopamine->save(writer)) {
+                NLM_LOG_ERROR("Failed to write dopamine to checkpoint");
+                writer.abort();
+                return false;
+            }
+        }
+        
+        if (pImpl->curiosity) {
+            if (!pImpl->curiosity->save(writer)) {
+                NLM_LOG_ERROR("Failed to write curiosity to checkpoint");
+                writer.abort();
+                return false;
+            }
+        }
+        
+        // Write memory systems
+        if (pImpl->workingMemory) {
+            if (!pImpl->workingMemory->save(writer)) {
+                NLM_LOG_ERROR("Failed to write working memory to checkpoint");
+                writer.abort();
+                return false;
+            }
+        }
+        
+        if (pImpl->episodicMemory) {
+            if (!pImpl->episodicMemory->save(writer)) {
+                NLM_LOG_ERROR("Failed to write episodic memory to checkpoint");
+                writer.abort();
+                return false;
+            }
         }
         
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
+            writer.abort();
             return false;
         }
         
         NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
+        
+        // Atomic rename - close writer first
+        writer.close();
+        
+        // Atomic rename to final file
+        if (std::rename(tempPath.c_str(), filepath.c_str()) != 0) {
+            NLM_LOG_ERROR("Failed to atomically rename checkpoint file");
+            std::remove(tempPath.c_str()); // Clean up temp file
+            return false;
+        }
+        
         return true;
         
     } catch (const std::exception& e) {
@@ -858,46 +913,124 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Read neurons
-        NeuronCheckpointData neuronData;
-        if (!reader.readNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to read neurons from checkpoint");
-            return false;
-        }
-        
-        // Apply neuron states
-        size_t idx = 0;
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
-                        }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
-                        }
-                    }
-                    idx++;
-                }
+        // Load neuromodulation systems
+        if (pImpl->dopamine) {
+            if (!pImpl->dopamine->load(reader)) {
+                NLM_LOG_ERROR("Failed to load dopamine from checkpoint");
+                return false;
             }
         }
         
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
-            return false;
+        if (pImpl->curiosity) {
+            if (!pImpl->curiosity->load(reader)) {
+                NLM_LOG_ERROR("Failed to load curiosity from checkpoint");
+                return false;
+            }
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        if (pImpl->novelty) {
+            if (!pImpl->novelty->load(reader)) {
+                NLM_LOG_ERROR("Failed to load novelty from checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->predictionError) {
+            if (!pImpl->predictionError->load(reader)) {
+                NLM_LOG_ERROR("Failed to load prediction error from checkpoint");
+                return false;
+            }
+        }
+        
+        // Load memory systems
+        if (pImpl->workingMemory) {
+            if (!pImpl->workingMemory->load(reader)) {
+                NLM_LOG_ERROR("Failed to load working memory from checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->episodicMemory) {
+            if (!pImpl->episodicMemory->load(reader)) {
+                NLM_LOG_ERROR("Failed to load episodic memory from checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->associativeMemory) {
+            if (!pImpl->associativeMemory->load(reader)) {
+                NLM_LOG_ERROR("Failed to load associative memory from checkpoint");
+                return false;
+            }
+        }
+        
+        // Load cognition systems
+        if (pImpl->planner) {
+            if (!pImpl->planner->load(reader)) {
+                NLM_LOG_ERROR("Failed to load planner from checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->conceptFormation) {
+            if (!pImpl->conceptFormation->load(reader)) {
+                NLM_LOG_ERROR("Failed to load concept formation from checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->attention) {
+            if (!pImpl->attention->load(reader)) {
+                NLM_LOG_ERROR("Failed to load attention from checkpoint");
+                return false;
+            }
+        }
+        
+        // Load development system
+        if (pImpl->developmentSystem) {
+            if (!pImpl->developmentSystem->load(reader)) {
+                NLM_LOG_ERROR("Failed to load development system from checkpoint");
+                return false;
+            }
+        }
+        
+        // Load prediction system
+        if (pImpl->predictionSystem) {
+            if (!pImpl->predictionSystem->load(reader)) {
+                NLM_LOG_ERROR("Failed to load prediction system from checkpoint");
+                return false;
+            }
+        }
+        
+        // Load plasticity rules
+        if (pImpl->stdp) {
+            if (!pImpl->stdp->load(reader)) {
+                NLM_LOG_ERROR("Failed to load STDP from checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->hebbian) {
+            if (!pImpl->hebbian->load(reader)) {
+                NLM_LOG_ERROR("Failed to load Hebbian plasticity from checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->structuralPlasticity) {
+            if (!pImpl->structuralPlasticity->load(reader)) {
+                NLM_LOG_ERROR("Failed to load structural plasticity from checkpoint");
+                return false;
+            }
+        }
+        
+        // Load spike system
+        if (pImpl->spikeSystem) {
+            if (!pImpl->spikeSystem->load(reader)) {
+                NLM_LOG_ERROR("Failed to load spike system from checkpoint");
+                return false;
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
