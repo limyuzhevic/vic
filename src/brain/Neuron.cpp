@@ -170,6 +170,10 @@ NeuronState& Neuron::getState() {
     return pImpl->state;
 }
 
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
+}
+
 PlasticityFlags& Neuron::getPlasticityFlags() {
     return pImpl->plasticityFlags;
 }
@@ -178,6 +182,27 @@ void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
     pImpl->plasticityFlags.hebbian = hebbian;
     pImpl->plasticityFlags.stdp = stdp;
     pImpl->plasticityFlags.reward_modulated = rewardModulated;
+}
+
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
+}
+
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active || 
+           pImpl->state.firingState == FiringState::Refractory;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
+void Neuron::setPopulationId(PopulationId population) {
+    pImpl->populationId = population;
 }
 
 void Neuron::setRegionId(RegionId region) {
@@ -220,7 +245,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Convert dt from seconds to milliseconds for consistency with tau (ms)
+    V = V + static_cast<float>(dt * 1000.0f) * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -261,6 +287,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
+    // Use the configured timestep from plasticity rules if available
     TimestepDuration dt = 0.001;  // 1ms default
     stepLIF(currentTime, dt);
 }

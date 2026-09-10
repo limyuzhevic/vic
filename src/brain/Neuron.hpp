@@ -133,8 +133,8 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+// Update neuron for one simulation step
+    // Phase 6: Uses LIF dynamics implemented in stepLIF()
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -142,6 +142,10 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
+    
+    // Direct access to LIF step function
+    // Called by Brain during simulation
+    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
     
 private:
     struct Impl;
