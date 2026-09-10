@@ -18,42 +18,44 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+// Load from file (JSON format)
+    bool Config::loadFromFile(const std::string& filepath) {
+        // TODO: Implement proper JSON/YAML parser with schema validation
+        // TODO: Add support for nested keys and configuration inheritance
+        // TODO: Add proper error handling and file format detection
+        
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        
+        return true;
     }
-    
-    return true;
-}
 
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
@@ -86,7 +88,42 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Output value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << "\"" << arg[i] << "\"";
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else {
+                file << arg; // int, int64_t, double
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -154,6 +191,10 @@ void Config::remove(const std::string& key) {
         pImpl->entries.end()
     );
 }
+    
+    // TODO: Add support for configuration inheritance and merging
+    // TODO: Add configuration validation rules
+    // TODO: Add configuration templates
 
 std::vector<std::string> Config::getKeys() const {
     std::vector<std::string> keys;
@@ -167,6 +208,10 @@ std::vector<std::string> Config::getKeys() const {
 void Config::clear() {
     pImpl->entries.clear();
 }
+    
+    // TODO: Add backup/restore functionality for configuration
+    // TODO: Add configuration history tracking
+    // TODO: Add atomic configuration updates
 
 std::string Config::summary() const {
     std::ostringstream oss;
