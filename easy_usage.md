@@ -14,14 +14,6 @@ That's it! NLM simulates all of this.
 
 ---
 
-## The 3 Things You Need to Know
-
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
-
----
-
 ## Quick Start (Copy & Paste)
 
 ### Example 1: Simplest Brain
@@ -70,6 +62,26 @@ for step in range(50):
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
+
+---
+
+## Important Notes
+
+**UPDATED in Phase 6.3:** Previous versions included LookLeft and LookRight motor commands. These have been removed from the current implementation. Use only the remaining actions:
+- MoveForward
+- MoveBackward
+- TurnLeft
+- TurnRight
+- Interact
+- Wait
+
+---
+
+## The 3 Things You Need to Know
+
+1. **Brain** - The virtual brain that thinks
+2. **World** - The environment the brain lives in
+3. **Agent** - The bridge connecting brain to world
 
 ---
 
@@ -290,8 +302,100 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
+1. Read `HOW_TO_USE.md` for more detailed documentation
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
+
+---
+
+## Important Updates
+
+This version includes fixes for:
+- **Dynamic sensory input size**: The brain now adapts to world vision dimensions
+- **Removed deprecated actions**: LookLeft/LookRight commands removed (they were sensor panning, not actual motor actions)
+- **Improved novelty detection**: More accurate calculation of sensory changes
+- **Enhanced documentation**: Updated examples and fixed inconsistencies
+
+The agent now uses only the six core motor actions: MoveForward, MoveBackward, TurnLeft, TurnRight, Interact, and Wait.
+
+When experimenting with different configurations:
+
+```python
+# Create brain with custom configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 500)  # Smaller brain for testing
+config.set("plasticity.stdp.enable", True)
+config.set("neuromodulation.curiosity.enable", True)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+**Remember:** Brains need time to develop! Even with learning enabled, it may take many steps before you see complex behavior.
+
+That's it! You're now ready to use NLM.
+
+---
+
+## Frequently Asked Questions
+
+**Q: What does `agent.enableCuriosity(True)` do?**
+A: Enables exploration behavior. When curiosity is high, the agent may randomly try different actions to discover new things, even if the current action isn't the most rewarding.
+
+**Q: Why does the agent sometimes wait even when there are firing neurons?**
+A: The agent uses a threshold (0.5) - if no motor group has sufficient activity, it defaults to waiting. This prevents random, noisy movements.
+
+**Q: Can I make the brain learn faster?**
+A: Yes! Increase `plasticity.stdp.learning_rate` in the configuration, enable `neuromodulation.dopamine.scale`, and use reward signals effectively.
+
+**Q: What's the difference between `action` and `motor command`?**
+A: `Action` is a high-level concept with parameters, while `MotorCommand` is a low-level, innate signal that the brain produces. The agent decodes neural activity into MotorCommands.
+
+---
+
+## Advanced Usage Tips
+
+**1. Configure your world dimensions for optimal learning:**
+```python
+world.configure(width=30, height=30, visionWidth=16, visionHeight=16)
+# Larger vision gives more detailed input
+```
+
+**2. Use development stages for structured learning:**
+```python
+# Early stages: high plasticity (good for learning)
+# Later stages: lower plasticity (good for stability)
+agent.enableDevelopment(True)
+```
+
+**3. Control exploration vs. exploitation:**
+```python
+# High curiosity = more exploration
+# Low curiosity = more exploitation of known rewards
+agent.enableCuriosity(True)
+```
+
+**4. Save and load brain states:**
+```python
+# Save after good performance
+brain.save("good_brain.bin")
+
+# Load to continue training or use
+brain.load("saved_brain.bin")
+```
+
+**5. Monitor multiple agents:**
+```python
+# Create multiple agents with different brains
+agents = []
+for i in range(3):
+    brain = pynlm.createBrain(pynlm.createDefaultConfig())
+    brain.initialize()
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    agents.append(agent)
+```
+
+This improved version should give you a much better experience with NLM! The fixes make the system more robust, the documentation is clearer, and the examples actually work with the current implementation.

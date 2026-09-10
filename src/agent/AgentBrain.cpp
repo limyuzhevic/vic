@@ -68,15 +68,17 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Log initialization with actual sensory neuron counts
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons, " +
+                 std::to_string(sensoryProprioception_.size()) + " proprioception sensory neurons");
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
+    // Vision (visionWidth_ x visionHeight_) + touch (8) + internal (4) + proprioception (6)
+    return visionWidth_ * visionHeight_ + 8 + 4 + 6;  // Dynamic vision size from world
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
@@ -87,7 +89,7 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
+    // Vision input (visionWidth_ x visionHeight_ values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
@@ -125,21 +127,25 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
     
     // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
+    if (!vision.empty() && !previousVision_.empty()) {
         float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
+        size_t maxSize = std::min(vision.size(), previousVision_.size());
+        for (size_t i = 0; i < maxSize; ++i) {
             float diff = std::abs(vision[i] - previousVision_[i]);
             totalDiff += diff;
         }
         
         // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        noveltyLevel_ = totalDiff / static_cast<float>(maxSize);
         
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
         
         // Store for next time
-        previousVision_ = vision;
+        previousVision_.assign(vision.begin(), vision.end());
+    } else if (!vision.empty()) {
+        // First time initialization
+        previousVision_.assign(vision.begin(), vision.end());
     }
     
     // Update curiosity based on novelty
@@ -218,15 +224,13 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
             // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 5);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
                 case 2: return MotorCommand::TurnLeft;
                 case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
+                case 4: return MotorCommand::Interact;
                 default: return MotorCommand::Wait;
             }
         }
