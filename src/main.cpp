@@ -367,20 +367,20 @@ int main(int argc, char** argv) {
     config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default, "Random seed for reproducible experiments");
+    config->set("simulation_timestep", 0.001, ConfigSource::Default, "Simulation timestep in seconds");
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default, "Number of neurons in the brain");
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default, "Number of brain regions");
+    config->set("connection_probability", 0.15f, ConfigSource::Default, "Connection probability for random connectivity");
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default, "STDP LTP weight");
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default, "STDP LTD weight");
+    config->set("stdp_tau", 20.0f, ConfigSource::Default, "STDP time constant");
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default, "Synaptogenesis rate");
+    config->set("pruning_rate", 0.00001f, ConfigSource::Default, "Pruning rate");
     
     // Log configuration summary
     NLM_LOG_INFO("");

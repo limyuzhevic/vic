@@ -19,9 +19,6 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -29,30 +26,124 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::string line;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty() || line[0] == '#') {
             continue;
         }
         
-        // Parse simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+            std::string valueStr = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            if (valueStr.size() >= 2 && 
+                ((valueStr.front() == '"' && valueStr.back() == '"') ||
+                 (valueStr.front() == '\'' && valueStr.back() == '\''))) {
+                valueStr = valueStr.substr(1, valueStr.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            std::string description = "";
+            auto it = pImpl->entries.begin();
+            while (it != pImpl->entries.end()) {
+                if (it->key == key) {
+                    description = it->description;
+                    break;
+                }
+                ++it;
+            }
+            
+            ConfigValue value = parseValue(valueStr);
+            set(key, value, ConfigSource::File, description);
         }
     }
     
     return true;
+}
+
+ConfigValue Config::parseValue(const std::string& str) {
+    std::istringstream iss(str);
+    
+    std::string token;
+    if (std::getline(iss, token, '[') && token.find(']') != std::string::npos) {
+        std::vector<std::string> items;
+        size_t endBracket = token.find(']');
+        std::string arrayPart = token.substr(token.find('[') + 1, endBracket - token.find('[') - 1);
+        
+        std::stringstream ss(arrayPart);
+        std::string item;
+        while (std::getline(ss, item, ',')) {
+            items.push_back(trim(item));
+        }
+        
+        if (items.empty()) {
+            return std::vector<int>{};
+        }
+        
+        bool allInt = true;
+        std::vector<int> intVec;
+        for (const auto& item : items) {
+            try {
+                size_t pos;
+                int val = std::stoi(item, &pos);
+                if (pos != item.size()) {
+                    allInt = false;
+                }
+                intVec.push_back(val);
+            } catch (...) {
+                allInt = false;
+            }
+        }
+        
+        if (allInt) {
+            return intVec;
+        }
+        
+        bool allDouble = true;
+        std::vector<double> doubleVec;
+        for (const auto& item : items) {
+            try {
+                size_t pos;
+                double val = std::stod(item, &pos);
+                if (pos != item.size()) {
+                    allDouble = false;
+                }
+                doubleVec.push_back(val);
+            } catch (...) {
+                allDouble = false;
+            }
+        }
+        
+        if (allDouble) {
+            return doubleVec;
+        }
+        
+        return std::vector<std::string>(items.begin(), items.end());
+    }
+    
+    try {
+        size_t pos;
+        long long intVal = std::stoll(str, &pos);
+        if (pos == str.size()) {
+            return intVal;
+        }
+    } catch (...) {}
+    
+    try {
+        size_t pos;
+        double doubleVal = std::stod(str, &pos);
+        if (pos == str.size()) {
+            return doubleVal;
+        }
+    } catch (...) {}
+    
+    try {
+        if (str == "true" || str == "false") {
+            bool boolVal = (str == "true");
+            return boolVal;
+        }
+    } catch (...) {}
+    
+    return str;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -65,14 +156,14 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                set(key, value, ConfigSource::CommandLine, "Command line override");
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            set(key, value, ConfigSource::CommandLine, "Command line override");
         }
     }
     return true;
@@ -86,7 +177,28 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                  std::is_same_v<T, std::vector<double>> ||
+                                  std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        if (i > 0) file << ", ";
+                        file << "\"" << arg[i] << "\"";
+                    } else {
+                        if (i > 0) file << ", ";
+                        file << arg[i];
+                    }
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -126,20 +238,36 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     }
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+void Config::set(const std::string& key, const std::string& value, ConfigSource source, const std::string& description) {
     set(key, ConfigValue(value), source);
+    if (auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; }); it != pImpl->entries.end()) {
+        it->description = description;
+    }
 }
 
-void Config::set(const std::string& key, int value, ConfigSource source) {
+void Config::set(const std::string& key, int value, ConfigSource source, const std::string& description) {
     set(key, ConfigValue(value), source);
+    if (auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; }); it != pImpl->entries.end()) {
+        it->description = description;
+    }
 }
 
-void Config::set(const std::string& key, double value, ConfigSource source) {
+void Config::set(const std::string& key, double value, ConfigSource source, const std::string& description) {
     set(key, ConfigValue(value), source);
+    if (auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; }); it != pImpl->entries.end()) {
+        it->description = description;
+    }
 }
 
-void Config::set(const std::string& key, bool value, ConfigSource source) {
+void Config::set(const std::string& key, bool value, ConfigSource source, const std::string& description) {
     set(key, ConfigValue(value), source);
+    if (auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; }); it != pImpl->entries.end()) {
+        it->description = description;
+    }
 }
 
 bool Config::has(const std::string& key) const {
