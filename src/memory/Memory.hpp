@@ -47,9 +47,14 @@ struct EpisodicMemoryItem {
     std::vector<NeuronId> neurons;
     std::vector<float> values;
     std::string metadata;
+    // Store working memory content for consolidation integration
+    std::vector<float> workingMemoryContent;
+    float reward;
+    float noveltyLevel;
+    float curiosityLevel;
     
-    EpisodicMemoryItem() : timestamp(0) {}
-};
+    EpisodicMemoryItem() : timestamp(0), reward(0.0f), noveltyLevel(0.0f), curiosityLevel(0.0f) {}
+}
 
 class EpisodicMemory {
 public:
@@ -73,6 +78,27 @@ public:
     
     // Memory consolidation (move to long-term)
     void consolidate(float relevanceThreshold);
+    
+    // Get episodes for replay (integration with replay system)
+    std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t maxResults) const;
+    
+    // Replay an episode (neural replay for consolidation)
+    void replayEpisode(const EpisodicMemoryItem& episode);
+    
+    // Get most recent active episodes for replay
+    std::vector<const EpisodicMemoryItem*> getRecentActiveEpisodes(size_t maxResults) const;
+    
+    // Calculate similarity between episodes for pattern completion
+    static float computeSimilarity(const std::vector<float>& pattern, const EpisodicMemoryItem& episode);
+    
+    // Get episodes by time window for development integration
+    std::vector<const EpisodicMemoryItem*> getEpisodesInTimeWindow(SimulationStep startTime, SimulationStep endTime) const;
+    
+    // Check if episode contains specific neural patterns
+    bool containsPattern(const std::vector<float>& pattern, float threshold) const;
+    
+    // Update all episodes (for aging, consolidation)
+    void updateAll(float dt);
     
 private:
     struct Impl;
