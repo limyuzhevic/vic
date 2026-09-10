@@ -25,7 +25,6 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/brain/NeuralPopulation.cpp
     ${NLM_SOURCE_DIR}/brain/NeuralRegion.cpp
     ${NLM_SOURCE_DIR}/brain/Brain.cpp
-    ${NLM_SOURCE_DIR}/dynamics/NeuralDynamics.cpp
     ${NLM_SOURCE_DIR}/dynamics/SpikeSystem.cpp
     ${NLM_SOURCE_DIR}/plasticity/PlasticityRule.cpp
     ${NLM_SOURCE_DIR}/plasticity/Hebbian.cpp

@@ -36,7 +36,6 @@ add_library(nlm_core STATIC
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
     # Dynamics
-    src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
     # Plasticity
     src/plasticity/PlasticityRule.cpp

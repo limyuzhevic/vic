@@ -31,16 +31,20 @@ struct Brain::Impl {
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
+    // ========== INTEGRATED PREDICTION SYSTEM ==========
+    
     std::unique_ptr<PredictionSystem> predictionSystem;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
+    
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
-    
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
@@ -100,6 +104,28 @@ struct Brain::Impl {
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
+    // Phase 2: REAL cognitive and memory systems (finally implemented!)
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
+    
+    // ========== INTEGRATED PREDICTION SYSTEM ==========
+    
+    std::unique_ptr<PredictionSystem> predictionSystem;
+    
+    // ========== INTEGRATED COGNITION SYSTEMS ==========
+    
+    std::unique_ptr<NeuralPlanner> planner;
+    std::unique_ptr<ConceptFormation> conceptFormation;
+    std::unique_ptr<AttentionalSelection> attention;
+    // ========== DEVELOPMENT SYSTEM ==========
+    std::unique_ptr<DevelopmentSystem> developmentSystem;
+    
+    // ========== NEUROMODULATION SYSTEMS ==========
+    std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Curiosity> curiosity;
+    std::unique_ptr<PredictionError> predictionError;
+    std::unique_ptr<Novelty> novelty;
+        
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
         stdp = std::make_unique<STDP>();
@@ -112,6 +138,50 @@ struct Brain::Impl {
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        
+        // Phase 2 FIX: Initialize Semantic and Procedural Memory (finally!)
+        semanticMemory = std::make_unique<SemanticMemory>();
+        proceduralMemory = std::make_unique<ProceduralMemory>();
+        
+        // Initialize prediction system
+        predictionSystem = std::make_unique<PredictionSystem>();
+        
+        // Initialize cognition systems
+        planner = std::make_unique<NeuralPlanner>();
+        conceptFormation = std::make_unique<ConceptFormation>();
+        attention = std::make_unique<AttentionalSelection>();
+        
+        // Initialize development system
+        developmentSystem = std::make_unique<DevelopmentSystem>();
+        
+        // Initialize neuromodulation systems
+        dopamine = std::make_unique<Dopamine>();
+        curiosity = std::make_unique<Curiosity>();
+        predictionError = std::make_unique<PredictionError>();
+        novelty = std::make_unique<Novelty>();
+        
+        // Configure STDP parameters
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        stdp->configure(ltpWeight, ltdWeight, tau);
+        
+        // Configure structural plasticity
+        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+        structuralPlasticity->setPruningRate(pruningRate);
+        
+        // Get timestep
+        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        
+        // Get integration intervals from config
+        replayInterval = config->getOr<size_t>("replay_interval", 100);
+        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        
+        // Initialize checkpoint manager
+        checkpointManager = std::make_unique<CheckpointManager>();
+    }
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -241,6 +311,10 @@ bool Brain::initialize() {
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
+    
+    // Phase 2 FIX: Initialize Semantic and Procedural Memory (finally!)
+    pImpl->semanticMemory->initialize(this);
+    pImpl->proceduralMemory->initialize(this);
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -1015,6 +1089,16 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+}
+
+// ========== SEMANTIC AND PROCEDURAL MEMORY ACCESSORS ==========
+
+SemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+ProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========

@@ -65,7 +65,6 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **Brain**: Central coordinator
 
 ### 3. Dynamics Layer
-- **NeuralDynamics**: Abstract base for neuron dynamics
 - **SpikeSystem**: Event-driven spike processing
 
 ### 4. Plasticity Layer

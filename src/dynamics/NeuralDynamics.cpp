@@ -1,14 +1,7 @@
-#include "NeuralDynamics.hpp"
-#include <cmath>
-
-namespace nlm {
-
-struct IntegrateAndFireDynamics::Impl {
-    float membraneTimeConstant;  // ms
-    float membraneResistance;     // MOhm
-    
-    Impl() : membraneTimeConstant(20.0f), membraneResistance(10.0f) {}
-};
+// NeuralDynamics.cpp was removed as it contained duplicate/incomplete LIF implementation.
+// The actual LIF implementation is in src/brain/Neuron.cpp (complete, sophisticated implementation).
+// All references to NeuralDynamics have been removed from CMakeLists.txt and other files.
+// This file can be safely deleted.
 
 IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 
