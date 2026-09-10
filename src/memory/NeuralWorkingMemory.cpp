@@ -36,16 +36,18 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    // Find neurons to encode this pattern - store as sparse representation
+    size_t neuronsToUse = std::min(pattern.size(), memoryNeurons_.size() + 10);
     
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
+    for (size_t i = 0; i < neuronsToUse; ++i) {
+        // Cycle through neurons for pattern storage
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+        // Set neuron activation for pattern storage
+        if (auto* region = brain_->getRegion(neuron.getId() / 1000)) {
+            auto neurons = region->getAllNeurons();
+            for (auto* nn : neurons) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
                     break;
@@ -53,7 +55,7 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
             }
         }
         
-        // Update stored activation
+        // Update stored pattern in memory
         if (i < memoryActivations_.size()) {
             memoryActivations_[i] = activation;
         } else {
@@ -63,9 +65,9 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         }
     }
     
-    // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    // Create recurrent connections to maintain the pattern (Hebbian)
+    for (size_t i = 1; i < neuronsToUse; ++i) {
+        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.3f);
     }
 }
 

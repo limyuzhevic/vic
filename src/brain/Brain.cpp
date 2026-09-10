@@ -390,8 +390,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     
                     // Store to working memory - neurons that fire become part of working memory
                     if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                        // Capture actual neural activity pattern (not just scalar value)
+                        float activation = std::abs(state.membranePotential - state.restingPotential);
+                        
+                        // Normalize to 0-1 range for working memory storage
+                        float normalizedActivation = activation / std::max(activation, 1.0f);
+                        
+                        // Also capture the full neural state for richer pattern
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), normalizedActivation);
+                        
+                        // Store the actual neural pattern (synaptic weights, membrane potential)
+                        // This allows reconstruction of the neural state
+                        if (auto* region = pImpl->getRegion(neuron->getId() / 1000)) {
+                            auto neurons = region->getAllNeurons();
+                            std::vector<float> neuralPattern;
+                            neuralPattern.reserve(neurons.size() * 2);  // membranePotential + synaptic_weight
+                            
+                            for (auto* n : neurons) {
+                                const auto& nstate = n->getState();
+                                neuralPattern.push_back(nstate.membranePotential / 100.0f);  // Normalize
+                                
+                                // Add average synaptic input
+                                float totalSynaptic = 0.0f;
+                                auto synapses = region->getSynapsesTo(n->getId());
+                                for (auto* syn : synapses) {
+                                    totalSynaptic += syn->getWeight();
+                                }
+                                neuralPattern.push_back(totalSynaptic / std::max(1.0f, synapses.size()));
+                            }
+                            
+                            // Store the neural pattern
+                            pImpl->workingMemory->store(neuralPattern, normalizedActivation);
+                        }
                     }
                 }
             }
@@ -414,7 +444,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        // Apply updated signature for curiosity
+        float novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        float predictionError = pImpl->predictionError ? pImpl->predictionError->getLevel() : 0.0f;
+        pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -483,36 +516,82 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
+            // Create richer episode with neural traces
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Capture full sensory state
+            if (pImpl->sensoryNeurons.size() > 0) {
+                episode.sensoryState.resize(pImpl->sensoryNeurons.size());
+                for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+                    const auto& state = pImpl->sensoryNeurons[i]->getState();
+                    episode.sensoryState[i] = state.membranePotential / 100.0f;  // Normalize
+                }
+            }
+            
+            // Capture detailed neural activity pattern (not just neuron IDs)
+            std::vector<float> neuralPattern;
+            std::vector<NeuronId> activeNeurons;
+            std::vector<float> neuronActivations;
+            
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        
+                        // Consider neuron active if above threshold
                         if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
-                            episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                            std::abs(state.membranePotential - state.restingPotential) > 5.0f) {
+                            activeNeurons.push_back(neuron->getId());
+                            neuronActivations.push_back(
+                                std::abs(state.membranePotential - state.restingPotential) / 100.0f);
+                            
+                            // Add to neural pattern with position info
+                            neuralPattern.push_back(state.membranePotential / 100.0f);
+                            
+                            // Add synaptic weight contribution
+                            float totalInput = 0.0f;
+                            auto synapses = region->getSynapsesTo(neuron->getId());
+                            for (auto* syn : synapses) {
+                                totalInput += syn->getWeight();
+                            }
+                            neuralPattern.push_back(totalInput / std::max(1.0f, synapses.size()));
                         }
                     }
                 }
             }
             
-            // Store reward in episode
+            // Store neural pattern in episode for later retrieval
+            episode.activeNeurons = activeNeurons;
+            episode.neuronActivations = neuronActivations;
+            
+            // Store reward
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    // Step 8: Update prediction system with sensory input
+    if (pImpl->predictionSystem && !pImpl->sensoryNeurons.empty()) {
+        // Collect current sensory state as input for prediction
+        std::vector<float> sensoryPattern;
+        sensoryPattern.reserve(pImpl->sensoryNeurons.size());
+        
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            const auto& state = neuron->getState();
+            sensoryPattern.push_back(state.membranePotential / 100.0f);  // Normalize
+        }
+        
+        // Create a simple sensory input for prediction system
+        // (This would typically use an actual SensoryInput object)
+        // For now, we update the prediction system with the current pattern
+        if (!sensoryPattern.empty()) {
+            // Update predictions based on current sensory state
+            // This connects the prediction system to the brain's sensory processing
+            pImpl->predictionSystem->updateCurrentPattern(sensoryPattern);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -526,10 +605,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
+    // Step 10: Update concept formation with current neural activity
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Collect current neural activity pattern for concept formation
+        std::vector<float> currentPattern;
+        std::vector<float> currentFeatures;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    
+                    // Add neural activity to pattern
+                    currentPattern.push_back(state.membranePotential / 100.0f);
+                    
+                    // Extract features based on neuron type and activity
+                    if (neuron->getType() == NeuronType::Sensory) {
+                        currentFeatures.push_back(state.membranePotential / 100.0f);
+                    }
+                }
+            }
+        }
+        
+        // Process this neural pattern to form/update concepts
+        // Use dopamine level as reward signal
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        pImpl->conceptFormation->presentExperience(currentPattern, currentFeatures, reward, currentStep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

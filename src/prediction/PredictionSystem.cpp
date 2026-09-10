@@ -6,6 +6,7 @@ struct PredictionSystem::Impl {
     float predictionError;
     float confidence;
     std::vector<float> errorHistory;
+    std::vector<float> expectedPattern;  // Expected sensory pattern for next timestep
     
     Impl() : predictionError(0.0f), confidence(0.5f) {}
 };
@@ -53,8 +54,27 @@ void PredictionSystem::clearHistory() {
     pImpl->errorHistory.clear();
 }
 
-void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+void PredictionSystem::updateCurrentPattern(const std::vector<float>& pattern) {
+    // Update prediction model with current sensory pattern
+    // This is a placeholder implementation - in a real system this would update
+    // an internal prediction model based on the current sensory input
+    
+    // Store pattern as the "expected" pattern for next step
+    pImpl->expectedPattern = pattern;
+    
+    // Clear previous prediction error history
+    pImpl->errorHistory.clear();
+    
+    // Initialize confidence based on pattern variability
+    if (!pattern.empty()) {
+        float sum = 0.0f, sumSq = 0.0f;
+        for (float val : pattern) {
+            sum += val;
+            sumSq += val * val;
+        }
+        float mean = sum / pattern.size();
+        pImpl->confidence = 1.0f / (1.0f + std::sqrt(sumSq / pattern.size() - mean * mean));
+    }
 }
 
 } // namespace nlm
