@@ -16,6 +16,9 @@ class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
+class WorkingMemory;
+class SemanticMemory;
+class ProceduralMemory;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
@@ -28,8 +31,58 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class CheckpointManager;
 
 // Inter-regional connection (long-range connectivity)
+// Sleep stage enumeration
+enum class SleepStage {
+    Awake,
+    NREM1,      // Light sleep (initial stage)
+    NREM2,      // Deeper sleep
+    NREM3,      // Slow wave sleep (deepest NREM)
+    REM,        // Rapid eye movement sleep
+    TransitionToSleep,
+    TransitionToWake
+};
+
+// Sleep state structure for memory consolidation
+struct SleepState {
+    SleepStage currentStage;
+    Timestamp stageStartTime;     // When current stage began
+    Timestamp sleepStartTime;     // When sleep began
+    float sleepPressure;          // Homeostatic sleep drive
+    float hippocampalEngagement;  // Pattern completion level
+    float synapticWeightChange;   // Cumulative weight modification
+    float memoryPriority;         // Memory consolidation priority
+    bool reactivationActive;      // Neural pattern reactivation active
+    
+    SleepState()
+        : currentStage(SleepStage::Awake)
+        , stageStartTime(0.0)
+        , sleepStartTime(0.0)
+        , sleepPressure(0.0f)
+        , hippocampalEngagement(0.0f)
+        , synapticWeightChange(0.0f)
+        , memoryPriority(0.0f)
+        , reactivationActive(false) {}
+};
+
+// Replay schedule for memory consolidation
+struct replaySchedule {
+    size_t replayInterval;        // Steps between replay events
+    size_t consolidationInterval; // Steps between consolidation events
+    bool replayDuringSleep;       // Whether replay occurs during sleep
+    size_t maxReplaysPerStage;    // Maximum number of replays per sleep stage
+    float consolidationStrength; // How strongly to consolidate memories
+    
+    replaySchedule()
+        : replayInterval(100)
+        , consolidationInterval(1000)
+        , replayDuringSleep(true)
+        , maxReplaysPerStage(5)
+        , consolidationStrength(0.8f) {}
+};
+
 struct InterRegionConnection {
     RegionId sourceRegion;
     RegionId targetRegion;
@@ -115,6 +168,28 @@ public:
     // Load brain state from file
     bool load(const std::string& filepath);
     
+    // Sleep and consolidation methods
+    void startSleep();
+    void endSleep();
+    bool isInSleep() const;
+    SleepStage getCurrentSleepStage() const;
+    void updateSleepSchedule(Timestamp currentTime);
+    void processSleepMemories();
+    
+    // Memory consolidation during sleep
+    void consolidateMemoriesDuringSleep();
+    void replayMemoriesDuringSleep();
+    void strengthenImportantMemories();
+    void pruneWeakConnections();
+    
+    // Development during sleep
+    void updateDevelopmentalStageDuringSleep();
+    
+    // Neuromodulation effects on sleep
+    void applyAChEffects();
+    void applyNEEffects();
+    void apply5HTEffects();
+    
     // Region management
     RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);
@@ -140,29 +215,48 @@ public:
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    WorkingMemory* getWorkingMemory() { return pImpl->workingMemory.get(); }
+    NeuralWorkingMemory* getNeuralWorkingMemory() const { return pImpl->workingMemory.get(); }
     
     // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    EpisodicMemory* getEpisodicMemory() { return pImpl->episodicMemory.get(); }
+    NeuralEpisodicMemory* getNeuralEpisodicMemory() const { return pImpl->episodicMemory.get(); }
+    
+    // Semantic memory - knowledge storage
+    SemanticMemory* getSemanticMemory() { return pImpl->semanticMemory.get(); }
+    
+    // Procedural memory - skills and habits
+    ProceduralMemory* getProceduralMemory() { return pImpl->proceduralMemory.get(); }
     
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    NeuralAssociativeMemory* getAssociativeMemory() const { return pImpl->associativeMemory.get(); }
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
     
-    // ========== COGNITION SYSTEMS ==========
-    
+// ========== COGNITION SYSTEMS ==========
+
     // Neural planner for action planning
-    NeuralPlanner* getPlanner();
-    
+    NeuralPlanner* getNeuralPlanner();
+
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
-    
+
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+
+    // Get prediction system for error-based learning
+    PredictionSystem* getPredictionSystem();
+
+    // Get neuromodulation systems for error signals and adaptation
+    Acetylcholine* getAcetylcholine();
+    Norepinephrine* getNorepinephrine();
+    Serotonin* getSerotonin();
+
+    // Get working memory for temporary storage
+    NeuralWorkingMemory* getWorkingMemory() const;
     
     // ========== DEVELOPMENT SYSTEM ==========
     

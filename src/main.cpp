@@ -344,7 +344,7 @@ int main(int argc, char** argv) {
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
+    std::string configFile = "configs/default_config.json";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {

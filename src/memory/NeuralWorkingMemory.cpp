@@ -244,6 +244,62 @@ void NeuralWorkingMemory::decayWeakTraces() {
     }
 }
 
+std::vector<NeuronId> NeuralWorkingMemory::getImportantNeurons(float priorityBoost) {
+    std::vector<NeuronId> importantNeurons;
+    
+    // Select neurons based on activation and priority boost
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        float activation = memoryActivations_[i] * priorityBoost;
+        
+        // Check if activation is above threshold for importance
+        if (activation > 0.5f) {  // High threshold for important memories
+            importantNeurons.push_back(memoryNeurons_[i]);
+        } else if (activation > 0.2f) {  // Medium threshold for less important
+            // Still include but with lower weight
+            importantNeurons.push_back(memoryNeurons_[i]);
+        }
+    }
+    
+    // Sort by activation level (descending)
+    std::sort(importantNeurons.begin(), importantNeurons.end(),
+        [this](const NeuronId& a, const NeuronId& b) {
+            return getNeuronActivation(a) > getNeuronActivation(b);
+        });
+    
+    // Limit number of important neurons to top 20%
+    size_t limit = std::max(size_t(1), importantNeurons.size() / 5);
+    if (importantNeurons.size() > limit) {
+        importantNeurons.resize(limit);
+    }
+    
+    return importantNeurons;
+}
+
+void NeuralWorkingMemory::updateConsolidation(float consolidationStrength) {
+    if (!brain_) return;
+    
+    // Enhance important memory traces during consolidation
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        NeuronId neuron = memoryNeurons_[i];
+        float activation = memoryActivations_[i];
+        
+        // Boost activation for consolidation
+        if (activation > 0.1f) {
+            float boost = consolidationStrength * (activation / 1.0f);  // Normalize by max activation
+            activation *= (1.0f + boost);
+            activation = std::min(activation, 1.0f);  // Cap at 1.0
+            
+            memoryActivations_[i] = activation;
+            
+            // Apply strengthening current
+            brain_->injectCurrent(neuron, activation * 3.0f * consolidationStrength);
+        }
+    }
+    
+    // Update maintenance connections to reinforce consolidation
+    updateRecurrentConnections();
+}
+
 // AttentionalSelection Implementation
 struct AttentionalSelection::Impl {
     // Neuron competition state

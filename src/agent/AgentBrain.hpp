@@ -43,14 +43,14 @@ public:
     // Get neuromodulation level
     float getNeuromodulationLevel() const;
     
-    // Get curiosity level
-    float getCuriosityLevel() const;
+    // Get acetylcholine level
+    float getAcetylcholineLevel() const;
     
-    // Get novelty level
-    float getNoveltyLevel() const;
+    // Get norepinephrine level
+    float getNorepinephrineLevel() const;
     
-    // Get prediction error
-    float getPredictionError() const;
+    // Get serotonin level
+    float getSerotoninLevel() const;
     
     // Reset agent for new episode
     void reset();
@@ -97,6 +97,9 @@ private:
     float noveltyLevel_;
     float curiosityLevel_;
     float predictionError_;
+    float acetylcholineLevel_;
+    float norepinephrineLevel_;
+    float serotoninLevel_;
     float expectedReward_;
     
     // Development state

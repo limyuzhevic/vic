@@ -55,6 +55,10 @@ public:
     size_t getCapacity() const { return capacity_; }
     void setCapacity(size_t cap) { capacity_ = cap; }
 
+    // Get capacity
+    size_t getCapacity() const { return capacity_; }
+    void setCapacity(size_t cap) { capacity_ = cap; }
+
     // Decay rate for memory traces
     float getDecayRate() const { return decayRate_; }
     void setDecayRate(float rate) { decayRate_ = rate; }
@@ -73,6 +77,12 @@ public:
 
     // Get overall memory activity level
     float getMemoryActivity() const;
+
+    // Get neurons important for consolidation during sleep
+    std::vector<NeuronId> getImportantNeurons(float priorityBoost = 1.0f);
+
+    // Update working memory for consolidation
+    void updateConsolidation(float consolidationStrength);
 
 private:
     // Create recurrent connection for maintenance

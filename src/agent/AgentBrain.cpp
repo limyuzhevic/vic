@@ -11,6 +11,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
     , predictionError_(0.0f)
+    , acetylcholineLevel_(0.0f)
+    , norepinephrineLevel_(0.0f)
+    , serotoninLevel_(0.0f)
     , expectedReward_(0.0f)
     , developmentalAge_(0.0)
     , plasticityModifier_(1.0f)
@@ -330,8 +333,19 @@ float AgentBrain::getNoveltyLevel() const {
     return noveltyLevel_;
 }
 
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
+float AgentBrain::getAcetylcholineLevel() const {
+    if (!brain_ || !brain_->getAcetylcholine()) return 0.0f;
+    return brain_->getAcetylcholine()->getLevel();
+}
+
+float AgentBrain::getNorepinephrineLevel() const {
+    if (!brain_ || !brain_->getNorepinephrine()) return 0.0f;
+    return brain_->getNorepinephrine()->getLevel();
+}
+
+float AgentBrain::getSerotoninLevel() const {
+    if (!brain_ || !brain_->getSerotonin()) return 0.0f;
+    return brain_->getSerotonin()->getLevel();
 }
 
 void AgentBrain::reset() {

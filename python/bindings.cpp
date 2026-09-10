@@ -6,15 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "SystemIntegrationResult.hpp"
+#include "VerificationFunctions.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -416,10 +409,154 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    py::class_<SelfModel>(m, "SelfModel", R"pbdoc(Self model: represents the agent's internal model of itself)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SelfModel::initialize, py::arg("brain"), "Initialize with brain reference")
+        .def("recordSelfAction", &SelfModel::recordSelfAction, py::arg("action"), py::arg("beforeState"), py::arg("afterState"), "Record that taking an action caused a specific sensory change")
+        .def("predictActionConsequence", &SelfModel::predictActionConsequence, py::arg("action"), py::arg("currentState"), "Predict sensory consequence of an action")
+        .def("getSelfModelConfidence", &SelfModel::getSelfModelConfidence, py::arg("action"), "Get confidence in self-model for a given action")
+        .def("computeSelfGeneratedLikeness", &SelfModel::computeSelfGeneratedLikeness, py::arg("beforeState"), py::arg("afterState"), py::arg("action"), "Is this change likely caused by self?")
+        .def("getPreferredAction", &SelfModel::getPreferredAction, py::arg("state"), "Get the body schema (preferred actions)")
+        .def("updateSelfModel", &SelfModel::updateSelfModel, py::arg("predicted"), py::arg("actual"), py::arg("action"), "Update self-model based on prediction error")
+        .def("getCapabilityLevel", &SelfModel::getCapabilityLevel, "Get current capability level")
+        .def("getBodyAwareness", &SelfModel::getBodyAwareness, "Get body awareness")
+        .def("clear", &SelfModel::clear, "Clear self-model")
+        .def("hasSelfModel", &SelfModel::hasSelfModel, "Has self-model formed?");
 
-} // namespace nlm
+    py::class_<SocialLearning>(m, "SocialLearning", R"pbdoc(Social learning: enables learning from observing other agents)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SocialLearning::initialize, py::arg("brain"), "Initialize with brain reference")
+        .def("observeAgentAction", &SocialLearning::observeAgentAction, py::arg("observedAction"), py::arg("observerState"), py::arg("resultingState"), "Record observation of another agent's action")
+        .def("canImitate", &SocialLearning::canImitate, py::arg("observedAction"), "Can I imitate this observed action?")
+        .def("getImitationAction", &SocialLearning::getImitationAction, py::arg("currentState"), "Get the best action to imitate")
+        .def("learnCommunicationSignal", &SocialLearning::learnCommunicationSignal, py::arg("signalPattern"), py::arg("signalReward"), "Learn simple communication signal")
+        .def("detectSignal", &SocialLearning::detectSignal, py::arg("neuralPattern"), "Detect if another agent is signaling")
+        .def("getSignalPattern", &SocialLearning::getSignalPattern, "Get learned signal pattern")
+        .def("getSignalMeaning", &SocialLearning::getSignalMeaning, "Get signal meaning")
+        .def("updateSocialKnowledge", &SocialLearning::updateSocialKnowledge, py::arg("interactionReward"), "Update social knowledge")
+        .def("clear", &SocialLearning::clear, "Clear social learning")
+        .def("hasSocialKnowledge", &SocialLearning::hasSocialKnowledge, "Has learned from others?")
+        .def("getObservationCount", &SocialLearning::getObservationCount, "Get observation count");
+
+    py::class_<SpatialRepresentation>(m, "SpatialRepresentation", R"pbdoc(Spatial representation: learns spatial relationships from experience)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SpatialRepresentation::initialize, py::arg("brain"), "Initialize with brain reference")
+        .def("recordPosition", &SpatialRepresentation::recordPosition, py::arg("x"), py::arg("y"), py::arg("sensoryCues"), "Record current position experience")
+        .def("getPredictedPosition", &SpatialRepresentation::getPredictedPosition, "Get predicted position based on path integration")
+        .def("integrateMovement", &SpatialRepresentation::integrateMovement, py::arg("dx"), py::arg("dy"), "Update position estimate based on movement")
+        .def("getPositionActivation", &SpatialRepresentation::getPositionActivation, py::arg("x"), py::arg("y"), "Get position neuron activation")
+        .def("getPlaceNeuronsNear", &SpatialRepresentation::getPlaceNeuronsNear, py::arg("x"), py::arg("y"), py::arg("radius"), "Find place neurons near a position")
+        .def("getGridSpacing", &SpatialRepresentation::getGridSpacing, "Get grid spacing")
+        .def("clear", &SpatialRepresentation::clear, "Clear spatial representations")
+        .def("hasPlaceCells", &SpatialRepresentation::hasPlaceCells, "Have place cells formed?");
+
+    // Performance Infrastructure
+    py::class_<CheckpointSystem>(m, "CheckpointSystem", R"pbdoc(Checkpoint system: brain state serialization and checkpointing)pbdoc")
+        .def(py::init<>())
+        .def("save", &CheckpointSystem::save, py::arg("filepath"), "Save brain state to file")
+        .def("load", &CheckpointSystem::load, py::arg("filepath"), "Load brain state from file");
+
+    // MemoryPool is a template class, we need to expose a specific type
+    m.def("createMemoryPool", []() -> std::shared_ptr<MemoryPool<NeuronId>> {
+        return std::make_shared<MemoryPool<NeuronId>>();
+    }, "Create a memory pool for NeuronId");
+
+    m.def("createMemoryPoolSynapse", []() -> std::shared_ptr<MemoryPool<SynapseId>> {
+        return std::make_shared<MemoryPool<SynapseId>>();
+    }, "Create a memory pool for SynapseId");
+
+    py::class_<EventQueue>(m, "EventQueue", R"pbdoc(Event queue: lock-free event queue for spike processing)pbdoc")
+        .def(py::init<>())
+        .def("push", &EventQueue::push, py::arg("event"), "Push an event to the queue")
+        .def("pop", &EventQueue::pop, "Pop an event from the queue")
+        .def("size", &EventQueue::size, "Get queue size")
+        .def("empty", &EventQueue::empty, "Check if queue is empty")
+        .def("clear", &EventQueue::clear, "Clear all events");
+
+    py::class_<SparseConnectivity>(m, "SparseConnectivity", R"pbdoc(Sparse connectivity: memory-efficient neural connectivity)pbdoc")
+        .def(py::init<>())
+        .def("addSynapse", &SparseConnectivity::addSynapse, py::arg("source"), py::arg("dest"), py::arg("weight"), py::arg("delay"), py::arg("synapseType"), "Add a synapse")
+        .def("removeSynapse", &SparseConnectivity::removeSynapse, py::arg("index"), "Remove a synapse")
+        .def("getSynapse", &SparseConnectivity::getSynapse, py::arg("index"), "Get synapse by index")
+        .def("getSynapsesFrom", &SparseConnectivity::getSynapsesFrom, py::arg("source"), "Get synapses from source neuron")
+        .def("getSynapsesTo", &SparseConnectivity::getSynapsesTo, py::arg("dest"), "Get synapses to destination neuron")
+        .def("getSynapseCountFrom", &SparseConnectivity::getSynapseCountFrom, py::arg("source"), "Get synapse count from source")
+        .def("getSynapseCountTo", &SparseConnectivity::getSynapseCountTo, py::arg("dest"), "Get synapse count to destination")
+        .def("getSynapseCount", &SparseConnectivity::getSynapseCount, "Get total synapse count")
+        .def("getNeuronCount", &SparseConnectivity::getNeuronCount, "Get neuron count")
+        .def("getSynapsesWithDelay", &SparseConnectivity::getSynapsesWithDelay, py::arg("maxDelay"), "Get synapses with delay <= max")
+        .def("getStats", &SparseConnectivity::getStats, "Get connectivity statistics")
+        .def("clear", &SparseConnectivity::clear, "Clear all synapses")
+        .def("memoryUsage", &SparseConnectivity::memoryUsage, "Get memory usage")
+        .def("forEachSynapse", &SparseConnectivity::forEachSynapse, "Iterate over all synapses");
+
+    py::class_<SIMDVectorization>(m, "SIMDVectorization", R"pbdoc(SIMD vectorization: SIMD operations for neural computation)pbdoc")
+        .def(py::init<>())
+        .def("isSIMDAvailable", &SIMDVectorization::isSIMDAvailable, "Check if SIMD is available")
+        .def("getSIMDType", &SIMDVectorization::getSIMDType, "Get SIMD type name")
+        .def("getSIMDWidth", &SIMDVectorization::getSIMDWidth, "Get SIMD width")
+        .def("updateLIF", &SIMDVectorization::updateLIF, "Update membrane potentials using SIMD")
+        .def("updateSTD", &SIMDVectorization::updateSTD, "Update short-term plasticity using SIMD")
+        .def("updateSTDP", &SIMDVectorization::updateSTDP, "Update STDP using SIMD")
+        .def("computeStats", &SIMDVectorization::computeStats, "Compute statistics using SIMD")
+        .def("clamp", &SIMDVectorization::clamp, "Clamp values using SIMD");
+
+    // Comprehensive system integration verification
+    py::class_<SystemIntegrationResult>(m, "SystemIntegrationResult", R"pbdoc(System integration verification result)pbdoc")
+        .def_readwrite("overallStatus", &SystemIntegrationResult::overallStatus)
+        .def_readwrite("memorySystemStatus", &SystemIntegrationResult::memorySystemStatus)
+        .def_readwrite("cognitiveSystemStatus", &SystemIntegrationResult::cognitiveSystemStatus)
+        .def_readwrite("neuromodulationSystemStatus", &SystemIntegrationResult::neuromodulationSystemStatus)
+        .def_readwrite("performanceInfrastructureStatus", &SystemIntegrationResult::performanceInfrastructureStatus)
+        .def_readwrite("sleepSystemStatus", &SystemIntegrationResult::sleepSystemStatus)
+        .def_readwrite("developmentSystemStatus", &SystemIntegrationResult::developmentSystemStatus)
+        .def_readwrite("errors", &SystemIntegrationResult::errors)
+        .def_readwrite("warnings", &SystemIntegrationResult::warnings)
+        .def_readwrite("metrics", &SystemIntegrationResult::metrics)
+        .def("toDict", [](const SystemIntegrationResult& self) {
+            py::dict result;
+            result["overallStatus"] = self.overallStatus;
+            result["memorySystemStatus"] = self.memorySystemStatus;
+            result["cognitiveSystemStatus"] = self.cognitiveSystemStatus;
+            result["neuromodulationSystemStatus"] = self.neuromodulationSystemStatus;
+            result["performanceInfrastructureStatus"] = self.performanceInfrastructureStatus;
+            result["sleepSystemStatus"] = self.sleepSystemStatus;
+            result["developmentSystemStatus"] = self.developmentSystemStatus;
+            result["errors"] = self.errors;
+            result["warnings"] = self.warnings;
+            return result;
+        }, R"pbdoc(Convert integration result to Python dictionary)pbdoc");
+
+    m.def("verifyMemorySystem", &verifyMemorySystem,
+          py::arg("brain"), py::arg("detailed"), py::arg("includeReplayTests"),
+          "Verify memory system integration and functionality");
+
+    m.def("verifyCognitiveIntegration", &verifyCognitiveIntegration,
+          py::arg("brain"), py::arg("detailed"), py::arg("includePlanningTests"),
+          "Verify cognitive system integration and functionality");
+
+    m.def("verifyNeuromodulationIntegration", &verifyNeuromodulationIntegration,
+          py::arg("brain"), py::arg("detailed"), py::arg("includeLearningTests"),
+          "Verify neuromodulation system integration and functionality");
+
+    m.def("verifyPerformanceInfrastructure", &verifyPerformanceInfrastructure,
+          py::arg("brain"), py::arg("detailed"),
+          "Verify performance infrastructure integration and functionality");
+
+    m.def("verifySleepRestCycle", &verifySleepRestCycle,
+          py::arg("brain"), py::arg("detailed"), py::arg("includeConsolidationTests"),
+          "Verify sleep/rest cycle integration and functionality");
+
+    m.def("verifyDevelopment", &verifyDevelopment,
+          py::arg("brain"), py::arg("detailed"),
+          "Verify development system integration and functionality");
+
+    m.def("verifyCompleteSystemIntegration", &verifyCompleteSystemIntegration,
+          py::arg("brain"), py::arg("detailed"),
+          "Perform complete system integration verification and return comprehensive status report");
+
+    m.def("testSystemIntegration", &testSystemIntegration,
+          py::arg("brain"), py::arg("testSuite"),
+          "Run specific integration test suite");
+
+ } // namespace nlm
