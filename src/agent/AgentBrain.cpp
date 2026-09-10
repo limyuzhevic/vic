@@ -20,44 +20,80 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups for efficient access
     if (brain_) {
+        // Reserve space to avoid reallocations
+        motorForward_.reserve(50);
+        motorBackward_.reserve(50);
+        motorTurnLeft_.reserve(50);
+        motorTurnRight_.reserve(50);
+        motorInteract_.reserve(50);
+        motorWait_.reserve(50);
+        
+        sensoryVision_.reserve(100);
+        sensoryTouch_.reserve(50);
+        sensoryInternal_.reserve(50);
+        sensoryProprioception_.reserve(50);
+        
+        // Pre-allocate neuron pointers vector for better memory locality
+        std::vector<Neuron*> allMotorNeurons;
+        allMotorNeurons.reserve(300);
+        
+        // Collect all neurons by type for batch processing
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
+                for (Neuron* n : pop->getNeurons()) {
+                    if (type == NeuronType::Motor) {
+                        allMotorNeurons.push_back(n);
                     }
                 }
             }
         }
+        
+        // Batch distribute motor neurons using modulo operation for better cache locality
+        for (size_t i = 0; i < allMotorNeurons.size(); ++i) {
+            switch (i % 6) {
+                case 0: motorForward_.push_back(allMotorNeurons[i]); break;
+                case 1: motorBackward_.push_back(allMotorNeurons[i]); break;
+                case 2: motorTurnLeft_.push_back(allMotorNeurons[i]); break;
+                case 3: motorTurnRight_.push_back(allMotorNeurons[i]); break;
+                case 4: motorInteract_.push_back(allMotorNeurons[i]); break;
+                case 5: motorWait_.push_back(allMotorNeurons[i]); break;
+            }
+        }
+        
+        // Optimize sensory neuron distribution using efficient algorithms
+        std::vector<Neuron*> allSensoryNeurons;
+        allSensoryNeurons.reserve(250);
+        
+        for (const auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                NeuronType type = pop->getNeuronType();
+                if (type == NeuronType::Sensory) {
+                    for (Neuron* n : pop->getNeurons()) {
+                        allSensoryNeurons.push_back(n);
+                    }
+                }
+            }
+        }
+        
+        // Batch distribute sensory neurons using deterministic but varied distribution
+        for (size_t i = 0; i < allSensoryNeurons.size(); ++i) {
+            // Use a better distribution that considers neuron properties
+            // For now, use a simple modulo with offset for variety
+            int group = (i * 7 + i / 3) % 4;  // Better distribution than simple modulo
+            switch (group) {
+                case 0: sensoryVision_.push_back(allSensoryNeurons[i]); break;
+                case 1: sensoryTouch_.push_back(allSensoryNeurons[i]); break;
+                case 2: sensoryInternal_.push_back(allSensoryNeurons[i]); break;
+                case 3: sensoryProprioception_.push_back(allSensoryNeurons[i]); break;
+            }
+        }
+        
+        // Clear temporary vectors
+        allMotorNeurons.clear();
+        allSensoryNeurons.clear();
     }
 }
 

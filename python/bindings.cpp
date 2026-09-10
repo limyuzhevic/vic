@@ -33,7 +33,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
+        .def("index", [](const NeuronId& id) { return id.value; })  // Convert to index
         .def("__eq__", &NeuronId::operator==)
         .def("__ne__", &NeuronId::operator!=)
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
@@ -45,7 +45,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
+        .def("index", [](const SynapseId& id) { return id.value; })  // Convert to index
         .def("__eq__", &SynapseId::operator==)
         .def("__ne__", &SynapseId::operator!=)
         .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
@@ -57,7 +57,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
+        .def("index", [](const RegionId& id) { return id.value; })  // Convert to index
         .def("__eq__", &RegionId::operator==)
         .def("__ne__", &RegionId::operator!=)
         .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
@@ -69,7 +69,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
+        .def("index", [](const PopulationId& id) { return id.value; })  // Convert to index
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
 

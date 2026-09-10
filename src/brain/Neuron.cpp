@@ -144,6 +144,7 @@ void Neuron::injectCurrent(MembranePotential current) {
 }
 
 void Neuron::clearTotalCurrent() {
+    // Clear accumulated synaptic current for the next step
     pImpl->synapticInput = 0.0f;
 }
 
@@ -260,8 +261,9 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Default LIF step with configurable timestep
+    // This should use the brain's timestep parameter
+    TimestepDuration dt = pImpl->timestep;  // Use brain's timestep
     stepLIF(currentTime, dt);
 }
 
