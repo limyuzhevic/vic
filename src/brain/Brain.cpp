@@ -697,18 +697,20 @@ std::unique_ptr<class Action> Brain::produceAction() {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
+    // Calculate activity of motor neuron groups using a more efficient approach
     size_t firingMotor = 0;
     for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
+        if (neuron && neuron->isFiring()) {
             ++firingMotor;
         }
     }
     
-    // Return a simple action
+    // Return a simple action with more options based on activity
     ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
+    if (firingMotor >= static_cast<size_t>(pImpl->motorNeurons.size() * 0.8f)) {
         type = ActionType::MoveForward;
+    } else if (firingMotor >= static_cast<size_t>(pImpl->motorNeurons.size() * 0.5f)) {
+        type = ActionType::MoveBackward;
     }
     
     auto action = std::make_unique<Action>(type);

@@ -121,12 +121,35 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
     const float moveSpeed = 3.0f;
     const float turnSpeed = 2.0f;
     
-    // Only allow one action per step
+    // Input validation
+    if (!std::isfinite(currentTime)) {
+        NLM_LOG_WARNING("Invalid currentTime in applyMotorCommand: " + std::to_string(currentTime));
+        return ActionResult(0.0f, false, "invalid_time");
+    }
+    
+    // Rate limiting - prevent actions too close in time
     if (currentTime - agent_.lastActionTime < 0.1) {
         return ActionResult(0.0f, false, "too soon");
     }
     
     agent_.lastActionTime = currentTime;
+    
+    // Process command with safety checks
+    switch (cmd) {
+        case MotorCommand::MoveForward:
+        case MotorCommand::MoveBackward:
+        case MotorCommand::TurnLeft:
+        case MotorCommand::TurnRight:
+        case MotorCommand::LookLeft:
+        case MotorCommand::LookRight:
+        case MotorCommand::Interact:
+        case MotorCommand::Wait:
+            // Valid commands, proceed with execution
+            break;
+        default:
+            NLM_LOG_WARNING("Unknown MotorCommand in applyMotorCommand: " + std::to_string(static_cast<int>(cmd)));
+            return ActionResult(0.0f, false, "unknown_command");
+    }
     
     switch (cmd) {
         case MotorCommand::MoveForward: {
@@ -184,12 +207,8 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             break;
             
         case MotorCommand::LookLeft:
-            // Pan sensor (no movement)
-            result.reward = 0.0f;
-            result.success = true;
-            break;
-            
         case MotorCommand::LookRight:
+            // Pan sensor (no movement)
             result.reward = 0.0f;
             result.success = true;
             break;
