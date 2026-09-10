@@ -1,4 +1,7 @@
 #include "PredictionSystem.hpp"
+#include "../prediction/NeuralPrediction.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include <memory>
 
 namespace nlm {
 
@@ -6,6 +9,7 @@ struct PredictionSystem::Impl {
     float predictionError;
     float confidence;
     std::vector<float> errorHistory;
+    std::unique_ptr<NeuralPrediction> neuralPrediction;
     
     Impl() : predictionError(0.0f), confidence(0.5f) {}
 };
@@ -14,27 +18,34 @@ PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
 
-std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
-    // TODO PHASE 2: Implement real prediction using NLM's neural substrate
-    // PLACEHOLDER: Just return a copy of current state
-    return currentState.clone();
+void PredictionSystem::initialize(Brain* brain) {
+    if (pImpl->neuralPrediction) {
+        pImpl->neuralPrediction->initialize(brain);
+    }
 }
 
-void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
-    // TODO PHASE 2: Implement real prediction error computation
-    // PLACEHOLDER: Calculate simple error
-    const auto& predData = predicted.getData();
-    const auto& actualData = actual.getData();
-    
-    if (predData.size() == actualData.size() && !predData.empty()) {
-        float sumError = 0.0f;
-        for (size_t i = 0; i < predData.size(); ++i) {
-            float diff = predData[i] - actualData[i];
-            sumError += diff * diff;
+std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
+    // Use NeuralPrediction for actual predictions
+    if (pImpl->neuralPrediction) {
+        // Extract sensory data from current state
+        const auto& data = currentState.getData();
+        
+        // Generate prediction based on learned temporal sequences
+        std::vector<float> predictedData = pImpl->neuralPrediction->generatePrediction(0);
+        
+        if (!predictedData.empty()) {
+            pImpl->confidence = pImpl->neuralPrediction->getPredictionConfidence();
+            pImpl->predictionError = pImpl->neuralPrediction->getPredictionError();
+            
+            // Create new sensory input with predicted data
+            auto predictedInput = std::make_unique<SensoryInput>(predictedData.size());
+            predictedInput->setData(predictedData);
+            return predictedInput;
         }
-        pImpl->predictionError = sumError / predData.size();
-        pImpl->errorHistory.push_back(pImpl->predictionError);
     }
+    
+    // Fallback to current state
+    return currentState.clone();
 }
 
 float PredictionSystem::getPredictionError() const {

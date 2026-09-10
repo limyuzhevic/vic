@@ -5,12 +5,11 @@
 
 namespace nlm {
 
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
+AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
-    , predictionError_(0.0f)
     , expectedReward_(0.0f)
     , developmentalAge_(0.0)
     , plasticityModifier_(1.0f)
@@ -30,8 +29,8 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                                     motorTurnLeft_.size() + motorTurnRight_.size() +
+                                     motorInteract_.size() + motorWait_.size();
                         
                         switch (idx % 6) {
                             case 0: motorForward_.push_back(n); break;
@@ -46,7 +45,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
+                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
                         switch (idx % 4) {
                             case 0: sensoryVision_.push_back(n); break;
@@ -238,8 +237,14 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     
-    // Compute prediction error
-    predictionError_ = reward - predictedReward;
+    // Get prediction error from brain's prediction system
+    float predictionErrorFromBrain = 0.0f;
+    if (brain_->getPredictionSystem()) {
+        predictionErrorFromBrain = brain_->getPredictionSystem()->getPredictionError();
+    }
+    
+    // Use brain's prediction error instead of calculating reward-prediction error
+    predictionError_ = predictionErrorFromBrain;
     
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;

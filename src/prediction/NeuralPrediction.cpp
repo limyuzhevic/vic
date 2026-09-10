@@ -50,10 +50,14 @@ void NeuralPrediction::initialize(Brain* brain) {
 
 void NeuralPrediction::recordSensoryState(const std::vector<float>& sensoryState, 
                                          SimulationStep currentStep) {
-    if (!temporalPredictionEnabled_) return;
-    
-    recentSensoryStates_.push_back(sensoryState);
-    stateTimestamps_.push_back(currentStep);
+    // Store the sensory state as the last observation
+    if (!sensoryState.empty()) {
+        recentSensoryStates_.back() = sensoryState;
+        stateTimestamps_.back() = currentStep;
+    } else {
+        recentSensoryStates_.push_back(sensoryState);
+        stateTimestamps_.push_back(currentStep);
+    }
     
     // Keep only recent states
     if (recentSensoryStates_.size() > sequenceMemorySize_) {

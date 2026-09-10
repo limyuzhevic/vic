@@ -99,6 +99,21 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
         
         // Reduce confidence if we're uncertain
         confidence *= getSelfModelConfidence(action);
+        
+        // Use concept formation to improve planning if available
+        if (brain_ && brain_->getConceptFormation()) {
+            // Use concept information to adjust action evaluation
+            auto& conceptFormation = brain_->getConceptFormation();
+            const auto& concepts = conceptFormation->getConcepts();
+            
+            for (const auto& concept : concepts) {
+                if (conceptFormation->isConceptStable(concept.id)) {
+                    // Concepts provide abstract knowledge that can guide planning
+                    // For now, just note that concept information is available
+                    break;
+                }
+            }
+        }
     }
     
     candidate.expectedReward = totalReward;
@@ -335,9 +350,9 @@ float SelfModel::getSelfModelConfidence(ActionType action) const {
     return totalConf / effects.size();
 }
 
-float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeState,
-                                              const std::vector<float>& afterState,
-                                              ActionType action) const {
+float SelfModel::computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
+                                               const std::vector<float>& afterState,
+                                               ActionType action) const {
     // If we have a good prediction for this action, it's likely self-generated
     auto predicted = findMatchingEffect(action, beforeState);
     

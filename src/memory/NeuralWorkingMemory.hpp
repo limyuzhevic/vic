@@ -2,6 +2,7 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../motor/Action.hpp"
 #include <vector>
 #include <memory>
 #include <functional>
@@ -45,15 +46,17 @@ public:
     // Update working memory (maintenance and decay)
     void update(TimestepDuration dt);
 
-    // Clear working memory
-    void clear();
-
-    // Get number of active memory traces
-    size_t getActiveTraces() const { return activeTraces_.size(); }
-
-    // Get capacity
-    size_t getCapacity() const { return capacity_; }
-    void setCapacity(size_t cap) { capacity_ = cap; }
+        // Store an action in working memory for planning integration
+    void storeAction(ActionType action, SimulationStep step);
+    
+    // Retrieve planned action if available
+    ActionType retrievePlannedAction() const;
+    
+    // Get step when action was planned
+    SimulationStep getPlannedActionStep() const;
+    
+    // Clear planned action
+    void clearPlannedAction();
 
     // Decay rate for memory traces
     float getDecayRate() const { return decayRate_; }
@@ -62,7 +65,7 @@ public:
     // Get neurons currently in working memory
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
 
-    // Strengthen working memory representation (for rehearsal)
+// Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);
 
     // Competition between memory traces
@@ -73,6 +76,15 @@ public:
 
     // Get overall memory activity level
     float getMemoryActivity() const;
+
+    // Store current concept ID for other systems
+    void setCurrentConcept(size_t conceptId) { currentConceptId_ = conceptId; }
+
+    // Get current concept ID
+    size_t getCurrentConceptId() const { return currentConceptId_; }
+
+    // Check if concept formation should influence memory competition
+    void applyConceptBiasToCompetition();
 
 private:
     // Create recurrent connection for maintenance
@@ -90,20 +102,27 @@ private:
     Brain* brain_;
     size_t capacity_;
     float decayRate_;
-    
+
     // Memory content
     std::vector<NeuronId> memoryNeurons_;
     std::vector<float> memoryActivations_;
     std::vector<SimulationStep> memoryTimestamps_;
-    
+
     // Active memory traces
     std::vector<size_t> activeTraces_;
-    
+
     // Recurrent connections for maintenance
     std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
-    
+
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;
+
+    // Planned action storage
+    ActionType plannedAction_;
+    SimulationStep plannedActionStep_;
+
+    // Current concept ID for integration
+    size_t currentConceptId_;
 };
 
 // AttentionalSelection: Neural attention through competition

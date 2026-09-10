@@ -18,11 +18,6 @@ namespace nlm {
 // - Prediction error emerges from comparison of predicted vs actual sensory states
 // - No token prediction architecture - purely neural dynamics
 
-class NeuralPrediction {
-public:
-    NeuralPrediction();
-    ~NeuralPrediction();
-
     // Initialize with brain reference
     void initialize(Brain* brain);
 
@@ -41,7 +36,7 @@ public:
     // Predict consequences of a potential action
     // Uses learned action-consequence associations
     std::vector<float> predictActionConsequence(ActionType action,
-                                                  const std::vector<float>& currentState);
+                                               const std::vector<float>& currentState);
 
     // Get current prediction error (0 = perfect prediction, 1 = total error)
     float getPredictionError() const { return predictionError_; }
@@ -61,6 +56,9 @@ public:
 
     // Clear prediction history
     void clearHistory();
+
+    // Get last observation as vector<float>
+    std::vector<float> getLastObservation() const;
 
     // Enable/disable mechanisms
     void enableTemporalPrediction(bool enable) { temporalPredictionEnabled_ = enable; }

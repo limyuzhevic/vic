@@ -22,6 +22,7 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , currentConceptId_(0)
 {
 }
 
@@ -150,6 +151,7 @@ void NeuralWorkingMemory::clear() {
     memoryTimestamps_.clear();
     activeTraces_.clear();
     pImpl->maintenanceSynapses.clear();
+    currentConceptId_ = 0;  // Reset concept ID
 }
 
 void NeuralWorkingMemory::strengthenMemory(float factor) {
