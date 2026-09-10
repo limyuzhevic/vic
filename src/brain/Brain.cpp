@@ -414,7 +414,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        // Get prediction error for curiosity calculation
+        float predictionError = 0.0f;
+        if (pImpl->predictionError) {
+            predictionError = pImpl->predictionError->getError();
+        }
+        pImpl->curiosity->update(pImpl->novelty->getLevel(), predictionError, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -436,6 +441,69 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                 }
             }
+        }
+        
+        // Apply neuromodulation to working memory
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->applyNeuromodulation(
+                dopamineLevel,
+                pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f,
+                pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f,
+                pImpl->timestep
+            );
+        }
+        
+        // Apply neuromodulation to episodic memory
+        if (pImpl->episodicMemory) {
+            // Dopamine enhances memory consolidation and retrieval
+            float dopamineStrength = dopamineLevel * 0.5f + 0.5f; // Range 0.5-1.0
+            pImpl->episodicMemory->applyNeuromodulation(dopamineStrength, pImpl->timestep);
+        }
+    }
+    
+    // Apply curiosity effects on attention and exploration
+    if (pImpl->curiosity && pImpl->attention) {
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        // Curiosity modulates attention - increases exploration bias
+        if (curiosityLevel > 0.3f) {
+            // Apply curiosity-driven attention to working memory content
+            if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+                // Curiosity increases exploration, reduces competition threshold
+                float curiosityInhibition = 0.3f * curiosityLevel;
+                pImpl->attention->processCompetition(competitors, curiosityInhibition);
+            }
+        }
+    }
+    
+    // Apply novelty effects on prediction system
+    if (pImpl->novelty && pImpl->predictionSystem) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        // Novelty modulates prediction - increases prediction error sensitivity
+        if (noveltyLevel > 0.0f) {
+            // For now, just log that novelty affects prediction
+            // A full implementation would modulate prediction weights or thresholds
+        }
+    }
+    if (pImpl->predictionError) {
+        float error = pImpl->predictionError->getError();
+        // Prediction error modulates dopamine signaling
+        if (pImpl->dopamine) {
+            // Integrate prediction error into dopamine system
+            float errorInfluence = std::abs(error) * 0.5f;
+            float currentDA = pImpl->dopamine->getLevel();
+            float targetDA = currentDA + errorInfluence * 0.1f;
+            pImpl->dopamine->setLevel(targetDA);
+        }
+        
+        // Prediction error affects curiosity
+        if (pImpl->curiosity) {
+            // Higher prediction error drives curiosity
+            float errorCuriosityBoost = std::abs(error) * 0.3f;
+            float currentCuriosity = pImpl->curiosity->getLevel();
+            float targetCuriosity = std::min(1.0f, currentCuriosity + errorCuriosityBoost * 0.2f);
+            // Note: Curiosity doesn't have setLevel method, this is a placeholder
+            // In a full implementation, curiosity would be updated based on error
         }
     }
     

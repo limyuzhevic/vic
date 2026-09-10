@@ -1,5 +1,4 @@
-#include "NeuralWorkingMemory.hpp"
-#include "../core/Logger/Logger.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -242,6 +241,75 @@ void NeuralWorkingMemory::decayWeakTraces() {
         memoryActivations_.erase(memoryActivations_.begin() + *it);
         memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
     }
+}
+
+void NeuralWorkingMemory::applyNeuromodulation(float dopamineLevel, float noveltyLevel, float curiosityLevel, TimestepDuration dt) {
+    if (!brain_) return;
+    
+    // Dopamine effects on working memory:
+    // 1. Increase capacity when dopamine is high
+    // 2. Enhance stability of memory traces
+    // 3. Promote maintenance of salient information
+    
+    // Adjust effective capacity based on dopamine
+    float capacityMod = 1.0f + dopamineLevel * 0.5f; // Up to 50% increase with high dopamine
+    size_t effectiveCapacity = static_cast<size_t>(capacity_ * capacityMod);
+    
+    // Enhance maintenance current based on dopamine
+    float maintenanceBoost = 1.0f + dopamineLevel * 1.5f;
+    
+    // Apply neuromodulation to each memory trace
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        NeuronId neuron = memoryNeurons_[i];
+        float activation = memoryActivations_[i];
+        
+        // Dopamine enhances maintenance - apply stronger current to maintain activation
+        if (dopamineLevel > 0.3f) {
+            float dopamineCurrent = activation * 3.0f * maintenanceBoost;
+            brain_->injectCurrent(neuron, dopamineCurrent);
+        }
+        
+        // Novelty modulates encoding - higher novelty increases trace strength
+        if (noveltyLevel > 0.5f) {
+            // Novelty-bound traces are strengthened
+            memoryActivations_[i] = std::min(1.0f, activation * (1.0f + noveltyLevel * 0.3f));
+        }
+        
+        // Curiosity drives exploration - affects trace reactivation probability
+        if (curiosityLevel > 0.0f) {
+            // Occasionally trigger memory search based on curiosity
+            if (i % 5 == 0 && curiosityLevel > 0.7f) {  // Simplified random access
+                // Reactivate weaker traces
+                if (activation < 0.3f && activation > 0.0f) {
+                    float curiosityCurrent = activation * 2.0f;
+                    brain_->injectCurrent(neuron, curiosityCurrent);
+                }
+            }
+        }
+        
+        // Apply decay modulation by neuromodulators
+        if (activation > 0.1f) {
+            // Dopamine reduces decay rate
+            float decayMod = 1.0f - dopamineLevel * 0.2f;
+            
+            // Curiosity increases decay (promotes forgetting for exploration)
+            decayMod += curiosityLevel * 0.1f;
+            
+            // Novelty stabilizes memories (negative curiosity effect)
+            decayMod -= noveltyLevel * 0.05f;
+            
+            decayMod = std::clamp(decayMod, 0.5f, 1.0f);
+            
+            // Apply modified decay
+            memoryActivations_[i] *= decayMod;
+            if (i < memoryTimestamps_.size()) {
+                memoryTimestamps_[i]++;
+            }
+        }
+    }
+    
+    // Adjust recurrence strength based on neuromodulation
+    updateRecurrentConnections();
 }
 
 // AttentionalSelection Implementation

@@ -111,12 +111,18 @@ public:
     // Clear old episodes
     void consolidate(float relevanceThreshold);
 
-    // Clear all episodes
+// Clear all episodes
     void clear();
-
+    
     // Enable/disable replay
     void enableReplay(bool enable) { replayEnabled_ = enable; }
     bool isReplayEnabled() const { return replayEnabled_; }
+    
+    // Apply neuromodulatory effects on episodic memory
+    // Dopamine enhances memory consolidation and retrieval
+    // Novelty modulates memory encoding strength
+    // Curiosity drives exploration of memory contents
+    void applyNeuromodulation(float dopamineLevel, TimestepDuration dt);
 
     // Get episodes for replay (selection based on relevance and recency)
     std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;

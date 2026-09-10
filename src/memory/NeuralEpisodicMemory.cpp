@@ -1,5 +1,4 @@
-#include "NeuralEpisodicMemory.hpp"
-#include "../core/Logger/Logger.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>

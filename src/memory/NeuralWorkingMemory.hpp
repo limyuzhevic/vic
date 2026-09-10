@@ -70,6 +70,12 @@ public:
 
     // Is this neuron part of the winning population?
     bool isWinning(NeuronId neuron) const;
+    
+    // Apply neuromodulatory effects on memory
+    // Dopamine enhances working memory capacity and stability
+    // Novelty modulates memory encoding strength
+    // Curiosity drives exploration of memory contents
+    void applyNeuromodulation(float dopamineLevel, float noveltyLevel, float curiosityLevel, float dt);
 
     // Get overall memory activity level
     float getMemoryActivity() const;
