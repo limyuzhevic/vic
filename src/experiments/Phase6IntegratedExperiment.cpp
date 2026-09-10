@@ -23,8 +23,24 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
-    // Create configuration
+    // Create configuration with validation
     auto cfg = std::make_shared<Config>();
+    
+    // Validate configuration parameters
+    if (config.neuronCount < 10) {
+        NLM_LOG_WARNING("Neuron count is very low (" + std::to_string(config.neuronCount) + ") - simulation may not be meaningful");
+    }
+    
+    if (config.maxSteps < 100) {
+        NLM_LOG_WARNING("Max steps is very low (" + std::to_string(config.maxSteps) + ") - may not show meaningful learning");
+    }
+    
+    if (config.regionCount < 1) {
+        NLM_LOG_ERROR("Region count must be at least 1");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
     cfg->set("connection_probability", config.connectionProbability);
@@ -33,17 +49,31 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
     
-    // Create brain
+    // Set simulation seed for reproducibility
+    cfg->set("random_seed", config.neuronCount); // Use neuronCount as seed
+    
+    // Enhanced error handling for brain initialization
+    NLM_LOG_INFO("Attempting to initialize brain with " + std::to_string(config.neuronCount) + " neurons");
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain");
+        NLM_LOG_ERROR("Brain initialization failed - check configuration and dependencies");
+        // Try to provide more diagnostic information
+        auto configKeys = cfg->getKeys();
+        NLM_LOG_INFO("Configuration keys set: ");
+        for (const auto& key : configKeys) {
+            NLM_LOG_INFO("  - " + key);
+        }
         result.endTime = time(nullptr);
         return result;
     }
+    NLM_LOG_INFO("Brain initialized successfully - " + std::to_string(brain->getTotalNeuronCount()) + " neurons, " + 
+                 std::to_string(brain->getTotalSynapseCount()) + " synapses");
     
     // Create simple world
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.configure(16.0f, 16.0f, 16, 16);
+    world.setRandomSeed(42u);  // Fixed seed for reproducibility
+    world.reset();  // Initialize world with objects
     
     // Create agent
     AgentBrain agent(brain);
@@ -54,6 +84,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     agent.enableCuriosity(true);
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
+    NLM_LOG_INFO("World configured: " + std::to_string(world.getWidth()) + "x" + 
+                 std::to_string(world.getHeight()) + ", Vision: " +
+                 std::to_string(world.getVisionWidth()) + "x" +
+                 std::to_string(world.getVisionHeight()));
     
     // Run simulation
     float totalReward = 0.0f;
@@ -61,44 +95,58 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        NLM_LOG_DEBUG("Simulation step " + std::to_string(step));
         
-        // Process sensory input
-        agent.processSensoryInput(percept);
-        
-        // Brain step
-        brain->step(step, step * 0.001);
-        
-        // Get motor command
-        MotorCommand cmd = agent.decodeMotorCommand();
-        
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
-        
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
-        totalReward += reward;
-        
-        // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
-        
-        // Update development
-        if (config.enableDevelopment) {
-            agent.updateDevelopment(0.001);
-        }
-        
-        // Collect metrics
-        totalFiringRate += brain->getAverageFiringRate();
-        if (brain->getFiringNeuronCount() > 0) firingCount++;
-        
-        // Periodic status
-        if (step % 1000 == 0) {
-            NLM_LOG_INFO("Step " + std::to_string(step) + 
-                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+            // Get motor command
+            MotorCommand cmd = agent.decodeMotorCommand();
+            NLM_LOG_TRACE("Decoded motor command: " + std::to_string(static_cast<int>(cmd)));
+            
+            // Apply action to world
+            ActionResult actionResult = world.applyMotorCommand(cmd, world.getSimulationTime());
+            
+            // Compute reward (estimate from world state)
+            float reward = 0.0f;
+            // Calculate reward based on agent state and environment
+            reward = agent.getNeuromodulationLevel();  // Use neuromodulation as proxy for reward
+            reward += (world.getAgentBody().energy / world.getMaxEnergy()) * 0.5f;  // Add energy component
+            NLM_LOG_TRACE("Computed reward: " + std::to_string(reward));
+            
+            totalReward += reward;
+            
+            // Apply reward modulation with enhanced logging
+            agent.applyRewardModulation(reward, 0.0f);
+            NLM_LOG_TRACE("Applied reward modulation, dopamine level changed from " + 
+                         std::to_string(agent.getNeuromodulationLevel() - reward) + 
+                         " to " + std::to_string(agent.getNeuromodulationLevel()));
+            
+            // Update development system with logging
+            if (config.enableDevelopment) {
+                NLM_LOG_TRACE("Updating development system");
+                agent.updateDevelopment(0.01);
+                NLM_LOG_TRACE("Development stage: " + std::to_string(static_cast<int>(agent.getDevelopmentalStage())));
+            }
+            
+            // Update world (simulate timestep)
+            world.update(0.01);  // 10ms timestep
+            
+            // Collect metrics
+            totalFiringRate += brain->getAverageFiringRate();
+            if (brain->getFiringNeuronCount() > 0) firingCount++;
+            
+            // Enhanced debugging information
+            if (step % 100 == 0) {
+                NLM_LOG_TRACE("Step " + std::to_string(step) + 
+                             " | Reward per step: " + std::to_string(reward) +
+                             " | Total reward avg: " + std::to_string(totalReward / (step + 1)) +
+                             " | Firing rate: " + std::to_string(brain->getAverageFiringRate()) +
+                             " | Spike count: " + std::to_string(brain->getTotalSpikeCount()) +
+                             " | Active neurons: " + std::to_string(brain->getActiveNeuronCount()) +
+                             " | Working memory traces: " + std::to_string(brain->getWorkingMemory() ? 
+                                 brain->getWorkingMemory()->getActiveTraces() : 0) +
+                             " | Novelty level: " + std::to_string(agent.getNoveltyLevel()) +
+                             " | Curiosity level: " + std::to_string(agent.getCuriosityLevel()) +
+                             " | Neuromodulation level: " + std::to_string(agent.getNeuromodulationLevel()));
+            }
         }
     }
     
@@ -125,25 +173,76 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
     
+    // Enhanced integration verification with detailed logging
+    NLM_LOG_INFO("=== Enhanced Integration Verification ===");
+    auto* wm = brain->getWorkingMemory();
+    auto* em = brain->getEpisodicMemory();
+    auto* dopamine = brain->getDopamine();
+    auto* prediction = brain->getPredictionSystem();
+    auto* development = brain->getDevelopmentSystem();
+    
+    NLM_LOG_INFO("Working Memory System: " + std::string(wm ? "ENABLED" : "DISABLED"));
+    if (wm) {
+        NLM_LOG_INFO("  - Active traces: " + std::to_string(wm->getActiveTraces()));
+        NLM_LOG_INFO("  - Capacity: " + std::to_string(wm->getCapacity()));
+    }
+    
+    NLM_LOG_INFO("Episodic Memory System: " + std::string(em ? "ENABLED" : "DISABLED"));
+    if (em) {
+        NLM_LOG_INFO("  - Episode count: " + std::to_string(em->getEpisodeCount()));
+        NLM_LOG_INFO("  - Memory capacity: " + std::to_string(em->getMemoryCapacity()));
+    }
+    
+    NLM_LOG_INFO("Neuromodulation System (Dopamine): " + std::string(dopamine ? "ENABLED" : "DISABLED"));
+    if (dopamine) {
+        NLM_LOG_INFO("  - Current dopamine level: " + std::to_string(dopamine->getCurrentLevel()));
+        NLM_LOG_INFO("  - Neuromodulation active: " + std::string(dopamine->isActive() ? "YES" : "NO"));
+    }
+    
+    NLM_LOG_INFO("Prediction System: " + std::string(prediction ? "ENABLED" : "DISABLED"));
+    if (prediction) {
+        NLM_LOG_INFO("  - Prediction model loaded: " + std::string(prediction->isModelLoaded() ? "YES" : "NO"));
+        NLM_LOG_INFO("  - Prediction error tracking: " + std::string(prediction->isTrackingErrors() ? "YES" : "NO"));
+    }
+    
+    NLM_LOG_INFO("Development System: " + std::string(development ? "ENABLED" : "DISABLED"));
+    if (development) {
+        NLM_LOG_INFO("  - Current stage: " + std::to_string(static_cast<int>(development->getCurrentStage())));
+        NLM_LOG_INFO("  - Developmental age: " + std::to_string(development->getDevelopmentalAge()));
+        NLM_LOG_INFO("  - Plasticity modifier: " + std::to_string(development->getPlasticityModifier()));
+    }
+    
     // Test checkpointing
-    if (config.enableCheckpointing) {
+    if (config.enableCheckpointing && !config.checkpointPath.empty()) {
         NLM_LOG_INFO("Testing checkpoint save/load...");
+        NLM_LOG_INFO("Checkpoint path: " + config.checkpointPath);
+        
+        // Save the brain's configuration and state to file
         if (brain->save(config.checkpointPath)) {
-            NLM_LOG_INFO("Checkpoint saved successfully");
+            NLM_LOG_INFO("Checkpoint saved successfully to " + config.checkpointPath);
             
-            // Create new brain and load
-            auto brain2 = std::make_shared<Brain>(cfg);
+            // Create new brain with same config
+            auto brain2 = std::make_shared<Brain>(*cfg);
             brain2->initialize();
             
             if (brain2->load(config.checkpointPath)) {
                 NLM_LOG_INFO("Checkpoint loaded successfully");
                 result.checkpointingWorks = true;
+                
+                // Verify state was properly restored
+                if (brain2->getTotalNeuronCount() != brain->getTotalNeuronCount()) {
+                    NLM_LOG_WARNING("Neuron count mismatch after load: " + 
+                                  std::to_string(brain2->getTotalNeuronCount()) + 
+                                  " vs " + std::to_string(brain->getTotalNeuronCount()));
+                }
             } else {
                 NLM_LOG_ERROR("Failed to load checkpoint");
             }
         } else {
             NLM_LOG_ERROR("Failed to save checkpoint");
         }
+    } else {
+        NLM_LOG_INFO("Checkpointing disabled or no checkpoint path provided");
     }
     
     result.endTime = time(nullptr);

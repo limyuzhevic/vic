@@ -9,12 +9,7 @@
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
 #include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/experiments/Phase6IntegratedExperiment.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -400,21 +395,79 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Create Phase 6 configuration
+    py::class_<nlm::Phase6Config>(m, "Phase6Config", R"pbdoc(Configuration for Phase 6 integration experiment)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("maxSteps", &nlm::Phase6Config::maxSteps)
+        .def_readwrite("neuronCount", &nlm::Phase6Config::neuronCount)
+        .def_readwrite("regionCount", &nlm::Phase6Config::regionCount)
+        .def_readwrite("connectionProbability", &nlm::Phase6Config::connectionProbability)
+        .def_readwrite("enableCheckpointing", &nlm::Phase6Config::enableCheckpointing)
+        .def_readwrite("enableReplay", &nlm::Phase6Config::enableReplay)
+        .def_readwrite("enableDevelopment", &nlm::Phase6Config::enableDevelopment)
+        .def_readwrite("checkpointPath", &nlm::Phase6Config::checkpointPath)
+        .def("__repr__", [](const nlm::Phase6Config& config) {
+            std::stringstream ss;
+            ss << "<Phase6Config: neurons=" << config.neuronCount 
+               << ", steps=" << config.maxSteps 
+               << ", dev=" << (config.enableDevelopment ? "true" : "false")
+               << ">";
+            return ss.str();
+        });
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Create Phase 6 integrated experiment
+    py::class_<nlm::Phase6IntegratedExperiment>(m, "Phase6IntegratedExperiment", 
+        R"pbdoc(Runs the complete NLM Phase 6 integration test)pbdoc")
+        .def(py::init<>())
+        .def("run", &nlm::Phase6IntegratedExperiment::run, 
+             py::arg("config"), 
+             "Run the integration test with configuration")
+        .def("verifyIntegration", &nlm::Phase6IntegratedExperiment::verifyIntegration,
+             "Verify that all brain systems are properly integrated")
+        .def("testMemoryIntegration", &nlm::Phase6IntegratedExperiment::testMemoryIntegration,
+             "Test memory system integration")
+        .def("testNeuromodulationIntegration", &nlm::Phase6IntegratedExperiment::testNeuromodulationIntegration,
+             "Test neuromodulation system integration")
+        .def("testCheckpointing", &nlm::Phase6IntegratedExperiment::testCheckpointing,
+             "Test checkpoint save/load functionality")
+        .def("testReplay", &nlm::Phase6IntegratedExperiment::testReplay,
+             "Test the replay system");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Convenient factory function to create a configured experiment
+    m.def("createPhase6Experiment", []() -> std::shared_ptr<nlm::Phase6IntegratedExperiment> {
+        return std::make_shared<nlm::Phase6IntegratedExperiment>();
+    }, "Create a new Phase6IntegratedExperiment");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("createPhase6Config", []() -> nlm::Phase6Config {
+        nlm::Phase6Config config;
+        config.maxSteps = 10000;
+        config.neuronCount = 1000;
+        config.regionCount = 1;
+        config.connectionProbability = 0.1f;
+        config.enableCheckpointing = true;
+        config.enableReplay = true;
+        config.enableDevelopment = true;
+        config.checkpointPath = "./checkpoint_test.bin";
+        return config;
+    }, "Create a default Phase6 configuration");
+
+    m.def("createConfiguredPhase6Experiment", []() {
+        // Create default configuration
+        nlm::Phase6Config config;
+        config.maxSteps = 5000;
+        config.neuronCount = 500;
+        config.regionCount = 2;
+        config.connectionProbability = 0.15f;
+        config.enableCheckpointing = false;
+        config.enableReplay = false;
+        config.enableDevelopment = true;
+        config.checkpointPath = "/tmp/phase6_checkpoint.bin";
+        
+        // Create and configure the experiment
+        auto experiment = std::make_shared<nlm::Phase6IntegratedExperiment>();
+        
+        return py::make_tuple(experiment, config);
+    }, "Create a pre-configured Phase6 experiment with default settings");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
