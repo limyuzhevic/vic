@@ -347,4 +347,18 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
-} // namespace nlm
+bool AgentBrain::isRewardModulationEnabled() const {
+    return rewardModulationEnabled_;
+}
+
+bool AgentBrain::isStructuralPlasticityEnabled() const {
+    return structuralPlasticityEnabled_;
+}
+
+bool AgentBrain::isDevelopmentEnabled() const {
+    return developmentEnabled_;
+}
+
+bool AgentBrain::isCuriosityEnabled() const {
+    return curiosityEnabled_;
+}

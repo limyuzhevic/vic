@@ -62,6 +62,10 @@ void Neuron::addToMembranePotential(MembranePotential delta) {
     pImpl->state.membranePotential += delta;
 }
 
+NeuronId Neuron::getId() const {
+    return pImpl->id;
+}
+
 void Neuron::setThreshold(MembranePotential threshold) {
     pImpl->state.threshold = threshold;
 }
