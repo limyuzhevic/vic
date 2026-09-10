@@ -11,6 +11,7 @@ namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Integrated with cognitive systems for advanced behavior
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -76,7 +77,20 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Cognitive system integration
+    void integrateCognitiveSystems();
+    void updateConceptFormation(const SensoryPercept& percept);
+    void updatePredictionSystem(const SensoryPercept& percept);
+    void applyAttentionalSelection(const SensoryPercept& percept);
+    void executeNeuralPlanning();
+    
     std::shared_ptr<Brain> brain_;
+    
+    // Cognitive system pointers
+    NeuralPlanner* neuralPlanner_;
+    ConceptFormation* conceptFormation_;
+    AttentionalSelection* attentionalSelection_;
+    PredictionSystem* predictionSystem_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -112,6 +126,13 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Planning and attention state
+    float planningConfidence_;
+    std::vector<float> currentGoal_;
+    
+    // Attentional focus tracking
+    std::vector<RegionId> attendedRegions_;
 };
 
 } // namespace nlm

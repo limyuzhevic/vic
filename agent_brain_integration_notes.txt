@@ -1,0 +1,44 @@
+SensoryInput is an abstract class representing sensory input from the environment, while SensoryPercept is the concrete class used by AgentBrain to represent processed perceptual information from the world. The AgentBrain should use SensoryPercept for its sensory processing since that's what's available in the system. The integration should work with SensoryPercept, not directly with SensoryInput.
+
+When AgentBrain.processSensoryInput() is called, it receives a SensoryPercept object that contains the processed sensory data from the environment. This data should be passed to cognitive systems for higher-level processing.
+
+The correct approach is:
+1. AgentBrain receives SensoryPercept from the environment
+2. AgentBrain passes SensoryPercept to cognitive systems (concept formation, prediction, attention)
+3. Cognitive systems process the information and influence action selection
+
+However, looking at the code I wrote, there's a mismatch. I'm trying to use SensoryInput in the updatePredictionSystem() method, but the AgentBrain.processSensoryInput() receives SensoryPercept. I need to either:
+
+1. Change updatePredictionSystem() to work with SensoryPercept
+2. Create a conversion method from SensoryPercept to SensoryInput
+
+Since the AgentBrain already has methods to extract vision, touch, internal, and proprioception data from SensoryPercept, it should be able to create a SensoryInput object for the prediction system. But looking at the code, there's no setVision(), setTouch() methods in SensoryInput class - only Vision, Audio, and InternalSignals classes exist.
+
+Let me check the Brain class to see how it uses these systems and what interfaces are expected.
+
+Actually, I think the issue is that I need to look at the full context of how these systems are integrated in the overall architecture. Let me check the Brain.cpp file to see how these cognitive systems are supposed to work together.
+
+Looking at the Brain.cpp code, I see that the prediction system is updated with sensory observations. The attention system is also updated. The neural planner is used for action selection.
+
+So the integration should be:
+1. AgentBrain.processSensoryInput() receives SensoryPercept from environment
+2. AgentBrain passes sensory data to cognitive systems
+3. Cognitive systems process the data
+4. Neural planner uses processed data to plan actions
+5. AgentBrain.decodeMotorCommand() returns the planned action
+
+But I need to make sure I'm using the correct types and interfaces. Let me look at the Brain class to see what methods are available on the cognitive systems.
+
+Looking at Brain.cpp, I see:
+- predictionSystem_->updatePredictions()
+- attention->update() 
+- neuralPlanner_->planAction()
+
+So the integration should work like this:
+1. AgentBrain.processSensoryInput() receives SensoryPercept
+2. AgentBrain passes sensory data to cognitive systems
+3. Cognitive systems process the data
+4. Neural planner uses processed data to plan actions
+5. AgentBrain.decodeMotorCommand() returns the planned action
+
+I think the issue is that I'm trying to use SensoryInput where I should be using the appropriate types. Let me look at what the prediction system expects and fix the integration accordingly.

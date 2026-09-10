@@ -1,5 +1,9 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../memory/AttentionalSelection.hpp"
+#include "../prediction/PredictionSystem.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -19,7 +23,15 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , planningConfidence_(0.0f)
+    , neuralPlanner_(nullptr)
+    , conceptFormation_(nullptr)
+    , attentionalSelection_(nullptr)
+    , predictionSystem_(nullptr)
 {
+    // Initialize cognitive systems
+    integrateCognitiveSystems();
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -63,16 +75,221 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 
 AgentBrain::~AgentBrain() = default;
 
-void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+void AgentBrain::integrateCognitiveSystems() {
+    if (!brain_) return;
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    // Initialize cognitive systems
+    neuralPlanner_ = brain_->getPlanner();
+    conceptFormation_ = brain_->getConceptFormation();
+    attentionalSelection_ = brain_->getAttention();
+    predictionSystem_ = brain_->getPredictionSystem();
+    
+    if (neuralPlanner_) {
+        neuralPlanner_->initialize(brain_.get());
+        NLM_LOG_INFO("Neural planner integrated");
+    }
+    
+    if (conceptFormation_) {
+        conceptFormation_->initialize(brain_.get());
+        NLM_LOG_INFO("Concept formation integrated");
+    }
+    
+    if (attentionalSelection_) {
+        attentionalSelection_->initialize(brain_.get());
+        NLM_LOG_INFO("Attentional selection integrated");
+    }
+    
+    if (predictionSystem_) {
+        NLM_LOG_INFO("Prediction system integrated");
+    }
 }
+
+void AgentBrain::updateConceptFormation(const SensoryPercept& percept) {
+    if (!conceptFormation_) return;
+    
+    // Extract sensory features from percept
+    std::vector<float> pattern;
+    std::vector<float> features;
+    
+    // Vision features (flatten vision data)
+    const auto& vision = percept.getVision();
+    pattern.insert(pattern.end(), vision.begin(), vision.end());
+    
+    // Extract basic features
+    features.resize(4, 0.0f);
+    if (!vision.empty()) {
+        float avgBrightness = 0.0f;
+        float contrast = 0.0f;
+        for (float v : vision) {
+            avgBrightness += v;
+        }
+        avgBrightness /= vision.size();
+        
+        for (float v : vision) {
+            contrast += (v - avgBrightness) * (v - avgBrightness);
+        }
+        contrast = std::sqrt(contrast / vision.size());
+        
+        features[0] = avgBrightness;      // Brightness
+        features[1] = contrast;           // Contrast
+        features[2] = noveltyLevel_;      // Novelty
+        features[3] = curiosityLevel_;    // Curiosity
+    }
+    
+    // Present experience to concept formation
+    size_t conceptId = conceptFormation_->presentExperience(pattern, features, expectedReward_, 0);
+    
+    // Use concept for action selection if available
+    if (conceptId > 0) {
+        const DiscoveredConcept* concept = conceptFormation_->getConcept(conceptId);
+        if (concept && concept->avgStability > 0.5f) {
+            // Concept is stable, use its knowledge
+            const auto& prototype = conceptFormation_->getConceptPrototype(conceptId);
+            
+            // Convert concept features to action preference
+            if (!prototype.empty() && prototype[0] > 0.7f) {
+                // Bright concept -> interact
+                currentGoal_.clear();
+                currentGoal_.push_back(0.0f); // Approach goal
+            }
+        }
+    }
+}
+
+void AgentBrain::updatePredictionSystem(const SensoryPercept& percept) {
+    if (!predictionSystem_) return;
+    
+    // Create sensory input from percept
+    SensoryInput currentState;
+    
+    // Extract vision data
+    const auto& vision = percept.getVision();
+    currentState.setVision(vision);
+    
+    // Extract other sensory data
+    currentState.setTouch(percept.getTouch());
+    currentState.setInternal(percept.getInternal());
+    currentState.setProprioception(percept.getProprioception());
+    
+    // Make prediction
+    auto predictedState = predictionSystem_->predictNextState(currentState);
+    
+    // Update with actual observation
+    predictionSystem_->updatePredictions(*predictedState, currentState);
+    
+    // Get prediction error
+    predictionError_ = predictionSystem_->getPredictionError();
+    
+    // Use prediction error for learning
+    if (curiosityEnabled_) {
+        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+}
+
+void AgentBrain::applyAttentionalSelection(const SensoryPercept& percept) {
+    if (!attentionalSelection_) return;
+    
+    // Collect competing neuron IDs from different sensory modalities
+    std::vector<NeuronId> competitors;
+    
+    // Add vision neurons
+    for (Neuron* n : sensoryVision_) {
+        if (n) competitors.push_back(n->getId());
+    }
+    
+    // Add touch neurons
+    for (Neuron* n : sensoryTouch_) {
+        if (n) competitors.push_back(n->getId());
+    }
+    
+    // Add internal neurons
+    for (Neuron* n : sensoryInternal_) {
+        if (n) competitors.push_back(n->getId());
+    }
+    
+    // Process competition to select winners
+    std::vector<NeuronId> winners = attentionalSelection_->processCompetition(
+        competitors, 0.5f // Global inhibition
+    );
+    
+    // Update attended regions based on winners
+    attendedRegions_.clear();
+    for (NeuronId winnerId : winners) {
+        // Find which region this neuron belongs to
+        for (const auto& region : brain_->getRegions()) {
+            for (const auto& pop : region->getPopulations()) {
+                for (Neuron* n : pop->getNeurons()) {
+                    if (n && n->getId() == winnerId) {
+                        attendedRegions_.push_back(region->getId());
+                    }
+                }
+            }
+        }
+    }
+}
+
+void AgentBrain::executeNeuralPlanning() {
+    if (!neuralPlanner_) return;
+    
+    // Convert current sensory state to planning state
+    std::vector<float> currentState;
+    
+    // Use vision as primary planning input
+    const auto& vision = previousVision_;
+    currentState.insert(currentState.end(), vision.begin(), vision.end());
+    
+    // Add neuromodulatory state
+    currentState.push_back(dopamineLevel_);
+    currentState.push_back(curiosityLevel_);
+    currentState.push_back(predictionError_);
+    
+    // Set goal based on attended regions
+    currentGoal_.clear();
+    if (!attendedRegions_.empty()) {
+        // Focus on first attended region
+        currentGoal_.push_back(0.5f); // Moderate goal value
+    }
+    
+    // Plan action
+    ActionType plannedAction = neuralPlanner_->planAction(currentState, 0.5f);
+    
+    // Convert action to motor command
+    MotorCommand plannedMotorCmd;
+    switch (plannedAction) {
+        case ActionType::MoveForward: plannedMotorCmd = MotorCommand::MoveForward; break;
+        case ActionType::MoveBackward: plannedMotorCmd = MotorCommand::MoveBackward; break;
+        case ActionType::TurnLeft: plannedMotorCmd = MotorCommand::TurnLeft; break;
+        case ActionType::TurnRight: plannedMotorCmd = MotorCommand::TurnRight; break;
+        case ActionType::LookLeft: plannedMotorCmd = MotorCommand::LookLeft; break;
+        case ActionType::LookRight: plannedMotorCmd = MotorCommand::LookRight; break;
+        case ActionType::Interact: plannedMotorCmd = MotorCommand::Interact; break;
+        case ActionType::Wait: plannedMotorCmd = MotorCommand::Wait; break;
+        default: plannedMotorCmd = MotorCommand::Wait; break;
+    }
+    
+    // Store planned action for potential use
+    // In a real implementation, this would be used instead of basic decoding
+    
+    // Update planning confidence
+    planningConfidence_ = neuralPlanner_->getPlanningConfidence();
+}
+
+void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
+    if (!brain_) return;
+    
+    // Vision input (256 values -> sensoryVision_ neurons)
+    const auto& vision = percept.getVision();
+    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+        if (sensoryVision_[i]) {
+            // Inject current proportional to vision intensity
+            float current = vision[i] * 5.0f;  // Scale factor
+            sensoryVision_[i]->injectCurrent(current);
+        }
+    }
+    
+    // Touch input (8 values -> sensoryTouch_ neurons)
+
 
 size_t AgentBrain::getSensoryInputSize() const {
     // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
