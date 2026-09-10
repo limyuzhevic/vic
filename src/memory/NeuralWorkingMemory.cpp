@@ -36,36 +36,35 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    // Ensure we have enough neurons for the pattern
+    size_t neuronsNeeded = std::min(pattern.size(), static_cast<size_t>(capacity_));
+    
+    // Clear existing memory if at capacity
+    if (memoryNeurons_.size() >= capacity_) {
+        memoryNeurons_.clear();
+        memoryActivations_.clear();
+        memoryTimestamps_.clear();
+        pImpl->maintenanceSynapses.clear();
+    }
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
+        // Create or get neuron for this memory trace
+        NeuronId neuron(i + 1000); // Use region 1 for working memory
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
+        float activation = pattern[i % pattern.size()] * strength;
+        
+        // Inject current to activate neuron
+        brain_->injectCurrent(neuron, activation * 5.0f);
         
         // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
-        }
+        memoryNeurons_.push_back(neuron);
+        memoryActivations_.push_back(activation);
+        memoryTimestamps_.push_back(0);
     }
     
     // Create maintenance connections if needed
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], 0.5f);
     }
 }
 

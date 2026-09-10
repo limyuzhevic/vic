@@ -48,6 +48,10 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Get prediction error and reward signal
+    float getPredictionError() const;
+    float getRewardSignal() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

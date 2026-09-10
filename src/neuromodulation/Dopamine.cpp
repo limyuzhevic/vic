@@ -1,5 +1,6 @@
-#include "Neuromodulator.hpp"
+#include "Dopamine.hpp"
 #include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
@@ -34,35 +35,27 @@ void Dopamine::setLevel(float level) {
 }
 
 float Dopamine::getPlasticityFactor() const {
-    // Dopamine-modulated plasticity: higher dopamine increases learning rate
-    // Base plasticity factor of 0.5, scaled by dopamine level
     float basePlasticity = 0.5f;
-    float modulation = 1.0f + pImpl->level; // 1.0 to 2.0x plasticity
+    float modulation = 1.0f + pImpl->level;
     return basePlasticity * modulation;
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // Decay towards baseline over time
     float dtf = static_cast<float>(dt);
     if (pImpl->level > pImpl->baseline) {
         pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * dtf);
     }
     
-    // Decay prediction error signal
     pImpl->predictionError = std::max(0.0f, pImpl->predictionError - pImpl->decayRate * dtf);
     pImpl->rewardSignal = std::max(0.0f, pImpl->rewardSignal - pImpl->decayRate * dtf);
 }
 
 void Dopamine::signalReward(float reward) {
-    // Reward prediction: burst of dopamine proportional to reward
-    // Cap at peak level to prevent runaway excitation
     pImpl->rewardSignal = reward;
     pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // Reward prediction error: positive error (better than expected) increases dopamine
-    // Negative error (worse than expected) decreases dopamine
     pImpl->predictionError = std::abs(error);
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
