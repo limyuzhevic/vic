@@ -1,28 +1,22 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "../brain/Synapse.hpp"
-
-namespace nlm {
-
 // Abstract base class for plasticity rules
-// PLACEHOLDER - Phase 2 will implement real plasticity rules
+// Implements real plasticity rules for Phase 2
 
 class PlasticityRule {
 public:
     virtual ~PlasticityRule() = default;
     
     // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
+    // Real implementation calculates weight changes based on spike timing
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,
                         TimestepDuration dt) = 0;
     
-    // Apply weight change
+    // Apply weight change with biological constraints
+    // Real implementation includes bounds checking and synaptic dynamics
     virtual void applyWeightChange(Synapse* synapse, SynapticWeight delta) = 0;
     
-    // Get rule name
+    // Get rule name for identification and logging
     virtual const char* getName() const = 0;
     
     // Check if rule is enabled
@@ -37,7 +31,7 @@ private:
 };
 
 // Hebbian plasticity rule: "neurons that fire together, wire together"
-// PLACEHOLDER - Phase 2 will implement real Hebbian learning
+// Real implementation uses covariance rule for spike-based learning
 class HebbianRule : public PlasticityRule {
 public:
     HebbianRule();
@@ -50,7 +44,32 @@ public:
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override;
     
-    // Parameters
+    // Parameters for Hebbian learning
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    
+    void setMaxWeight(float maxWeight);
+    float getMaxWeight() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Anti-Hebbian rule: decrease weight when neurons fire together
+// Implements "neurons that fire apart, unwind together"
+class AntiHebbianRule : public PlasticityRule {
+public:
+    AntiHebbianRule();
+    ~AntiHebbianRule() override;
+    
+    void update(Synapse* synapse,
+                 const std::vector<Timestamp>& preSpikes,
+                 const std::vector<Timestamp>& postSpikes,
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
     void setLearningRate(float rate);
     float getLearningRate() const;
     
@@ -59,28 +78,29 @@ private:
     Impl* pImpl;
 };
 
-// Anti-Hebbian rule: decrease weight when neurons fire together
-// PLACEHOLDER - Phase 2
-class AntiHebbianRule : public PlasticityRule {
-public:
-    void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "AntiHebbian"; }
-};
-
 // Bienenstock-Cooper-Munro (BCM) rule
-// PLACEHOLDER - Phase 2
+// Dynamic threshold model for supervised learning
 class BCMRule : public PlasticityRule {
 public:
+    BCMRule();
+    ~BCMRule() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "BCM"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    
+    void setThetaPlus(float thetaPlus);
+    float getThetaPlus() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

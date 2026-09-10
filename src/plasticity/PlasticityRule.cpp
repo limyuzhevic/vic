@@ -24,26 +24,36 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
+    // Real Hebbian learning implementation with covariance rule
+    // Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
     
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
-    for (Timestamp pre : preSpikes) {
-        for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
+    // Calculate firing rates from spike history
+    float preRate = static_cast<float>(preSpikes.size()) / 100.0f;
+    float postRate = static_cast<float>(postSpikes.size()) / 100.0f;
+    
+    // Calculate co-activity (correlation) - spikes within 5ms window
+    size_t coactivity = 0;
+    for (Timestamp preTime : preSpikes) {
+        for (Timestamp postTime : postSpikes) {
+            if (std::abs(static_cast<float>(preTime - postTime)) < 5.0f) {
+                ++coactivity;
             }
         }
     }
     
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
+    // Normalized co-activity rate
+    float prePostRate = coactivity / 100.0f;
+    
+    // Covariance rule: Δw = η * (coactivity_rate - pre_rate * post_rate)
+    float delta = pImpl->learningRate * (prePostRate - preRate * postRate);
+    
+    // Apply weight change
+    if (std::abs(delta) > 1e-6f) {
+        applyWeightChange(synapse, delta);
     }
 }
 

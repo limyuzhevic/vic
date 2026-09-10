@@ -6,6 +6,7 @@
  */
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
+#include "experiments/Phase6Config.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
 

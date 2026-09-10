@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <memory>
 
 namespace nlm {
 
@@ -27,7 +28,7 @@ struct Neuron::Impl {
              totalCurrent(0.0f), synapticInput(0.0f) {}
 };
 
-Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+Neuron::Neuron(NeuronId id) : pImpl(std::make_unique<Impl>()) {
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
@@ -37,15 +38,11 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -111,6 +108,10 @@ void Neuron::setResetPotential(MembranePotential potential) {
     pImpl->state.resetPotential = potential;
 }
 
+MembranePotential Neuron::getResetPotential() const {
+    return pImpl->state.resetPotential;
+}
+
 bool Neuron::checkThreshold() const {
     return pImpl->state.membranePotential >= pImpl->state.threshold;
 }
@@ -170,7 +171,15 @@ NeuronState& Neuron::getState() {
     return pImpl->state;
 }
 
+const NeuronState& Neuron::getState() const {
+    return pImpl->state;
+}
+
 PlasticityFlags& Neuron::getPlasticityFlags() {
+    return pImpl->plasticityFlags;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
     return pImpl->plasticityFlags;
 }
 
@@ -184,8 +193,53 @@ void Neuron::setRegionId(RegionId region) {
     pImpl->regionId = region;
 }
 
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
 void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
+}
+
+MembranePotential Neuron::getMembranePotential() const {
+    return pImpl->state.membranePotential;
+}
+
+void Neuron::setMembranePotential(MembranePotential potential) {
+    pImpl->state.membranePotential = potential;
+}
+
+void Neuron::addToMembranePotential(MembranePotential delta) {
+    pImpl->state.membranePotential += delta;
+}
+
+MembranePotential Neuron::getThreshold() const {
+    return pImpl->state.threshold;
+}
+
+void Neuron::setThreshold(MembranePotential threshold) {
+    pImpl->state.threshold = threshold;
+}
+
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active || 
+           pImpl->state.firingState == FiringState::Refractory;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
+}
+
+void Neuron::setFiringRate(FiringRate rate) {
+    pImpl->state.firingRate = rate;
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
@@ -203,7 +257,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     }
     
     // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
+    // dV/dt = (V_rest - V)/tau + I / C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
     
     MembranePotential& V = pImpl->state.membranePotential;

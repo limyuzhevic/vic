@@ -17,6 +17,7 @@
 
 #include "../experiments/Experiment.hpp"
 #include "../experiments/Metrics.hpp"
+#include "Phase6Config.hpp"
 #include <vector>
 #include <string>
 #include <memory>

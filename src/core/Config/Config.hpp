@@ -55,13 +55,15 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (simple key=value format)
+    // Supports: key = value, key=value, key = "value", # comments
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
+    // Supports: --key=value or -key value
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (simple key=value format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
