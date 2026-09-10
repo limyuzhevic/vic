@@ -16,16 +16,27 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // Real storage with capacity limits and competition
+    // Implements winner-take-all competition for working memory slots
+    
+    // Check if neuron already stored
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
             return;
         }
     }
-    if (pImpl->items.size() < pImpl->capacity) {
-        pImpl->items.emplace_back(neuron, value);
+    
+    // Check capacity and evict if necessary
+    if (pImpl->items.size() >= pImpl->capacity) {
+        // Find item with lowest value (weakest memory)
+        auto weakest = std::min_element(pImpl->items.begin(), pImpl->items.end(),
+            [](const auto& a, const auto& b) { return a.second < b.second; });
+        pImpl->items.erase(weakest);
     }
+    
+    // Add new item
+    pImpl->items.emplace_back(neuron, value);
 }
 
 float WorkingMemory::retrieve(NeuronId neuron) const {

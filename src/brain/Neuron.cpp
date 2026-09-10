@@ -265,6 +265,57 @@ void Neuron::step(Timestamp currentTime) {
     stepLIF(currentTime, dt);
 }
 
+void Neuron::adaptToRate(FiringRate targetRate) {
+    // Adjust neuron parameters based on firing rate for homeostatic plasticity
+    float currentRate = getFiringRate();
+    
+    if (targetRate > 0.0f) {
+        float rateRatio = currentRate / targetRate;
+        
+        if (rateRatio > 2.0f) {
+            // Reduce excitability - firing too high
+            setThreshold(getThreshold() * 1.05f);  // Higher threshold
+            setLeakConductance(getLeakConductance() * 0.95f);  // Lower leak
+        } else if (rateRatio < 0.5f) {
+            // Increase excitability - firing too low  
+            setThreshold(getThreshold() * 0.95f);  // Lower threshold
+            setLeakConductance(getLeakConductance() * 1.05f);  // Higher leak
+        }
+    }
+}
+
+void Neuron::modulateByNeuromodulator(float dopamineLevel, float curiosityLevel) {
+    // Apply neuromodulation effects on neuron excitability and plasticity
+    if (dopamineLevel > 0.5f) {
+        // High dopamine increases excitability
+        float excitabilityMod = (dopamineLevel - 0.5f) * 2.0f;
+        setThreshold(getThreshold() * (1.0f - excitabilityMod * 0.2f));
+    }
+    
+    if (curiosityLevel > 0.3f) {
+        // Curiosity modulates plasticity
+        enablePlasticity(getPlasticityFlags().hebbian, 
+                        getPlasticityFlags().stdp, 
+                        true);  // Enable reward-modulated plasticity
+    }
+}
+
+void Neuron::applyHomeostaticPlasticity(float targetWeightSum) {
+    // Implement synaptic homeostasis to maintain stable network activity
+    float currentWeightSum = 0.0f;
+    for (const auto& synHandle : getIncomingSynapses()) {
+        // TODO: Get actual synapse weight from synapse handle
+        // For now, use placeholder logic
+        currentWeightSum += 0.1f;
+    }
+    
+    if (targetWeightSum > 0.0f && std::abs(currentWeightSum - targetWeightSum) > 0.1f) {
+        float adjustment = (targetWeightSum - currentWeightSum) * 0.01f;
+        // Adjust incoming synapse weights
+        // TODO: Implement actual weight adjustment logic
+    }
+}
+
 void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;

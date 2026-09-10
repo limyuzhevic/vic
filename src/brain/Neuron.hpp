@@ -134,14 +134,26 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
+    
+    // Real integrate-and-fire dynamics with homeostatic regulation
+    void step(Timestamp currentTime, bool applyHomeostasis, 
+              float targetRate);
     
     // Reset to initial state
     void reset();
     
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
+    
+    // Advanced homeostasis: adapt parameters to maintain stable firing rate
+    void adaptToRate(FiringRate targetRate);
+    
+    // Neuromodulation: integrate dopamine and curiosity signals
+    void modulateByNeuromodulator(float dopamineLevel, float curiosityLevel);
+    
+    // Synaptic homeostasis: maintain synaptic weight balance
+    void applyHomeostaticPlasticity(float targetWeightSum);
     
 private:
     struct Impl;

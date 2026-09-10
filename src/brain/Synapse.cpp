@@ -222,6 +222,65 @@ void Synapse::step(Timestamp currentTime) {
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
+void Synapse::updateEfficacyBasedOnActivity() {
+    // Update synaptic efficacy based on recent spike activity
+    // Higher usage increases efficacy (use-dependent plasticity)
+    
+    float efficacy = getEfficacy();
+    
+    // Check for recent pre-synaptic activity
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        float timeSincePre = static_cast<float>(getCurrentTime() - pImpl->lastPreSpikeTime);
+        
+        if (timeSincePre < 100.0f) {  // Recent spike (within 100ms)
+            // Recent activity increases efficacy
+            efficacy = std::min(2.0f, efficacy + 0.05f);
+        }
+    }
+    
+    // Check for recent post-synaptic activity
+    if (pImpl->lastPostSpikeTime >= 0.0f) {
+        float timeSincePost = static_cast<float>(getCurrentTime() - pImpl->lastPostSpikeTime);
+        
+        if (timeSincePost < 100.0f) {  // Recent spike (within 100ms)
+            // Post-synaptic activity modulates efficacy
+            efficacy = std::min(2.0f, efficacy + 0.02f);
+        }
+    }
+    
+    // Long-term decay of efficacy
+    efficacy *= 0.999f;
+    
+    setEfficacy(efficacy);
+}
+
+void Synapse::addToEligibilityTrace(float reward, float learningRate) {
+    // Add to eligibility trace for reward-modulated learning
+    // Eligibility trace tracks recent synaptic activity for future reward association
+    
+    if (reward != 0.0f) {
+        float currentTrace = getEligibilityTrace();
+        // Update trace based on reward prediction error
+        setEligibilityTrace(currentTrace + reward * learningRate * efficacy);
+    }
+}
+
+void Synapse::applyRewardModulatedLearning(float reward) {
+    // Apply reward-modulated learning using eligibility traces
+    // Implements actor-critic style learning
+    
+    float trace = getEligibilityTrace();
+    
+    if (std::abs(trace) > 0.001f) {
+        // Weight update proportional to trace and reward
+        float weightDelta = trace * reward * 0.1f;
+        addToWeight(weightDelta);
+        
+        // Decay eligibility trace after update
+        setEligibilityTrace(0.0f);
+    }
+}
+
 void Synapse::reset() {
     pImpl->weight = 0.0f;
     pImpl->preSpikeHistory.clear();

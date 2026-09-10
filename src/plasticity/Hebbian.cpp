@@ -83,6 +83,57 @@ void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     synapse->setWeight(newWeight);
 }
 
+void Hebbian::updateWithRewardModulation(Synapse* synapse, 
+                                         const std::vector<Timestamp>& preSpikes,
+                                         const std::vector<Timestamp>& postSpikes,
+                                         TimestepDuration dt, 
+                                         float reward) {
+    // Reward-modulated Hebbian learning
+    // Combines Hebbian coactivity with reward prediction error
+    
+    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+        return;
+    }
+    
+    // Base Hebbian update
+    update(synapse, preSpikes, postSpikes, dt);
+    
+    if (reward != 0.0f) {
+        // Modulate Hebbian learning by reward signal
+        float trace = synapse->getEligibilityTrace();
+        
+        if (trace > 0.0f) {
+            // Positive reward strengthens synapses that were active
+            float delta = pImpl->learningRate * 0.1f * reward * trace;
+            applyWeightChange(synapse, delta);
+        } else if (trace < 0.0f) {
+            // Negative reward weakens synapses that were active
+            float delta = pImpl->learningRate * 0.05f * reward * trace;  // reward negative
+            applyWeightChange(synapse, delta);
+        }
+    }
+}
+
+void Hebbian::setCovarianceThreshold(float threshold) {
+    pImpl->covarianceThreshold = std::clamp(threshold, 0.0f, 100.0f);
+}
+
+float Hebbian::getCovarianceThreshold() const {
+    return pImpl->covarianceThreshold;
+}
+
+void Hebbian::enableLocalLearning(Synapse* synapse, float localLearningRate) {
+    // Enable local learning rules that don't require global signals
+    // Implements µ-rule type plasticity
+    
+    if (synapse) {
+        // Update local eligibility trace
+        float trace = synapse->getEligibilityTrace();
+        float deltaTrace = localLearningRate * 0.01f;
+        synapse->setEligibilityTrace(trace + deltaTrace);
+    }
+}
+
 const char* Hebbian::getName() const {
     return "Hebbian";
 }
