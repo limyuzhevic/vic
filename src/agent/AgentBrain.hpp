@@ -69,6 +69,9 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Initialize neuromodulation with all integrated systems
+    void initializeNeuromodulation();
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();

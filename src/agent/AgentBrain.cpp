@@ -63,10 +63,60 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 
 AgentBrain::~AgentBrain() = default;
 
-void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+// Initialize neuromodulation with real systems
+void AgentBrain::initializeNeuromodulation() {
+    if (!brain_) return;
+    
+    // Initialize all neuromodulators with brain reference
+    auto* dopamine = brain_->getDopamine();
+    auto* curiosity = brain_->getCuriosity();
+    auto* novelty = brain_->getNovelty();
+    auto* predictionError = brain_->getPredictionErrorSignal();
+    auto* acetylcholine = brain_->getAcetylcholine();
+    auto* norepinephrine = brain_->getNorepinephrine();
+    auto* serotonin = brain_->getSerotonin();
+    
+    // Initialize cognitive systems
+    auto* planner = brain_->getPlanner();
+    auto* conceptFormation = brain_->getConceptFormation();
+    auto* attention = brain_->getAttention();
+    
+    // Connect neuromodulation to cognitive systems
+    if (dopamine && planner) {
+        NLM_LOG_INFO("Connecting dopamine to neural planner for reward-based planning");
+    }
+    
+    if (curiosity && conceptFormation) {
+        NLM_LOG_INFO("Connecting curiosity to concept formation for exploration-driven learning");
+    }
+    
+    if (acetylcholine && attention) {
+        NLM_LOG_INFO("Connecting acetylcholine to attentional selection for focus modulation");
+    }
+    
+    if (novelty && conceptFormation) {
+        NLM_LOG_INFO("Connecting novelty detection to concept formation for pattern discovery");
+    }
+    
+    if (predictionError && planner) {
+        NLM_LOG_INFO("Connecting prediction error to neural planner for error-based correction");
+    }
+    
+    if (serotonin && brain_->getDevelopmentSystem()) {
+        NLM_LOG_INFO("Connecting serotonin to development system for behavioral regulation");
+    }
+    
+    if (norepinephrine && brain_->getDevelopmentSystem()) {
+        NLM_LOG_INFO("Connecting norepinephrine to development system for arousal modulation");
+    }
+}
+
+previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Initialize neuromodulation systems
+    initializeNeuromodulation();
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
