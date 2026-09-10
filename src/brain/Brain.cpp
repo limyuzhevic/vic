@@ -511,8 +511,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // The prediction system is updated with current sensory state
+        // Get current sensory state from sensory neurons
+        std::vector<float> currentSensoryState;
+        size_t numSensory = pImpl->sensoryNeurons.size();
+        currentSensoryState.reserve(numSensory);
+        
+        for (size_t i = 0; i < numSensory; ++i) {
+            // Get membrane potential as proxy for sensory state
+            if (auto* neuron = pImpl->sensoryNeurons[i]) {
+                float potential = neuron->getState().membranePotential;
+                // Normalize to [-1, 1] range
+                float normalized = (potential - neuron->getState().restingPotential) / 20.0f;
+                currentSensoryState.push_back(normalized);
+            }
+        }
+        
+        if (!currentSensoryState.empty()) {
+            // Make prediction for next state
+            auto predicted = pImpl->predictionSystem->predictNextState(currentSensoryState);
+            
+            // If prediction system provided predictions, update it
+            if (predicted) {
+                // Convert predicted to sensory state vector for comparison
+                std::vector<float> predictedSensoryState;
+                predictedSensoryState.reserve(predicted->getData().size());
+                
+                for (float val : predicted->getData()) {
+                    // Normalize prediction
+                    float normalized = std::min(1.0f, std::max(-1.0f, val * 0.1f));
+                    predictedSensoryState.push_back(normalized);
+                }
+                
+                // Update predictions based on actual observation
+                pImpl->predictionSystem->updatePredictions(*predicted, currentSensoryState);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,11 +562,102 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity pattern to form concepts
+        // Get active neural population activity patterns
+        std::vector<float> currentPattern;
+        currentPattern.reserve(100);
+        
+        // Sample from active neurons in the brain
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                // Get average activation of this population
+                float avgActivation = 0.0f;
+                size_t neuronCount = 0;
+                
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->getState().membranePotential > neuron->getState().restingPotential) {
+                        avgActivation += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        ++neuronCount;
+                    }
+                }
+                
+                if (neuronCount > 0) {
+                    avgActivation /= neuronCount;
+                    currentPattern.push_back(avgActivation);
+                }
+            }
+        }
+        
+        if (!currentPattern.empty()) {
+            // Present pattern to concept formation system
+            pImpl->conceptFormation->presentExperience(currentPattern, currentPattern, 0.0f, currentStep);
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Apply planner to produce action ==========
+    if (pImpl->planner) {
+        // Use neural planner to select appropriate action
+        // Get current neural state as planning context
+        std::vector<float> currentState;
+        
+        // Extract current state from neural activity
+        // This is a simplified approach - more sophisticated state extraction would
+        // be done through the brain's internal representation
+        float totalFiring = pImpl->totalSpikesThisStep;
+        float avgFiringRate = getAverageFiringRate();
+        
+        // Create simple state vector for planner
+        currentState.push_back(totalFiring);
+        currentState.push_back(avgFiringRate);
+        
+        // Get reward prediction error from neuromodulation
+        float rewardPrediction = 0.5f;  // Default target
+        if (pImpl->dopamine) {
+            rewardPrediction = pImpl->dopamine->getLevel() * 2.0f - 0.5f;  // Scale to reasonable range
+        }
+        
+        // Plan action based on current state and reward
+        ActionType plannedAction = pImpl->planner->planAction(currentState, rewardPrediction);
+        
+        // Execute planned action
+        if (plannedAction != ActionType::Wait) {
+            // Apply the planned action to motor neurons
+            float actionIntensity = 1.0f;
+            
+            // Find motor neuron population
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    if (pop->getNeuronType() == NeuronType::Motor) {
+                        // Inject current to motor neurons based on planned action
+                        for (auto* neuron : pop->getNeurons()) {
+                            neuron->injectCurrent(actionIntensity * 2.0f);
+                        }
+                        
+                        // Record action in memory for learning
+                        if (pImpl->episodicMemory) {
+                            EpisodicMemoryItem actionEpisode;
+                            actionEpisode.timestamp = currentStep;
+                            actionEpisode.action = plannedAction;
+                            actionEpisode.reward = rewardPrediction;
+                            actionEpisode.activeNeurons = std::vector<NeuronId>();
+                            
+                            // Store the action in episodic memory
+                            pImpl->episodicMemory->storeEpisode(actionEpisode);
+                        }
+                        
+                        // Update planner with outcome
+                        if (pImpl->dopamine) {
+                            pImpl->dopamine->signalReward(rewardPrediction);
+                        }
+                        
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 12: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
@@ -1011,6 +1136,10 @@ NeuralWorkingMemory* Brain::getWorkingMemory() {
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
+}
+
+NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    return pImpl->associativeMemory.get();
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
