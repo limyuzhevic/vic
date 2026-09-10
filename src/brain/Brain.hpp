@@ -1,13 +1,4 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
+#include "../memory/Memory.hpp"
 
 namespace nlm {
 
@@ -21,9 +12,8 @@ class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
+class SemanticMemory;
+class ProceduralMemory;
 class Dopamine;
 class Curiosity;
 class Novelty;
@@ -137,8 +127,8 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
-    
+// ========== MEMORY SYSTEMS ==========
+
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
     
@@ -148,6 +138,12 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
+    // Semantic memory - gradually acquired knowledge
+    SemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - learned skills and habits
+    ProceduralMemory* getProceduralMemory();
+
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation

@@ -4,13 +4,14 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction, motor decoding, and COGNITIVE INTEGRATION
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);

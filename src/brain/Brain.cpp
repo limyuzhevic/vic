@@ -1,24 +1,5 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include "../memory/SemanticMemory.hpp"
+#include "../memory/ProceduralMemory.hpp"
 
 namespace nlm {
 
@@ -32,6 +13,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -100,18 +83,20 @@ struct Brain::Impl {
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
+        // Initialize semantic memory
+        semanticMemory = std::make_unique<SemanticMemory>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+        // Initialize procedural memory
+        proceduralMemory = std::make_unique<ProceduralMemory>();
         
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        // Initialize associative memory (NeuralAssociativeMemory not SemanticMemory)
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        
+        // Initialize episodic memory
+        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        
+        // Initialize working memory
+        workingMemory = std::make_unique<NeuralWorkingMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -130,13 +115,7 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
+                // Configure structural plasticity
         float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
         float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
@@ -401,9 +380,65 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
+    // ========== STEP 4.5: MEMORY INTEGRATION ==========
+    // Connect working memory to attention and episodic memory
+    // Store current experience in working memory BEFORE attention selection
+    if (pImpl->workingMemory && pImpl->episodicMemory) {
+        // Store current neural state as working memory pattern
+        std::vector<float> currentPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    float activation = std::abs(state.membranePotential - state.restingPotential);
+                    currentPattern.push_back(activation);
+                }
+            }
+        }
+        
+        if (!currentPattern.empty()) {
+            pImpl->workingMemory->store(currentPattern, 1.0f);
+        }
+        
+        // Store current experience as episode if new
+        if (pImpl->stepsSinceLastEpisode >= 5) {  // More frequent episodes for better learning
+            pImpl->stepsSinceLastEpisode = 0;
+            
+            EpisodicMemoryItem episode;
+            episode.timestamp = currentStep;
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Capture current brain state
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        if (neuron->isFiring() || 
+                            std::abs(state.membranePotential - state.restingPotential) > 5.0f) {
+                            episode.activeNeurons.push_back(neuron->getId());
+                            episode.neuronActivations.push_back(
+                                std::abs(state.membranePotential - state.restingPotential) / 20.0f);
+                        }
+                    }
+                }
+            }
+            
+            pImpl->episodicMemory->storeEpisode(episode);
+        }
+    }
+    
+    // Update prediction system with current state
+    if (pImpl->predictionSystem) {
+        // Generate prediction from current state
+        float predictedReward = 0.0f;
+        if (pImpl->dopamine) {
+            predictedReward = pImpl->dopamine->getLevel();
+        }
+        
+        // Store prediction error for learning
+        if (pImpl->predictionError) {
+            pImpl->predictionError->update(predictedReward, 0.0f);  // Simplified for now
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -882,6 +917,7 @@ bool Brain::load(const std::string& filepath) {
                         if (idx < neuronData.refractoryRemaining.size()) {
                             neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
                         }
+                        neuron->setLastSpikeTime(idx < neuronData.lastSpikeTime.size() ? neuronData.lastSpikeTime[idx] : 0.0f);
                     }
                     idx++;
                 }
@@ -895,8 +931,56 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
+        // Apply synapse states - map by source/destination neuron IDs
+        // This is complex because we need to find matching synapses in the brain
+        for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+            NeuronId sourceNeuron(synapseData.sourceNeuron[i]);
+            NeuronId destNeuron(synapseData.destinationNeuron[i]);
+            
+            // Find the synapse in the brain
+            bool synapseFound = false;
+            for (auto& region : pImpl->regions) {
+                // Find source and destination neurons in all populations
+                Neuron* source = nullptr;
+                Neuron* dest = nullptr;
+                
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (!source && neuron->getId() == sourceNeuron) source = neuron;
+                        if (!dest && neuron->getId() == destNeuron) dest = neuron;
+                        if (source && dest) break;
+                    }
+                    if (source && dest) break;
+                }
+                
+                if (source && dest) {
+                    // Check if this synapse exists in the brain's connectivity
+                    auto outgoingSynapses = region->getSynapsesFrom(sourceNeuron);
+                    for (auto* syn : outgoingSynapses) {
+                        if (syn->getDestinationNeuron() == destNeuron) {
+                            // Update synapse state
+                            syn->setWeight(synapseData.weight[i]);
+                            syn->setDelay(static_cast<Delay>(synapseData.delay[i]));
+                            syn->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                            syn->enablePlasticity(
+                                synapseData.plasticityFlags[i] & 1,  // STDP
+                                synapseData.plasticityFlags[i] & 2,  // Hebbian
+                                synapseData.plasticityFlags[i] & 4   // Structural
+                            );
+                            synapseFound = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (!synapseFound) {
+                NLM_LOG_WARNING("Could not find synapse from " + 
+                    std::to_string(synapseData.sourceNeuron[i]) + " to " + 
+                    std::to_string(synapseData.destinationNeuron[i]));
+            }
+        }
+        
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         
         NLM_LOG_INFO("Brain state loaded successfully");
@@ -1013,11 +1097,13 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
 }
 
-NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
+SemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
+ProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
+}
 
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();

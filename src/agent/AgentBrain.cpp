@@ -18,7 +18,16 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , workingMemoryEnabled_(true)
+    , episodicMemoryEnabled_(true)
+    , predictionEnabled_(true)
+    , cognitionEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , currentPrediction_(0.0f)
+    , planningStep_(0)
+    , selfPositionX_(0.0f)
+    , selfPositionY_(0.0f)
+    , selfOrientation_(0.0f)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -59,6 +68,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
             }
         }
     }
+    
+    // Initialize cognitive state
+    currentSensoryPattern_.resize(256, 0.0f);
+    memoryPattern_.resize(256, 0.0f);
+    observedBehaviors_.reserve(100);
 }
 
 AgentBrain::~AgentBrain() = default;
