@@ -28,6 +28,8 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class MovementSystem;
+class MotorSystem;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -88,6 +90,16 @@ public:
     STDP* getSTDP();
     Hebbian* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
+    
+    // Neuromodulation system access
+    Dopamine* getDopamine();
+    Curiosity* getCuriosity();
+    Novelty* getNovelty();
+    PredictionError* getPredictionErrorSignal();
+    
+    // Movement system access
+    MovementSystem* getMovementSystem();
+    MotorSystem* getMotorSystem();
     
     // Statistics
     float getExcitationInhibitionRatio() const;

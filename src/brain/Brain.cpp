@@ -22,9 +22,6 @@
 
 namespace nlm {
 
-struct Brain::Impl {
-    std::shared_ptr<Config> config;
-    std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
@@ -77,7 +74,7 @@ struct Brain::Impl {
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
-    
+
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -152,9 +149,6 @@ struct Brain::Impl {
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
     }
-    
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
 };
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
@@ -189,6 +183,9 @@ bool Brain::initialize() {
     for (size_t i = 0; i < regionCount; ++i) {
         addRegion("Region_" + std::to_string(i + 1));
     }
+    
+    // Initialize all integrated systems
+    initializeAllSystems();
     
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
@@ -906,7 +903,8 @@ bool Brain::load(const std::string& filepath) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
         return false;
     }
-}
+    
+    return true;  // Should never reach here due to early returns, but ensures completeness
 
 RegionId Brain::addRegion(const std::string& name) {
     RegionId id(pImpl->nextRegionId++);
