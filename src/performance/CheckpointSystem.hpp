@@ -1,29 +1,3 @@
-#pragma once
-
-/**
- * CheckpointSystem - Brain state serialization and checkpointing
- * 
- * Provides robust checkpointing for large-scale neural simulations.
- * Supports incremental saves, version compatibility, and validation.
- * 
- * Features:
- * - Complete brain state serialization
- * - Incremental checkpointing
- * - Version compatibility checks
- * - Integrity validation
- * - Streaming for large checkpoints
- * 
- * Stored state:
- * - Neuron states (membrane potential, firing state, etc.)
- * - Synapse states (weights, plasticity, etc.)
- * - Spike history (recent)
- * - Plasticity state (eligibility traces, etc.)
- * - Developmental state
- * - Random generator state
- * - Simulation clock
- * - Environment state (optional)
- */
-
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -275,7 +249,7 @@ public:
      * Set checkpoint metadata
      */
     void setMetadata(uint64_t neuronCount, uint64_t synapseCount, 
-                   uint64_t regionCount, uint64_t step, double simTime);
+                    uint64_t regionCount, uint64_t step, double simTime);
     
     /**
      * Write checkpoint data
@@ -394,7 +368,7 @@ public:
      * Check if checkpoint should be saved
      */
     bool shouldSave(uint64_t currentStep) const;
-    
+
 private:
     std::string checkpointDir_;
     uint64_t saveIntervalSteps_;
