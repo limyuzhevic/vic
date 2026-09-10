@@ -420,6 +420,226 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // High-level convenience functions for Python users
+    
+    m.def("create_connected_brain", [](int neuronCount, float connectionProb, 
+                                      float learningRate, float weightInitMean) {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", neuronCount, ConfigSource::Default);
+        config->set("brain.connection_probability", connectionProb, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", learningRate, ConfigSource::Default);
+        config->set("brain.initial_weight_mean", weightInitMean, ConfigSource::Default);
+        config->set("brain.initial_weight_std", 0.1f, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("neuronCount") = 1000,
+       py::arg("connectionProb") = 0.1,
+       py::arg("learningRate") = 0.001,
+       py::arg("weightInitMean") = 0.5,
+       "Create a pre-configured brain with optimized connectivity");
+
+    m.def("run_learning_episode", [](std::shared_ptr<Brain> brain,
+                                    std::shared_ptr<SimpleWorld> world,
+                                    std::shared_ptr<AgentBrain> agent,
+                                    int numSteps, bool enableLearning) {
+        if (enableLearning) {
+            agent->enableRewardModulation(true);
+            agent->enableStructuralPlasticity(true);
+            agent->enableDevelopment(true);
+            agent->enableCuriosity(true);
+        }
+        
+        double totalReward = 0.0;
+        int stepsCompleted = 0;
+        
+        for (int step = 0; step < numSteps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory percept
+            auto percept = world->getSensoryPercept();
+            
+            // Process input
+            agent->processSensoryInput(percept);
+            
+            // Run brain
+            brain->step(step);
+            
+            // Get action
+            auto action = agent->decodeMotorCommand();
+            
+            // Apply to world
+            auto result = world->applyMotorCommand(action, world->getSimulationTime());
+            totalReward += result.reward;
+            
+            // Apply reward modulation
+            agent->applyRewardModulation(result.reward, 0.0f);
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+            
+            stepsCompleted++;
+        }
+        
+        return std::make_tuple(totalReward, stepsCompleted);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+       py::arg("numSteps") = 1000,
+       py::arg("enableLearning") = true,
+       "Run a complete learning episode with brain, world, and agent");
+
+    m.def("visualize_brain", [](std::shared_ptr<Brain> brain, 
+                               const std::string& outputFile,
+                               bool includeConnections) {
+        // For now, just create a simple visualization report
+        std::string report = "Brain Visualization Report:\n";
+        report += "======================\n\n";
+        report += "Statistics:\n";
+        report += "  - Total neurons: " + std::to_string(brain->getTotalNeuronCount()) + "\n";
+        report += "  - Total synapses: " + std::to_string(brain->getTotalSynapseCount()) + "\n";
+        report += "  - Firing neurons: " + std::to_string(brain->getFiringNeuronCount()) + "\n";
+        report += "  - Average firing rate: " + std::to_string(brain->getAverageFiringRate()) + " Hz\n";
+        report += "  - Development stage: " + std::to_string(static_cast<int>(brain->getDevelopmentalStage())) + "\n";
+        
+        if (includeConnections) {
+            report += "\nConnectivity:\n";
+            report += "  - Excitatory/Inhibitory ratio: " + 
+                     std::to_string(brain->getExcitationInhibitionRatio()) + "\n";
+        }
+        
+        report += "\nVisualization saved to: " + outputFile + "\n";
+        
+        // In a real implementation, this would generate an image
+        std::ofstream outFile(outputFile);
+        if (outFile.is_open()) {
+            outFile << report;
+            outFile.close();
+        }
+        
+        return report;
+    }, py::arg("brain"), py::arg("outputFile") = "brain_viz.txt",
+       py::arg("includeConnections") = false,
+       "Generate a brain connectivity visualization");
+
+    m.def("create_experiment_brain", []() {
+        // Create a brain optimized for experiments with all systems enabled
+        auto config = std::make_shared<Config>();
+        
+        // Configure for experimental use
+        config->set("brain.neuron_count", 2000, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.15f, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("development.enable", true, ConfigSource::Default);
+        config->set("memory.working_memory.enable", true, ConfigSource::Default);
+        config->set("memory.episodic_memory.enable", true, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Create agent interface
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        return std::make_tuple(brain, agent);
+    }, "Create a brain and agent pre-configured for experiments");
+
+    m.def("create_simple_simulation", [](int numSteps) {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 500, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        std::vector<float> firingRates;
+        
+        for (int step = 0; step < numSteps; ++step) {
+            brain->step(step);
+            firingRates.push_back(brain->getFiringNeuronCount());
+        }
+        
+        return std::make_tuple(brain, firingRates);
+    }, py::arg("numSteps") = 100,
+       "Create a simple brain and run a simulation, returning firing rates");
+
+    m.def("get_example_configurations", []() {
+        std::vector<std::string> examples;
+        
+        examples.push_back(R"(
+## Simple Configuration
+brain.neuron_count = 1000
+brain.synapse_density = 0.1
+brain.v_thresh = -50.0
+brain.v_rest = -70.0
+brain.tau_mem = 20.0
+brain.tau_ref = 2.0
+        )"");
+        
+        examples.push_back(R"(
+## Learning Configuration  
+brain.neuron_count = 2000
+brain.synapse_density = 0.2
+plasticity.stdp.enable = true
+plasticity.hebbian.enable = true
+plasticity.stdp.learning_rate = 0.01
+neuromod.dopamine.scale = 1.5
+neuromod.curiosity.enable = true
+        )""");
+        
+        examples.push_back(R"(
+## Development Configuration
+brain.neuron_count = 1500
+brain.synapse_density = 0.15
+development.synaptogenesis_rate = 0.002
+development.pruning_rate = 0.0001
+development.enable = true
+plasticity.structural.enable = true
+        )""");
+        
+        return examples;
+    }, "Get example configuration presets for different use cases");
+
+    m.def("validate_configuration", [](const Config& config) {
+        // Basic validation checks
+        std::vector<std::string> errors;
+        
+        // Check for required keys
+        if (!config.has("brain.neuron_count")) {
+            errors.push_back("Missing 'brain.neuron_count'");
+        }
+        
+        if (!config.has("brain.synapse_density")) {
+            errors.push_back("Missing 'brain.synapse_density'");
+        }
+        
+        // Validate values
+        if (config.has("brain.neuron_count")) {
+            auto count = config.get<int64_t>("brain.neuron_count");
+            if (count && (*count <= 0 || *count > 100000)) {
+                errors.push_back("'brain.neuron_count' must be between 1 and 100000");
+            }
+        }
+        
+        if (config.has("brain.synapse_density")) {
+            auto density = config.get<double>("brain.synapse_density");
+            if (density && (*density < 0.0 || *density > 1.0)) {
+                errors.push_back("'brain.synapse_density' must be between 0.0 and 1.0");
+            }
+        }
+        
+        return errors;
+    }, py::arg("config"),
+       "Validate a configuration and return any errors found");
+
+    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
+    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
+    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
 
 } // namespace nlm

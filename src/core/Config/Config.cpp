@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <filesystem>
 
+using json = nlohmann::json;
+
 namespace nlm {
 
 struct Config::Impl {
@@ -170,26 +172,26 @@ void Config::clear() {
 
 std::string Config::summary() const {
     std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "Configuration (" << pImpl->entries.size() << " entries):\\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
+                oss << "\\\"" << arg << "\\\"";
             } else {
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << "] (" << static_cast<int>(entry.source) << ")\\n";
     }
     return oss.str();
 }
 
 std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
+    size_t start = str.find_first_not_of(" \\t\\r\\n");
     if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
+    size_t end = str.find_last_not_of(" \\t\\r\\n");
     return str.substr(start, end - start + 1);
 }
 
