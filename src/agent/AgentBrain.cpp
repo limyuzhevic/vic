@@ -91,8 +91,27 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            // Apply multi-scale feature detection for richer sensory processing
+            float processedInput = vision[i];
+            
+            // Multi-scale feature extraction
+            if (i > 0 && i < sensoryVision_.size() - 1) {
+                // Edge detection enhancement
+                float leftNeighbor = (i > 0) ? vision[i-1] : 0.0f;
+                float rightNeighbor = (i < vision.size() - 1) ? vision[i+1] : 0.0f;
+                float edgeResponse = std::abs(leftNeighbor - vision[i]) + std::abs(rightNeighbor - vision[i]);
+                processedInput += edgeResponse * 0.1f;
+            }
+            
+            // Contrast normalization
+            float maxVision = *std::max_element(vision.begin(), vision.end());
+            float minVision = *std::min_element(vision.begin(), vision.end());
+            if (maxVision - minVision > 0.1f) {
+                processedInput = (processedInput - minVision) / (maxVision - minVision) * 2.0f - 0.5f;
+            }
+            
+            // Inject current proportional to processed vision intensity
+            float current = processedInput * 6.0f;  // Enhanced scaling
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -101,7 +120,16 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            // Multi-dimensional touch processing
+            float processedTouch = touch[i];
+            
+            // Normalize touch pressure (0-1 range)
+            processedTouch = std::clamp(processedTouch, 0.0f, 1.0f);
+            
+            // Apply non-linear response (Weber-Fechner law)
+            processedTouch = std::log(processedTouch * 10.0f + 1.0f) / std::log(11.0f);
+            
+            float current = processedTouch * 10.0f;  // Enhanced scaling
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -110,8 +138,19 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+            // Complex internal signal processing
+            float processedInternal = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            
+            // Apply non-linear transformation based on homeostatic regulation
+            float homeostaticFactor = 1.0f + (std::sin(intern[i] * 10.0f) * 0.2f);
+            processedInternal *= homeostaticFactor;
+            
+            // Temporal filtering for smooth state changes
+            static float previousInternal = 0.0f;
+            float filteredInternal = processedInternal * 0.7f + previousInternal * 0.3f;
+            previousInternal = filteredInternal;
+            
+            sensoryInternal_[i]->injectCurrent(filteredInternal);
         }
     }
     
@@ -119,8 +158,23 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+            // Advanced proprioceptive processing
+            float processedProprio = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            
+            // Velocity and acceleration integration
+            static float previousProprio = 0.0f;
+            float velocity = processedProprio - previousProprio;
+            float acceleration = velocity - (previousProprio - processedProprio);
+            previousProprio = processedProprio;
+            
+            // Combine position, velocity, and acceleration
+            float enrichedProprio = processedProprio + velocity * 0.1f + acceleration * 0.01f;
+            
+            // Smoothing filter
+            static float filteredProprio = 0.0f;
+            filteredProprio = enrichedProprio * 0.8f + filteredProprio * 0.2f;
+            
+            sensoryProprioception_[i]->injectCurrent(filteredProprio);
         }
     }
     
@@ -129,11 +183,23 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         float totalDiff = 0.0f;
         for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
             float diff = std::abs(vision[i] - previousVision_[i]);
+            
+            // Emphasize differences in high-contrast areas
+            float avgNeighbor = 0.0f;
+            size_t count = 0;
+            if (i > 0) { avgNeighbor += vision[i-1]; count++; }
+            if (i < vision.size() - 1) { avgNeighbor += vision[i+1]; count++; }
+            if (count > 0) avgNeighbor /= count;
+            
+            float contrast = std::abs(vision[i] - avgNeighbor);
+            diff *= (1.0f + contrast);  // Emphasize contrast changes
+            
             totalDiff += diff;
         }
         
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        // Enhanced novelty computation with temporal filtering
+        float temporalSmoothing = 0.9f;
+        noveltyLevel_ = noveltyLevel_ * temporalSmoothing + totalDiff / std::max<size_t>(vision.size(), 1) * (1.0f - temporalSmoothing);
         
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
@@ -142,14 +208,303 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity with more sophisticated computation
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        // Multi-factor curiosity computation
+        float noveltyContribution = noveltyLevel_ * 2.0f;
+        
+        // Prediction error contribution (enhanced)
+        float predictionErrorContribution = std::abs(predictionError_) * 0.8f;
+        
+        // Intrinsic motivation factor (exploration vs exploitation)
+        float intrinsicFactor = 1.0f - std::clamp(dopamineLevel_, -1.0f, 1.0f);
+        
+        // Adaptive curiosity scaling based on recent rewards
+        float recentRewardFactor = std::min(2.0f, std::max(0.1f, 1.0f + totalReward * 0.1f));
+        
+        // Combined curiosity with adaptive weighting
+        curiosityLevel_ = (noveltyContribution * 0.5f + 
+                          predictionErrorContribution * 0.3f + 
+                          intrinsicFactor * 0.1f + 
+                          recentRewardFactor * 0.1f);
+        
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
 
-MotorCommand AgentBrain::decodeMotorCommand() {
+// Advanced Learning Methods
+void AgentBrain::enableAdvancedLearning(bool enable) {
+    advancedLearningEnabled_ = enable;
+    
+    if (enable && brain_) {
+        // Initialize advanced learning components
+        initializeMetaLearning();
+        initializeSkillSystem();
+        initializeSocialLearning();
+        initializeHierarchicalLearning();
+    }
+}
+
+void AgentBrain::initializeMetaLearning() {
+    metaLearningState_.learningRate = 0.01f;
+    metaLearningState_.adaptationRate = 0.005f;
+    metaLearningState_.explorationRate = 0.1f;
+    metaLearningState_.exploitationRate = 0.9f;
+    metaLearningState_.taskUncertainty = 1.0f;
+    metaLearningState_.metaGradient = 0.0f;
+}
+
+void AgentBrain::initializeSkillSystem() {
+    skillSystem_.maxSkills = 20;
+    skillSystem_.skillAcquisitionRate = 0.001f;
+    skillSystem_.skillTransferRate = 0.3f;
+    skillSystem_.skillDecayRate = 0.0005f;
+    skillSystem_.currentSkillLevel = 0.0f;
+}
+
+void AgentBrain::initializeSocialLearning() {
+    socialLearningState_.socialObservationEnabled = true;
+    socialLearningState_.imitationStrength = 0.3f;
+    socialLearningState_.teachableMomentThreshold = 0.7f;
+    socialLearningState_.observerNeuronsActive = 0;
+    socialLearningState_.modelTeacherNeuronsActive = 0;
+}
+
+void AgentBrain::initializeHierarchicalLearning() {
+    hierarchicalState_.levels = 3;
+    hierarchicalState_.topDownControl = 1.0f;
+    hierarchicalState_.bottomUpSignals = 0.0f;
+    hierarchicalState_.subgoalProgress = 0.0f;
+}
+
+void AgentBrain::updateAdvancedLearning(double timestep) {
+    if (!advancedLearningEnabled_ || !brain_) return;
+    
+    // Update meta-learning
+    updateMetaLearningState(timestep);
+    
+    // Update skill acquisition
+    updateSkillSystem(timestep);
+    
+    // Update social learning
+    updateSocialLearning(timestep);
+    
+    // Update hierarchical control
+    updateHierarchicalLearning(timestep);
+}
+
+void AgentBrain::updateMetaLearningState(double timestep) {
+    // Adaptive learning rate based on performance
+    float performance = calculatePerformance();
+    float targetLearningRate = 0.1f / std::max(1.0f, performance);
+    
+    // Smooth update
+    metaLearningState_.learningRate += 
+        (targetLearningRate - metaLearningState_.learningRate) * 0.1f;
+    
+    // Meta-gradient descent for learning rate adaptation
+    float errorSignal = 1.0f - performance;
+    metaLearningState_.metaGradient = errorSignal * metaLearningState_.learningRate;
+    
+    // Update exploration-exploitation balance based on uncertainty
+    metaLearningState_.taskUncertainty = 1.0f - performance;
+    metaLearningState_.explorationRate = std::min(0.3f, metaLearningState_.taskUncertainty * 0.3f);
+    metaLearningState_.exploitationRate = 1.0f - metaLearningState_.explorationRate;
+    
+    // Apply meta-gradient to learning
+    float effectiveLearning = metaLearningState_.learningRate + 
+                              metaLearningState_.metaGradient * 0.01f;
+    
+    // Apply meta-learning to plasticity systems
+    auto* stdp = brain_->getSTDP();
+    auto* hebbian = brain_->getHebbian();
+    if (stdp && hebbian) {
+        float plasticityModulation = 1.0f + effectiveLearning * 2.0f;
+        stdp->setLTPWeight(0.01f * plasticityModulation);
+        stdp->setLTDWeight(0.012f * plasticityModulation);
+        hebbian->setLearningRate(0.01f * plasticityModulation);
+    }
+}
+
+void AgentBrain::updateSkillSystem(double timestep) {
+    // Update current skill level based on performance
+    skillSystem_.currentSkillLevel += skillSystem_.skillAcquisitionRate * performance * timestep;
+    skillSystem_.currentSkillLevel = std::min(1.0f, skillSystem_.currentSkillLevel);
+    
+    // Skill decay over time if not used
+    skillSystem_.currentSkillLevel *= (1.0f - skillSystem_.skillDecayRate * timestep);
+    
+    // Skill transfer between related tasks
+    if (dopamineLevel_ > 0.5f) {
+        // High dopamine facilitates skill transfer
+        skillSystem_.skillTransfer *= (1.0f + skillSystem_.skillTransferRate * timestep);
+    }
+    
+    // Check for new skill opportunities
+    if (curiosityLevel_ > 0.8f && performance < 0.5f) {
+        // High curiosity and low performance may indicate need for new skills
+        skillSystem_.skillAcquisitionRate *= 1.5f;
+    }
+}
+
+void AgentBrain::updateSocialLearning(double timestep) {
+    // Update social learning state based on observed behaviors
+    if (socialLearningState_.socialObservationEnabled) {
+        // Count active teacher and observer neurons
+        size_t teacherNeurons = 0;
+        size_t observerNeurons = 0;
+        
+        for (const auto& neuron : brain_->getRegions()[0]->getAllNeurons()) {
+            // Simplified check - in real implementation would use actual neuron types
+            if (neuron->getState().membranePotential > 0.0f) {
+                if (teacherNeurons < 10) teacherNeurons++;
+                if (observerNeurons < 5) observerNeurons++;
+            }
+        }
+        
+        socialLearningState_.modelTeacherNeuronsActive = teacherNeurons;
+        socialLearningState_.observerNeuronsActive = observerNeurons;
+        
+        // Social learning activation based on teacher availability
+        if (teacherNeurons > 0) {
+            float socialLearningActivation = 
+                socialLearningState_.imitationStrength * 
+                (static_cast<float>(observerNeurons) / std::max(1, teacherNeurons));
+            
+            // Apply social learning to policy
+            applySocialPolicy(socialLearningActivation, timestep);
+        }
+    }
+}
+
+void AgentBrain::updateHierarchicalLearning(double timestep) {
+    // Update hierarchical control with error signals
+    float predictionError = std::abs(predictionError_);
+    
+    // Bottom-up signals from prediction error
+    hierarchicalState_.bottomUpSignals = predictionError * 0.5f;
+    
+    // Top-down control for goal achievement
+    hierarchicalState_.topDownControl = std::clamp(
+        hierarchicalState_.topDownControl + (1.0f - hierarchicalState_.subgoalProgress) * 0.1f,
+        0.0f, 1.0f
+    );
+    
+    // Update subgoal progress
+    if (dopamineLevel_ > 0.0f) {
+        hierarchicalState_.subgoalProgress += dopamineLevel_ * 0.05f * timestep;
+        hierarchicalState_.subgoalProgress = std::min(1.0f, hierarchicalState_.subgoalProgress);
+    }
+    
+    // Hierarchical policy selection
+    int selectedLevel = selectHierarchicalLevel();
+    applyHierarchicalPolicy(selectedLevel, timestep);
+}
+
+void AgentBrain::applySocialPolicy(float socialStrength, double timestep) {
+    // Apply social learning to motor command selection
+    if (socialStrength > 0.1f && curiosityLevel_ > 0.3f) {
+        // Consider social models in action selection
+        float socialBias = socialStrength * curiosityLevel_;
+        
+        // Modify motor command probabilities based on social observation
+        // In real implementation, would influence neural populations
+        socialPolicyInfluence_ = socialBias;
+    }
+}
+
+void AgentBrain::applyHierarchicalPolicy(int level, double timestep) {
+    // Apply hierarchical control to action selection
+    float hierarchicalBias = hierarchicalState_.topDownControl * (level + 1) / hierarchicalState_.levels;
+    
+    // Modify action selection based on level
+    if (level == 0) {
+        // Low-level: motor execution
+        // Apply precise motor control
+        motorPrecision_ = hierarchicalBias * 2.0f;
+    } else if (level == 1) {
+        // Mid-level: action selection
+        // Apply goal-directed selection
+        goalDirectedness_ = hierarchicalBias * 2.0f;
+    } else if (level == 2) {
+        // High-level: strategic planning
+        // Apply long-term planning
+        planningHorizon_ = hierarchicalBias * 10.0f;  // Time steps
+    }
+}
+
+int AgentBrain::selectHierarchicalLevel() {
+    // Select which hierarchical level to emphasize based on task demands
+    float errorSignal = std::abs(predictionError_);
+    
+    if (errorSignal > 0.8f) {
+        // High error - need more flexible, exploratory behavior
+        return 2;  // High-level planning
+    } else if (errorSignal > 0.3f) {
+        // Moderate error - balanced approach
+        return 1;  // Mid-level action selection
+    } else {
+        // Low error - rely on learned policies
+        return 0;  // Low-level execution
+    }
+}
+
+float AgentBrain::calculatePerformance() const {
+    // Calculate overall performance based on multiple metrics
+    float rewardPerformance = std::clamp(expectedReward_, 0.0f, 1.0f);
+    float noveltyPerformance = noveltyLevel_;  // Novelty indicates exploration
+    float efficiencyPerformance = 1.0f - (predictionError_ * predictionError_);  // Lower error = better
+    
+    // Weighted combination
+    float performance = rewardPerformance * 0.5f + 
+                       noveltyPerformance * 0.2f + 
+                       efficiencyPerformance * 0.3f;
+    
+    return performance;
+}
+
+void AgentBrain::enableMetaLearning(bool enable) {
+    metaLearningEnabled_ = enable;
+}
+
+void AgentBrain::enableSkillAcquisition(bool enable) {
+    skillAcquisitionEnabled_ = enable;
+}
+
+void AgentBrain::enableSocialLearning(bool enable) {
+    socialLearningEnabled_ = enable;
+}
+
+void AgentBrain::enableHierarchicalControl(bool enable) {
+    hierarchicalControlEnabled_ = enable;
+}
+
+bool AgentBrain::isAdvancedLearningEnabled() const {
+    return advancedLearningEnabled_;
+}
+
+void AgentBrain::resetAdvancedLearning() {
+    // Reset advanced learning states for new episode
+    metaLearningState_.learningRate = 0.01f;
+    metaLearningState_.explorationRate = 0.1f;
+    metaLearningState_.exploitationRate = 0.9f;
+    metaLearningState_.taskUncertainty = 1.0f;
+    metaLearningState_.metaGradient = 0.0f;
+    
+    skillSystem_.currentSkillLevel = 0.0f;
+    skillSystem_.skillTransfer = 1.0f;
+    
+    socialLearningState_.observerNeuronsActive = 0;
+    socialLearningState_.modelTeacherNeuronsActive = 0;
+    
+    hierarchicalState_.topDownControl = 1.0f;
+    hierarchicalState_.bottomUpSignals = 0.0f;
+    hierarchicalState_.subgoalProgress = 0.0f;
+    
+    // Reset curiosity and exploration
+    curiosityLevel_ = 0.0f;
+    noveltyLevel_ = 0.0f;
+}
     if (!brain_) return MotorCommand::Wait;
     
     MotorCommand decoded = decodeFromMotorNeurons();

@@ -69,12 +69,42 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced Learning Configuration
+    void enableAdvancedLearning(bool enable);
+    void enableMetaLearning(bool enable);
+    void enableSkillAcquisition(bool enable);
+    void enableSocialLearning(bool enable);
+    void enableHierarchicalControl(bool enable);
+    
+    bool isAdvancedLearningEnabled() const;
+    void resetAdvancedLearning();
+    
+    // Advanced Learning Update
+    void updateAdvancedLearning(double timestep);
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Advanced Learning Components
+    void initializeMetaLearning();
+    void initializeSkillSystem();
+    void initializeSocialLearning();
+    void initializeHierarchicalLearning();
+    
+    void updateMetaLearningState(double timestep);
+    void updateSkillSystem(double timestep);
+    void updateSocialLearning(double timestep);
+    void updateHierarchicalLearning(double timestep);
+    
+    void applySocialPolicy(float socialStrength, double timestep);
+    void applyHierarchicalPolicy(int level, double timestep);
+    
+    float calculatePerformance() const;
+    int selectHierarchicalLevel();
     
     std::shared_ptr<Brain> brain_;
     
@@ -112,6 +142,59 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Advanced Learning State
+    struct MetaLearningState {
+        float learningRate;
+        float adaptationRate;
+        float explorationRate;
+        float exploitationRate;
+        float taskUncertainty;
+        float metaGradient;
+    };
+    
+    struct SkillSystemState {
+        size_t maxSkills;
+        float skillAcquisitionRate;
+        float skillTransferRate;
+        float skillDecayRate;
+        float currentSkillLevel;
+        float skillTransfer;
+    };
+    
+    struct SocialLearningState {
+        bool socialObservationEnabled;
+        float imitationStrength;
+        float teachableMomentThreshold;
+        size_t observerNeuronsActive;
+        size_t modelTeacherNeuronsActive;
+    };
+    
+    struct HierarchicalLearningState {
+        int levels;
+        float topDownControl;
+        float bottomUpSignals;
+        float subgoalProgress;
+    };
+    
+    MetaLearningState metaLearningState_;
+    SkillSystemState skillSystem_;
+    SocialLearningState socialLearningState_;
+    HierarchicalLearningState hierarchicalState_;
+    
+    // Advanced Learning Control Flags
+    bool advancedLearningEnabled_;
+    bool metaLearningEnabled_;
+    bool skillAcquisitionEnabled_;
+    bool socialLearningEnabled_;
+    bool hierarchicalControlEnabled_;
+    
+    // Advanced Learning Influence Variables
+    float socialPolicyInfluence_;
+    float motorPrecision_;
+    float goalDirectedness_;
+    float planningHorizon_;
+    float totalReward_;
 };
 
 } // namespace nlm

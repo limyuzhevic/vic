@@ -66,13 +66,31 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                // Handle --key value format (without =)
+                if (i + 1 < argc && argv[i + 1][0] != '-') {
+                    std::string key = arg.substr(2);
+                    std::string value = argv[++i];
+                    set(key, value, ConfigSource::CommandLine);
+                } else {
+                    // Flag with no value (treat as boolean true)
+                    set(arg.substr(2), true, ConfigSource::CommandLine);
+                }
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            if (argv[i + 1][0] != '-') {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
+                set(key, value, ConfigSource::CommandLine);
+            } else {
+                // Flag with no value (treat as boolean true)
+                set(arg.substr(1), true, ConfigSource::CommandLine);
+            }
+        } else if (arg[0] == '-') {
+            // Short flag with no value (treat as boolean true)
+            set(arg.substr(1), true, ConfigSource::CommandLine);
         }
     }
     return true;
