@@ -32,9 +32,10 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// PHASE 6: Real dopamine dynamics with adaptation and prediction error integration
 class Dopamine : public Neuromodulator {
 public:
+    Dopamine(std::shared_ptr<Config> config);
     Dopamine();
     ~Dopamine() override;
     

@@ -8,13 +8,13 @@ namespace nlm {
 struct NeuralWorkingMemory::Impl {
     Brain* brain;
     
-    // Maintenance connections (recurrent)
-    std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
+    // Sensory input buffer
+    std::vector<float> sensoryBuffer;
     
-    // Memory trace ages
-    std::vector<SimulationStep> traceAges;
+    // Sensory encoding strength
+    float sensoryEncodingStrength;
     
-    Impl() : brain(nullptr) {}
+    Impl() : brain(nullptr), sensoryEncodingStrength(0.5f) {}
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
@@ -22,6 +22,7 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , sensoryEncodingStrength_(0.3f)
 {
 }
 
@@ -36,36 +37,33 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
-    
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
-        
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
-        
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
+    // Store sensory input in working memory
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        if (i < memoryNeurons_.size()) {
+            // Store activation in existing memory trace
+            memoryActivations_[i] = pattern[i] * strength * sensoryEncodingStrength_;
+            memoryTimestamps_[i] = 0;
+        } else if (memoryNeurons_.size() < capacity_) {
+            // Add new memory trace for sensory input
+            memoryNeurons_.push_back(NeuronId(100000 + i)); // Create unique ID
+            memoryActivations_.push_back(pattern[i] * strength * sensoryEncodingStrength_);
             memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
         }
     }
     
-    // Create maintenance connections if needed
+    // Create sensory-to-working memory connections
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], 
+                                  strength * sensoryEncodingStrength_ * 0.5f);
+    }
+    
+    // Inject stored pattern into neural population
+    injectPatternIntoNeurons(pattern, strength * sensoryEncodingStrength_);
+    
+    // Also store in sensory buffer for later retrieval
+    std::copy(pattern.begin(), pattern.end(), std::back_inserter(pImpl->sensoryBuffer));
+    if (pImpl->sensoryBuffer.size() > 100) {
+        pImpl->sensoryBuffer.erase(pImpl->sensoryBuffer.begin());
     }
 }
 
@@ -86,6 +84,12 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     // Inject current to maintain activation
     if (brain_) {
         brain_->injectCurrent(neuron, activation * 5.0f);
+    }
+    
+    // Also store in sensory buffer for episodic memory
+    pImpl->sensoryBuffer.push_back(activation);
+    if (pImpl->sensoryBuffer.size() > 100) {
+        pImpl->sensoryBuffer.erase(pImpl->sensoryBuffer.begin());
     }
 }
 
@@ -150,6 +154,7 @@ void NeuralWorkingMemory::clear() {
     memoryTimestamps_.clear();
     activeTraces_.clear();
     pImpl->maintenanceSynapses.clear();
+    pImpl->sensoryBuffer.clear();
 }
 
 void NeuralWorkingMemory::strengthenMemory(float factor) {
@@ -241,6 +246,32 @@ void NeuralWorkingMemory::decayWeakTraces() {
         memoryNeurons_.erase(memoryNeurons_.begin() + *it);
         memoryActivations_.erase(memoryActivations_.begin() + *it);
         memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
+    }
+}
+
+// === Sensory Storage Methods ===
+
+std::vector<float> NeuralWorkingMemory::getSensoryBuffer() const {
+    return pImpl->sensoryBuffer;
+}
+
+void NeuralWorkingMemory::setSensoryEncodingStrength(float strength) {
+    pImpl->sensoryEncodingStrength = std::clamp(strength, 0.0f, 1.0f);
+}
+
+float NeuralWorkingMemory::getSensoryEncodingStrength() const {
+    return pImpl->sensoryEncodingStrength;
+}
+
+void NeuralWorkingMemory::updateSensoryBuffer(const std::vector<float>& newSensory, float strength) {
+    // Add new sensory input to buffer with weighting
+    for (float value : newSensory) {
+        pImpl->sensoryBuffer.push_back(value * strength);
+    }
+    // Limit buffer size
+    if (pImpl->sensoryBuffer.size() > 200) {
+        pImpl->sensoryBuffer.erase(pImpl->sensoryBuffer.begin(), 
+                                  pImpl->sensoryBuffer.begin() + 50);
     }
 }
 
