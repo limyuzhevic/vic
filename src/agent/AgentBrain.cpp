@@ -210,29 +210,171 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
-        
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
+    // Advanced action selection with curiosity-driven exploration
+    // Integrates curiosity, novelty, and prediction error for optimal behavior
+    
+    // Calculate exploration propensity based on multiple factors
+    float explorationFactor = 0.0f;
+    
+    // 1. Curiosity factor: high curiosity drives exploration
+    explorationFactor += curiosityLevel_ * 0.4f;
+    
+    // 2. Novelty factor: novel environments encourage exploration
+    explorationFactor += noveltyLevel_ * 0.3f;
+    
+    // 3. Prediction error factor: unexpected situations encourage exploration
+    explorationFactor += std::abs(predictionError_) * 0.2f;
+    
+    // 4. Dopamine factor: low dopamine increases exploration (in depression models)
+    explorationFactor += std::max(0.0f, 0.5f - std::abs(dopamineLevel_)) * 0.1f;
+    
+    // 5. Developmental factor: critical periods have high exploration
+    float developmentalExploration = 0.0f;
+    if (developmentalAge_ < 60.0f) {  // Critical period
+        developmentalExploration = 0.3f;
+    } else if (developmentalAge_ < 300.0f) {  // Maturation
+        developmentalExploration = 0.1f;
+    }
+    explorationFactor += developmentalExploration * 0.1f;
+    
+    // Clamp exploration factor
+    explorationFactor = std::clamp(explorationFactor, 0.0f, 1.0f);
+    
+    // Determine if we should explore based on exploration factor
+    float exploreThreshold = 0.3f + explorationFactor * 0.4f;  // Higher factor = more exploration
+    exploreThreshold = std::clamp(exploreThreshold, 0.3f, 0.8f);
+    
+    // Random number for exploration decision
+    float explorationRoll = brain_->getRandomGenerator() ? 
+        brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f) : 0.5f;
+    
+    if (explorationRoll < exploreThreshold) {
+        // EXPLORATION: Choose action based on curiosity and novelty
+        return chooseExplorationAction();
+    } else {
+        // EXPLOITATION: Use default action (most rewarding known action)
+        return defaultCmd;
+    }
+}
+
+MotorCommand AgentBrain::chooseExplorationAction() {
+    // Choose exploration action based on sensory interest and curiosity
+    
+    // Calculate action suitability based on current sensory input
+    std::vector<std::pair<MotorCommand, float>> actionScores;
+    
+    // Vision-based action selection
+    float visionInterest = calculateVisionInterest();
+    if (visionInterest > 0.5f) {
+        // High visual interest: explore visually
+        actionScores.push_back({MotorCommand::LookLeft, visionInterest * 0.3f});
+        actionScores.push_back({MotorCommand::LookRight, visionInterest * 0.3f});
+        actionScores.push_back({MotorCommand::Interact, visionInterest * 0.4f});
+    }
+    
+    // Movement-based action selection
+    float movementInterest = calculateMovementInterest();
+    if (movementInterest > 0.3f) {
+        // High movement interest: explore the environment
+        actionScores.push_back({MotorCommand::MoveForward, movementInterest * 0.4f});
+        actionScores.push_back({MotorCommand::MoveBackward, movementInterest * 0.2f});
+        actionScores.push_back({MotorCommand::TurnLeft, movementInterest * 0.2f});
+        actionScores.push_back({MotorCommand::TurnRight, movementInterest * 0.2f});
+    }
+    
+    // Novelty-based action selection
+    float noveltyBasedScore = noveltyLevel_ * 0.5f;
+    if (noveltyBasedScore > 0.2f) {
+        // Novelty suggests trying something different
+        actionScores.push_back({MotorCommand::Wait, noveltyBasedScore * 0.3f});
+    }
+    
+    // Random action selection with bias toward unexplored actions
+    if (actionScores.empty()) {
+        // No preferred actions, choose random
+        int choice = brain_->getRandomGenerator() ? 
+            brain_->getRandomGenerator()->uniformInt(0, 7) : 0;
+        switch (choice) {
+            case 0: return MotorCommand::MoveForward;
+            case 1: return MotorCommand::MoveBackward;
+            case 2: return MotorCommand::TurnLeft;
+            case 3: return MotorCommand::TurnRight;
+            case 4: return MotorCommand::LookLeft;
+            case 5: return MotorCommand::LookRight;
+            case 6: return MotorCommand::Interact;
+            default: return MotorCommand::Wait;
         }
     }
     
-    return defaultCmd;
+    // Select best action based on scores
+    MotorCommand bestAction = defaultCmd;
+    float bestScore = 0.0f;
+    
+    for (const auto& actionScore : actionScores) {
+        if (actionScore.second > bestScore) {
+            bestScore = actionScore.second;
+            bestAction = actionScore.first;
+        }
+    }
+    
+    // Add random exploration: with small probability, choose random action
+    float randomChance = curiosityLevel_ * 0.2f;  // More random when curious
+    if (brain_->getRandomGenerator() && 
+        brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f) < randomChance) {
+        // Force random action to ensure diverse exploration
+        int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+        switch (choice) {
+            case 0: return MotorCommand::MoveForward;
+            case 1: return MotorCommand::MoveBackward;
+            case 2: return MotorCommand::TurnLeft;
+            case 3: return MotorCommand::TurnRight;
+            case 4: return MotorCommand::LookLeft;
+            case 5: return MotorCommand::LookRight;
+            case 6: return MotorCommand::Interact;
+            default: return MotorCommand::Wait;
+        }
+    }
+    
+    return bestAction;
+}
+
+float AgentBrain::calculateVisionInterest() const {
+    // Calculate how visually interesting the current scene is
+    // High edge density, novel patterns, etc. increase interest
+    
+    // This would access the actual visual features from the brain
+    // For now, use a simplified version based on novelty
+    float baseInterest = noveltyLevel_ * 0.5f;
+    
+    // Add curiosity-based amplification
+    float curiosityAmplification = curiosityLevel_ * 0.3f;
+    
+    // Consider prediction error
+    float predictionErrorAmplification = std::abs(predictionError_) * 0.2f;
+    
+    return std::min(1.0f, baseInterest + curiosityAmplification + predictionErrorAmplification);
+}
+
+float AgentBrain::calculateMovementInterest() const {
+    // Calculate how much the agent should move based on internal state
+    // This would analyze proprioception, energy levels, etc.
+    
+    // Simplified version based on developmental stage and energy
+    float developmentalInterest = 0.0f;
+    if (developmentalAge_ < 60.0f) {  // Critical period - high exploration
+        developmentalInterest = 0.8f;
+    } else if (developmentalAge_ < 300.0f) {  // Maturation
+        developmentalInterest = 0.5f;
+    } else {  // Adult
+        developmentalInterest = 0.2f;
+    }
+    
+    // Base interest on energy level (low energy = less movement)
+    float energyLevel = 0.5f;  // Placeholder - would come from actual internal signals
+    float energyInterest = energyLevel * 0.5f;
+    
+    // Combine factors
+    return std::min(1.0f, (developmentalInterest + energyInterest) * 0.5f);
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {

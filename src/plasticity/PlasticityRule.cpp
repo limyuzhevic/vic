@@ -21,29 +21,40 @@ HebbianRule::HebbianRule() : pImpl(new Impl) {}
 HebbianRule::~HebbianRule() = default;
 
 void HebbianRule::update(Synapse* synapse,
-                          const std::vector<Timestamp>& preSpikes,
-                          const std::vector<Timestamp>& postSpikes,
-                          TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
+                           const std::vector<Timestamp>& preSpikes,
+                           const std::vector<Timestamp>& postSpikes,
+                           TimestepDuration dt) {
+    // Real Hebbian learning implementation (Covariance rule)
+    // Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
     
-    if (preSpikes.empty() || postSpikes.empty()) {
+    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
-    for (Timestamp pre : preSpikes) {
-        for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
-            }
+    // Calculate cross-correlation term: ⟨pre * post⟩
+    float crossCorrelation = 0.0f;
+    for (size_t i = 0; i < preSpikes.size(); ++i) {
+        for (size_t j = 0; j < postSpikes.size(); ++j) {
+            float timeDiff = static_cast<float>(postSpikes[j] - preSpikes[i]);
+            // Use exponential kernel for spike timing similarity
+            float kernel = std::exp(-std::abs(timeDiff) / 20.0f);  // 20ms time constant
+            crossCorrelation += kernel;
         }
     }
+    crossCorrelation /= (preSpikes.size() * postSpikes.size());
     
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
+    // Calculate baseline: ⟨pre⟩⟨post⟩ (product of mean firing rates)
+    float preRate = static_cast<float>(preSpikes.size()) / dt;
+    float postRate = static_cast<float>(postSpikes.size()) / dt;
+    float baseline = preRate * postRate * 0.001f;  // Scale factor
+    
+    // Compute covariance-based weight change
+    float covariance = crossCorrelation - baseline;
+    float delta = pImpl->learningRate * covariance;
+    
+    // Apply with bounds
+    if (std::abs(delta) > 1e-8f) {
+        applyWeightChange(synapse, delta);
     }
 }
 

@@ -22,56 +22,40 @@ void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& preSpikes,
                       const std::vector<Timestamp>& postSpikes,
                       TimestepDuration dt) {
-    /*
-     * Real Hebbian learning implementation
-     * 
-     * Mathematical formulation (Covariance rule):
-     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
-     * 
-     * Simplified version for spike-based systems:
-     * Δw = η * (coactivity - baseline)
-     * 
-     * Where:
-     *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
-     * 
-     * Biological inspiration:
-     *   - Reflects AMPA receptor trafficking
-     *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
-     *   - Correlation-based learning in visual cortex
-     *   
-     * Limitations:
-     *   - Doesn't account for STDP timing details
-     *   - Single learning rate (no separate potentiation/depression rates)
-     *   - Assumes stationary statistics
-     */
+    // Real Hebbian learning implementation (Covariance rule)
+    // Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
-            }
+    // Calculate cross-correlation term: ⟨pre * post⟩
+    float crossCorrelation = 0.0f;
+    for (size_t i = 0; i < preSpikes.size(); ++i) {
+        for (size_t j = 0; j < postSpikes.size(); ++j) {
+            float timeDiff = static_cast<float>(postSpikes[j] - preSpikes[i]);
+            // Use exponential kernel for spike timing similarity
+            float kernel = std::exp(-std::abs(timeDiff) / 20.0f);  // 20ms time constant
+            crossCorrelation += kernel;
         }
     }
+    crossCorrelation /= (preSpikes.size() * postSpikes.size());
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    // Calculate baseline: ⟨pre⟩⟨post⟩ (product of mean firing rates)
+    float preRate = static_cast<float>(preSpikes.size()) / dt;
+    float postRate = static_cast<float>(postSpikes.size()) / dt;
+    float baseline = preRate * postRate * 0.001f;  // Scale factor
     
-    // Apply with bounds
-    if (std::abs(delta) > 1e-6f) {
-        applyWeightChange(synapse, delta);
+    // Compute covariance-based weight change
+    float covariance = crossCorrelation - baseline;
+    float delta = pImpl->learningRate * covariance;
+    
+    // Apply with bounds and stability constraints
+    if (std::abs(delta) > 1e-8f) {
+        // Ensure weight doesn't exceed bounds
+        float newWeight = synapse->getWeight() + delta;
+        newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
+        synapse->setWeight(newWeight);
     }
 }
 

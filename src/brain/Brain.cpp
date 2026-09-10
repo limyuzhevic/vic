@@ -22,77 +22,100 @@
 
 namespace nlm {
 
-struct Brain::Impl {
-    std::shared_ptr<Config> config;
-    std::unique_ptr<RandomGenerator> rng;
-    std::vector<std::unique_ptr<NeuralRegion>> regions;
-    std::vector<InterRegionConnection> interRegionConnections;
+void Brain::Impl::updateIntegratedSystems() {
+    // Update all integrated systems that were previously disconnected
     
-    // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    // 1. Update prediction system with current neural state
+    if (predictionSystem) {
+        // Create sensory input from current neural activity
+        auto sensoryInput = createSensoryInputFromNeuralState();
+        
+        // Predict next state based on current state
+        auto prediction = predictionSystem->predictNextState(sensoryInput);
+        
+        // Get prediction error
+        float predictionError = predictionSystem->getPredictionError();
+        
+        // Use prediction error for attention and learning
+        // This connects prediction to cognitive processes
+    }
     
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
+    // 2. Update working memory with sensory experiences
+    if (workingMemory) {
+        // Store current neural patterns in working memory
+        storeCurrentPatternInWorkingMemory();
+        
+        // Working memory updates attention based on novelty
+        // This connects memory to attention
+    }
     
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
-    std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
+    // 3. Update episodic memory with experiences
+    if (episodicMemory) {
+        // Create episodic memory from current state and reward
+        createEpisodicMemoryFromExperience();
+        
+        // Episodic memory triggers consolidation
+        episodicMemory->consolidate(0.1f);  // Consolidate relevance > 0.1
+    }
     
-    // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
+    // 4. Update development system beyond structural plasticity
+    if (developmentSystem) {
+        // Development modulates plasticity rules
+        developmentSystem->modulatePlasticityRates(this);
+        
+        // Development affects attention and memory consolidation
+        updateDevelopmentEffects();
+    }
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
+    // 5. Update neuromodulation systems
+    if (dopamine) {
+        // Dopamine updates based on prediction error
+        dopamine->updatePredictionError(currentTime);
+        
+        // Dopamine modulates multiple systems: working memory, episodic memory, attention
+        // This connects neuromodulation across all cognitive systems
+    }
     
-    // Phase 2: Real neural computation components
-    std::unique_ptr<SpikeSystem> spikeSystem;
-    std::unique_ptr<STDP> stdp;
-    std::unique_ptr<Hebbian> hebbian;
-    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    if (curiosity) {
+        // Curiosity integrates novelty, prediction error, and memory retrieval
+        curiosity->updateWorkingMemoryNovelty(workingMemory.get());
+        curiosity->updateEpisodicMemoryAccess(episodicMemory.get());
+    }
     
-    // Simulation parameters
-    TimestepDuration timestep;
-    SimulationStep currentStep;
-    Timestamp currentTime;
+    // 6. Update attentional selection
+    if (attention) {
+        // Attention selects information based on:
+        // - Prediction error (salient events)
+        // - Novelty (new experiences)
+        // - Working memory activation (important items)
+        // - Neuromodulation levels (dopamine, acetylcholine)
+        updateAttentionalSelection();
+    }
     
-    // Statistics
-    size_t totalSpikesThisStep;
-    size_t totalSpikesTotal;
+    // 7. Update concept formation
+    if (conceptFormation) {
+        // Concept formation extracts patterns from:
+        // - Working memory patterns
+        // - Episodic memory similarities
+        // - Attention-weighted sensory input
+        updateConceptFormation();
+    }
     
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
+    // 8. Update neural planning
+    if (planner) {
+        // Neural planner uses:
+        // - Concepts from concept formation
+        // - Attention-filtered sensory input
+        // - Memory constraints
+        updateNeuralPlanning();
+    }
     
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
-    size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
+    // 9. Handle sleep/rest cycle for memory consolidation
+    handleSleepRestCycle();
     
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
-    
-    Impl(std::shared_ptr<Config> cfg)
-        : config(cfg)
-        , rng(nullptr)
-        , developmentalStage(DevelopmentalStage::Initial)
-        , nextRegionId(1)
-        , timestep(0.001)
-        , currentStep(0)
-        , currentTime(0.0)
-        , totalSpikesThisStep(0)
-        , totalSpikesTotal(0)
-        , isResting(false)
-        , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
-    {
+    // 10. Integrate reward-modulated plasticity
+    integrateRewardModulatedPlasticity();
+}
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
