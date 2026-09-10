@@ -152,23 +152,31 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
-    
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+    // Use cognitive systems for better motor command selection
+    // 1. Get prediction-based action preferences from planner
+    MotorCommand plannedAction = MotorCommand::Wait;
+    if (brain_->getPlanner()) {
+        // Get planning recommendations
+        plannedAction = brain_->getPlanner()->getRecommendedAction();
     }
     
-    return decoded;
-}
-
-MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
+    // 2. Apply attention system to filter motor neurons based on current focus
+    MotorCommand attendedAction = MotorCommand::Wait;
+    if (brain_->getAttention() && !brain_->getAttention()->getWinners().empty()) {
+        // Get attended neurons and convert to motor commands
+        const auto& winners = brain_->getAttention()->getWinners();
+        attendedAction = decodeFromAttendedNeurons(winners);
+    }
+    
+    // 3. Use prediction error to adjust exploration/exploitation
+    float predError = getPredictionError();
+    float baseActivity = 0.0f;
+    
+    // Calculate current motor neuron activity
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
         }
         return sum / neurons.size();
@@ -181,7 +189,23 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     float interactAct = calcActivity(motorInteract_);
     float waitAct = calcActivity(motorWait_);
     
-    // Find maximum activity
+    // 4. Combine prediction-based action with neural activity
+    // Prediction error modulates sensitivity to motor activity
+    float sensitivity = 0.5f + std::abs(predError) * 0.5f;  // Higher error = more exploration
+    
+    // Check if prediction suggested an action
+    if (plannedAction != MotorCommand::Wait) {
+        // Check if attended action is different from planned
+        if (attendedAction != MotorCommand::Wait && attendedAction != plannedAction) {
+            // Both systems active - use weighted combination based on attention
+            return attendedAction;
+        } else if (attendedAction == MotorCommand::Wait) {
+            // Use predicted action
+            return plannedAction;
+        }
+    }
+    
+    // 5. Fall back to neural activity-based selection with error modulation
     struct { MotorCommand cmd; float activity; } commands[] = {
         {MotorCommand::MoveForward, forwardAct},
         {MotorCommand::MoveBackward, backwardAct},
@@ -192,12 +216,36 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     };
     
     MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
+    float bestActivity = waitAct;
     
     for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
+        float weightedActivity = c.activity * sensitivity;
+        if (weightedActivity > bestActivity) {
+            bestActivity = weightedActivity;
             best = c.cmd;
+        }
+    }
+    
+    // Apply curiosity-based exploration when prediction error is high
+    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+        // Higher prediction error increases exploration
+        float exploreChance = std::min(0.5f, std::abs(predError) * 0.5f + curiosityLevel_ * 0.2f);
+        if (exploreChance > 0.0f) {
+            float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+            if (r < exploreChance) {
+                // Exploration: occasionally choose random action
+                int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+                switch (choice) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::MoveBackward;
+                    case 2: return MotorCommand::TurnLeft;
+                    case 3: return MotorCommand::TurnRight;
+                    case 4: return MotorCommand::LookLeft;
+                    case 5: return MotorCommand::LookRight;
+                    case 6: return MotorCommand::Interact;
+                    default: return MotorCommand::Wait;
+                }
+            }
         }
     }
     
@@ -207,6 +255,46 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     }
     
     return best;
+}
+
+MotorCommand AgentBrain::decodeFromAttendedNeurons(const std::vector<NeuronId>& attendedNeurons) {
+    // Convert attended neurons to motor commands
+    // Find attended motor neurons and determine action
+    
+    int forwardCount = 0;
+    int backwardCount = 0;
+    int leftCount = 0;
+    int rightCount = 0;
+    int interactCount = 0;
+    int waitCount = 0;
+    
+    for (const NeuronId& neuronId : attendedNeurons) {
+        // Find which motor group this neuron belongs to
+        auto findInGroup = [neuronId](const std::vector<Neuron*>& group) {
+            for (Neuron* n : group) {
+                if (n->getId() == neuronId) return true;
+            }
+            return false;
+        };
+        
+        if (findInGroup(motorForward_)) forwardCount++;
+        else if (findInGroup(motorBackward_)) backwardCount++;
+        else if (findInGroup(motorTurnLeft_)) leftCount++;
+        else if (findInGroup(motorTurnRight_)) rightCount++;
+        else if (findInGroup(motorInteract_)) interactCount++;
+        else if (findInGroup(motorWait_)) waitCount++;
+    }
+    
+    // Determine command based on attended neurons
+    int maxCount = std::max({forwardCount, backwardCount, leftCount, rightCount, interactCount, waitCount});
+    if (maxCount <= 0) return MotorCommand::Wait;
+    
+    if (forwardCount == maxCount) return MotorCommand::MoveForward;
+    if (backwardCount == maxCount) return MotorCommand::MoveBackward;
+    if (leftCount == maxCount) return MotorCommand::TurnLeft;
+    if (rightCount == maxCount) return MotorCommand::TurnRight;
+    if (interactCount == maxCount) return MotorCommand::Interact;
+    return MotorCommand::Wait;
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
