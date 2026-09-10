@@ -65,14 +65,13 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
 Synapse::~Synapse() = default;
 
 Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+    pImpl = std::exchange(other.pImpl, nullptr);
 }
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
         delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::exchange(other.pImpl, nullptr);
     }
     return *this;
 }
@@ -193,15 +192,19 @@ void Synapse::setEfficacy(float efficacy) {
 
 void Synapse::step(Timestamp currentTime) {
     // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    // 1. Decay short-term plasticity state (Tsodyks-Markram model)
+    // 2. Decay eligibility trace for reward-modulated learning
+    // 3. Update synaptic efficacy based on use
+    // 4. Apply biological constraints and bounds checking
     
     TimestepDuration dt = 0.001;  // 1ms timestep
+    
+    // ===== 1. DECAY SHORT-TERM PLASTICITY STATE =====
     
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        // Exponential decay toward 0 with biological time constant
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
@@ -211,15 +214,52 @@ void Synapse::step(Timestamp currentTime) {
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
-        // Recovery from depression toward 1.0
+        // Recovery from depression toward 1.0 (full recovery)
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    // Clamp short-term plasticity state to [0, 1] range
+    pImpl->shortTermDepression = std::clamp(pImpl->shortTermDepression, 0.0f, 1.0f);
+    pImpl->shortTermFacilitation = std::clamp(pImpl->shortTermFacilitation, 0.0f, 1.0f);
     
-    // Clamp weight bounds
+    // ===== 2. DECAY ELIGIBILITY TRACE =====
+    
+    // Decay eligibility trace for reward-modulated learning
+    // Use constant decay rate from constants
+    decayEligibilityTrace(nlm::SynapseConstants::ELIGIBILITY_TRACE_DECAY * dt * 1000.0f);
+    
+    // ===== 3. UPDATE SYNAPTIC EFFICACY =====
+    
+    // Synaptic efficacy modulates transmission based on recent activity
+    // Higher efficacy means more reliable transmission
+    float usageBasedModulation = pImpl->shortTermFacilitation - (1.0f - pImpl->shortTermDepression);
+    pImpl->efficacy += usageBasedModulation * 0.01f;  // Slowly adapt to usage
+    pImpl->efficacy = std::clamp(pImpl->efficacy, nlm::SynapseConstants::MIN_EFFICIENCY, nlm::SynapseConstants::MAX_EFFICIENCY);
+    
+    // ===== 4. APPLY BIOLOGICAL CONSTRAINTS =====
+    
+    // Clamp weight bounds to prevent runaway excitation
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    // ===== 5. MAINTAIN SPIKE HISTORY =====
+    
+    // Update last spike times if they exist (should have been set by recordPreSpike/recordPostSpike)
+    // This ensures spike history stays up-to-date
+    if (pImpl->preSpikeHistory.empty() && pImpl->lastPreSpikeTime >= 0.0f) {
+        // If history is empty but we have a last spike time, update history
+        pImpl->preSpikeHistory.push_back(pImpl->lastPreSpikeTime);
+    }
+    if (pImpl->postSpikeHistory.empty() && pImpl->lastPostSpikeTime >= 0.0f) {
+        pImpl->postSpikeHistory.push_back(pImpl->lastPostSpikeTime);
+    }
+    
+    // Keep history history within limits
+    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+    }
+    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+    }
 }
 
 void Synapse::reset() {

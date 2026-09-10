@@ -35,17 +35,14 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->totalCurrent = 0.0f;
 }
 
-Neuron::~Neuron() = default;
-
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+    pImpl = std::exchange(other.pImpl, nullptr);
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
         delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::exchange(other.pImpl, nullptr);
     }
     return *this;
 }
@@ -122,13 +119,15 @@ float Neuron::getLastSpikeTime() const {
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
-    pImpl->synapticInput += amplitude;
+    // Scale with constant factor
+    pImpl->synapticInput += amplitude * nlm::NeuronConstants::SYNAPTIC_INPUT_SCALE_FACTOR;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
-    pImpl->synapticInput -= amplitude;
+    // Scale with constant factor
+    pImpl->synapticInput -= amplitude * nlm::NeuronConstants::SYNAPTIC_INPUT_SCALE_FACTOR;
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
@@ -140,7 +139,8 @@ void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
-    pImpl->synapticInput += current;
+    // Use constant factor for biological accuracy
+    pImpl->synapticInput += current * nlm::NeuronConstants::SYNAPTIC_INPUT_SCALE_FACTOR;
 }
 
 void Neuron::clearTotalCurrent() {
@@ -210,10 +210,13 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    
+    // Use constants from NeuronConstants
+    float tau = nlm::NeuronConstants::TIME_CONSTANT;  // ms
+    float C = nlm::NeuronConstants::MEMBRANE_CAPACITANCE;  // nF
     
     // Synaptic input contributes to membrane potential change
+    // Scale with constant factor for biological accuracy
     float synapticContribution = pImpl->synapticInput / C;
     
     // Leak contribution
@@ -225,11 +228,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        pImpl->state.adaptationVariable *= nlm::NeuronConstants::ADAPTATION_DECAY_RATE;
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    V = std::clamp(V, nlm::NeuronConstants::MIN_MEMBRANE_POTENTIAL, nlm::NeuronConstants::MAX_MEMBRANE_POTENTIAL);
     
     // Check for spike
     if (V >= threshold) {
@@ -248,7 +251,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        pImpl->state.adaptationVariable += nlm::NeuronConstants::ADAPTATION_INCREMENT;
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
@@ -277,10 +280,10 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
     // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.threshold = nlm::NeuronConstants::THRESHOLD_POTENTIAL + rng.uniformReal(-2.0f, 2.0f);
     
     // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.restingPotential = nlm::NeuronConstants::RESTING_POTENTIAL + rng.uniformReal(-2.0f, 2.0f);
     
     // Reset potential is usually close to resting
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);

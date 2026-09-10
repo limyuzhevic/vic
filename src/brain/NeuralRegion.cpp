@@ -4,35 +4,16 @@
 
 namespace nlm {
 
-struct NeuralRegion::Impl {
-    RegionId id;
-    std::string name;
-    std::vector<std::unique_ptr<NeuralPopulation>> populations;
-    std::vector<std::unique_ptr<Synapse>> synapses;
-    std::unordered_map<NeuronId, std::vector<SynapseId>> outgoingSynapses;  // source -> synapse ids
-    std::unordered_map<NeuronId, std::vector<SynapseId>> incomingSynapses;  // dest -> synapse ids
-    SynapseId nextSynapseId;
-    
-    explicit Impl(RegionId id) : id(id), nextSynapseId(1) {}
-};
-
-NeuralRegion::NeuralRegion(RegionId id) : pImpl(new Impl(id)) {}
-
-NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(new Impl(id)) {
-    pImpl->name = name;
-}
-
 NeuralRegion::~NeuralRegion() = default;
 
 NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+    pImpl = std::exchange(other.pImpl, nullptr);
 }
 
 NeuralRegion& NeuralRegion::operator=(NeuralRegion&& other) noexcept {
     if (this != &other) {
         delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::exchange(other.pImpl, nullptr);
     }
     return *this;
 }
@@ -58,7 +39,7 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
 }
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    if (id.index() <= 0 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
     return pImpl->populations[id.index() - 1].get();
@@ -244,6 +225,20 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
     // Get all neurons
     auto neurons = getAllNeurons();
     size_t neuronCount = neurons.size();
+    
+    // Validate parameters for numerical stability
+    if (neuronCount < 2) {
+        NLM_LOG_WARNING("Region has insufficient neurons for connectivity: " + std::to_string(neuronCount));
+        return;
+    }
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection probability: " + std::to_string(connectionProbability));
+        return;
+    }
+    if (weightVariance < 0.0f) {
+        NLM_LOG_ERROR("Negative weight variance: " + std::to_string(weightVariance));
+        return;
+    }
     
     // Create random connections
     for (size_t i = 0; i < neuronCount; ++i) {
