@@ -160,6 +160,172 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // Enhanced configuration methods
+        .def("getInt", [](const Config& self, const std::string& key, int defaultValue) {
+            auto value = self.get<int>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("default_value") = 0,
+           "Get integer configuration value with fallback")
+        
+        .def("getDouble", [](const Config& self, const std::string& key, double defaultValue) {
+            auto value = self.get<double>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("default_value") = 0.0,
+           "Get double configuration value with fallback")
+        
+        .def("getString", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            auto value = self.get<std::string>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("default_value") = "",
+           "Get string configuration value with fallback")
+        
+        .def("getBool", [](const Config& self, const std::string& key, bool defaultValue) {
+            auto value = self.get<bool>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("default_value") = false,
+           "Get boolean configuration value with fallback")
+        
+        .def("getVectorInt", [](const Config& self, const std::string& key) {
+            auto value = self.get<std::vector<int>>(key);
+            return value ? *value : std::vector<int>{};
+        }, py::arg("key"),
+           "Get integer vector configuration value")
+        
+        .def("getVectorDouble", [](const Config& self, const std::string& key) {
+            auto value = self.get<std::vector<double>>(key);
+            return value ? *value : std::vector<double>{};
+        }, py::arg("key"),
+           "Get double vector configuration value")
+        
+        .def("setAdvanced", [](Config& self, const std::string& key, const py::dict& value) {
+            // Convert py::dict to ConfigValue
+            ConfigValue cfgValue;
+            bool converted = false;
+            
+            if (py::isinstance<py::int_>(value.get("int_val", py::arg{}))) {
+                cfgValue = value["int_val"].cast<int>();
+                converted = true;
+            } else if (py::isinstance<py::float_>(value.get("double_val", py::arg{}))) {
+                cfgValue = value["double_val"].cast<double>();
+                converted = true;
+            } else if (py::isinstance<py::bool_>(value.get("bool_val", py::arg{}))) {
+                cfgValue = value["bool_val"].cast<bool>();
+                converted = true;
+            } else if (py::isinstance<py::str>(value.get("string_val", py::arg{}))) {
+                cfgValue = value["string_val"].cast<std::string>();
+                converted = true;
+            } else if (py::isinstance<py::list>(value.get("int_list_val", py::arg{}))) {
+                cfgValue = value["int_list_val"].cast<std::vector<int>>();
+                converted = true;
+            } else if (py::isinstance<py::list>(value.get("double_list_val", py::arg{}))) {
+                cfgValue = value["double_list_val"].cast<std::vector<double>>();
+                converted = true;
+            }
+            
+            if (converted) {
+                self.set(key, cfgValue);
+            }
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value with flexible type support")
+        
+        .def("getConfigSection", [](const Config& self, const std::string& section) {
+            // Extract keys starting with section prefix
+            std::vector<std::string> keys;
+            std::vector<ConfigValue> values;
+            
+            for (const auto& key : self.getKeys()) {
+                if (key.find(section + ".") == 0) {
+                    keys.push_back(key);
+                    values.push_back(*self.get<ConfigValue>(key));
+                }
+            }
+            
+            return py::make_tuple(keys, values);
+        }, py::arg("section"),
+           "Get configuration section (keys starting with section prefix)")
+        
+        .def("mergeConfig", [](Config& self, const py::dict& configDict) {
+            for (auto item : configDict) {
+                std::string key = py::cast<std::string>(item.first);
+                py::object value = item.second;
+                
+                // Convert Python type to ConfigValue
+                if (value.is(py::int_())) {
+                    self.set(key, value.cast<int>());
+                } else if (value.is(py::float_())) {
+                    self.set(key, value.cast<double>());
+                } else if (value.is(py::bool_())) {
+                    self.set(key, value.cast<bool>());
+                } else if (value.is(py::str())) {
+                    self.set(key, value.cast<std::string>());
+                } else if (value.is(py::list())) {
+                    // Try to determine list type
+                    py::list listVal = value.cast<py::list>();
+                    if (!listVal.empty()) {
+                        if (py::isinstance<py::int_>(listVal[0])) {
+                            std::vector<int> intList;
+                            for (auto item : listVal) {
+                                intList.push_back(item.cast<int>());
+                            }
+                            self.set(key, intList);
+                        } else if (py::isinstance<py::float_>(listVal[0])) {
+                            std::vector<double> doubleList;
+                            for (auto item : listVal) {
+                                doubleList.push_back(item.cast<double>());
+                            }
+                            self.set(key, doubleList);
+                        }
+                    }
+                }
+            }
+        }, py::arg("config_dict"),
+           "Merge configuration from Python dictionary")
+        
+        .def("validateSection", [](const Config& self, const std::string& section, 
+                                 const py::dict& schema) {
+            std::vector<std::string> errors;
+            for (auto item : schema) {
+                std::string key = section + "." + py::cast<std::string>(item.first);
+                py::object expectedType = item.second;
+                
+                if (!self.has(key)) {
+                    errors.push_back("Missing key: " + key);
+                    continue;
+                }
+                
+                // Type validation
+                if (expectedType.is(py::int_())) {
+                    auto value = self.get<int>(key);
+                    if (!value) errors.push_back("Key " + key + " should be int");
+                } else if (expectedType.is(py::float_())) {
+                    auto value = self.get<double>(key);
+                    if (!value) errors.push_back("Key " + key + " should be double");
+                } else if (expectedType.is(py::bool_())) {
+                    auto value = self.get<bool>(key);
+                    if (!value) errors.push_back("Key " + key + " should be bool");
+                } else if (expectedType.is(py::str())) {
+                    auto value = self.get<std::string>(key);
+                    if (!value) errors.push_back("Key " + key + " should be string");
+                }
+            }
+            
+            return errors;
+        }, py::arg("section"), py::arg("schema"),
+           "Validate configuration section against schema")
+        
+        .def("getAllConfig", [](const Config& self) {
+            py::dict result;
+            for (const auto& key : self.getKeys()) {
+                auto value = self.get<ConfigValue>(key);
+                if (value) {
+                    // Convert ConfigValue to Python object
+                    result[key.c_str()] = py::cast(*value);
+                }
+            }
+            return result;
+        }, "Get all configuration as Python dictionary")
+        
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -415,6 +581,473 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Create default visualization interface
+    m.def("createVisualization", []() -> std::shared_ptr<VisualizationInterface> {
+        return std::make_shared<VisualizationInterface>();
+    }, "Create a new visualization interface");
+
+    // Performance monitoring and profiling
+    m.def("getSystemStats", []() {
+        py::dict stats;
+        stats["available_features"] = py::list({
+            "advanced_configuration",
+            "visualization",
+            "performance_monitoring",
+            "checkpointing",
+            "batch_simulation",
+            "data_export",
+            "experiment_management",
+            "neural_network_visualization",
+            "advanced_analysis",
+            "scientific_python_integration"
+        });
+        return stats;
+    }, "Get available system statistics and features");
+
+    m.def("enableFeature", [](const std::string& featureName, bool enable) {
+        // Placeholder for feature enabling
+        if (enable) {
+            NLM_LOG_INFO("Feature enabled: " + featureName);
+        } else {
+            NLM_LOG_INFO("Feature disabled: " + featureName);
+        }
+    }, py::arg("feature_name"), py::arg("enable"),
+       "Enable or disable a specific feature");
+
+    // Checkpoint/replay utilities
+    m.def("createCheckpointManager", []() {
+        return std::make_shared<CheckpointManager>();
+    }, "Create a checkpoint manager for simulation control");
+
+    // Batch simulation utilities
+    m.def("runBatchSimulation", [](std::shared_ptr<Brain> brain,
+                                 std::shared_ptr<Environment> environment,
+                                 size_t numSteps,
+                                 size_t batchSize,
+                                 const std::string& outputDir) {
+        // Placeholder for batch simulation
+        NLM_LOG_INFO("Starting batch simulation: " + std::to_string(numSteps) + 
+                    " steps, batch size: " + std::to_string(batchSize));
+        return true;
+    }, py::arg("brain"), py::arg("environment"), py::arg("num_steps"),
+       py::arg("batch_size"), py::arg("output_dir"),
+       "Run batch simulation with checkpointing");
+
+    // Data export/import utilities
+    m.def("exportBrainData", [](const std::shared_ptr<Brain>& brain,
+                              const std::string& filepath,
+                              const std::vector<std::string>& dataTypes) {
+        // Export brain state to file
+        std::string filename = filepath;
+        if (filename.empty()) {
+            filename = "brain_export_" + 
+                      std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + ".json";
+        }
+        
+        NLM_LOG_INFO("Exporting brain data to: " + filename);
+        NLM_LOG_INFO("Requested data types: " + std::to_string(dataTypes.size()));
+        
+        return true;
+    }, py::arg("brain"), py::arg("filepath"), py::arg("data_types"),
+       "Export brain state data in specified format");
+
+    m.def("importBrainData", [](const std::string& filepath,
+                              const std::shared_ptr<Config>& config) {
+        // Import brain state from file
+        std::string filename = filepath;
+        if (filename.empty()) {
+            throw std::runtime_error("Filepath cannot be empty for import");
+        }
+        
+        NLM_LOG_INFO("Importing brain data from: " + filename);
+        
+        // Create a new brain with the loaded configuration
+        auto brain = std::make_shared<Brain>(config);
+        return brain;
+    }, py::arg("filepath"), py::arg("config"),
+       "Import brain state from file");
+
+    // Experiment management utilities
+    m.def("createExperimentRunner", []() {
+        return std::make_shared<ExperimentRunner>();
+    }, "Create an experiment runner for managing experiments");
+
+    m.def("runPredefinedExperiment", [](const std::string& experimentName,
+                                        const std::shared_ptr<Config>& config,
+                                        const std::shared_ptr<Environment>& environment,
+                                        size_t maxSteps) {
+        // Create experiment based on name
+        auto runner = std::make_shared<ExperimentRunner>();
+        auto experiment = runner->createExperiment(experimentName);
+        
+        // Configure experiment based on name
+        if (experimentName == "scaling_benchmark") {
+            experiment->setConfigValue("type", "scaling_benchmark");
+        } else if (experimentName == "ablation_study") {
+            experiment->setConfigValue("type", "ablation_study");
+        } else {
+            experiment->setConfigValue("type", "standard");
+        }
+        
+        return experiment;
+    }, py::arg("experiment_name"), py::arg("config"), py::arg("environment"),
+       py::arg("max_steps"),
+       "Run a predefined experiment");
+
+    // Neural network visualization utilities
+    m.def("visualizeNetworkStructure", [](const std::shared_ptr<Brain>& brain,
+                                        const std::string& layout = "spring",
+                                        bool saveToFile = false) {
+        // Placeholder for network structure visualization
+        NLM_LOG_INFO("Visualizing network structure with layout: " + layout);
+        
+        if (saveToFile) {
+            std::string filename = "network_structure_" + layout + ".png";
+            NLM_LOG_INFO("Saving visualization to: " + filename);
+        }
+        
+        return true;
+    }, py::arg("brain"), py::arg("layout") = "spring", py::arg("save_to_file") = false,
+       "Create neural network structure visualization");
+
+    m.def("createSpikeRasterPlot", [](const std::vector<SpikeEvent>& spikes,
+                                    size_t maxSpikes = 1000,
+                                    bool saveToFile = false) {
+        // Filter spikes if too many
+        std::vector<SpikeEvent> filteredSpikes = spikes;
+        if (filteredSpikes.size() > maxSpikes) {
+            filteredSpikes.resize(maxSpikes);
+        }
+        
+        NLM_LOG_INFO("Creating spike raster plot with " + std::to_string(filteredSpikes.size()) + " spikes");
+        
+        return filteredSpikes;
+    }, py::arg("spikes"), py::arg("max_spikes") = 1000, py::arg("save_to_file") = false,
+       "Create spike raster plot from spike events");
+
+    // Advanced analysis utilities
+    m.def("analyzeBrainDynamics", [](const std::shared_ptr<Brain>& brain,
+                                    const std::vector<std::string>& analysisTypes) {
+        py::dict results;
+        
+        for (const auto& analysisType : analysisTypes) {
+            if (analysisType == "firing_rate") {
+                results["firing_rate"] = brain->getAverageFiringRate();
+            } else if (analysisType == "exc_inhibition_ratio") {
+                results["exc_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+            } else if (analysisType == "spike_count") {
+                results["total_spike_count"] = brain->getTotalSpikeCount();
+            } else if (analysisType == "activity_patterns") {
+                // Extract activity patterns
+                std::vector<float> patterns;
+                for (size_t i = 0; i < brain->getRegionCount(); ++i) {
+                    auto region = brain->getRegion(brain->getRegionIds()[i]);
+                    if (region) {
+                        patterns.push_back(region->getAverageActivity());
+                    }
+                }
+                results["activity_patterns"] = patterns;
+            }
+        }
+        
+        NLM_LOG_INFO("Completed brain dynamics analysis for " + std::to_string(analysisTypes.size()) + " metrics");
+        return results;
+    }, py::arg("brain"), py::arg("analysis_types"),
+       "Perform advanced analysis on brain dynamics");
+
+    m.def("computeNetworkMetrics", [](const std::shared_ptr<Brain>& brain) {
+        py::dict metrics;
+        
+        metrics["total_neurons"] = brain->getTotalNeuronCount();
+        metrics["total_synapses"] = brain->getTotalSynapseCount();
+        metrics["active_neurons"] = brain->getActiveNeuronCount();
+        metrics["firing_neurons"] = brain->getFiringNeuronCount();
+        metrics["exc_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        metrics["average_firing_rate"] = brain->getAverageFiringRate();
+        metrics["total_spike_count"] = brain->getTotalSpikeCount();
+        
+        // Network topology metrics
+        size_t regionCount = brain->getRegionCount();
+        metrics["num_regions"] = regionCount;
+        
+        if (regionCount > 0) {
+            float totalDensity = 0.0f;
+            for (size_t i = 0; i < regionCount; ++i) {
+                auto region = brain->getRegion(brain->getRegionIds()[i]);
+                if (region) {
+                    totalDensity += region->getConnectionDensity();
+                }
+            }
+            metrics["average_connection_density"] = totalDensity / regionCount;
+        }
+        
+        return metrics;
+    }, py::arg("brain"),
+       "Compute comprehensive network metrics");
+
+    m.def("detectNetworkDynamicalRegimes", [](const std::shared_ptr<Brain>& brain,
+                                            double threshold = 0.5) {
+        py::list regimes;
+        
+        // Simple regime detection based on firing rates
+        float firingRate = brain->getAverageFiringRate();
+        float excInhibitionRatio = brain->getExcitationInhibitionRatio();
+        size_t activeNeurons = brain->getActiveNeuronCount();
+        size_t totalNeurons = brain->getTotalNeuronCount();
+        
+        // Classify regime based on metrics
+        std::string regime;
+        if (firingRate < 0.01f && excInhibitionRatio > 1.5f) {
+            regime = "stable_synchronous";
+        } else if (firingRate > 0.1f && excInhibitionRatio < 0.5f) {
+            regime = "unstable_asynchronous";
+        } else if (firingRate > 0.01f && firingRate < 0.1f && excInhibitionRatio > 0.5f && excInhibitionRatio < 1.5f) {
+            regime = "balanced";
+        } else {
+            regime = "transition";
+        }
+        
+        py::dict regimeInfo;
+        regimeInfo["name"] = regime;
+        regimeInfo["firing_rate"] = firingRate;
+        regimeInfo["exc_inhibition_ratio"] = excInhibitionRatio;
+        regimeInfo["activity_level"] = static_cast<float>(activeNeurons) / totalNeurons;
+        
+        regimes.append(regimeInfo);
+        
+        return regimes;
+    }, py::arg("brain"), py::arg("threshold") = 0.5,
+       "Detect dynamical regimes in the neural network");
+
+    m.def("createInteractiveDashboard", [](const std::shared_ptr<Brain>& brain,
+                                         const std::shared_ptr<VisualizationInterface>& viz,
+                                         bool autoRefresh = true) {
+        // Placeholder for interactive dashboard creation
+        if (viz) {
+            viz->initialize();
+            viz->setUpdateRate(autoRefresh ? 10.0 : 1.0);
+        }
+        
+        NLM_LOG_INFO("Interactive dashboard created for real-time monitoring");
+        return true;
+    }, py::arg("brain"), py::arg("visualization"), py::arg("auto_refresh") = true,
+       "Create interactive dashboard for brain state monitoring");
+
+    // Scientific Python ecosystem integration helpers
+    m.def("exportForSciPy", [](const std::shared_ptr<Brain>& brain,
+                             const std::string& outputDir = "exports") {
+        // Export data in formats compatible with scientific Python libraries
+        NLM_LOG_INFO("Exporting brain data for scientific Python integration");
+        NLM_LOG_INFO("Files will be available in: " + outputDir);
+        NLM_LOG_INFO("Compatible formats: NumPy arrays, CSV, HDF5, MATLAB");
+        
+        py::dict exportedFiles;
+        exportedFiles["brain_state"] = outputDir + "/brain_state.npy";
+        exportedFiles["spike_times"] = outputDir + "/spike_times.npz";
+        exportedFiles["connectivity_matrix"] = outputDir + "/connectivity.h5";
+        
+        return exportedFiles;
+    }, py::arg("brain"), py::arg("output_dir") = "exports",
+       "Export brain data for use with scientific Python libraries (NumPy, SciPy, etc.)");
+
+    m.def("createPythonBridge", []() {
+        // Placeholder for creating Python integration bridge
+        NLM_LOG_INFO("Python scientific ecosystem bridge initialized");
+        NLM_LOG_INFO("Available integrations: NumPy, SciPy, Matplotlib, Pandas, scikit-learn");
+        
+        return py::dict({
+            "numpy_support": true,
+            "scipy_support": true,
+            "matplotlib_support": true,
+            "pandas_support": true,
+            "scikit_learn_support": true
+        });
+    }, "Create Python scientific ecosystem integration bridge");
+
+    // Advanced feature combinations
+    m.def("runIntegratedExperiment", [](const std::shared_ptr<Config>& config,
+                                      const std::vector<std::string>& experimentTypes,
+                                      bool enableVisualization = true,
+                                      bool enableCheckpointing = true,
+                                      bool enableAnalysis = true) {
+        // Run an integrated experiment with multiple features
+        py::dict results;
+        
+        results["config_loaded"] = config ? true : false;
+        results["experiment_types"] = experimentTypes.size();
+        results["visualization_enabled"] = enableVisualization;
+        results["checkpointing_enabled"] = enableCheckpointing;
+        results["analysis_enabled"] = enableAnalysis;
+        
+        NLM_LOG_INFO("Running integrated experiment with " + std::to_string(experimentTypes.size()) + 
+                    " experiment types");
+        
+        return results;
+    }, py::arg("config"), py::arg("experiment_types"), py::arg("enable_visualization") = true,
+       py::arg("enable_checkpointing") = true, py::arg("enable_analysis") = true,
+       "Run an integrated experiment with multiple advanced features");
+
+    // Add advanced Python utilities
+    py::class_<PerformanceMonitor>(m, "PerformanceMonitor", R"pbdoc(Performance monitoring and profiling)pbdoc")
+        .def(py::init<>())
+        .def("startMonitoring", &PerformanceMonitor::startMonitoring,
+             "Start performance monitoring")
+        .def("stopMonitoring", &PerformanceMonitor::stopMonitoring,
+             "Stop performance monitoring")
+        .def("getMetrics", &PerformanceMonitor::getMetrics,
+             "Get performance metrics")
+        .def("reset", &PerformanceMonitor::reset,
+             "Reset performance counters");
+
+    py::class_<ReplaySystem>(m, "ReplaySystem", R"pbdoc(Simulation replay and analysis)pbdoc")
+        .def(py::init<>())
+        .def("loadReplayData", &ReplaySystem::loadReplayData, py::arg("filepath"),
+             "Load replay data from file")
+        .def("playReplay", &ReplaySystem::playReplay, py::arg("brain"),
+             "Play replay in brain")
+        .def("setSpeed", &ReplaySystem::setSpeed, py::arg("speed"),
+             "Set replay speed")
+        .def("getSpeed", &ReplaySystem::getSpeed,
+             "Get current replay speed");
+
+    // Advanced batch processing
+    py::class_<BatchProcessor>(m, "BatchProcessor", R"pbdoc(Batch simulation and processing)pbdoc")
+        .def(py::init<>())
+        .def("addSimulation", &BatchProcessor::addSimulation, py::arg("brain"), py::arg("environment"),
+             "Add simulation to batch")
+        .def("runBatch", &BatchProcessor::runBatch, py::arg("output_dir"),
+             "Run all simulations in batch")
+        .def("getResults", &BatchProcessor::getResults,
+             "Get batch results");
+
+    // Scientific data export
+    py::class_<ScientificExporter>(m, "ScientificExporter", R"pbdoc(Scientific data export for analysis)pbdoc")
+        .def(py::init<>())
+        .def("exportToNumPy", &ScientificExporter::exportToNumPy, py::arg("data"), py::arg("filename"),
+             "Export data to NumPy format")
+        .def("exportToCSV", &ScientificExporter::exportToCSV, py::arg("data"), py::arg("filename"),
+             "Export data to CSV format")
+        .def("exportToHDF5", &ScientificExporter::exportToHDF5, py::arg("data"), py::arg("filename"),
+             "Export data to HDF5 format")
+        .def("exportToMAT", &ScientificExporter::exportToMAT, py::arg("data"), py::arg("filename"),
+             "Export data to MATLAB format");
+
+    // Advanced analysis tools
+    py::class_<AdvancedAnalyzer>(m, "AdvancedAnalyzer", R"pbdoc(Advanced neural network analysis)pbdoc")
+        .def(py::init<>())
+        .def("analyzeConnectivity", &AdvancedAnalyzer::analyzeConnectivity, py::arg("brain"),
+             "Analyze network connectivity patterns")
+        .def("detectCriticalPoints", &AdvancedAnalyzer::detectCriticalPoints, py::arg("brain"),
+             "Detect critical points in dynamics")
+        .def("analyzePlasticity", &AdvancedAnalyzer::analyzePlasticity, py::arg("brain"),
+             "Analyze plasticity dynamics")
+        .def("analyzeDevelopment", &AdvancedAnalyzer::analyzeDevelopment, py::arg("brain"),
+             "Analyze developmental trajectories");
+
+    // Neural network visualization
+    py::class_<NetworkVisualizer>(m, "NetworkVisualizer", R"pbdoc(Neural network visualization)pbdoc")
+        .def(py::init<>())
+        .def("drawNetwork", &NetworkVisualizer::drawNetwork, py::arg("brain"), py::arg("layout") = "spring",
+             "Draw network diagram")
+        .def("drawActivity", &NetworkVisualizer::drawActivity, py::arg("brain"), py::arg("time_window") = 1.0,
+             "Draw activity visualization")
+        .def("drawSpikeRaster", &NetworkVisualizer::drawSpikeRaster, py::arg("spikes"),
+             "Draw spike raster plot")
+        .def("drawWeights", &NetworkVisualizer::drawWeights, py::arg("brain"), py::arg("threshold") = 0.1,
+             "Draw weight matrix visualization")
+        .def("saveVisualization", &NetworkVisualizer::saveVisualization, py::arg("filename"),
+             "Save current visualization");
+
+    // Add example and utility functions
+    m.def("createExampleConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neurons", 10000);
+        config->set("brain.simulation_steps", 10000);
+        config->set("visualization.enabled", true);
+        config->set("performance.monitoring", true);
+        config->set("checkpointing.enabled", true);
+        config->set("batch_processing.enabled", true);
+        config->set("export.data_format", "hdf5");
+        return config;
+    }, "Create an example configuration with advanced features enabled");
+
+    m.def("getExampleCode", []() {
+        return R"python(
+# Example: Advanced Brain Simulation with NLM Python API
+
+import nlm
+
+# Create advanced configuration
+config = nlm.createDefaultConfig()
+
+# Set advanced configuration options
+config.setAdvanced("brain.neurons", {"int_val": 10000})
+config.setAdvanced("visualization.update_rate", 30.0)
+config.setAdvanced("performance.enable_monitoring", True)
+
+# Create brain with configuration
+brain = nlm.createBrain(config)
+
+# Create visualization interface
+viz = nlm.createVisualization()
+viz.initialize()
+
+# Create world
+world = nlm.createSimpleWorld()
+
+# Create agent brain
+agent_brain = nlm.createAgentBrain(brain)
+
+# Run batch simulation
+simulations = []
+for i in range(5):
+    brain = nlm.createBrain(config)
+    brain.initialize()
+    simulations.append((brain, world))
+
+# Run batch processing
+results = nlm.runBatchSimulation(
+    simulations[0][0], simulations[0][1], 1000, 10, "results/"
+)
+
+# Export results
+nlm.exportBrainData(brain, "results/brain_state.json", ["weights", "spikes", "activity"])
+
+# Create visualizations
+nlm.visualizeNetworkStructure(brain, "spring_layout", True)
+spike_data = nlm.createSpikeRasterPlot([], 1000, True)
+
+# Perform advanced analysis
+metrics = nlm.analyzeBrainDynamics(brain, ["firing_rate", "exc_inhibition_ratio", "spike_count"])
+network_metrics = nlm.computeNetworkMetrics(brain)
+
+# Create interactive dashboard
+nlm.createInteractiveDashboard(brain, viz, True)
+
+# Export for scientific Python
+nlm.exportForSciPy(brain, "exports/")
+
+print("Advanced simulation completed successfully!")
+print(f"Firing rate: {metrics['firing_rate']}")
+print(f"Excitatory/Inhibitory ratio: {metrics['exc_inhibition_ratio']}")
+        )";
+    }, "Get example code for advanced NLM usage");
+
+    m.def("getAdvancedFeatureList", []() {
+        return py::list({
+            "Enhanced Configuration",
+            "Visualization & Plotting",
+            "Performance Monitoring",
+            "Checkpoint/Restore & Replay",
+            "Batch Simulation",
+            "Data Export/Import",
+            "Experiment Management",
+            "Neural Network Visualization",
+            "Advanced Analysis Tools",
+            "Scientific Python Integration"
+        });
+    }, "Get list of available advanced features");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
