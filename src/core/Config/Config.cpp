@@ -86,7 +86,18 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Use visitor pattern to serialize actual value
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -187,9 +198,12 @@ std::string Config::summary() const {
 }
 
 std::string Config::trim(const std::string& str) {
+    if (str.empty()) return str;
+    
     size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
     size_t end = str.find_last_not_of(" \t\r\n");
+    
+    if (start == std::string::npos) return "";
     return str.substr(start, end - start + 1);
 }
 
