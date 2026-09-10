@@ -35,7 +35,9 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->totalCurrent = 0.0f;
 }
 
-Neuron::~Neuron() = default;
+Neuron::~Neuron() {
+    delete pImpl;
+}
 
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -260,8 +262,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Perform Leaky Integrate-and-Fire (LIF) dynamics for one simulation timestep
+    // The neuron integrates synaptic inputs, checks for threshold crossing, and may fire
+    // Handles refractory period, adaptation, and spike resetting internally via stepLIF()
+    TimestepDuration dt = 0.001;  // Standard 1ms timestep for most simulations
     stepLIF(currentTime, dt);
 }
 

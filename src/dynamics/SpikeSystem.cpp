@@ -84,7 +84,7 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
     if (it != pImpl->delayedSpikes.end()) {
         // Process all spikes scheduled for this step
         for (const auto& delayedEvent : it->second) {
-            // Call delayed spike handlers (these will deliver synaptic input)
+            // Call delayed spike handlers to deliver synaptic input
             for (auto& handler : pImpl->delayedHandlers) {
                 handler(delayedEvent);
             }
