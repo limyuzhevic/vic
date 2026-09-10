@@ -528,8 +528,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form or update concepts
+        // Collect current brain state for concept formation
+        ConceptFormationInput input;
+        
+        // Extract active neural patterns
+        std::vector<float> activePattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        activePattern.push_back(std::abs(neuron->getState().membranePotential - 
+                                                       neuron->getState().restingPotential) / 20.0f);
+                    } else {
+                        activePattern.push_back(0.0f);
+                    }
+                }
+            }
+        }
+        
+        input.activePattern = activePattern;
+        
+        // Also include prediction error for concept learning
+        input.predictionError = pImpl->predictionSystem ? 
+                                pImpl->predictionSystem->getPredictionError() : 0.0f;
+        
+        // Update concepts based on current brain state
+        pImpl->conceptFormation->updateConcept(input);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -828,6 +854,110 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write memory systems
+        if (pImpl->workingMemory) {
+            WorkingMemoryCheckpointData wmData;
+            // TODO: Fill in working memory data
+            if (!writer.writeWorkingMemory(wmData)) {
+                NLM_LOG_ERROR("Failed to write working memory to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->episodicMemory) {
+            EpisodicMemoryCheckpointData emData;
+            // TODO: Fill in episodic memory data
+            if (!writer.writeEpisodicMemory(emData)) {
+                NLM_LOG_ERROR("Failed to write episodic memory to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->associativeMemory) {
+            AssociativeMemoryCheckpointData amData;
+            // TODO: Fill in associative memory data
+            if (!writer.writeAssociativeMemory(amData)) {
+                NLM_LOG_ERROR("Failed to write associative memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write prediction system
+        if (pImpl->predictionSystem) {
+            PredictionSystemCheckpointData psData;
+            // TODO: Fill in prediction system data
+            if (!writer.writePredictionSystem(psData)) {
+                NLM_LOG_ERROR("Failed to write prediction system to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write cognitive systems
+        if (pImpl->planner) {
+            PlannerCheckpointData pData;
+            // TODO: Fill in planner data
+            if (!writer.writePlanner(pData)) {
+                NLM_LOG_ERROR("Failed to write planner to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->conceptFormation) {
+            ConceptFormationCheckpointData cfData;
+            // TODO: Fill in concept formation data
+            if (!writer.writeConceptFormation(cfData)) {
+                NLM_LOG_ERROR("Failed to write concept formation to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->attention) {
+            AttentionCheckpointData aData;
+            // TODO: Fill in attention data
+            if (!writer.writeAttention(aData)) {
+                NLM_LOG_ERROR("Failed to write attention to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write neuromodulators
+        if (pImpl->dopamine) {
+            DopamineCheckpointData dData;
+            dData.level = pImpl->dopamine->getLevel();
+            if (!writer.writeDopamine(dData)) {
+                NLM_LOG_ERROR("Failed to write dopamine to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->curiosity) {
+            CuriosityCheckpointData cData;
+            cData.level = pImpl->curiosity->getLevel();
+            if (!writer.writeCuriosity(cData)) {
+                NLM_LOG_ERROR("Failed to write curiosity to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->novelty) {
+            NoveltyCheckpointData nData;
+            nData.level = pImpl->novelty->getLevel();
+            if (!writer.writeNovelty(nData)) {
+                NLM_LOG_ERROR("Failed to write novelty to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write development system
+        if (pImpl->developmentSystem) {
+            DevelopmentSystemCheckpointData dsData;
+            // TODO: Fill in development system data
+            if (!writer.writeDevelopmentSystem(dsData)) {
+                NLM_LOG_ERROR("Failed to write development system to checkpoint");
+                return false;
+            }
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -898,6 +1028,99 @@ bool Brain::load(const std::string& filepath) {
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // Read memory systems
+        if (pImpl->workingMemory && reader.hasWorkingMemory()) {
+            WorkingMemoryCheckpointData wmData;
+            if (reader.readWorkingMemory(wmData)) {
+                // TODO: Apply working memory data
+                NLM_LOG_INFO("Loaded working memory data");
+            }
+        }
+        
+        if (pImpl->episodicMemory && reader.hasEpisodicMemory()) {
+            EpisodicMemoryCheckpointData emData;
+            if (reader.readEpisodicMemory(emData)) {
+                // TODO: Apply episodic memory data
+                NLM_LOG_INFO("Loaded episodic memory data");
+            }
+        }
+        
+        if (pImpl->associativeMemory && reader.hasAssociativeMemory()) {
+            AssociativeMemoryCheckpointData amData;
+            if (reader.readAssociativeMemory(amData)) {
+                // TODO: Apply associative memory data
+                NLM_LOG_INFO("Loaded associative memory data");
+            }
+        }
+        
+        // Read prediction system
+        if (pImpl->predictionSystem && reader.hasPredictionSystem()) {
+            PredictionSystemCheckpointData psData;
+            if (reader.readPredictionSystem(psData)) {
+                // TODO: Apply prediction system data
+                NLM_LOG_INFO("Loaded prediction system data");
+            }
+        }
+        
+        // Read cognitive systems
+        if (pImpl->planner && reader.hasPlanner()) {
+            PlannerCheckpointData pData;
+            if (reader.readPlanner(pData)) {
+                // TODO: Apply planner data
+                NLM_LOG_INFO("Loaded planner data");
+            }
+        }
+        
+        if (pImpl->conceptFormation && reader.hasConceptFormation()) {
+            ConceptFormationCheckpointData cfData;
+            if (reader.readConceptFormation(cfData)) {
+                // TODO: Apply concept formation data
+                NLM_LOG_INFO("Loaded concept formation data");
+            }
+        }
+        
+        if (pImpl->attention && reader.hasAttention()) {
+            AttentionCheckpointData aData;
+            if (reader.readAttention(aData)) {
+                // TODO: Apply attention data
+                NLM_LOG_INFO("Loaded attention data");
+            }
+        }
+        
+        // Read neuromodulators
+        if (pImpl->dopamine && reader.hasDopamine()) {
+            DopamineCheckpointData dData;
+            if (reader.readDopamine(dData)) {
+                pImpl->dopamine->setLevel(dData.level);
+                NLM_LOG_INFO("Loaded dopamine data");
+            }
+        }
+        
+        if (pImpl->curiosity && reader.hasCuriosity()) {
+            CuriosityCheckpointData cData;
+            if (reader.readCuriosity(cData)) {
+                // TODO: Apply curiosity data
+                NLM_LOG_INFO("Loaded curiosity data");
+            }
+        }
+        
+        if (pImpl->novelty && reader.hasNovelty()) {
+            NoveltyCheckpointData nData;
+            if (reader.readNovelty(nData)) {
+                // TODO: Apply novelty data
+                NLM_LOG_INFO("Loaded novelty data");
+            }
+        }
+        
+        // Read development system
+        if (pImpl->developmentSystem && reader.hasDevelopmentSystem()) {
+            DevelopmentSystemCheckpointData dsData;
+            if (reader.readDevelopmentSystem(dsData)) {
+                // TODO: Apply development system data
+                NLM_LOG_INFO("Loaded development system data");
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
