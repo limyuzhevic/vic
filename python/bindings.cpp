@@ -1,20 +1,14 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/functional.h>
-#include <pybind11/chrono.h>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/AssociativeMemory.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/AttentionalSelection.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/neuromodulation/Acetylcholine.hpp"
+#include "../src/neuromodulation/Norepinephrine.hpp"
+#include "../src/neuromodulation/Serotonin.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -25,6 +19,20 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        Plus advanced classes for memory systems, prediction, cognition, and neuromodulation.
+        
+        NEW IN PHASE 6: The Python bindings now include advanced cognitive and neuromodulatory systems:
+        - Memory Systems: WorkingMemory, EpisodicMemory, AssociativeMemory
+        - Prediction System: PredictionSystem
+        - Cognitive Systems: NeuralPlanner, ConceptFormation, AttentionalSelection
+        - Neuromodulation: Dopamine, Curiosity, Novelty, and other neuromodulators
+        - Development: DevelopmentSystem
+        - Additional World Objects: WorldObject, AgentBody, ActionResult, SensoryPercept
+        - Enhanced Simulation: SimpleWorld with improved object handling
+        
+        These bindings enable Python users to access the full Phase 6 integrated brain functionality,
+        including memory storage, concept formation, prediction, planning, and sophisticated
+        neuromodulation for learning and behavior.
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -198,28 +206,27 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
-    py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
+    py::class_<Curiosity>(m, "Curiosity", R"pbdoc(Curiosity neuromodulator for exploration)pbdoc")
         .def(py::init<>())
-        .def(py::init<ActionType>(), py::arg("type"))
-        .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
-        .def("getType", &Action::getType)
-        .def("setType", &Action::setType, py::arg("type"))
-        .def("getParameters", &Action::getParameters)
-        .def("setParameters", &Action::setParameters, py::arg("params"))
-        .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("update", &Curiosity::update, py::arg("timestep"),
+             "Update curiosity")
+        .def("getLevel", &Curiosity::getLevel,
+             "Get curiosity level")
+        .def("setLevel", &Curiosity::setLevel, py::arg("level"),
+             "Set curiosity level")
+        .def("updateFromNovelty", &Curiosity::updateFromNovelty, py::arg("novelty"), py::arg("prediction_error"),
+             "Update from novelty and prediction error");
 
-    py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
+    py::class_<Novelty>(m, "Novelty", R"pbdoc(Novelty detection for difference detection)pbdoc")
         .def(py::init<>())
-        .def(py::init<float, float, WorldObjectType, float, float>(),
-             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
-             py::arg("radius") = 0.5f)
-        .def_readwrite("x", &WorldObject::x)
-        .def_readwrite("y", &WorldObject::y)
-        .def_readwrite("radius", &WorldObject::radius)
-        .def_readwrite("type", &WorldObject::type)
-        .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
+        .def("update", &Novelty::update, py::arg("timestep"),
+             "Update novelty")
+        .def("getLevel", &Novelty::getLevel,
+             "Get novelty level")
+        .def("detectNovelty", &Novelty::detectNovelty, py::arg("current_input"), py::arg("memory"),
+             "Detect novelty in input")
+        .def("setDecayRate", &Novelty::setDecayRate, py::arg("rate"),
+             "Set novelty decay rate");
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())

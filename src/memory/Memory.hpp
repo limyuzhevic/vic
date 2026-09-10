@@ -7,15 +7,17 @@
 namespace nlm {
 
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Implements neural working memory with persistent activity and capacity limits
 
 class WorkingMemory {
 public:
     WorkingMemory();
     ~WorkingMemory();
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
+    // Initialize with capacity
+    void initialize(size_t capacity) { capacity_ = capacity; }
+    
+    // Store item with capacity management
     void store(NeuronId neuron, float value);
     
     // Retrieve item
@@ -28,27 +30,32 @@ public:
     void clear();
     
     // Get capacity
-    size_t getCapacity() const;
-    size_t getCurrentSize() const;
+    size_t getCapacity() const { return capacity_; }
+    size_t getCurrentSize() const { return items_.size(); }
     
     // Decay all items
     void decay(float decayRate);
     
+    // Get all items for neural integration
+    const std::vector<std::pair<NeuronId, float>>& getAllItems() const { return items_; }
+    
 private:
-    struct Impl;
-    Impl* pImpl;
+    std::vector<std::pair<NeuronId, float>> items_;
+    size_t capacity_;
 };
 
 // Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
+// Implements neural episodic memory with capacity management and consolidation
 
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
     std::vector<NeuronId> neurons;
     std::vector<float> values;
     std::string metadata;
+    float relevance;  // 0.0 to 1.0
     
-    EpisodicMemoryItem() : timestamp(0) {}
+    EpisodicMemoryItem()
+        : timestamp(0), relevance(0.5f) {}
 };
 
 class EpisodicMemory {
@@ -56,14 +63,17 @@ public:
     EpisodicMemory();
     ~EpisodicMemory();
     
-    // Store episode
+    // Initialize with capacity
+    void initialize(size_t maxEpisodes) { maxEpisodes_ = maxEpisodes; }
+    
+    // Store episode with capacity management
     void storeEpisode(const EpisodicMemoryItem& episode);
     
     // Retrieve episode
     EpisodicMemoryItem retrieveEpisode(size_t index) const;
     
     // Get episode count
-    size_t getEpisodeCount() const;
+    size_t getEpisodeCount() const { return episodes_.size(); }
     
     // Get recent episodes
     std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
@@ -74,9 +84,15 @@ public:
     // Memory consolidation (move to long-term)
     void consolidate(float relevanceThreshold);
     
+    // Get episodes for replay
+    std::vector<EpisodicMemoryItem> getEpisodesForReplay(size_t count) const;
+    
+    // Replay episode
+    void replayEpisode(const EpisodicMemoryItem& episode);
+    
 private:
-    struct Impl;
-    Impl* pImpl;
+    std::vector<EpisodicMemoryItem> episodes_;
+    size_t maxEpisodes_;
 };
 
 // Semantic memory: gradually acquired knowledge
