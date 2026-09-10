@@ -5,11 +5,16 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
+
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+class ConfigSchema;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -41,6 +46,56 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// JSON serialization functions
+nlohmann::json configValueToJson(const ConfigValue& value);
+ConfigValue jsonToConfigValue(const nlohmann::json& jsonValue);
+bool validateJsonConfig(const nlohmann::json& jsonConfig, const ConfigSchema& schema);
+
+// Schema validation types
+struct ConfigSchemaEntry {
+    std::string key;
+    std::string type; // "int", "int64", "double", "bool", "string", "vector<int>", "vector<double>", "vector<string>"
+    bool required;
+    ConfigValue defaultValue;
+    std::string validationPattern;
+    double minValue;
+    double maxValue;
+    size_t minSize;
+    size_t maxSize;
+};
+
+struct ConfigSchema {
+    std::string name;
+    std::string description;
+    std::vector<ConfigSchemaEntry> entries;
+    std::unordered_map<std::string, std::function<bool(const ConfigValue&)>> customValidators;
+    
+    ConfigSchema() : name(), description() {}
+    ConfigSchema(const std::string& n, const std::string& desc) : name(n), description(desc) {}
+    
+    void addEntry(const std::string& key, const std::string& type, bool required = false, 
+                  const ConfigValue& defaultValue = ConfigValue{}, 
+                  const std::string& validationPattern = "",
+                  double minValue = 0.0, double maxValue = 0.0,
+                  size_t minSize = 0, size_t maxSize = 0) {
+        ConfigSchemaEntry entry;
+        entry.key = key;
+        entry.type = type;
+        entry.required = required;
+        entry.defaultValue = defaultValue;
+        entry.validationPattern = validationPattern;
+        entry.minValue = minValue;
+        entry.maxValue = maxValue;
+        entry.minSize = minSize;
+        entry.maxSize = maxSize;
+        entries.push_back(entry);
+    }
+    
+    void addCustomValidator(const std::string& key, std::function<bool(const ConfigValue&)> validator) {
+        customValidators[key] = validator;
+    }
 };
 
 // Main configuration class

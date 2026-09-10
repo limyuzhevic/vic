@@ -133,6 +133,83 @@ def run_simulation(brain, world, agent, num_steps):
 run_simulation(brain, world, agent, 1000)
 ```
 
+### Pattern 2: JSON Configuration
+
+```python
+import pynlm
+import json
+
+# Create configuration from JSON string
+config_json = """
+{
+    "brain": {
+        "neuronCount": 1000,
+        "regionCount": 4,
+        "plasticityEnabled": true,
+        "developmentStage": "Initial"
+    },
+    "world": {
+        "width": 20,
+        "height": 20,
+        "visionWidth": 8,
+        "visionHeight": 8,
+        "maxEnergy": 100.0
+    },
+    "agent": {
+        "enableRewardModulation": true,
+        "enableCuriosity": true,
+        "enableDevelopment": true
+    }
+}
+"""
+
+# Load configuration from JSON
+config = pynlm.createDefaultConfig()
+config.loadFromJsonString(config_json)
+
+# Create brain with JSON configuration
+brain = pynlm.createBrain(config)
+
+# Or load from file
+# brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# brain.getConfig().loadFromJsonFile("/path/to/config.json")
+```
+
+### Pattern 3: Performance Monitoring
+
+```python
+import pynlm
+import time
+
+# Create brain with performance monitoring
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# Enable performance monitoring
+brain.enablePerformanceMonitoring(True)
+
+brain.initialize()
+
+# Run simulation with performance tracking
+start_time = time.time()
+total_spikes = 0
+
+for i in range(1000):
+    brain.step(i)
+    total_spikes = brain.getTotalSpikeCount()
+    
+    # Print performance stats every 100 steps
+    if i % 100 == 0:
+        stats = brain.getPerformanceStats()
+        print(f"Step {i}: {stats['steps']} steps, "
+              f"{stats['spikes']} spikes, "
+              f"{stats['avgFiringRate']:.2f} avg firing rate, "
+              f"{stats['elapsedTime']:.2f}s elapsed")
+
+elapsed = time.time() - start_time
+print(f"Simulation completed in {elapsed:.2f}s")
+print(f"Total spikes: {total_spikes}")
+```
+
 ### Pattern 2: Get Brain Stats
 
 ```python
