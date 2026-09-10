@@ -9,11 +9,6 @@
 #include <fstream>
 #include <sstream>
 
-namespace nlm {
-
-// Main Phase 3 demonstration
-// Shows: experience -> neural activity -> action -> consequence -> learning
-
 class Phase3Demo {
 public:
     Phase3Demo() {}
