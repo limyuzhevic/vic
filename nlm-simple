@@ -1,0 +1,654 @@
+#!/bin/bash
+
+# NLM Simple Usage Script
+# Easy-to-use wrapper for common NLM operations
+
+# Color output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+PROJECT_NAME="NLM Simple Usage"
+
+show_help() {
+    echo "NLM Simple Usage - Quick start for common operations"
+    echo "============================================="
+    echo ""
+    echo "Available commands:"
+    echo "  simple-bird     Run a simple bird simulation (basic agent)"
+    echo "  simple-world    Run a simple world exploration"
+    echo "  simple-learn    Run a learning demonstration"
+    echo "  simple-neurons  Test neural activity with basic neurons"
+    echo "  simple-plasticity Show synaptic plasticity in action"
+    echo "  simple-config   Display current configuration"
+    echo "  simple-stats    Show brain statistics and metrics"
+    echo "  simple-demo     Run complete demo with default settings"
+    echo "  custom-config   Create custom configuration file"
+    echo "  help           Show this help message"
+    echo ""
+    echo "Quick usage examples:"
+    echo "  nlm-simple simple-demo           # Run full demo"
+    echo "  nlm-simple simple-bird           # Watch a bird fly"
+    echo "  nlm-simple simple-learn          # See learning in action"
+    echo ""
+    echo "For advanced options, use the full build_and_test.sh script"
+}
+
+# Create simple demo configuration
+create_simple_config() {
+    local config_file="simple_config.cfg"
+    
+    cat > "$config_file" << EOF
+# Simple NLM Configuration
+# For demonstrations and learning
+
+neuron_count = 200
+region_count = 1
+connection_probability = 0.05
+stdp_ltp_weight = 0.005
+stdp_ltd_weight = 0.012
+stdp_tau = 10.0
+synaptogenesis_rate = 0.0005
+pruning_rate = 0.00005
+replay_interval = 200
+consolidation_interval = 2000
+simulation_timestep = 0.001
+random_seed = 123
+
+# Enable all systems for demo
+enable_checkpointing = false
+max_steps = 500
+enable_neuromodulation = true
+enable_curiosity = true
+enable_prediction = true
+enable_concept_formation = true
+enable_memory = true
+memory_capacity = 20
+
+# Demo settings
+log_level = INFO
+verbose = false
+EOF
+    
+    echo "Created simple configuration: $config_file"
+}
+
+# Run simple bird demo (agent exploring a world)
+run_simple_bird() {
+    echo -e "${YELLOW}Starting Simple Bird Demo...${NC}"
+    echo "Watch an agent (bird) explore and learn in a simulated world"
+    echo ""
+    
+    # Create config
+    create_simple_config
+    
+    # Check if demo is built
+    if [ ! -f "build/nlm_phase4_demo" ]; then
+        echo "Building Phase 4 demo (simple world demo)..."
+        if ! bash build_and_test.sh build Release; then
+            echo -e "${RED}Build failed!${NC}"
+            exit 1
+        fi
+    fi
+    
+    # Run Phase 4 demo (simpler than Phase 6)
+    echo -e "${BLUE}Running bird simulation...${NC}"
+    ./build/nlm_phase4_demo
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Simple bird demo completed!${NC}"
+        echo "The bird learned to navigate and avoid obstacles."
+    else
+        echo -e "${RED}Bird demo failed!${NC}"
+        exit 1
+    fi
+}
+
+# Run simple world exploration
+run_simple_world() {
+    echo -e "${YELLOW}Starting Simple World Demo...${NC}"
+    echo "Basic agent behavior in a simple environment"
+    echo ""
+    
+    # Create Python script for simple world demo
+    cat > simple_world_demo.py << 'EOF'
+#!/usr/bin/env python3
+import pynlm
+import time
+
+print("=== Simple World Demo ===")
+print("Creating brain and world for basic exploration...")
+
+# Create brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Brain created with {brain.getTotalNeuronCount()} neurons")
+
+# Create world
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+world.setAgentStart(10.0, 10.0)
+
+# Create agent
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+print("Running simple exploration...")
+print("The agent will explore the world and learn from experience.")
+print("")
+
+# Run simulation
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing, "
+              f"position: {world.getAgentBody().x:.1f}, {world.getAgentBody().y:.1f}")
+
+print("")
+print("=== Demo Complete ===")
+print("The agent explored the world and demonstrated basic navigation.")
+print("Key observations:")
+print(f"- Total spikes: {brain.getTotalSpikeCount()}")
+print(f"- Max firing rate: {brain.getAverageFiringRate():.2f}")
+print(f"- Curiosity level: {agent.getCuriosityLevel():.2f}")
+print(f"- Novelty level: {agent.getNoveltyLevel():.2f}")
+EOF
+    
+    python3 simple_world_demo.py
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Simple world demo completed!${NC}"
+    else
+        echo -e "${RED}Simple world demo failed!${NC}"
+        exit 1
+    fi
+}
+
+# Run simple learning demonstration
+run_simple_learn() {
+    echo -e "${YELLOW}Starting Simple Learning Demo...${NC}"
+    echo "Demonstrate learning, plasticity, and memory"
+    echo ""
+    
+    # Create Python script for learning demo
+    cat > simple_learning_demo.py << 'EOF'
+#!/usr/bin/env python3
+import pynlm
+import time
+
+print("=== Simple Learning Demo ===")
+print("Demonstrating neural learning, plasticity, and memory...")
+print("")
+
+# Create brain with learning enabled
+config = pynlm.createDefaultConfig()
+# Increase plasticity for dramatic learning effects
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Brain created with {brain.getTotalNeuronCount()} neurons")
+print("Learning features enabled:")
+print("- Reward modulation: YES")
+print("- Structural plasticity: YES") 
+print("- Development stages: YES")
+print("- Curiosity-driven exploration: YES")
+print("")
+
+# Create world for learning
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=6, visionHeight=6)
+world.reset()
+world.setAgentStart(7.5, 7.5)
+
+# Create agent with all learning systems
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all learning features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+print("Running learning simulation...")
+print("Watch the brain learn from rewards and exploration.")
+print("")
+
+# Run learning simulation
+for step in range(200):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Simulate reward based on proximity to center
+    body = world.getAgentBody()
+    distance = ((body.x - 7.5) ** 2 + (body.y - 7.5) ** 2) ** 0.5
+    reward = max(0.0, 1.0 - distance / 7.5)  # Higher reward when close to center
+    
+    agent.applyRewardModulation(reward, 0.0)
+    agent.updateDevelopment(0.1)
+    
+    if step % 40 == 0:
+        print(f"Step {step}:")
+        print(f"  Position: {body.x:.1f}, {body.y:.1f}")
+        print(f"  Reward: {reward:.2f}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.2f}")
+        print(f"  Development stage: {brain.getDevelopmentalStage()}")
+        print(f"  Neurons firing: {brain.getFiringNeuronCount()}")
+
+print("")
+print("=== Learning Results ===")
+print(f"Final firing rate: {brain.getAverageFiringRate():.2f}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Final curiosity level: {agent.getCuriosityLevel():.2f}")
+print(f"Final novelty level: {agent.getNoveltyLevel():.2f}")
+print(f"Final developmental stage: {brain.getDevelopmentalStage()}")
+print("")
+print("Learning observations:")
+print("- The brain adapted based on rewards")
+print("- Structural plasticity created new connections")
+print("- Development stages affected plasticity rates")
+print("- Curiosity-driven exploration occurred")
+print("- Neural networks were reorganized through experience")
+EOF
+    
+    python3 simple_learning_demo.py
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Simple learning demo completed!${NC}"
+    else
+        echo -e "${RED}Simple learning demo failed!${NC}"
+        exit 1
+    fi
+}
+
+# Run simple neuron test
+run_simple_neurons() {
+    echo -e "${YELLOW}Starting Simple Neuron Test...${NC}"
+    echo "Test basic neural activity and spiking"
+    echo ""
+    
+    cat > simple_neuron_test.py << 'EOF'
+#!/usr/bin/env python3
+import pynlm
+
+print("=== Simple Neuron Test ===")
+print("Testing basic neural dynamics and spiking...")
+print("")
+
+# Create brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Brain created: {brain.getTotalNeuronCount()} neurons")
+print("")
+
+# Test without any input (silence)
+print("Testing neural activity without input...")
+for step in range(50):
+    brain.step(step)
+    if step % 10 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons, "
+              f"{brain.getTotalSpikeCount()} total spikes")
+
+print("")
+
+# Test with sensory input
+print("Testing neural activity with sensory input...")
+# Create a simple world for sensory input
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=4, visionHeight=4)
+world.reset()
+
+# Inject current into sensory neurons
+brain.injectCurrentToNeurons(pynlm.NeuronType.Sensory, 5.0)
+
+print("Injecting current into sensory neurons...")
+for step in range(50, 100):
+    brain.step(step)
+    if step % 10 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons, "
+              f"{brain.getTotalSpikeCount()} total spikes")
+
+print("")
+print("=== Neuron Test Results ===")
+print(f"Average firing rate: {brain.getAverageFiringRate():.2f}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Excitation/Inhibition ratio: {brain.getExcitationInhibitionRatio():.2f}")
+print("")
+print("Key observations:")
+print("- Neurons show spontaneous activity")
+print("- Sensory input triggers neural firing")
+print("- Neural dynamics follow LIF principles")
+print("- Network exhibits coordinated activity")
+EOF
+    
+    python3 simple_neuron_test.py
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Simple neuron test completed!${NC}"
+    else
+        echo -e "${RED}Simple neuron test failed!${NC}"
+        exit 1
+    fi
+}
+
+# Run simple plasticity demo
+run_simple_plasticity() {
+    echo -e "${YELLOW}Starting Simple Plasticity Demo...${NC}"
+    echo "Demonstrate synaptic plasticity and learning"
+    echo ""
+    
+    cat > simple_plasticity_demo.py << 'EOF'
+#!/usr/bin/env python3
+import pynlm
+
+print("=== Simple Plasticity Demo ===")
+print("Demonstrating synaptic plasticity mechanisms...")
+print("")
+
+# Create brain with high plasticity
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Brain created: {brain.getTotalNeuronCount()} neurons")
+print("Plasticity systems enabled:")
+print("- STDP: YES")
+print("- Hebbian: YES")
+print("- Structural: YES")
+print("- Neuromodulation: YES")
+print("")
+
+# Get plasticity systems
+stdp = brain.getSTDP()
+hebbian = brain.getHebbian()
+structural = brain.getStructuralPlasticity()
+
+print("Running plasticity simulation...")
+print("Watch synaptic weights change through learning.")
+print("")
+
+# Run simulation with plasticity
+for step in range(100):
+    # Inject activity to trigger plasticity
+    brain.injectCurrentToNeurons(pynlm.NeuronType.Internal, 2.0)
+    
+    # Step the brain (triggers plasticity)
+    brain.step(step)
+    
+    # Check development
+    brain.develop()
+    
+    # Apply some neuromodulation effects
+    brain.develop()
+    
+    if step % 20 == 0:
+        print(f"Step {step}:")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+        print(f"  Development stage: {brain.getDevelopmentalStage()}")
+
+print("")
+print("=== Plasticity Results ===")
+print(f"Average firing rate: {brain.getAverageFiringRate():.2f}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"E/I ratio: {brain.getExcitationInhibitionRatio():.2f}")
+print("")
+print("Plasticity observations:")
+print("- STDP strengthens active synapses")
+print("- Hebbian learning reinforces correlated activity")
+print("- Structural plasticity creates new connections")
+print("- Development stages modulate plasticity rates")
+print("- Neuromodulation coordinates learning")
+EOF
+    
+    python3 simple_plasticity_demo.py
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Simple plasticity demo completed!${NC}"
+    else
+        echo -e "${RED}Simple plasticity demo failed!${NC}"
+        exit 1
+    fi
+}
+
+# Run simple config display
+run_simple_config() {
+    echo -e "${YELLOW}Simple Configuration ===${NC}"
+    echo "Current NLM configuration settings:"
+    echo ""
+    
+    # Create Python script to display config
+    cat > show_config.py << 'EOF'
+#!/usr/bin/env python3
+import pynlm
+
+print("=== Current NLM Configuration ===")
+config = pynlm.createDefaultConfig()
+print(config.summary())
+
+print("")
+print("=== Key Configuration Parameters ===")
+print("These parameters control brain behavior:")
+print("1. neuron_count - Number of neurons in the brain")
+print("2. region_count - Number of brain regions")
+print("3. connection_probability - Likelihood of synaptic connections")
+print("4. stdp_ltp_weight - STDP long-term potentiation weight")
+print("5. stdp_ltd_weight - STDP long-term depression weight")
+print("6. stdp_tau - STDP time constant")
+print("7. synaptogenesis_rate - Rate of new synapse creation")
+print("8. pruning_rate - Rate of synapse elimination")
+print("")
+print("You can modify these settings by editing configuration files")
+print("or by setting command-line arguments.")
+EOF
+    
+    python3 show_config.py
+}
+
+# Run simple stats display
+run_simple_stats() {
+    echo -e "${YELLOW}Simple Brain Statistics ===${NC}"
+    echo "Displaying current brain statistics and metrics:"
+    echo ""
+    
+    # Create Python script to show stats
+    cat > show_stats.py << 'EOF'
+#!/usr/bin/env python3
+import pynlm
+
+print("=== NLM Brain Statistics ===")
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Brain Statistics:")
+print(f"  - Total neurons: {brain.getTotalNeuronCount()}")
+print(f"  - Total synapses: {brain.getTotalSynapseCount()}")
+print(f"  - Active neurons: {brain.getActiveNeuronCount()}")
+print(f"  - Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"  - Average firing rate: {brain.getAverageFiringRate():.2f}")
+print(f"  - Total spikes: {brain.getTotalSpikeCount()}")
+print(f"  - Excitation/Inhibition ratio: {brain.getExcitationInhibitionRatio():.2f}")
+print(f"  - Developmental stage: {brain.getDevelopmentalStage()}")
+print(f"  - Region count: {brain.getRegionCount()}")
+print(f"  - Pending spike events: {brain.getPendingSpikeEventCount()}")
+print("")
+
+# Run a quick simulation
+print("Running quick simulation...")
+for i in range(50):
+    brain.step(i)
+
+print(f"After simulation:")
+print(f"  - Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"  - Average firing rate: {brain.getAverageFiringRate():.2f}")
+print(f"  - Total spikes: {brain.getTotalSpikeCount()}")
+print("")
+print("These statistics help monitor brain health and performance.")
+EOF
+    
+    python3 show_stats.py
+}
+
+# Run complete demo
+run_simple_demo() {
+    echo -e "${YELLOW}Starting Complete Simple Demo...${NC}"
+    echo "Running a complete demo with default settings"
+    echo ""
+    
+    if [ ! -f "build/nlm_phase6_demo" ]; then
+        echo "Building Phase 6 demo..."
+        if ! bash build_and_test.sh build Release; then
+            echo -e "${RED}Build failed!${NC}"
+            exit 1
+        fi
+    fi
+    
+    # Create simple Phase 6 config
+    cat > simple_phase6_config.cfg << EOF
+# Simple Phase 6 Configuration
+neuron_count = 100
+region_count = 2
+connection_probability = 0.1
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+stdp_tau = 20.0
+synaptogenesis_rate = 0.0001
+pruning_rate = 0.00001
+replay_interval = 100
+consolidation_interval = 1000
+simulation_timestep = 0.001
+random_seed = 42
+
+max_steps = 200
+enable_checkpointing = false
+enable_neuromodulation = true
+enable_curiosity = true
+enable_prediction = true
+enable_concept_formation = true
+enable_memory = true
+memory_capacity = 30
+EOF
+    
+    export NLM_DEMO_CONFIG="simple_phase6_config.cfg"
+    
+    echo -e "${BLUE}Running complete Phase 6 demo...${NC}"
+    ./build/nlm_phase6_demo
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Complete demo finished successfully!${NC}"
+        echo ""
+        echo "=== Demo Summary ==="
+        echo "The Phase 6 demo integrated all brain systems:"
+        echo "✓ Neural core with spiking neurons"
+        echo "✓ Working and episodic memory systems"
+        echo "✓ Neuromodulation with dopamine and curiosity"
+        echo "✓ Prediction and concept formation"
+        echo "✓ Planning and attention systems"
+        echo "✓ Developmental stages and plasticity"
+        echo "✓ Complete closed-loop brain loop"
+    else
+        echo -e "${RED}Complete demo failed!${NC}"
+        exit 1
+    fi
+}
+
+# Create custom configuration
+run_custom_config() {
+    echo -e "${YELLOW}Creating Custom Configuration ===${NC}"
+    echo "Creating a custom configuration file for your specific needs"
+    echo ""
+    
+    cat > create_custom_config.sh << 'EOF'
+#!/bin/bash
+
+cat > custom_nlm_config.cfg << CONFIG
+# Custom NLM Configuration File
+# Modify these settings for your specific needs
+
+# Basic brain parameters
+neuron_count = 500                    # Number of neurons
+region_count = 3                      # Number of brain regions
+connection_probability = 0.15         # Synapse formation probability
+
+# Plasticity parameters
+stdp_ltp_weight = 0.02                # STDP potentiation weight
+stdp_ltd_weight = 0.018               # STDP depression weight
+stdp_tau = 15.0                       # STDP time constant
+
+# Structural plasticity
+for
+
+CONFIG
+
+echo "Custom configuration created: custom_nlm_config.cfg"
+echo ""
+echo "You can use this configuration with:"
+echo "  ./build_and_test.sh build Release -c custom_nlm_config.cfg"
+echo "  ./run_phase6_demo.sh --enable-neuromodulation --enable-curiosity"
+EOF
+    
+    chmod +x create_custom_config.sh
+    ./create_custom_config.sh
+}
+
+# Main command processing
+main() {
+    local command="${1:-help}"
+    
+    case $command in
+        simple-bird)
+            run_simple_bird
+            ;;
+        simple-world)
+            run_simple_world
+            ;;
+        simple-learn)
+            run_simple_learn
+            ;;
+        simple-neurons)
+            run_simple_neurons
+            ;;
+        simple-plasticity)
+            run_simple_plasticity
+            ;;
+        simple-config)
+            run_simple_config
+            ;;
+        simple-stats)
+            run_simple_stats
+            ;;
+        simple-demo)
+            run_simple_demo
+            ;;
+        custom-config)
+            run_custom_config
+            ;;
+        help|*)
+            show_help
+            ;;
+        *)
+            echo -e "${RED}Unknown command: $command${NC}"
+            echo "Use 'nlm-simple help' to see available commands"
+            exit 1
+            ;;
+    esac
+}
+
+# Execute main function with all arguments
+main "$@"

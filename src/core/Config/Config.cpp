@@ -43,7 +43,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -53,6 +53,32 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
+}
+
+// Additional file format support
+bool Config::loadFromJSON(const std::string& filepath) {
+    // TODO PHASE 3: Implement proper JSON parser
+    // For now, use the simple key=value format but accept .json extension
+    return loadFromFile(filepath);
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    // TODO PHASE 3: Implement proper YAML parser  
+    // For now, use the simple key=value format but accept .yaml/.yml extension
+    return loadFromFile(filepath);
+}
+
+// Additional file format support
+bool Config::loadFromJSON(const std::string& filepath) {
+    // TODO PHASE 3: Implement proper JSON parser
+    // For now, use the simple key=value format but accept .json extension
+    return loadFromFile(filepath);
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    // TODO PHASE 3: Implement proper YAML parser  
+    // For now, use the simple key=value format but accept .yaml/.yml extension
+    return loadFromFile(filepath);
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

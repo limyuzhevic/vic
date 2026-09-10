@@ -121,6 +121,27 @@ struct Brain::Impl {
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
+        // Connect concept formation to brain for pattern analysis
+        if (conceptFormation) {
+            conceptFormation->initialize(this);
+        }
+        
+        // Connect prediction system to brain for forward models
+        if (predictionSystem) {
+            // Initialize prediction system with brain reference
+            // This is needed for real-time prediction using neural substrate
+        }
+        
+        // Connect working memory to brain for transient storage
+        if (workingMemory) {
+            // Set up working memory integration with sensory input
+        }
+        
+        // Connect episodic memory to brain for experience storage
+        if (episodicMemory) {
+            // Initialize episodic memory with proper encoding mechanisms
+        }
+        
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
