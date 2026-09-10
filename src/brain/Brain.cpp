@@ -402,7 +402,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processSpikes(currentStep);
     
     // ========== STEP 4: Update working memory ==========
+    // Update working memory to maintain active traces and apply decay
     if (pImpl->workingMemory) {
+        // Apply consolidation and cleanup to working memory periodically
+        if (currentStep % pImpl->consolidationInterval == 0) {
+            pImpl->workingMemory->decayWeakTraces();
+        }
+        
+        // Update working memory to maintain active traces
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
@@ -444,6 +451,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    // Apply neuromodulation effects on plasticity rules
+    if (pImpl->novelty) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        if (noveltyLevel > 0.5f) {
+            // High novelty increases learning rate
+            plasticityMod *= (1.0f + noveltyLevel * 0.5f);
+        }
     }
     
     for (auto& region : pImpl->regions) {
@@ -488,7 +504,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store active neurons with their activation levels
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,7 +518,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
+            // Store reward in episode (overwrite previous reward assignment)
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
@@ -511,8 +527,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural state
+        // This would normally predict next sensory input based on current state
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Get prediction error from system
+        if (pImpl->predictionError) {
+            // Prediction error signals modulate learning and attention
+            float predictionErrorLevel = pImpl->predictionError->getLevel();
+            if (predictionErrorLevel > 0.0f) {
+                // High prediction error increases plasticity
+                plasticityMod *= (1.0f + predictionErrorLevel * 0.3f);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
