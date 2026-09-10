@@ -110,25 +110,50 @@ struct Brain::Impl {
         
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
+        workingMemory->initialize(this);
+        workingMemory->setCapacity(config->getOr<size_t>("working_memory_capacity", 500));
+        
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        episodicMemory->initialize(this);
+        episodicMemory->setMaxEpisodes(config->getOr<size_t>("max_episodes", 1000));
+        
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        associativeMemory->initialize(this);
+        associativeMemory->setAssociativityThreshold(config->getOr<float>("associativity_threshold", 0.5f));
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
+        predictionSystem->initialize(this);
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
+        planner->initialize(this);
+        planner->setPlanningDepth(config->getOr<size_t>("planning_depth", 5));
+        
         conceptFormation = std::make_unique<ConceptFormation>();
+        conceptFormation->initialize(this);
+        
         attention = std::make_unique<AttentionalSelection>();
+        attention->initialize(this);
+        attention->setInhibitionStrength(config->getOr<float>("attention_inhibition_strength", 0.5f));
+        attention->setExcitationStrength(config->getOr<float>("attention_excitation_strength", 1.5f));
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
+        developmentSystem->initialize(this);
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        dopamine->initialize(this);
+        
         curiosity = std::make_unique<Curiosity>();
+        curiosity->initialize(this);
+        
         predictionError = std::make_unique<PredictionError>();
+        predictionError->initialize(this);
+        
         novelty = std::make_unique<Novelty>();
+        novelty->initialize(this);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -229,42 +254,43 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
-    
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
-    
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
-    
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
-    
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
-    
-    pImpl->conceptFormation->initialize(this);
-    
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
-    
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
-    
-    // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
+        // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
+        
+        // Initialize working memory
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(config->getOr<size_t>("working_memory_capacity", 500));
+        
+        // Initialize episodic memory
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(config->getOr<size_t>("max_episodes", 1000));
+        
+        // Initialize associative memory
+        pImpl->associativeMemory->initialize(this);
+        pImpl->associativeMemory->setAssociativityThreshold(config->getOr<float>("associativity_threshold", 0.5f));
+        
+        // Initialize prediction system
+        // (PredictionSystem doesn't have initialize method currently)
+        
+        // Initialize cognition systems
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(config->getOr<size_t>("planning_depth", 5));
+        
+        pImpl->conceptFormation->initialize(this);
+        
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(config->getOr<float>("attention_inhibition_strength", 0.5f));
+        pImpl->attention->setExcitationStrength(config->getOr<float>("attention_excitation_strength", 1.5f));
+        
+        // Initialize neuromodulation
+        pImpl->novelty->initialize(this);
+        pImpl->curiosity->initialize(this);
+        
+        // Register spike handlers for event-driven processing
+        pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+            // Count spikes
+            ++pImpl->totalSpikesThisStep;
+            ++pImpl->totalSpikesTotal;
+        });
     
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
