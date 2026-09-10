@@ -47,7 +47,17 @@ public:
     bool isExcitatory() const;
     bool isInhibitory() const;
     
-    // Activity history for plasticity
+    // Synaptic efficacy (use-dependent modulation)
+    float getEfficacy() const;
+    void setEfficacy(float efficacy);
+    void updateEfficacy(bool preSpike, bool postSpike, Timestamp currentTime);
+    
+    // Short-term plasticity state
+    float getShortTermFacilitation() const;
+    float getShortTermDepression() const;
+    float getUtilization() const;  // Combined STP metric
+    
+    // Spike history for plasticity
     void recordPreSpike(Timestamp timestamp);
     void recordPostSpike(Timestamp timestamp);
     const std::vector<Timestamp>& getPreSpikeHistory() const;
@@ -65,13 +75,17 @@ public:
     float getEligibilityTrace() const;
     void setEligibilityTrace(float trace);
     void decayEligibilityTrace(float decayRate);
+    void addToEligibilityTrace(float delta);
     
-    // Synaptic efficacy (use-dependent modulation)
-    float getEfficacy() const;
-    void setEfficacy(float efficacy);
+    // Synaptic weight homeostasis
+    void setHomeostasisTarget(float target);
+    float getHomeostasisTarget() const;
+    void updateHomeostasis(TimestepDuration dt);
+    
+    // Synaptic transmission
+    void applySynapticInput(MembranePotential& membranePotential, Timestamp currentTime) const;
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -79,6 +93,12 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(class RandomGenerator& rng);
+    
+    // Advanced features
+    void setSynapticStrength(float strength);
+    void enableDepression(bool enable);
+    void enableFacilitation(bool enable);
+    void setSTPParameters(float facilitationTimeConstant, float depressionTimeConstant);
     
 private:
     struct Impl;
