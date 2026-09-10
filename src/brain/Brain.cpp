@@ -269,6 +269,11 @@ bool Brain::initialize() {
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
         // Find destination neuron and deliver synaptic input
+        // FIXED: Check for valid destination neuron before accessing
+        if (!event.destination_neuron || event.destination_neuron == INVALID_NEURON_ID) {
+            return;
+        }
+        
         for (auto& region : pImpl->regions) {
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {
@@ -450,8 +455,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         for (auto& syn : region->getSynapses()) {
             // Apply STDP with neuromodulation
             if (syn->getPlasticityFlags().stdp) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
+                // FIX RACE CONDITION: Make local copies of spike histories before checking
+                auto preSpikes = syn->getPreSpikeHistory();
+                auto postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
                     // Modify weight change based on dopamine

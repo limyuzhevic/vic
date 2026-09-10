@@ -35,17 +35,24 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->totalCurrent = 0.0f;
 }
 
-Neuron::~Neuron() = default;
-
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+    // Fix potential double deletion: only steal the pointer if it's not null
+    if (other.pImpl) {
+        other.pImpl = nullptr;
+    }
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        // Only delete if we own the pointer (avoid double deletion)
+        if (pImpl && pImpl != other.pImpl) {
+            delete pImpl;
+        }
         pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        // Set other's pointer to nullptr only if we got a valid pointer
+        if (other.pImpl) {
+            other.pImpl = nullptr;
+        }
     }
     return *this;
 }

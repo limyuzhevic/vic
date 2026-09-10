@@ -62,15 +62,17 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->lastPostSpikeTime = -1.0f;
 }
 
-Synapse::~Synapse() = default;
-
 Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
+    // Fix potential double deletion: only steal the pointer if it's not null
     other.pImpl = nullptr;
 }
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        // Only delete if we own the pointer (avoid double deletion)
+        if (pImpl && pImpl != other.pImpl) {
+            delete pImpl;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }

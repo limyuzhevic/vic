@@ -3,11 +3,34 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <optional>
+#include <string>
+#include <unordered_map>
+#include <memory>
+#include <vector>
+
+// Try to include nlohmann/json for JSON parsing
+#ifdef __has_include
+#if __has_include(<nlohmann/json.hpp>)
+#include <nlohmann/json.hpp>
+#define HAVE_NLOHMANN_JSON 1
+#endif
+#endif
 
 namespace nlm {
 
+#ifdef HAVE_NLOHMANN_JSON
+using json = nlohmann::json;
+#endif
+
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    
+    // JSON/YAML support
+#ifdef HAVE_NLOHMANN_JSON
+    static bool parseJsonFile(const std::string& filepath, std::vector<ConfigEntry>& entries);
+    static bool writeJsonFile(const std::string& filepath, const std::vector<ConfigEntry>& entries);
+#endif
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -17,6 +40,122 @@ Config::~Config() = default;
 Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
+
+// ============= JSON/YAML IMPLEMENTATION =============
+
+#ifdef HAVE_NLOHMANN_JSON
+
+bool Config::loadFromFile(const std::string& filepath) {
+    // Check if file extension suggests JSON format
+    std::string ext = std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == ".json" || ext == ".yaml" || ext == ".yml") {
+        // Use JSON parser
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        try {
+            json j;
+            file >> j;
+            
+            pImpl->entries.clear();
+            
+            // Parse JSON object
+            if (j.is_object()) {
+                for (auto it = j.begin(); it != j.end(); ++it) {
+                    std::string key = it.key();
+                    const json& value = it.value();
+                    
+                    // Convert JSON value to ConfigValue
+                    ConfigValue configValue;
+                    
+                    if (value.is_string()) {
+                        configValue = value.get<std::string>();
+                    } else if (value.is_number_integer()) {
+                        configValue = value.get<int>();
+                    } else if (value.is_number_unsigned()) {
+                        configValue = value.get<uint64_t>();
+                    } else if (value.is_number_float()) {
+                        configValue = value.get<double>();
+                    } else if (value.is_boolean()) {
+                        configValue = value.get<bool>();
+                    } else if (value.is_array()) {
+                        // Try to detect array type
+                        if (!value.empty()) {
+                            if (std::all_of(value.begin(), value.end(), [](const json& v) { return v.is_number_integer(); })) {
+                                configValue = value.get<std::vector<int>>();
+                            } else if (std::all_of(value.begin(), value.end(), [](const json& v) { return v.is_number_float(); })) {
+                                configValue = value.get<std::vector<double>>();
+                            } else if (std::all_of(value.begin(), value.end(), [](const json& v) { return v.is_string(); })) {
+                                configValue = value.get<std::vector<std::string>>();
+                            } else {
+                                // Mixed or unknown type - convert to string
+                                configValue = value.dump();
+                            }
+                        } else {
+                            configValue = std::vector<std::string>{};
+                        }
+                    } else {
+                        // For non-basic types, convert to string
+                        configValue = value.dump();
+                    }
+                    
+                    pImpl->entries.emplace_back(key, configValue, ConfigSource::File);
+                }
+            }
+            
+            return true;
+        } catch (const std::exception& e) {
+            // Fallback to simple format if JSON parsing fails
+            return Config::loadFromFile(filepath);
+        }
+    }
+    
+    // Fall back to simple key=value format for non-JSON files
+    return Config::loadFromFile(filepath);
+}
+
+bool Config::loadFromArgs(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        // Handle -key value format
+        else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            set(key, value, ConfigSource::CommandLine);
+        }
+    }
+    return true;
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    }
+    
+    return true;
+}
+
+// ============= SIMPLE IMPLEMENTATION =============
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
@@ -200,16 +339,16 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+namespace nlm {
+    template std::optional<int> Config::get<int>(const std::string&) const;
+    template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+    template std::optional<double> Config::get<double>(const std::string&) const;
+    template std::optional<bool> Config::get<bool>(const std::string&) const;
+    template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm
+    template int Config::getOr<int>(const std::string&, const int&) const;
+    template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+    template double Config::getOr<double>(const std::string&, const double&) const;
+    template bool Config::getOr<bool>(const std::string&, const bool&) const;
+    template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+}

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_BRAIN_HPP
+#define NLM_BRAIN_HPP
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
