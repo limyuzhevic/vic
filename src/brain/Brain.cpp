@@ -666,6 +666,7 @@ float Brain::getExcitationInhibitionRatio() const {
     
     for (const auto& region : pImpl->regions) {
         for (const auto& syn : region->getSynapses()) {
+            if (!syn) continue; // Safety check
             float weight = syn->getWeight();
             if (weight > 0) {
                 totalExcitatory += weight;
@@ -678,7 +679,10 @@ float Brain::getExcitationInhibitionRatio() const {
     if (totalInhibitory > 0.0f) {
         return totalExcitatory / totalInhibitory;
     }
-    return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
+    if (totalExcitatory > 0.0f) {
+        return std::numeric_limits<float>::infinity();
+    }
+    return 0.0f;
 }
 
 size_t Brain::getTotalSpikeCount() const {
@@ -686,6 +690,7 @@ size_t Brain::getTotalSpikeCount() const {
 }
 
 size_t Brain::getPendingSpikeEventCount() const {
+    if (!pImpl->spikeSystem) return 0;
     return pImpl->spikeSystem->getPendingSpikeCount() + pImpl->spikeSystem->getPendingDelayedCount();
 }
 

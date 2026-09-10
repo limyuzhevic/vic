@@ -77,6 +77,8 @@ struct LearningExperiment {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        } else {
+            NLM_LOG_WARN("  Warning: No synapses found in first region for weight recording");
         }
     }
     
@@ -98,6 +100,8 @@ struct LearningExperiment {
             float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
             float mean = sum / finalWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        } else {
+            NLM_LOG_WARN("  Warning: No synapses found in first region for weight recording");
         }
     }
     
@@ -106,7 +110,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("=== Learning Experiment Results ===");
         NLM_LOG_INFO("");
         
-        if (initialWeights.empty() || finalWeights.empty()) {
+        if (initialWeights.empty() && finalWeights.empty()) {
             NLM_LOG_INFO("ERROR: No weights recorded");
             return;
         }
@@ -255,7 +259,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     // Get first few synapses
     auto& synapses = region->getSynapses();
     if (synapses.size() < 5) {
-        NLM_LOG_INFO("  Not enough synapses for STDP test");
+        NLM_LOG_WARN("  Not enough synapses for STDP test (found " + 
+                    std::to_string(synapses.size()) + ", need 5)");
         return;
     }
     
