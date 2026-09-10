@@ -159,15 +159,22 @@ struct Brain::Impl {
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
-Brain::~Brain() = default;
+Brain::~Brain() {
+    // Clean up pImpl - important to delete the implementation
+    delete pImpl;
+    pImpl = nullptr;
+}
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
+    // Move pImpl pointer and clear source
     other.pImpl = nullptr;
 }
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
+        // Clean up current pImpl first
         delete pImpl;
+        // Move pImpl from other
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -807,6 +814,7 @@ bool Brain::save(const std::string& filepath) const {
         
         if (!writer.writeNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to write neurons to checkpoint");
+            writer.cleanup(); // Clean up on write failure
             return false;
         }
         
@@ -825,12 +833,14 @@ bool Brain::save(const std::string& filepath) const {
         
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+            writer.cleanup(); // Clean up on write failure
             return false;
         }
         
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
+            writer.cleanup(); // Clean up on finalize failure
             return false;
         }
         
@@ -839,6 +849,11 @@ bool Brain::save(const std::string& filepath) const {
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+        // Attempt cleanup
+        if (std::filesystem::exists(filepath)) {
+            std::filesystem::remove(filepath);
+            NLM_LOG_INFO("Cleaned up corrupted checkpoint file: " + filepath);
+        }
         return false;
     }
 }
@@ -895,8 +910,24 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
+        // Apply synapse states - restore all synapse properties from checkpoint
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                if (synapseIdx < synapseData.weight.size()) {
+                    // Restore all synapse properties
+                    syn->setWeight(synapseData.weight[synapseIdx]);
+                    syn->setDelay(synapseData.delay[synapseIdx]);
+                    syn->setType(static_cast<SynapseType>(synapseData.synapseType[synapseIdx]));
+                    
+                    if (synapseIdx < synapseData.eligibilityTrace.size()) {
+                        syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx]);
+                    }
+                }
+                synapseIdx++;
+            }
+        }
+        
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         
         NLM_LOG_INFO("Brain state loaded successfully");
@@ -904,6 +935,13 @@ bool Brain::load(const std::string& filepath) {
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
+        
+        // Cleanup: Remove corrupted checkpoint file
+        if (std::filesystem::exists(filepath)) {
+            std::filesystem::remove(filepath);
+            NLM_LOG_INFO("Cleaned up corrupted checkpoint file: " + filepath);
+        }
+        
         return false;
     }
 }
