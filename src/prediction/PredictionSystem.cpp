@@ -55,6 +55,7 @@ void PredictionSystem::clearHistory() {
 
 void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
+    // PLACEHOLDER: Currently no training implementation
 }
 
 } // namespace nlm

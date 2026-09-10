@@ -390,8 +390,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     
                     // Store to working memory - neurons that fire become part of working memory
                     if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                        // Use firing state strength instead of membrane potential difference
+                        // Neurons firing have stronger activation in working memory
+                        float activation = 0.0f;
+                        if (state.firingState == FiringState::Firing) {
+                            activation = 1.0f; // Full activation for firing neurons
+                        } else if (state.firingState == FiringState::Refractory) {
+                            activation = 0.5f; // Moderate activation during refractory period
+                        } else if (state.firingState == FiringState::Resetting) {
+                            activation = 0.2f; // Low activation during reset
+                        }
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), activation);
                     }
                 }
             }
@@ -478,8 +487,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 7: Update episodic memory ==========
+    // Update significance counter and capture significant episodes
     pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+    
+    // Check if episode is significant (based on neural activity and reward)
+    float episodeSignificance = 0.0f;
+    
+    // Calculate significance based on neural activity
+    size_t totalActiveNeurons = 0;
+    float totalActivation = 0.0f;
+    
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                // Check if neuron is significantly active
+                if (neuron->isFiring()) {
+                    totalActiveNeurons++;
+                    // Get membrane potential as activation level
+                    float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                    totalActivation += activation;
+                }
+            }
+        }
+    }
+    
+    // Normalize activation and convert to significance
+    if (!pImpl->regions.empty()) {
+        float avgActivation = totalActivation / static_cast<float>(getTotalNeuronCount());
+        episodeSignificance += avgActivation * 0.5f;
+    }
+    
+    // Add significance from dopamine/reward
+    if (pImpl->dopamine) {
+        episodeSignificance += pImpl->dopamine->getLevel() * 0.5f;
+    }
+    
+    // Store significant episode if above threshold
+    if (episodeSignificance > 0.3f || pImpl->stepsSinceLastEpisode >= pImpl->consolidationInterval) {
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
@@ -488,10 +532,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store active neurons with their activation levels
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
+                        // Store neurons that are firing or significantly above resting
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());
@@ -502,17 +547,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            pImpl->episodicMemory->storeEpisode(episode);
+            // Store episode if it has meaningful content
+            if (!episode.activeNeurons.empty() || episodeSignificance > 0.5f) {
+                pImpl->episodicMemory->storeEpisode(episode);
+            }
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current brain state for prediction
+        // In a real system, this would be encoded sensory input
+        
+        // Use internal signals as a simple representation of brain state
+        InternalSignals currentState;
+        
+        // Encode key brain state features
+        // Get average firing rate per region
+        for (const auto& region : pImpl->regions) {
+            float avgRate = region->getAverageFiringRate();
+            currentState.addSignal(avgRate);
+        }
+        
+        // Encode active neuron count
+        currentState.addSignal(static_cast<float>(getActiveNeuronCount()));
+        
+        // Encode total spike count
+        currentState.addSignal(static_cast<float>(getTotalSpikeCount()));
+        
+        // Get prediction error for monitoring
+        float error = pImpl->predictionSystem->getPredictionError();
+        currentState.addSignal(error);
+        
+        // Update prediction system using the current state
+        pImpl->predictionSystem->updatePredictions(currentState, currentState);
+        
+        // Train with current observations
+        pImpl->predictionSystem->train(currentState);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,21 +599,87 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current brain state to form concepts from recurring patterns
+        
+        // Encode current brain state for concept formation
+        std::vector<float> pattern;
+        std::vector<float> features;
+        
+        // Extract pattern from neural activity
+        for (const auto& region : pImpl->regions) {
+            // Get average firing rate of region as pattern feature
+            pattern.push_back(region->getAverageFiringRate());
+            
+            // Get activity pattern complexity
+            features.push_back(static_cast<float>(region->getActiveNeuronCount()));
+        }
+        
+        // Add global statistics
+        pattern.push_back(static_cast<float>(getTotalSpikeCount()));
+        pattern.push_back(static_cast<float>(getFiringNeuronCount()));
+        
+        // Features include reward prediction error for learning
+        if (pImpl->dopamine) {
+            features.push_back(pImpl->dopamine->getPredictionError() ? 1.0f : 0.0f);
+        }
+        
+        features.push_back(pImpl->predictionSystem ? pImpl->predictionSystem->getPredictionError() : 0.0f);
+        
+        // Present experience to concept formation system
+        pImpl->conceptFormation->presentExperience(pattern, features, 
+                                                     pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                                                     currentStep);
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    // ========== STEP 11: Update planner for action selection ==========
+    if (pImpl->planner) {
+        // Get current neural state for planning
+        std::vector<float> currentState;
+        
+        // Extract state features for planning
+        for (const auto& region : pImpl->regions) {
+            // Region firing rates as state features
+            currentState.push_back(region->getAverageFiringRate());
+            
+            // Region activity as additional state
+            currentState.push_back(static_cast<float>(region->getActiveNeuronCount()));
+        }
+        
+        // Get prediction error for planning
+        float predictionError = pImpl->predictionSystem ? pImpl->predictionSystem->getPredictionError() : 0.0f;
+        currentState.push_back(predictionError);
+        
+        // Get dopamine level for reward-based planning
+        float dopamineLevel = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        currentState.push_back(dopamineLevel);
+        
+        // Let planner evaluate current situation
+        // This helps refine internal predictions and plans
+        pImpl->planner->planAction(currentState, 0.5f);  // Default target reward
+        
+        // Update planner based on recent performance
+        if (pImpl->stepsSinceLastEpisode >= 10) {
+            pImpl->planner->updatePlanQuality(std::vector<ActionType>(), std::vector<ActionType>(), 0.0f);
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+        
+        // Replay episodes by updating working memory with important patterns
         for (const auto* episode : episodesToReplay) {
             pImpl->episodicMemory->replayEpisode(episode);
+            
+            // Additionally update working memory with high-priority patterns from the episode
+            if (pImpl->workingMemory) {
+                for (const auto& neuronId : episode->activeNeurons) {
+                    // High activation neurons from the episode get stored in working memory
+                    float priority = 1.0f; // Importance weighting
+                    pImpl->workingMemory->storeToNeuron(neuronId, priority);
+                }
+            }
         }
     }
     
