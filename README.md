@@ -75,12 +75,49 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 6 Demo (Integration Test) - RECOMMENDED START
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs a comprehensive integration test verifying all brain systems are connected. Phase 6 is the FINAL INTEGRATION phase that brings together all previous components.
+
+### Phase 4 Demo - Advanced Cognitive Capabilities
+```bash
+./nlm_phase4_demo
+```
+
+This demonstrates Phase 4 cognitive capabilities including concept formation, neural planning, attention, and more advanced processing.
+
+### Phase 3 Demo - Basic World Interaction
+```bash
+./nlm_phase3_demo
+```
+
+This demonstrates Phase 3 world interaction capabilities including sensory processing, motor control, and basic learning.
+
+### Main Executable (NLM) - Direct Neural Computation
+```bash
+./nlm
+```
+
+This runs the core NLM simulation without pre-built experiments.
+
+
+### Phase 4 Demo
+```bash
+./nlm_phase4_demo
+```
+
+This demonstrates Phase 4 cognitive capabilities.
+
+### Phase 3 Demo
+```bash
+./nlm_phase3_demo
+```
+
+This demonstrates Phase 3 world interaction capabilities.
+
 
 ## Project Structure
 
@@ -152,7 +189,7 @@ NLM/
 - Parallel processing
 - Checkpoint system
 
-### Phase 6 (Complete - Final Integration)
+### Phase 6 (Complete - Final Integration) - RECOMMENDED
 - All systems integrated into coherent brain loop
 - Memory systems connected to neural processing
 - Neuromodulation affects plasticity and dynamics
@@ -161,6 +198,7 @@ NLM/
 - Checkpoint save/load working
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+- Comprehensive integration test available (`nlm_phase6_demo`)
 
 ## Scientific Limitations
 
