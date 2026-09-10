@@ -403,7 +403,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // Store newly firing neurons in working memory
+        std::vector<NeuronId> activeNeurons;
+        std::vector<float> activations;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        activeNeurons.push_back(neuron->getId());
+                        // Calculate activation level
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                        activations.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        // Update working memory with new traces
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Also store active neurons as working memory traces
+        for (size_t i = 0; i < activeNeurons.size() && i < activations.size(); ++i) {
+            pImpl->workingMemory->storeToNeuron(activeNeurons[i], activations[i]);
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -498,6 +521,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                             episode.neuronActivations.push_back(
                                 std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
                         }
+                    }
+                }
+            }
+            
+            // Also include working memory traces if available
+            if (pImpl->workingMemory) {
+                auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+                for (auto neuronId : memoryNeurons) {
+                    // Check if neuron was already added from neural activity
+                    bool alreadyAdded = false;
+                    for (auto& id : episode.activeNeurons) {
+                        if (id.index() == neuronId.index()) {
+                            alreadyAdded = true;
+                            break;
+                        }
+                    }
+                    if (!alreadyAdded) {
+                        episode.activeNeurons.push_back(neuronId);
+                        episode.neuronActivations.push_back(0.5f); // Working memory trace strength
                     }
                 }
             }
@@ -768,6 +810,7 @@ bool Brain::save(const std::string& filepath) const {
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+            NLM_LOG_ERROR("Check if file path is valid and writable");
             return false;
         }
         
@@ -788,43 +831,92 @@ bool Brain::save(const std::string& filepath) const {
         neuronData.resetPotential.reserve(getTotalNeuronCount());
         neuronData.leakConductance.reserve(getTotalNeuronCount());
         
+        // Validate neuron data before writing
+        bool hasValidNeurons = false;
         for (const auto& region : pImpl->regions) {
-            for (const auto& pop : region->getPopulations()) {
-                for (const auto* neuron : pop->getNeurons()) {
-                    const auto& state = neuron->getState();
-                    neuronData.membranePotential.push_back(state.membranePotential);
-                    neuronData.restingPotential.push_back(state.restingPotential);
-                    neuronData.threshold.push_back(state.threshold);
-                    neuronData.resetPotential.push_back(state.resetPotential);
-                    neuronData.leakConductance.push_back(state.leakConductance);
-                    neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
-                    neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
-                    neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
-                    neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+            if (region) {
+                hasValidNeurons = true;
+                for (const auto& pop : region->getPopulations()) {
+                    if (pop) {
+                        const auto& neurons = pop->getNeurons();
+                        for (const auto* neuron : neurons) {
+                            if (neuron) {
+                                const auto& state = neuron->getState();
+                                neuronData.membranePotential.push_back(state.membranePotential);
+                                neuronData.restingPotential.push_back(state.restingPotential);
+                                neuronData.threshold.push_back(state.threshold);
+                                neuronData.resetPotential.push_back(state.resetPotential);
+                                neuronData.leakConductance.push_back(state.leakConductance);
+                                neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                                neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
+                                neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
+                                neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                            }
+                        }
+                    }
                 }
             }
         }
         
+        if (!hasValidNeurons) {
+            NLM_LOG_ERROR("No valid neurons found for checkpoint");
+            return false;
+        }
+        
+        // Double-check neuron data count matches
+        size_t expectedNeuronCount = getTotalNeuronCount();
+        size_t actualNeuronCount = neuronData.membranePotential.size();
+        
+        if (expectedNeuronCount != actualNeuronCount) {
+            NLM_LOG_ERROR("Neuron count mismatch: expected " + std::to_string(expectedNeuronCount) +
+                         ", got " + std::to_string(actualNeuronCount));
+            return false;
+        }
+        
         if (!writer.writeNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to write neurons to checkpoint");
+            NLM_LOG_ERROR("Check disk space and file permissions");
             return false;
         }
         
         // Write synapses
         SynapseCheckpointData synapseData;
+        
+        // Validate synapse data before writing
+        bool hasValidSynapses = false;
         for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+            if (region) {
+                const auto& synapses = region->getSynapses();
+                if (!synapses.empty()) {
+                    hasValidSynapses = true;
+                    for (const auto* syn : synapses) {
+                        if (syn) {
+                            // Validate synapse components
+                            if (!syn->getSourceNeuron().isValid() || !syn->getDestinationNeuron().isValid()) {
+                                NLM_LOG_ERROR("Invalid synapse neuron ID in checkpoint");
+                                return false;
+                            }
+                            
+                            synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                            synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                            synapseData.weight.push_back(syn->getWeight());
+                            synapseData.delay.push_back(syn->getDelay());
+                            synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                            synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                        }
+                    }
+                }
             }
+        }
+        
+        if (!hasValidSynapses) {
+            NLM_LOG_ERROR("No valid synapses found for checkpoint");
+            // It's not necessarily an error to have no synapses, so we'll continue
         }
         
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+            NLM_LOG_ERROR("Check disk space and file permissions");
             return false;
         }
         
@@ -862,6 +954,7 @@ bool Brain::load(const std::string& filepath) {
         NeuronCheckpointData neuronData;
         if (!reader.readNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to read neurons from checkpoint");
+            NLM_LOG_ERROR("Checkpoint file may be corrupted or unreadable");
             return false;
         }
         
