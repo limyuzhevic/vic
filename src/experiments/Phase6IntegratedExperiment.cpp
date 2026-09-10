@@ -392,6 +392,8 @@ bool Phase6IntegratedExperiment::testReplay() {
         auto episodes = em->getEpisodesForReplay(3);
         if (!episodes.empty()) {
             NLM_LOG_INFO("[PASS] Replay system can retrieve episodes");
+            // Update integration status based on replay
+            result.replayWorks = true;
             return true;
         }
     }

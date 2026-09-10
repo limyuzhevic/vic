@@ -326,9 +326,21 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with level control
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    ConsoleLogger::Level logLevel = ConsoleLogger::Level::Info;
+    
+    // Parse command line arguments for logging and experiment control
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--quiet" || arg == "-q") {
+            logLevel = ConsoleLogger::Level::Error;  // Only show errors
+        } else if (arg == "--verbose" || arg == "-v") {
+            logLevel = ConsoleLogger::Level::Debug;  // Show all debug info
+        }
+    }
+    
+    auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
