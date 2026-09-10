@@ -511,8 +511,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current brain state
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Apply prediction error to neuromodulation systems
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (predictionError > 0.0f) {
+            // Use prediction error to modulate dopamine (reward prediction error)
+            if (pImpl->predictionError) {
+                pImpl->predictionError->setErrorLevel(predictionError);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +533,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Apply attention to brain state for memory encoding
+        pImpl->attention->applyToBrain(this);
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Use working memory and sensory input
+        if (pImpl->workingMemory && pImpl->predictionSystem) {
+            auto memoryPatterns = pImpl->workingMemory->retrieve();
+            if (!memoryPatterns.empty()) {
+                pImpl->conceptFormation->processPattern(memoryPatterns);
+            }
+            
+            // Update prediction-based concept formation
+            pImpl->conceptFormation->updateFromPrediction(pImpl->predictionSystem);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

@@ -1,15 +1,3 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
-#include <vector>
-#include <memory>
-#include <functional>
-#include <unordered_map>
-
-namespace nlm
-{
-
 // NeuralWorkingMemory: Implements working memory using neural dynamics
 // NOT a simple storage vector - uses persistent activity and recurrent connections
 //
@@ -108,3 +96,4 @@ private:
 };
 
 } // namespace nlm
+
