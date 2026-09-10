@@ -992,15 +992,7 @@ size_t Brain::getActiveNeuronCount() const {
 
 size_t Brain::getFiringNeuronCount() const {
     return pImpl->totalSpikesThisStep;
-}
-
-float Brain::getAverageFiringRate() const {
-    if (pImpl->regions.empty()) return 0.0f;
-    float sum = 0.0f;
-    for (const auto& region : pImpl->regions) {
-        sum += region->getAverageFiringRate();
     }
-    return sum / static_cast<float>(pImpl->regions.size());
 }
 
 // ========== MEMORY SYSTEM ACCESSORS ==========
