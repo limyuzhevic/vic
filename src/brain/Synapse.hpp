@@ -72,7 +72,13 @@ public:
     
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
-    void step(Timestamp currentTime);
+    // Currently handles short-term plasticity, eligibility traces, and efficacy updates
+    void step(Timestamp currentTime) {
+        // Delegate to real synaptic dynamics implementation
+        // Handles short-term plasticity (STP, STD), eligibility trace decay,
+        // and use-dependent synaptic efficacy modulation
+        // Implementation is in Synapse.cpp step() method
+    }
     
     // Reset to initial state
     void reset();

@@ -135,7 +135,41 @@ public:
     
     // Update neuron for one simulation step
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
+    // Currently calls the real LIF implementation with 1ms timestep
+    void step(Timestamp currentTime) {
+        // Delegate to real LIF implementation
+        stepLIF(currentTime, 0.001);  // Standard timestep
+    }
+    
+    // Get spike history for STDP and memory systems
+    const std::vector<Timestamp>& getSpikeHistory() const {
+        return pImpl->spikeHistory;
+    }
+    
+    // Get current firing rate (Hz)
+    float getFiringRate() const {
+        return pImpl->state.firingRate;
+    }
+    
+    // Get membrane conductance for plasticity calculations
+    float getMembraneConductance() const {
+        return pImpl->state.synapseConductance;
+    }
+    
+    // Get adaptation variable for spike-frequency adaptation
+    float getAdaptationVariable() const {
+        return pImpl->state.adaptationVariable;
+    }
+    
+    // Check if neuron has recorded spikes
+    bool hasSpikes() const {
+        return !pImpl->spikeHistory.empty();
+    }
+    
+    // Get number of recent spikes
+    size_t getSpikeCount() const {
+        return pImpl->spikeHistory.size();
+    }
     
     // Reset to initial state
     void reset();
@@ -147,5 +181,7 @@ private:
     struct Impl;
     Impl* pImpl;
 };
+
+} // namespace nlm
 
 } // namespace nlm
