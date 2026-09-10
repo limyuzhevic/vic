@@ -85,6 +85,10 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    src/visualization/VisualizationSystem.cpp
+    src/visualization/VisualizationBackend.cpp
+    src/visualization/VisualizationConfig.cpp
+    src/visualization/ConsoleVisualizationBackend.cpp
 )
 
 target_include_directories(nlm_core PUBLIC

@@ -60,13 +60,14 @@ public:
     // Remove object at position
     void removeObject(float x, float y);
     
-    // Check if position is valid (not wall)
-    bool isValidPosition(float x, float y) const;
-    
-    // Get object at position (if any)
-    WorldObject* getObjectAt(float x, float y);
-    
-    // World dimensions
+// Get observation from a specific brain region (for agent interaction)
+    SensoryPercept observe(const NeuralRegion* region) const;
+
+    // Apply an action from a specific brain region (for agent interaction)
+    ActionResult applyAction(const NeuralRegion* region, MotorCommand cmd);
+
+    // Compute reward based on agent performance with respect to a specific brain region
+    float computeReward(const NeuralRegion* region) const;
     float getWidth() const { return width_; }
     float getHeight() const { return height_; }
     
