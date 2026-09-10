@@ -124,6 +124,52 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
+    // Store this sensory state in episodic memory for learning
+    if (brain_->getEpisodicMemory()) {
+        // Create a simple episodic memory item with current sensory state
+        nlm::EpisodicMemoryItem episode;
+        episode.timestamp = brain_->getTotalSpikeCount();
+        episode.reward = 0.0f;  // Will be set later with actual reward
+        
+        // Store active neurons during sensory processing
+        // (In a full implementation, would store the full neural state)
+        
+        brain_->getEpisodicMemory()->storeEpisode(episode);
+    }
+    
+    // Update concept formation with new sensory data
+    if (brain_->getConceptFormation()) {
+        // Extract features from sensory input for concept learning
+        std::vector<float> sensoryFeatures;
+        
+        // Combine different sensory modalities into feature vector
+        for (float v : vision) sensoryFeatures.push_back(v);
+        for (float t : touch) sensoryFeatures.push_back(t);
+        for (float i : intern) sensoryFeatures.push_back(i);
+        for (float p : proprio) sensoryFeatures.push_back(p);
+        
+        // Present to concept formation system for learning
+        // (Simplified call - full implementation would extract better features)
+        brain_->getConceptFormation()->presentExperience(sensoryFeatures, sensoryFeatures, 0.0f, brain_->getTotalSpikeCount());
+    }
+    
+    // Update attention system with new sensory input
+    if (brain_->getAttention()) {
+        // Create competition for attention based on sensory input strength
+        std::vector<nlm::NeuronId> competitors;
+        
+        // Add sensory neurons that were activated
+        for (auto* neuron : sensoryVision_) competitors.push_back(neuron->getId());
+        for (auto* neuron : sensoryTouch_) competitors.push_back(neuron->getId());
+        for (auto* neuron : sensoryInternal_) competitors.push_back(neuron->getId());
+        for (auto* neuron : sensoryProprioception_) competitors.push_back(neuron->getId());
+        
+        if (!competitors.empty()) {
+            // Process competition to select attention winners
+            brain_->getAttention()->processCompetition(competitors);
+        }
+    }
+    
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
         float totalDiff = 0.0f;
@@ -142,7 +188,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty and prediction error
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);

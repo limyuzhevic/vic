@@ -1,16 +1,3 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 class RandomGenerator;
