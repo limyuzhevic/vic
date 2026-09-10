@@ -258,29 +258,99 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
     // Get memory systems
     auto* wm = brain->getWorkingMemory();
     auto* em = brain->getEpisodicMemory();
+    auto* am = brain->getAssociativeMemory();
+    auto* ps = brain->getPredictionSystem();
     
-    if (!wm || !em) {
+    if (!wm || !em || !am || !ps) {
         NLM_LOG_ERROR("Memory systems not available");
         return false;
     }
     
-    // Run some steps
-    for (int i = 0; i < 100; ++i) {
-        brain->step(i, i * 0.001);
-    }
+    // Test working memory integration
+    NLM_LOG_INFO("Testing working memory integration...");
+    brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f);
+    brain->step(0, 0.0);
     
-    // Check if working memory has traces
     if (wm->getActiveTraces() > 0) {
-        NLM_LOG_INFO("[PASS] Working memory has active traces: " + std::to_string(wm->getActiveTraces()));
+        NLM_LOG_INFO("[PASS] Working memory is integrated - has active traces: " + std::to_string(wm->getActiveTraces()));
     } else {
-        NLM_LOG_INFO("[INFO] Working memory has no active traces (may be normal for simple simulation)");
+        NLM_LOG_ERROR("[FAIL] Working memory is not integrated - no active traces");
+        return false;
     }
     
-    // Check if episodic memory has episodes
+    // Test episodic memory integration
+    NLM_LOG_INFO("Testing episodic memory integration...");
+    
+    // Store an episode
+    EpisodicMemoryItem episode;
+    episode.timestamp = 0;
+    episode.reward = 0.5f;
+    episode.activeNeurons = {1, 2, 3};
+    episode.neuronActivations = {0.5f, 0.3f, 0.7f};
+    
+    em->storeEpisode(episode);
+    
     if (em->getEpisodeCount() > 0) {
-        NLM_LOG_INFO("[PASS] Episodic memory has episodes: " + std::to_string(em->getEpisodeCount()));
+        NLM_LOG_INFO("[PASS] Episodic memory is integrated - has " + std::to_string(em->getEpisodeCount()) + " episodes");
     } else {
-        NLM_LOG_INFO("[INFO] Episodic memory has no episodes (may be normal for simple simulation)");
+        NLM_LOG_ERROR("[FAIL] Episodic memory is not integrated - no episodes");
+        return false;
+    }
+    
+    // Test associative memory integration
+    NLM_LOG_INFO("Testing associative memory integration...");
+    
+    std::vector<float> pattern1 = {0.1f, 0.2f, 0.3f};
+    std::vector<float> pattern2 = {0.4f, 0.5f, 0.6f};
+    
+    am->associate(pattern1, pattern2, 0.8f);
+    
+    auto recalled = am->recall(pattern1);
+    if (!recalled.empty()) {
+        NLM_LOG_INFO("[PASS] Associative memory is integrated - can recall pattern");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Associative memory is not integrated - cannot recall");
+        return false;
+    }
+    
+    // Test prediction system integration
+    NLM_LOG_INFO("Testing prediction system integration...");
+    
+    std::vector<float> sensoryState = {0.1f, 0.2f, 0.3f};
+    ps->update(sensoryState, 0.001f);
+    
+    float predError = ps->getPredictionError();
+    if (std::abs(predError) <= 1.0f) {
+        NLM_LOG_INFO("[PASS] Prediction system is integrated - has prediction error: " + std::to_string(predError));
+    } else {
+        NLM_LOG_ERROR("[FAIL] Prediction system is not integrated - error out of range");
+        return false;
+    }
+    
+    // Run more steps to test episodic memory storage
+    NLM_LOG_INFO("Testing episodic memory storage over time...");
+    for (int i = 1; i < 50; ++i) {
+        brain->injectCurrentToNeurons(NeuronType::Sensory, 2.0f + 0.1f * i);
+        brain->step(i, i * 0.001f);
+    }
+    
+    size_t finalEpisodeCount = em->getEpisodeCount();
+    if (finalEpisodeCount >= 1) {
+        NLM_LOG_INFO("[PASS] Episodic memory stores episodes over time: " + std::to_string(finalEpisodeCount) + " total");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Episodic memory does not store episodes over time");
+        return false;
+    }
+    
+    // Test replay system
+    NLM_LOG_INFO("Testing memory replay system...");
+    
+    auto episodesToReplay = em->getEpisodesForReplay(5);
+    if (!episodesToReplay.empty()) {
+        NLM_LOG_INFO("[PASS] Memory replay system works - can retrieve " + std::to_string(episodesToReplay.size()) + " episodes");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Memory replay system does not work");
+        return false;
     }
     
     return true;

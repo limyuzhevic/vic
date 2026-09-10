@@ -528,8 +528,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        pImpl->conceptFormation->update(this, pImpl->timestep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -828,6 +827,41 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write memory system states if available
+        if (pImpl->workingMemory) {
+            std::vector<uint64_t> workingMemoryActiveTraces;
+            auto traces = pImpl->workingMemory->getActiveTraces();
+            workingMemoryActiveTraces.resize(traces);
+            writer.writeSection(CheckpointSection::Memory, workingMemoryActiveTraces.data(), 
+                                workingMemoryActiveTraces.size() * sizeof(uint64_t));
+        }
+        
+        // Write episodic memory if available
+        if (pImpl->episodicMemory) {
+            auto episodes = pImpl->episodicMemory->getEpisodeCount();
+            writer.writeSection(CheckpointSection::Memory, &episodes, sizeof(size_t));
+        }
+        
+        // Write prediction system state if available
+        if (pImpl->predictionSystem) {
+            float predictionConfidence = 0.0f; // Would need to extract from prediction system
+            writer.writeSection(CheckpointSection::Prediction, &predictionConfidence, sizeof(float));
+        }
+        
+        // Write neuromodulation states
+        if (pImpl->dopamine) {
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            writer.writeSection(CheckpointSection::Neuromodulation, &dopamineLevel, sizeof(float));
+        }
+        
+        if (pImpl->curiosity) {
+            float curiosityLevel = pImpl->curiosity->getLevel();
+            writer.writeSection(CheckpointSection::Neuromodulation, &curiosityLevel, sizeof(float));
+        }
+        
+        // Write developmental stage
+        writer.writeSection(CheckpointSection::Development, &pImpl->developmentalStage, sizeof(DevelopmentalStage));
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -1003,8 +1037,6 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
-
 NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
 }
@@ -1017,13 +1049,9 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
-
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
-
-// ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
     return pImpl->planner.get();
@@ -1037,21 +1065,9 @@ AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
-// ========== DEVELOPMENT SYSTEM ==========
-
 DevelopmentSystem* Brain::getDevelopmentSystem() {
     return pImpl->developmentSystem.get();
 }
-
-DevelopmentalStage Brain::getDevelopmentalStage() const {
-    return pImpl->developmentalStage;
-}
-
-void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
-    pImpl->developmentalStage = stage;
-}
-
-// ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
