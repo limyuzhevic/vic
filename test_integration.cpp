@@ -1,8 +1,3 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <memory>
-
 int main(int argc, char* argv[]) {
     NLM_LOG_INFO("NLM - Neural Learning Machine (Phase 6: Final Integration)");
     NLM_LOG_INFO("Building the first artificial developmental brain...");
@@ -20,15 +15,51 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // Create simple world
+    SimpleWorld world;
+    world.initialize(20, 20);
+    world.setAgentStart(10.0f, 10.0f);
+
+    // Create agent brain interface
+    AgentBrain agent(brain);
+    agent.initialize(world);
+
+    // Enable learning systems
+    agent.enableRewardModulation(true);
+    agent.enableStructuralPlasticity(true);
+    agent.enableDevelopment(true);
+    agent.enableCuriosity(true);
+
     NLM_LOG_INFO("Starting Phase 6 Integration Simulation");
 
-    // Run simulation for 100 steps
-    for (uint64_t step = 0; step < 100; ++step) {
+    // Run simulation for 500 steps
+    for (uint64_t step = 0; step < 500; ++step) {
+        // Update world (simple movement simulation)
+        world.update(0.1f);
+
+        // Get sensory percept
+        auto percept = world.getSensoryPercept();
+
+        // Process sensory input
+        agent.processSensoryInput(percept);
+
         // Brain step
         brain->step(step, step * 0.1f);
 
-        // Log status every 20 steps
-        if (step % 20 == 0) {
+        // Get motor command
+        auto action = agent.decodeMotorCommand();
+
+        // Apply action to world
+        world.applyMotorCommand(action, world.getSimulationTime());
+
+        // Apply reward modulation
+        agent.applyRewardModulation(0.1f, 0.0f);
+
+        // Update development
+        agent.updateDevelopment(0.1f);
+
+        // Log status every 100 steps
+        if (step % 100 == 0) {
             NLM_LOG_INFO(std::to_string(step) + ": Firing neurons: " + std::to_string(brain->getFiringNeuronCount()) +
                 ", Working memory traces: " + std::to_string(brain->getWorkingMemory() ? brain->getWorkingMemory()->getActiveTraces() : 0));
         }

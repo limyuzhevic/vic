@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
 #include <string>
 #include <vector>
 
@@ -27,6 +28,12 @@ public:
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
+    // Reset neuromodulator to baseline
+    virtual void reset() = 0;
+    
+    // Signal effect to brain
+    virtual void signal(Brain* brain) = 0;
+    
 protected:
     Neuromodulator() = default;
 };
@@ -48,6 +55,15 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Reset neuromodulator to baseline
+    void reset() override;
+    
+    // Signal effect to brain
+    void signal(Brain* brain) override {
+        boost::shared_ptr<Brain> brainPtr(brain);
+        // Apply dopamine effects
+    }
+    
 private:
     struct Impl;
     Impl* pImpl;
@@ -57,33 +73,90 @@ private:
 // PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Signal attention to the brain
+    void signalAttention(boost::shared_ptr<Brain> brain);
+    
+    // Reset neuromodulator to baseline
+    void reset() override;
+    
+    // Signal effect to brain
+    void signal(Brain* brain) override {
+        boost::shared_ptr<Brain> brainPtr(brain);
+        signalAttention(brainPtr);
+    }
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
 // PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Signal arousal to the brain
+    void signalArousal(float intensity, boost::shared_ptr<Brain> brain);
+    
+    // Reset neuromodulator to baseline
+    void reset() override;
+    
+    // Signal effect to brain
+    void signal(Brain* brain) override {
+        boost::shared_ptr<Brain> brainPtr(brain);
+        signalArousal(1.0f, brainPtr);
+    }
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
 // PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Signal mood change to the brain
+    void signalMoodChange(float moodChange, boost::shared_ptr<Brain> brain);
+    
+    // Reset neuromodulator to baseline
+    void reset() override;
+    
+    // Signal effect to brain
+    void signal(Brain* brain) override {
+        boost::shared_ptr<Brain> brainPtr(brain);
+        signalMoodChange(0.5f, brainPtr);
+    }
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

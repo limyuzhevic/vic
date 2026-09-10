@@ -1,16 +1,17 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "Neuromodulator.hpp"
 
 namespace nlm {
 
 // Curiosity drive: exploration motivation based on novelty and prediction error
 // Computed as weighted combination of novelty and prediction error
 
-class Curiosity {
+class Curiosity : public Neuromodulator {
 public:
     Curiosity();
-    ~Curiosity();
+    ~Curiosity() override;
     
     // Initialize with brain reference
     void initialize(class Brain* brain);
@@ -29,7 +30,10 @@ public:
     void setPredictionErrorWeight(float weight);
     
     // Reset
-    void reset();
+    void reset() override;
+    
+    // Signal effect to brain
+    void signal(Brain* brain) override;
     
 private:
     struct Impl;

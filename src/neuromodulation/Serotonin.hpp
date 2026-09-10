@@ -8,10 +8,10 @@
 
 namespace nlm {
 
-class PredictionError : public Neuromodulator {
+class Serotonin : public Neuromodulator {
 public:
-    PredictionError();
-    ~PredictionError() override;
+    Serotonin();
+    ~Serotonin() override;
     
     const char* getName() const override;
     float getLevel() const override;
@@ -19,8 +19,8 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
-    // Compute prediction error from prediction system
-    void computeError(float predicted, float actual);
+    // Signal mood change to the brain
+    void signalMoodChange(float moodChange, boost::shared_ptr<Brain> brain);
     
     // Reset neuromodulator to baseline
     void reset();
@@ -28,7 +28,7 @@ public:
     // Signal effect to brain
     void signal(Brain* brain) override {
         boost::shared_ptr<Brain> brainPtr(brain);
-        // Apply prediction error effects
+        signalMoodChange(0.5f, brainPtr);
     }
     
 private:

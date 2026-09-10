@@ -1,42 +1,52 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
+#include <memory>
+#include <string>
+#include <boost/shared_ptr.hpp>
 
 namespace nlm {
 
-// Novelty detection signal
-// Computes novelty from comparison with previous observations
-
-class Novelty {
+class Novelty : public Neuromodulator {
 public:
     Novelty();
-    ~Novelty();
+    ~Novelty() override;
     
-    // Initialize with brain reference
-    void initialize(class Brain* brain);
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
     
-    // Get novelty level
-    float getLevel() const;
-    void setLevel(float level);
+    // Detect novelty from sensory input
+    void detectNovelty(const class SensoryInput& observation,
+                      const class SensoryInput& previousObservation,
+                      boost::shared_ptr<Brain> brain);
     
-    // Detect novelty from observation
-    void detectNovelty(const class Observation& observation, 
-                       const class Observation& previousObservation);
+    // Reset neuromodulator to baseline
+    void reset();
     
-    // Detect novelty from sensory input pattern
-    void detectNovelty(const std::vector<float>& currentPattern,
-                       const std::vector<float>& previousPattern);
+    // Signal effect to brain
+    void signal(Brain* brain) override {
+        boost::shared_ptr<Brain> brainPtr(brain);
+        detectNovelty(observation_, previousObservation_, brainPtr);
+    }
     
-    // Decay novelty over time
-    void update(TimestepDuration dt);
+    // Store last observations
+    void setLastObservation(const class SensoryInput& obs) {
+        observation_ = obs;
+    }
     
-    // Get novelty history
-    const std::vector<float>& getHistory() const;
-    void clearHistory();
+    void setPreviousObservation(const class SensoryInput& obs) {
+        previousObservation_ = obs;
+    }
     
 private:
     struct Impl;
     Impl* pImpl;
+    class SensoryInput observation_;
+    class SensoryInput previousObservation_;
 };
 
 } // namespace nlm

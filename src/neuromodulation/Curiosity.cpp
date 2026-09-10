@@ -59,4 +59,8 @@ void Curiosity::reset() {
     pImpl->level = 0.0f;
 }
 
-} // namespace nlm
+float Curiosity::getPlasticityFactor() const {
+    // TODO PHASE 2: Implement real curiosity-modulated plasticity factor
+    // PLACEHOLDER: Higher curiosity increases exploration-based plasticity
+    return 0.5f + 0.5f * pImpl->level;
+}

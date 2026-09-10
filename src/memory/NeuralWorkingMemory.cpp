@@ -81,6 +81,11 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        
+        // Create maintenance connections for this new neuron
+        if (memoryNeurons_.size() > 1) {
+            createMaintenanceConnections();
+        }
     }
     
     // Inject current to maintain activation
@@ -125,6 +130,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             // Inject maintenance current
             brain_->injectCurrent(neuron, activation * 2.0f);
             
+            // Also apply recurrent connections for maintenance
+            updateRecurrentConnections();
+            
             // Age the trace
             memoryTimestamps_[i]++;
             
@@ -155,6 +163,28 @@ void NeuralWorkingMemory::clear() {
 void NeuralWorkingMemory::strengthenMemory(float factor) {
     for (auto& activation : memoryActivations_) {
         activation = std::min(1.0f, activation * factor);
+    }
+}
+
+void NeuralWorkingMemory::createMaintenanceConnections() {
+    // Create a ring of recurrent connections for memory maintenance
+    // This allows memory traces to sustain themselves through recurrent excitation
+    
+    if (memoryNeurons_.empty()) return;
+    
+    // Clear old maintenance connections
+    pImpl->maintenanceSynapses.clear();
+    
+    // Create ring connections: neuron[i] -> neuron[(i+1) % N]
+    // This creates a closed loop for persistent activity
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        size_t next = (i + 1) % memoryNeurons_.size();
+        createRecurrentConnection(memoryNeurons_[i], memoryNeurons_[next], 0.5f);
+    }
+    
+    // Also create back connections for stronger maintenance
+    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+        createRecurrentConnection(memoryNeurons_[i], memoryNeurons_[i-1], 0.3f);
     }
 }
 

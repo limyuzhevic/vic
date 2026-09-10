@@ -80,6 +80,9 @@ private:
 
     // Update recurrent connections for maintenance
     void updateRecurrentConnections();
+    
+    // Create maintenance connections for stored neurons
+    void createMaintenanceConnections();
 
     // Decay weak memory traces
     void decayWeakTraces();

@@ -3,54 +3,79 @@
 
 namespace nlm {
 
-struct Dopamine::Impl {
-    float level;
-    float baseline;
-    float peak;
-    float decayRate;
-    float releaseRate;
-    
-    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
-};
-
-Dopamine::Dopamine() : pImpl(new Impl) {}
-
-Dopamine::~Dopamine() = default;
-
-const char* Dopamine::getName() const {
-    return "DA";
+void Dopamine::signal(Brain* brain) override {
+    boost::shared_ptr<Brain> brainPtr(brain);
+    // Apply dopamine effects on neural excitability
+    float dopamineLevel = getLevel();
+    for (auto& region : brain->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                // Dopamine modulates excitability by injecting additional current
+                // Higher dopamine increases excitability (lower effective threshold)
+                float excitabilityMod = dopamineLevel * 0.5f;
+                if (excitabilityMod > 0.0f) {
+                    neuron->injectCurrent(excitabilityMod);
+                }
+            }
+        }
+    }
 }
 
-float Dopamine::getLevel() const {
-    return pImpl->level;
+void Acetylcholine::signal(Brain* brain) override {
+    boost::shared_ptr<Brain> brainPtr(brain);
+    signalAttention(brainPtr);
 }
 
-void Dopamine::setLevel(float level) {
-    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+void Norepinephrine::signal(Brain* brain) override {
+    boost::shared_ptr<Brain> brainPtr(brain);
+    signalArousal(1.0f, brainPtr);
 }
 
-float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
-    return 0.5f + 0.5f * pImpl->level;
+void Serotonin::signal(Brain* brain) override {
+    boost::shared_ptr<Brain> brainPtr(brain);
+    signalMoodChange(1.0f, brainPtr);
 }
 
-void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+void Curiosity::signal(Brain* brain) override {
+    // Curiosity drives exploration by biasing neural activity towards novel actions
+    float curiosityLevel = getLevel();
+    for (auto& region : brain->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            // Bias motor populations towards exploration
+            for (auto* neuron : pop->getNeurons()) {
+                // Curiosity increases exploration bias
+                neuron->injectCurrent(curiosityLevel * 0.1f);
+            }
+        }
+    }
 }
 
-void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+void Novelty::signal(Brain* brain) override {
+    // Novelty detection influences attention and novelty-seeking behavior
+    float noveltyLevel = getLevel();
+    for (auto& region : brain->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            // Novelty increases salience of sensory processing
+            for (auto* neuron : pop->getNeurons()) {
+                // Novelty enhances sensory processing
+                neuron->injectCurrent(noveltyLevel * 0.2f);
+            }
+        }
+    }
 }
 
-void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+void PredictionError::signal(Brain* brain) override {
+    // Prediction error drives learning and behavioral adaptation
+    float predictionErrorLevel = getLevel();
+    for (auto& region : brain->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            // Prediction error modulates plasticity in all regions
+            for (auto* neuron : pop->getNeurons()) {
+                // Prediction error modulates learning rate
+                neuron->injectCurrent(predictionErrorLevel * 0.3f);
+            }
+        }
+    }
 }
 
 } // namespace nlm

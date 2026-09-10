@@ -70,9 +70,11 @@ public:
     void setSequenceMemorySize(size_t size) { sequenceMemorySize_ = size; }
     void setPredictionHorizon(size_t steps) { predictionHorizon_ = steps; }
 
-    // Get neurons involved in prediction
-    std::vector<NeuronId> getPredictionNeurons() const;
-    std::vector<NeuronId> getSequenceNeurons() const;
+    // Get prediction system reference (for Brain integration)
+    NeuralPrediction* getPredictionSystem() { return this; }
+
+    // Get neural prediction reference (for PredictionSystem integration)
+    NeuralPrediction* getNeuralPrediction() { return this; }
 
 private:
     // Learn temporal sequence from sensory observations
