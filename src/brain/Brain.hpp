@@ -47,6 +47,7 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// Phase 6: Fully integrated artificial brain loop
 
 class Brain {
 public:

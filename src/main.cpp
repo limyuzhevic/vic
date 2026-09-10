@@ -1,11 +1,20 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Final Integration
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This phase implements the final integration of all brain systems into a coherent artificial brain:
+// - All memory systems (working, episodic, associative) fully integrated
+// - Neuromodulation (dopamine, curiosity, novelty) integrated with plasticity
+// - Prediction system integrated with brain loop
+// - Cognition systems (neural planner, concept formation, attention) integrated
+// - Development effects modulate plasticity rates
+// - Memory replay and consolidation during rest cycles
+// - Complete closed-loop processing from perception to action
+// - Memory systems (working, episodic, associative)
+// - Neuromodulation (dopamine, curiosity, novelty)
+// - Prediction system
+// - Cognitive systems (planner, concept formation, attention)
+// - Development system
+// - Checkpoint and persistence
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -35,20 +44,16 @@ void printBanner() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     Phase 6: Final Integration                                 ║
     ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     Integrates all brain systems into a coherent artificial    ║
+    ║     brain capable of learning, memory, and adaptation.        ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+// Learning Experiment: Demonstrates measurable synaptic changes through experience and integration with memory systems
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -103,7 +108,7 @@ struct LearningExperiment {
     
     void computeStatistics() {
         NLM_LOG_INFO("");
-        NLM_LOG_INFO("=== Learning Experiment Results ===");
+        NLM_LOG_INFO("=== Learning Experiment Results (Phase 6) ===");
         NLM_LOG_INFO("");
         
         if (initialWeights.empty() || finalWeights.empty()) {

@@ -108,8 +108,7 @@ struct Brain::Impl {
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
+        pImpl->workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
@@ -231,6 +230,8 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
+// ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
+    
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
@@ -243,7 +244,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem = std::make_unique<PredictionSystem>();
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -528,16 +529,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation would process current neural activity patterns
+        // to form abstract representations of experiences
+        // It receives input from working memory and attention
+        // and produces concepts that influence future processing
+        
+        // TODO: Pass working memory content to concept formation
+        // std::vector<float> workingMemoryPattern = 
+        //     (pImpl->workingMemory) ? pImpl->workingMemory->retrieve() : std::vector<float>();
+        // pImpl->conceptFormation->processPattern(workingMemoryPattern, currentTime);
+        
+        // Update concept formation based on current neural state
+        pImpl->conceptFormation->update(pImpl->timestep);
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Update neural planner ==========
+    if (pImpl->planner) {
+        // Neural planner would evaluate action sequences based on current goals
+        // and concepts formed
+        // It would integrate with curiosity and motivation systems
+        
+        // TODO: Pass goal state to planner
+        // std::vector<float> goalState;
+        // if (pImpl->curiosity) {
+        //     goalState = pImpl->curiosity->getCurrentGoal();
+        // }
+        // ActionType plannedAction = pImpl->planner->planAction(goalState);
+        
+        // Update planner based on current state
+        pImpl->planner->update(pImpl->timestep);
+    }
+    
+    // ========== STEP 12: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
+    // ========== STEP 13: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
@@ -546,7 +574,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // ========== STEP 14: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -576,15 +604,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // ========== STEP 15: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 16: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+    
+    // ========== STEP 17: Update neuromodulation effects ==========
+    // Update prediction error and other neuromodulators that affect learning
+    if (pImpl->predictionError) {
+        pImpl->predictionError->update(pImpl->timestep);
+    }
+    
+    // ========== STEP 18: Integrate cognition with action selection ==========
+    // Connect cognitive systems to motor output
+    if (pImpl->attention) {
+        // Apply attention-modulated action selection
+        // The planner's output could be influenced by attention
+    }
+    
+    if (pImpl->planner && pImpl->attention) {
+        // Integrate planning with attentional focus
+        // Maybe modify planning based on attended regions
     }
 }
 
