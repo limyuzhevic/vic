@@ -93,6 +93,12 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // New features
+    void enableValidation(bool enable);
+    bool isValidationEnabled() const;
+    void setDescription(const std::string& key, const std::string& description);
+    std::string getDescription(const std::string& key) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +106,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Advanced file parsing methods
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromKeyValue(const std::string& filepath);
+    bool saveToJSON(const std::string& filepath) const;
+    bool saveToKeyValue(const std::string& filepath) const;
+    nlohmann::json convertConfigValueToJSON(const ConfigValue& value) const;
+    std::string convertConfigValueToString(const ConfigValue& value) const;
+    ConfigValue convertToConfigValue(const std::string& value) const;
+    void runValidation();
 };
 
 } // namespace nlm
