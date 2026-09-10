@@ -183,6 +183,22 @@ enum class FiringState : uint8_t {
 using NeuronHandle = uint64_t;
 using SynapseHandle = uint64_t;
 
+// Spike event type enumeration
+enum class SpikeEventType : uint8_t {
+    Single,
+    Delayed,
+    Broadcast,
+    Propagated
+};
+
+// Spike event subtype enumeration
+enum class SpikeEventSubType : uint8_t {
+    Standard,
+    Neuromodulatory,
+    Plasticity,
+    Prediction
+};
+
 // Invalid ID sentinel
 constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
 constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
