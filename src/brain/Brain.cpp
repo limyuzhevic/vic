@@ -15,6 +15,7 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include <cassert>
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -182,6 +183,12 @@ bool Brain::initialize() {
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
+    // Validate parameters
+    assert(neuronCount > 0 && "neuron_count must be positive");
+    assert(regionCount > 0 && "region_count must be positive");
+    assert(regionCount <= neuronCount && "region_count cannot exceed neuron_count");
+    assert(connectionProbability >= 0.0f && connectionProbability <= 1.0f && "connection_probability must be between 0.0 and 1.0");
+    
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
@@ -324,6 +331,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 13. Apply development effects
      * 14. Collect statistics
      */
+    
+    // Validate parameters
+    assert(currentStep > 0 && "currentStep must be positive");
+    assert(currentTime >= 0.0 && "currentTime must be non-negative");
     
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
@@ -589,14 +600,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
+    // Validate input data
+    assert(&input && "input must not be null");
     
     const auto& values = input.getData();
+    
     if (values.empty()) return;
     
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
+    
+    // Validate data size
+    assert(values.size() == numSensory && "input data size must match number of sensory neurons");
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
@@ -605,6 +620,9 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         if (i < values.size()) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
         }
+        
+        // Validate normalized value
+        assert(std::isfinite(normalizedValue) && "normalizedValue must be finite");
         
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
@@ -629,6 +647,9 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    // Validate parameters
+    assert(std::isfinite(current) && "current must be finite");
+    
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             if (pop->getNeuronType() == type) {
@@ -909,6 +930,9 @@ bool Brain::load(const std::string& filepath) {
 }
 
 RegionId Brain::addRegion(const std::string& name) {
+    // Validate region name
+    assert(!name.empty() && "Region name cannot be empty");
+    
     RegionId id(pImpl->nextRegionId++);
     auto region = std::make_unique<NeuralRegion>(id, name);
     pImpl->regions.push_back(std::move(region));

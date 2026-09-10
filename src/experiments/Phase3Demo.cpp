@@ -1,16 +1,3 @@
-#include "Phase3Experiment.hpp"
-#include "../agent/AgentBrain.hpp"
-#include "../agent/SensoryPercept.hpp"
-#include "../world/SimpleWorld.hpp"
-#include "../brain/Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <iostream>
-#include <fstream>
-#include <sstream>
-
-namespace nlm {
-
 // Main Phase 3 demonstration
 // Shows: experience -> neural activity -> action -> consequence -> learning
 
@@ -81,7 +68,7 @@ public:
                 
                 // 3. Simulate brain (multiple steps per action)
                 for (int neuralStep = 0; neuralStep < 10; ++neuralStep) {
-                    brain->step(neuralStep);
+                    brain->step(neuralStep, neuralStep * 0.001);
                 }
                 
                 // 4. Decode motor command from brain activity
@@ -240,12 +227,27 @@ private:
     }
 };
 
-} // namespace nlm
-
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
+    // Parse command line arguments
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
+    
+    // Show help if requested
+    if (argc > 1 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
+        std::cout << "NLM Phase 3 Demo - World Interaction\n";
+        std::cout << "====================================\n\n";
+        std::cout << "USAGE:\n";
+        std::cout << "  nlm_phase3_demo [episodes] [steps]\n\n";
+        std::cout << "ARGUMENTS:\n";
+        std::cout << "  episodes    Number of episodes to run (default: 5)\n";
+        std::cout << "  steps      Steps per episode (default: 200)\n\n";
+        std::cout << "EXAMPLES:\n";
+        std::cout << "  nlm_phase3_demo              Run with defaults\n";
+        std::cout << "  nlm_phase3_demo 10 500      Run 10 episodes, 500 steps each\n";
+        std::cout << "  nlm_phase3_demo --help       Show this help\n";
+        return 0;
+    }
     
     if (argc > 1) {
         numEpisodes = std::atoi(argv[1]);

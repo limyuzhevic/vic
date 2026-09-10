@@ -37,14 +37,30 @@ void printSection(const std::string& title) {
 }
 
 int main(int argc, char* argv[]) {
-    std::cout << "NLM Phase 4: Emerging Cognition\n";
-    std::cout << "================================\n\n";
-    
     // Parse command line arguments
     size_t numTrials = 50;
+    
+    // Show help if requested
+    if (argc > 1 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
+        std::cout << "NLM Phase 4 Demo - Emerging Cognition\n";
+        std::cout << "=====================================\n\n";
+        std::cout << "USAGE:\n";
+        std::cout << "  nlm_phase4_demo [trials]\n\n";
+        std::cout << "ARGUMENTS:\n";
+        std::cout << "  trials      Number of trials for each experiment (default: 50)\n\n";
+        std::cout << "EXAMPLES:\n";
+        std::cout << "  nlm_phase4_demo              Run with defaults\n";
+        std::cout << "  nlm_phase4_demo 100         Run with 100 trials\n";
+        std::cout << "  nlm_phase4_demo --help       Show this help\n";
+        return 0;
+    }
+    
     if (argc > 1) {
         numTrials = std::stoi(argv[1]);
     }
+    
+    printHeader("NLM Phase 4 - Emerging Cognition");
+    std::cout << "================================\n\n";
     
     // Create configuration
     auto config = std::make_shared<Config>();
