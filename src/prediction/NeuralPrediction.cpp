@@ -36,6 +36,12 @@ NeuralPrediction::NeuralPrediction()
     , brain_(nullptr)
     , predictionError_(0.0f)
     , predictionConfidence_(0.5f)
+    , recentSensoryStates_()
+    , stateTimestamps_()
+    , recentActions_()
+    , errorHistory_()
+    , predictionNeurons_()
+    , sequenceNeurons_()
 {
 }
 

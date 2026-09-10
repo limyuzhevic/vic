@@ -16,6 +16,8 @@ NeuralPlanner::NeuralPlanner()
     , brain_(nullptr)
     , planningDepth_(3)
     , planningConfidence_(0.5f)
+    , recentPlanSuccess_()  // Initialize deque
+    , currentGoal_()  // Initialize goal vector
 {
     actionQuality_.resize(10, 0.0f);  // 10 action types
 }
