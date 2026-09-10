@@ -147,6 +147,80 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // NEW: Connect to higher cognition systems
+    
+    // 1. Send to concept formation for pattern discovery
+    if (brain_->getConceptFormation()) {
+        std::vector<float> pattern;
+        pattern.reserve(vision.size() + touch.size() + intern.size() + proprio.size());
+        pattern.insert(pattern.end(), vision.begin(), vision.end());
+        pattern.insert(pattern.end(), touch.begin(), touch.end());
+        pattern.insert(pattern.end(), intern.begin(), intern.end());
+        pattern.insert(pattern.end(), proprio.begin(), proprio.end());
+        
+        brain_->getConceptFormation()->presentExperience(
+            pattern,  // Pattern
+            pattern,  // Features
+            predictionError_,  // Reward signal
+            0.0f     // Time (would need to get from world)
+        );
+    }
+    
+    // 2. Send prediction error to prediction system
+    if (brain_->getPredictionErrorSignal()) {
+        brain_->getPredictionErrorSignal()->update(predictionError_, 0.0f);
+    }
+    
+    // 3. Update attention based on sensory input
+    if (brain_->getAttention()) {
+        // Create attention target from sensory input
+        std::vector<NeuronId> activeNeurons;
+        for (size_t i = 0; i < sensoryVision_.size(); ++i) {
+            if (sensoryVision_[i] && sensoryVision_[i]->isFiring()) {
+                activeNeurons.push_back(sensoryVision_[i]->getId());
+            }
+        }
+        
+        if (!activeNeurons.empty()) {
+            brain_->getAttention()->processCompetition(activeNeurons);
+        }
+    }
+    
+    // 4. Update working memory with sensory data
+    if (brain_->getWorkingMemory()) {
+        // Add sensory experience to working memory
+        for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+            if (sensoryVision_[i] && vision[i] > 0.1f) {
+                brain_->getWorkingMemory()->storeToNeuron(
+                    sensoryVision_[i]->getId(), 
+                    vision[i] / 10.0f
+                );
+            }
+        }
+    }
+    
+    // 5. Update episodic memory with current experience
+    if (brain_->getEpisodicMemory() && brain_->getDopamine()) {
+        // Store a new episodic memory with sensory input
+        EpisodicMemoryItem episode;
+        episode.timestamp = currentStep; // Would need simulation step from world
+        episode.reward = brain_->getDopamine()->getLevel();
+        
+        // Store sensory data
+        for (size_t i = 0; i < vision.size(); ++i) {
+            episode.activeNeurons.push_back(sensoryVision_[i]->getId());
+            episode.neuronActivations.push_back(vision[i] / 10.0f);
+        }
+        
+        brain_->getEpisodicMemory()->storeEpisode(episode);
+    }
+    
+    // 6. Update curiosity-driven exploration
+    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+        // Higher curiosity means more exploration
+        // This is handled in decodeMotorCommand via selectWithCuriosity
+    }
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {

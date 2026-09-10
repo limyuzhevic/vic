@@ -401,12 +401,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
-    }
-    
-    // ========== STEP 5: Apply neuromodulation effects ==========
+    // ========== STEP 6: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
@@ -439,7 +434,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+    // ========== STEP 7: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
@@ -509,13 +504,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+    // ========== STEP 5: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Connect prediction to sensory input and episodic memory
+        // Prediction system would use sensory input to predict next states
+        // For now, set up basic prediction capability
+        pImpl->predictionSystem->setInputSource(pImpl->sensoryNeurons);
+        pImpl->predictionSystem->setMemoryTarget(pImpl->episodicMemory.get());
+        pImpl->predictionSystem->update(pImpl->timestep);
     }
     
-    // ========== STEP 9: Update attention system ==========
+    // ========== STEP 8: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -526,10 +525,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
+    // ========== STEP 9: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation processes neural activity patterns to form abstract concepts
+        // It would use current sensory input and episodic memory to discover patterns
+        pImpl->conceptFormation->update(pImpl->timestep);
+    }
+    
+    // ========== STEP 10: Update planning system ==========
+    if (pImpl->planner) {
+        // Neural planning evaluates action sequences and selects optimal behaviors
+        // It uses working memory and episodic memory to simulate outcomes
+        pImpl->planner->update(pImpl->timestep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -828,6 +835,33 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write working memory
+        if (pImpl->workingMemory) {
+            auto workingMemoryData = pImpl->workingMemory->save();
+            if (!writer.writeWorkingMemory(workingMemoryData)) {
+                NLM_LOG_ERROR("Failed to write working memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write episodic memory
+        if (pImpl->episodicMemory) {
+            auto episodicMemoryData = pImpl->episodicMemory->save();
+            if (!writer.writeEpisodicMemory(episodicMemoryData)) {
+                NLM_LOG_ERROR("Failed to write episodic memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write prediction system
+        if (pImpl->predictionSystem) {
+            auto predictionData = pImpl->predictionSystem->save();
+            if (!writer.writePredictionSystem(predictionData)) {
+                NLM_LOG_ERROR("Failed to write prediction system to checkpoint");
+                return false;
+            }
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -898,6 +932,30 @@ bool Brain::load(const std::string& filepath) {
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // Read working memory
+        if (pImpl->workingMemory) {
+            auto workingMemoryData = reader.readWorkingMemory();
+            if (workingMemoryData) {
+                pImpl->workingMemory->load(workingMemoryData.value());
+            }
+        }
+        
+        // Read episodic memory
+        if (pImpl->episodicMemory) {
+            auto episodicMemoryData = reader.readEpisodicMemory();
+            if (episodicMemoryData) {
+                pImpl->episodicMemory->load(episodicMemoryData.value());
+            }
+        }
+        
+        // Read prediction system
+        if (pImpl->predictionSystem) {
+            auto predictionData = reader.readPredictionSystem();
+            if (predictionData) {
+                pImpl->predictionSystem->load(predictionData.value());
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
