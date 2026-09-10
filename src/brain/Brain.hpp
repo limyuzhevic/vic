@@ -19,6 +19,8 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class SemanticMemory;
+class ProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
@@ -144,49 +146,55 @@ public:
     
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
+// Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
-    
-    // ========== PREDICTION SYSTEM ==========
-    
+
+    // Semantic memory - knowledge representation  
+    SemanticMemory* getSemanticMemory();
+
+    // Procedural memory - skills and habits
+    ProceduralMemory* getProceduralMemory();
+
+// ========== PREDICTION SYSTEM ==========
+
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
-    
+
+// ========== COGNITION SYSTEMS ==========
+
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
-    
+
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
-    
+
     // Attentional selection for focus
     AttentionalSelection* getAttention();
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    
+
+// ========== DEVELOPMENT SYSTEM ==========
+
     DevelopmentSystem* getDevelopmentSystem();
+
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
+
+// ========== NEUROMODULATION SYSTEMS ==========
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
-    
+
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
-    
+
     // Novelty - novelty detection
     Novelty* getNovelty();
-    
+
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
-    
+
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
-    
+
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
