@@ -1,45 +1,32 @@
+/*
+ * Environment.cpp - Implementation of Environment interface
+ * 
+ * This file implements the Environment class and GridWorldEnvironment for world simulation.
+ * The environment provides the interface between the agent's brain and the external world,
+ * handling sensory input, actions, rewards, and world state. This is a placeholder
+ * implementation for Phase 1, with more sophisticated features planned for Phase 2.
+ */
+
 #include "Environment.hpp"
+#include "../agent/AgentBody.hpp"
+#include "../sensory/InternalSignals.hpp"
+#include <cmath>
+#include <algorithm>
+#include <iostream>
 
 namespace nlm {
 
-struct EnvironmentState::Impl {
-    bool terminal;
-    
-    Impl() : terminal(false) {}
-};
-
-EnvironmentState::EnvironmentState() : pImpl(new Impl) {}
-
-EnvironmentState::~EnvironmentState() = default;
-
-bool EnvironmentState::is_terminal() const {
-    return pImpl->terminal;
+// Environment implementation
+Environment::Environment()
+    : state_(nullptr)
+    , lastReward_(0.0f)
+    , done_(false) {
 }
 
-void EnvironmentState::set_terminal(bool terminal) {
-    pImpl->terminal = terminal;
+// GridWorldEnvironment implementation
+GridWorldEnvironment::GridWorldEnvironment(int width, int height)
+    : pImpl(new Impl(width, height)) {
 }
-
-Environment::Environment() : state_(nullptr), lastReward_(0.0f), done_(false) {}
-
-struct GridWorldEnvironment::Impl {
-    int width;
-    int height;
-    int agentX;
-    int agentY;
-    int goalX;
-    int goalY;
-    int steps;
-    int maxSteps;
-    bool done;
-    EnvironmentState state;
-    
-    Impl(int w, int h) : width(w), height(h), agentX(0), agentY(0), 
-                         goalX(w-1), goalY(h-1), steps(0), maxSteps(1000), done(false) {}
-};
-
-GridWorldEnvironment::GridWorldEnvironment(int width, int height) 
-    : pImpl(new Impl(width, height)) {}
 
 GridWorldEnvironment::~GridWorldEnvironment() = default;
 

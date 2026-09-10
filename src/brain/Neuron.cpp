@@ -1,3 +1,4 @@
+// Include standard headers
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
@@ -5,29 +6,13 @@
 
 namespace nlm {
 
-struct Neuron::Impl {
-    NeuronId id;
-    NeuronType type;
-    NeuronState state;
-    RegionId regionId;
-    PopulationId populationId;
-    MembranePotential totalCurrent;  // Total synaptic current input this step
-    MembranePotential synapticInput;  // Accumulated synaptic input
-    std::vector<Timestamp> spikeHistory;
-    std::vector<SynapseHandle> incomingSynapses;
-    std::vector<SynapseHandle> outgoingSynapses;
-    PlasticityFlags plasticityFlags;
-    
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
-    
-    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
-};
+// Define static constants for neuron parameters
+const float Neuron::Impl::MEMBRANE_CAPACITANCE = 1.0f;  // nF - membrane capacitance
+const float Neuron::Impl::TIME_CONSTANT = 20.0f;      // ms - membrane time constant
+const size_t Neuron::Impl::MAX_SPIKE_HISTORY = 100;    // Maximum spike events to record
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+    // Initialize neuron with unique ID
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
