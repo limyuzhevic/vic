@@ -1,11 +1,13 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Logger/Logger.hpp"
 
 namespace nlm {
 
-// Forward declaration
+// Forward declarations
 class Neuron;
+class RandomGenerator;
 
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
@@ -78,7 +80,7 @@ public:
     void reset();
     
     // Initialize with random parameters
-    void initializeRandom(class RandomGenerator& rng);
+    void initializeRandom(RandomGenerator& rng);
     
 private:
     struct Impl;

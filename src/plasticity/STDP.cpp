@@ -56,25 +56,53 @@ void STDP::update(Synapse* synapse,
         return;
     }
     
+    // OPTIMIZATION: Replace O(n²) nested loops with O(n log n) algorithm
+    // Sort spike times and use two-pointer technique for efficient pair processing
+    std::vector<Timestamp> sortedPre = preSpikes;
+    std::vector<Timestamp> sortedPost = postSpikes;
+    std::sort(sortedPre.begin(), sortedPre.end());
+    std::sort(sortedPost.begin(), sortedPost.end());
+    
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
+    // Use two-pointer technique to process spike pairs efficiently
+    // This reduces complexity from O(n²) to O(n + m) where n,m are spike counts
+    size_t i = 0, j = 0;
+    
+    while (i < sortedPre.size() && j < sortedPost.size()) {
+        Timestamp preTime = sortedPre[i];
+        Timestamp postTime = sortedPost[j];
+        float dt = static_cast<float>(postTime - preTime);
+        
+        // Check if spikes are within relevant STDP time window (e.g., ±200ms)
+        // STDP effects decay exponentially with distance in time
+        if (std::abs(dt) < 200.0f) {
             if (dt > 0) {
                 // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
                 float delta = pImpl->ltpWeight * std::exp(-dt / tau);
                 totalDelta += delta;
+                // Advance both pointers to find next unique pair
+                ++i;
+                ++j;
             } else if (dt < 0) {
                 // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                float delta = -pImpl->ltdWeight * std::exp(dt / tau);
                 totalDelta += delta;
+                // Advance both pointers to find next unique pair
+                ++i;
+                ++j;
+            } else {
+                // Simultaneous spikes: no effect (rare in practice)
+                ++i;
+                ++j;
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+        } else if (dt < -200.0f) {
+            // Post spike is too early relative to pre spike, move to later pre spike
+            ++i;
+        } else {
+            // Post spike is too late relative to pre spike, move to earlier post spike
+            ++j;
         }
     }
     

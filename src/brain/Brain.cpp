@@ -300,6 +300,15 @@ bool Brain::initialize() {
 }
 
 void Brain::step(SimulationStep currentStep) {
+    NLM_LOG_DEBUG("Brain::step(SimulationStep): Starting brain step " + std::to_string(currentStep));
+    
+    // Validate current step
+    if (currentStep > 0 && currentStep < static_cast<SimulationStep>(-1) / 2) {
+        NLM_LOG_ERROR("Brain::step(): Invalid simulation step: " + std::to_string(currentStep));
+        return;
+    }
+    
+    // Call the main step method with currentTime calculated
     step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
 }
 

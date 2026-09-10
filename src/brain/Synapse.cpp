@@ -78,66 +78,167 @@ Synapse& Synapse::operator=(Synapse&& other) noexcept {
 }
 
 SynapseId Synapse::getId() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getId(): pImpl is null");
+        return INVALID_SYNAPSE_ID;
+    }
     return pImpl->id;
 }
 
 NeuronId Synapse::getSourceNeuron() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getSourceNeuron(): pImpl is null");
+        return INVALID_NEURON_ID;
+    }
     return pImpl->sourceNeuron;
 }
 
 NeuronId Synapse::getDestinationNeuron() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getDestinationNeuron(): pImpl is null");
+        return INVALID_NEURON_ID;
+    }
     return pImpl->destinationNeuron;
 }
 
 SynapticWeight Synapse::getWeight() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getWeight(): pImpl is null");
+        return 0.0f;
+    }
     return pImpl->weight;
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::setWeight(): pImpl is null");
+        return;
+    }
+    
+    // Validate weight bounds before setting
+    if (weight < Impl::MIN_WEIGHT || weight > Impl::MAX_WEIGHT) {
+        NLM_LOG_ERROR("Synapse::setWeight(): Weight " + std::to_string(weight) + 
+                     " is out of valid range [" + std::to_string(Impl::MIN_WEIGHT) + ", " + 
+                     std::to_string(Impl::MAX_WEIGHT) + "]");
+        return;
+    }
+    
     pImpl->weight = weight;
+    NLM_LOG_DEBUG("Synapse::setWeight(): Successfully set weight to " + std::to_string(weight));
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::addToWeight(): pImpl is null");
+        return;
+    }
+    
+    float newWeight = pImpl->weight + delta;
+    if (newWeight < Impl::MIN_WEIGHT || newWeight > Impl::MAX_WEIGHT) {
+        NLM_LOG_WARNING("Synapse::addToWeight(): Weight change would exceed bounds. "
+                       "New weight would be " + std::to_string(newWeight) +
+                       " (current: " + std::to_string(pImpl->weight) + ")");
+    }
+    
     pImpl->weight += delta;
     // Clamp to reasonable bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    NLM_LOG_DEBUG("Synapse::addToWeight(): Added " + std::to_string(delta) + " to weight, new value: " + std::to_string(pImpl->weight));
 }
 
 Delay Synapse::getDelay() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getDelay(): pImpl is null");
+        return 1;  // Default delay
+    }
     return pImpl->delay;
 }
 
 void Synapse::setDelay(Delay delay) {
-    pImpl->delay = delay;
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::setDelay(): pImpl is null");
+        return;
+    }
+    
+    // Validate delay is reasonable (greater than 0)
+    if (delay <= 0) {
+        NLM_LOG_WARNING("Synapse::setDelay(): Delay must be positive, got " + std::to_string(delay) +
+                       ". Setting to minimum value of 1.");
+        pImpl->delay = 1;
+    } else {
+        pImpl->delay = delay;
+    }
+    NLM_LOG_DEBUG("Synapse::setDelay(): Set delay to " + std::to_string(pImpl->delay));
 }
 
 SynapseType Synapse::getType() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getType(): pImpl is null");
+        return SynapseType::Excitatory;  // Default
+    }
     return pImpl->type;
 }
 
 void Synapse::setType(SynapseType type) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::setType(): pImpl is null");
+        return;
+    }
     pImpl->type = type;
+    NLM_LOG_DEBUG("Synapse::setType(): Set type to " + std::to_string(static_cast<int>(type)));
 }
 
 bool Synapse::isExcitatory() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::isExcitatory(): pImpl is null");
+        return false;
+    }
     return pImpl->type == SynapseType::Excitatory;
 }
 
 bool Synapse::isInhibitory() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::isInhibitory(): pImpl is null");
+        return false;
+    }
     return pImpl->type == SynapseType::Inhibitory;
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::recordPreSpike(): pImpl is null");
+        return;
+    }
+    
+    // Validate timestamp is reasonable (not negative or excessively large)
+    if (timestamp < 0.0) {
+        NLM_LOG_WARNING("Synapse::recordPreSpike(): Timestamp cannot be negative, got " + std::to_string(timestamp));
+        return;
+    }
+    
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+        NLM_LOG_DEBUG("Synapse::recordPreSpike(): Spike history overflow, trimmed to max size");
     }
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::recordPostSpike(): pImpl is null");
+        return;
+    }
+    
+    // Validate timestamp
+    if (timestamp < 0.0) {
+        NLM_LOG_WARNING("Synapse::recordPostSpike(): Timestamp cannot be negative, got " + std::to_string(timestamp));
+        return;
+    }
+    
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+        NLM_LOG_DEBUG("Synapse::recordPostSpike(): Spike history overflow, trimmed to max size");
     }
 }
 

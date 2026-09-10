@@ -1,27 +1,28 @@
-#include "Hebbian.hpp"
+// FIXED: AntiHebbianRule.cpp - Full Implementation
+#include "AntiHebbianRule.hpp"
 #include "../../brain/Synapse.hpp"
 #include <algorithm>
 
 namespace nlm {
 
-struct Hebbian::Impl {
+struct AntiHebbianRule::Impl {
     float learningRate;
     float maxWeight;
     float minWeight;
-    float covarianceThreshold;
+    float baselineActivity;
     
     Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
-             covarianceThreshold(0.0f) {}
+             baselineActivity(0.0f) {}
 };
 
-Hebbian::Hebbian() : pImpl(new Impl) {}
+AntiHebbianRule::AntiHebbianRule() : pImpl(new Impl) {}
 
-Hebbian::~Hebbian() = default;
+AntiHebbianRule::~AntiHebbianRule() = default;
 
-void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
+void AntiHebbianRule::update(Synapse* synapse,
+                           const std::vector<Timestamp>& preSpikes,
+                           const std::vector<Timestamp>& postSpikes,
+                           TimestepDuration dt) {
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
@@ -35,7 +36,7 @@ void Hebbian::update(Synapse* synapse,
     
     // Count correlated spike pairs using two-pointer technique
     // This reduces complexity from O(n²) to O(n + m) where n,m are spike counts
-    size_t correlationCount = 0;
+    size_t coincidences = 0;
     size_t i = 0, j = 0;
     
     while (i < sortedPre.size() && j < sortedPost.size()) {
@@ -43,12 +44,12 @@ void Hebbian::update(Synapse* synapse,
         Timestamp postTime = sortedPost[j];
         float timeDiff = static_cast<float>(postTime - preTime);
         
-        if (std::abs(timeDiff) < 100.0f) {
-            ++correlationCount;
+        if (std::abs(timeDiff) < 10.0f) {
+            ++coincidences;
             // Advance both pointers since this pair is within window
             ++i;
             ++j;
-        } else if (timeDiff < -100.0f) {
+        } else if (timeDiff < -10.0f) {
             // Post spike is too early, need later pre spike
             ++i;
         } else {
@@ -57,14 +58,13 @@ void Hebbian::update(Synapse* synapse,
         }
     }
     
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
-    
-    if (std::abs(delta) > 1e-6f) {
+    if (coincidences > 0) {
+        float delta = -pImpl->learningRate * static_cast<float>(coincidences);
         applyWeightChange(synapse, delta);
     }
 }
 
-void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
+void AntiHebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
     float newWeight = synapse->getWeight() + delta;
@@ -72,23 +72,23 @@ void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     synapse->setWeight(newWeight);
 }
 
-const char* Hebbian::getName() const {
-    return "Hebbian";
+const char* AntiHebbianRule::getName() const {
+    return "AntiHebbian";
 }
 
-void Hebbian::setLearningRate(float rate) {
+void AntiHebbianRule::setLearningRate(float rate) {
     pImpl->learningRate = std::clamp(rate, 0.0f, 1.0f);
 }
 
-float Hebbian::getLearningRate() const {
+float AntiHebbianRule::getLearningRate() const {
     return pImpl->learningRate;
 }
 
-void Hebbian::setMaxWeight(float maxWeight) {
+void AntiHebbianRule::setMaxWeight(float maxWeight) {
     pImpl->maxWeight = std::clamp(maxWeight, 0.0f, 10.0f);
 }
 
-float Hebbian::getMaxWeight() const {
+float AntiHebbianRule::getMaxWeight() const {
     return pImpl->maxWeight;
 }
 
