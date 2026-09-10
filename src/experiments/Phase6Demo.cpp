@@ -15,9 +15,6 @@ int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
-    // Initialize logging
-    Logger::getInstance().setLevel(Logger::Level::Info);
-    
     // Create experiment
     Phase6IntegratedExperiment experiment;
     
@@ -57,8 +54,8 @@ int main(int argc, char* argv[]) {
     config.neuronCount = 500;
     config.maxSteps = 2000;
     config.enableCheckpointing = true;
-    config.enableReplay = true;
     config.enableDevelopment = true;
+    config.checkpointPath = "./checkpoint_test.bin";
     
     auto result = experiment.run(config);
     
