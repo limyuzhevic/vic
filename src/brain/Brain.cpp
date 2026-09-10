@@ -771,6 +771,14 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Validate file path
+        if (filepath.empty()) {
+            NLM_LOG_ERROR("Invalid filepath: empty string");
+            return false;
+        }
+        
+        NLM_CHECK_NULL(pImpl->config, ErrorCode::InvalidArgument, "Brain configuration is null");
+        
         // Set metadata
         writer.setMetadata(
             getTotalNeuronCount(),
