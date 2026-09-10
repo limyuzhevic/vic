@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "Error/Error.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -19,77 +20,150 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Config file not found: " + filepath);
+            throw FileIOException(ErrorCode::ConfigFileNotFound, 
+                                "Failed to open config file: " + filepath);
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        std::string line;
+        size_t lineNum = 0;
+        while (std::getline(file, line)) {
+            lineNum++;
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                if (key.empty()) {
+                    NLM_LOG_WARNING("Empty key found at line " + std::to_string(lineNum));
+                    continue;
+                }
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            } else {
+                NLM_LOG_WARNING("Invalid format in config file " + filepath + " at line " + std::to_string(lineNum));
+            }
         }
+        
+        NLM_LOG_INFO("Successfully loaded config from " + filepath + " (" + 
+                    std::to_string(pImpl->entries.size()) + " entries)");
+        return true;
+        
+    } catch (const FileIOException& e) {
+        NLM_LOG_ERROR("File I/O error in config file " + filepath + ": " + e.what());
+        throw;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Unexpected error loading config file " + filepath + ": " + e.what());
+        throw ConfigException(ErrorCode::ConfigParseError, 
+                             "Failed to parse config file: " + filepath + ": " + e.what(),
+                             __FILE__, __LINE__, __func__);
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
+    try {
+        if (argc <= 1) {
+            NLM_LOG_INFO("No command line arguments provided for config");
+            return true;
+        }
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            // Handle --key=value format
+            if (arg.substr(0, 2) == "--") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = arg.substr(2, pos - 2);
+                    std::string value = arg.substr(pos + 1);
+                    set(key, value, ConfigSource::CommandLine);
+                } else {
+                    NLM_LOG_ERROR("Invalid command line argument format: " + arg);
+                    throw ConfigException(ErrorCode::ConfigParseError,
+                                         "Invalid command line argument: " + arg);
+                }
+            }
+            // Handle -key value format
+            else if (arg[0] == '-' && i + 1 < argc) {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_ERROR("Invalid command line argument: " + arg);
+                throw ConfigException(ErrorCode::ConfigParseError,
+                                     "Invalid command line argument: " + arg);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+        
+        NLM_LOG_INFO("Successfully loaded config from command line arguments (" + 
+                    std::to_string(pImpl->entries.size()) + " entries)");
+        return true;
+        
+    } catch (const ConfigException& e) {
+        NLM_LOG_ERROR("Config parsing error in command line arguments: " + e.what());
+        throw;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Unexpected error loading config from command line arguments: " + e.what());
+        throw ConfigException(ErrorCode::ConfigParseError,
+                             "Failed to parse config from command line arguments: " + e.what(),
+                             __FILE__, __LINE__, __func__);
     }
-    return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    try {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
+            throw FileIOException(ErrorCode::ConfigFileNotFound, 
+                                "Failed to open config file for writing: " + filepath);
+        }
+        
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = " << "[";
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else {
+                    file << arg;
+                }
+            }, entry.value);
+            file << "]\n";
+        }
+        
+        NLM_LOG_INFO("Successfully saved config to " + filepath + " (" + 
+                    std::to_string(pImpl->entries.size()) + " entries)");
+        return true;
+        
+    } catch (const FileIOException& e) {
+        NLM_LOG_ERROR("File I/O error saving config to " + filepath + ": " + e.what());
+        throw;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Unexpected error saving config to " + filepath + ": " + e.what());
+        throw ConfigException(ErrorCode::ConfigParseError,
+                             "Failed to save config to file: " + filepath + ": " + e.what(),
+                             __FILE__, __LINE__, __func__);
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
 }
 
 template<typename T>
@@ -104,17 +178,27 @@ std::optional<T> Config::get(const std::string& key) const {
     try {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
-        return std::nullopt;
+        NLM_LOG_ERROR("Type mismatch accessing config key: " + key);
+        throw ConfigException(ErrorCode::ConfigTypeMismatch,
+                             "Type mismatch for config key: " + key);
     }
 }
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    if (val.has_value()) {
+        return *val;
+    }
+    NLM_LOG_DEBUG("Config key not found, using default: " + key);
+    return defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    if (key.empty()) {
+        throw ConfigException(ErrorCode::ConfigKeyNotFound, "Empty config key");
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -213,3 +297,4 @@ template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
+

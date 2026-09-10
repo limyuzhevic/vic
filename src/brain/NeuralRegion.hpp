@@ -9,6 +9,9 @@
 
 namespace nlm {
 
+// Forward declarations to break circular dependencies
+class RandomGenerator;
+
 // NeuralRegion: A brain region containing multiple populations and local connectivity
 // PLACEHOLDER - Phase 2 will implement region-level dynamics
 
@@ -70,7 +73,7 @@ public:
     void reset();
     
     // Initialize connectivity
-    void initializeRandomConnectivity(class RandomGenerator& rng, 
+    void initializeRandomConnectivity(RandomGenerator& rng, 
                                       float connectionProbability,
                                       float meanWeight,
                                       float weightVariance);
@@ -81,7 +84,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
