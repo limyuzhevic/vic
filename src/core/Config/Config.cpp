@@ -3,6 +3,11 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <regex>
+#include <unordered_map>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 namespace nlm {
 
@@ -18,17 +23,87 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Helper: Convert string to common types
+namespace {
+    int64_t parseInt(const std::string& str) {
+        try {
+            return std::stoll(str);
+        } catch (...) { return 0; }
+    }
     
+    double parseDouble(const std::string& str) {
+        try {
+            return std::stod(str);
+        } catch (...) { return 0.0; }
+    }
+    
+    float parseFloat(const std::string& str) {
+        return static_cast<float>(parseDouble(str));
+    }
+    
+    bool parseBool(const std::string& str) {
+        std::string lower = toLower(str);
+        return lower == "true" || lower == "1" || lower == "yes" || lower == "on";
+    }
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
+    // Try JSON first, then YAML, then fallback to key=value
+    std::string ext = std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == ".json") {
+        return loadFromJson(filepath);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        return loadFromYaml(filepath);
+    } else {
+        // Original key=value format
+        return loadFromKeyValue(filepath);
+    }
+}
+
+bool Config::loadFromJson(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        json j;
+        file >> j;
+        return loadFromJsonObject(j);
+    } catch (const json::exception& e) {
+        NLM_LOG_ERROR("JSON parsing error in " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromYaml(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        // For now, implement a simple YAML parser or fallback
+        // Since we don't have a YAML parser, treat as key=value if not JSON
+        return loadFromKeyValue(filepath);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("YAML parsing error in " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromKeyValue(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,6 +124,8 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNum) + ": " + line);
         }
     }
     
@@ -84,11 +161,28 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Save in JSON format for better compatibility
+    json j;
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        std::visit([&j](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                j[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, int>) {
+                j[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                j[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                j[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                j[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, float>) {
+                j[entry.key] = arg;
+            }
+        }, entry.value);
     }
     
+    file << j.dump(2);
     return true;
 }
 
@@ -104,6 +198,22 @@ std::optional<T> Config::get(const std::string& key) const {
     try {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        // Try type conversion from string
+        auto val = get<std::string>(key);
+        if (!val.has_value()) return std::nullopt;
+        
+        if constexpr (std::is_same_v<T, int>) {
+            return parseInt(val.value());
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return parseInt(val.value());
+        } else if constexpr (std::is_same_v<T, double>) {
+            return parseDouble(val.value());
+        } else if constexpr (std::is_same_v<T, float>) {
+            return parseFloat(val.value());
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return parseBool(val.value());
+        }
+        
         return std::nullopt;
     }
 }
