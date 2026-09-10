@@ -858,35 +858,52 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Read neurons
-        NeuronCheckpointData neuronData;
-        if (!reader.readNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to read neurons from checkpoint");
-            return false;
-        }
+        // Apply neuron states - verify checkpoint data integrity
+        size_t maxIdx = std::min<size_t>(neuronData.membranePotential.size(), 
+                                         std::min<size_t>(neuronData.restingPotential.size(),
+                                         std::min<size_t>(neuronData.threshold.size(),
+                                         std::min<size_t>(neuronData.resetPotential.size(),
+                                         std::min<size_t>(neuronData.leakConductance.size(),
+                                         std::min<size_t>(neuronData.firingState.size(),
+                                         std::min<size_t>(neuronData.refractoryRemaining.size(),
+                                         std::min<size_t>(neuronData.refractoryPeriod.size(), 
+                                         std::min<size_t>(idx, pImpl->regions.size() * 100))))))))));
         
-        // Apply neuron states
-        size_t idx = 0;
+        size_t actualIdx = 0;
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
+                    if (actualIdx < maxIdx) {
+                        neuron->setMembranePotential(neuronData.membranePotential[actualIdx]);
+                        neuron->setRestingPotential(neuronData.restingPotential[actualIdx]);
+                        neuron->setThreshold(neuronData.threshold[actualIdx]);
+                        neuron->setResetPotential(neuronData.resetPotential[actualIdx]);
+                        neuron->setLeakConductance(neuronData.leakConductance[actualIdx]);
+                        
+                        if (actualIdx < neuronData.firingState.size()) {
+                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[actualIdx]));
                         }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                        
+                        if (actualIdx < neuronData.refractoryRemaining.size()) {
+                            neuron->setRefractoryRemaining(neuronData.refractoryRemaining[actualIdx]);
+                        }
+                        
+                        if (actualIdx < neuronData.refractoryPeriod.size()) {
+                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[actualIdx]);
                         }
                     }
-                    idx++;
+                    actualIdx++;
                 }
             }
         }
+        
+        // Log any mismatch for debugging
+        if (neuronData.membranePotential.size() != actualIdx) {
+            NLM_LOG_WARNING("Neuron count mismatch: checkpoint has " + std::to_string(neuronData.membranePotential.size()) + 
+                           " neurons, brain has " + std::to_string(actualIdx));
+        }
+        
+        idx = actualIdx; // Update idx for synapse loading
         
         // Read synapses
         SynapseCheckpointData synapseData;

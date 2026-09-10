@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
     
-    // Create experiment
+    // Create experiment with proper initialization
     Phase6IntegratedExperiment experiment;
     
     // First, run the quick integration verification
