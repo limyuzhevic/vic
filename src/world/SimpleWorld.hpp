@@ -51,6 +51,30 @@ public:
     // Get current sensory percept for the agent
     const SensoryPercept& getSensoryPercept() const { return sensory_; }
     
+    // Get sensory percept from a specific brain region (for agent brain interface)
+    const SensoryPercept& observe(const NeuralRegion* region) const { return getSensoryPercept(); }
+    
+    // Apply action from agent to world
+    ActionResult applyAction(const NeuralRegion* region, MotorCommand cmd) {
+        return applyMotorCommand(cmd, getSimulationTime());
+    }
+    
+    // Compute reward based on agent-brain state
+    float computeReward(const NeuralRegion* region) const {
+        float reward = 0.0f;
+        
+        // Add energy-based reward
+        reward += agent_.energy / maxEnergy_ * 10.0f;
+        
+        // Add health-based reward  
+        reward += agent_.health * 20.0f;
+        
+        // Subtract age-based cost (age = stress)
+        reward -= agent_.age * 0.01f;
+        
+        return reward;
+    }
+    
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
     
@@ -70,11 +94,20 @@ public:
     float getWidth() const { return width_; }
     float getHeight() const { return height_; }
     
-    // Energy settings
+        // Energy settings
     float getMaxEnergy() const { return maxEnergy_; }
     void setMaxEnergy(float e) { maxEnergy_ = e; }
     float getEnergyDecayRate() const { return energyDecayRate_; }
     void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
+    float getResourceEnergyGain() const { return resourceEnergyGain_; }
+    void setResourceEnergyGain(float g) { resourceEnergyGain_ = g; }
+    
+    // Time
+    double getSimulationTime() const { return simTime_; }
+    
+    // Seed for reproducibility
+    void setRandomSeed(uint64_t seed);
+    uint64_t getRandomSeed() const { return rngSeed_; }
     
     // Time
     double getSimulationTime() const { return simTime_; }

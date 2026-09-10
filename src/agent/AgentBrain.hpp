@@ -112,6 +112,9 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Flag to indicate we own motor/sensory neuron vectors
+    bool ownsNeuronVectors_;
 };
 
 } // namespace nlm
