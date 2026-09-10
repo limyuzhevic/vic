@@ -151,6 +151,9 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Memory systems are initialized but don't have the brain reference yet
+        // They will be re-initialized in Brain::initialize() when Brain object is fully constructed
     }
     
     DevelopmentalStage developmentalStage;
@@ -299,31 +302,7 @@ bool Brain::initialize() {
     return true;
 }
 
-void Brain::step(SimulationStep currentStep) {
-    step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
-}
-
-void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
-    /*
-     * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
-     * 
-     * This implements the complete integrated brain simulation:
-     * 
-     * 1. Process pending delayed spike events (deliver synaptic input)
-     * 2. Update all neuron membrane potentials (LIF dynamics)
-     * 3. Detect spikes and schedule outgoing spike events
-     * 4. Update working memory (maintenance and competition)
-     * 5. Apply neuromodulation effects on neural excitability
-     * 6. Apply plasticity rules (STDP, Hebbian)
-     * 7. Update episodic memory with current experience
-     * 8. Update prediction system
-     * 9. Update attention system
-     * 10. Update concept formation
-     * 11. Apply structural plasticity (synaptogenesis, pruning)
-     * 12. Replay important memories (during rest or periodically)
-     * 13. Apply development effects
-     * 14. Collect statistics
-     */
+    // Update brain loop with complete integration
     
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
@@ -1095,6 +1074,9 @@ void Brain::logStatus() const {
     }
     if (pImpl->episodicMemory) {
         NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    }
+    if (pImpl->associativeMemory) {
+        NLM_LOG_INFO("Associative memory associations: " + std::to_string(pImpl->associativeMemory->getAssociationCount()));
     }
     
     // Neuromodulation status
