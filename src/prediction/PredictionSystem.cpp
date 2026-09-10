@@ -53,8 +53,23 @@ void PredictionSystem::clearHistory() {
     pImpl->errorHistory.clear();
 }
 
-void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
-}
+// Update prediction system based on current timestep
+    void PredictionSystem::update(float timestep) {
+        // Basic update - would integrate with NLM neural dynamics
+        // For now, just maintain error history
+        pImpl->predictionError *= 0.9f;  // Decay error over time
+    }
+    
+    // Reset prediction system
+    void PredictionSystem::reset() {
+        pImpl->predictionError = 0.0f;
+        pImpl->confidence = 0.5f;
+        pImpl->errorHistory.clear();
+    }
+    
+    // Get current prediction
+    const SensoryInput* PredictionSystem::getCurrentPrediction() const {
+        return nullptr;  // Not implemented yet
+    }
 
 } // namespace nlm

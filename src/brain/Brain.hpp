@@ -136,8 +136,7 @@ public:
     size_t getActiveNeuronCount() const;
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
-    
-    // ========== MEMORY SYSTEMS ==========
+// ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
@@ -147,6 +146,12 @@ public:
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    
+    // Semantic memory - abstract knowledge
+    SemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - skills and habits
+    ProceduralMemory* getProceduralMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
@@ -164,9 +169,16 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
+    // Neural self-model for internal representation
+    SelfModel* getSelfModel();
+    
+    // Social learning system
+    SocialLearning* getSocialLearning();
+    
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
+    
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     

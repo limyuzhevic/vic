@@ -86,14 +86,6 @@ public:
     FiringRate getFiringRate() const;
     void setFiringRate(FiringRate rate);
     
-    // LIF neuron parameters
-    void setLeakConductance(MembranePotential conductance);
-    MembranePotential getLeakConductance() const;
-    uint32_t getRefractoryPeriod() const;
-    void setRestingPotential(MembranePotential potential);
-    MembranePotential getRestingPotential() const;
-    void setResetPotential(MembranePotential potential);
-    
     // Spike detection
     bool checkThreshold() const;
     float getLastSpikeTime() const;
@@ -132,10 +124,6 @@ public:
     RegionId getRegionId() const;
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
-    
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
     
     // Reset to initial state
     void reset();

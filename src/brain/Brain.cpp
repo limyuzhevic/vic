@@ -13,8 +13,10 @@
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
+#include "../memory/SemanticMemory.hpp"
+#include "../memory/ProceduralMemory.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -40,6 +42,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -116,19 +120,33 @@ struct Brain::Impl {
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
         
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
+        // Initialize semantic memory
+        semanticMemory = std::make_unique<SemanticMemory>();
+        semanticMemory->initialize(this);
         
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
+        // Initialize procedural memory
+        proceduralMemory = std::make_unique<ProceduralMemory>();
+        proceduralMemory->initialize(this);
+        
+        // Initialize self-model
+        selfModel = std::make_unique<SelfModel>();
+        selfModel->initialize(this);
+        
+        // Initialize social learning
+        socialLearning = std::make_unique<SocialLearning>();
+        socialLearning->initialize(this);
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Configure neuromodulation parameters
+        dopamine->setLevel(0.0f);
+        curiosity->setLevel(0.5f);
+        predictionError->setLevel(0.0f);
+        novelty->setLevel(0.0f);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -439,6 +457,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 6: Apply prediction error effects ==========
+    if (pImpl->predictionError) {
+        pImpl->predictionError->update(pImpl->timestep);
+        
+        // Prediction error affects attention and learning
+        float predError = pImpl->predictionError->getError();
+        
+        // Scale attention based on prediction error
+        if (pImpl->attention) {
+            float attentionMod = std::clamp(predError * 0.5f + 0.5f, 0.0f, 1.0f);
+            pImpl->attention->setInhibitionStrength(0.5f * attentionMod);
+            pImpl->attention->setExcitationStrength(1.5f * attentionMod);
+        }
+        
+        // Prediction error affects development
+        if (pImpl->developmentSystem) {
+            pImpl->developmentSystem->setPredictionErrorFactor(predError);
+        }
+    }
+    
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
@@ -511,8 +549,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
+        // Update prediction system with current sensory observations
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        
+        // Use recent sensory input to update predictions
+        // This would normally be connected to the agent's sensory percept
+        // For now, a placeholder that at least connects the system
+        pImpl->predictionSystem->update(pImpl->timestep);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +568,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
-    }
-    
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -550,9 +588,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
+        // Development affects multiple systems, not just structural plasticity
+        auto* dev = pImpl->developmentSystem;
+        if (dev) {
             DevelopmentalStage stage = pImpl->developmentalStage;
             float plasticityMod = 1.0f;
             
@@ -571,8 +609,50 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     break;
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            // Development affects structural plasticity
+            auto* sp = pImpl->structuralPlasticity;
+            if (sp) {
+                sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+                sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            }
+            
+            // Development affects neuromodulation
+            if (pImpl->dopamine) {
+                // Dopamine baseline increases with development
+                float dopamineLevel = 0.1f + 0.3f * (1.0f - plasticityMod);
+                pImpl->dopamine->setLevel(dopamineLevel);
+            }
+            
+            // Development affects attention
+            if (pImpl->attention) {
+                // Attention regulation matures over time
+                float attentionStability = 0.5f + 0.3f * (1.0f - plasticityMod);
+                pImpl->attention->setStability(attentionStability);
+            }
+            
+            // Development affects working memory capacity
+            if (pImpl->workingMemory) {
+                // Working memory capacity grows with development
+                size_t capacity = neuronCount / 10 + (neuronCount / 20) * (1 - plasticityMod);
+                pImpl->workingMemory->setCapacity(capacity);
+            }
+            
+            // Development affects memory consolidation
+            if (pImpl->episodicMemory) {
+                // Consolidation efficiency improves with development
+                float consolidationEfficiency = 0.5f + 0.3f * (1.0f - plasticityMod);
+                pImpl->episodicMemory->setConsolidationEfficiency(consolidationEfficiency);
+            }
+            
+            // Development affects replay
+            pImpl->replayInterval = std::max<size_t>(10, 100 * plasticityMod);
+            
+            // Development affects curiosity
+            if (pImpl->curiosity) {
+                // Curiosity levels change with development
+                float curiosityLevel = 0.3f + 0.4f * plasticityMod;
+                pImpl->curiosity->setLevel(curiosityLevel);
+            }
         }
     }
     
