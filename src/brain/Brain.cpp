@@ -232,32 +232,48 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+    }
     
     // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+    }
+    if (pImpl->curiosity) {
+        pImpl->curiosity->initialize(this);
+    }
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -403,6 +419,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // Store current neural activity to working memory
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    // Store high-activation neurons
+                    if (std::abs(state.membranePotential - state.restingPotential) > 5.0f) {
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
+                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                    }
+                }
+            }
+        }
+        // Update working memory
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
@@ -509,12 +539,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
-    }
-    
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
@@ -527,9 +551,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && !pImpl->sensoryNeurons.empty()) {
+        // Convert current sensory activity to pattern for concept formation
+        std::vector<float> pattern;
+        pattern.reserve(pImpl->sensoryNeurons.size());
+        
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            const auto& state = neuron->getState();
+            pattern.push_back(std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+        }
+        
+        // Present to concept formation system
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f;
+        pImpl->conceptFormation->presentExperience(pattern, pattern, reward, currentStep);
+    }
+    
+    // ========== STEP 11: Update prediction system ==========
+    if (pImpl->predictionSystem && !pImpl->sensoryNeurons.empty()) {
+        // Convert current sensory activity to pattern for prediction
+        std::vector<float> sensoryPattern;
+        sensoryPattern.reserve(pImpl->sensoryNeurons.size());
+        
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            const auto& state = neuron->getState();
+            sensoryPattern.push_back(std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+        }
+        
+        // Use NeuralPrediction to predict next state if available
+        // For now, just record the current state
+        // In a full implementation, the prediction system would have access to the brain's prediction neurons
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -582,9 +632,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 14: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+    
+    // ========== STEP 15: Apply associative memory updates ==========
+    if (pImpl->associativeMemory && currentStep % 500 == 0) {
+        // Periodically associate current patterns with episodic memories
+        if (!pImpl->sensoryNeurons.empty() && pImpl->episodicMemory && !pImpl->episodicMemory->getRecentEpisodes(1).empty()) {
+            // Convert sensory activity to pattern
+            std::vector<float> sensoryPattern;
+            sensoryPattern.reserve(pImpl->sensoryNeurons.size());
+            
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                const auto& state = neuron->getState();
+                sensoryPattern.push_back(std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+            }
+            
+            // Associate with episodic memory
+            pImpl->associativeMemory->associateFromExperience(*pImpl->episodicMemory->getRecentEpisodes(1)[0]);
+        }
+    }
+    
+    // ========== STEP 16: Apply attentional modulation ==========
+    if (pImpl->attention) {
+        // Apply attention to neural activity
+        // Note: Attention affects processing priority, modulated by attention system
+    }
+    
+    // ========== STEP 17: Apply neuromodulation to plasticity ==========
+    if (pImpl->dopamine) {
+        // Update plasticity based on dopamine level
+        float plasticityFactor = pImpl->dopamine->getPlasticityFactor();
+        // This would be applied to STDP and Hebbian plasticity
     }
 }
 
@@ -761,16 +842,6 @@ void Brain::reset() {
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
-bool Brain::save(const std::string& filepath) const {
-    NLM_LOG_INFO("Saving brain state to " + filepath);
-    
-    try {
-        CheckpointWriter writer;
-        if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
-            return false;
-        }
-        
         // Set metadata
         writer.setMetadata(
             getTotalNeuronCount(),
@@ -801,6 +872,9 @@ bool Brain::save(const std::string& filepath) const {
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
                     neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    neuronData.neuronType.push_back(static_cast<uint64_t>(pop->getNeuronType()));
+                    neuronData.regionId.push_back(region->getId().index());
+                    neuronData.populationId.push_back(pop->getId());
                 }
             }
         }
@@ -819,7 +893,11 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                synapseData.plasticityFlags.push_back(syn->getPlasticityFlags().stdp ? 1 : 0);
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.efficacy.push_back(syn->getEfficacy());
+                synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+                synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
             }
         }
         
@@ -827,6 +905,24 @@ bool Brain::save(const std::string& filepath) const {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
             return false;
         }
+        
+        // Write memory system states
+        // TODO: Implement memory system checkpointing when proper serialization is available
+        
+        // Write cognitive system states
+        // TODO: Implement cognitive system checkpointing when proper serialization is available
+        
+        // Write neuromodulation system states
+        // TODO: Implement neuromodulation system checkpointing when proper serialization is available
+        
+        // Write development system state
+        // TODO: Implement development system checkpointing when proper serialization is available
+        
+        // Write random generator state
+        // TODO: Implement random generator state checkpointing
+        
+        // Write simulation clock state
+        // TODO: Implement simulation clock state checkpointing
         
         // Finalize
         if (!writer.finalize()) {
