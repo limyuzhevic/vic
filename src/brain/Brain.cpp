@@ -404,6 +404,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Also update episodic memory based on working memory content
+        if (pImpl->episodicMemory && pImpl->workingMemory->hasRecentActivity()) {
+            // Create memory episode when working memory has significant activity
+            EpisodicMemoryItem episode;
+            episode.timestamp = currentStep;
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Capture working memory patterns
+            auto memoryPatterns = pImpl->workingMemory->getMemoryNeurons();
+            for (auto neuronId : memoryPatterns) {
+                episode.activeNeurons.push_back(neuronId);
+                // Simple activation level - could be enhanced with actual values
+                episode.neuronActivations.push_back(1.0f); 
+            }
+            
+            pImpl->episodicMemory->storeEpisode(episode);
+            pImpl->stepsSinceLastEpisode = 0;
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -509,10 +528,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+    // ========== PREDICTION SYSTEM INTEGRATION ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system based on current brain state
+        // Prediction system would integrate with sensory input, working memory, and episodic memory
+        // For now, track prediction error as simple variation in neural activity
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Apply prediction error to neuromodulation
+        if (pImpl->dopamine) {
+            pImpl->dopamine->setPredictionError(predictionError);
+        }
+        
+        // Update prediction system with current neural state
+        pImpl->predictionSystem->updatePredictions();
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -716,14 +745,20 @@ std::unique_ptr<class Action> Brain::produceAction() {
     return action;
 }
 
-void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
-    float modulation = signal.getLevel();
-    
-    // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
-}
+// Apply neuromodulation to prediction system if available
+        if (pImpl->predictionSystem) {
+            pImpl->predictionSystem->applyNeuromodulation(signal);
+        }
+        
+        // Apply neuromodulation to working memory if available  
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->applyNeuromodulation(signal);
+        }
+        
+        // Apply neuromodulation to episodic memory if available
+        if (pImpl->episodicMemory) {
+            pImpl->episodicMemory->applyNeuromodulation(signal);
+        }
 
 void Brain::updatePlasticity() {
     // Plasticity is now applied during each step
@@ -828,6 +863,64 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write memory system states
+        if (pImpl->workingMemory) {
+            WorkingMemoryCheckpointData workingMemoryData;
+            // Extract working memory data
+            workingMemoryData.activeTraces = pImpl->workingMemory->getActiveTraces();
+            workingMemoryData.memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            workingMemoryData.activatedAt = pImpl->workingMemory->getActivatedAt();
+            if (!writer.writeWorkingMemory(workingMemoryData)) {
+                NLM_LOG_ERROR("Failed to write working memory to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->episodicMemory) {
+            EpisodicMemoryCheckpointData episodicMemoryData;
+            // Extract episodic memory data
+            episodicMemoryData.episodes = pImpl->episodicMemory->getEpisodes();
+            episodicMemoryData.currentIndex = pImpl->episodicMemory->getCurrentIndex();
+            if (!writer.writeEpisodicMemory(episodicMemoryData)) {
+                NLM_LOG_ERROR("Failed to write episodic memory to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->predictionSystem) {
+            PredictionSystemCheckpointData predictionData;
+            // Extract prediction system data
+            if (!writer.writePredictionSystem(predictionData)) {
+                NLM_LOG_ERROR("Failed to write prediction system to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write cognition system states
+        if (pImpl->planner) {
+            // Extract planner data
+            if (!writer.writePlannerData( /*data*/ )) {
+                NLM_LOG_ERROR("Failed to write planner to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->conceptFormation) {
+            // Extract concept formation data
+            if (!writer.writeConceptFormationData( /*data*/ )) {
+                NLM_LOG_ERROR("Failed to write concept formation to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->attention) {
+            // Extract attention data
+            if (!writer.writeAttentionData( /*data*/ )) {
+                NLM_LOG_ERROR("Failed to write attention to checkpoint");
+                return false;
+            }
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -898,6 +991,83 @@ bool Brain::load(const std::string& filepath) {
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // Read memory system states
+        if (reader.hasWorkingMemoryData()) {
+            WorkingMemoryCheckpointData workingMemoryData;
+            if (!reader.readWorkingMemory(workingMemoryData)) {
+                NLM_LOG_ERROR("Failed to read working memory from checkpoint");
+                return false;
+            }
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->load(workingMemoryData);
+            }
+        }
+        
+        if (reader.hasEpisodicMemoryData()) {
+            EpisodicMemoryCheckpointData episodicMemoryData;
+            if (!reader.readEpisodicMemory(episodicMemoryData)) {
+                NLM_LOG_ERROR("Failed to read episodic memory from checkpoint");
+                return false;
+            }
+            if (pImpl->episodicMemory) {
+                pImpl->episodicMemory->load(episodicMemoryData);
+            }
+        }
+        
+        if (reader.hasPredictionSystemData()) {
+            PredictionSystemCheckpointData predictionData;
+            if (!reader.readPredictionSystem(predictionData)) {
+                NLM_LOG_ERROR("Failed to read prediction system from checkpoint");
+                return false;
+            }
+            if (pImpl->predictionSystem) {
+                pImpl->predictionSystem->load(predictionData);
+            }
+        }
+        
+        // Read cognition system states
+        if (reader.hasPlannerData()) {
+            // Extract planner data
+            if (!reader.readPlannerData( /*data*/ )) {
+                NLM_LOG_ERROR("Failed to read planner from checkpoint");
+                return false;
+            }
+            if (pImpl->planner) {
+                // Load planner data
+                // pImpl->planner->load(data);
+            }
+        }
+        
+        if (reader.hasConceptFormationData()) {
+            // Extract concept formation data
+            if (!reader.readConceptFormationData( /*data*/ )) {
+                NLM_LOG_ERROR("Failed to read concept formation from checkpoint");
+                return false;
+            }
+            if (pImpl->conceptFormation) {
+                // Load concept formation data
+                // pImpl->conceptFormation->load(data);
+            }
+        }
+        
+        if (reader.hasAttentionData()) {
+            // Extract attention data
+            if (!reader.readAttentionData( /*data*/ )) {
+                NLM_LOG_ERROR("Failed to read attention from checkpoint");
+                return false;
+            }
+            if (pImpl->attention) {
+                // Load attention data
+                // pImpl->attention->load(data);
+            }
+        }
+        
+        // Set simulation state
+        pImpl->currentStep = 0; // Would be read from metadata
+        pImpl->currentTime = 0.0f; // Would be read from metadata
+        pImpl->totalSpikesThisStep = 0;
+        pImpl->totalSpikesTotal = 0;
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
