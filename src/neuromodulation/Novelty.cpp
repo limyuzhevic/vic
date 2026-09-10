@@ -68,9 +68,12 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
     pImpl->lastPattern = currentPattern;
 }
 
-void Novelty::update(TimestepDuration dt) {
+void Novelty::update(TimestepDuration dt, const std::vector<float>& currentPattern) {
     // Decay novelty
     pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    
+    // Store current pattern for next comparison
+    pImpl->lastPattern = currentPattern;
 }
 
 const std::vector<float>& Novelty::getHistory() const {

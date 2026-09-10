@@ -81,6 +81,22 @@ struct Brain::Impl {
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
+        , workingMemory(std::make_unique<NeuralWorkingMemory>())
+        , episodicMemory(std::make_unique<NeuralEpisodicMemory>())
+        , associativeMemory(std::make_unique<NeuralAssociativeMemory>())
+        , predictionSystem(std::make_unique<PredictionSystem>())
+        , planner(std::make_unique<NeuralPlanner>())
+        , conceptFormation(std::make_unique<ConceptFormation>())
+        , attention(std::make_unique<AttentionalSelection>())
+        , developmentSystem(std::make_unique<DevelopmentSystem>())
+        , dopamine(std::make_unique<Dopamine>())
+        , curiosity(std::make_unique<Curiosity>())
+        , predictionError(std::make_unique<PredictionError>())
+        , novelty(std::make_unique<Novelty>())
+        , spikeSystem(std::make_unique<SpikeSystem>())
+        , stdp(std::make_unique<STDP>())
+        , hebbian(std::make_unique<Hebbian>())
+        , structuralPlasticity(std::make_unique<StructuralPlasticity>())
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -101,34 +117,20 @@ struct Brain::Impl {
         rng = std::make_unique<RandomGenerator>(seed);
         
         // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        // Configure STDP parameters
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        stdp->configure(ltpWeight, ltdWeight, tau);
         
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+        // Configure structural plasticity
+        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+        structuralPlasticity->setPruningRate(pruningRate);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -264,6 +266,12 @@ bool Brain::initialize() {
         // Count spikes
         ++pImpl->totalSpikesThisStep;
         ++pImpl->totalSpikesTotal;
+        
+        // Store spike in working memory
+        if (pImpl->workingMemory) {
+            // Convert spike to memory trace
+            pImpl->workingMemory->storeToNeuron(event.neuron_id, 1.0f);
+        }
     });
     
     // Register delayed spike handler to deliver synaptic input
@@ -486,9 +494,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Capture current brain state as an episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Record sensory state (simplified - in reality would need access to agent's percept)
+            episode.sensoryState = std::vector<float>(pImpl->sensoryNeurons.size(), 0.5f);
+            
+            // Record position (simplified - in reality would come from environment)
+            episode.positionX = 5.0f;  // Center position
+            episode.positionY = 5.0f;
+            episode.orientation = 0.0f;
+            
+            // Record action (simplified - would come from motor output)
+            episode.action = ActionType::Wait;
+            
+            // Record internal state
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            episode.energy = 100.0f;  // Simplified
+            episode.novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+            
+            // Record resulting state (next step's sensory state)
+            episode.resultingSensoryState = episode.sensoryState;
+            episode.resultingReward = episode.reward;
+            
+            // Record active neurons
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,17 +529,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->workingMemory && pImpl->predictionError) {
+        // Get current working memory state as prediction input
+        std::vector<float> memoryPattern = pImpl->workingMemory->retrieve();
+        
+        // Get actual sensory state (would come from agent's percept)
+        // For now, use working memory as both predicted and actual
+        std::vector<float> actualSensoryState = memoryPattern;
+        
+        if (!actualSensoryState.empty()) {
+            // Update predictions based on current state
+            pImpl->predictionSystem->updatePredictions(memoryPattern, actualSensoryState);
+            
+            // Get prediction error
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // Compute prediction error signal
+            pImpl->predictionError->computeError(0.0f, predictionError);
+            
+            // Convert prediction error to neuromodulation levels
+            // Use prediction error to modulate dopamine for reward learning
+            float errorLevel = pImpl->predictionError->getMagnitude();
+            pImpl->dopamine->signalRewardPredictionError(errorLevel);
+            
+            // Use prediction error to modulate curiosity for exploration
+            pImpl->curiosity->computeError(0.0f, errorLevel);
+            
+            // Use prediction error for novelty detection
+            pImpl->novelty->computeError(0.0f, errorLevel);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,9 +577,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Process working memory patterns to form concepts
+        std::vector<float> memoryPattern = pImpl->workingMemory->retrieve();
+        if (!memoryPattern.empty()) {
+            // Encode features for concept formation (simplified)
+            std::vector<float> features = memoryPattern;
+            // Process the pattern to form concepts
+            pImpl->conceptFormation->presentExperience(memoryPattern, features, 0.0f, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -537,7 +593,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
+// ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
