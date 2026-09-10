@@ -6,7 +6,6 @@
 namespace nlm {
 
 // Agent body state - contains physical properties and internal state
-// This is part of the environment, not the brain
 struct AgentBody {
     // Position in world
     float x;
