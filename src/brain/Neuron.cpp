@@ -32,7 +32,6 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
-    pImpl->totalCurrent = 0.0f;
 }
 
 Neuron::~Neuron() = default;
@@ -253,8 +252,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Active;
     }
     
-    // Clear synaptic input for next step
-    pImpl->synapticInput = 0.0f;
+    // Clear total current for next step (not synaptic input which is used during the step)
+    pImpl->totalCurrent = 0.0f;
     
     return fired;
 }
