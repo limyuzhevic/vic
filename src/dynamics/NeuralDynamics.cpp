@@ -37,7 +37,7 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     // Check for firing
     if (shouldFire(neuron)) {
         neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
+        neuron->recordSpike(dt);  // FIXED: Use actual time instead of 0.0
     }
     
     // Refractory mechanism
@@ -52,7 +52,7 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
 void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
     // TODO PHASE 2: Implement real synaptic dynamics
     // PLACEHOLDER: Synapse decay
-    synapse->step(0.0);
+    synapse->step(dt);  // FIXED: Use actual time instead of 0.0
 }
 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
