@@ -55,19 +55,23 @@ public:
     // Reset agent for new episode
     void reset();
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Get motor group access helpers
+    const std::vector<Neuron*>& getMotorForward() const { return motorForward_; }
+    const std::vector<Neuron*>& getMotorBackward() const { return motorBackward_; }
+    const std::vector<Neuron*>& getMotorTurnLeft() const { return motorTurnLeft_; }
+    const std::vector<Neuron*>& getMotorTurnRight() const { return motorTurnRight_; }
+    const std::vector<Neuron*>& getMotorLookLeft() const { return motorLookLeft_; }
+    const std::vector<Neuron*>& getMotorLookRight() const { return motorLookRight_; }
+    const std::vector<Neuron*>& getMotorInteract() const { return motorInteract_; }
+    const std::vector<Neuron*>& getMotorWait() const { return motorWait_; }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
-    
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Get sensory group access helpers
+    const std::vector<Neuron*>& getSensoryVision() const { return sensoryVision_; }
+    const std::vector<Neuron*>& getSensoryTouch() const { return sensoryTouch_; }
+    const std::vector<Neuron*>& getSensoryInternal() const { return sensoryInternal_; }
+    const std::vector<Neuron*>& getSensoryProprioception() const { return sensoryProprioception_; }
+    const std::vector<Neuron*>& getSensoryBalance() const { return sensoryBalance_; }
+    const std::vector<Neuron*>& getSensoryVestibular() const { return sensoryVestibular_; }
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -83,6 +87,8 @@ private:
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
     std::vector<Neuron*> motorTurnRight_;
+    std::vector<Neuron*> motorLookLeft_;
+    std::vector<Neuron*> motorLookRight_;
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
@@ -91,6 +97,8 @@ private:
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
+    std::vector<Neuron*> sensoryBalance_;
+    std::vector<Neuron*> sensoryVestibular_;
     
     // Neuromodulation state
     float dopamineLevel_;
