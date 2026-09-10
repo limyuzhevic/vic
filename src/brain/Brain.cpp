@@ -259,6 +259,23 @@ bool Brain::initialize() {
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
     
+    // Initialize prediction system
+    pImpl->predictionSystem->initialize(this);
+    
+    // Initialize cognition systems
+    pImpl->planner->initialize(this);
+    pImpl->conceptFormation->initialize(this);
+    pImpl->attention->initialize(this);
+    
+    // Initialize development system
+    pImpl->developmentSystem->initialize(this);
+    
+    // Initialize missing neuromodulators
+    pImpl->predictionError->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->curiosity->initialize(this);
+    pImpl->novelty->initialize(this);
+    
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
         // Count spikes
@@ -1003,7 +1020,7 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
+    // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
@@ -1017,14 +1034,12 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
-
+// Access prediction system
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
 
-// ========== COGNITION SYSTEM ACCESSORS ==========
-
+// Access cognition systems
 NeuralPlanner* Brain::getPlanner() {
     return pImpl->planner.get();
 }
@@ -1037,10 +1052,26 @@ AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
-// ========== DEVELOPMENT SYSTEM ==========
-
+// Access development system
 DevelopmentSystem* Brain::getDevelopmentSystem() {
     return pImpl->developmentSystem.get();
+}
+
+// Access neuromodulation systems
+Dopamine* Brain::getDopamine() {
+    return pImpl->dopamine.get();
+}
+
+Curiosity* Brain::getCuriosity() {
+    return pImpl->curiosity.get();
+}
+
+PredictionError* Brain::getPredictionErrorSignal() {
+    return pImpl->predictionError.get();
+}
+
+Novelty* Brain::getNovelty() {
+    return pImpl->novelty.get();
 }
 
 DevelopmentalStage Brain::getDevelopmentalStage() const {

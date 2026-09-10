@@ -498,7 +498,7 @@ for _ in range(500):
 
 ---
 
-## Troubleshooting
+## Part 6: Troubleshooting
 
 ### Build Issues
 
