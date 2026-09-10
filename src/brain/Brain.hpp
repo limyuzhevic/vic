@@ -28,6 +28,8 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SocialLearning;
+class SelfModel;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -158,11 +160,11 @@ public:
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
     
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    // Social learning from observation
+    SocialLearning* getSocialLearning();
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // Self-model for internal representation
+    SelfModel* getSelfModel();
     
     // ========== DEVELOPMENT SYSTEM ==========
     
