@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -19,40 +22,147 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    /*
+     * Load configuration from file (JSON or YAML)
+     * 
+     * Automatically detects file type based on extension (.json or .yaml/.yml)
+     * 
+     * Supports both JSON and YAML configuration files
+     */
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    std::string extension = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+    
+    clear(); // Clear existing entries
+    
+    try {
+        if (extension == ".json") {
+            nlohmann::json jsonData;
+            file >> jsonData;
+            fromJson(jsonData);
+        } else if (extension == ".yaml" || extension == ".yml") {
+            YAML::Node yamlData = YAML::LoadFile(filepath);
+            fromYaml(yamlData);
+        } else {
+            // Fallback to simple key=value format
+            std::string line;
+            while (std::getline(file, line)) {
+                // Skip empty lines and comments
+                line = trim(line);
+                if (line.empty() || line[0] == '#' || line[0] == '/') {
+                    continue;
+                }
+                
+                // Parse simple key=value pairs
+                size_t pos = line.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = trim(line.substr(0, pos));
+                    std::string value = trim(line.substr(pos + 1));
+                    
+                    // Remove quotes if present
+                    if (value.size() >= 2 && 
+                        ((value.front() == '"' && value.back() == '"') ||
+                         (value.front() == '\'' && value.back() == '\''))) {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                    
+                    set(key, value, ConfigSource::File);
+                }
+            }
         }
+    } catch (const std::exception& e) {
+        // If parsing fails, try fallback to simple format
+        file.clear();
+        file.seekg(0);
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
     return true;
+}
+
+void Config::fromJson(const nlohmann::json& json) {
+    if (!json.is_object()) {
+        return;
+    }
+    
+    for (auto it = json.begin(); it != json.end(); ++it) {
+        std::string key = it.key();
+        
+        // Recursively process nested objects
+        if (it->is_object()) {
+            // For nested objects, convert to string representation or handle differently
+            set(key, it->dump(), ConfigSource::File);
+        } else if (it->is_array()) {
+            // Convert arrays to string representation
+            set(key, it->dump(), ConfigSource::File);
+        } else if (it->is_number_integer()) {
+            set(key, it->get<int64_t>(), ConfigSource::File);
+        } else if (it->is_number_float()) {
+            set(key, it->get<double>(), ConfigSource::File);
+        } else if (it->is_boolean()) {
+            set(key, it->get<bool>(), ConfigSource::File);
+        } else if (it->is_string()) {
+            set(key, it->get<std::string>(), ConfigSource::File);
+        }
+    }
+}
+
+void Config::fromYaml(const YAML::Node& yaml) {
+    if (!yaml.IsMap()) {
+        return;
+    }
+    
+    for (const auto& pair : yaml) {
+        std::string key = pair.first.as<std::string>();
+        
+        // Recursively process nested structures
+        if (pair.second.IsMap()) {
+            set(key, pair.second.as<std::string>(), ConfigSource::File);
+        } else if (pair.second.IsSequence()) {
+            set(key, pair.second.as<std::string>(), ConfigSource::File);
+        } else if (pair.second.IsScalar()) {
+            // Try to infer type
+            const YAML::Node& value = pair.second;
+            
+            if (value.IsInt()) {
+                set(key, value.as<int64_t>(), ConfigSource::File);
+            } else if (value.IsFloat()) {
+                set(key, value.as<float>(), ConfigSource::File);
+            } else if (value.IsBool()) {
+                set(key, value.as<bool>(), ConfigSource::File);
+            } else {
+                set(key, value.as<std::string>(), ConfigSource::File);
+            }
+        }
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,12 +194,45 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Create JSON object
+    nlohmann::json json;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        json[entry.key] = toJsonValue(entry.value);
     }
     
+    // Write JSON to file
+    file << json.dump(2); // Pretty print with 2-space indentation
+    
     return true;
+}
+
+nlohmann::json Config::toJsonValue(const ConfigValue& value) {
+    return std::visit([](auto&& arg) -> nlohmann::json {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            nlohmann::json array = arg;
+            return array;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            nlohmann::json array = arg;
+            return array;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            nlohmann::json array = arg;
+            return array;
+        } else {
+            return nlohmann::json();
+        }
+    }, value);
 }
 
 template<typename T>

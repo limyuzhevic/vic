@@ -5,29 +5,61 @@
 
 namespace nlm {
 
-// Abstract base class for plasticity rules
-// PLACEHOLDER - Phase 2 will implement real plasticity rules
-
+/**
+ * @class PlasticityRule
+ * @brief Abstract base class for synaptic plasticity rules
+ * 
+ * This class defines the interface for all synaptic plasticity mechanisms,
+ * including Hebbian learning, STDP, and homeostatic plasticity.
+ * 
+ * Plasticity rules are responsible for updating synaptic weights based on
+ * pre-synaptic and post-synaptic neural activity.
+ */
 class PlasticityRule {
 public:
     virtual ~PlasticityRule() = default;
     
-    // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
+    /**
+     * @brief Update synaptic weights based on pre/post synaptic activity
+     * 
+     * @param synapse The synapse to update
+     * @param preSpikes Vector of pre-synaptic spike timestamps
+     * @param postSpikes Vector of post-synaptic spike timestamps
+     * @param dt Timestep duration
+     */
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,
                         TimestepDuration dt) = 0;
     
-    // Apply weight change
+    /**
+     * @brief Apply a direct weight change to a synapse
+     * 
+     * @param synapse The synapse to update
+     * @param delta The weight change to apply
+     */
     virtual void applyWeightChange(Synapse* synapse, SynapticWeight delta) = 0;
     
-    // Get rule name
+    /**
+     * @brief Get the name of the plasticity rule
+     * 
+     * @return String identifier for the rule type
+     */
     virtual const char* getName() const = 0;
     
-    // Check if rule is enabled
-    bool isEnabled() const;
-    void setEnabled(bool enabled);
+    /**
+     * @brief Check if the plasticity rule is enabled
+     * 
+     * @return True if the rule is active
+     */
+    virtual bool isEnabled() const = 0;
+    
+    /**
+     * @brief Enable or disable the plasticity rule
+     * 
+     * @param enabled Whether the rule should be active
+     */
+    virtual void setEnabled(bool enabled) = 0;
     
 protected:
     PlasticityRule() : enabled_(true) {}
@@ -36,8 +68,14 @@ private:
     bool enabled_;
 };
 
-// Hebbian plasticity rule: "neurons that fire together, wire together"
-// PLACEHOLDER - Phase 2 will implement real Hebbian learning
+/**
+ * @class HebbianRule
+ * @brief Implements Hebbian plasticity: "neurons that fire together, wire together"
+ * 
+ * This rule strengthens synapses when pre- and post-synaptic neurons
+ * fire in close temporal proximity, implementing the classical Hebbian
+ * learning rule.
+ */
 class HebbianRule : public PlasticityRule {
 public:
     HebbianRule();
@@ -50,8 +88,70 @@ public:
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override;
     
-    // Parameters
+    /**
+     * @brief Set the learning rate for Hebbian updates
+     * 
+     * @param rate Learning rate (typically 0.01-0.05)
+     */
     void setLearningRate(float rate);
+    
+    /**
+     * @brief Get the current learning rate
+     * 
+     * @return Current learning rate
+     */
+    float getLearningRate() const;
+    
+    /**
+     * @brief Set the maximum synaptic weight
+     * 
+     * @param maxWeight Maximum allowed weight
+     */
+    void setMaxWeight(float maxWeight);
+    
+    /**
+     * @brief Get the maximum synaptic weight
+     * 
+     * @return Maximum weight
+     */
+    float getMaxWeight() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+/**
+ * @class AntiHebbianRule
+ * @brief Implements anti-Hebbian plasticity for stability
+ * 
+ * This rule weakens synapses when pre- and post-synaptic neurons
+ * fire together, promoting homeostasis and preventing runaway excitation.
+ */
+class AntiHebbianRule : public PlasticityRule {
+public:
+    AntiHebbianRule();
+    ~AntiHebbianRule() override;
+    
+    void update(Synapse* synapse,
+                 const std::vector<Timestamp>& preSpikes,
+                 const std::vector<Timestamp>& postSpikes,
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    /**
+     * @brief Set the learning rate for anti-Hebbian updates
+     * 
+     * @param rate Learning rate (typically 0.001-0.01)
+     */
+    void setLearningRate(float rate);
+    
+    /**
+     * @brief Get the current learning rate
+     * 
+     * @return Current learning rate
+     */
     float getLearningRate() const;
     
 private:
@@ -59,28 +159,43 @@ private:
     Impl* pImpl;
 };
 
-// Anti-Hebbian rule: decrease weight when neurons fire together
-// PLACEHOLDER - Phase 2
-class AntiHebbianRule : public PlasticityRule {
-public:
-    void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "AntiHebbian"; }
-};
-
-// Bienenstock-Cooper-Munro (BCM) rule
-// PLACEHOLDER - Phase 2
+/**
+ * @class BCMRule
+ * @brief Implements Bienenstock-Cooper-Munro (BCM) theory
+ * 
+ * This rule implements synaptic modification based on a sliding threshold
+ * that adapts according to the history of post-synaptic activity,
+ * balancing potentiation and depression.
+ */
 class BCMRule : public PlasticityRule {
 public:
+    BCMRule();
+    ~BCMRule() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "BCM"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    /**
+     * @brief Set the learning rate for BCM updates
+     * 
+     * @param rate Learning rate (typically 0.0001-0.001)
+     */
+    void setLearningRate(float rate);
+    
+    /**
+     * @brief Get the current learning rate
+     * 
+     * @return Current learning rate
+     */
+    float getLearningRate() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm
