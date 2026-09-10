@@ -218,6 +218,132 @@ std::vector<float> NeuralPlanner::predictNextState(ActionType action,
     return nextState;
 }
 
+float NeuralPlanner::evaluateAction(ActionType action, const std::vector<float>& state) {
+    size_t actionIdx = static_cast<size_t>(action);
+    if (actionIdx >= actionQuality_.size()) return 0.0f;
+    
+    // Base value from experience
+    float baseValue = actionQuality_[actionIdx];
+    
+    // Bonus for approaching goal (if goal is defined)
+    float goalBonus = 0.0f;
+    if (!currentGoal_.empty() && state.size() == currentGoal_.size()) {
+        float stateGoalSim = 0.0f, stateNorm = 0.0f, goalNorm = 0.0f;
+        for (size_t i = 0; i < state.size(); ++i) {
+            stateGoalSim += state[i] * currentGoal_[i];
+            stateNorm += state[i] * state[i];
+            goalNorm += currentGoal_[i] * currentGoal_[i];
+        }
+        if (stateNorm > 0.0001f && goalNorm > 0.0001f) {
+            goalBonus = stateGoalSim / (std::sqrt(stateNorm) * std::sqrt(goalNorm));
+        }
+    }
+    
+    return baseValue * 0.7f + goalBonus * 0.3f;
+}
+
+// NEW: Predict next state using brain's prediction system
+std::vector<float> NeuralPlanner::predictNextState(ActionType action, const std::vector<float>& currentState) {
+    // If we have access to brain, use prediction system for better integration
+    if (brain_ && brain_->getPredictionSystem()) {
+        // Get working memory pattern for prediction
+        auto* workingMemory = brain_->getWorkingMemory();
+        if (workingMemory) {
+            std::vector<float> memoryPattern = workingMemory->retrieve();
+            if (!memoryPattern.empty()) {
+                // Create a simple action-effect prediction
+                std::vector<float> predictedState = memoryPattern;
+                
+                // Apply expected effect based on action
+                // This uses the brain's neural activity patterns for prediction
+                for (size_t i = 0; i < predictedState.size() && i < 10; ++i) {
+                    switch (action) {
+                        case ActionType::MoveForward:
+                            predictedState[i] = std::min(1.0f, predictedState[i] + 0.15f);
+                            break;
+                        case ActionType::MoveBackward:
+                            predictedState[i] = std::max(0.0f, predictedState[i] - 0.1f);
+                            break;
+                        case ActionType::TurnLeft:
+                        case ActionType::TurnRight:
+                            // Rotate pattern - alternate direction
+                            predictedState[i] = 1.0f - predictedState[i];
+                            break;
+                        case ActionType::Interact:
+                            predictedState[i] = 0.75f;
+                            break;
+                        case ActionType::Wait:
+                        default:
+                            // No change for wait
+                            break;
+                    }
+                }
+                
+                // Use prediction system to refine prediction
+                auto* predictionSystem = brain_->getPredictionSystem();
+                if (predictionSystem) {
+                    // Apply prediction error adjustments
+                    float predictionError = predictionSystem->getPredictionError();
+                    float confidence = predictionSystem->getConfidence();
+                    
+                    // Adjust prediction based on system confidence
+                    for (size_t i = 0; i < predictedState.size(); ++i) {
+                        if (confidence > 0.0f) {
+                            predictedState[i] *= confidence;
+                        }
+                    }
+                }
+                
+                return predictedState;
+            }
+        }
+    }
+    
+    // Fallback to simple prediction
+    std::vector<float> nextState = currentState;
+    
+    // Apply expected effect based on action
+    // This is a simplified model - real implementation would use experience
+    switch (action) {
+        case ActionType::MoveForward:
+            // Shift visual field forward
+            if (nextState.size() > 10) {
+                for (size_t i = 10; i < nextState.size(); ++i) {
+                    nextState[i-10] = nextState[i] * 0.9f;
+                }
+            }
+            break;
+        case ActionType::MoveBackward:
+            if (nextState.size() > 10) {
+                for (size_t i = nextState.size() - 1; i >= 10; --i) {
+                    nextState[i] = nextState[i-10] * 0.9f;
+                }
+            }
+            break;
+        case ActionType::TurnLeft:
+        case ActionType::TurnRight:
+            // Rotate pattern
+            // Simplified: just add some noise
+            for (auto& v : nextState) {
+                v += 0.05f * (v > 0.5f ? -1.0f : 1.0f);
+                v = std::clamp(v, 0.0f, 1.0f);
+            }
+            break;
+        case ActionType::Interact:
+            // Interaction changes state significantly
+            for (auto& v : nextState) {
+                v = v > 0.5f ? 0.8f : 0.2f;
+            }
+            break;
+        case ActionType::Wait:
+        default:
+            // No change
+            break;
+    }
+    
+    return nextState;
+}
+
 void NeuralPlanner::updatePlanQuality(const std::vector<ActionType>& plannedActions,
                                      const std::vector<ActionType>& actualActions,
                                      float actualReward) {
@@ -249,7 +375,7 @@ bool NeuralPlanner::wasRecentPlanSuccessful() const {
         if (success) ++successCount;
     }
     
-    return successCount > recentPlanSuccess_.size() / 2;
+    return (successCount >= recentPlanSuccess_.size() / 2);
 }
 
 // SelfModel Implementation
