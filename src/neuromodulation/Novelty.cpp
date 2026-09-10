@@ -14,6 +14,15 @@ struct Novelty::Impl {
     float noveltyThreshold;
     
     Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
+    
+    ~Impl() {
+        brain = nullptr;
+        level = 0.0f;
+        decayRate = 0.0f;
+        noveltyThreshold = 0.0f;
+        history.clear();
+        lastPattern.clear();
+    }
 };
 
 Novelty::Novelty() : pImpl(new Impl) {}
@@ -21,6 +30,10 @@ Novelty::Novelty() : pImpl(new Impl) {}
 Novelty::~Novelty() = default;
 
 void Novelty::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Null pointer provided to Novelty::initialize");
+        return;
+    }
     pImpl->brain = brain;
     NLM_LOG_INFO("Novelty detection initialized");
 }
@@ -30,11 +43,16 @@ float Novelty::getLevel() const {
 }
 
 void Novelty::setLevel(float level) {
-    pImpl->level = level;
+    if (!std::isfinite(level)) {
+        NLM_LOG_WARNING("Invalid novelty level: " + std::to_string(level));
+        return;
+    }
+    pImpl->level = std::max(0.0f, std::min(level, 1.0f));
 }
 
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
+    NLM_LOG_WARNING("Novelty::detectNovelty with Observation objects not implemented");
     // Extract features from observations and compare
     // Simple implementation: just set to a placeholder
     pImpl->level = 1.0f;
@@ -62,7 +80,12 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
     
     // Update novelty level based on difference
     pImpl->level = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
+    
+    // Keep history bounded
     pImpl->history.push_back(pImpl->level);
+    if (pImpl->history.size() > 1000) {
+        pImpl->history.erase(pImpl->history.begin());
+    }
     
     // Store current pattern for next comparison
     pImpl->lastPattern = currentPattern;
@@ -79,6 +102,7 @@ const std::vector<float>& Novelty::getHistory() const {
 
 void Novelty::clearHistory() {
     pImpl->history.clear();
+    pImpl->lastPattern.clear();
 }
 
 } // namespace nlm

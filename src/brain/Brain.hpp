@@ -50,8 +50,16 @@ struct InterRegionConnection {
 
 class Brain {
 public:
+    // Factory methods for common configurations
+    static std::unique_ptr<Brain> createDefault();
+    static std::unique_ptr<Brain> createForSimulation(size_t neuronCount, size_t regionCount);
+    static std::unique_ptr<Brain> createForResearch();
+    
     // Create brain with configuration
     explicit Brain(std::shared_ptr<Config> config);
+    
+    // Create brain with default configuration
+    Brain();
     
     ~Brain();
     
@@ -63,6 +71,9 @@ public:
     
     // Initialize brain with configuration
     bool initialize();
+    
+    // Initialize with a configuration and parameters
+    bool initialize(std::shared_ptr<Config> config);
     
     // Main simulation step
     void step(SimulationStep currentStep);
