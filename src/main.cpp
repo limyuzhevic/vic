@@ -19,6 +19,22 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
+// Constants for experiment configuration
+namespace Constants {
+    constexpr float DEFAULT_INJECTION_CURRENT = 50.0f;      // mV, current injected for connectivity tests
+    constexpr SimulationStep CONNECTIVITY_TEST_STEPS = 50;  // Number of steps for basic connectivity test
+    constexpr float CONNECTIVITY_THRESHOLD = 1.0f;          // Minimum spikes to consider connectivity established
+    constexpr SimulationStep PLASTICITY_EXPERIMENT_STEPS = 1000;  // Steps for plasticity experiments
+    constexpr float PLASTICITY_INPUT_CURRENT = 30.0f;       // mV, current injected during plasticity experiments
+    constexpr SimulationStep STDP_VERIFICATION_STEPS = 100;  // Steps for STDP verification
+    constexpr float STDP_INPUT_CURRENT = 60.0f;             // mV, current for STDP verification experiments
+    constexpr float STDP_POTENTIATION_THRESHOLD = 0.001f;   // Minimum weight change for LTP detection
+    constexpr float LEARNING_WEIGHT_CHANGE_THRESHOLD = 0.01f;  // Threshold for detecting learning
+    constexpr float DEFAULT_TIME_STEP = 0.001f;             // Default simulation timestep (seconds)
+    constexpr float DEFAULT_SYNAPTIC_SCALE_FACTOR = 10.0f;  // Scale factor for synaptic current conversion
+    constexpr float DEFAULT_LEAK_CONDUCTANCE = 10.0f;       // nS, default leak conductance for neurons
+}
+
 #include <iostream>
 #include <memory>
 #include <string>

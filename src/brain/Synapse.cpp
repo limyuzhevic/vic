@@ -207,10 +207,13 @@ void Synapse::step(Timestamp currentTime) {
     
     // Decay short-term depression
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
+        float timeSincePre = pImpl->lastPreSpikeTime >= 0.0f ? 
+            static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f;
+        float timeSincePost = pImpl->lastPostSpikeTime >= 0.0f ? 
+            static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f;
+        
+        // Use the most recent spike time for recovery
+        float timeSinceActivity = std::max(timeSincePre, timeSincePost);
         // Recovery from depression toward 1.0
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
