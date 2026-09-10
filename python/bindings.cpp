@@ -142,6 +142,41 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Python-friendly typedefs for common types
+    py::class_<std::vector<float>>(m, "FloatVector")
+        .def(py::init<>())
+        .def(py::init<size_t>())
+        .def("__len__", &std::vector<float>::size)
+        .def("__getitem__", [](const std::vector<float>& v, size_t i) {
+            if (i >= v.size()) {
+                throw py::index_error("Index out of bounds");
+            }
+            return v[i];
+        })
+        .def("__setitem__", [](std::vector<float>& v, size_t i, float val) {
+            if (i >= v.size()) {
+                throw py::index_error("Index out of bounds");
+            }
+            v[i] = val;
+        });
+
+    py::class_<std::vector<int>>(m, "IntVector")
+        .def(py::init<>())
+        .def(py::init<size_t>())
+        .def("__len__", &std::vector<int>::size)
+        .def("__getitem__", [](const std::vector<int>& v, size_t i) {
+            if (i >= v.size()) {
+                throw py::index_error("Index out of bounds");
+            }
+            return v[i];
+        })
+        .def("__setitem__", [](std::vector<int>& v, size_t i, int val) {
+            if (i >= v.size()) {
+                throw py::index_error("Index out of bounds");
+            }
+            v[i] = val;
+        });
+
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),

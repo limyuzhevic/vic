@@ -28,7 +28,9 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,7 +50,15 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Validate and set with error reporting
+            if (!validateKey(key)) {
+                // Log error and skip this line
+                continue;
+            }
+            
             set(key, value, ConfigSource::File);
+        } else {
+            // Log warning about malformed line
         }
     }
     
