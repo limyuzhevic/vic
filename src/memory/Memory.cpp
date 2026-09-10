@@ -1,5 +1,6 @@
 #include "Memory.hpp"
 #include <algorithm>
+#include <limits>
 
 namespace nlm {
 
@@ -7,16 +8,16 @@ namespace nlm {
 struct WorkingMemory::Impl {
     std::vector<std::pair<NeuronId, float>> items;
     size_t capacity;
+    float decayRate;  // decay per timestep
     
-    Impl(size_t cap) : capacity(cap) {}
+    Impl(size_t cap, float decay) : capacity(cap), decayRate(decay) {}
 };
 
-WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
+WorkingMemory::WorkingMemory() : pImpl(new Impl(100, 0.01f)) {}
 
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
@@ -25,6 +26,78 @@ void WorkingMemory::store(NeuronId neuron, float value) {
     }
     if (pImpl->items.size() < pImpl->capacity) {
         pImpl->items.emplace_back(neuron, value);
+    } else {
+        // Replace lowest priority item (simple implementation)
+        float minValue = std::numeric_limits<float>::max();
+        size_t minIndex = 0;
+        for (size_t i = 0; i < pImpl->items.size(); ++i) {
+            if (pImpl->items[i].second < minValue) {
+                minValue = pImpl->items[i].second;
+                minIndex = i;
+            }
+        }
+        pImpl->items[minIndex] = {neuron, value};
+    }
+}
+
+float WorkingMemory::retrieve(NeuronId neuron) const {
+    for (const auto& item : pImpl->items) {
+        if (item.first == neuron) {
+            return item.second;
+        }
+    }
+    return 0.0f;
+}
+
+bool WorkingMemory::contains(NeuronId neuron) const {
+    for (const auto& item : pImpl->items) {
+        if (item.first == neuron) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void WorkingMemory::clear() {
+    pImpl->items.clear();
+}
+
+size_t WorkingMemory::getCapacity() const {
+    return pImpl->capacity;
+}
+
+size_t WorkingMemory::getCurrentSize() const {
+    return pImpl->items.size();
+}
+
+void WorkingMemory::decay(float decayRate) {
+    for (auto& item : pImpl->items) {
+        item.second *= (1.0f - decayRate);
+    }
+}
+
+WorkingMemory::~WorkingMemory() = default;
+
+void WorkingMemory::store(NeuronId neuron, float value) {
+    for (auto& item : pImpl->items) {
+        if (item.first == neuron) {
+            item.second = value;
+            return;
+        }
+    }
+    if (pImpl->items.size() < pImpl->capacity) {
+        pImpl->items.emplace_back(neuron, value);
+    } else {
+        // Replace lowest priority item (simple implementation)
+        float minValue = std::numeric_limits<float>::max();
+        size_t minIndex = 0;
+        for (size_t i = 0; i < pImpl->items.size(); ++i) {
+            if (pImpl->items[i].second < minValue) {
+                minValue = pImpl->items[i].second;
+                minIndex = i;
+            }
+        }
+        pImpl->items[minIndex] = {neuron, value};
     }
 }
 
