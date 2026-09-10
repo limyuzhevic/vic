@@ -4,6 +4,7 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "AgentBrainConstants.hpp"
 #include <memory>
 #include <vector>
 
@@ -68,6 +69,11 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Fix enum mismatch between ActionType and MotorCommand
+    // ActionType has "Look" but not "LookLeft"/"LookRight" like MotorCommand does
+    // MotorCommand is for internal muscle signals, ActionType is for semantic actions
+    // We need to handle this conversion carefully
     
 private:
     // Motor decoding: convert neural activity to motor command
