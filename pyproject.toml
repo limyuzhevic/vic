@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "nlohmann_json>=3.11.2"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -12,7 +12,7 @@ requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "neuroscience"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -25,9 +25,12 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
 ]
 
-dependencies = []
+dependencies = [
+    "nlohmann_json>=3.11.2",  # JSON library for C++ (used in Config system)
+]
 
 [project.optional-dependencies]
 dev = [
@@ -47,10 +50,12 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DJSONCPP_ROOT=/usr/local/include",  # Path to nlohmann/json header
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+JSONCPP_FOUND = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
