@@ -30,51 +30,13 @@ StructuralPlasticity::StructuralPlasticity() : pImpl(new Impl) {}
 
 StructuralPlasticity::~StructuralPlasticity() = default;
 
-SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source, 
-                                               NeuronId destination, SynapticWeight weight) {
-    /*
-     * Create a new synapse between source and destination neurons
-     * 
-     * The synapse is added to the appropriate neural region based on
-     * which region contains the destination neuron.
-     * 
-     * Returns INVALID_SYNAPSE_ID if creation fails.
-     */
-    if (!brain) {
-        return INVALID_SYNAPSE_ID;
-    }
-    
-    // Find the region containing the destination neuron
-    for (auto& region : brain->getRegions()) {
-        auto synapsesTo = region->getSynapsesTo(destination);
-        
-        // Check if connection already exists
-        for (Synapse* syn : synapsesTo) {
-            if (syn->getSourceNeuron() == source) {
-                return INVALID_SYNAPSE_ID;  // Connection already exists
-            }
-        }
-        
-        // Check max synapses limit
-        if (region->getSynapseCount() >= pImpl->maxTotalSynapses) {
-            return INVALID_SYNAPSE_ID;
-        }
-        
-        // Count outgoing synapses from source in this region
-        auto synapsesFrom = region->getSynapsesFrom(source);
-        if (synapsesFrom.size() >= pImpl->maxSynapsesPerNeuron) {
-            continue;  // Try next region
-        }
-        
-        // Create the synapse
-        SynapseId synId = region->addSynapse(source, destination, weight, 1);
-        if (synId != INVALID_SYNAPSE_ID) {
-            ++pImpl->totalSynapsesCreated;
-            return synId;
-        }
-    }
-    
-    return INVALID_SYNAPSE_ID;
+void StructuralPlasticity::configureFromConfig(const class Config& config) {
+    synaptogenesisRate = config.getOr<float>("synaptogenesis_rate", 0.0001f);
+    pruningRate = config.getOr<float>("pruning_rate", 0.00001f);
+    minWeightThreshold = config.getOr<float>("min_weight_threshold", 0.05f);
+    activityThreshold = config.getOr<float>("activity_threshold", 0.001f);
+    maxSynapsesPerNeuron = config.getOr<size_t>("max_synapses_per_neuron", 100);
+    maxTotalSynapses = config.getOr<size_t>("max_total_synapses", 1000000);
 }
 
 bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {

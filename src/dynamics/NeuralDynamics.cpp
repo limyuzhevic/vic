@@ -14,39 +14,9 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
-void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
-    
-    const auto& state = neuron->getState();
-    
-    // Leaky integration: dV/dt = -(V - V_rest) / tau + I / C
-    // For simplicity using explicit Euler:
-    // V_new = V_old + dt * (-(V_old - V_rest) / tau + I / C)
-    
-    float V = neuron->getMembranePotential();
-    float V_rest = state.restingPotential;
-    float I = neuron->getTotalCurrent();
-    float tau = pImpl->membraneTimeConstant;
-    float R = pImpl->membraneResistance;
-    
-    // Simple Euler integration
-    float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
-    neuron->setMembranePotential(V + dV);
-    
-    // Check for firing
-    if (shouldFire(neuron)) {
-        neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
-    }
-    
-    // Refractory mechanism
-    if (neuron->isRefractory()) {
-        neuron->setMembranePotential(state.resetPotential);
-    }
-    
-    // Clear current for next step
-    neuron->clearTotalCurrent();
+void IntegrateAndFireDynamics::configureFromConfig(const class Config& config) {
+    membraneTimeConstant = config.getOr<float>("membrane_time_constant", 20.0f);
+    membraneResistance = config.getOr<float>("membrane_resistance", 10.0f);
 }
 
 void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
