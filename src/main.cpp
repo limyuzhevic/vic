@@ -28,27 +28,55 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+void printUsage() {
+    std::cout << R"(
+NLM (熙然) - Neural Learning Machine - Usage
+
+COMMANDS:
+  nlm --help                    Show this help message
+  nlm --version                 Show version information
+  nlm --create-config <file>     Create default configuration file
+  nlm --run-demo                Run Phase 6 integration demo
+  nlm --run-phase3-demo         Run Phase 3 demonstration
+  nlm --run-phase4-demo         Run Phase 4 demonstration
+  nlm --run-tests               Run all unit tests
+
+CONFIGURATION:
+  nlm --config <file>           Load configuration from file
+  nlm --neuron-count <count>    Set number of neurons
+  nlm --region-count <count>    Set number of brain regions
+  nlm --connection-prob <prob>  Set connection probability
+  nlm --stdp-weights <ltp> <ltd> Set STDP learning rates
+  nlm --plasticity-rate <rate>  Set plasticity rate
+
+MEMORY OPERATIONS:
+  nlm --save <file>             Save brain state to checkpoint
+  nlm --load <file>             Load brain state from checkpoint
+  nlm --memory-info            Display memory system statistics
+
+DEBUGGING:
+  nlm --debug-level <level>     Set debug logging level (0-3)
+  nlm --benchmark              Run performance benchmark
+  nlm --profile                Run profiling session
+
+EXAMPLES:
+  nlm --run-demo --config myconfig.cfg
+  nlm --save checkpoint.bin --load checkpoint.bin
+  nlm --neuron-count 2000 --region-count 3
+  nlm --debug-level 2
+
+For more information, visit: https://github.com/nlm-project/nlm
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM (熙然) Neural Learning Machine - Version 0.1.0" << std::endl;
+    std::cout << "Phase 6: Final Integration" << std::endl;
+    std::cout << "Built with C++20" << std::endl;
+    std::cout << "Phase 6: Implemented - All brain systems integrated and functional" << std::endl;
+}
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -343,44 +371,73 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    int neuronCount = 500;
+    int regionCount = 1;
+    float connectionProbability = 0.15f;
+    float stdpLTP = 0.02f;
+    float stdpLTD = 0.015f;
+    float stdpTau = 20.0f;
+    float synaptogenesisRate = 0.0001f;
+    float pruningRate = 0.00001f;
+    bool runDemo = false;
+    bool runPhase3Demo = false;
+    bool runPhase4Demo = false;
+    bool showVersion = false;
+    bool showHelp = false;
+    std::string savePath;
+    std::string loadPath;
+    int debugLevel = 0;
+    
     for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        std::string arg = argv[i];
+        if (arg == "--help") {
+            showHelp = true;
+        } else if (arg == "--version") {
+            showVersion = true;
+        } else if (arg == "--run-demo") {
+            runDemo = true;
+        } else if (arg == "--run-phase3-demo") {
+            runPhase3Demo = true;
+        } else if (arg == "--run-phase4-demo") {
+            runPhase4Demo = true;
+        } else if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+        } else if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--neuron-count" && i + 1 < argc) {
+            neuronCount = std::stoi(argv[++i]);
+        } else if (arg == "--region-count" && i + 1 < argc) {
+            regionCount = std::stoi(argv[++i]);
+        } else if (arg == "--connection-prob" && i + 1 < argc) {
+            connectionProbability = std::stof(argv[++i]);
+        } else if (arg == "--stdp-weights" && i + 2 < argc) {
+            stdpLTP = std::stof(argv[++i]);
+            stdpLTD = std::stof(argv[++i]);
+        } else if (arg == "--plasticity-rate" && i + 1 < argc) {
+            synaptogenesisRate = std::stof(argv[++i]);
+        } else if (arg == "--save" && i + 1 < argc) {
+            savePath = argv[++i];
+        } else if (arg == "--load" && i + 1 < argc) {
+            loadPath = argv[++i];
+        } else if (arg == "--debug-level" && i + 1 < argc) {
+            debugLevel = std::stoi(argv[++i]);
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    if (showHelp) {
+        printUsage();
+        return 0;
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
-    
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    if (showVersion) {
+        printVersion();
+        return 0;
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");

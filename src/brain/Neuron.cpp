@@ -18,13 +18,18 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    // LIF parameters - made configurable for different neuron types
+    // These should come from global config or neuron-specific config
+    float membraneCapacitance;  // nF - membrane capacitance
+    float timeConstant;        // ms - membrane time constant
+    size_t maxSpikeHistory;   // Maximum number of spikes to record
     
-    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+    Impl() 
+        : id(), type(NeuronType::Internal), regionId(), populationId(),
+          totalCurrent(0.0f), synapticInput(0.0f),
+          membraneCapacitance(1.0f),    // Default: 1 nF
+          timeConstant(20.0f),         // Default: 20 ms
+          maxSpikeHistory(100) {}       // Default: record 100 spikes
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -149,7 +154,7 @@ void Neuron::clearTotalCurrent() {
 
 void Neuron::recordSpike(Timestamp timestamp) {
     pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+    if (pImpl->spikeHistory.size() > pImpl->maxSpikeHistory) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
     }
 }
@@ -210,8 +215,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    float tau = pImpl->timeConstant;  // ms - now instance variable
+    float C = pImpl->membraneCapacitance;  // nF - now instance variable
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;

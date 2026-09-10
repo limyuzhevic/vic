@@ -44,6 +44,12 @@ struct Synapse::Impl {
     static constexpr float STP_U_MAX = 1.0f;  // Max utilization
     
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    Impl()
+        : id(), sourceNeuron(), destinationNeuron(), weight(0.0f), delay(1),
+          type(SynapseType::Excitatory), shortTermDepression(1.0f),
+          shortTermFacilitation(0.0f), lastPreSpikeTime(-1.0f),
+          lastPostSpikeTime(-1.0f), eligibilityTrace(0.0f), efficacy(1.0f) {}
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
