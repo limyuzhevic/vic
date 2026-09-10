@@ -1,5 +1,11 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../brain/Brain.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -235,47 +241,79 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     return defaultCmd;
 }
 
-void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
-    
-    // Compute prediction error
-    predictionError_ = reward - predictedReward;
-    
-    // Update expected reward (exponential moving average)
-    expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
-    
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
-    
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
-    
-    // Apply to all synapses with eligibility traces
-    for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
-            
-            if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
-                syn->addToWeight(delta);
-                
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
-            }
-        }
+// Phase 6 integration functions
+void AgentBrain::enablePlanning(bool enable) {
+    if (brain_) {
+        brain_->getPlanner()->enablePlanning(enable);
     }
+}
+
+void AgentBrain::enableConceptFormation(bool enable) {
+    if (brain_) {
+        brain_->getConceptFormation()->enableConceptFormation(enable);
+    }
+}
+
+void AgentBrain::enableAttention(bool enable) {
+    if (brain_) {
+        brain_->getAttention()->enableAttention(enable);
+    }
+}
+
+void AgentBrain::setPlanningDepth(int depth) {
+    if (brain_) {
+        brain_->getPlanner()->setPlanningDepth(depth);
+    }
+}
+
+void AgentBrain::setConceptLearningRate(float rate) {
+    if (brain_) {
+        brain_->getConceptFormation()->setLearningRate(rate);
+    }
+}
+
+void AgentBrain::setAttentionThreshold(float threshold) {
+    if (brain_) {
+        brain_->getAttention()->setCompetitionThreshold(threshold);
+    }
+}
+
+// Advanced neuromodulation functions
+void AgentBrain::setNeuromodulationParameters(float noveltyWeight, float curiosityWeight, float rewardWeight) {
+    noveltyWeight_ = noveltyWeight;
+    curiosityWeight_ = curiosityWeight;
+    rewardWeight_ = rewardWeight;
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
-    
-    // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+    if (brain_) {
+        auto* novelty = brain_->getNovelty();
+        auto* curiosity = brain_->getCuriosity();
+        auto* dopamine = brain_->getDopamine();
+        
+        if (novelty) novelty->setWeight(noveltyWeight);
+        if (curiosity) curiosity->setWeight(curiosityWeight);
+        if (dopamine) dopamine->setWeight(rewardWeight);
+    }
+}
+
+void AgentBrain::updateNeuromodulationParameters(double timestep) {
+    // Update neuromodulation based on current state
+    if (brain_) {
+        auto* novelty = brain_->getNovelty();
+        auto* curiosity = brain_->getCuriosity();
+        auto* dopamine = brain_->getDopamine();
+        
+        // Novelty depends on sensory change
+        float noveltyInput = noveltyLevel_ * noveltyWeight_;
+        if (novelty) novelty->update(noveltyInput, timestep);
+        
+        // Curiosity depends on novelty and prediction error
+        float curiosityInput = (noveltyLevel_ * noveltyWeight_ + 
+                              std::abs(predictionError_) * curiosityWeight_) * 0.5f;
+        if (curiosity) curiosity->update(curiosityInput, timestep);
+        
+        // Dopamine depends on prediction error and reward
+        float rewardInput = predictionError_ * rewardWeight_;
+        if (dopamine) dopamine->update(rewardInput, timestep);
     }
 }
 

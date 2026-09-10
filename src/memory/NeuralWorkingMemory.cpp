@@ -69,7 +69,7 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     }
 }
 
-void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
+bool NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     // Find or add this neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     
@@ -77,16 +77,21 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
+        // Record as active trace
+        activeTraces_.push_back(idx);
+        return true;
     } else if (memoryNeurons_.size() < capacity_) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        activeTraces_.push_back(memoryNeurons_.size() - 1);
+        // Inject current to maintain activation
+        if (brain_) {
+            brain_->injectCurrent(neuron, activation * 5.0f);
+        }
+        return true;
     }
-    
-    // Inject current to maintain activation
-    if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
-    }
+    return false;
 }
 
 std::vector<float> NeuralWorkingMemory::retrieve() const {
