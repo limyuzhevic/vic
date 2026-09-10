@@ -144,7 +144,38 @@ Tests if hidden objects remain relevant to behavior.
 
 **Expected:** Agent should maintain object representation.
 
-### Phase 4.9: Social Learning
+### Phase 4.6: Neural Prediction
+Tests if NLM can anticipate future states.
+
+**Procedure:**
+1. Present sensory input
+2. Predict next state
+3. Compare prediction with actual input
+4. Learn from prediction error
+
+**Metrics:**
+- Prediction accuracy
+- Prediction error reduction
+- Learning curve
+
+**Expected:** Prediction accuracy should improve with experience.
+
+### Phase 4.7: Development
+Tests if neural systems change over time.
+
+**Procedure:**
+1. Track developmental stages
+2. Measure structural changes
+3. Test plasticity modulation
+
+**Metrics:**
+- Development stage progression
+- Structural stability
+- Plasticity modulation effectiveness
+
+**Expected:** Development should show progressive refinement.
+
+### Phase 4.8: Social Learning
 Tests if NLM can learn from observing another agent.
 
 **Procedure:**
@@ -158,6 +189,21 @@ Tests if NLM can learn from observing another agent.
 - Transfer to new situations
 
 **Expected:** Socially learned actions should be imitatable.
+
+### Phase 4.9: Neuromodulation
+Tests if neuromodulators affect learning and behavior.
+
+**Procedure:**
+1. Present reward prediction errors
+2. Measure neuromodulator response
+3. Test modulation of learning
+
+**Metrics:**
+- Neuromodulator levels
+- Learning modulation strength
+- Behavioral adjustment
+
+**Expected:** Neuromodulation should enhance adaptive behavior.
 
 ### Phase 4.10: Continual Learning
 Tests if NLM can learn new tasks without forgetting old ones.
@@ -201,6 +247,54 @@ Combines all Phase 4 mechanisms in a complex environment.
 - Total reward
 - All individual mechanism metrics
 - Behavior improvement
+
+**Expected:** Performance should improve across episodes as all systems integrate.
+
+## Running Phase 4 Experiments
+
+```bash
+./nlm_phase4_demo [num_trials]
+```
+
+Example:
+```bash
+./nlm_phase4_demo 100
+```
+
+## Experiment Configuration
+
+Experiments can be configured via command line or config file:
+```cpp
+config->set("neuron_count", size_t(1000));
+config->set("prediction_horizon", size_t(3));
+config->set("working_memory_capacity", size_t(100));
+```
+
+## Standard Metrics
+
+### Neural Activity
+- Firing rate distribution
+- Spike timing statistics
+- Population activity levels
+- Synchrony measures
+
+### Memory
+- Retention accuracy
+- Recall success rate
+- Pattern stability
+- Generalization
+
+### Learning
+- Prediction error over time
+- Concept formation rate
+- Planning success
+- Self-prediction accuracy
+
+### Social
+- Imitation success
+- Observation efficiency
+- Communication signal learning
+- Reinforcement learning effectiveness
 
 ## Running Phase 4 Experiments
 

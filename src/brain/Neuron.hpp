@@ -108,7 +108,9 @@ public:
     
     // Current injection (from external sources)
     void injectCurrent(MembranePotential current);
+    // Get total current (synaptic + external) for this neuron
     MembranePotential getTotalCurrent() const;
+    // Clear all currents for next integration step
     void clearTotalCurrent();
     
     // Spike history (recent spikes for STDP)
