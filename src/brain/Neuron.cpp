@@ -260,9 +260,26 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
+    // Get timestep from simulation clock via config (Phase 2: real timing)
+    // For now use standard 1ms timestep
     TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    
+    // Process incoming synaptic inputs before integrating
+    processIncomingSynapses();
+    
+    // Apply neuromodulatory effects that affect neuron dynamics
+    applyNeuromodulation();
+    
+    // Perform real LIF integration and spike detection
+    bool fired = stepLIF(currentTime, dt);
+    
+    if (fired) {
+        // Emit spike to all outgoing synapses
+        emitSpike();
+    }
+    
+    // Clear processed synaptic input
+    clearTotalCurrent();
 }
 
 void Neuron::reset() {

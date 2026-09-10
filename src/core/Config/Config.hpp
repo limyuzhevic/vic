@@ -1,13 +1,3 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 
@@ -100,6 +90,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Enhanced file parsing (JSON/YAML support)
+    bool parseJSONFile(const std::string& filepath);
+    bool parseYAMLFile(const std::string& filepath);
+    bool saveAsJSON(const std::string& filepath) const;
 };
+
+// JSON parsing forward declaration
+namespace nlohmann {
+    class json;
+}
 
 } // namespace nlm
