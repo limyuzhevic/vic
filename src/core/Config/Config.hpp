@@ -55,11 +55,14 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON or YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
+    
+    // Save to file (JSON format)
+    bool saveToFile(const std::string& filepath, bool pretty = true) const;
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;

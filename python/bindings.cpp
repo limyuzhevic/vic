@@ -144,14 +144,26 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+    .def("loadFromFile", [](Config& self, const std::string& filepath) {
+        return self.loadFromFile(filepath);
+    }, py::arg("filepath"), "Load configuration from a file (JSON/YAML format)")
+    .def("loadFromJSON", &Config::loadFromJSON, py::arg("filepath"),
+         "Load configuration from a JSON file")
+    .def("loadFromYAML", &Config::loadFromYAML, py::arg("filepath"),
+         "Load configuration from a YAML file")
+    .def("saveToFile", [](Config& self, const std::string& filepath) {
+        return self.saveToFile(filepath);
+    }, py::arg("filepath"), "Save configuration to a file (JSON format)")
+    .def("saveToJSON", [](Config& self, bool pretty) {
+        return self.saveToJSON(pretty);
+    }, py::arg("pretty") = true, "Generate JSON configuration string")
+    .def("saveToJSON", &Config::saveToJSON, py::arg("pretty") = true,
+         "Generate JSON configuration string")
+    .def("saveToYAML", &Config::saveToYAML, py::arg("pretty") = true,
+         "Generate YAML configuration string")
+    .def("saveToYAML", [](Config& self, bool pretty) {
+        return self.saveToYAML(pretty);
+    }, py::arg("pretty") = true, "Generate YAML configuration string")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,

@@ -6,6 +6,33 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Find JSON and YAML libraries
+find_package(nlohmann_json QUIET)
+if(nlohmann_json_FOUND)
+    message(STATUS "Found nlohmann_json")
+else()
+    # Try to find it through CMake
+    include(FetchContent)
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.2
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+endif()
+
+find_package(yaml-cpp QUIET)
+if(NOT yaml-cpp_FOUND)
+    # Try to find it through CMake
+    include(FetchContent)
+    FetchContent_Declare(
+        yaml-cpp
+        GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+        GIT_TAG 0.7.0
+    )
+    FetchContent_MakeAvailable(yaml-cpp)
+endif()
+
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
