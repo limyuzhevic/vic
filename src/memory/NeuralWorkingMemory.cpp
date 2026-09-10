@@ -36,36 +36,64 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    // Clear existing traces and create new ones
+    memoryNeurons_.clear();
+    memoryActivations_.clear();
+    memoryTimestamps_.clear();
+    pImpl->maintenanceSynapses.clear();
     
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
-        
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
-        
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
+    // Check if working memory is at capacity
+    if (memoryNeurons_.size() >= capacity_) {
+        // Decay existing traces before adding new ones
+        for (auto& activation : memoryActivations_) {
+            activation *= 0.5f;
         }
     }
     
-    // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    // Store pattern as neural activity pattern
+    // Each element of the pattern represents the activation of a specific neuron
+    size_t patternSize = std::min(pattern.size(), capacity_);
+    
+    // Normalize pattern to [0,1] range for consistency
+    std::vector<float> normalizedPattern(patternSize);
+    float maxVal = 0.0f;
+    for (size_t i = 0; i < patternSize; ++i) {
+        maxVal = std::max(maxVal, std::abs(pattern[i]));
+    }
+    if (maxVal > 0.0f) {
+        for (size_t i = 0; i < patternSize; ++i) {
+            normalizedPattern[i] = pattern[i] / maxVal;
+        }
+    }
+    
+    for (size_t i = 0; i < patternSize; ++i) {
+        // Get a specific neuron ID based on pattern element
+        // We'll use the pattern index to select a neuron
+        // For simplicity, use first available neuron or create a specific pattern
+        NeuronId neuronId(i + 1);  // Use simple neuron IDs based on pattern index
+        
+        float activation = normalizedPattern[i] * strength;
+        
+        // Store the memory trace
+        memoryNeurons_.push_back(neuronId);
+        memoryActivations_.push_back(activation);
+        memoryTimestamps_.push_back(0);
+        
+        // Inject current to activate the neuron
+        brain_->injectCurrent(neuronId, activation * 5.0f);
+    }
+    
+    // Create recurrent connections for pattern maintenance
+    // This allows the pattern to sustain itself through internal dynamics
+    if (memoryNeurons_.size() >= 2) {
+        // Create a chain of recurrent connections
+        for (size_t i = 0; i < memoryNeurons_.size() - 1; ++i) {
+            createRecurrentConnection(memoryNeurons_[i], memoryNeurons_[i+1], strength * 0.5f);
+        }
+        // Also create backward connections for pattern stability
+        for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+            createRecurrentConnection(memoryNeurons_[i], memoryNeurons_[i-1], strength * 0.3f);
+        }
     }
 }
 

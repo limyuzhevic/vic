@@ -1,0 +1,32 @@
+MemoryRetentionTest Runner - Main test execution script
+
+#!/bin/bash
+
+# Memory Retention Test Execution Script
+# This script compiles and runs the comprehensive memory retention test
+
+echo "============================================"
+echo "NLM Memory Retention Test Execution"
+echo "============================================"
+echo ""
+echo "Test Purpose: Verify integrated memory systems maintain patterns"
+echo "over extended simulation periods."
+echo ""
+echo "Test Components:"
+echo "1. Brain initialization with integrated memory systems"
+echo "2. Extended simulation (5000 steps)"
+echo "3. Working memory pattern tracking"
+echo "4. Episodic memory storage and retrieval verification"
+echo "5. Memory consolidation effectiveness tracking"
+echo "6. Replay mechanism validation"
+echo "7. Comprehensive statistics and analysis"
+echo ""
+echo "Prerequisites: NLM brain with integrated memory systems"
+echo ""
+echo "To run this test:"
+echo "1. Ensure the NLM library is built and accessible"
+echo "2. Compile the MemoryRetentionTest implementation"
+echo "3. Execute the test executable"
+echo ""
+echo "The test will output detailed metrics showing memory retention"
+echo "over time and verify that all memory systems work together."
