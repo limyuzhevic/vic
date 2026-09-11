@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <string>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -23,13 +25,32 @@ using ConfigValue = std::variant<
     std::vector<std::string>
 >;
 
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
-};
+// Helper to convert ConfigSource to string
+inline const char* configSourceToString(ConfigSource source) {
+    switch (source) {
+        case ConfigSource::Default: return "Default";
+        case ConfigSource::File: return "File";
+        case ConfigSource::CommandLine: return "CommandLine";
+        case ConfigSource::Runtime: return "Runtime";
+        default: return "Unknown";
+    }
+}
+
+// Helper to convert string to ConfigSource (case-insensitive)
+inline ConfigSource stringToConfigSource(const std::string& str) {
+    std::string lower = str;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    
+    static const std::unordered_map<std::string, ConfigSource> sourceMap = {
+        {"default", ConfigSource::Default},
+        {"file", ConfigSource::File},
+        {"commandline", ConfigSource::CommandLine},
+        {"runtime", ConfigSource::Runtime}
+    };
+    
+    auto it = sourceMap.find(lower);
+    return (it != sourceMap.end()) ? it->second : ConfigSource::Default;
+}
 
 // Configuration entry
 struct ConfigEntry {
@@ -93,6 +114,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Get description for a key
+    std::string getDescription(const std::string& key) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +124,23 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Format conversion functions
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
+    std::string saveToJSON() const;
+    std::string saveToYAML() const;
+    std::string saveToSimpleFormat() const;
+    
+    // Value type conversion functions
+    static std::string valueToString(const ConfigValue& value);
+    static ConfigValue stringToValue(const std::string& str);
+    
+    // Helper to find entry by key
+    ConfigEntry* findEntry(const std::string& key);
+    const ConfigEntry* findEntry(const std::string& key) const;
 };
 
 } // namespace nlm
