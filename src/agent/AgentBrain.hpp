@@ -12,7 +12,65 @@ namespace nlm {
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
+
 public:
+    // Constants for sensory processing
+    static constexpr float VISION_INPUT_SCALE_FACTOR = 5.0f;
+    static constexpr float TOUCH_INPUT_SCALE_FACTOR = 8.0f;
+    static constexpr float INTERNAL_INPUT_CENTER = 1.0f;
+    static constexpr float INTERNAL_INPUT_SCALE = 2.0f;
+    static constexpr float PROPRIOCEPTION_INPUT_CENTER = 1.0f;
+    static constexpr float PROPRIOCEPTION_INPUT_SCALE = 2.0f;
+    static constexpr float PROPRIOCEPTION_OUTPUT_SCALE = 3.0f;
+    
+    // Constants for neuromodulation and learning
+    static constexpr float NOVELTY_DETECTION_DECAY_RATE = 0.99f;
+    static constexpr float NOVELTY_NORMALIZATION_DIVISOR = 1.0f;
+    static constexpr float CURIOUSITY_WEIGHT_NOVELTY = 2.0f;
+    static constexpr float CURIOUSITY_WEIGHT_PREDICTION_ERROR = 0.5f;
+    static constexpr float CURIOUSITY_THRESHOLD_FOR_EXPLORATION = 0.3f;
+    static constexpr float MAX_CURIOUSITY_LEVEL = 1.0f;
+    
+    // Constants for exploration behavior
+    static constexpr float EXPLORATION_CURIOUSITY_THRESHOLD = 0.5f;
+    static constexpr float EXPLORATION_PROBABILITY_MAX = 0.3f;
+    static constexpr int EXPLORATION_RANDOM_CHOICE_MIN = 0;
+    static constexpr int EXPLORATION_RANDOM_CHOICE_MAX = 7;
+    
+    // Constants for reward modulation and plasticity
+    static constexpr float ELIGIBILITY_TRACE_THRESHOLD = 0.001f;
+    static constexpr float ELIGIBILITY_TRACE_DECAY_RATE = 0.1f;
+    static constexpr float PLASTICITY_BASE_FACTOR = 0.5f;
+    static constexpr float PLASTICITY_MAX_FACTOR = 2.0f;
+    static constexpr float PLASTICITY_MIN_FACTOR = 0.1f;
+    static constexpr float STDP_POTENTIATION_BASE_WEIGHT = 0.01f;
+    static constexpr float STDP_DEPRESSION_BASE_WEIGHT = 0.012f;
+    static constexpr float EXPECTED_REWARD_DECAY_FACTOR = 0.95f;
+    static constexpr float EXPECTED_REWARD_LEARNING_RATE = 0.05f;
+    
+    // Constants for development and structural plasticity
+    static constexpr float SYNAPTOGENESIS_BASE_RATE = 0.0001f;
+    static constexpr float PRUNING_BASE_RATE = 0.00001f;
+    
+    // Constants for developmental stages
+    static constexpr double DEVELOPMENTAL_STAGE_CRITICAL_PERIOD_START = 60.0;
+    static constexpr double DEVELOPMENTAL_STAGE_MATURATION_END = 300.0;
+    static constexpr double DEVELOPMENTAL_STAGE_ADULT_END = 900.0;
+    
+    // Constants for stage-specific plasticity modifiers
+    static constexpr float STAGE_INITIAL_PLASTICITY = 1.0f;
+    static constexpr float STAGE_CRITICAL_PERIOD_PLASTICITY = 0.8f;
+    static constexpr float STAGE_MATURATION_PLASTICITY = 0.5f;
+    static constexpr float STAGE_ADULT_PLASTICITY = 0.2f;
+    
+    // Constants for motor decoding
+    static constexpr float MOTOR_ACTIVITY_THRESHOLD = 0.5f;
+    static constexpr float MOTOR_ACTIVITY_RESTING_DEVIATION = 0.0f;
+    
+    // Motor command look commands
+    static constexpr int MOTOR_COMMAND_LOOK_LEFT = 4;
+    static constexpr int MOTOR_COMMAND_LOOK_RIGHT = 5;
+    
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
     

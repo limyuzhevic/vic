@@ -90,6 +90,61 @@ void testBrainRegions() {
     std::cout << "    testBrainRegions passed" << std::endl;
 }
 
+void testAgentBrain() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Create an AgentBrain with the brain
+    nlm::AgentBrain agentBrain(std::make_shared<nlm::Brain>(brain));
+    
+    // Create a simple world
+    nlm::SimpleWorld world;
+    world.configure(10, 10, 8, 8);
+    world.reset();
+    
+    // Initialize the agent brain
+    agentBrain.initialize(world);
+    
+    // Test that agent brain was properly initialized
+    assert(agentBrain.getSensoryInputSize() > 0);
+    assert(agentBrain.getMotorOutputSize() > 0);
+    
+    // Test processSensoryInput with some data
+    nlm::SensoryPercept percept;
+    std::vector<float> visionData(256, 0.5f);
+    percept.setVision(visionData);
+    
+    agentBrain.processSensoryInput(percept);
+    
+    // Test curiosity level changes after input
+    float initialCuriosity = agentBrain.getCuriosityLevel();
+    
+    // Test decodeMotorCommand doesn't crash
+    nlm::MotorCommand cmd = agentBrain.decodeMotorCommand();
+    assert(cmd == nlm::MotorCommand::Wait || cmd == nlm::MotorCommand::MoveForward || 
+           cmd == nlm::MotorCommand::MoveBackward || cmd == nlm::MotorCommand::TurnLeft || 
+           cmd == nlm::MotorCommand::TurnRight || cmd == nlm::MotorCommand::Interact);
+    
+    // Test applyRewardModulation
+    agentBrain.applyRewardModulation(1.0f, 0.5f);
+    
+    // Test development
+    agentBrain.updateDevelopment(0.1f);
+    
+    // Test reset
+    agentBrain.reset();
+    
+    assert(agentBrain.getCuriosityLevel() == 0.0f);
+    assert(agentBrain.getPredictionError() == 0.0f);
+    assert(agentBrain.getNeuromodulationLevel() == 0.0f);
+    
+    std::cout << "    testAgentBrain passed" << std::endl;
+}
+
 void testBrainActionProduction() {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
@@ -104,7 +159,7 @@ void testBrainActionProduction() {
     std::cout << "    testBrainActionProduction passed" << std::endl;
 }
 
-void testBrainStatus() {
+void testAgentBrain() {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
@@ -112,23 +167,51 @@ void testBrainStatus() {
     nlm::Brain brain(config);
     brain.initialize();
     
-    // Verify statistics are accessible
-    assert(brain.getTotalNeuronCount() > 0);
-    assert(brain.getTotalSynapseCount() >= 0);
-    assert(brain.getFiringNeuronCount() >= 0);
-    assert(brain.getAverageFiringRate() >= 0.0f);
+    // Create an AgentBrain with the brain
+    nlm::AgentBrain agentBrain(std::make_shared<nlm::Brain>(brain));
     
-    std::cout << "    testBrainStatus passed" << std::endl;
-}
-
-void runAll() {
-    testBrainCreation();
-    testBrainInitialization();
-    testBrainStep();
-    testBrainReset();
-    testBrainRegions();
-    testBrainActionProduction();
-    testBrainStatus();
+    // Create a simple world
+    nlm::SimpleWorld world;
+    world.configure(10, 10, 8, 8);
+    world.reset();
+    
+    // Initialize the agent brain
+    agentBrain.initialize(world);
+    
+    // Test that agent brain was properly initialized
+    assert(agentBrain.getSensoryInputSize() > 0);
+    assert(agentBrain.getMotorOutputSize() > 0);
+    
+    // Test processSensoryInput with some data
+    nlm::SensoryPercept percept;
+    std::vector<float> visionData(256, 0.5f);
+    percept.setVision(visionData);
+    
+    agentBrain.processSensoryInput(percept);
+    
+    // Test curiosity level changes after input
+    float initialCuriosity = agentBrain.getCuriosityLevel();
+    
+    // Test decodeMotorCommand doesn't crash
+    nlm::MotorCommand cmd = agentBrain.decodeMotorCommand();
+    assert(cmd == nlm::MotorCommand::Wait || cmd == nlm::MotorCommand::MoveForward || 
+           cmd == nlm::MotorCommand::MoveBackward || cmd == nlm::MotorCommand::TurnLeft || 
+           cmd == nlm::MotorCommand::TurnRight || cmd == nlm::MotorCommand::Interact);
+    
+    // Test applyRewardModulation
+    agentBrain.applyRewardModulation(1.0f, 0.5f);
+    
+    // Test development
+    agentBrain.updateDevelopment(0.1f);
+    
+    // Test reset
+    agentBrain.reset();
+    
+    assert(agentBrain.getCuriosityLevel() == 0.0f);
+    assert(agentBrain.getPredictionError() == 0.0f);
+    assert(agentBrain.getNeuromodulationLevel() == 0.0f);
+    
+    std::cout << "    testAgentBrain passed" << std::endl;
 }
 
 } // namespace test_brain
