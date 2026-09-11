@@ -1,7 +1,6 @@
-#pragma once
-
 #include "../agent/AgentBody.hpp"
 #include "../agent/SensoryPercept.hpp"
+#include "../brain/NeuralRegion.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -53,6 +52,15 @@ public:
     
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
+    
+    // Observe the world from a brain region
+    SensoryPercept observe(class NeuralRegion* brainRegion) const;
+    
+    // Apply an action from a brain region
+    void applyAction(class NeuralRegion* brainRegion, MotorCommand cmd);
+    
+    // Compute reward based on a brain region
+    float computeReward(class NeuralRegion* brainRegion) const;
     
     // Add object to world
     void addObject(const WorldObject& obj);

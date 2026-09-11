@@ -61,7 +61,21 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::~AgentBrain() {
+    // Clean up motor neuron groups
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    
+    // Clean up sensory neuron groups
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
@@ -332,6 +346,97 @@ float AgentBrain::getNoveltyLevel() const {
 
 float AgentBrain::getPredictionError() const {
     return predictionError_;
+}
+
+void AgentBrain::reset() {
+    dopamineLevel_ = 0.0f;
+    noveltyLevel_ = 0.0f;
+    curiosityLevel_ = 0.0f;
+    predictionError_ = 0.0f;
+    expectedReward_ = 0.0f;
+    developmentalAge_ = 0.0;
+    plasticityModifier_ = 1.0f;
+    
+    // Clear previous vision
+    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
+    if (!brain_ || !rewardModulationEnabled_) return;
+    
+    // Compute prediction error
+    predictionError_ = reward - predictedReward;
+    
+    // Update expected reward (exponential moving average)
+    expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
+    
+    // Dopamine-like signal (based on prediction error)
+    dopamineLevel_ = predictionError_;
+    
+    // Clamp to reasonable range
+    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    
+    // Apply to all synapses with eligibility traces
+    for (const auto& region : brain_->getRegions()) {
+        for (auto* syn : region->getSynapses()) {
+            float eligibility = syn->getEligibilityTrace();
+            
+            if (std::abs(eligibility) > 0.001f) {
+                // Apply reward-modulated weight change
+                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                syn->addToWeight(delta);
+                
+                // Decay eligibility trace
+                syn->decayEligibilityTrace(0.1f);
+            }
+        }
+    }
+    
+    // Modulate plasticity based on dopamine
+    // Positive dopamine increases plasticity, negative decreases
+    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
+    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+    
+    // Apply to STDP
+    auto* stdp = brain_->getSTDP();
+    if (stdp) {
+        stdp->setLTPWeight(0.01f * plasticityFactor);
+        stdp->setLTDWeight(0.012f * plasticityFactor);
+    }
+}
+
+void AgentBrain::updateDevelopment(double timestep) {
+    if (!brain_ || !developmentEnabled_) return;
+    
+    developmentalAge_ += timestep;
+    
+    // Simple developmental stages based on age
+    // This is a biologically inspired approximation
+    if (developmentalAge_ < 60.0) {  // ~1 minute
+        plasticityModifier_ = 1.0f;  // High plasticity
+        brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
+    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
+        plasticityModifier_ = 0.8f;
+        brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
+    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
+        plasticityModifier_ = 0.5f;
+        brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
+    } else {
+        plasticityModifier_ = 0.2f;  // Adult - more stable
+        brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
+    }
+    
+    // Structural plasticity changes with development
+    if (structuralPlasticityEnabled_) {
+        auto* sp = brain_->getStructuralPlasticity();
+        if (sp) {
+            // Higher synaptogenesis in early development
+            float synRate = 0.0001f * plasticityModifier_;
+            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
+            sp->setSynaptogenesisRate(synRate);
+            sp->setPruningRate(pruneRate);
+        }
+    }
 }
 
 void AgentBrain::reset() {
