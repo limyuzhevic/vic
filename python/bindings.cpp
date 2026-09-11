@@ -316,6 +316,199 @@ PYBIND11_MODULE(pynlm, m) {
              "Save brain state to file")
         .def("load", &Brain::load, py::arg("filepath"),
              "Load brain state from file")
+        
+        // ===== ADVANCED SIMULATION CONTROL =====
+        .def("setTimestep", &Brain::setTimestep,
+             py::arg("timestep"),
+             "Set fine-grained simulation timestep")
+        .def("getTimestep", &Brain::getTimestep,
+             "Get current simulation timestep")
+        .def("pause", &Brain::pause,
+             "Pause simulation execution")
+        .def("resume", &Brain::resume,
+             "Resume simulation execution")
+        .def("isPaused", &Brain::isPaused,
+             "Check if simulation is paused")
+        .def("addSpikeHandler", &Brain::addSpikeHandler,
+             py::arg("handler"),
+             "Add custom spike event handler callback")
+        .def("removeSpikeHandler", &Brain::removeSpikeHandler,
+             py::arg("handler"),
+             "Remove spike event handler")
+        .def("batchExecute", &Brain::batchExecute,
+             py::arg("operations"),
+             "Execute batch operations for performance")
+        .def("getSpikeHistory", &Brain::getSpikeHistory,
+             py::return_value_policy::reference_internal,
+             "Get spike history buffer")
+        .def("clearSpikeHistory", &Brain::clearSpikeHistory,
+             "Clear spike history buffer")
+        
+        // ===== MEMORY AND PERFORMANCE MONITORING =====
+        .def("getMemoryUsage", &Brain::getMemoryUsage,
+             "Get current memory usage (bytes)")
+        .def("getPerformanceStats", &Brain::getPerformanceStats,
+             "Get performance metrics")
+        .def("getResourceUsage", &Brain::getResourceUsage,
+             "Get system resource usage")
+        .def("profileMemory", &Brain::profileMemory,
+             py::arg("duration") = 1.0,
+             "Profile memory usage over time")
+        .def("startProfiling", &Brain::startProfiling,
+             "Start performance profiling")
+        .def("stopProfiling", &Brain::stopProfiling,
+             "Stop performance profiling")
+        .def("getProfileData", &Brain::getProfileData,
+             "Get collected profiling data")
+        .def("logPerformanceMetrics", &Brain::logPerformanceMetrics,
+             "Log detailed performance metrics")
+        
+        // ===== STATE MANAGEMENT =====
+        .def("checkpoint", &Brain::checkpoint,
+             py::arg("name"),
+             "Create a checkpoint with metadata")
+        .def("loadCheckpoint", &Brain::loadCheckpoint,
+             py::arg("name"),
+             "Load checkpoint by name")
+        .def("listCheckpoints", &Brain::listCheckpoints,
+             "List all available checkpoints")
+        .def("compareStates", &Brain::compareStates,
+             py::arg("other"), py::arg("tolerance") = 1e-5,
+             "Compare brain state with another brain")
+        .def("getStateDiff", &Brain::getStateDiff,
+             py::arg("other"),
+             "Get state differences from another brain")
+        .def("diffWithCheckpoint", &Brain::diffWithCheckpoint,
+             py::arg("checkpointName"),
+             "Compare current state with checkpoint")
+        
+        // ===== NEUROMODULATION CONTROL =====
+        .def("setDopamineLevel", &Brain::setDopamineLevel,
+             py::arg("level"),
+             "Set dopamine neuromodulator level")
+        .def("setCuriosityLevel", &Brain::setCuriosityLevel,
+             py::arg("level"),
+             "Set curiosity neuromodulator level")
+        .def("setNoveltyLevel", &Brain::setNoveltyLevel,
+             py::arg("level"),
+             "Set novelty neuromodulator level")
+        .def("setPredictionError", &Brain::setPredictionError,
+             py::arg("error"),
+             "Set prediction error signal")
+        .def("applyCustomPlasticity", &Brain::applyCustomPlasticity,
+             py::arg("ruleName"), py::arg("parameters"),
+             "Apply custom plasticity rule")
+        .def("getNeuromodulationLevel", &Brain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("setRewardShaping", &Brain::setRewardShaping,
+             py::arg("rewardFunc"),
+             "Set custom reward shaping function")
+        .def("getNeuromodulators", &Brain::getNeuromodulators,
+             "Get current neuromodulator levels")
+        .def("resetNeuromodulation", &Brain::resetNeuromodulation,
+             "Reset all neuromodulators to baseline")
+        
+        // ===== DEVELOPMENT AND LEARNING CONTROL =====
+        .def("setLearningRate", &Brain::setLearningRate,
+             py::arg("rate"),
+             "Set global learning rate")
+        .def("setPlasticityThreshold", &Brain::setPlasticityThreshold,
+             py::arg("threshold"),
+             "Set synaptic plasticity threshold")
+        .def("setEligibilityTraceDecay", &Brain::setEligibilityTraceDecay,
+             py::arg("decay"),
+             "Set eligibility trace decay rate")
+        .def("applyCustomLearningRule", &Brain::applyCustomLearningRule,
+             py::arg("ruleName"), py::arg("params"),
+             "Apply custom learning rule")
+        .def("enablePatternReplay", &Brain::enablePatternReplay,
+             py::arg("patternId"), py::arg("replaySpeed") = 1.0,
+             "Enable pattern replay control")
+        .def("stopPatternReplay", &Brain::stopPatternReplay,
+             "Stop pattern replay")
+        .def("getLearningStats", &Brain::getLearningStats,
+             "Get learning statistics")
+        
+        // ===== DIAGNOSTICS AND DEBUGGING =====
+        .def("visualizeNetwork", &Brain::visualizeNetwork,
+             py::arg("outputFile"),
+             "Generate network visualization")
+        .def("analyzeConnectivity", &Brain::analyzeConnectivity,
+             py::arg("threshold"),
+             "Analyze network connectivity")
+        .def("getConnectivityMatrix", &Brain::getConnectivityMatrix,
+             "Get connectivity matrix")
+        .def("profileNeuralActivity", &Brain::profileNeuralActivity,
+             py::arg("duration"),
+             "Profile neural activity patterns")
+        .def("getActivityStats", &Brain::getActivityStats,
+             "Get neural activity statistics")
+        .def("findRepeats", &Brain::findRepeats,
+             py::arg("patternSize"),
+             "Find recurring activity patterns")
+        .def("detectBursts", &Brain::detectBursts,
+             py::arg("threshold"),
+             "Detect neural firing bursts")
+        .def("getRegionStats", &Brain::getRegionStats,
+             py::arg("regionId"),
+             "Get statistics for a specific region")
+        .def("getAllRegionStats", &Brain::getAllRegionStats,
+             "Get statistics for all regions")
+        
+        // ===== DEVELOPMENT AND LEARNING CONTROL =====
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage")
+        .def("advanceDevelopment", &Brain::advanceDevelopment,
+             py::arg("timeStep"),
+             "Advance development system")
+        .def("setLearningRate", &Brain::setLearningRate,
+             py::arg("rate"),
+             "Set global learning rate")
+        .def("setPlasticityThreshold", &Brain::setPlasticityThreshold,
+             py::arg("threshold"),
+             "Set synaptic plasticity threshold")
+        .def("setEligibilityTraceDecay", &Brain::setEligibilityTraceDecay,
+             py::arg("decay"),
+             "Set eligibility trace decay rate")
+        .def("applyCustomLearningRule", &Brain::applyCustomLearningRule,
+             py::arg("ruleName"), py::arg("params"),
+             "Apply custom learning rule")
+        .def("enablePatternReplay", &Brain::enablePatternReplay,
+             py::arg("patternId"), py::arg("replaySpeed") = 1.0,
+             "Enable pattern replay control")
+        .def("stopPatternReplay", &Brain::stopPatternReplay,
+             "Stop pattern replay")
+        .def("getLearningStats", &Brain::getLearningStats,
+             "Get learning statistics")
+        
+        // ===== DIAGNOSTICS AND DEBUGGING =====
+        .def("visualizeNetwork", &Brain::visualizeNetwork,
+             py::arg("outputFile"),
+             "Generate network visualization")
+        .def("analyzeConnectivity", &Brain::analyzeConnectivity,
+             py::arg("threshold"),
+             "Analyze network connectivity")
+        .def("getConnectivityMatrix", &Brain::getConnectivityMatrix,
+             "Get connectivity matrix")
+        .def("profileNeuralActivity", &Brain::profileNeuralActivity,
+             py::arg("duration"),
+             "Profile neural activity patterns")
+        .def("getActivityStats", &Brain::getActivityStats,
+             "Get neural activity statistics")
+        .def("findRepeats", &Brain::findRepeats,
+             py::arg("patternSize"),
+             "Find recurring activity patterns")
+        .def("detectBursts", &Brain::detectBursts,
+             py::arg("threshold"),
+             "Detect neural firing bursts")
+        .def("getRegionStats", &Brain::getRegionStats,
+             py::arg("regionId"),
+             "Get statistics for a specific region")
+        .def("getAllRegionStats", &Brain::getAllRegionStats,
+             "Get statistics for all regions")
+        
+        // ===== UTILITY AND STATUS =====
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
         .def("getRegion", &Brain::getRegion, py::arg("id"),
@@ -344,9 +537,6 @@ PYBIND11_MODULE(pynlm, m) {
              "Get total spike count")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
@@ -387,18 +577,50 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        
+        // ===== MULTI-AGENT AND ENVIRONMENT CONTROL =====
+        .def("batchProcessSensors", &AgentBrain::batchProcessSensors,
+             py::arg("percepts"),
+             "Process multiple sensory inputs in batch")
+        .def("batchExecuteActions", &AgentBrain::batchExecuteActions,
+             py::arg("actions"),
+             "Execute multiple motor commands in batch")
+        .def("coordinateWithAgent", &AgentBrain::coordinateWithAgent,
+             py::arg("otherBrain"), py::arg("coordinationType"),
+             "Coordinate behavior with another agent")
+        .def("synchronizeMemories", &AgentBrain::synchronizeMemories,
+             py::arg("otherBrain"), py::arg("memoryType"),
+             "Synchronize memory with another agent")
+        .def("createEnvironmentScript", &AgentBrain::createEnvironmentScript,
+             py::arg("script"),
+             "Create and execute environment script")
+        .def("batchUpdateWorld", &AgentBrain::batchUpdateWorld,
+             py::arg("worldUpdates"),
+             "Batch update world state")
+        .def("getAllAgentBodies", &AgentBrain::getAllAgentBodies,
+             "Get all agent bodies in world")
+        .def("getNearbyAgents", &AgentBrain::getNearbyAgents,
+             py::arg("x"), py::arg("y"), py::arg("radius"),
+             "Get agents within radius")
+        .def("setEnvironmentVariable", &AgentBrain::setEnvironmentVariable,
+             py::arg("key"), py::arg("value"),
+             "Set environment variable")
+        .def("getEnvironmentVariable", &AgentBrain::getEnvironmentVariable,
+             py::arg("key"),
+             "Get environment variable")
+        .def("clearEnvironment", &AgentBrain::clearEnvironment,
+             "Clear all environment objects")
+        .def("spawnEnvironmentObject", &AgentBrain::spawnEnvironmentObject,
+             py::arg("type"), py::arg("x"), py::arg("y"),
+             "Spawn environment object")
+        .def("getEnvironmentStats", &AgentBrain::getEnvironmentStats,
+             "Get environment statistics")
+        .def("exportEnvironment", &AgentBrain::exportEnvironment,
+             py::arg("filename"),
+             "Export current environment to file")
+        .def("importEnvironment", &AgentBrain::importEnvironment,
+             py::arg("filename"),
+             "Import environment from file");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

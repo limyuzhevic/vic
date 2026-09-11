@@ -166,6 +166,33 @@ void Neuron::addOutgoingSynapse(SynapseHandle handle) {
     pImpl->outgoingSynapses.push_back(handle);
 }
 
+bool Neuron::checkThreshold() const {
+    return pImpl->state.membranePotential >= pImpl->state.threshold;
+}
+
+float Neuron::getLastSpikeTime() const {
+    return pImpl->state.lastSpikeTime;
+}
+
+void Neuron::recordSpike(Timestamp timestamp) {
+    pImpl->spikeHistory.push_back(timestamp);
+    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    }
+}
+
+void Neuron::clearSpikeHistory() {
+    pImpl->spikeHistory.clear();
+}
+
+void Neuron::addIncomingSynapse(SynapseHandle handle) {
+    pImpl->incomingSynapses.push_back(handle);
+}
+
+void Neuron::addOutgoingSynapse(SynapseHandle handle) {
+    pImpl->outgoingSynapses.push_back(handle);
+}
+
 NeuronState& Neuron::getState() {
     return pImpl->state;
 }

@@ -30,6 +30,13 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     float tau = pImpl->membraneTimeConstant;
     float R = pImpl->membraneResistance;
     
+    // Validate parameters to prevent division by zero
+    if (tau <= 0.0f || R <= 0.0f) {
+        // Use reasonable defaults
+        tau = 20.0f;
+        R = 10.0f;
+    }
+    
     // Simple Euler integration
     float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
     neuron->setMembranePotential(V + dV);
