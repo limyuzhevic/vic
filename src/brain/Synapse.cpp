@@ -15,9 +15,14 @@ struct Synapse::Impl {
     // Synapse type
     SynapseType type;
     
-    // Spike history for STDP
+    // Spike history for STDP - using circular buffer for efficiency
     std::vector<Timestamp> preSpikeHistory;
+    size_t preSpikeHistoryHead;
+    size_t preSpikeHistoryCount;
+    
     std::vector<Timestamp> postSpikeHistory;
+    size_t postSpikeHistoryHead;
+    size_t postSpikeHistoryCount;
     
     // Plasticity state
     PlasticityFlags plasticityFlags;
@@ -44,6 +49,17 @@ struct Synapse::Impl {
     static constexpr float STP_U_MAX = 1.0f;  // Max utilization
     
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    Impl()
+        : id(), sourceNeuron(), destinationNeuron(), weight(0.0f), delay(1)
+        , type(SynapseType::Excitatory), preSpikeHistoryHead(0), preSpikeHistoryCount(0)
+        , postSpikeHistoryHead(0), postSpikeHistoryCount(0)
+        , shortTermDepression(1.0f), shortTermFacilitation(0.0f)
+        , lastPreSpikeTime(-1.0f), lastPostSpikeTime(-1.0f), eligibilityTrace(0.0f), efficacy(1.0f)
+    {
+        preSpikeHistory.resize(MAX_SPIKE_HISTORY);
+        postSpikeHistory.resize(MAX_SPIKE_HISTORY);
+    }
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
@@ -65,14 +81,29 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
 Synapse::~Synapse() = default;
 
 Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+    // Transfer ownership of all resources from other
+    if (other.pImpl) {
+        // Transfer ownership of spike history and other resources
+        pImpl->preSpikeHistory = std::move(other.pImpl->preSpikeHistory);
+        pImpl->postSpikeHistory = std::move(other.pImpl->postSpikeHistory);
+        pImpl->plasticityFlags = other.pImpl->plasticityFlags;
+        // other resources stay with the moved-from object for safety
+        other.pImpl = nullptr;
+    }
 }
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
         delete pImpl;
         pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        // Transfer ownership of all resources from other
+        if (other.pImpl) {
+            pImpl->preSpikeHistory = std::move(other.pImpl->preSpikeHistory);
+            pImpl->postSpikeHistory = std::move(other.pImpl->postSpikeHistory);
+            pImpl->plasticityFlags = other.pImpl->plasticityFlags;
+            // other resources stay with the moved-from object for safety
+            other.pImpl = nullptr;
+        }
     }
     return *this;
 }
@@ -128,25 +159,105 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
-    pImpl->preSpikeHistory.push_back(timestamp);
-    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+    // Validate input
+    if (timestamp < 0.0) {
+        // Invalid timestamp, ignore
+        return;
     }
+    
+    // Store spike in circular buffer
+    pImpl->preSpikeHistory[pImpl->preSpikeHistoryHead] = timestamp;
+    pImpl->preSpikeHistoryHead = (pImpl->preSpikeHistoryHead + 1) % pImpl->preSpikeHistory.size();
+    if (pImpl->preSpikeHistoryCount < pImpl->preSpikeHistory.size()) {
+        pImpl->preSpikeHistoryCount++;
+    }
+    
+    // Track last pre-spike time for short-term plasticity
+    pImpl->lastPreSpikeTime = timestamp;
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
-    pImpl->postSpikeHistory.push_back(timestamp);
-    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+    // Validate input
+    if (timestamp < 0.0) {
+        // Invalid timestamp, ignore
+        return;
     }
+    
+    // Store spike in circular buffer
+    pImpl->postSpikeHistory[pImpl->postSpikeHistoryHead] = timestamp;
+    pImpl->postSpikeHistoryHead = (pImpl->postSpikeHistoryHead + 1) % pImpl->postSpikeHistory.size();
+    if (pImpl->postSpikeHistoryCount < pImpl->postSpikeHistory.size()) {
+        pImpl->postSpikeHistoryCount++;
+    }
+    
+    // Track last post-spike time for short-term plasticity
+    pImpl->lastPostSpikeTime = timestamp;
 }
 
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
-    return pImpl->preSpikeHistory;
+    // Return only the valid entries (not the entire buffer)
+    static std::vector<Timestamp> validHistory;
+    validHistory.clear();
+    validHistory.reserve(pImpl->preSpikeHistoryCount);
+    
+    if (pImpl->preSpikeHistoryCount == 0) {
+        return validHistory;
+    }
+    
+    // Copy entries from circular buffer
+    if (pImpl->preSpikeHistoryHead == 0 && pImpl->preSpikeHistoryCount == pImpl->preSpikeHistory.size()) {
+        // Buffer is full
+        validHistory = pImpl->preSpikeHistory;
+    } else {
+        // Buffer is partially filled - copy from head to end, then from beginning to head
+        size_t elementsAfterHead = pImpl->preSpikeHistory.size() - pImpl->preSpikeHistoryHead;
+        size_t elementsToCopy = std::min(pImpl->preSpikeHistoryCount, elementsAfterHead);
+        
+        validHistory.insert(validHistory.end(),
+                           pImpl->preSpikeHistory.begin() + pImpl->preSpikeHistoryHead,
+                           pImpl->preSpikeHistory.begin() + pImpl->preSpikeHistoryHead + elementsToCopy);
+        
+        if (pImpl->preSpikeHistoryCount > elementsToCopy) {
+            validHistory.insert(validHistory.end(),
+                               pImpl->preSpikeHistory.begin(),
+                               pImpl->preSpikeHistory.begin() + (pImpl->preSpikeHistoryCount - elementsToCopy));
+        }
+    }
+    
+    return validHistory;
 }
 
 const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
-    return pImpl->postSpikeHistory;
+    // Return only the valid entries (not the entire buffer)
+    static std::vector<Timestamp> validHistory;
+    validHistory.clear();
+    validHistory.reserve(pImpl->postSpikeHistoryCount);
+    
+    if (pImpl->postSpikeHistoryCount == 0) {
+        return validHistory;
+    }
+    
+    // Copy entries from circular buffer
+    if (pImpl->postSpikeHistoryHead == 0 && pImpl->postSpikeHistoryCount == pImpl->postSpikeHistory.size()) {
+        // Buffer is full
+        validHistory = pImpl->postSpikeHistory;
+    } else {
+        // Buffer is partially filled - copy from head to end, then from beginning to head
+        size_t elementsAfterHead = pImpl->postSpikeHistory.size() - pImpl->postSpikeHistoryHead;
+        size_t elementsToCopy = std::min(pImpl->postSpikeHistoryCount, elementsAfterHead);
+        
+        validHistory.insert(validHistory.end(),
+                           pImpl->postSpikeHistory.begin() + pImpl->postSpikeHistoryHead,
+                           pImpl->postSpikeHistory.begin() + pImpl->postSpikeHistoryHead + elementsToCopy);
+        
+        if (pImpl->postSpikeHistoryCount > elementsToCopy) {
+            validHistory.insert(validHistory.end(),
+                               pImpl->postSpikeHistory.begin(),
+                               pImpl->postSpikeHistory.begin() + (pImpl->postSpikeHistoryCount - elementsToCopy));
+        }
+    }
+    
+    return validHistory;
 }
 
 void Synapse::clearHistory() {

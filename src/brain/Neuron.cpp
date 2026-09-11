@@ -11,8 +11,7 @@ struct Neuron::Impl {
     NeuronState state;
     RegionId regionId;
     PopulationId populationId;
-    MembranePotential totalCurrent;  // Total synaptic current input this step
-    MembranePotential synapticInput;  // Accumulated synaptic input
+    MembranePotential synapticInput;  // Accumulated synaptic input (used for LIF integration)
     std::vector<Timestamp> spikeHistory;
     std::vector<SynapseHandle> incomingSynapses;
     std::vector<SynapseHandle> outgoingSynapses;
@@ -24,7 +23,7 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             synapticInput(0.0f) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -32,20 +31,35 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
-    pImpl->totalCurrent = 0.0f;
+    pImpl->synapticInput = 0.0f;
 }
 
 Neuron::~Neuron() = default;
 
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+    // Transfer ownership of all resources from other
+    if (other.pImpl) {
+        // Transfer ownership of spike history, synaptic input, and other resources
+        pImpl->spikeHistory = std::move(other.pImpl->spikeHistory);
+        pImpl->incomingSynapses = std::move(other.pImpl->incomingSynapses);
+        pImpl->outgoingSynapses = std::move(other.pImpl->outgoingSynapses);
+        pImpl->plasticityFlags = other.pImpl->plasticityFlags;
+        other.pImpl = nullptr;
+    }
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
         delete pImpl;
         pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        // Transfer ownership of all resources from other
+        if (other.pImpl) {
+            pImpl->spikeHistory = std::move(other.pImpl->spikeHistory);
+            pImpl->incomingSynapses = std::move(other.pImpl->incomingSynapses);
+            pImpl->outgoingSynapses = std::move(other.pImpl->outgoingSynapses);
+            pImpl->plasticityFlags = other.pImpl->plasticityFlags;
+            other.pImpl = nullptr;
+        }
     }
     return *this;
 }
@@ -166,6 +180,11 @@ void Neuron::addOutgoingSynapse(SynapseHandle handle) {
     pImpl->outgoingSynapses.push_back(handle);
 }
 
+// Constants and forward declarations need to be checked in headers
+// For now, adding include guards for compilation
+
+// Note: getIncomingSynapses() and getOutgoingSynapses() should be in Neuron.hpp
+
 NeuronState& Neuron::getState() {
     return pImpl->state;
 }
@@ -186,6 +205,21 @@ void Neuron::setRegionId(RegionId region) {
 
 void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
+}
+
+// Firing state implementation
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active || 
+           pImpl->state.firingState == FiringState::Refractory;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
+// Total current accessor (deprecated - synapticInput is now used)
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->synapticInput;
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
