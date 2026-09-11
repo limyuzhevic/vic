@@ -30,8 +30,8 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                                     motorTurnLeft_.size() + motorTurnRight_.size() +
+                                     motorInteract_.size() + motorWait_.size();
                         
                         switch (idx % 6) {
                             case 0: motorForward_.push_back(n); break;
@@ -46,7 +46,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
+                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
                         switch (idx % 4) {
                             case 0: sensoryVision_.push_back(n); break;
@@ -347,4 +347,427 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
+// Implement ConfigurationBuilder methods
+AgentBrain::ConfigurationBuilder::ConfigurationBuilder(AgentBrain* agentBrain)
+    : agentBrain_(agentBrain)
+    , rewardModulationEnabled_(agentBrain ? agentBrain->isRewardModulationEnabled() : true)
+    , structuralPlasticityEnabled_(agentBrain ? agentBrain->isStructuralPlasticityEnabled() : true)
+    , developmentEnabled_(agentBrain ? agentBrain->isDevelopmentEnabled() : true)
+    , curiosityEnabled_(agentBrain ? agentBrain->isCuriosityEnabled() : true)
+    , neuromodulationLevel_(0.0f)
+    , curiosityLevel_(0.0f)
+    , noveltyLevel_(0.0f)
+    , predictionError_(0.0f)
+{
+}
+
+AgentBrain::ConfigurationBuilder& AgentBrain::ConfigurationBuilder::setRewardModulation(bool enable) {
+    rewardModulationEnabled_ = enable;
+    return *this;
+}
+
+AgentBrain::ConfigurationBuilder& AgentBrain::ConfigurationBuilder::setStructuralPlasticity(bool enable) {
+    structuralPlasticityEnabled_ = enable;
+    return *this;
+}
+
+AgentBrain::ConfigurationBuilder& AgentBrain::ConfigurationBuilder::setDevelopment(bool enable) {
+    developmentEnabled_ = enable;
+    return *this;
+}
+
+AgentBrain::ConfigurationBuilder& AgentBrain::ConfigurationBuilder::setCuriosity(bool enable) {
+    curiosityEnabled_ = enable;
+    return *this;
+}
+
+AgentBrain::ConfigurationBuilder& AgentBrain::ConfigurationBuilder::setNeuromodulationLevel(float level) {
+    neuromodulationLevel_ = level;
+    return *this;
+}
+
+AgentBrain::ConfigurationBuilder& AgentBrain::ConfigurationBuilder::setCuriosityLevel(float level) {
+    curiosityLevel_ = level;
+    return *this;
+}
+
+AgentBrain::ConfigurationBuilder& AgentBrain::ConfigurationBuilder::setNoveltyLevel(float level) {
+    noveltyLevel_ = level;
+    return *this;
+}
+
+AgentBrain::ConfigurationBuilder& AgentBrain::ConfigurationBuilder::setPredictionError(float error) {
+    predictionError_ = error;
+    return *this;
+}
+
+void AgentBrain::ConfigurationBuilder::apply() {
+    if (agentBrain_) {
+        agentBrain_->enableRewardModulation(rewardModulationEnabled_);
+        agentBrain_->enableStructuralPlasticity(structuralPlasticityEnabled_);
+        agentBrain_->enableDevelopment(developmentEnabled_);
+        agentBrain_->enableCuriosity(curiosityEnabled_);
+        
+        // Update neuromodulation levels
+        agentBrain_->dopamineLevel_ = neuromodulationLevel_;
+        agentBrain_->curiosityLevel_ = curiosityLevel_;
+        agentBrain_->noveltyLevel_ = noveltyLevel_;
+        agentBrain_->predictionError_ = predictionError_;
+    }
+}
+
+void AgentBrain::ConfigurationBuilder::reset() {
+    rewardModulationEnabled_ = agentBrain_ ? agentBrain_->isRewardModulationEnabled() : true;
+    structuralPlasticityEnabled_ = agentBrain_ ? agentBrain_->isStructuralPlasticityEnabled() : true;
+    developmentEnabled_ = agentBrain_ ? agentBrain_->isDevelopmentEnabled() : true;
+    curiosityEnabled_ = agentBrain_ ? agentBrain_->isCuriosityEnabled() : true;
+    neuromodulationLevel_ = 0.0f;
+    curiosityLevel_ = 0.0f;
+    noveltyLevel_ = 0.0f;
+    predictionError_ = 0.0f;
+}
+
+bool AgentBrain::ConfigurationBuilder::isRewardModulationEnabled() const {
+    return rewardModulationEnabled_;
+}
+
+bool AgentBrain::ConfigurationBuilder::isStructuralPlasticityEnabled() const {
+    return structuralPlasticityEnabled_;
+}
+
+bool AgentBrain::ConfigurationBuilder::isDevelopmentEnabled() const {
+    return developmentEnabled_;
+}
+
+bool AgentBrain::ConfigurationBuilder::isCuriosityEnabled() const {
+    return curiosityEnabled_;
+}
+
+// Implement NeuromodulationSubscription methods
+AgentBrain::NeuromodulationSubscription::NeuromodulationSubscription(AgentBrain* agentBrain, std::function<void(float)> callback)
+    : agentBrain_(agentBrain)
+    , callback_(callback)
+    , active_(false)
+    , lastTriggerLevel_(0.0f)
+{
+    if (agentBrain_ && callback_) {
+        active_ = true;
+    }
+}
+
+AgentBrain::NeuromodulationSubscription::~NeuromodulationSubscription() {
+    // Cleanup if needed
+}
+
+bool AgentBrain::NeuromodulationSubscription::isActive() const {
+    return active_;
+}
+
+float AgentBrain::NeuromodulationSubscription::getLastTriggerLevel() const {
+    return lastTriggerLevel_;
+}
+
+// Implement enhanced AgentBrain methods
+AgentBrain::ConfigurationBuilder AgentBrain::configure() {
+    return ConfigurationBuilder(this);
+}
+
+AgentBrain::NeuromodulationSubscription AgentBrain::subscribeToNeuromodulation(std::function<void(float)> callback) {
+    return NeuromodulationSubscription(this, callback);
+}
+
+void AgentBrain::setupForControlTask(float targetReward, float explorationBonus) {
+    enableRewardModulation(true);
+    enableCuriosity(false);
+    enableDevelopment(false);
+    dopamineLevel_ = targetReward;
+    // Additional control task specific setup
+}
+
+void AgentBrain::setupForExplorationTask(float noveltyThreshold, float curiosityFactor) {
+    enableRewardModulation(false);
+    enableCuriosity(true);
+    enableDevelopment(true);
+    curiosityLevel_ = curiosityFactor;
+    // Additional exploration task specific setup
+}
+
+void AgentBrain::setupForMemoryTask(float memoryCapacity, float consolidationRate) {
+    enableRewardModulation(true);
+    enableCuriosity(false);
+    enableDevelopment(true);
+    // Additional memory task specific setup
+}
+
+bool AgentBrain::enableExperimentalMode() {
+    // Disable all modulators for experimental mode
+    rewardModulationEnabled_ = false;
+    structuralPlasticityEnabled_ = false;
+    developmentEnabled_ = false;
+    curiosityEnabled_ = false;
+    return true;
+}
+
+bool AgentBrain::enableResearchMode() {
+    // Enable all modulators for research mode
+    rewardModulationEnabled_ = true;
+    structuralPlasticityEnabled_ = true;
+    developmentEnabled_ = true;
+    curiosityEnabled_ = true;
+    return true;
+}
+
+bool AgentBrain::disableAllModulators() {
+    // Completely disable all neuromodulation
+    rewardModulationEnabled_ = false;
+    structuralPlasticityEnabled_ = false;
+    developmentEnabled_ = false;
+    curiosityEnabled_ = false;
+    dopamineLevel_ = 0.0f;
+    curiosityLevel_ = 0.0f;
+    noveltyLevel_ = 0.0f;
+    predictionError_ = 0.0f;
+    return true;
+}
+
+void AgentBrain::startProfiler() {
+    // Enable performance profiling
+    NLM_LOG_INFO("AgentBrain profiler started");
+}
+
+void AgentBrain::stopProfiler() {
+    // Disable performance profiling
+    NLM_LOG_INFO("AgentBrain profiler stopped");
+}
+
+bool AgentBrain::isProfilerActive() const {
+    // Check if profiler is active
+    return false;  // Placeholder - should track profiler state
+}
+
+std::string AgentBrain::getProfilerReport() const {
+    // Generate profiler report
+    return "AgentBrain Profiler Report (Placeholder)\n";
+}
+
+void AgentBrain::setDebugLevel(int level) {
+    // Set debug logging level
+    NLM_LOG_INFO("AgentBrain debug level set to: " + std::to_string(level));
+}
+
+int AgentBrain::getDebugLevel() const {
+    // Get current debug level
+    return 0;  // Placeholder - should track debug level
+}
+
+void AgentBrain::enableLoggingToFile(const std::string& filepath) {
+    // Enable file logging
+    NLM_LOG_INFO("AgentBrain logging enabled to: " + filepath);
+}
+
+void AgentBrain::disableLoggingToFile() {
+    // Disable file logging
+    NLM_LOG_INFO("AgentBrain logging disabled");
+}
+
+bool AgentBrain::isLoggingToFile() const {
+    // Check if file logging is enabled
+    return false;  // Placeholder - should track logging state
+}
+
+// Performance monitoring
+
+double AgentBrain::getSimulationSpeed() const {
+    // Calculate simulation speed (placeholder)
+    return 1.0;  // Placeholder - should calculate actual speed
+}
+
+double AgentBrain::getAverageFiringRatePerStep() const {
+    if (!brain_) return 0.0;
+    return static_cast<double>(brain_->getAverageFiringRate());
+}
+
+size_t AgentBrain::getMemoryFootprint() const {
+    // Calculate memory footprint (placeholder)
+    return 0;  // Placeholder - should calculate actual memory usage
+}
+
+// Statistical analysis
+
+AgentBrain::StatisticalSummary AgentBrain::computeStatisticalSummary(const std::vector<float>& data) const {
+    StatisticalSummary summary;
+    if (data.empty()) return summary;
+    
+    double sum = 0.0;
+    double sumSq = 0.0;
+    double min = data[0];
+    double max = data[0];
+    
+    for (float val : data) {
+        sum += val;
+        sumSq += val * val;
+        if (val < min) min = val;
+        if (val > max) max = val;
+    }
+    
+    summary.count = data.size();
+    summary.mean = sum / summary.count;
+    summary.variance = (sumSq / summary.count) - (summary.mean * summary.mean);
+    summary.stddev = std::sqrt(summary.variance);
+    summary.min = min;
+    summary.max = max;
+    
+    return summary;
+}
+
+AgentBrain::StatisticalSummary AgentBrain::computeMotorOutputStatistics() const {
+    // Compute statistics for motor output (placeholder)
+    return StatisticalSummary();
+}
+
+AgentBrain::StatisticalSummary AgentBrain::computeSensoryInputStatistics() const {
+    // Compute statistics for sensory input (placeholder)
+    return StatisticalSummary();
+}
+
+// Batch operations
+
+void AgentBrain::applyBatchNeuromodulation(const std::vector<std::pair<std::string, float>>& neuromodulators) {
+    for (const auto& pair : neuromodulators) {
+        if (pair.first == "dopamine") {
+            dopamineLevel_ = pair.second;
+        } else if (pair.first == "curiosity") {
+            curiosityLevel_ = pair.second;
+        } else if (pair.first == "novelty") {
+            noveltyLevel_ = pair.second;
+        }
+    }
+}
+
+void AgentBrain::updateBatchDevelopment(double timestep) {
+    developmentalAge_ += timestep;
+    // Update development state
+    if (developmentEnabled_) {
+        // Simplified development update
+        if (developmentalAge_ > 100.0) {
+            plasticityModifier_ = 0.2f;
+        }
+    }
+}
+
+// State management
+
+void AgentBrain::saveState(const std::string& filepath) {
+    // Save agent brain state (placeholder)
+    NLM_LOG_INFO("AgentBrain state saved to: " + filepath);
+}
+
+bool AgentBrain::loadState(const std::string& filepath) {
+    // Load agent brain state (placeholder)
+    NLM_LOG_INFO("AgentBrain state loaded from: " + filepath);
+    return true;
+}
+
+// Configuration validation
+
+bool AgentBrain::validateConfiguration(std::vector<std::string>& errors) const {
+    bool isValid = true;
+    
+    // Validate neuromodulation levels
+    if (dopamineLevel_ < -1.0f || dopamineLevel_ > 1.0f) {
+        errors.push_back("Dopamine level out of range [-1.0, 1.0]");
+        isValid = false;
+    }
+    
+    if (curiosityLevel_ < 0.0f || curiosityLevel_ > 1.0f) {
+        errors.push_back("Curiosity level out of range [0.0, 1.0]");
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+bool AgentBrain::isConfigurationValid() const {
+    std::vector<std::string> errors;
+    return validateConfiguration(errors);
+}
+
+// Export and visualization helpers
+
+std::string AgentBrain::generateActivityReport() const {
+    std::ostringstream oss;
+    oss << "AgentBrain Activity Report\n";
+    oss << "==========================\n";
+    oss << "Neuromodulation Levels:\n";
+    oss << "  Dopamine: " << dopamineLevel_ << "\n";
+    oss << "  Curiosity: " << curiosityLevel_ << "\n";
+    oss << "  Novelty: " << noveltyLevel_ << "\n";
+    oss << "  Prediction Error: " << predictionError_ << "\n";
+    oss << "Developmental Age: " << developmentalAge_ << "\n";
+    oss << "Plasticity Modifier: " << plasticityModifier_ << "\n";
+    
+    return oss.str();
+}
+
+std::string AgentBrain::generateConnectivityReport() const {
+    std::ostringstream oss;
+    oss << "AgentBrain Connectivity Report\n";
+    oss << "=============================\n";
+    oss << "Motor neurons groups:\n";
+    oss << "  Forward: " << motorForward_.size() << " neurons\n";
+    oss << "  Backward: " << motorBackward_.size() << " neurons\n";
+    oss << "  Turn Left: " << motorTurnLeft_.size() << " neurons\n";
+    oss << "  Turn Right: " << motorTurnRight_.size() << " neurons\n";
+    oss << "  Interact: " << motorInteract_.size() << " neurons\n";
+    oss << "  Wait: " << motorWait_.size() << " neurons\n";
+    oss << "\nSensory neurons groups:\n";
+    oss << "  Vision: " << sensoryVision_.size() << " neurons\n";
+    oss << "  Touch: " << sensoryTouch_.size() << " neurons\n";
+    oss << "  Internal: " << sensoryInternal_.size() << " neurons\n";
+    oss << "  Proprioception: " << sensoryProprioception_.size() << " neurons\n";
+    
+    return oss.str();
+}
+
+// Simulation state management
+
+void AgentBrain::pauseSimulation() {
+    // Pause agent brain simulation (placeholder)
+    NLM_LOG_INFO("AgentBrain simulation paused");
+}
+
+void AgentBrain::resumeSimulation() {
+    // Resume agent brain simulation (placeholder)
+    NLM_LOG_INFO("AgentBrain simulation resumed");
+}
+
+bool AgentBrain::isSimulationPaused() const {
+    // Check if simulation is paused (placeholder)
+    return false;  // Placeholder - should track simulation state
+}
+
+// Checkpoint and recovery
+
+bool AgentBrain::createCheckpoint(const std::string& prefix) {
+    // Create checkpoint (placeholder)
+    std::string filepath = prefix + "_agentbrain_" + std::to_string(std::time(nullptr)) + ".ckpt";
+    saveState(filepath);
+    NLM_LOG_INFO("AgentBrain checkpoint created: " + filepath);
+    return true;
+}
+
+bool AgentBrain::restoreFromCheckpoint(const std::string& filepath) {
+    // Restore from checkpoint (placeholder)
+    loadState(filepath);
+    NLM_LOG_INFO("AgentBrain checkpoint restored from: " + filepath);
+    return true;
+}
+
+std::vector<std::string> AgentBrain::getAvailableCheckpoints() const {
+    // Get list of available checkpoints (placeholder)
+    return std::vector<std::string>();  // Placeholder
+}
+
 } // namespace nlm
+
+

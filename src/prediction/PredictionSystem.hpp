@@ -14,6 +14,9 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Update prediction system state
+    void update(float dt);
+    
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
@@ -23,6 +26,12 @@ public:
     
     // Get prediction error
     float getPredictionError() const;
+    
+    // Get prediction change (temporal derivative)
+    float getPredictionChange() const;
+    
+    // Get prediction surprise
+    float getSurprise() const;
     
     // Get prediction confidence
     float getConfidence() const;
@@ -35,8 +44,16 @@ public:
     void train(const SensoryInput& observation);
     
 private:
+    struct Impl {
+        float predictionError;
+        float predictionChange;
+        float surprise;
+        float confidence;
+        std::vector<float> errorHistory;
+        
+        Impl() : predictionError(0.0f), predictionChange(0.0f), surprise(0.0f), confidence(0.5f) {}
+    };
+    
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 };
-
-} // namespace nlm

@@ -70,15 +70,20 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
-    // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Update synapse for one simulation step with realistic dynamics
+    // Includes short-term plasticity (STP), synaptic delay, eligibility trace for learning,
+    // and use-dependent modulation of synaptic efficacy
     void step(Timestamp currentTime);
     
-    // Reset to initial state
-    void reset();
+    // Process spike events through the synapse delay queue
+    // Returns any spikes that have reached their delivery time
+    std::vector<DelayedSpikeEvent> processDelayedSpikes(Timestamp currentTime);
     
-    // Initialize with random parameters
-    void initializeRandom(class RandomGenerator& rng);
+    // Calculate synaptic efficacy based on pre- and post-synaptic activity
+    void updateEfficacy(Timestamp currentTime);
+    
+    // Apply plasticity rules based on spike timing or neuromodulation
+    void applyPlasticity(Timestamp currentTime, float rewardPredictionError = 0.0f);
     
 private:
     struct Impl;

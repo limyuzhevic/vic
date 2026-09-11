@@ -1,5 +1,7 @@
 #include "Memory.hpp"
 #include <algorithm>
+#include <cmath>
+#include <chrono>
 
 namespace nlm {
 
@@ -7,8 +9,10 @@ namespace nlm {
 struct WorkingMemory::Impl {
     std::vector<std::pair<NeuronId, float>> items;
     size_t capacity;
+    float decayRate;
+    uint64_t lastConsolidationStep;
     
-    Impl(size_t cap) : capacity(cap) {}
+    Impl(size_t cap) : capacity(cap), decayRate(0.01f), lastConsolidationStep(0) {}
 };
 
 WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
@@ -16,34 +20,41 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
-    for (auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            item.second = value;
-            return;
-        }
+    // Phase 2: Real storage with capacity limits and competitive dynamics
+    
+    // Check if neuron already has an item
+    auto it = std::find_if(pImpl->items.begin(), pImpl->items.end(),
+                          [&neuron](const auto& item) { return item.first == neuron; });
+    if (it != pImpl->items.end()) {
+        // Update existing value
+        it->second = value;
+        return;
     }
-    if (pImpl->items.size() < pImpl->capacity) {
-        pImpl->items.emplace_back(neuron, value);
+    
+    // Check capacity and potentially remove lowest priority item
+    if (pImpl->items.size() >= pImpl->capacity && pImpl->capacity > 0) {
+        // Find item with lowest value (simplified competitive replacement)
+        auto minIt = std::min_element(pImpl->items.begin(), pImpl->items.end(),
+                                     [](const auto& a, const auto& b) { return a.second < b.second; });
+        pImpl->items.erase(minIt);
     }
+    
+    // Add new item
+    pImpl->items.emplace_back(neuron, value);
 }
 
 float WorkingMemory::retrieve(NeuronId neuron) const {
-    for (const auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            return item.second;
-        }
+    auto it = std::find_if(pImpl->items.begin(), pImpl->items.end(),
+                          [&neuron](const auto& item) { return item.first == neuron; });
+    if (it != pImpl->items.end()) {
+        return it->second;
     }
     return 0.0f;
 }
 
 bool WorkingMemory::contains(NeuronId neuron) const {
-    for (const auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            return true;
-        }
-    }
-    return false;
+    return std::any_of(pImpl->items.begin(), pImpl->items.end(),
+                      [&neuron](const auto& item) { return item.first == neuron; });
 }
 
 void WorkingMemory::clear() {
@@ -59,9 +70,17 @@ size_t WorkingMemory::getCurrentSize() const {
 }
 
 void WorkingMemory::decay(float decayRate) {
+    // Apply exponential decay to all items
     for (auto& item : pImpl->items) {
-        item.second *= (1.0f - decayRate);
+        item.second *= std::exp(-decayRate);
     }
+    
+    // Remove items that have decayed below threshold
+    pImpl->items.erase(
+        std::remove_if(pImpl->items.begin(), pImpl->items.end(),
+                      [](const auto& item) { return std::abs(item.second) < 0.01f; }),
+        pImpl->items.end()
+    );
 }
 
 // Episodic Memory Implementation

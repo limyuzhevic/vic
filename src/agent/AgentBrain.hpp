@@ -58,16 +58,141 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // ========== ENHANCED AGENT BRAIN API ==========
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Configuration method chaining
+    class ConfigurationBuilder {
+    public:
+        ConfigurationBuilder(AgentBrain* agentBrain);
+        
+        // Chain configuration methods
+        ConfigurationBuilder& setRewardModulation(bool enable);
+        ConfigurationBuilder& setStructuralPlasticity(bool enable);
+        ConfigurationBuilder& setDevelopment(bool enable);
+        ConfigurationBuilder& setCuriosity(bool enable);
+        ConfigurationBuilder& setNeuromodulationLevel(float level);
+        ConfigurationBuilder& setCuriosityLevel(float level);
+        ConfigurationBuilder& setNoveltyLevel(float level);
+        ConfigurationBuilder& setPredictionError(float error);
+        
+        // Apply all accumulated configuration
+        void apply();
+        
+        // Reset builder state
+        void reset();
+        
+        // Get current configuration state
+        bool isRewardModulationEnabled() const;
+        bool isStructuralPlasticityEnabled() const;
+        bool isDevelopmentEnabled() const;
+        bool isCuriosityEnabled() const;
+        
+    private:
+        AgentBrain* agentBrain_;
+        bool rewardModulationEnabled_;
+        bool structuralPlasticityEnabled_;
+        bool developmentEnabled_;
+        bool curiosityEnabled_;
+        float neuromodulationLevel_;
+        float curiosityLevel_;
+        float noveltyLevel_;
+        float predictionError_;
+    };
+    
+    // Create configuration builder for method chaining
+    ConfigurationBuilder configure();
+    
+    // Subscription-based neuromodulation
+    class NeuromodulationSubscription {
+    public:
+        NeuromodulationSubscription(AgentBrain* agentBrain, std::function<void(float)> callback);
+        ~NeuromodulationSubscription();
+        
+        // Check if subscription is active
+        bool isActive() const;
+        
+        // Get neuromodulation level that triggered callback
+        float getLastTriggerLevel() const;
+        
+    private:
+        AgentBrain* agentBrain_;
+        std::function<void(float)> callback_;
+        bool active_;
+        float lastTriggerLevel_;
+    };
+    
+    // Subscribe to neuromodulation events
+    NeuromodulationSubscription subscribeToNeuromodulation(std::function<void(float)> callback);
+    
+    // Convenience methods for common agent operations
+    void setupForControlTask(float targetReward = 1.0f, float explorationBonus = 0.1f);
+    void setupForExplorationTask(float noveltyThreshold = 0.5f, float curiosityFactor = 1.0f);
+    void setupForMemoryTask(float memoryCapacity = 1000.0f, float consolidationRate = 0.01f);
+    
+    // Experimental and research mode helpers
+    bool enableExperimentalMode();
+    bool enableResearchMode();
+    bool disableAllModulators();
+    
+    // Debugging and profiling methods
+    void startProfiler();
+    void stopProfiler();
+    bool isProfilerActive() const;
+    std::string getProfilerReport() const;
+    
+    void setDebugLevel(int level);
+    int getDebugLevel() const;
+    
+    void enableLoggingToFile(const std::string& filepath);
+    void disableLoggingToFile();
+    bool isLoggingToFile() const;
+    
+    // Performance monitoring
+    double getSimulationSpeed() const;
+    double getAverageFiringRatePerStep() const;
+    size_t getMemoryFootprint() const;
+    
+    // Statistical analysis
+    struct StatisticalSummary {
+        double mean;
+        double variance;
+        double stddev;
+        double min;
+        double max;
+        size_t count;
+        
+        StatisticalSummary() : mean(0.0), variance(0.0), stddev(0.0), min(0.0), max(0.0), count(0) {}
+    };
+    
+    StatisticalSummary computeStatisticalSummary(const std::vector<float>& data) const;
+    StatisticalSummary computeMotorOutputStatistics() const;
+    StatisticalSummary computeSensoryInputStatistics() const;
+    
+    // Batch operations
+    void applyBatchNeuromodulation(const std::vector<std::pair<std::string, float>>& neuromodulators);
+    void updateBatchDevelopment(double timestep);
+    
+    // State management
+    void saveState(const std::string& filepath);
+    bool loadState(const std::string& filepath);
+    
+    // Configuration validation
+    bool validateConfiguration(std::vector<std::string>& errors) const;
+    bool isConfigurationValid() const;
+    
+    // Export and visualization helpers
+    std::string generateActivityReport() const;
+    std::string generateConnectivityReport() const;
+    
+    // Simulation state management
+    void pauseSimulation();
+    void resumeSimulation();
+    bool isSimulationPaused() const;
+    
+    // Checkpoint and recovery
+    bool createCheckpoint(const std::string& prefix = "checkpoint");
+    bool restoreFromCheckpoint(const std::string& filepath);
+    std::vector<std::string> getAvailableCheckpoints() const;
     
 private:
     // Motor decoding: convert neural activity to motor command

@@ -1114,4 +1114,130 @@ void Brain::logStatus() const {
     }
 }
 
+// Implement SimulationSession methods
+SimulationSession::SimulationSession(Brain* brain, double timestep, SimulationStep startStep)
+    : brain_(brain), timestep_(timestep), startStep_(startStep), currentStep_(startStep), currentTime_(0.0), active_(false) {
+    if (brain_) {
+        active_ = true;
+    }
+}
+
+SimulationSession::~SimulationSession() {
+    if (active_) {
+        active_ = false;
+    }
+}
+
+bool SimulationSession::runSteps(size_t steps) {
+    if (!active_ || !brain_) {
+        return false;
+    }
+    
+    for (size_t i = 0; i < steps; ++i) {
+        if (!step()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool SimulationSession::runUntil(double timeLimit) {
+    if (!active_ || !brain_) {
+        return false;
+    }
+    
+    while (active_ && currentTime_ < timeLimit) {
+        if (!step()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool SimulationSession::step() {
+    if (!active_ || !brain_) {
+        return false;
+    }
+    
+    brain_->step(currentStep_, currentTime_);
+    currentStep_++;
+    currentTime_ += timestep_;
+    return true;
+}
+
+SimulationStep SimulationSession::getCurrentStep() const {
+    return currentStep_;
+}
+
+double SimulationSession::getCurrentTime() const {
+    return currentTime_;
+}
+
+bool SimulationSession::isActive() const {
+    return active_;
+}
+
+// Implement SimulationSession methods
+SimulationSession::SimulationSession(Brain* brain, double timestep, SimulationStep startStep)
+    : brain_(brain), timestep_(timestep), startStep_(startStep), currentStep_(startStep), currentTime_(0.0), active_(false) {
+    if (brain_) {
+        active_ = true;
+    }
+}
+
+SimulationSession::~SimulationSession() {
+    if (active_) {
+        active_ = false;
+    }
+}
+
+bool SimulationSession::runSteps(size_t steps) {
+    if (!active_ || !brain_) {
+        return false;
+    }
+    
+    for (size_t i = 0; i < steps; ++i) {
+        if (!step()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool SimulationSession::runUntil(double timeLimit) {
+    if (!active_ || !brain_) {
+        return false;
+    }
+    
+    while (active_ && currentTime_ < timeLimit) {
+        if (!step()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool SimulationSession::step() {
+    if (!active_ || !brain_) {
+        return false;
+    }
+    
+    brain_->step(currentStep_, currentTime_);
+    currentStep_++;
+    currentTime_ += timestep_;
+    return true;
+}
+
+SimulationStep SimulationSession::getCurrentStep() const {
+    return currentStep_;
+}
+
+double SimulationSession::getCurrentTime() const {
+    return currentTime_;
+}
+
+bool SimulationSession::isActive() const {
+    return active_;
+}
+
 } // namespace nlm

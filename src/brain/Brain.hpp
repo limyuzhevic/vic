@@ -61,137 +61,168 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
-    // Initialize brain with configuration
-    bool initialize();
+    // Context manager for simulation
+    class SimulationSession {
+    public:
+        SimulationSession(Brain* brain, double timestep, SimulationStep startStep = 0);
+        ~SimulationSession();
+        
+        // Run simulation for specified number of steps
+        bool runSteps(size_t steps);
+        
+        // Run simulation until time limit
+        bool runUntil(double timeLimit);
+        
+        // Run single step
+        bool step();
+        
+        // Get current simulation state
+        SimulationStep getCurrentStep() const;
+        double getCurrentTime() const;
+        
+        // Check if session is active
+        bool isActive() const;
+        
+    private:
+        Brain* brain_;
+        double timestep_;
+        SimulationStep startStep_;
+        SimulationStep currentStep_;
+        double currentTime_;
+        bool active_;
+    };
     
-    // Main simulation step
-    void step(SimulationStep currentStep);
+    // Context manager interface for Python
+    SimulationSession createSession(double timestep, SimulationStep startStep = 0) {
+        return SimulationSession(this, timestep, startStep);
+    }
     
-    // Simulation time step
-    void step(SimulationStep currentStep, Timestamp currentTime);
+    // Enhanced initialization with validation
+    bool initializeWithConfig(const std::map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>>>& config);
     
-    // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
-    void receiveSensoryInput(const class SensoryInput& input);
+    // Simulation helper methods
+    bool runSimulationSteps(SimulationStep steps, double timestep = 0.001);
+    bool runSimulationTime(double duration, double timestep = 0.001);
+    bool runEpisode(double maxDuration = 60.0, double timestep = 0.001);
     
-    // Inject current directly into a specific neuron
-    void injectCurrent(NeuronId neuron, MembranePotential current);
+    // Statistical analysis methods
+    double getStatisticalMean(const std::vector<float>& data) const;
+    double getStatisticalStdDev(const std::vector<float>& data, double mean) const;
+    double getStatisticalVariance(const std::vector<float>& data) const;
+    std::pair<double, double> getStatisticalBounds(const std::vector<float>& data) const;
     
-    // Inject current into all neurons of a specific type
-    void injectCurrentToNeurons(NeuronType type, MembranePotential current);
+    // Neural activity analysis
+    std::vector<float> getNeutronActivityPattern(RegionId regionId) const;
+    double getRegionExcitabilityRatio(RegionId regionId) const;
+    std::vector<std::pair<NeuronId, float>> getTopActiveNeurons(size_t topN = 10) const;
     
-    // Spike system access
-    SpikeSystem* getSpikeSystem();
-    const SpikeSystem* getSpikeSystem() const;
+    // Memory system analysis
+    size_t getWorkingMemoryUsage() const;
+    size_t getEpisodicMemoryCount() const;
+    double getMemoryConsolidationScore() const;
     
-    // Plasticity system access
-    STDP* getSTDP();
-    Hebbian* getHebbian();
-    StructuralPlasticity* getStructuralPlasticity();
+    // Development and learning metrics
+    float getPlasticityIndex() const;
+    float getLearningRate() const;
+    float getExplorationRate() const;
     
-    // Statistics
-    float getExcitationInhibitionRatio() const;
-    size_t getTotalSpikeCount() const;
-    size_t getPendingSpikeEventCount() const;
+    // Experimental mode helpers
+    bool enableExperimentalMode();
+    bool enableResearchMode();
+    bool disableAllModulators();
     
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    // Debugging and profiling methods
+    void startProfiler();
+    void stopProfiler();
+    bool isProfilerActive() const;
+    std::string getProfilerReport() const;
     
-    // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    void setDebugLevel(int level);
+    int getDebugLevel() const;
     
-    // Update plasticity rules (called automatically in step)
-    void updatePlasticity();
+    void enableLoggingToFile(const std::string& filepath);
+    void disableLoggingToFile();
+    bool isLoggingToFile() const;
     
-    // Apply developmental changes (called automatically in step)
-    void develop();
+    // Performance monitoring
+    double getSimulationSpeed() const;
+    double getAverageFiringRatePerStep() const;
+    size_t getMemoryFootprint() const;
     
-    // Reset brain state
-    void reset();
+    // Simulation state management
+    void pauseSimulation();
+    void resumeSimulation();
+    bool isSimulationPaused() const;
     
-    // Save brain state to file (checkpointing)
-    bool save(const std::string& filepath) const;
+    // Checkpoint and recovery
+    bool createCheckpoint(const std::string& prefix = "checkpoint");
+    bool restoreFromCheckpoint(const std::string& filepath);
+    std::vector<std::string> getAvailableCheckpoints() const;
     
-    // Load brain state from file
-    bool load(const std::string& filepath);
+    // Configuration validation
+    bool validateConfiguration(std::vector<std::string>& errors) const;
+    bool isConfigurationValid() const;
     
-    // Region management
-    RegionId addRegion(const std::string& name = "");
-    NeuralRegion* getRegion(RegionId id);
-    const NeuralRegion* getRegion(RegionId id) const;
-    size_t getRegionCount() const;
-    std::vector<RegionId> getRegionIds() const;
+    // Convenience methods for common patterns
+    void setupForControlTask(float targetReward = 1.0f, float explorationBonus = 0.1f);
+    void setupForExplorationTask(float noveltyThreshold = 0.5f, float curiosityFactor = 1.0f);
+    void setupForMemoryTask(float memoryCapacity = 1000.0f, float consolidationRate = 0.01f);
     
-    // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
+    // Export and visualization helpers
+    std::string generateActivityReport() const;
+    std::string generateConnectivityMatrix(RegionId regionId) const;
+    void exportNeutronActivity(const std::string& filepath, RegionId regionId) const;
+    void exportSynapseWeights(const std::string& filepath) const;
     
-    // Inter-region connection management
-    void addInterRegionConnection(RegionId source, RegionId target, 
-                                  float weight = 0.0f, Delay delay = 1);
-    void removeInterRegionConnection(RegionId source, RegionId target);
+    // Statistical analysis helpers
+    struct StatisticalSummary {
+        double mean;
+        double variance;
+        double stddev;
+        double min;
+        double max;
+        size_t count;
+        
+        StatisticalSummary() : mean(0.0), variance(0.0), stddev(0.0), min(0.0), max(0.0), count(0) {}
+    };
     
-    // Global statistics
-    size_t getTotalNeuronCount() const;
-    size_t getTotalSynapseCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
+    StatisticalSummary computeStatisticalSummary(const std::vector<float>& data) const;
+    std::vector<StatisticalSummary> computeStatisticalSummaryByRegion() const;
     
-    // ========== MEMORY SYSTEMS ==========
+    // Debugging helpers
+    void setNeuronDebugFlag(NeuronId id, bool enabled);
+    bool getNeuronDebugFlag(NeuronId id) const;
+    void clearAllDebugFlags();
     
-    // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    // Error handling and recovery
+    class SimulationError : public std::runtime_error {
+    public:
+        SimulationError(const std::string& message) : std::runtime_error(message) {}
+    };
     
-    // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    // Exception-safe simulation execution
+    bool executeSafely(std::function<bool()> simulationFunc);
     
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    // Timing and synchronization
+    void setTimeStep(double timestep);
+    double getTimeStep() const;
     
-    // ========== PREDICTION SYSTEM ==========
+    void setRandomSeed(uint64_t seed);
+    uint64_t getRandomSeed() const;
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    // Real-time control
+    void setSimulationSpeed(double speed);
+    double getSimulationSpeed() const;
     
-    // ========== COGNITION SYSTEMS ==========
+    // Advanced simulation control
+    void enableFixedTimeStep(bool enabled);
+    bool isFixedTimeStepEnabled() const;
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    void setMaxSimulationSteps(size_t maxSteps);
+    size_t getMaxSimulationSteps() const;
     
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
-    
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
-    
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
-    
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
-    void logStatus() const;
+    void enableGracefulShutdown(bool enabled);
+    bool isGracefulShutdownEnabled() const;
     
 private:
     struct Impl;

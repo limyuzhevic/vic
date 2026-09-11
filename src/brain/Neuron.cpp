@@ -260,9 +260,102 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    // Phase 2: Real integrate-and-fire dynamics with biological realism
+    // Implementation includes exponential integration, spike detection,
+    // refractory period, spike-frequency adaptation, and homeostatic plasticity
+    
+    // Handle refractory period - neuron cannot integrate during refractory
+    if (pImpl->state.refractoryRemaining > 0) {
+        --pImpl->state.refractoryRemaining;
+        if (pImpl->state.refractoryRemaining == 0) {
+            pImpl->state.firingState = FiringState::Resting;
+        }
+        // During refractory period, synaptic input is discarded
+        return;
+    }
+    
+    // Get current synaptic input (from Neuron::receiveExcitatoryInput etc.)
+    const MembranePotential synapticInput = pImpl->synapticInput;
+    
+    // Membrane potential integration using exponential Euler method
+    // dV/dt = (V_rest - V)/tau + I/C
+    MembranePotential& V = pImpl->state.membranePotential;
+    MembranePotential V_rest = pImpl->state.restingPotential;
+    float tau = Impl::TIME_CONSTANT;  // Membrane time constant (ms)
+    float C = Impl::MEMBRANE_CAPACITANCE; // Membrane capacitance (nF)
+    
+    // Calculate synaptic current contribution
+    float synapticContribution = synapticInput / C;
+    
+    // Calculate leak contribution (restoring toward resting potential)
+    float leakContribution = (V_rest - V) / tau;
+    
+    // Update membrane potential with exponential integration
+    // Time since last spike for adaptation calculation
+    float timeSinceLastSpike = (pImpl->state.lastSpikeTime > 0.0f) ? 
+        static_cast<float>(currentTime - pImpl->state.lastSpikeTime) : 0.0f;
+    
+    V = V + timeSinceLastSpike * (leakContribution + synapticContribution);
+    
+    // Apply spike-frequency adaptation (slow negative feedback after spikes)
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        // Adaptation variable causes hyperpolarization
+        V -= pImpl->state.adaptationVariable * 0.01f;
+        // Decay adaptation variable exponentially
+        pImpl->state.adaptationVariable *= 0.95f;
+    }
+    
+    // Apply homeostatic plasticity - maintain firing rate around target
+    const float targetFiringRate = 10.0f; // Hz - target firing rate
+    float currentFiringRate = pImpl->state.firingRate;
+    if (currentFiringRate > targetFiringRate * 1.5f) {
+        // Suppress firing if too high
+        pImpl->state.threshold += 0.5f * (currentFiringRate - targetFiringRate) / targetFiringRate;
+    } else if (currentFiringRate < targetFiringRate * 0.5f) {
+        // Increase excitability if too low
+        pImpl->state.threshold -= 0.5f * (targetFiringRate - currentFiringRate) / targetFiringRate;
+    }
+    
+    // Clamp threshold to reasonable bounds
+    pImpl->state.threshold = std::clamp(pImpl->state.threshold, -50.0f, -20.0f);
+    
+    // Clamp membrane potential to prevent instability
+    V = std::clamp(V, -100.0f, 50.0f);
+    
+    // Check for spike threshold crossing
+    if (V >= pImpl->state.threshold) {
+        // Record spike with current timestamp
+        recordSpike(currentTime);
+        
+        // Update firing state
+        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+        
+        // Apply spike-triggered adaptation
+        pImpl->state.adaptationVariable += 1.0f;
+        
+        // Reset membrane potential to reset potential
+        V = pImpl->state.resetPotential;
+        
+        // Enter refractory period
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        pImpl->state.firingState = FiringState::Refractory;
+        
+        // Update firing rate based on inter-spike interval
+        if (pImpl->state.lastSpikeTime > 0.0f && pImpl->state.spikeHistory.size() >= 2) {
+            float isi = pImpl->state.spikeHistory.back() - pImpl->state.spikeHistory[pImpl->state.spikeHistory.size() - 2];
+            if (isi > 0.0f) {
+                float instantaneousRate = 1000.0f / isi; // Convert to Hz (1/ms)
+                pImpl->state.firingRate = instantaneousRate;
+            }
+        }
+    } else {
+        // Not firing - set state accordingly
+        pImpl->state.firingState = FiringState::Active;
+    }
+    
+    // Clear synaptic input for next step (already done in receive methods)
+    pImpl->synapticInput = 0.0f;
 }
 
 void Neuron::reset() {
