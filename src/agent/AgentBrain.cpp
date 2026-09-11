@@ -20,46 +20,58 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+// Motor decoding constants for action selection thresholds and ranges
+    // These define the thresholds for meaningful motor activity and exploration ranges
+    const float MIN_ACTIVITY_THRESHOLD = 0.5f;  // Minimum activity to select non-wait action
+    const float MAX_EXPLORATION_CHANCE = 0.3f;  // Maximum random exploration probability
+    const float MIN_EXPLORATION_CHANCE = 0.0f;  // Minimum random exploration probability
+    const float NEURAL_TO_MOTOR_SCALE = 5.0f;  // Scale factor for vision signal injection
+    const float TOUCH_TO_MOTOR_SCALE = 8.0f;  // Scale factor for touch signal injection
+    const float INTERNAL_TO_MOTOR_SCALE = 5.0f;  // Scale factor for internal signal injection
+    const float PROPRIOCEPTION_TO_MOTOR_SCALE = 3.0f;  // Scale factor for proprioception
+    const float NOVELTY_DECAY_RATE = 0.99f;  // Decay rate for novelty signal
+    const float MIN_NOVELTY_LEVEL = 0.0f;  // Minimum possible novelty level
+    const float MAX_NOVELTY_LEVEL = 1.0f;  // Maximum possible novelty level
+    const float MIN_CURIOUSITY_LEVEL = 0.0f;  // Minimum curiosity level
+    const float MAX_CURIOUSTY_LEVEL = 1.0f;  // Maximum curiosity level
+    const float MIN_DOPAMINE_LEVEL = -1.0f;  // Minimum dopamine level
+    const float MAX_DOPAMINE_LEVEL = 1.0f;  // Maximum dopamine level
+    const float MIN_PREDICTION_ERROR = -1.0f;  // Minimum prediction error
+    const float MAX_PREDICTION_ERROR = 1.0f;  // Maximum prediction error
+    const float MIN_PLASTICITY_MODIFIER = 0.1f;  // Minimum plasticity modifier
+    const float MAX_PLASTICITY_MODIFIER = 2.0f;  // Maximum plasticity modifier
+    const float DEFAULT_PLASTICITY_MODIFIER = 1.0f;  // Default plasticity modifier
+    const float DEFAULT_DEVELOPMENTAL_AGE = 0.0;  // Default developmental age
+    const float DEVELOPMENT_STAGE_AGE_1MIN = 60.0f;  // Age for Initial stage (~1 minute)
+    const float DEVELOPMENT_STAGE_AGE_5MIN = 300.0f;  // Age for CriticalPeriod (~5 minutes)
+    const float DEVELOPMENT_STAGE_AGE_15MIN = 900.0f;  // Age for Maturation (~15 minutes)
+    const float PLASTICITY_MODIFIER_INITIAL = 1.0f;  // High plasticity in initial stage
+    const float PLASTICITY_MODIFIER_CRITICAL = 0.8f;  // Moderate plasticity in critical period
+    const float PLASTICITY_MODIFIER_MATURE = 0.5f;  // Lower plasticity in maturation stage
+    const float PLASTICITY_MODIFIER_ADULT = 0.2f;  // Stable plasticity in adult stage
+    const float MIN_DEVELOPMENTAL_STAGE = static_cast<float>(nlm::DevelopmentalStage::Initial);
+    const float MAX_DEVELOPMENTAL_STAGE = static_cast<float>(nlm::DevelopmentalStage::Adult);
+    const size_t NEURAL_TO_MOTOR_DISTRIBUTION = 6;  // Number of motor action groups
+    const size_t SENSORY_TO_NEURAL_DISTRIBUTION = 4;  // Number of sensory input groups
+    const float AGENT_BODY_INITIAL_ENERGY = 1.0f;  // Initial energy level (0-1)
+    const float AGENT_BODY_INITIAL_HEALTH = 1.0f;  // Initial health level (0-1)
+    const float AGENT_BODY_INITIAL_AGE = 0.0f;  // Initial age
+    const float AGENT_BODY_DEFAULT_VELOCITY = 0.0f;  // Default velocity
+    const float AGENT_BODY_DEFAULT_ORIENTATION = 0.0f;  // Default orientation (radians)
+    const float AGENT_BODY_DEFAULT_MOVE_SPEED = 3.0f;  // Default movement speed
+    const float AGENT_BODY_DEFAULT_TURN_SPEED = 2.0f;  // Default turning speed
+    const float AGENT_BODY_DEFAULT_INTERACTION_RANGE = 1.0f;  // Default interaction range
+    const float AGENT_BODY_DEFAULT_RESOURCE_GAIN = 30.0f;  // Energy gain from resources
+    const float AGENT_BODY_DEFAULT_HAZARD_DAMAGE = 0.2f;  // Damage from hazards
+    const float AGENT_BODY_DEFAULT_PASSIVE_DAMAGE_RATE = 0.01f;  // Passive damage rate
+    const float WORLD_DEFAULT_WIDTH = 20.0f;  // Default world width
+    const float WORLD_DEFAULT_HEIGHT = 20.0f;  // Default world height
+    const size_t WORLD_DEFAULT_VISION_WIDTH = 16;  // Default vision width
+    const size_t WORLD_DEFAULT_VISION_HEIGHT = 16;  // Default vision height
+    const float WORLD_DEFAULT_MAX_ENERGY = 100.0f;  // Default max energy
+    const float WORLD_DEFAULT_ENERGY_DECAY_RATE = 0.01f;  // Default energy decay rate
+    const float WORLD_DEFAULT_SIMULATION_TIME_STEP = 0.1f;  // Default time step
+    const float WORLD_DEFAULT_RNG_SEED = 42;  // Default random seed
 
 AgentBrain::~AgentBrain() = default;
 
