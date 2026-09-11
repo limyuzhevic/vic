@@ -133,7 +133,8 @@ std::vector<Synapse*> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
     auto it = pImpl->outgoingSynapses.find(neuron);
     if (it != pImpl->outgoingSynapses.end()) {
         for (SynapseId synId : it->second) {
-            if (auto* syn = getSynapse(synId)) {
+            auto* syn = getSynapse(synId);
+            if (syn) {  // Check for null pointer
                 result.push_back(syn);
             }
         }

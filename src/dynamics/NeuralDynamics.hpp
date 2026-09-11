@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include "../brain/Neuron.hpp"
 #include "../brain/Synapse.hpp"
+#include "../core/Random/Random.hpp"
 
 namespace nlm {
 
@@ -34,7 +35,7 @@ public:
 // Integrate-and-fire dynamics (simple model)
 class IntegrateAndFireDynamics : public NeuralDynamics {
 public:
-    IntegrateAndFireDynamics();
+    IntegrateAndFireDynamics(RandomGenerator* rng = nullptr);
     ~IntegrateAndFireDynamics() override;
     
     void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
@@ -46,6 +47,9 @@ public:
     // Parameters
     void setMembraneTimeConstant(float tau);
     float getMembraneTimeConstant() const;
+    
+    // Set random generator (for stochastic dynamics)
+    void setRandomGenerator(RandomGenerator* rng);
     
 private:
     struct Impl;

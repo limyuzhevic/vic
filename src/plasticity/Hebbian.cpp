@@ -53,21 +53,49 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
-            }
-        }
+    // OPTIMIZATION: Sort spikes and use time-window correlation
+    std::vector<Timestamp> sortedPreSpikes = preSpikes;
+    std::vector<Timestamp> sortedPostSpikes = postSpikes;
+    std::sort(sortedPreSpikes.begin(), sortedPreSpikes.end());
+    std::sort(sortedPostSpikes.begin(), sortedPostSpikes.end());
+    
+    // Use time-based correlation instead of O(n²) pairwise comparison
+    // This is more biologically realistic - correlations happen within specific time windows
+    const float correlationWindow = 50.0f;  // 50ms window for correlation
+    
+    // For each pre-synaptic spike, find post-synaptic spikes within correlation window
+    float totalCorrelation = 0.0f;
+    for (size_t i = 0; i < sortedPreSpikes.size(); ++i) {
+        Timestamp preTime = sortedPreSpikes[i];
+        
+        // Find post spikes in time window [preTime, preTime + correlationWindow]
+        auto postStartIt = std::lower_bound(sortedPostSpikes.begin(), sortedPostSpikes.end(), preTime);
+        auto postEndIt = std::upper_bound(postStartIt, sortedPostSpikes.end(), preTime + correlationWindow);
+        
+        // Count correlated post spikes
+        size_t correlatedPostCount = std::distance(postStartIt, postEndIt);
+        totalCorrelation += static_cast<float>(correlatedPostCount);
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    // Also count reverse correlation (post before pre)
+    float totalReverseCorrelation = 0.0f;
+    for (size_t i = 0; i < sortedPostSpikes.size(); ++i) {
+        Timestamp postTime = sortedPostSpikes[i];
+        
+        // Find pre spikes in time window [postTime, postTime + correlationWindow]
+        auto preStartIt = std::lower_bound(sortedPreSpikes.begin(), sortedPreSpikes.end(), postTime);
+        auto preEndIt = std::upper_bound(preStartIt, sortedPreSpikes.end(), postTime + correlationWindow);
+        
+        // Count correlated pre spikes
+        size_t correlatedPreCount = std::distance(preStartIt, preEndIt);
+        totalReverseCorrelation += static_cast<float>(correlatedPreCount);
+    }
+    
+    // Apply covariance-based Hebbian learning
+    // Δw = η * (coactivity - baseline) where coactivity = correlated spikes
+    float coactivity = totalCorrelation;
+    float baseline = pImpl->learningRate * (totalCorrelation + totalReverseCorrelation) * 0.5f;
+    float delta = pImpl->learningRate * (coactivity - baseline);
     
     // Apply with bounds
     if (std::abs(delta) > 1e-6f) {

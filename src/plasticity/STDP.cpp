@@ -59,22 +59,36 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
-            }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+    // OPTIMIZATION: Sort spike times and use binary search to find time windows
+    std::vector<Timestamp> sortedPreSpikes = preSpikes;
+    std::vector<Timestamp> sortedPostSpikes = postSpikes;
+    std::sort(sortedPreSpikes.begin(), sortedPreSpikes.end());
+    std::sort(sortedPostSpikes.begin(), sortedPostSpikes.end());
+    
+    // For each pre spike, find all post spikes that occur after it (LTP)
+    for (size_t i = 0; i < sortedPreSpikes.size(); ++i) {
+        Timestamp preTime = sortedPreSpikes[i];
+        
+        // Find first post spike after preTime using binary search
+        auto it = std::upper_bound(sortedPostSpikes.begin(), sortedPostSpikes.end(), preTime);
+        
+        // Process all post spikes after this pre spike (LTP window)
+        for (auto postIt = it; postIt != sortedPostSpikes.end(); ++postIt) {
+            float dt = static_cast<float>(*postIt - preTime);
+            // Apply exponential decay for LTP
+            totalDelta += pImpl->ltpWeight * std::exp(-dt / tau);
+        }
+        
+        // Find all pre spikes that occur after this post spike (LTD window)
+        // Equivalent to finding post spikes before current pre spike
+        auto preIt = std::upper_bound(sortedPreSpikes.begin(), sortedPreSpikes.end(), preTime);
+        
+        // Process all pre spikes that occur after this pre spike (i.e., these are later pre spikes
+        // that will be LTD with this current pre spike as the post reference)
+        for (auto laterIt = preIt; laterIt != sortedPreSpikes.end(); ++laterIt) {
+            float dt = static_cast<float>(preTime - *laterIt);  // Negative dt for LTD
+            // Apply exponential decay for LTD
+            totalDelta += -pImpl->ltdWeight * std::exp(dt / tau);
         }
     }
     
