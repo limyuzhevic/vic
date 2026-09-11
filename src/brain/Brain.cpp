@@ -12,9 +12,8 @@
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -39,6 +38,8 @@ struct Brain::Impl {
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
     std::unique_ptr<AttentionalSelection> attention;
     
     // ========== DEVELOPMENT SYSTEM ==========
@@ -93,64 +94,53 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
-        
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
-        
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+    // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+    
+    // Initialize memory systems
+    workingMemory = std::make_unique<NeuralWorkingMemory>();
+    episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+    associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+    
+    // Initialize prediction system
+    predictionSystem = std::make_unique<PredictionSystem>();
+    
+    // Initialize cognition systems
+    planner = std::make_unique<NeuralPlanner>();
+    conceptFormation = std::make_unique<ConceptFormation>();
+    selfModel = std::make_unique<SelfModel>();
+    socialLearning = std::make_unique<SocialLearning>();
+    attention = std::make_unique<AttentionalSelection>();
+    
+    // Initialize development system
+    developmentSystem = std::make_unique<DevelopmentSystem>();
+    
+    // Initialize neuromodulation systems
+    dopamine = std::make_unique<Dopamine>();
+    curiosity = std::make_unique<Curiosity>();
+    predictionError = std::make_unique<PredictionError>();
+    novelty = std::make_unique<Novelty>();
+    
+    // Configure STDP parameters
+    float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+    float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+    float tau = config->getOr<float>("stdp_tau", 20.0f);
+    stdp->configure(ltpWeight, ltdWeight, tau);
+    
+    // Configure structural plasticity
+    float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+    structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+    structuralPlasticity->setPruningRate(pruningRate);
+    
+    // Get timestep
+    timestep = config->getOr<double>("simulation_timestep", 0.001);
+    
+    // Get integration intervals from config
+    replayInterval = config->getOr<size_t>("replay_interval", 100);
+    consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+    
+    // Initialize checkpoint manager
+    checkpointManager = std::make_unique<CheckpointManager>();
     }
     
     DevelopmentalStage developmentalStage;
@@ -232,15 +222,21 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -511,8 +507,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current brain state
+        // The prediction system uses sensory input to predict next state
+        // and generates prediction error signals for learning
+        
+        // Simple prediction using current neural activity patterns
+        float predictionUpdate = 0.01f;  // Learning rate for prediction
+        
+        // Calculate current state summary from neural activity
+        float activitySum = 0.0f;
+        size_t activeCount = 0;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron->isActive()) {
+                        activitySum += std::abs(neuron->getState().membranePotential);
+                        activeCount++;
+                    }
+                }
+            }
+        }
+        
+        float currentActivity = activeCount > 0 ? activitySum / activeCount : 0.0f;
+        
+        // Update prediction system
+        pImpl->predictionSystem->updatePrediction(currentActivity);
+        
+        // Get prediction error and apply to neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        if (pImpl->predictionError) {
+            pImpl->predictionError->setPredictionError(predictionError);
+            pImpl->predictionError->setActualValue(currentActivity);
+            pImpl->predictionError->setPredictedValue(pImpl->predictionSystem->getPredictedValue());
+        }
+        
+        // Update prediction error history for learning
+        pImpl->predictionError->recordError(predictionError, currentStep);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +559,82 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Use sensory input encoded in working memory to extract patterns
+        
+        // Get sensory input from the last step (stored in working memory)
+        std::vector<float> currentSensoryState;
+        if (pImpl->workingMemory) {
+            // Get the most recent sensory encoding from working memory
+            currentSensoryState = pImpl->workingMemory->getRecentSensoryState();
+        }
+        
+        // If we have sensory state, form concepts from it
+        if (!currentSensoryState.empty()) {
+            pImpl->conceptFormation->processSensoryInput(currentSensoryState);
+        }
+        
+        // Update concept formation with current neural activity
+        // This helps concepts adapt to current brain state
+        pImpl->conceptFormation->updateConceptActivation(pImpl->timestep);
+        
+        // Get current concepts and influence action selection
+        auto currentConcepts = pImpl->conceptFormation->getActiveConcepts();
+        for (const auto& concept : currentConcepts) {
+            // Concepts can influence planning and attention
+            // For now, just log concept formation
+            if (concept.importance > 0.5f) {
+                NLM_LOG_INFO("Concept formed: importance=" + std::to_string(concept.importance) +
+                           " features=" + std::to_string(concept.featureCount));
+            }
+        }
+    }
+    
+    // ========== STEP 12: Run neural planner for action selection ==========
+    if (pImpl->planner) {
+        // Neural planner uses prediction system and concept formation to plan actions
+        // This happens after concept formation but before action selection
+        
+        // Get current sensory state for planning
+        std::vector<float> currentState;
+        if (pImpl->workingMemory) {
+            currentState = pImpl->workingMemory->getRecentSensoryState();
+        }
+        
+        // Get current goal (default to activity maintenance)
+        std::vector<float> currentGoal = pImpl->planner->getCurrentGoal();
+        if (currentGoal.empty()) {
+            // Create simple goal: maintain neural activity balance
+            float activitySum = 0.0f;
+            size_t activeCount = 0;
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        if (neuron->isActive()) {
+                            activitySum += std::abs(neuron->getState().membranePotential);
+                            activeCount++;
+                        }
+                    }
+                }
+            }
+            float avgActivity = activeCount > 0 ? activitySum / activeCount : 0.0f;
+            currentGoal = std::vector<float>(1, avgActivity);  // Goal: maintain this activity level
+        }
+        
+        // Plan next action based on current state and goal
+        ActionType plannedAction = pImpl->planner->planAction(currentState, 0.5f);
+        
+        // Store planned action in working memory for later use
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->storePlannedAction(plannedAction);
+        }
+        
+        // Log planning activity
+        if (pImpl->planner->getPlanningDepth() > 0) {
+            NLM_LOG_INFO("Planner selected action: " + std::to_string(static_cast<int>(plannedAction)) +
+                        " depth=" + std::to_string(pImpl->planner->getPlanningDepth()) +
+                        " confidence=" + std::to_string(pImpl->planner->getPlanningConfidence()));
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -581,10 +686,910 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
+
+    // ========== STEP 15: Checkpoint management ==========
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+
+    // ========== STEP 16: INTEGRATE WITH COGNITION SYSTEMS ==========
+    
+    // Enhanced NeuralPlanner with advanced prediction integration
+    if (pImpl->planner) {
+        // Convert sensory input to state vector for planning
+        std::vector<float> currentState;
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Use working memory as input to planner
+            size_t memorySize = pImpl->workingMemory->getMemoryNeurons().size();
+            currentState.reserve(memorySize);
+            for (auto neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                // Get actual neuron activation from the brain
+                float activation = 0.0f;
+                for (auto& region : pImpl->regions) {
+                    for (auto* neuron : region->getAllNeurons()) {
+                        if (neuron->getId() == neuronId) {
+                            activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f;
+                            break;
+                        }
+                    }
+                    if (activation > 0.0f) break;
+                }
+                currentState.push_back(activation);
+            }
+        }
+        
+        // Integrate with prediction system for better planning
+        float predictionConfidence = 1.0f;
+        if (pImpl->predictionSystem) {
+            predictionConfidence = 1.0f - std::abs(pImpl->predictionSystem->getPredictionError());
+        }
+        
+        // Get current goal from concept formation or enhanced prediction
+        std::vector<float> currentGoal;
+        if (pImpl->conceptFormation) {
+            currentGoal = pImpl->conceptFormation->getConceptPrototype(1);
+        }
+        
+        // Use prediction system to refine goals
+        if (pImpl->predictionSystem && !currentGoal.empty()) {
+            std::vector<float> predictedGoal = pImpl->predictionSystem->predictNextState(currentGoal);
+            // Blend current and predicted goals
+            for (size_t i = 0; i < std::min(currentGoal.size(), predictedGoal.size()); ++i) {
+                currentGoal[i] = currentGoal[i] * 0.5f + predictedGoal[i] * 0.5f * predictionConfidence;
+            }
+        }
+        
+        // Set goal if not set
+        if (currentGoal.empty() && pImpl->conceptFormation) {
+            // Use current sensory features as target for concept formation
+            if (!currentState.empty()) {
+                currentGoal = currentState;
+            }
+        }
+        
+        pImpl->planner->setCurrentGoal(currentGoal);
+        
+        // Plan action using current state, goal, and enhanced prediction
+        float targetReward = 1.0f;
+        if (!currentGoal.empty()) {
+            // Calculate goal achievement probability
+            float goalDistance = 0.0f;
+            for (float val : currentState) {
+                goalDistance += std::abs(val - currentGoal[0]);
+            }
+            targetReward = 1.0f - std::min(1.0f, goalDistance / currentGoal.size());
+        }
+        
+        ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Store planned action in working memory for motor execution
+        if (pImpl->workingMemory) {
+            // Store planning result with prediction confidence
+            pImpl->workingMemory->storeAction(plannedAction, currentStep);
+            pImpl->workingMemory->storePlanningContext(currentState, currentGoal, predictionConfidence);
+        }
+        
+        // Update plan quality with prediction error integration
+        float actualReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        float predictionError = 0.0f;
+        if (pImpl->predictionSystem) {
+            predictionError = pImpl->predictionSystem->getPredictionError();
+        }
+        
+        pImpl->planner->updatePlanQuality(
+            std::vector<ActionType>{plannedAction}, // Would have sequence in full implementation
+            std::vector<ActionType>{plannedAction}, // Would have actual actions
+            actualReward,
+            predictionError
+        );
+        
+        // Store prediction error for self-model
+        if (pImpl->selfModel) {
+            pImpl->selfModel->recordPredictionError(predictionError, currentStep);
+        }
+    }
+    
+    // Enhanced ConceptFormation with prediction and self-model integration
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Extract sensory features from working memory with enhanced processing
+        std::vector<float> currentPattern;
+        std::vector<float> features;
+        
+        if (!pImpl->workingMemory->getMemoryNeurons().empty()) {
+            currentPattern.reserve(pImpl->workingMemory->getMemoryNeurons().size());
+            features.reserve(pImpl->workingMemory->getMemoryNeurons().size());
+            
+            for (auto neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                // Get actual neuron activation from the brain
+                float activation = 0.0f;
+                float membranePotential = 0.0f;
+                for (auto& region : pImpl->regions) {
+                    for (auto* neuron : region->getAllNeurons()) {
+                        if (neuron->getId() == neuronId) {
+                            membranePotential = neuron->getState().membranePotential;
+                            activation = std::abs(membranePotential - neuron->getState().restingPotential) / 10.0f;
+                            break;
+                        }
+                    }
+                    if (membranePotential > 0.0f) break;
+                }
+                currentPattern.push_back(activation);
+                features.push_back(activation * 2.0f - 1.0f); // Normalize to [-1, 1]
+            }
+            
+            // Integrate with prediction system
+            float noveltyScore = 0.0f;
+            if (pImpl->novelty) {
+                noveltyScore = pImpl->novelty->getNoveltyLevel();
+            }
+            
+            // Integrate with self-model
+            float selfModelConfidence = 1.0f;
+            if (pImpl->selfModel) {
+                selfModelConfidence = pImpl->selfModel->getConfidence();
+            }
+            
+            // Present to concept formation with enhanced context
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                currentPattern, features,
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                currentStep,
+                noveltyScore,
+                selfModelConfidence
+            );
+            
+            // Store concept ID in working memory for planning
+            if (conceptId > 0) {
+                pImpl->workingMemory->storeConcept(conceptId);
+                
+                // Store self-model prediction for this concept
+                if (pImpl->selfModel) {
+                    std::vector<float> predictedOutcome = pImpl->selfModel->predictActionConsequence(
+                        ActionType::Wait, // Would track actual planned action
+                        currentPattern
+                    );
+                    pImpl->workingMemory->storeConceptPrediction(conceptId, predictedOutcome);
+                }
+            }
+            
+            // Check if we should merge concepts based on prediction errors
+            if (pImpl->conceptFormation->getConceptCount() > 3 && pImpl->predictionSystem) {
+                pImpl->conceptFormation->mergeSimilarConcepts(pImpl->predictionSystem->getPredictionError());
+            }
+        }
+    }
+    
+    // Advanced SelfModel with predictive coding and memory integration
+    if (pImpl->selfModel) {
+        // Record self-action relationship with enhanced context
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Get actual neural activity for better experience tracking
+            std::vector<float> beforeState;
+            std::vector<float> afterState;
+            
+            for (auto neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                float activation = 0.0f;
+                for (auto& region : pImpl->regions) {
+                    for (auto* neuron : region->getAllNeurons()) {
+                        if (neuron->getId() == neuronId) {
+                            activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f;
+                            break;
+                        }
+                    }
+                    if (activation > 0.0f) break;
+                }
+                beforeState.push_back(activation);
+                afterState.push_back(activation); // Would be different in full implementation
+            }
+            
+            // Record with enhanced self-awareness
+            pImpl->selfModel->recordSelfAction(
+                ActionType::Wait, // Would track actual planned action
+                beforeState, afterState
+            );
+            
+            // Update capability level with prediction integration
+            float experienceLevel = pImpl->workingMemory->getActiveTraces() > 0 ? 0.8f : 0.5f;
+            
+            // Integrate with prediction system for better self-assessment
+            if (pImpl->predictionSystem) {
+                float predictionAccuracy = 1.0f - std::abs(pImpl->predictionSystem->getPredictionError());
+                experienceLevel = experienceLevel * 0.7f + predictionAccuracy * 0.3f;
+            }
+            
+            pImpl->selfModel->setCapabilityLevel(experienceLevel);
+        }
+        
+        // Enhanced action consequence prediction using prediction system
+        if (pImpl->planner) {
+            std::vector<float> currentState;
+            if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                currentState.reserve(pImpl->workingMemory->getMemoryNeurons().size());
+                for (auto neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                    float activation = 0.0f;
+                    for (auto& region : pImpl->regions) {
+                        for (auto* neuron : region->getAllNeurons()) {
+                            if (neuron->getId() == neuronId) {
+                                activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f;
+                                break;
+                            }
+                        }
+                        if (activation > 0.0f) break;
+                    }
+                    currentState.push_back(activation);
+                }
+            }
+            
+            // Use prediction system for action consequence prediction
+            std::vector<float> predictedConsequence = currentState;
+            if (pImpl->predictionSystem) {
+                predictedConsequence = pImpl->predictionSystem->predictNextState(currentState);
+            }
+            
+            // Update self-model with prediction
+            pImpl->selfModel->updateSelfModel(
+                currentState, predictedConsequence, 
+                ActionType::Wait // Would use actual action
+            );
+            
+            // Store prediction for later comparison
+            pImpl->selfModel->storePrediction(currentState, predictedConsequence, currentStep);
+        }
+    }
+    
+    // Enhanced SocialLearning with prediction and self-model integration
+    if (pImpl->socialLearning) {
+        // Process observations from environment with enhanced context
+        if (pImpl->dopamine) {
+            // Update social knowledge with prediction system integration
+            float predictionError = 0.0f;
+            if (pImpl->predictionSystem) {
+                predictionError = pImpl->predictionSystem->getPredictionError();
+            }
+            
+            // Integrate with self-model
+            float selfModelInsight = 0.0f;
+            if (pImpl->selfModel) {
+                selfModelInsight = pImpl->selfModel->getBodyAwareness();
+            }
+            
+            pImpl->socialLearning->updateSocialKnowledge(
+                pImpl->dopamine->getLevel(),
+                predictionError,
+                selfModelInsight
+            );
+            
+            // Learn from prediction errors in social context
+            pImpl->socialLearning->learnFromObservation(
+                predictionError,
+                pImpl->dopamine->getLevel()
+            );
+        }
+        
+        // Enhanced imitation learning with self-model
+        if (pImpl->selfModel && pImpl->planner) {
+            // Use self-model to evaluate observed actions
+            ActionType preferredAction = pImpl->selfModel->getPreferredAction(std::vector<float>());
+            
+            if (preferredAction != ActionType::Wait) {
+                // Imitate with self-model confidence adjustment
+                float imitationConfidence = pImpl->selfModel->getSelfModelConfidence(preferredAction);
+                pImpl->socialLearning->imitateAction(preferredAction, imitationConfidence);
+            }
+        }
+    }
+    
+    // Enhanced attention system with prediction and planning integration
+    if (pImpl->attention) {
+        pImpl->attention->update(pImpl->timestep);
+        
+        // Apply attention to working memory winners
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            
+            // Add planned action to attention competition with enhanced context
+            if (pImpl->planner) {
+                // Get current state from actual neural activity
+                std::vector<float> currentState;
+                if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                    currentState.reserve(pImpl->workingMemory->getMemoryNeurons().size());
+                    for (auto neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                        float activation = 0.0f;
+                        for (auto& region : pImpl->regions) {
+                            for (auto* neuron : region->getAllNeurons()) {
+                                if (neuron->getId() == neuronId) {
+                                    activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f;
+                                    break;
+                                }
+                            }
+                            if (activation > 0.0f) break;
+                        }
+                        currentState.push_back(activation);
+                    }
+                }
+                
+                ActionType plannedAction = pImpl->planner->planAction(currentState, 0.5f);
+                competitors.push_back(NeuronId(static_cast<size_t>(plannedAction)));
+                
+                // Store attention weighting based on prediction confidence
+                if (pImpl->predictionSystem) {
+                    float predictionConfidence = 1.0f - std::abs(pImpl->predictionSystem->getPredictionError());
+                    pImpl->attention->setActionWeight(plannedAction, predictionConfidence);
+                }
+            }
+            
+            pImpl->attention->processCompetition(competitors);
+        }
+    }
+    
+    // Enhanced development system integration with prediction
+    if (pImpl->developmentSystem && pImpl->structuralPlasticity) {
+        // Development affects structural plasticity with prediction integration
+        DevelopmentalStage stage = pImpl->developmentSystem->getStage();
+        
+        // Adapt structural plasticity rates based on development and prediction errors
+        float plasticityMod = pImpl->developmentSystem->getPlasticityModifier();
+        
+        // Integrate prediction error into development
+        if (pImpl->predictionSystem) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            // Prediction errors can guide developmental timing
+            plasticityMod *= (1.0f + std::abs(predictionError) * 0.5f);
+        }
+        
+        // Update structural plasticity with developmental and prediction modulation
+        if (stage == DevelopmentalStage::CriticalPeriod) {
+            // Enhanced plasticity during critical period
+            pImpl->structuralPlasticity->setSynaptogenesisRate(0.0002f * plasticityMod);
+            pImpl->structuralPlasticity->setPruningRate(0.00002f * plasticityMod);
+        }
+        
+        // Development can also affect prediction system parameters
+        if (pImpl->predictionSystem) {
+            pImpl->predictionSystem->updatePredictionParameters(plasticityMod);
+        }
+    }
+
+    // ========== STEP 16: INTEGRATE WITH COGNITION SYSTEMS ==========
+    
+    // NeuralPlanner: Use sensory percept for planning and current goal for action selection
+    if (pImpl->planner) {
+        // Convert sensory input to state vector for planning
+        std::vector<float> currentState;
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Use working memory as input to planner
+            size_t memorySize = pImpl->workingMemory->getMemoryNeurons().size();
+            currentState.reserve(memorySize);
+            for (auto neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                // Convert neuron ID to activation value (simplified)
+                float activation = 0.5f;  // Would be actual neuron state
+                currentState.push_back(activation);
+            }
+        }
+        
+        // Get current goal from concept formation or external source
+        std::vector<float> currentGoal = pImpl->conceptFormation ? 
+            pImpl->conceptFormation->getConceptPrototype(1) : // Use first concept as goal if available
+            std::vector<float>(); // Empty goal if no concept formed
+        
+        // Set goal if not set
+        if (currentGoal.empty() && pImpl->conceptFormation) {
+            // Use current sensory features as target for concept formation
+            if (!currentState.empty()) {
+                currentGoal = currentState;
+            }
+        }
+        pImpl->planner->setCurrentGoal(currentGoal);
+        
+        // Plan action using current state and goal
+        ActionType plannedAction = pImpl->planner->planAction(currentState, 
+            currentGoal.empty() ? 0.5f : 1.0f);  // Use target reward based on goal
+        
+        // Store planned action in working memory for motor execution
+        if (pImpl->workingMemory) {
+            // Store planning result
+            pImpl->workingMemory->storeAction(plannedAction, currentStep);
+        }
+        
+        // Update plan quality based on actual outcome
+        pImpl->planner->updatePlanQuality(
+            std::vector<ActionType>{plannedAction}, // Would have sequence in full implementation
+            std::vector<ActionType>{plannedAction}, // Would have actual actions
+            pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f
+        );
+    }
+    
+    // ConceptFormation: Present current sensory patterns for concept discovery
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Extract sensory features from working memory
+        std::vector<float> currentPattern;
+        std::vector<float> features;
+        
+        if (!pImpl->workingMemory->getMemoryNeurons().empty()) {
+            currentPattern.reserve(pImpl->workingMemory->getMemoryNeurons().size());
+            features.reserve(pImpl->workingMemory->getMemoryNeurons().size());
+            
+            for (auto neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                // Get neuron activation (simplified - would use actual neuron state)
+                float activation = 0.5f;
+                currentPattern.push_back(activation);
+                features.push_back(activation * 2.0f - 1.0f); // Normalize to [-1, 1]
+            }
+            
+            // Present to concept formation
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                currentPattern, features,
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                currentStep
+            );
+            
+            // Store concept ID in working memory for planning
+            if (conceptId > 0) {
+                pImpl->workingMemory->storeConcept(conceptId);
+            }
+        }
+    }
+    
+    // SelfModel: Update with experiences and predict actions
+    if (pImpl->selfModel) {
+        // Record self-action relationship
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Would track before/after states in full implementation
+            // For now, just update capability level based on experience
+            float experienceLevel = pImpl->workingMemory->getActiveTraces() > 0 ? 0.8f : 0.5f;
+            pImpl->selfModel->setCapabilityLevel(experienceLevel);
+        }
+        
+        // Predict action consequences
+        if (pImpl->planner) {
+            std::vector<float> currentState;
+            if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                currentState.reserve(pImpl->workingMemory->getMemoryNeurons().size());
+                for (auto neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                    currentState.push_back(0.5f); // Simplified
+                }
+            }
+            
+            // Would predict consequences in full implementation
+            // For now, just update self-model confidence
+            pImpl->selfModel->updateSelfModel(
+                currentState, currentState, 
+                ActionType::Wait // Would use actual action
+            );
+        }
+    }
+    
+    // SocialLearning: Process observations from environment
+    if (pImpl->socialLearning) {
+        // Would process observed actions in full implementation
+        // For now, update social knowledge based on interactions
+        if (pImpl->dopamine) {
+            pImpl->socialLearning->updateSocialKnowledge(
+                pImpl->dopamine->getLevel()
+            );
+        }
+    }
     
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+
+    // ========== STEP 16: INTEGRATE WITH COGNITION SYSTEMS ==========
+    
+    // Enhanced NeuralPlanner with advanced prediction integration
+    if (pImpl->planner) {
+        // Convert sensory input to state vector for planning
+        std::vector<float> currentState;
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Use working memory as input to planner
+            size_t memorySize = pImpl->workingMemory->getMemoryNeurons().size();
+            currentState.reserve(memorySize);
+            for (auto neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                // Get actual neuron activation from the brain
+                float activation = 0.0f;
+                for (auto& region : pImpl->regions) {
+                    for (auto* neuron : region->getAllNeurons()) {
+                        if (neuron->getId() == neuronId) {
+                            activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f;
+                            break;
+                        }
+                    }
+                    if (activation > 0.0f) break;
+                }
+                currentState.push_back(activation);
+            }
+        }
+        
+        // Integrate with prediction system for better planning
+        float predictionConfidence = 1.0f;
+        if (pImpl->predictionSystem) {
+            predictionConfidence = 1.0f - std::abs(pImpl->predictionSystem->getPredictionError());
+        }
+        
+        // Get current goal from concept formation or enhanced prediction
+        std::vector<float> currentGoal;
+        if (pImpl->conceptFormation) {
+            currentGoal = pImpl->conceptFormation->getConceptPrototype(1);
+        }
+        
+        // Use prediction system to refine goals
+        if (pImpl->predictionSystem && !currentGoal.empty()) {
+            std::vector<float> predictedGoal = pImpl->predictionSystem->predictNextState(currentGoal);
+            // Blend current and predicted goals
+            for (size_t i = 0; i < std::min(currentGoal.size(), predictedGoal.size()); ++i) {
+                currentGoal[i] = currentGoal[i] * 0.5f + predictedGoal[i] * 0.5f * predictionConfidence;
+            }
+        }
+        
+        // Set goal if not set
+        if (currentGoal.empty() && pImpl->conceptFormation) {
+            // Use current sensory features as target for concept formation
+            if (!currentState.empty()) {
+                currentGoal = currentState;
+            }
+        }
+        
+        pImpl->planner->setCurrentGoal(currentGoal);
+        
+        // Plan action using current state, goal, and enhanced prediction
+        float targetReward = 1.0f;
+        if (!currentGoal.empty()) {
+            // Calculate goal achievement probability
+            float goalDistance = 0.0f;
+            for (float val : currentState) {
+                goalDistance += std::abs(val - currentGoal[0]);
+            }
+            targetReward = 1.0f - std::min(1.0f, goalDistance / currentGoal.size());
+        }
+        
+        ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Store planned action in working memory for motor execution
+        if (pImpl->workingMemory) {
+            // Store planning result with prediction confidence
+            pImpl->workingMemory->storeAction(plannedAction, currentStep);
+            pImpl->workingMemory->storePlanningContext(currentState, currentGoal, predictionConfidence);
+        }
+        
+        // Update plan quality with prediction error integration
+        float actualReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        float predictionError = 0.0f;
+        if (pImpl->predictionSystem) {
+            predictionError = pImpl->predictionSystem->getPredictionError();
+        }
+        
+        pImpl->planner->updatePlanQuality(
+            std::vector<ActionType>{plannedAction}, // Would have sequence in full implementation
+            std::vector<ActionType>{plannedAction}, // Would have actual actions
+            actualReward,
+            predictionError
+        );
+        
+        // Store prediction error for self-model
+        if (pImpl->selfModel) {
+            pImpl->selfModel->recordPredictionError(predictionError, currentStep);
+        }
+    }
+    
+    // Enhanced ConceptFormation with prediction and self-model integration
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Extract sensory features from working memory with enhanced processing
+        std::vector<float> currentPattern;
+        std::vector<float> features;
+        
+        if (!pImpl->workingMemory->getMemoryNeurons().empty()) {
+            currentPattern.reserve(pImpl->workingMemory->getMemoryNeurons().size());
+            features.reserve(pImpl->workingMemory->getMemoryNeurons().size());
+            
+            for (auto neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                // Get actual neuron activation from the brain
+                float activation = 0.0f;
+                float membranePotential = 0.0f;
+                for (auto& region : pImpl->regions) {
+                    for (auto* neuron : region->getAllNeurons()) {
+                        if (neuron->getId() == neuronId) {
+                            membranePotential = neuron->getState().membranePotential;
+                            activation = std::abs(membranePotential - neuron->getState().restingPotential) / 10.0f;
+                            break;
+                        }
+                    }
+                    if (membranePotential > 0.0f) break;
+                }
+                currentPattern.push_back(activation);
+                features.push_back(activation * 2.0f - 1.0f); // Normalize to [-1, 1]
+            }
+            
+            // Integrate with prediction system
+            float noveltyScore = 0.0f;
+            if (pImpl->novelty) {
+                noveltyScore = pImpl->novelty->getNoveltyLevel();
+            }
+            
+            // Integrate with self-model
+            float selfModelConfidence = 1.0f;
+            if (pImpl->selfModel) {
+                selfModelConfidence = pImpl->selfModel->getConfidence();
+            }
+            
+            // Present to concept formation with enhanced context
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                currentPattern, features,
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                currentStep,
+                noveltyScore,
+                selfModelConfidence
+            );
+            
+            // Store concept ID in working memory for planning
+            if (conceptId > 0) {
+                pImpl->workingMemory->storeConcept(conceptId);
+                
+                // Store self-model prediction for this concept
+                if (pImpl->selfModel) {
+                    std::vector<float> predictedOutcome = pImpl->selfModel->predictActionConsequence(
+                        ActionType::Wait, // Would track actual planned action
+                        currentPattern
+                    );
+                    pImpl->workingMemory->storeConceptPrediction(conceptId, predictedOutcome);
+                }
+            }
+            
+            // Check if we should merge concepts based on prediction errors
+            if (pImpl->conceptFormation->getConceptCount() > 3 && pImpl->predictionSystem) {
+                pImpl->conceptFormation->mergeSimilarConcepts(pImpl->predictionSystem->getPredictionError());
+            }
+        }
+    }
+    
+    // Advanced SelfModel with predictive coding and memory integration
+    if (pImpl->selfModel) {
+        // Record self-action relationship with enhanced context
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Get actual neural activity for better experience tracking
+            std::vector<float> beforeState;
+            std::vector<float> afterState;
+            
+            for (auto neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                float activation = 0.0f;
+                for (auto& region : pImpl->regions) {
+                    for (auto* neuron : region->getAllNeurons()) {
+                        if (neuron->getId() == neuronId) {
+                            activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f;
+                            break;
+                        }
+                    }
+                    if (activation > 0.0f) break;
+                }
+                beforeState.push_back(activation);
+                afterState.push_back(activation); // Would be different in full implementation
+            }
+            
+            // Record with enhanced self-awareness
+            pImpl->selfModel->recordSelfAction(
+                ActionType::Wait, // Would track actual planned action
+                beforeState, afterState
+            );
+            
+            // Update capability level with prediction integration
+            float experienceLevel = pImpl->workingMemory->getActiveTraces() > 0 ? 0.8f : 0.5f;
+            
+            // Integrate with prediction system for better self-assessment
+            if (pImpl->predictionSystem) {
+                float predictionAccuracy = 1.0f - std::abs(pImpl->predictionSystem->getPredictionError());
+                experienceLevel = experienceLevel * 0.7f + predictionAccuracy * 0.3f;
+            }
+            
+            pImpl->selfModel->setCapabilityLevel(experienceLevel);
+        }
+        
+        // Enhanced action consequence prediction using prediction system
+        if (pImpl->planner) {
+            std::vector<float> currentState;
+            if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                currentState.reserve(pImpl->workingMemory->getMemoryNeurons().size());
+                for (auto neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                    float activation = 0.0f;
+                    for (auto& region : pImpl->regions) {
+                        for (auto* neuron : region->getAllNeurons()) {
+                            if (neuron->getId() == neuronId) {
+                                activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f;
+                                break;
+                            }
+                        }
+                        if (activation > 0.0f) break;
+                    }
+                    currentState.push_back(activation);
+                }
+            }
+            
+            // Use prediction system for action consequence prediction
+            std::vector<float> predictedConsequence = currentState;
+            if (pImpl->predictionSystem) {
+                predictedConsequence = pImpl->predictionSystem->predictNextState(currentState);
+            }
+            
+            // Update self-model with prediction
+            pImpl->selfModel->updateSelfModel(
+                currentState, predictedConsequence, 
+                ActionType::Wait // Would use actual action
+            );
+            
+            // Store prediction for later comparison
+            pImpl->selfModel->storePrediction(currentState, predictedConsequence, currentStep);
+        }
+    }
+    
+    // Enhanced SocialLearning with prediction and self-model integration
+    if (pImpl->socialLearning) {
+        // Process observations from environment with enhanced context
+        if (pImpl->dopamine) {
+            // Update social knowledge with prediction system integration
+            float predictionError = 0.0f;
+            if (pImpl->predictionSystem) {
+                predictionError = pImpl->predictionSystem->getPredictionError();
+            }
+            
+            // Integrate with self-model
+            float selfModelInsight = 0.0f;
+            if (pImpl->selfModel) {
+                selfModelInsight = pImpl->selfModel->getBodyAwareness();
+            }
+            
+            pImpl->socialLearning->updateSocialKnowledge(
+                pImpl->dopamine->getLevel(),
+                predictionError,
+                selfModelInsight
+            );
+            
+            // Learn from prediction errors in social context
+            pImpl->socialLearning->learnFromObservation(
+                predictionError,
+                pImpl->dopamine->getLevel()
+            );
+        }
+        
+        // Enhanced imitation learning with self-model
+        if (pImpl->selfModel && pImpl->planner) {
+            // Use self-model to evaluate observed actions
+            ActionType preferredAction = pImpl->selfModel->getPreferredAction(std::vector<float>());
+            
+            if (preferredAction != ActionType::Wait) {
+                // Imitate with self-model confidence adjustment
+                float imitationConfidence = pImpl->selfModel->getSelfModelConfidence(preferredAction);
+                pImpl->socialLearning->imitateAction(preferredAction, imitationConfidence);
+            }
+        }
+    }
+    
+    // Enhanced attention system with prediction and planning integration
+    if (pImpl->attention) {
+        // Enhanced attention system with full cognitive integration
+        
+        // Update attention system with current brain state
+        pImpl->attention->update(pImpl->timestep);
+        
+        // Integrate attention with prediction system for goal-directed focus
+        if (pImpl->predictionSystem) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float predictionConfidence = 1.0f - std::abs(predictionError);
+            
+            // Use prediction confidence to modulate attention gain
+            pImpl->attention->setAttentionGain(predictionConfidence);
+            
+            // Prediction errors highlight important sensory features
+            if (predictionError > 0.3f) {
+                pImpl->attention->increasePriorityOnPredictionError();
+            }
+        }
+        
+        // Integrate attention with self-model for self-aware focus
+        if (pImpl->selfModel) {
+            float selfModelAwareness = pImpl->selfModel->getBodyAwareness();
+            
+            // Self-awareness modulates attentional scope
+            pImpl->attention->setAttentionalScope(selfModelAwareness);
+            
+            // Self-model predicts attentional relevance of stimuli
+            std::vector<float> currentState;
+            if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                currentState.reserve(pImpl->workingMemory->getMemoryNeurons().size());
+                for (auto neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                    float activation = 0.0f;
+                    for (auto& region : pImpl->regions) {
+                        for (auto* neuron : region->getAllNeurons()) {
+                            if (neuron->getId() == neuronId) {
+                                activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f;
+                                break;
+                            }
+                        }
+                        if (activation > 0.0f) break;
+                    }
+                    currentState.push_back(activation);
+                }
+            }
+            
+            // Self-model predicts attentional priorities
+            pImpl->attention->integrateWithSelfModel(currentState);
+        }
+        
+        // Apply attention to working memory winners with enhanced context
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            
+            // Add planned action to attention competition
+            if (pImpl->planner) {
+                // Get current state from actual neural activity
+                std::vector<float> currentState;
+                if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                    currentState.reserve(pImpl->workingMemory->getMemoryNeurons().size());
+                    for (auto neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                        float activation = 0.0f;
+                        for (auto& region : pImpl->regions) {
+                            for (auto* neuron : region->getAllNeurons()) {
+                                if (neuron->getId() == neuronId) {
+                                    activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f;
+                                    break;
+                                }
+                            }
+                            if (activation > 0.0f) break;
+                        }
+                        currentState.push_back(activation);
+                    }
+                }
+                
+                ActionType plannedAction = pImpl->planner->planAction(currentState, 0.5f);
+                competitors.push_back(NeuronId(static_cast<size_t>(plannedAction)));
+                
+                // Store attentional weighting based on planning confidence
+                if (pImpl->predictionSystem) {
+                    float predictionConfidence = 1.0f - std::abs(pImpl->predictionSystem->getPredictionError());
+                    pImpl->attention->setActionWeight(plannedAction, predictionConfidence);
+                }
+                
+                // Integrate planning context into attention
+                pImpl->attention->integrateWithPlanningContext(currentState, plannedAction);
+            }
+            
+            // Integrate with concept formation for semantic attention
+            if (pImpl->conceptFormation) {
+                // Get current concepts from concept formation
+                auto currentConcepts = pImpl->conceptFormation->getActiveConcepts();
+                
+                // Integrate concepts into attentional selection
+                pImpl->attention->integrateWithConcepts(currentConcepts);
+            }
+            
+            // Process competition with enhanced neuromodulation integration
+            pImpl->attention->processCompetition(competitors);
+        }
+        
+        // Enhanced attention with social learning integration
+        if (pImpl->socialLearning) {
+            // Integrate social observations into attentional weights
+            float socialKnowledge = pImpl->socialLearning->getSocialKnowledgeLevel();
+            
+            // Use social knowledge to prioritize socially relevant stimuli
+            pImpl->attention->adjustSocialPriority(socialKnowledge);
+            
+            // Learn attentional biases from social interactions
+            pImpl->attention->learnFromSocialObservations();
+        }
+        
+        // Enhanced attention with development system integration
+        if (pImpl->developmentSystem) {
+            DevelopmentalStage stage = pImpl->developmentSystem->getStage();
+            
+            // Development stage affects attentional strategies
+            if (stage == DevelopmentalStage::Initial) {
+                pImpl->attention->setExplorationMode(true);
+            } else if (stage == DevelopmentalStage::Maturation) {
+                pImpl->attention->setExploitationMode(true);
+            }
+            
+            // Integration with developmental attention mechanisms
+            pImpl->attention->integrateWithDevelopment();
+        }
     }
 }
 
@@ -1006,15 +2011,27 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
+    if (pImpl->workingMemory) {
+        return pImpl->workingMemory.get();
+    }
+    NLM_LOG_ERROR("Working memory not initialized - returning nullptr");
+    return nullptr;
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
+    if (pImpl->episodicMemory) {
+        return pImpl->episodicMemory.get();
+    }
+    NLM_LOG_ERROR("Episodic memory not initialized - returning nullptr");
+    return nullptr;
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
+    if (pImpl->associativeMemory) {
+        return pImpl->associativeMemory.get();
+    }
+    NLM_LOG_ERROR("Associative memory not initialized - returning nullptr");
+    return nullptr;
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========

@@ -1,16 +1,3 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 class RandomGenerator;
@@ -22,6 +9,8 @@ class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
+class SelfModel;
+class SocialLearning;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
@@ -160,6 +149,12 @@ public:
     
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
+    
+    // Self-model for internal representation
+    SelfModel* getSelfModel();
+    
+    // Social learning for observation processing
+    SocialLearning* getSocialLearning();
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
