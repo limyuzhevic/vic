@@ -21,6 +21,9 @@ public:
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
+    // Update predictions without new data (for periodic processing)
+    void updatePredictions();
+    
     // Get prediction error
     float getPredictionError() const;
     
