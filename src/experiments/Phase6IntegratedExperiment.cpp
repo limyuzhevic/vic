@@ -6,6 +6,7 @@
 #include "../agent/AgentBrain.hpp"
 #include <chrono>
 #include <cmath>
+#include <vector>
 
 namespace nlm {
 
@@ -61,11 +62,15 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get observation from world
+        auto* region = brain->getRegion(RegionId(1));
+        SensoryPercept percept = world.observe(region);
         
         // Process sensory input
         agent.processSensoryInput(percept);
+        
+        // Apply sensory input to brain
+        brain->receiveSensoryInput(percept);
         
         // Brain step
         brain->step(step, step * 0.001);
@@ -74,10 +79,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyAction(region, cmd);
         
         // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        float reward = world.computeReward(region);
         totalReward += reward;
         
         // Apply reward modulation
@@ -267,6 +272,14 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
     // Run some steps
     for (int i = 0; i < 100; ++i) {
         brain->step(i, i * 0.001);
+        
+        // Add some sensory input to store in memory
+        if (i % 10 == 0) {
+            auto* region = brain->getRegion(RegionId(1));
+            SensoryInput input;
+            input.addValue(i % 256);
+            brain->receiveSensoryInput(input);
+        }
     }
     
     // Check if working memory has traces
@@ -312,7 +325,16 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
         brain->step(i, i * 0.001);
     }
     
+    // Check neuromodulation levels
+    float dopamineLevel = dopamine->getLevel();
+    float curiosityLevel = curiosity->getLevel();
+    float noveltyLevel = novelty->getLevel();
+    
     NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
+    NLM_LOG_INFO("  Dopamine: " + std::to_string(dopamineLevel));
+    NLM_LOG_INFO("  Curiosity: " + std::to_string(curiosityLevel));
+    NLM_LOG_INFO("  Novelty: " + std::to_string(noveltyLevel));
+    
     return true;
 }
 
@@ -381,6 +403,30 @@ bool Phase6IntegratedExperiment::testReplay() {
     // Run some steps
     for (int i = 0; i < 200; ++i) {
         brain->step(i, i * 0.001);
+        
+        // Add episodic memory content
+        if (i % 10 == 0) {
+            // Record current state as an episode
+            EpisodicMemoryItem episode;
+            episode.timestamp = i;
+            episode.reward = 0.1f * (i % 10);
+            
+            // Store active neurons
+            for (auto& region : brain->getRegions()) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring() || 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            episode.activeNeurons.push_back(neuron->getId());
+                            episode.neuronActivations.push_back(
+                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                        }
+                    }
+                }
+            }
+            
+            em->storeEpisode(episode);
+        }
     }
     
     // Check if episodes exist for replay

@@ -134,11 +134,19 @@ public:
     // Get generalization ability (can concept handle variations?)
     float getGeneralizationAbility(size_t conceptId) const;
 
-    // Set parameters
-    void setFormationThreshold(float t) { formationThreshold_ = t; }
-    void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
-
-private:
+    // Update concept formation with new activity pattern (called from Brain)
+    void updatePattern(const std::vector<float>& pattern) {
+        // Convert pattern to features (simplified: use pattern itself as features)
+        presentExperience(pattern, pattern, 0.0f, 0);
+    }
+    
+    // Overloaded version with features and reward for more complete update
+    void updatePattern(const std::vector<float>& pattern, 
+                      const std::vector<float>& features,
+                      float reward,
+                      SimulationStep timeStep) {
+        presentExperience(pattern, features, reward, timeStep);
+    }
     // Create new concept from pattern
     size_t createConcept(const std::vector<float>& pattern,
                         const std::vector<float>& features,

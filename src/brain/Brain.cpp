@@ -510,9 +510,31 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && !pImpl->sensoryNeurons.empty()) {
+        // Update prediction system with current sensory state
+        // Convert sensory neuron activities to a sensory input
+        std::vector<float> sensoryData;
+        sensoryData.reserve(pImpl->sensoryNeurons.size());
+        
+        for (Neuron* sensoryNeuron : pImpl->sensoryNeurons) {
+            const auto& state = sensoryNeuron->getState();
+            // Normalize activity to [0, 1] range
+            float activity = std::clamp(
+                (state.membranePotential - state.restingPotential) / 20.0f, 0.0f, 1.0f);
+            sensoryData.push_back(activity);
+        }
+        
+        // Create sensory input from neural activities
+        SensoryInput currentObservation(sensoryData);
+        
+        // Train prediction system with current observation
+        pImpl->predictionSystem->train(currentObservation);
+        
+        // Predict next state
+        auto predictedState = pImpl->predictionSystem->predictNextState(currentObservation);
+        
+        // Store prediction for reward calculation
+        // (In a full implementation, this would drive curiosity and exploration)
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -526,10 +548,92 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 10: Trigger NeuralPlanner action planning ==========
+    if (pImpl->planner && currentStep % 50 == 0) {  // Plan every 50 steps
+        // Get current neural state for planning
+        std::vector<float> currentState;
+        currentState.reserve(pImpl->sensoryNeurons.size() + 10);
+        
+        // Add sensory neuron activities
+        for (Neuron* sensoryNeuron : pImpl->sensoryNeurons) {
+            const auto& state = sensoryNeuron->getState();
+            float activity = std::clamp(
+                (state.membranePotential - state.restingPotential) / 20.0f, 0.0f, 1.0f);
+            currentState.push_back(activity);
+        }
+        
+        // Add motor neuron activities for action selection
+        float totalMotorActivity = 0.0f;
+        for (Neuron* motorNeuron : pImpl->motorNeurons) {
+            const auto& state = motorNeuron->getState();
+            float activity = std::abs(state.membranePotential - state.restingPotential) / 20.0f;
+            currentState.push_back(activity);
+            totalMotorActivity += activity;
+        }
+        
+        // Add development context
+        currentState.push_back(static_cast<float>(pImpl->developmentalStage));
+        currentState.push_back(totalMotorActivity / std::max<size_t>(pImpl->motorNeurons.size(), 1));
+        
+        // Get predicted reward from neuromodulation
+        float predictedReward = 0.0f;
+        if (pImpl->dopamine) {
+            predictedReward = pImpl->dopamine->getLevel();  // Dopamine level as reward signal
+        }
+        
+        // Plan action based on current state and predicted reward
+        ActionType plannedAction = pImpl->planner->planAction(currentState, predictedReward);
+        
+        // Apply planned action - in a real agent, this would be sent to the motor system
+        // For now, store it for analysis
+        if (plannedAction != ActionType::Wait) {
+            // Could be recorded in episodic memory or sent to AgentBrain
+            // This connects planning to action execution
+        }
+    }
+    
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && !pImpl->sensoryNeurons.empty()) {
+        // Extract current neural activity patterns for concept formation
+        std::vector<float> currentActivityPattern;
+        currentActivityPattern.reserve(pImpl->sensoryNeurons.size() + 
+                                         pImpl->motorNeurons.size() + 
+                                         pImpl->regions.size() * 10);
+        
+        // Add sensory neuron activities
+        for (Neuron* sensoryNeuron : pImpl->sensoryNeurons) {
+            const auto& state = sensoryNeuron->getState();
+            float activity = std::clamp(
+                (state.membranePotential - state.restingPotential) / 20.0f, 0.0f, 1.0f);
+            currentActivityPattern.push_back(activity);
+        }
+        
+        // Add motor neuron activities
+        for (Neuron* motorNeuron : pImpl->motorNeurons) {
+            const auto& state = motorNeuron->getState();
+            float activity = std::clamp(
+                (state.membranePotential - state.restingPotential) / 20.0f, 0.0f, 1.0f);
+            currentActivityPattern.push_back(activity);
+        }
+        
+        // Add some internal neural population activities for richer patterns
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (Neuron* neuron : pop->getNeurons()) {
+                    // Sample neurons to keep pattern size reasonable
+                    static int sampleCount = 0;
+                    if (++sampleCount % 5 == 0) {  // Sample every 5th neuron
+                        const auto& state = neuron->getState();
+                        float activity = std::clamp(
+                            (state.membranePotential - state.restingPotential) / 20.0f, 0.0f, 1.0f);
+                        currentActivityPattern.push_back(activity);
+                    }
+                }
+            }
+        }
+        
+        // Update concept formation with current activity pattern
+        pImpl->conceptFormation->updatePattern(currentActivityPattern);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

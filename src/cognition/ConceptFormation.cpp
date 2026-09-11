@@ -280,15 +280,13 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
     if (!concept) return 0.0f;
     
     // Generalization ability = how varied are the instances
-    if (concept->instances.size() < 2) return 0.0f;
-    
-    float totalVariance = 0.0f;
+    float variance = 0.0f;
     for (const auto& instance : concept->instances) {
         float sim = computeSimilarity(instance.pattern, concept->prototype);
-        totalVariance += (1.0f - sim);
+        variance += (1.0f - sim);
     }
     
-    return 1.0f - (totalVariance / concept->instances.size());
+    return 1.0f - (variance / concept->instances.size());
 }
 
 void ConceptFormation::clear() {
