@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <sstream>
 
 namespace nlm {
 
@@ -55,7 +56,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -97,9 +98,23 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
+    // File parsing implementations
+    bool parseJsonFile(const std::string& filepath);
+    bool parseYamlFile(const std::string& filepath);
+    bool parseKeyValueFile(const std::string& filepath);
+    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string configValueToString(const ConfigValue& value);
+    
+    // Parsing helpers
+    static bool parseJsonValue(const std::string& jsonStr, ConfigValue& result);
+    static bool parseYamlValue(const std::string& yamlStr, ConfigValue& result);
+    static bool parseNumber(const std::string& str, ConfigValue& result);
+    static bool parseBoolean(const std::string& str, bool& result);
+    static bool parseString(const std::string& str, std::string& result);
+    static bool parseArray(const std::string& str, std::vector<std::string>& result);
 };
 
 } // namespace nlm

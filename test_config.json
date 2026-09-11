@@ -1,0 +1,8 @@
+// Test JSON file
+{
+  "int_value": 42,
+  "double_value": 3.14,
+  "string_value": "hello",
+  "bool_value": true,
+  "array_value": [1, 2, 3]
+}

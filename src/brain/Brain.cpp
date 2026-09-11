@@ -106,13 +106,6 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
         
@@ -129,6 +122,25 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize additional neuromodulators
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
+        reward = std::make_unique<Reward>();
+        
+        // Initialize neuromodulator factory
+        neuromodulatorFactory = std::make_unique<NeuromodulatorFactory>();
+        neuromodulatorFactory->initializeAll(this);
+        
+        // Initialize novelty from config
+        float noveltyThreshold = 0.3f;
+        if (auto thresholdOpt = config->get<float>("novelty_threshold")) {
+            noveltyThreshold = *thresholdOpt;
+        }
+        if (novelty) {
+            novelty->setLevel(0.5f);
+        }
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -152,26 +164,37 @@ struct Brain::Impl {
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
     }
+    }
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
-
-Brain::~Brain() = default;
-
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
-
-Brain& Brain::operator=(Brain&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {
+    // Initialize neuromodulator factory
+    pImpl->neuromodulatorFactory = std::make_unique<NeuromodulatorFactory>();
+    
+    // Initialize all neuromodulators
+    pImpl->neuromodulatorFactory->initializeAll(this);
+    
+    // Make neuromodulators available via Brain accessors
+    pImpl->dopamine = pImpl->neuromodulatorFactory->getDopamine();
+    pImpl->acetylcholine = std::make_unique<Acetylcholine>();
+    pImpl->norepinephrine = std::make_unique<Norepinephrine>();
+    pImpl->serotonin = std::make_unique<Serotonin>();
+    pImpl->curiosity = pImpl->neuromodulatorFactory->getCuriosity();
+    pImpl->novelty = pImpl->neuromodulatorFactory->getNovelty();
+    pImpl->predictionError = pImpl->neuromodulatorFactory->getPredictionError();
+    pImpl->reward = pImpl->neuromodulatorFactory->getReward();
+    
+    // Initialize novelty from config if available
+    float noveltyThreshold = 0.3f;
+    if (auto thresholdOpt = config->get<float>("novelty_threshold")) {
+        noveltyThreshold = *thresholdOpt;
     }
-    return *this;
+    if (pImpl->novelty) {
+        pImpl->novelty->setLevel(0.5f);  // Start with moderate novelty
+    }
 }
 
 bool Brain::initialize() {
@@ -511,8 +534,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input
+        // Compute prediction error for learning
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Use prediction error for learning and motivation
+        float error = pImpl->predictionSystem->getPredictionError();
+        if (pImpl->dopamine) {
+            pImpl->dopamine->signalRewardPredictionError(error);
+        }
+        
+        if (pImpl->curiosity) {
+            pImpl->curiosity->update(error, pImpl->timestep);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -523,13 +557,49 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Apply attention modulation to working memory
+            pImpl->attention->processWorkingMemory(pImpl->workingMemory.get(), *pImpl->rng);
+        }
+        
+        // Apply attention to sensory processing
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+            Neuron* neuron = pImpl->sensoryNeurons[i];
+            if (neuron && pImpl->attention->isAttended(neuron->getId())) {
+                // Enhance sensory neuron activity based on attention
+                float attentionBoost = pImpl->attention->getExcitationFor(neuron->getId());
+                neuron->injectCurrent(attentionBoost * 2.0f);
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Get current neural state for concept formation
+        std::vector<float> currentState;
+        if (!pImpl->sensoryNeurons.empty() && pImpl->workingMemory) {
+            // Build state representation from sensory and working memory
+            currentState.reserve(pImpl->sensoryNeurons.size() + pImpl->workingMemory->getMemoryNeurons().size());
+            
+            // Add sensory neuron activations
+            for (Neuron* neuron : pImpl->sensoryNeurons) {
+                if (neuron) {
+                    currentState.push_back(std::abs(neuron->getState().membranePotential - 
+                                                 neuron->getState().restingPotential) / 10.0f);
+                }
+            }
+            
+            // Add working memory activations
+            for (const auto& neuron : pImpl->workingMemory->getMemoryNeurons()) {
+                float activation = pImpl->workingMemory->getNeuronActivation(neuron);
+                currentState.push_back(activation);
+            }
+        }
+        
+        // Form concepts from current state
+        if (!currentState.empty()) {
+            pImpl->conceptFormation->presentExperience(currentState, 0.5f, currentTime, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -588,15 +658,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
 }
 
-void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
-    
-    const auto& values = input.getData();
+const auto& values = input.getData();
     if (values.empty()) return;
     
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
+    
+    // Create sensory input
+    class SensoryInput sensoryInput(values);
+    
+    // Feed sensory input to prediction system for prediction error
+    if (pImpl->predictionSystem) {
+        // For now, use the current state as the prediction target
+        // A real implementation would use actual sensory observations
+        auto prediction = pImpl->predictionSystem->predictNextState(sensoryInput);
+        
+        // Update prediction with actual observation
+        pImpl->predictionSystem->updatePredictions(prediction.get(), sensoryInput);
+        
+        // Use prediction error for learning and motivation
+        float error = pImpl->predictionSystem->getPredictionError();
+        if (pImpl->dopamine) {
+            pImpl->dopamine->signalRewardPredictionError(error);
+        }
+        
+        if (pImpl->curiosity) {
+            pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, 
+                                   error, pImpl->timestep);
+        }
+    }
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
@@ -888,19 +978,65 @@ bool Brain::load(const std::string& filepath) {
             }
         }
         
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
-            return false;
+            // Read synapses
+    SynapseCheckpointData synapseData;
+    if (!reader.readSynapses(synapseData)) {
+        NLM_LOG_ERROR("Failed to read synapses from checkpoint");
+        return false;
+    }
+    
+    // Apply synapse states - find matching synapses and restore their properties
+    size_t synIdx = 0;
+    for (size_t regionIdx = 0; regionIdx < pImpl->regions.size(); ++regionIdx) {
+        auto& region = pImpl->regions[regionIdx];
+        auto& populations = region->getPopulations();
+        
+        for (size_t popIdx = 0; popIdx < populations.size(); ++popIdx) {
+            auto& pop = populations[popIdx];
+            auto neurons = pop->getNeurons();
+            
+            // Check all outgoing synapses from this population
+            for (auto* neuron : neurons) {
+                auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
+                for (Synapse* syn : outgoingSynapses) {
+                    if (synIdx < synapseData.weight.size()) {
+                        // Restore synapse properties
+                        syn->setWeight(synapseData.weight[synIdx]);
+                        syn->setDelay(synapseData.delay[synIdx]);
+                        syn->setType(static_cast<SynapseType>(synapseData.synapseType[synIdx]));
+                        syn->setEligibilityTrace(synapseData.eligibilityTrace[synIdx]);
+                        synIdx++;
+                    }
+                }
+            }
+            
+            // Check all incoming synapses to this population
+            for (auto* neuron : neurons) {
+                auto incomingSynapses = region->getSynapsesTo(neuron->getId());
+                for (Synapse* syn : incomingSynapses) {
+                    if (synIdx < synapseData.weight.size()) {
+                        // Restore synapse properties
+                        syn->setWeight(synapseData.weight[synIdx]);
+                        syn->setDelay(synapseData.delay[synIdx]);
+                        syn->setType(static_cast<SynapseType>(synapseData.synapseType[synIdx]));
+                        syn->setEligibilityTrace(synapseData.eligibilityTrace[synIdx]);
+                        synIdx++;
+                    }
+                }
+            }
         }
-        
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
-        
-        NLM_LOG_INFO("Brain state loaded successfully");
-        return true;
+    }
+    
+    // Note: Inter-region connections need separate handling
+    // For now, we'll create them based on the synapse data
+    if (synIdx < synapseData.weight.size()) {
+        NLM_LOG_INFO("Note: " + std::to_string(synapseData.weight.size() - synIdx) + 
+                    " synapses from checkpoint were not restored (inter-region connections)");
+    }
+    
+    NLM_LOG_INFO("Brain state loaded successfully");
+    return true;
+}
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());

@@ -1,13 +1,5 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "../neuromodulation/NeuromodulatorFactory.hpp"
 #include <memory>
-#include <string>
 
 namespace nlm {
 
@@ -28,6 +20,10 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Reward;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -175,6 +171,15 @@ public:
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
+    
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
     
@@ -183,6 +188,12 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Reward signal
+    Reward* getReward();
+    
+    // Get neuromodulator factory
+    NeuromodulatorFactory* getNeuromodulatorFactory() { return neuromodulatorFactory_.get(); }
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
@@ -196,6 +207,10 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Neuromodulator factory for integrated neuromodulation
+    std::unique_ptr<NeuromodulatorFactory> neuromodulatorFactory_;
 };
 
 } // namespace nlm
+

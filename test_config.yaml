@@ -1,0 +1,6 @@
+# Test YAML file
+int_value: 100
+double_value: 2.718
+string_value: "world"
+bool_value: false
+array_value: ["a", "b", "c"]
