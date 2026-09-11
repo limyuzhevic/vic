@@ -142,16 +142,187 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/functional.h>
+#include <pybind11/chrono.h>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "../src/brain/Brain.hpp"
+#include "../src/core/Config/Config.hpp"
+#include "../src/core/Types/Types.hpp"
+#include "../src/agent/AgentBrain.hpp"
+#include "../src/world/SimpleWorld.hpp"
+#include "../src/sensory/SensoryInput.hpp"
+#include "../src/motor/Action.hpp"
+#include "../src/agent/AgentBody.hpp"
+#include "../src/agent/SensoryPercept.hpp"
+
+namespace py = pybind11;
+namespace nlm {
+
+// Register custom exceptions
+PYBIND11_MODULE(pynlm, m) {
+    m.doc() = R"pbdoc(
+        NLM (Neural Learning Machine) Python Bindings
+        ---------------------------------------------
+        A Python binding for the NLM C++ neural simulation framework.
+        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+    )pbdoc";
+
+    // Register C++ exceptions as Python exceptions
+    py::register_exception<nlm::ConfigException>(m, "ConfigException");
+    py::register_exception<nlm::ConfigFileError>(m, "ConfigFileError");
+    py::register_exception<nlm::ConfigValidationError>(m, "ConfigValidationError");
+    py::register_exception<nlm::ConfigParseError>(m, "ConfigParseError");
+
+    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &NeuronId::value)
+        .def("index", &NeuronId::index)
+        .def("__eq__", &NeuronId::operator==)
+        .def("__ne__", &NeuronId::operator!=)
+        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const NeuronId& id) {
+            return "<NeuronId: " + std::to_string(id.value) + ">";
+        });
+
+    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &SynapseId::value)
+        .def("index", &SynapseId::index)
+        .def("__eq__", &SynapseId::operator==)
+        .def("__ne__", &SynapseId::operator!=)
+        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const SynapseId& id) {
+            return "<SynapseId: " + std::to_string(id.value) + ">";
+        });
+
+    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &RegionId::value)
+        .def("index", &RegionId::index)
+        .def("__eq__", &RegionId::operator==)
+        .def("__ne__", &RegionId::operator!=)
+        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const RegionId& id) {
+            return "<RegionId: " + std::to_string(id.value) + ">";
+        });
+
+    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &PopulationId::value)
+        .def("index", &PopulationId::index)
+        .def("__eq__", &PopulationId::operator==)
+        .def("__ne__", &PopulationId::operator!=);
+
+    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
+        .value("Excitatory", NeuronType::Excitatory)
+        .value("Inhibitory", NeuronType::Inhibitory)
+        .value("Modulatory", NeuronType::Modulatory)
+        .value("Sensory", NeuronType::Sensory)
+        .value("Motor", NeuronType::Motor)
+        .value("Internal", NeuronType::Internal)
+        .export_values();
+
+    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
+        .value("Excitatory", SynapseType::Excitatory)
+        .value("Inhibitory", SynapseType::Inhibitory)
+        .value("Modulatory", SynapseType::Modulatory)
+        .value("Electrical", SynapseType::Electrical)
+        .value("GapJunction", SynapseType::GapJunction)
+        .export_values();
+
+    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
+        .value("Initial", DevelopmentalStage::Initial)
+        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
+        .value("Maturation", DevelopmentalStage::Maturation)
+        .value("Adult", DevelopmentalStage::Adult)
+        .value("Aging", DevelopmentalStage::Aging)
+        .export_values();
+
+    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
+        .value("Resting", FiringState::Resting)
+        .value("Active", FiringState::Active)
+        .value("Refractory", FiringState::Refractory)
+        .value("Inhibited", FiringState::Inhibited)
+        .export_values();
+
+    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
+        .value("MoveForward", ActionType::MoveForward)
+        .value("MoveBackward", ActionType::MoveBackward)
+        .value("MoveLeft", ActionType::MoveLeft)
+        .value("MoveRight", ActionType::MoveRight)
+        .value("TurnLeft", ActionType::TurnLeft)
+        .value("TurnRight", ActionType::TurnRight)
+        .value("Look", ActionType::Look)
+        .value("LookUp", ActionType::LookUp)
+        .value("LookDown", ActionType::LookDown)
+        .value("Interact", ActionType::Interact)
+        .value("Eat", ActionType::Eat)
+        .value("Drink", ActionType::Drink)
+        .value("Rest", ActionType::Rest)
+        .value("Wait", ActionType::Wait)
+        .value("Custom", ActionType::Custom)
+        .export_values();
+
+    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
+        .value("MoveForward", MotorCommand::MoveForward)
+        .value("MoveBackward", MotorCommand::MoveBackward)
+        .value("TurnLeft", MotorCommand::TurnLeft)
+        .value("TurnRight", MotorCommand::TurnRight)
+        .value("LookLeft", MotorCommand::LookLeft)
+        .value("LookRight", MotorCommand::LookRight)
+        .value("Interact", MotorCommand::Interact)
+        .value("Wait", MotorCommand::Wait)
+        .export_values();
+
+    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
+        .value("Empty", WorldObjectType::Empty)
+        .value("Resource", WorldObjectType::Resource)
+        .value("Hazard", WorldObjectType::Hazard)
+        .value("Wall", WorldObjectType::Wall)
+        .value("Marker", WorldObjectType::Marker)
+        .export_values();
+
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            try {
+                auto result = self.loadFromFileWithError(filepath);
+                if (!result.has_value()) {
+                    throw nlm::ConfigFileError("Failed to load config file: " + result.error());
+                }
+                return result.value();
+            } catch (const nlm::ConfigException& e) {
+                throw py::value_error(e.what());
+            } catch (const std::exception& e) {
+                throw py::value_error("Error loading config file: " + std::string(e.what()));
+            }
+        }, py::arg("filepath"),
+             "Load configuration from a file with proper error handling")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
+            try {
+                return self.loadFromArgs(argc, argv);
+            } catch (const std::exception& e) {
+                throw py::value_error("Error loading config from args: " + std::string(e.what()));
+            }
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+           "Load configuration from command line arguments with error handling")
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            try {
+                return self.saveToFile(filepath);
+            } catch (const std::exception& e) {
+                throw py::value_error("Error saving config file: " + std::string(e.what()));
+            }
+        }, py::arg("filepath"),
+             "Save configuration to a file with error handling")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -160,6 +331,40 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("getWithError", [](Config& self, const std::string& key) {
+            try {
+                auto result = self.getWithError<std::string>(key);
+                if (!result.has_value()) {
+                    throw nlm::ConfigValidationError(result.error());
+                }
+                return result.value();
+            } catch (const nlm::ConfigException& e) {
+                throw py::value_error(e.what());
+            } catch (const std::exception& e) {
+                throw py::value_error("Error getting config value: " + std::string(e.what()));
+            }
+        }, py::arg("key"),
+             "Get configuration value with error handling")
+        .def("setWithValidation", [](Config& self, const std::string& key, const std::string& value) {
+            try {
+                return self.setWithValidation<std::string>(key, value);
+            } catch (const nlm::ConfigException& e) {
+                throw py::value_error(e.what());
+            } catch (const std::exception& e) {
+                throw py::value_error("Error setting config value: " + std::string(e.what()));
+            }
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value with validation and error handling")
+        .def("validateSchema", [](Config& self, const std::vector<Config::ConfigSchema>& schema) {
+            try {
+                return self.validateSchema(schema);
+            } catch (const nlm::ConfigException& e) {
+                throw py::value_error(e.what());
+            } catch (const std::exception& e) {
+                throw py::value_error("Error validating schema: " + std::string(e.what()));
+            }
+        }, py::arg("schema"),
+             "Validate configuration against schema with error handling")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });

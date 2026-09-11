@@ -1,0 +1,16 @@
+neuron_count = 100
+region_count = 1
+simulation_timestep = 0.001
+random_seed = 42
+connection_probability = 0.15
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_tau = 20
+synaptogenesis_rate = 0.0001
+pruning_rate = 0.00001
+replay_interval = 100
+consolidation_interval = 1000
+checkpoint_dir = ./checkpoints
+enable_checkpointing = true
+enable_replay = true
+enable_development = true

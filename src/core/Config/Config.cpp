@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -18,78 +19,145 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Helper function to convert std::expected to bool for existing API
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
+    try {
+        auto result = loadFromFileWithError(filepath);
+        if (!result.has_value()) {
+            return false;
+        }
+        return result.value();
+    } catch (const ConfigException& e) {
         return false;
     }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+}
+
+std::expected<bool, std::string> Config::loadFromFileWithError(const std::string& filepath) {
+    try {
+        std::filesystem::path path(filepath);
+        if (!std::filesystem::exists(path)) {
+            return std::unexpected("File does not exist: " + filepath);
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return std::unexpected("Cannot open file for reading: " + filepath);
+        }
+        
+        std::string line;
+        int lineNum = 0;
+        while (std::getline(file, line)) {
+            lineNum++;
+            line = trim(line);
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                size_t pos = line.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = trim(line.substr(0, pos));
+                    std::string value = trim(line.substr(pos + 1));
+                    
+                    if (key.empty()) {
+                        return std::unexpected("Invalid format on line " + std::to_string(lineNum) + ": missing key");
+                    }
+                    
+                    // Remove quotes if present
+                    if (value.size() >= 2 && 
+                        ((value.front() == '"' && value.back() == '"') ||
+                         (value.front() == '\'' && value.back() == '\''))) {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                    
+                    set(key, value, ConfigSource::File);
+                } else {
+                    return std::unexpected("Invalid format on line " + std::to_string(lineNum) + ": missing '='");
+                }
+            } catch (const std::exception& e) {
+                return std::unexpected("Error parsing line " + std::to_string(lineNum) + ": " + e.what());
+            }
         }
+        
+        return true;
+    } catch (const std::filesystem::filesystem_error& e) {
+        return std::unexpected("Filesystem error: " + std::string(e.what()));
+    } catch (const ConfigException& e) {
+        return std::unexpected(e.what());
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
+    try {
+        if (argc <= 1) return true;
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
+        for (int i = 1; i < argc; ++i) {
+            if (argv[i] == nullptr) continue;
+            
+            std::string arg(argv[i]);
+            
+            // Handle --key=value format
+            if (arg.substr(0, 2) == "--") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = arg.substr(2, pos - 2);
+                    std::string value = arg.substr(pos + 1);
+                    set(key, value, ConfigSource::CommandLine);
+                } else {
+                    // Handle --key value format
+                    if (i + 1 < argc && argv[i + 1] != nullptr && argv[i + 1][0] != '-') {
+                        std::string key = arg.substr(2);
+                        std::string value = argv[++i];
+                        set(key, value, ConfigSource::CommandLine);
+                    }
+                }
+            }
+            // Handle -key value format
+            else if (arg[0] == '-' && i + 1 < argc && argv[i + 1] != nullptr && argv[i + 1][0] != '-') {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
                 set(key, value, ConfigSource::CommandLine);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        return false;
     }
-    return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+    try {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = ";
+            
+            try {
+                std::visit([&file](auto&& arg) {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, std::string>) {
+                        file << "\"" << arg << "\"";
+                    } else {
+                        file << arg;
+                    }
+                }, entry.value);
+            } catch (...) {
+                file << "[ERROR: invalid value type]";
+            }
+            
+            file << "\n";
+        }
+        
+        return true;
+    } catch (...) {
         return false;
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
 }
 
 template<typename T>
@@ -115,6 +183,10 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    if (key.empty()) {
+        throw ConfigValidationError("Cannot set configuration with empty key");
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -173,14 +245,18 @@ std::string Config::summary() const {
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
+        try {
+            std::visit([&oss](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    oss << "\"" << arg << "\"";
+                } else {
+                    oss << arg;
+                }
+            }, entry.value);
+        } catch (...) {
+            oss << "[ERROR: invalid value]";
+        }
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
@@ -197,6 +273,53 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+// Validate configuration against schema
+bool Config::validateSchema(const std::vector<ConfigSchema>& schema) const {
+    for (const auto& entry : schema) {
+        if (entry.required && !has(entry.key)) {
+            throw ConfigValidationError("Required configuration key \"" + entry.key + "\" is missing");
+        }
+        
+        if (has(entry.key)) {
+            auto value = getAny(entry.key);
+            if (!value.has_value()) continue;
+            
+            // Type checking
+            bool typeMatches = false;
+            if (entry.type == "int" && std::holds_alternative<int>(value.value())) typeMatches = true;
+            else if (entry.type == "double" && std::holds_alternative<double>(value.value())) typeMatches = true;
+            else if (entry.type == "string" && std::holds_alternative<std::string>(value.value())) typeMatches = true;
+            else if (entry.type == "bool" && std::holds_alternative<bool>(value.value())) typeMatches = true;
+            else if (entry.type == "vector" && (std::holds_alternative<std::vector<int>>(value.value()) ||
+                                                 std::holds_alternative<std::vector<double>>(value.value()) ||
+                                                 std::holds_alternative<std::vector<std::string>>(value.value())))
+                typeMatches = true;
+            
+            if (!typeMatches) {
+                throw ConfigValidationError("Type mismatch for key \"" + entry.key + "\": expected " + entry.type);
+            }
+            
+            // Apply custom validator
+            if (entry.validator && !entry.validator(value.value())) {
+                throw ConfigValidationError("Validation failed for key \"" + entry.key + "\"");
+            }
+        }
+    }
+    
+    return true;
+}
+
+std::optional<ConfigValue> Config::getAny(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+    
+    return it->value;
 }
 
 // Explicit template instantiations

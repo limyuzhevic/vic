@@ -25,6 +25,14 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
+#include <chrono>
+#include <thread>
+#include <map>
+#include <cmath>
 
 using namespace nlm;
 
@@ -159,7 +167,614 @@ struct LearningExperiment {
     }
 };
 
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+// Advanced CLI utilities
+void printHelp() {
+    std::cout << "\n=== NLM Advanced CLI Utilities ===\n";
+    std::cout << "Basic commands:\n";
+    std::cout << "  nlm [--config=FILE]           - Run standard tests\n";
+    std::cout << "\nAdvanced commands:\n";
+    std::cout << "  nlm --validate-config=FILE      - Validate configuration file\n";
+    std::cout << "  nlm --perf-monitor              - Monitor performance metrics\n";
+    std::cout << "  nlm --debug-viz                 - Generate debug visualization\n";
+    std::cout << "  nlm --export-brain=FILE        - Export brain state\n";
+    std::cout << "  nlm --import-brain=FILE        - Import brain state\n";
+    std::cout << "  nlm --tune-params               - Tune simulation parameters\n";
+    std::cout << "  nlm --run-experiment=FILE      - Run custom experiment\n";
+    std::cout << "  nlm --batch-process=DIR        - Process multiple configs\n";
+    std::cout << "  nlm --schema-validate=FILE     - Validate against schema\n";
+    std::cout << "\nConfiguration validation:\n";
+    std::cout << "  nlm --config-schema=FILE        - Show schema for config file\n";
+    std::cout << "  nlm --list-configs              - List available configs\n";
+}
+
+void validateConfiguration(const std::string& configFile) {
+    std::cout << "\n=== Configuration Validation ===\n";
+    std::cout << "Validating: " << configFile << "\n";
+    
+    auto config = std::make_shared<Config>();
+    
+    if (!config->loadFromFile(configFile)) {
+        NLM_LOG_ERROR("Failed to load configuration file: " + configFile);
+        std::cout << "ERROR: Configuration file could not be loaded.\n";
+        return;
+    }
+    
+    NLM_LOG_INFO("Configuration loaded successfully.");
+    NLM_LOG_INFO("Validation results:");
+    
+    // Check required keys for basic functionality
+    std::vector<std::string> requiredKeys = {"neuron_count", "region_count", "simulation_timestep"};
+    bool allValid = true;
+    
+    for (const auto& key : requiredKeys) {
+        if (config->has(key)) {
+            NLM_LOG_INFO("  ✓ " + key + " present");
+        } else {
+            NLM_LOG_WARNING("  ✗ " + key + " missing");
+            allValid = false;
+        }
+    }
+    
+    // Validate value ranges
+    NLM_LOG_INFO("\nValue validation:");
+    if (auto neurons = config->getOr<size_t>("neuron_count", 0); neurons == 0) {
+        NLM_LOG_WARNING("  neuron_count is 0 (invalid)");
+        allValid = false;
+    } else {
+        NLM_LOG_INFO("  neuron_count = " + std::to_string(neurons) + " (valid)");
+    }
+    
+    if (auto timestep = config->getOr<double>("simulation_timestep", 0.0); timestep <= 0.0) {
+        NLM_LOG_WARNING("  simulation_timestep is <= 0 (invalid)");
+        allValid = false;
+    } else {
+        NLM_LOG_INFO("  simulation_timestep = " + std::to_string(timestep) + "s (valid)");
+    }
+    
+    NLM_LOG_INFO("\nConfiguration validation " + std::string(allValid ? "PASSED" : "FAILED"));
+}
+
+void monitorPerformance() {
+    std::cout << "\n=== Performance Monitor ===\n";
+    std::cout << "Starting performance monitoring...\n";
+    
+    auto config = std::make_shared<Config>();
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
+    
+    // Run a simulation and collect metrics
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    for (SimulationStep step = 0; step < 100; ++step) {
+        brain->step(step);
+    }
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    
+    // Calculate performance metrics
+    double avgFiringRate = brain->getAverageFiringRate();
+    double spikesPerMs = static_cast<double>(brain->getTotalSpikeCount()) / duration.count();
+    double neuronsPerMs = static_cast<double>(brain->getTotalNeuronCount()) / duration.count();
+    
+    std::cout << "\nPerformance Results (100 steps):\n";
+    std::cout << "  Total simulation time: " << duration.count() << " ms\n";
+    std::cout << "  Steps per second: " << (100.0 / (duration.count() / 1000.0)) << " steps/s\n";
+    std::cout << "  Spikes per millisecond: " << spikesPerMs << " spikes/ms\n";
+    std::cout << "  Neurons processed per ms: " << neuronsPerMs << " neurons/ms\n";
+    std::cout << "  Average firing rate: " << avgFiringRate << " Hz\n";
+    std::cout << "  Total spikes generated: " << brain->getTotalSpikeCount() << "\n";
+    
+    // Save performance report
+    std::string timestamp = std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
+    std::string reportFile = "performance_report_" + timestamp + ".txt";
+    std::ofstream report(reportFile);
+    if (report.is_open()) {
+        report << "NLM Performance Report\n";
+        report << "======================\n\n";
+        report << "Timestamp: " << timestamp << "\n";
+        report << "Duration: " << duration.count() << " ms\n";
+        report << "Steps per second: " << (100.0 / (duration.count() / 1000.0)) << "\n";
+        report << "Spikes per millisecond: " << spikesPerMs << "\n";
+        report << "Neurons per millisecond: " << neuronsPerMs << "\n";
+        report << "Average firing rate: " << avgFiringRate << " Hz\n";
+        report << "Total spikes: " << brain->getTotalSpikeCount() << "\n";
+        report.close();
+        std::cout << "\nPerformance report saved to: " << reportFile << "\n";
+    }
+}
+
+void generateDebugVisualization(const std::string& outputDir) {
+    std::cout << "\n=== Debug Visualization ===\n";
+    std::cout << "Generating visualization data...\n";
+    
+    // Create output directory if it doesn't exist
+    std::filesystem::create_directories(outputDir);
+    
+    auto config = std::make_shared<Config>();
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(200), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
+    
+    // Run simulation to generate activity
+    for (SimulationStep step = 0; step < 500; ++step) {
+        brain->step(step);
+    }
+    
+    // Generate network graph data
+    std::string graphFile = outputDir + "/network_graph.json";
+    std::ofstream graphOut(graphFile);
+    if (graphOut.is_open()) {
+        graphOut << "{\n";
+        graphOut << "  \"nodes\": [\n";
+        
+        size_t neuronCount = brain->getTotalNeuronCount();
+        for (size_t i = 0; i < neuronCount; ++i) {
+            graphOut << "    {\"id\": \"neuron_" << i << "\", \"type\": \"neuron\"}";
+            if (i < neuronCount - 1) graphOut << ",";
+            graphOut << "\n";
+        }
+        
+        graphOut << "  ],\n";
+        graphOut << "  \"edges\": [\n";
+        
+        // Write synapse connections (sample)
+        size_t maxEdges = std::min<size_t>(1000, brain->getTotalSynapseCount());
+        size_t edgeCount = 0;
+        for (const auto& region : brain->getRegions()) {
+            for (const auto* syn : region->getSynapses()) {
+                if (edgeCount >= maxEdges) break;
+                graphOut << "    {\"source\": \"neuron_" << syn->getSourceNeuron().index()
+                         << "\", \"target\": \"neuron_" << syn->getDestinationNeuron().index()
+                         << "\", \"weight\": " << syn->getWeight() << "}";
+                if (edgeCount < maxEdges - 1) graphOut << ",";
+                graphOut << "\n";
+                edgeCount++;
+            }
+        }
+        
+        graphOut << "  ],\n";
+        graphOut << "  \"metrics\": {\n";
+        graphOut << "    \"total_neurons\": " << neuronCount << ",\n";
+        graphOut << "    \"total_synapses\": " << brain->getTotalSynapseCount() << ",\n";
+        graphOut << "    \"active_neurons\": " << brain->getActiveNeuronCount() << ",\n";
+        graphOut << "    \"firing_neurons\": " << brain->getFiringNeuronCount() << ",\n";
+        graphOut << "    \"avg_firing_rate\": " << brain->getAverageFiringRate() << ",\n";
+        graphOut << "    \"total_spikes\": " << brain->getTotalSpikeCount() << "\n";
+        graphOut << "  }\n";
+        graphOut << "}\n";
+        graphOut.close();
+        std::cout << "  Network graph saved to: " << graphFile << "\n";
+    }
+    
+    // Generate time series data
+    std::string timeSeriesFile = outputDir + "/time_series.json";
+    std::ofstream timeSeriesOut(timeSeriesFile);
+    if (timeSeriesOut.is_open()) {
+        timeSeriesOut << "[\n"; // Start of time series array
+        
+        auto brain2 = std::make_shared<Brain>(config);
+        brain2->initialize();
+        
+        for (SimulationStep step = 0; step < 100; ++step) {
+            brain2->step(step);
+            
+            timeSeriesOut << "  {\n";
+            timeSeriesOut << "    \"step\": " << step << ",\n";
+            timeSeriesOut << "    \"time\": " << step * 0.001 << ",\n";
+            timeSeriesOut << "    \"firing_neurons\": " << brain2->getFiringNeuronCount() << ",\n";
+            timeSeriesOut << "    \"total_spikes\": " << brain2->getTotalSpikeCount() << ",\n";
+            timeSeriesOut << "    \"active_neurons\": " << brain2->getActiveNeuronCount() << ",\n";
+            timeSeriesOut << "    \"avg_firing_rate\": " << brain2->getAverageFiringRate();
+            
+            if (step < 99) timeSeriesOut << ",\n";
+            else timeSeriesOut << "\n";
+        }
+        
+        timeSeriesOut << "]\n";
+        timeSeriesOut.close();
+        std::cout << "  Time series data saved to: " << timeSeriesFile << "\n";
+    }
+    
+    std::cout << "  Visualization data saved to directory: " << outputDir << "\n";
+    std::cout << "  You can use this data with D3.js or other visualization tools.\n";
+}
+
+void exportBrainState(const std::string& outputFile) {
+    std::cout << "\n=== Brain State Export ===\n";
+    std::cout << "Exporting brain state to: " << outputFile << "\n";
+    
+    auto config = std::make_shared<Config>();
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
+    
+    // Run some learning to have interesting state
+    LearningExperiment experiment(brain, 42);
+    experiment.recordInitialState();
+    
+    for (SimulationStep step = 0; step < 1000; ++step) {
+        brain->step(step);
+    }
+    
+    experiment.recordFinalState();
+    
+    // Save brain state
+    bool success = brain->save(outputFile);
+    
+    if (success) {
+        std::cout << "  ✓ Brain state exported successfully.\n";
+        
+        // Also save metadata
+        std::string metaFile = outputFile.substr(0, outputFile.find_last_of('.')) + "_meta.json";
+        std::ofstream metaOut(metaFile);
+        if (metaOut.is_open()) {
+            metaOut << "{\n";
+            metaOut << "  \"export_time\": \"" << std::chrono::system_clock::now().time_since_epoch().count() << "\",\n";
+            metaOut << "  \"neuron_count\": " << brain->getTotalNeuronCount() << ",\n";
+            metaOut << "  \"synapse_count\": " << brain->getTotalSynapseCount() << ",\n";
+            metaOut << "  \"final_firing_rate\": " << brain->getAverageFiringRate() << ",\n";
+            metaOut << "  \"total_spikes\": " << brain->getTotalSpikeCount() << ",\n";
+            metaOut << "  \"developmental_stage\": " << static_cast<int>(brain->getDevelopmentalStage()) << ",\n";
+            metaOut << "  \"experiment_learning_occurred\": " << (std::abs(experiment.finalWeights.empty() ? 0.0f : std::accumulate(experiment.finalWeights.begin(), experiment.finalWeights.end(), 0.0f) / experiment.finalWeights.size() - 
+                                                                    std::accumulate(experiment.initialWeights.begin(), experiment.initialWeights.end(), 0.0f) / experiment.initialWeights.size()) > 0.001f) << "\n";
+            metaOut << "}\n";
+            metaOut.close();
+            std::cout << "  Metadata saved to: " << metaFile << "\n";
+        }
+    } else {
+        std::cout << "  ✗ Failed to export brain state.\n";
+    }
+}
+
+void importBrainState(const std::string& inputFile) {
+    std::cout << "\n=== Brain State Import ===\n";
+    std::cout << "Importing brain state from: " << inputFile << "\n";
+    
+    auto config = std::make_shared<Config>();
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
+    
+    bool success = brain->load(inputFile);
+    
+    if (success) {
+        std::cout << "  ✓ Brain state imported successfully.\n";
+        brain->logStatus();
+    } else {
+        std::cout << "  ✗ Failed to import brain state.\n";
+    }
+}
+
+void tuneParameters() {
+    std::cout << "\n=== Parameter Tuning ===\n";
+    std::cout << "Running parameter optimization...\n";
+    
+    // Simulate parameter tuning by running with different configurations
+    std::vector<std::string> parameterSets = {
+        "standard", "high_plasticity", "low_noise", "balanced"
+    };
+    
+    std::map<std::string, std::map<std::string, double>> results;
+    
+    for (const auto& paramSet : parameterSets) {
+        std::cout << "  Testing parameter set: " << paramSet << "...\n";
+        
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        
+        // Configure based on parameter set
+        if (paramSet == "standard") {
+            config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+            config->set("connection_probability", 0.15f, ConfigSource::Default);
+            config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+            config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        } else if (paramSet == "high_plasticity") {
+            config->set("neuron_count", static_cast<int64_t>(300), ConfigSource::Default);
+            config->set("connection_probability", 0.2f, ConfigSource::Default);
+            config->set("stdp_ltp_weight", 0.05f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.03f, ConfigSource::Default);
+            config->set("synaptogenesis_rate", 0.001f, ConfigSource::Default);
+        } else if (paramSet == "low_noise") {
+            config->set("neuron_count", static_cast<int64_t>(800), ConfigSource::Default);
+            config->set("connection_probability", 0.1f, ConfigSource::Default);
+            config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.008f, ConfigSource::Default);
+            config->set("synaptogenesis_rate", 0.00005f, ConfigSource::Default);
+        } else if (paramSet == "balanced") {
+            config->set("neuron_count", static_cast<int64_t>(600), ConfigSource::Default);
+            config->set("connection_probability", 0.12f, ConfigSource::Default);
+            config->set("stdp_ltp_weight", 0.015f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+            config->set("synaptogenesis_rate", 0.0002f, ConfigSource::Default);
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Run simulation
+        auto startTime = std::chrono::high_resolution_clock::now();
+        for (SimulationStep step = 0; step < 500; ++step) {
+            brain->step(step);
+        }
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        // Calculate metrics
+        double finalFiringRate = brain->getAverageFiringRate();
+        double learningScore = 0.0f;
+        if (!std::isnan(finalFiringRate)) {
+            learningScore = std::min(1.0, finalFiringRate / 10.0); // Normalize to [0,1]
+        }
+        double performance = (500.0 / (duration.count() / 1000.0)) * learningScore; // Speed * Learning
+        
+        results[paramSet]["firing_rate"] = finalFiringRate;
+        results[paramSet]["duration_ms"] = duration.count();
+        results[paramSet]["performance"] = performance;
+        
+        std::cout << "    Final firing rate: " << finalFiringRate << " Hz\n";
+        std::cout << "    Duration: " << duration.count() << " ms\n";
+        std::cout << "    Performance score: " << performance << "\n";
+    }
+    
+    // Find best parameter set
+    std::string bestSet = "";
+    double bestScore = -1.0f;
+    for (const auto& pair : results) {
+        if (pair.second.at("performance") > bestScore) {
+            bestScore = pair.second.at("performance");
+            bestSet = pair.first;
+        }
+    }
+    
+    std::cout << "\nParameter tuning results:\n";
+    std::cout << "  Best parameter set: " << bestSet << "\n";
+    std::cout << "  Best performance score: " << bestScore << "\n\n";
+    
+    // Save tuning results
+    std::string timestamp = std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
+    std::string tuningFile = "parameter_tuning_" + timestamp + ".txt";
+    std::ofstream tuningOut(tuningFile);
+    if (tuningOut.is_open()) {
+        tuningOut << "NLM Parameter Tuning Results\n";
+        tuningOut << "==============================\n\n";
+        for (const auto& pair : results) {
+            tuningOut << "Parameter set: " << pair.first << "\n";
+            tuningOut << "  Firing rate: " << pair.second.at("firing_rate") << " Hz\n";
+            tuningOut << "  Duration: " << pair.second.at("duration_ms") << " ms\n";
+            tuningOut << "  Performance score: " << pair.second.at("performance") << "\n\n";
+        }
+        tuningOut << "Best set: " << bestSet << " (score: " << bestScore << ")\n";
+        tuningOut.close();
+        std::cout << "  Results saved to: " << tuningFile << "\n";
+    }
+}
+
+void runCustomExperiment(const std::string& configFile) {
+    std::cout << "\n=== Custom Experiment ===\n";
+    std::cout << "Running experiment with config: " << configFile << "\n";
+    
+    auto config = std::make_shared<Config>();
+    if (!config->loadFromFile(configFile)) {
+        NLM_LOG_ERROR("Failed to load experiment config: " + configFile);
+        return;
+    }
+    
+    // Create and run experiment
+    Phase6IntegratedExperiment experiment;
+    
+    Phase6Config expConfig;
+    expConfig.neuronCount = config->getOr<size_t>("neuron_count", 500);
+    expConfig.maxSteps = config->getOr<size_t>("max_steps", 2000);
+    expConfig.enableCheckpointing = config->getOr<bool>("enable_checkpointing", true);
+    expConfig.enableReplay = config->getOr<bool>("enable_replay", true);
+    expConfig.enableDevelopment = config->getOr<bool>("enable_development", true);
+    
+    std::cout << "  Experiment configuration loaded.\n";
+    std::cout << "  Neurons: " << expConfig.neuronCount << "\n";
+    std::cout << "  Max steps: " << expConfig.maxSteps << "\n";
+    std::cout << "  Checkpointing: " << (expConfig.enableCheckpointing ? "enabled" : "disabled") << "\n";
+    std::cout << "  Replay: " << (expConfig.enableReplay ? "enabled" : "disabled") << "\n";
+    std::cout << "  Development: " << (expConfig.enableDevelopment ? "enabled" : "disabled") << "\n";
+    
+    // Run experiment
+    auto result = experiment.run(expConfig);
+    
+    std::cout << "\nExperiment Results:\n";
+    std::cout << "  Total reward: " << result.totalReward << "\n";
+    std::cout << "  Average firing rate: " << result.avgFiringRate << " Hz\n";
+    std::cout << "  Episodes stored: " << result.memoryEpisodesStored << "\n";
+    std::cout << "  Dopamine level: " << result.dopamineLevel << "\n";
+    std::cout << "  Wall clock time: " << result.totalWallClockTime << "s\n";
+    
+    std::cout << "\nIntegration Status:\n";
+    std::cout << "  Working Memory: " << (result.memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << "\n";
+    std::cout << "  Episodic Memory: " << (result.memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << "\n";
+    std::cout << "  Neuromodulation: " << (result.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << "\n";
+    std::cout << "  Prediction: " << (result.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << "\n";
+    std::cout << "  Development: " << (result.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << "\n";
+}
+
+void batchProcessDirectory(const std::string& directory) {
+    std::cout << "\n=== Batch Processing ===\n";
+    std::cout << "Processing configs in directory: " << directory << "\n";
+    
+    if (!std::filesystem::exists(directory)) {
+        std::cout << "  ERROR: Directory does not exist.\n";
+        return;
+    }
+    
+    std::vector<std::string> configFiles;
+    for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+        if (entry.is_regular_file() && 
+            (entry.path().extension() == ".json" || entry.path().extension() == ".config" || 
+             entry.path().extension() == ".cfg")) {
+            configFiles.push_back(entry.path().string());
+        }
+    }
+    
+    std::cout << "  Found " << configFiles.size() << " configuration files.\n";
+    
+    // Sort config files
+    std::sort(configFiles.begin(), configFiles.end());
+    
+    // Process each config
+    for (const auto& configFile : configFiles) {
+        std::cout << "\nProcessing: " << configFile << "\n";
+        
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(configFile)) {
+            std::cout << "  ✗ Failed to load config.\n";
+            continue;
+        }
+        
+        std::cout << "  ✓ Config loaded successfully.\n";
+        
+        // Quick validation
+        if (config->has("neuron_count") && config->has("region_count")) {
+            size_t neurons = config->getOr<size_t>("neuron_count", 0);
+            size_t regions = config->getOr<size_t>("region_count", 0);
+            std::cout << "  Config parameters: " << neurons << " neurons, " << regions << " regions\n";
+        }
+        
+        // Save processed config with timestamp
+        std::string timestamp = std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
+        std::string processedFile = directory + "/processed_" + 
+                                     std::filesystem::path(configFile).stem().string() + 
+                                     "_" + timestamp + ".json";
+        
+        config->saveToFile(processedFile);
+        std::cout << "  ✓ Processed config saved to: " << processedFile << "\n";
+    }
+    
+    std::cout << "\nBatch processing complete.\n";
+}
+
+void showSchemaForConfig(const std::string& configFile) {
+    std::cout << "\n=== Configuration Schema ===\n";
+    std::cout << "Analyzing: " << configFile << "\n";
+    
+    auto config = std::make_shared<Config>();
+    if (!config->loadFromFile(configFile)) {
+        std::cout << "  ✗ Failed to load config file.\n";
+        return;
+    }
+    
+    std::cout << "\nCurrent configuration schema (based on loaded keys):\n";
+    std::cout << "  Required keys for basic operation:\n";
+    
+    std::vector<std::pair<std::string, std::string>> schema = {
+        {"neuron_count", "int - Number of neurons in the brain"},
+        {"region_count", "int - Number of brain regions"},
+        {"simulation_timestep", "double - Simulation time step in seconds"},
+        {"random_seed", "int64 - Random seed for reproducible results"},
+        {"connection_probability", "float - Probability of connection between neurons"},
+        {"stdp_ltp_weight", "float - STDP long-term potentiation weight"},
+        {"stdp_ltd_weight", "float - STDP long-term depression weight"},
+        {"stdp_tau", "float - STDP time constant"},
+        {"synaptogenesis_rate", "float - Rate of new synapse formation"},
+        {"pruning_rate", "float - Rate of synapse elimination"},
+        {"replay_interval", "int - Steps between memory replay"},
+        {"consolidation_interval", "int - Steps between memory consolidation"},
+        {"checkpoint_dir", "string - Directory for checkpoint files"},
+        {"enable_checkpointing", "bool - Enable checkpointing"},
+        {"enable_replay", "bool - Enable memory replay"},
+        {"enable_development", "bool - Enable developmental processes"}
+    };
+    
+    for (const auto& entry : schema) {
+        bool present = config->has(entry.first);
+        std::string status = present ? "✓" : "✗";
+        std::cout << "    " << status << " " << entry.first << " (" << entry.second << ")\n";
+        
+        if (present) {
+            if (entry.first == "neuron_count" || entry.first == "region_count") {
+                auto value = config->get<size_t>(entry.first);
+                if (value) std::cout << "      Value: " << *value << "\n";
+            } else if (entry.first == "simulation_timestep" || entry.first == "random_seed" || 
+                       entry.first == "stdp_tau" || entry.first == "connection_probability") {
+                auto value = config->get<double>(entry.first);
+                if (value) std::cout << "      Value: " << *value << "\n";
+            } else if (entry.first == "stdp_ltp_weight" || entry.first == "stdp_ltd_weight" || 
+                       entry.first == "synaptogenesis_rate" || entry.first == "pruning_rate") {
+                auto value = config->get<float>(entry.first);
+                if (value) std::cout << "      Value: " << *value << "\n";
+            } else if (entry.first == "enable_checkpointing" || entry.first == "enable_replay" || 
+                       entry.first == "enable_development") {
+                auto value = config->get<bool>(entry.first);
+                if (value) std::cout << "      Value: " << (*value ? "true" : "false") << "\n";
+            } else if (entry.first == "checkpoint_dir") {
+                auto value = config->get<std::string>(entry.first);
+                if (value) std::cout << "      Value: " << *value << "\n";
+            }
+        }
+    }
+    
+    std::cout << "\nSchema validation notes:\n";
+    std::cout << "  - All keys marked with ✓ are present in the config file\n";
+    std::cout << "  - Missing keys (✗) will be set to defaults\n";
+    std::cout << "  - Values shown for present keys\n";
+}
+
+void listAvailableConfigs() {
+    std::cout << "\n=== Available Configuration Files ===\n";
+    
+    // Check standard config locations
+    std::vector<std::string> configPaths = {
+        "configs/config.json",
+        "configs/default.json",
+        "config.json",
+        "default.json",
+        "settings.json",
+        "brain_config.json"
+    };
+    
+    bool foundAny = false;
+    for (const auto& path : configPaths) {
+        std::ifstream file(path);
+        if (file.good()) {
+            foundAny = true;
+            std::cout << "  ✓ " << path << "\n";
+            file.close();
+        }
+    }
+    
+    if (!foundAny) {
+        std::cout << "  No standard configuration files found.\n";
+        std::cout << "  Looking for files in: configs/, current directory\n";
+    }
+    
+    // Check for any .json files in configs directory
+    if (std::filesystem::exists("configs")) {
+        std::cout << "\nSearching for .json files in configs/:\n";
+        for (const auto& entry : std::filesystem::directory_iterator("configs")) {
+            if (entry.is_regular_file() && entry.path().extension() == ".json") {
+                std::cout << "  ✓ " << entry.path().string() << "\n";
+            }
+        }
+    }
+}
+
+int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
@@ -344,7 +959,7 @@ int main(int argc, char** argv) {
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
+    std::string configFile = "configs/config.json";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {

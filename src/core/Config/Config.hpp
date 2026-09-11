@@ -5,11 +5,37 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <expected>
+#include <any>
+#include <functional>
+#include <stdexcept>
 
 namespace nlm {
 
-// Forward declarations
-class Config;
+// Configuration exceptions
+class ConfigException : public std::runtime_error {
+public:
+    explicit ConfigException(const std::string& message)
+        : std::runtime_error("Config Error: " + message) {}
+};
+
+class ConfigFileError : public ConfigException {
+public:
+    explicit ConfigFileError(const std::string& message)
+        : ConfigException("File Error: " + message) {}
+};
+
+class ConfigValidationError : public ConfigException {
+public:
+    explicit ConfigValidationError(const std::string& message)
+        : ConfigException("Validation Error: " + message) {}
+};
+
+class ConfigParseError : public ConfigException {
+public:
+    explicit ConfigParseError(const std::string& message)
+        : ConfigException("Parse Error: " + message) {}
+};
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -45,6 +71,10 @@ struct ConfigEntry {
 
 // Main configuration class
 class Config {
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
 public:
     Config();
     ~Config();
@@ -57,6 +87,7 @@ public:
     
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
+    std::expected<bool, std::string> loadFromFileWithError(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -70,6 +101,9 @@ public:
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
+    
+    // Get any configuration value
+    std::optional<ConfigValue> getAny(const std::string& key) const;
     
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
@@ -90,16 +124,42 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
+    // Get configuration value with error handling
+    template<typename T>
+    std::expected<T, std::string> getWithError(const std::string& key) const {
+        auto value = get<T>(key);
+        if (!value.has_value()) {
+            return std::unexpected("Configuration key \"" + key + "\" not found");
+        }
+        return *value;
+    }
+    
+    // Set configuration value with validation
+    template<typename T>
+    bool setWithValidation(const std::string& key, const T& value, ConfigSource source = ConfigSource::Runtime,
+                           std::function<bool(const T&)> validator = nullptr) {
+        if (validator && !validator(value)) {
+            return false;
+        }
+        set(key, value, source);
+        return true;
+    }
+    
+    // Configuration schema validation
+    struct ConfigSchema {
+        std::string key;
+        std::string type; // "int", "double", "string", "bool", "vector"
+        std::string description;
+        std::any defaultValue;
+        bool required = false;
+        std::function<bool(const std::any&)> validator;
+    };
+    
+    // Validate configuration against schema
+    bool validateSchema(const std::vector<ConfigSchema>& schema) const;
+    
+    // Utility methods
     std::string summary() const;
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
-
-} // namespace nlm

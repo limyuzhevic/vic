@@ -1,0 +1,43 @@
+{
+    "configuration": {
+        "brain": {
+            "neuron_count": 500,
+            "region_count": 1,
+            "connection_probability": 0.15,
+            "stdp_ltp_weight": 0.02,
+            "stdp_ltd_weight": 0.015,
+            "stdp_tau": 20.0,
+            "synaptogenesis_rate": 0.0001,
+            "pruning_rate": 0.00001,
+            "checkpoint_dir": "./checkpoints"
+        },
+        "development": {
+            "synaptogenesis_rate": 0.001,
+            "pruning_rate": 0.0001
+        },
+        "neuromodulation": {
+            "dopamine_baseline": 0.1
+        },
+        "simulation": {
+            "random_seed": 42,
+            "simulation_timestep": 0.001,
+            "reward_discount_factor": 0.99,
+            "max_simulation_steps": 10000,
+            "simulation_time_limit": 0.0
+        },
+        "environment": {
+            "name": "GridWorld",
+            "width": 10,
+            "height": 10
+        },
+        "logging": {
+            "level": "INFO",
+            "log_to_file": false,
+            "filename": "nlm.log"
+        },
+        "visualization": {
+            "enabled": false,
+            "update_rate": 30.0
+        }
+    }
+}
