@@ -4,12 +4,7 @@ project(NLM VERSION 0.1.0 LANGUAGES CXX)
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+set(CMAKE_EXTENSIONS OFF)
 
 # Enable warnings
 if(MSVC)
@@ -83,6 +78,26 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    # Phase 3 experiments
+    src/experiments/Phase3Experiment.cpp
+    # Phase 4 experiments
+    src/experiments/Phase4Experiment.cpp
+    src/experiments/Phase4Demo.cpp
+    src/experiments/Phase4Demo.hpp
+    # Phase 5 experiments
+    src/experiments/Phase5Experiment.cpp
+    # Phase 6 experiments
+    src/experiments/Phase6Demo.cpp
+    src/experiments/Phase6Demo.hpp
+    src/experiments/Phase6Demo.cpp
+    # Performance system
+    src/performance/CheckpointSystem.cpp
+    src/performance/ParallelProcessing.cpp
+    src/performance/SIMDVectorization.cpp
+    src/performance/EventQueue.cpp
+    src/performance/SparseConnectivity.cpp
+    src/performance/OptimizedBrain.cpp
+    src/performance/MemoryPool.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
 )
@@ -139,12 +154,18 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

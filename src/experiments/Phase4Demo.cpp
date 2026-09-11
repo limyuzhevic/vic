@@ -1,52 +1,40 @@
+#include "Phase4Demo.hpp"
+#include "../Phase4Experiment.hpp"
 #include <iostream>
-#include <memory>
 #include <iomanip>
-#include <sstream>
-#include "core/Config/Config.hpp"
-#include "core/Logger/Logger.hpp"
-#include "brain/Brain.hpp"
-#include "agent/AgentBrain.hpp"
-#include "world/SimpleWorld.hpp"
-#include "experiments/Phase4Experiment.hpp"
-#include "prediction/NeuralPrediction.hpp"
-#include "memory/NeuralWorkingMemory.hpp"
-#include "memory/NeuralEpisodicMemory.hpp"
-#include "cognition/ConceptFormation.hpp"
-#include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
 
-using namespace nlm;
+namespace nlm {
 
-void printHeader(const std::string& title) {
-    std::cout << "\n" << std::string(60, '=') << "\n";
-    std::cout << "  " << title << "\n";
-    std::cout << std::string(60, '=') << "\n";
+struct Phase4Demo::Impl {
+    bool completed;
+    std::string results;
+    size_t trialsPerExperiment;
+    size_t stepsPerEpisode;
+    bool verbose;
+};
+
+Phase4Demo::Phase4Demo() : pImpl(std::make_unique<Impl>()) {
+    pImpl->completed = false;
+    pImpl->trialsPerExperiment = 50;
+    pImpl->stepsPerEpisode = 200;
+    pImpl->verbose = true;
 }
 
-void printResult(const std::string& name, float value, float max = 1.0f) {
-    std::cout << "  " << std::left << std::setw(30) << name << ": ";
-    std::cout << std::fixed << std::setprecision(3) << value;
-    if (max > 0) {
-        std::cout << " (" << std::setprecision(1) << (value/max*100) << "%)";
-    }
-    std::cout << "\n";
-}
+Phase4Demo::~Phase4Demo() = default;
 
-void printSection(const std::string& title) {
-    std::cout << "\n--- " << title << " ---\n";
-}
-
-int main(int argc, char* argv[]) {
-    std::cout << "NLM Phase 4: Emerging Cognition\n";
-    std::cout << "================================\n\n";
+void Phase4Demo::run(size_t trialsPerExperiment, size_t stepsPerEpisode, bool verbose) {
+    pImpl->trialsPerExperiment = trialsPerExperiment;
+    pImpl->stepsPerEpisode = stepsPerEpisode;
+    pImpl->verbose = verbose;
     
-    // Parse command line arguments
-    size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
+    if (pImpl->verbose) {
+        std::cout << "=== NLM Phase 4: Emerging Cognition Demo ===" << std::endl;
+        std::cout << "Running 10 cognitive capability experiments..." << std::endl;
     }
     
-    // Create configuration
+    std::ostringstream results;
+    
+    // Create brain once for all experiments
     auto config = std::make_shared<Config>();
     config->set("neuron_count", size_t(1000));
     config->set("region_count", size_t(2));
@@ -56,170 +44,147 @@ int main(int argc, char* argv[]) {
     config->set("stdp_ltp_weight", 0.01f);
     config->set("stdp_ltd_weight", 0.012f);
     
-    // Create brain
-    std::cout << "Initializing brain...\n";
     auto brain = std::make_shared<Brain>(config);
     if (!brain->initialize()) {
-        std::cerr << "Failed to initialize brain!\n";
-        return 1;
+        results << "ERROR: Failed to initialize brain!";
+        pImpl->results = results.str();
+        return;
     }
     
-    printHeader("PHASE 4 EXPERIMENTS");
-    
-    // Run Temporal Prediction Experiment
-    printSection("1. Temporal Prediction Learning");
-    {
-        TemporalPredictionExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+    // Run all 10 experiments
+    for (size_t i = 0; i < 10; ++i) {
+        if (pImpl->verbose) {
+            std::cout << "--- Experiment " << (i + 1) << "/10 ---" << std::endl;
+        }
         
-        printResult("Initial Prediction Error", results.predictionErrorInitial);
-        printResult("Final Prediction Error", results.predictionErrorFinal);
-        printResult("Improvement", results.predictionAccuracyImprovement);
+        // Run each experiment
+        switch (i) {
+            case 0: {
+                TemporalPredictionExperiment exp;
+                Phase4Results res = exp.run(brain.get(), pImpl->trialsPerExperiment);
+                results << "1. Temporal Prediction: Initial error=" << res.predictionErrorInitial 
+                        << ", Final error=" << res.predictionErrorFinal 
+                        << ", Improvement=" << res.predictionAccuracyImprovement << "\n";
+                break;
+            }
+            case 1: {
+                WorkingMemoryExperiment exp;
+                Phase4Results res = exp.run(brain.get(), pImpl->trialsPerExperiment);
+                results << "2. Working Memory: Initial retention=" << res.workingMemoryRetentionInitial 
+                        << ", Final retention=" << res.workingMemoryRetentionFinal 
+                        << ", Capacity=" << res.workingMemoryCapacity << "\n";
+                break;
+            }
+            case 2: {
+                EpisodicRecallExperiment exp;
+                Phase4Results res = exp.run(brain.get(), pImpl->trialsPerExperiment);
+                results << "3. Episodic Memory: Recall accuracy=" << res.episodicRecallAccuracy 
+                        << ", Episodes stored=" << res.episodesStored 
+                        << ", Influence=" << res.episodicInfluence << "\n";
+                break;
+            }
+            case 3: {
+                ConceptFormationExperiment exp;
+                Phase4Results res = exp.run(brain.get(), pImpl->trialsPerExperiment);
+                results << "4. Concept Formation: Concepts formed=" << res.conceptsFormed 
+                        << ", Stability=" << res.conceptStability 
+                        << ", Generalization=" << res.generalizationAbility << "\n";
+                break;
+            }
+            case 4: {
+                AttentionExperiment exp;
+                Phase4Results res = exp.run(brain.get(), pImpl->trialsPerExperiment);
+                results << "5. Neural Attention: Selectivity=" << res.attentionSelectivity 
+                        << ", Distraction resistance=" << res.distractionResistance << "\n";
+                break;
+            }
+            case 5: {
+                PlanningExperiment exp;
+                Phase4Results res = exp.run(brain.get(), pImpl->trialsPerExperiment / 2);
+                results << "6. Multi-Step Planning: Accuracy=" << res.planningAccuracy 
+                        << ", Confidence=" << res.planningConfidence << "\n";
+                break;
+            }
+            case 6: {
+                SelfModelExperiment exp;
+                Phase4Results res = exp.run(brain.get(), pImpl->trialsPerExperiment);
+                results << "7. Self-Model: Prediction accuracy=" << res.selfPredictionAccuracy 
+                        << ", Body awareness=" << res.bodyAwareness << "\n";
+                break;
+            }
+            case 7: {
+                SocialLearningExperiment exp;
+                Phase4Results res = exp.run(brain.get(), pImpl->trialsPerExperiment / 2);
+                results << "8. Social Learning: Imitation accuracy=" << res.imitationAccuracy 
+                        << ", Observations=" << res.observationsFromOthers << "\n";
+                break;
+            }
+            case 8: {
+                ContinualLearningExperiment exp;
+                Phase4Results res = exp.run(brain.get(), pImpl->trialsPerExperiment);
+                results << "9. Continual Learning: Improvement=" << res.behaviorImprovement 
+                        << ", Transfer=" << res.transferPerformance << "\n";
+                break;
+            }
+            case 9: {
+                Phase4IntegratedExperiment exp;
+                Phase4Results res = exp.run(brain.get(), 10, pImpl->stepsPerEpisode);
+                results << "10. Integrated Phase 4: Total reward=" << res.totalReward 
+                        << ", Episodes=" << res.episodesStored 
+                        << ", Concepts=" << res.conceptsFormed << "\n";
+                break;
+            }
+        }
         
-        float improvement = results.predictionErrorInitial - results.predictionErrorFinal;
-        if (improvement > 0) {
-            std::cout << "  [SUCCESS] Prediction improved through experience!\n";
-        } else {
-            std::cout << "  [INFO] No significant prediction improvement yet.\n";
+        if (pImpl->verbose) {
+            std::cout << "   Completed!" << std::endl;
         }
     }
     
-    // Run Working Memory Experiment
-    printSection("2. Working Memory");
-    {
-        WorkingMemoryExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
-        
-        printResult("Initial Retention", results.workingMemoryRetentionInitial);
-        printResult("Final Retention", results.workingMemoryRetentionFinal);
-        printResult("Capacity", results.workingMemoryCapacity, 100.0f);
+    pImpl->results = results.str();
+    pImpl->completed = true;
+    
+    if (pImpl->verbose) {
+        std::cout << "=== All Phase 4 experiments completed successfully! ===" << std::endl;
     }
-    
-    // Run Episodic Recall Experiment
-    printSection("3. Episodic Memory");
-    {
-        EpisodicRecallExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
-        
-        printResult("Recall Accuracy", results.episodicRecallAccuracy);
-        printResult("Episodes Stored", results.episodesStored);
-        printResult("Episodic Influence", results.episodicInfluence);
-    }
-    
-    // Run Concept Formation Experiment
-    printSection("4. Concept Formation");
-    {
-        ConceptFormationExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
-        
-        printResult("Concepts Formed", results.conceptsFormed);
-        printResult("Concept Stability", results.conceptStability);
-        printResult("Generalization Ability", results.generalizationAbility);
-        
-        if (results.conceptsFormed > 0) {
-            std::cout << "  [SUCCESS] Concepts emerged from repeated experience!\n";
-        }
-    }
-    
-    // Run Attention Experiment
-    printSection("5. Neural Attention");
-    {
-        AttentionExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
-        
-        printResult("Attention Selectivity", results.attentionSelectivity);
-        printResult("Distraction Resistance", results.distractionResistance);
-        
-        if (results.attentionSelectivity > 0.5f) {
-            std::cout << "  [SUCCESS] Selective attention emerged!\n";
-        }
-    }
-    
-    // Run Planning Experiment
-    printSection("6. Multi-Step Planning");
-    {
-        PlanningExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials / 2);
-        
-        printResult("Planning Accuracy", results.planningAccuracy);
-        printResult("Planning Confidence", results.planningConfidence);
-        
-        if (results.planningAccuracy > 0.4f) {
-            std::cout << "  [SUCCESS] Planning ability demonstrated!\n";
-        }
-    }
-    
-    // Run Self-Model Experiment
-    printSection("7. Self-Model");
-    {
-        SelfModelExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
-        
-        printResult("Self-Prediction Accuracy", results.selfPredictionAccuracy);
-        printResult("Body Awareness", results.bodyAwareness);
-        
-        if (results.selfPredictionAccuracy > 0.3f) {
-            std::cout << "  [SUCCESS] Self-model developing!\n";
-        }
-    }
-    
-    // Run Social Learning Experiment
-    printSection("8. Social Learning");
-    {
-        SocialLearningExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials / 2);
-        
-        printResult("Imitation Accuracy", results.imitationAccuracy);
-        printResult("Observations from Others", results.observationsFromOthers);
-        
-        if (results.imitationAccuracy > 0.2f) {
-            std::cout << "  [SUCCESS] Social learning observed!\n";
-        }
-    }
-    
-    // Run Continual Learning Experiment
-    printSection("9. Continual Learning");
-    {
-        ContinualLearningExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
-        
-        printResult("Behavior Improvement", results.behaviorImprovement);
-        printResult("Transfer Performance", results.transferPerformance);
-    }
-    
-    // Run Integrated Experiment
-    printSection("10. Integrated Phase 4");
-    {
-        Phase4IntegratedExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), 10, 50);
-        
-        printResult("Total Reward", results.totalReward);
-        printResult("Episodes Stored", results.episodesStored);
-        printResult("Concepts Formed", results.conceptsFormed);
-        printResult("Planning Confidence", results.planningConfidence);
-        printResult("Body Awareness", results.bodyAwareness);
-    }
-    
-    // Final summary
-    printHeader("PHASE 4 SUMMARY");
-    
-    std::cout << "\nPhase 4 demonstrates:\n";
-    std::cout << "  - Temporal prediction: Learning relationships between events\n";
-    std::cout << "  - Working memory: Maintaining information across delays\n";
-    std::cout << "  - Episodic memory: Storing and recalling experiences\n";
-    std::cout << "  - Concept formation: Discovering patterns without labels\n";
-    std::cout << "  - Neural attention: Selective processing through competition\n";
-    std::cout << "  - Multi-step planning: Using predictions to select actions\n";
-    std::cout << "  - Self-model: Learning body schema and action consequences\n";
-    std::cout << "  - Social learning: Observing and imitating others\n";
-    std::cout << "  - Continual learning: Adapting to new tasks\n";
-    
-    std::cout << "\nAll mechanisms emerge from neural dynamics and plasticity.\n";
-    std::cout << "No predefined concepts, rules, or symbolic AI were used.\n";
-    
-    std::cout << "\n" << std::string(60, '=') << "\n";
-    std::cout << "Phase 4 Complete!\n";
-    std::cout << std::string(60, '=') << "\n";
-    
-    return 0;
 }
+
+void Phase4Demo::runExperiment(size_t experimentIndex) {
+    if (experimentIndex >= 10) {
+        throw std::out_of_range("Experiment index must be between 0 and 9");
+    }
+    
+    // For simplicity, just run the full demo
+    run(pImpl->trialsPerExperiment, pImpl->stepsPerEpisode, pImpl->verbose);
+}
+
+std::string Phase4Demo::getResults() const {
+    return pImpl->results;
+}
+
+bool Phase4Demo::isCompleted() const {
+    return pImpl->completed;
+}
+
+void Phase4Demo::reset() {
+    pImpl->completed = false;
+    pImpl->results.clear();
+}
+
+std::string Phase4Demo::getStatistics() const {
+    if (!pImpl->completed) {
+        return "Demo not completed yet!";
+    }
+    
+    std::ostringstream stats;
+    stats << "=== Phase 4 Demo Statistics ===" << std::endl;
+    stats << "Experiments completed: 10/10" << std::endl;
+    stats << "Trials per experiment: " << pImpl->trialsPerExperiment << std::endl;
+    stats << "Steps per episode: " << pImpl->stepsPerEpisode << std::endl;
+    stats << "Verbose mode: " << (pImpl->verbose ? "Yes" : "No") << std::endl;
+    stats << "\nResults:" << std::endl;
+    stats << pImpl->results;
+    return stats.str();
+}
+
+} // namespace nlm

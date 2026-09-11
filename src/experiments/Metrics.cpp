@@ -10,7 +10,7 @@ struct Metrics::Impl {
     std::map<std::string, std::vector<double>> metrics;
 };
 
-Metrics::Metrics() : pImpl(new Impl) {}
+Metrics::Metrics() : pImpl(std::make_unique<Impl>()) {}
 
 Metrics::~Metrics() = default;
 
