@@ -526,10 +526,31 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
+    // Update concept formation with current neural activity patterns
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current working memory and episodic memory to form concepts
+        // This is a simplified implementation - in practice would use
+        // attention-filtered neural activity patterns from working memory
+        auto workingMemoryContent = pImpl->workingMemory ? 
+            pImpl->workingMemory->retrieve() : std::vector<float>();
+        
+        // Feed neural activity patterns to concept formation
+        if (!workingMemoryContent.empty()) {
+            pImpl->conceptFormation->update(pImpl->timestep);
+            
+            // Store formed concepts in episodic memory for later retrieval
+            if (pImpl->episodicMemory) {
+                // Store current sensory state as an episode for concept formation
+                // This is a simplified approach - concept formation could extract
+                // features from neural activity patterns to create new episodes
+                EpisodicMemoryItem conceptEpisode;
+                conceptEpisode.sensoryState = workingMemoryContent;
+                conceptEpisode.timestamp = currentStep;
+                conceptEpisode.age = 0;
+                
+                pImpl->episodicMemory->storeEpisode(conceptEpisode);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
