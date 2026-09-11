@@ -513,6 +513,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        pImpl->predictionSystem->updatePredictionSystem(currentStep, currentTime);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +529,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Get active neurons from working memory and update concepts
+        if (pImpl->workingMemory) {
+            auto traces = pImpl->workingMemory->getMemoryNeurons();
+            auto activations = pImpl->workingMemory->getMemoryActivations();
+            
+            if (!traces.empty()) {
+                pImpl->conceptFormation->updateConceptSystem(traces, activations, currentStep);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -828,6 +837,34 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write working memory state if available
+        if (pImpl->workingMemory) {
+            WorkingMemoryCheckpointData wmData;
+            auto traces = pImpl->workingMemory->getMemoryNeurons();
+            auto activations = pImpl->workingMemory->getMemoryActivations();
+            for (size_t i = 0; i < traces.size(); ++i) {
+                wmData.neuronIds.push_back(traces[i]);
+                wmData.activations.push_back(activations[i]);
+            }
+            if (!writer.writeWorkingMemory(wmData)) {
+                NLM_LOG_ERROR("Failed to write working memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write episodic memory state if available
+        if (pImpl->episodicMemory) {
+            EpisodicMemoryCheckpointData emData;
+            auto episodes = pImpl->episodicMemory->getEpisodesForReplay(100);  // Get all episodes
+            for (const auto* episode : episodes) {
+                emData.episodes.push_back(*episode);
+            }
+            if (!writer.writeEpisodicMemory(emData)) {
+                NLM_LOG_ERROR("Failed to write episodic memory to checkpoint");
+                return false;
+            }
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -843,70 +880,89 @@ bool Brain::save(const std::string& filepath) const {
     }
 }
 
-bool Brain::load(const std::string& filepath) {
-    NLM_LOG_INFO("Loading brain state from " + filepath);
-    
-    try {
-        CheckpointReader reader;
-        if (!reader.open(filepath)) {
-            NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
-            return false;
-        }
+// Load brain state from file
+    bool Brain::load(const std::string& filepath) {
+        NLM_LOG_INFO("Loading brain state from " + filepath);
         
-        if (!reader.validate()) {
-            NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
-            return false;
-        }
-        
-        // Read neurons
-        NeuronCheckpointData neuronData;
-        if (!reader.readNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to read neurons from checkpoint");
-            return false;
-        }
-        
-        // Apply neuron states
-        size_t idx = 0;
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
+        try {
+            CheckpointReader reader;
+            if (!reader.open(filepath)) {
+                NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
+                return false;
+            }
+            
+            if (!reader.validate()) {
+                NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
+                return false;
+            }
+            
+            // Read neurons
+            NeuronCheckpointData neuronData;
+            if (!reader.readNeurons(neuronData)) {
+                NLM_LOG_ERROR("Failed to read neurons from checkpoint");
+                return false;
+            }
+            
+            // Apply neuron states
+            size_t idx = 0;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (idx < neuronData.membranePotential.size()) {
+                            neuron->setMembranePotential(neuronData.membranePotential[idx]);
+                            neuron->setRestingPotential(neuronData.restingPotential[idx]);
+                            neuron->setThreshold(neuronData.threshold[idx]);
+                            neuron->setResetPotential(neuronData.resetPotential[idx]);
+                            neuron->setLeakConductance(neuronData.leakConductance[idx]);
+                            if (idx < neuronData.firingState.size()) {
+                                neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
+                            }
+                            if (idx < neuronData.refractoryRemaining.size()) {
+                                neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                            }
                         }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
-                        }
+                        idx++;
                     }
-                    idx++;
                 }
             }
-        }
-        
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
+            
+            // Read synapses
+            SynapseCheckpointData synapseData;
+            if (!reader.readSynapses(synapseData)) {
+                NLM_LOG_ERROR("Failed to read synapses from checkpoint");
+                return false;
+            }
+            
+            // Read working memory state if available
+            WorkingMemoryCheckpointData wmData;
+            if (reader.readWorkingMemory(wmData)) {
+                if (pImpl->workingMemory) {
+                    pImpl->workingMemory->clear();
+                    for (size_t i = 0; i < wmData.neuronIds.size() && i < wmData.activations.size(); ++i) {
+                        pImpl->workingMemory->storeToNeuron(wmData.neuronIds[i], wmData.activations[i]);
+                    }
+                }
+            }
+            
+            // Read episodic memory state if available
+            EpisodicMemoryCheckpointData emData;
+            if (reader.readEpisodicMemory(emData)) {
+                if (pImpl->episodicMemory) {
+                    pImpl->episodicMemory->clear();
+                    for (const auto& episode : emData.episodes) {
+                        pImpl->episodicMemory->storeEpisode(episode);
+                    }
+                }
+            }
+            
+            NLM_LOG_INFO("Brain state loaded successfully");
+            return true;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
             return false;
         }
-        
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
-        
-        NLM_LOG_INFO("Brain state loaded successfully");
-        return true;
-        
-    } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
-        return false;
     }
-}
 
 RegionId Brain::addRegion(const std::string& name) {
     RegionId id(pImpl->nextRegionId++);
