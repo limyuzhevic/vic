@@ -55,6 +55,21 @@ public:
     size_t getCapacity() const { return capacity_; }
     void setCapacity(size_t cap) { capacity_ = cap; }
 
+    // Get maximum capacity (soft limit, enforced by enforceCapacity)
+    size_t getMaxCapacity() const { return maxCapacity_; }
+    void setMaxCapacity(size_t max) { maxCapacity_ = max; }
+
+    // Check if at hard capacity
+    bool isAtCapacity() const { return memoryNeurons_.size() >= capacity_; }
+    
+    // Get capacity usage percentage
+    float getUsagePercentage() const {
+        return capacity_ > 0 ? static_cast<float>(memoryNeurons_.size()) / capacity_ : 0.0f;
+    }
+
+    // Force removal of weak traces to enforce capacity limits
+    void enforceCapacity();
+
     // Decay rate for memory traces
     float getDecayRate() const { return decayRate_; }
     void setDecayRate(float rate) { decayRate_ = rate; }
@@ -89,6 +104,7 @@ private:
 
     Brain* brain_;
     size_t capacity_;
+    size_t maxCapacity_;  // Soft limit
     float decayRate_;
     
     // Memory content

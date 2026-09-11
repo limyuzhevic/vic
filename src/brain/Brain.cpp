@@ -509,12 +509,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+// ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Get prediction error and apply to neuromodulation
+        if (pImpl->predictionError) {
+            float error = pImpl->predictionSystem->getPredictionError();
+            pImpl->predictionError->setLevel(error);
+        }
     }
-    
+
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
@@ -525,27 +530,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->attention->processCompetition(competitors);
         }
     }
-    
+
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity to form concepts
+        // Get current sensory representation from working memory or direct observation
+        std::vector<float> currentPattern;
+        if (pImpl->workingMemory) {
+            currentPattern = pImpl->workingMemory->retrieve();
+        }
+        
+        if (!currentPattern.empty()) {
+            pImpl->conceptFormation->processPattern(currentPattern, pImpl->timestep);
+        }
     }
-    
+
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
-    
+
     // ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
+        // Get episodes for replay (based on relevance and recency)
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
             pImpl->episodicMemory->replayEpisode(episode);
         }
     }
-    
+
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
@@ -575,16 +588,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
-    
+
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
-    
+
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+
+    // ========== STEP 16: Update cognitive integration ==========
+    if (pImpl->attention && pImpl->workingMemory) {
+        // Use working memory content to guide attention
+        std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        if (!memoryNeurons.empty()) {
+            // Apply top-down bias based on memory content
+            for (size_t i = 0; i < std::min<size_t>(memoryNeurons.size(), 10); ++i) {
+                pImpl->attention->applyTopDownBias(memoryNeurons[i], 0.5f * (i + 1) / 10.0f);
+            }
+        }
+    }
+
+    if (pImpl->planner) {
+        // Simple planning integration - plan for action based on current state
+        pImpl->planner->update(pImpl->timestep);
+    }
+
+    if (pImpl->conceptFormation && pImpl->attention) {
+        // Concept-driven attention
+        pImpl->attention->applyTopDownBiasToCurrentFocus();
     }
 }
 
@@ -609,9 +644,15 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
+        // ALSO STORE IN WORKING MEMORY - encode sensory input
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+            // Encode sensory input as working memory trace
+            std::vector<float> sensoryPattern(values.size());
+            for (size_t j = 0; j < values.size() && j < sensoryPattern.size(); ++j) {
+                sensoryPattern[j] = static_cast<float>(values[j]) * 0.1f;  // Scale for memory
+            }
+            
+            pImpl->workingMemory->store(sensoryPattern, 1.0f);
         }
     }
 }
@@ -828,6 +869,123 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write inter-region connections
+        InterRegionConnectionData connectionData;
+        for (const auto& conn : pImpl->interRegionConnections) {
+            InterRegionConnectionData::Connection c;
+            c.source = conn.sourceRegion;
+            c.target = conn.targetRegion;
+            c.weight = conn.weight;
+            c.delay = conn.delay;
+            c.plasticityFlags = conn.plasticityFlags;
+            connectionData.connections.push_back(c);
+        }
+        
+        if (!writer.writeInterRegionConnections(connectionData)) {
+            NLM_LOG_ERROR("Failed to write inter-region connections to checkpoint");
+            return false;
+        }
+        
+        // Write working memory
+        if (pImpl->workingMemory) {
+            std::vector<float> wmNeurons;
+            std::vector<float> wmActivations;
+            
+            for (size_t i = 0; i < pImpl->workingMemory->getMemoryNeurons().size(); ++i) {
+                wmNeurons.push_back(pImpl->workingMemory->getMemoryNeurons()[i].index());
+                wmActivations.push_back(pImpl->workingMemory->getNeuronActivation(pImpl->workingMemory->getMemoryNeurons()[i]));
+            }
+            
+            if (!writer.writeWorkingMemory(wmNeurons, wmActivations)) {
+                NLM_LOG_ERROR("Failed to write working memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write episodic memory (simplified for now - just store episode count)
+        if (pImpl->episodicMemory) {
+            size_t episodeCount = pImpl->episodicMemory->getEpisodeCount();
+            if (!writer.writeEpisodicMemoryCount(episodeCount)) {
+                NLM_LOG_ERROR("Failed to write episodic memory count to checkpoint");
+                return false;
+            }
+            
+            // For full episodic memory storage, we would need to serialize all episodes
+            // This is a simplified implementation that stores just the metadata
+            for (size_t i = 0; i < std::min<size_t>(episodeCount, 1000); ++i) {
+                if (const EpisodicMemoryItem* episode = pImpl->episodicMemory->getEpisode(i)) {
+                    EpisodicMemoryData epiData;
+                    epiData.timestamp = episode->timestamp;
+                    epiData.reward = episode->reward;
+                    epiData.action = static_cast<uint8_t>(episode->action);
+                    epiData.age = episode->age;
+                    
+                    if (!writer.writeEpisodicMemoryEpisode(epiData)) {
+                        NLM_LOG_ERROR("Failed to write episodic memory episode to checkpoint");
+                        return false;
+                    }
+                }
+            }
+        }
+        
+        // Write prediction system (simplified)
+        if (pImpl->predictionSystem) {
+            PredictionSystemData predData;
+            predData.predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            if (!writer.writePredictionSystem(predData)) {
+                NLM_LOG_ERROR("Failed to write prediction system to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write cognitive systems (simplified)
+        if (pImpl->planner) {
+            // Could store planner state here
+            if (!writer.writePlannerState(PlannerState())) {
+                NLM_LOG_ERROR("Failed to write planner state to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->attention) {
+            // Could store attention state here
+            if (!writer.writeAttentionState(AttentionState())) {
+                NLM_LOG_ERROR("Failed to write attention state to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->conceptFormation) {
+            // Could store concept formation state here
+            if (!writer.writeConceptFormationState(ConceptFormationState())) {
+                NLM_LOG_ERROR("Failed to write concept formation state to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write neuromodulation state
+        NeuromodulationState nmodState;
+        if (pImpl->dopamine) nmodState.dopamine = pImpl->dopamine->getLevel();
+        if (pImpl->curiosity) nmodState.curiosity = pImpl->curiosity->getLevel();
+        if (pImpl->novelty) nmodState.novelty = pImpl->novelty->getLevel();
+        if (pImpl->predictionError) nmodState.predictionError = pImpl->predictionError->getLevel();
+        
+        if (!writer.writeNeuromodulationState(nmodState)) {
+            NLM_LOG_ERROR("Failed to write neuromodulation state to checkpoint");
+            return false;
+        }
+        
+        // Write development state
+        DevelopmentState devState;
+        devState.developmentalStage = pImpl->developmentalStage;
+        devState.developmentalAge = pImpl->currentTime;
+        
+        if (!writer.writeDevelopmentState(devState)) {
+            NLM_LOG_ERROR("Failed to write development state to checkpoint");
+            return false;
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -1003,8 +1161,6 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
-
 NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
 }
@@ -1017,13 +1173,9 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
-
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
-
-// ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
     return pImpl->planner.get();
@@ -1037,8 +1189,6 @@ AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
-// ========== DEVELOPMENT SYSTEM ==========
-
 DevelopmentSystem* Brain::getDevelopmentSystem() {
     return pImpl->developmentSystem.get();
 }
@@ -1050,8 +1200,6 @@ DevelopmentalStage Brain::getDevelopmentalStage() const {
 void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;
 }
-
-// ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
