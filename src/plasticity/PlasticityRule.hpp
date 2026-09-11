@@ -5,34 +5,56 @@
 
 namespace nlm {
 
-// Abstract base class for plasticity rules
-// PLACEHOLDER - Phase 2 will implement real plasticity rules
+// Abstract base class for synaptic plasticity rules
+// 
+// Defines the interface for implementing synaptic plasticity mechanisms
+// that modify synaptic strengths based on neural activity patterns.
+// 
+// Plasticity rules are essential for learning and memory in the brain,
+// implementing biological learning rules like Hebbian and STDP.
+// 
+// Phase 2 and later will implement real biological plasticity rules
+// with proper mathematical formulations based on neuroscience research.
 
 class PlasticityRule {
 public:
+    /// \brief Virtual destructor for proper cleanup of derived classes
     virtual ~PlasticityRule() = default;
     
-    // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
+    /// \brief Update synaptic weights based on pre/post synaptic activity patterns
+    /// \param synapse The synapse to be modified
+    /// \param preSpikes Vector of pre-synaptic spike timestamps
+    /// \param postSpikes Vector of post-synaptic spike timestamps  
+    /// \param dt Current simulation timestep
+    /// \note Derived classes implement specific plasticity rules
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,
                         TimestepDuration dt) = 0;
     
-    // Apply weight change
+    /// \brief Apply a direct weight change to a synapse
+    /// \param synapse The synapse to modify
+    /// \param delta Weight change to apply (can be positive or negative)
     virtual void applyWeightChange(Synapse* synapse, SynapticWeight delta) = 0;
     
-    // Get rule name
+    /// \brief Get the name/identifier of this plasticity rule
+    /// \return String name of the rule (e.g., "STDP", "Hebbian")
     virtual const char* getName() const = 0;
     
-    // Check if rule is enabled
+    /// \brief Check if the plasticity rule is currently enabled
+    /// \return true if the rule is active, false otherwise
     bool isEnabled() const;
+    
+    /// \brief Enable or disable the plasticity rule
+    /// \param enabled true to enable, false to disable
     void setEnabled(bool enabled);
     
 protected:
+    /// \brief Protected constructor - concrete classes should instantiate
     PlasticityRule() : enabled_(true) {}
     
 private:
+    /// \brief Internal flag indicating whether the rule is active
     bool enabled_;
 };
 

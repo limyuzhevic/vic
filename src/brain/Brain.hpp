@@ -190,10 +190,24 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
-    void logStatus() const;
-    
 private:
+    // Step decomposition methods
+    void processPendingDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateAllNeurons(Timestamp currentTime, TimestepDuration timestep);
+    void detectSpikesAndScheduleSpikeEvents(SimulationStep currentStep, Timestamp currentTime);
+    void updateWorkingMemory(TimestepDuration timestep);
+    void applyNeuromodulationEffects(TimestepDuration timestep);
+    void applyPlasticityRules(TimestepDuration timestep, float plasticityMod);
+    void updateEpisodicMemory(SimulationStep currentStep, Timestamp currentTime);
+    void updatePredictionSystem();
+    void updateAttentionSystem(TimestepDuration timestep);
+    void updateConceptFormation();
+    void applyStructuralPlasticity(SimulationStep currentStep, class RandomGenerator& rng);
+    void replayImportantMemories(SimulationStep currentStep);
+    void applyDevelopmentEffects(SimulationStep currentStep, class RandomGenerator& rng, TimestepDuration timestep);
+    void periodicMemoryConsolidation(SimulationStep currentStep);
+    void checkpointManagement(SimulationStep currentStep, Timestamp currentTime);
+
     struct Impl;
     Impl* pImpl;
 };

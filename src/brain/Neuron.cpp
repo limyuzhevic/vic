@@ -19,9 +19,9 @@ struct Neuron::Impl {
     PlasticityFlags plasticityFlags;
     
     // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr float membrane_capacitance = 1.0f;  // nF
+    static constexpr float time_constant = 20.0f;  // ms
+    static constexpr size_t max_spike_history = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
@@ -210,10 +210,9 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    float tau = Impl::time_constant;  // ms
+    float C = Impl::membrane_capacitance;  // nF
     
-    // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
     // Leak contribution

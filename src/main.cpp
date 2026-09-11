@@ -356,10 +356,11 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file (handle errors gracefully)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
+        NLM_LOG_ERROR("Configuration file not found or invalid: " + configFile);
         NLM_LOG_INFO("Using default configuration.");
     }
     
