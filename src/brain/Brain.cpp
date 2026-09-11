@@ -404,6 +404,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Update working memory with current neural activity patterns
+        // Competition among active traces to select winners
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Apply attention to working memory winners
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            if (pImpl->attention) {
+                pImpl->attention->processCompetition(competitors);
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -488,7 +498,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store active neurons and their activations
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -505,14 +515,60 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Store emotional valance based on novelty/curiosity
+            episode.valence = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+            
+            // Store prediction error
+            episode.predictionError = pImpl->predictionError ? pImpl->predictionError->getLevel() : 0.0f;
+            
+            // Store in episodic memory
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->attention) {
+        // Prediction system integration with attention
+        
+        // Get current brain state summary for prediction
+        std::vector<float> brainStateFeatures;
+        
+        // Extract features from neural populations
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                // Add population activation level
+                float activation = pop->getAverageActivation();
+                brainStateFeatures.push_back(activation);
+                
+                // Add population type for prediction
+                brainStateFeatures.push_back(static_cast<float>(pop->getNeuronType()));
+            }
+        }
+        
+        // Add global metrics for prediction
+        brainStateFeatures.push_back(static_cast<float>(pImpl->totalSpikesThisStep));
+        brainStateFeatures.push_back(static_cast<float>(pImpl->currentStep) / 1000.0f);  // Normalized step
+        brainStateFeatures.push_back(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f);
+        brainStateFeatures.push_back(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f);
+        
+        // Update prediction system with current state
+        if (!brainStateFeatures.empty()) {
+            pImpl->predictionSystem->updatePrediction(brainStateFeatures, currentTime);
+        }
+        
+        // Apply prediction-based attention modulation
+        if (pImpl->predictionSystem) {
+            float predictionConfidence = pImpl->predictionSystem->getConfidence();
+            
+            // High confidence increases attention focus
+            if (pImpl->attention) {
+                float attentionGain = 1.0f + predictionConfidence * 0.5f;
+                pImpl->attention->setFocusGain(attentionGain);
+                
+                // Prediction affects attention dynamics
+                pImpl->attention->updateWithPrediction(predictionConfidence);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
