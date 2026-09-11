@@ -1,8 +1,11 @@
 #include "Config.hpp"
+#include "ConfigJsonHelper.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -15,13 +18,72 @@ Config::Config() : pImpl(std::make_unique<Impl>()) {}
 Config::~Config() = default;
 
 Config::Config(Config&&) noexcept = default;
-
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Helper function to flatten nested JSON objects to key=value pairs
+static void flattenJsonRecursive(const nlohmann::json& json, std::string prefix,
+                                std::unordered_map<std::string, std::string>& result) {
+    if (json.is_object()) {
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            std::string key = prefix.empty() ? it.key() : prefix + "." + it.key();
+            flattenJsonRecursive(it.value(), key, result);
+        }
+    } else if (json.is_array()) {
+        // Handle arrays - treat them as single string values
+        std::stringstream ss;
+        ss << json.dump();
+        result[prefix] = ss.str();
+    } else {
+        // Convert to string based on type
+        std::stringstream ss;
+        if (json.is_string()) {
+            ss << "\"" << json.get<std::string>() << "\"";
+        } else {
+            ss << json.dump();
+        }
+        result[prefix] = ss.str();
+    }
+}
+
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // NEW: Try to load as JSON file first, with fallback to key=value format
+    if (ConfigJsonHelper::isJsonFile(filepath)) {
+        return loadFromJsonFile(filepath);
+    } else {
+        return loadFromKeyValueFile(filepath);
+    }
+}
+
+bool Config::loadFromJsonFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    try {
+        // Parse JSON file
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Flatten nested JSON to key=value pairs
+        std::unordered_map<std::string, std::string> flatConfig;
+        flattenJsonRecursive(jsonData, "", flatConfig);
+        
+        // Set each value
+        for (const auto& pair : flatConfig) {
+            // Convert string to appropriate ConfigValue type
+            ConfigValue value = ConfigJsonHelper::convertStringToConfigValue(pair.second);
+            set(pair.first, value, ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        // Error parsing JSON - fallback to key=value format
+        return loadFromKeyValueFile(filepath);
+    }
+}
+
+bool Config::loadFromKeyValueFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -92,6 +154,7 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
+// Implementation of Config methods
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),

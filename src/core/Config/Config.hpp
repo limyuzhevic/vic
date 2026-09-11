@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -55,7 +56,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format with key=value fallback)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -100,6 +101,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Private implementations for different file formats
+    bool loadFromJsonFile(const std::string& filepath);
+    bool loadFromKeyValueFile(const std::string& filepath);
 };
 
 } // namespace nlm
