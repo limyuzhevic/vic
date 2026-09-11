@@ -7,8 +7,9 @@ namespace nlm {
 struct WorkingMemory::Impl {
     std::vector<std::pair<NeuronId, float>> items;
     size_t capacity;
+    float decayRate;
     
-    Impl(size_t cap) : capacity(cap) {}
+    Impl(size_t cap) : capacity(cap), decayRate(0.01f) {}
 };
 
 WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
@@ -16,14 +17,20 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // Find existing neuron
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
             return;
         }
     }
+    
+    // Add new neuron if capacity allows
     if (pImpl->items.size() < pImpl->capacity) {
+        pImpl->items.emplace_back(neuron, value);
+    } else {
+        // Remove least recently used item (simple FIFO)
+        pImpl->items.erase(pImpl->items.begin());
         pImpl->items.emplace_back(neuron, value);
     }
 }
@@ -108,7 +115,28 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Move high-relevance episodes to long-term storage
+    // For now, just mark relevant episodes
+    for (auto& episode : pImpl->episodes) {
+        // Simple relevance: episodes with high reward or novelty
+        if (episode.reward > relevanceThreshold || episode.novelty > 0.5f) {
+            // Mark for consolidation (in real implementation, would move to long-term)
+            episode.age = 0; // Reset age for consolidated episode
+        } else {
+            // Old episodes age naturally
+            episode.age++;
+        }
+    }
+    
+    // Remove very old low-relevance episodes to make room
+    auto it = pImpl->episodes.begin();
+    while (it != pImpl->episodes.end()) {
+        if (it->age > 1000 && (it->reward < relevanceThreshold * 0.5f && it->novelty < 0.3f)) {
+            it = pImpl->episodes.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 // Semantic Memory Implementation
@@ -199,6 +227,14 @@ void ProceduralMemory::updateProficiency(const std::string& name, float delta) {
     for (auto& skill : pImpl->skills) {
         if (skill.name == name) {
             skill.proficiency = std::clamp(skill.proficiency + delta, 0.0f, 1.0f);
+            // Store proficiency in neural pattern as activation
+            float neuralActivation = skill.proficiency * 2.0f - 1.0f;  // Map [0,1] to [-1,1]
+            
+            // Find the corresponding neural pattern and update
+            for (NeuronId neuronId : skill.neuralPattern) {
+                // In real implementation, this would update the brain's neural activity
+                // For now, just store locally
+            }
             return;
         }
     }
@@ -256,6 +292,7 @@ void AssociativeMemory::updateAssociation(NeuronId a, NeuronId b, float delta) {
         if ((std::get<0>(assoc) == a && std::get<1>(assoc) == b) ||
             (std::get<0>(assoc) == b && std::get<1>(assoc) == a)) {
             std::get<2>(assoc) = std::clamp(std::get<2>(assoc) + delta, 0.0f, 1.0f);
+            // In real implementation, this would strengthen/connect the associated neural pathways
             return;
         }
     }

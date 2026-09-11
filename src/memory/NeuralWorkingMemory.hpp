@@ -9,6 +9,9 @@
 
 namespace nlm {
 
+// Forward declarations
+class Brain;
+
 // NeuralWorkingMemory: Implements working memory using neural dynamics
 // NOT a simple storage vector - uses persistent activity and recurrent connections
 //
@@ -83,6 +86,9 @@ private:
 
     // Decay weak memory traces
     void decayWeakTraces();
+
+    // Find an available neuron from brain regions
+    NeuronId findAvailableNeuron();
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;

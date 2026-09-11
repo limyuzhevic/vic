@@ -184,6 +184,165 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
+#### Working Memory
+
+```python
+import pynlm
+
+# Create brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Get working memory system
+working_memory = brain.getWorkingMemory()
+
+# Store neural pattern
+if working_memory:
+    # Store firing neurons as active traces
+    for region in brain.getRegions():
+        for pop in region->getPopulations():
+            for neuron in pop->getNeurons():
+                if neuron->isFiring():
+                    working_memory->storeToNeuron(neuron->getId(),
+                                                 neuron->getState().membranePotential / 20.0f)
+    
+    # Check active traces
+    print(f"Active working memory traces: {working_memory->getActiveTraces()}")
+```
+
+#### Episodic Memory
+
+```python
+import pynlm
+
+# Create brain and world for an agent-based scenario
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Run an episode to collect memories
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+
+# Get episodic memory
+episodic_memory = brain.getEpisodicMemory()
+if episodic_memory:
+    episodes = episodic_memory->getRecentEpisodes(5)
+    print(f"Recent episodes: {episodes.size()}")
+    for i, episode : episodes.iter():
+        print(f"  Episode {i}: {episode->activeNeurons.size()} neurons, reward={episode->reward}")
+```
+
+#### Prediction System
+
+```python
+import pynlm
+
+# Create brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Get prediction system
+prediction_system = brain.getPredictionSystem()
+if prediction_system:
+    # Run a few steps to train prediction
+    for step in range(50):
+        brain.step(step)
+    
+    # Check prediction accuracy
+    error = prediction_system->getPredictionError()
+    confidence = prediction_system->getPredictionConfidence()
+    print(f"Prediction error: {error:.3f}")
+    print(f"Prediction confidence: {confidence:.3f}")
+```
+
+#### Neuromodulation
+
+```python
+import pynlm
+
+# Create brain and agent
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable all neuromodulation subsystems
+agent.enableRewardModulation(True)      # Dopamine - reward prediction error
+agent.enableCuriosity(True)              # Drives exploration behavior  
+agent.enableNovelty(True)                # Surprise detection
+
+# Run simulation
+for step in range(200):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    
+    # Get neuromodulation levels
+    dopamine = agent.getNeuromodulationLevel()
+    curiosity = agent.getCuriosityLevel()
+    novelty = agent.getNoveltyLevel()
+    
+    if step % 50 == 0:
+        print(f"Step {step}:")
+        print(f"  Dopamine: {dopamine:.3f}")
+        print(f"  Curiosity: {curiosity:.3f}")
+        print(f"  Novelty: {novelty:.3f}")
+        
+        # Apply reward modulation based on world feedback
+        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+```
+
+#### Development System
+
+```python
+import pynlm
+
+# Create brain and agent
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Run a developmental episode
+print("Starting developmental episode...")
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+    agent.updateDevelopment(0.1)  # Update developmental stage
+    
+    if step % 100 == 0:
+        stage = brain.getDevelopmentalStage()
+        print(f"Step {step}: Developmental stage = {stage}")
+        
+        # Observe how development affects plasticity
+        if stage == pynlm.DevelopmentalStage.Maturation:
+            print("  Maturation: Plasticity being reduced for stability")
+        elif stage == pynlm.DevelopmentalStage.CriticalPeriod:
+            print("  Critical Period: High plasticity for learning")
+```
+
 ### Complete Agent Example
 
 ```python

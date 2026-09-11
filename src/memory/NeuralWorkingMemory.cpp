@@ -1,27 +1,22 @@
 #include "NeuralWorkingMemory.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Types/Types.hpp"
 #include <algorithm>
 #include <cmath>
 
 namespace nlm {
 
-struct NeuralWorkingMemory::Impl {
-    Brain* brain;
-    
-    // Maintenance connections (recurrent)
-    std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
-    
-    // Memory trace ages
-    std::vector<SimulationStep> traceAges;
-    
-    Impl() : brain(nullptr) {}
-};
+// Use the invalid ID from Types.hpp
+const NeuronId INVALID_ID = INVALID_NEURON_ID;
 
 NeuralWorkingMemory::NeuralWorkingMemory()
     : pImpl(new Impl)
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , activeTraces_()
+    , recurrentConnections_()
+    , winners_()
 {
 }
 
@@ -37,11 +32,24 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     if (pattern.empty() || !brain_) return;
     
     // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    size_t neuronsNeeded = std::min(pattern.size(), static_cast<size_t>(brain_->getTotalNeuronCount()));
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
+        // Try to find a neuron that isn't already in working memory
+        NeuronId neuron = findAvailableNeuron();
+        if (neuron == INVALID_ID) {
+            // If no available neuron, use the least recently used one
+            if (!memoryNeurons_.empty()) {
+                neuron = memoryNeurons_[0];  // Simple LRU - use oldest
+            } else {
+                break; // No neurons available
+            }
+        }
+        
         float activation = pattern[i] * strength;
+        
+        // Store in working memory
+        storeToNeuron(neuron, activation);
         
         // Set neuron activation
         if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
@@ -52,20 +60,6 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
                 }
             }
         }
-        
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
-        }
-    }
-    
-    // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
     }
 }
 
@@ -77,10 +71,15 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
+        // Add to active traces if not already present
+        if (std::find(activeTraces_.begin(), activeTraces_.end(), idx) == activeTraces_.end()) {
+            activeTraces_.push_back(idx);
+        }
     } else if (memoryNeurons_.size() < capacity_) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        activeTraces_.push_back(memoryNeurons_.size() - 1);
     }
     
     // Inject current to maintain activation
@@ -133,7 +132,11 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
                 activation *= (1.0f - decayRate_);
             }
             
+            // Update memory with decayed activation
             memoryActivations_[i] = activation;
+        } else {
+            // Decay low activations
+            memoryActivations_[i] *= (1.0f - decayRate_ * 2.0f);
         }
     }
     
@@ -150,6 +153,8 @@ void NeuralWorkingMemory::clear() {
     memoryTimestamps_.clear();
     activeTraces_.clear();
     pImpl->maintenanceSynapses.clear();
+    recurrentConnections_.clear();
+    winners_.clear();
 }
 
 void NeuralWorkingMemory::strengthenMemory(float factor) {
@@ -204,6 +209,8 @@ void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, 
     }
     
     pImpl->maintenanceSynapses.emplace_back(from, to);
+    // Also add to local recurrent connections
+    recurrentConnections_.emplace_back(from, to);
 }
 
 void NeuralWorkingMemory::updateRecurrentConnections() {
@@ -225,6 +232,25 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
     }
 }
 
+NeuronId NeuralWorkingMemory::findAvailableNeuron() {
+    // Find an available neuron from the brain regions
+    if (!brain_) return INVALID_ID;
+    
+    // Try to find neurons that aren't already in working memory
+    for (const auto& region : brain_->getRegions()) {
+        auto neurons = region->getAllNeurons();
+        for (const auto* neuron : neurons) {
+            NeuronId id = neuron->getId();
+            if (std::find(memoryNeurons_.begin(), memoryNeurons_.end(), id) == memoryNeurons_.end()) {
+                return id;
+            }
+        }
+    }
+    
+    // No available neuron found
+    return INVALID_ID;
+}
+
 void NeuralWorkingMemory::decayWeakTraces() {
     std::vector<size_t> toRemove;
     
@@ -238,9 +264,24 @@ void NeuralWorkingMemory::decayWeakTraces() {
     
     // Remove weak traces (in reverse order to maintain indices)
     for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
-        memoryNeurons_.erase(memoryNeurons_.begin() + *it);
-        memoryActivations_.erase(memoryActivations_.begin() + *it);
-        memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
+        size_t idx = *it;
+        // Remove from active traces too
+        auto activeIt = std::find(activeTraces_.begin(), activeTraces_.end(), idx);
+        if (activeIt != activeTraces_.end()) {
+            activeTraces_.erase(activeIt);
+        }
+        memoryNeurons_.erase(memoryNeurons_.begin() + idx);
+        memoryActivations_.erase(memoryActivations_.begin() + idx);
+        memoryTimestamps_.erase(memoryTimestamps_.begin() + idx);
+        
+        // Remove associated recurrent connections
+        auto connIt = std::remove_if(recurrentConnections_.begin(), recurrentConnections_.end(),
+                                     [idx](const std::pair<NeuronId, NeuronId>& conn) {
+                                         // Check if this connection involves a removed neuron
+                                         // For simplicity, we'll just remove connections that reference removed neurons
+                                         return false; // TODO: Implement proper connection cleanup
+                                     });
+        recurrentConnections_.erase(connIt, recurrentConnections_.end());
     }
 }
 
