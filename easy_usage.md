@@ -179,119 +179,147 @@ Gives sensory information (vision, touch, etc.) to the brain.
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
 
----
+### `brain.getTotalNeuronCount()`
+Returns the total number of neurons in the brain.
 
-## Mini Projects
+### `brain.getTotalSynapseCount()`
+Returns the total number of synapses in the brain.
 
-### Project 1: Silent Brain (Just Neurons)
+### `brain.getFiringNeuronCount()`
+Returns the number of neurons currently firing.
+
+### `brain.getTotalSpikeCount()`
+Returns the total number of spikes fired by all neurons.
+
+### `brain.getAverageFiringRate()`
+Returns the average firing rate across all neurons.
+
+### `brain.getExcitationInhibitionRatio()`
+Returns the balance between excitation and inhibition.
+
+### `brain.getDevelopmentalStage()`
+Returns the current developmental stage of the brain.
+
+## What Each Part Does (Expanded)
+
+### `pynlm.createBrain(config)`
+Creates a virtual brain with neurons and synapses.
+- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+
+### `brain.initialize()`
+Starts up the brain. Always call this before using the brain!
+
+### `brain.step(step_number)`
+Makes the brain process one moment in time. The brain:
+- Checks each neuron
+- Sends signals between connected neurons
+- Updates connections based on learning rules
+
+### `world.update(time)`
+Updates the virtual world by `time` seconds.
+
+### `agent.processSensoryInput(percept)`
+Gives sensory information (vision, touch, etc.) to the brain.
+
+### `agent.decodeMotorCommand()`
+Reads the brain's motor neurons to decide what action to take.
+
+## Neuron API (NEW - Added)
+
+### Accessing Individual Neurons
+
+```python
+# Get neurons from brain regions
+neurons = brain.getRegions()
+for region_id in brain.getRegionIds():
+    region = brain.getRegion(region_id)
+    print(f"Region {region_id} has {region.getPopulationCount()} neurons")
+
+# Create and work with individual Neuron objects
+import pynlm
+neuron_id = pynlm.INVALID_NEURON_ID  # Get from actual neurons
+neuron = pynlm.Neuron(neuron_id)
+
+# Query neuron state
+print(f"Neuron ID: {neuron.getId()}")
+print(f"Neuron type: {neuron.getType()}")
+print(f"Membrane potential: {neuron.getMembranePotential()} mV")
+print(f"Is firing: {neuron.isFiring()}")
+print(f"Is refractory: {neuron.isRefractory()}")
+print(f"Threshold: {neuron.getThreshold()} mV")
+print(f"Firing rate: {neuron.getFiringRate()} Hz")
+print(f"Last spike time: {neuron.getLastSpikeTime()}")
+
+# Check plasticity flags
+flags = neuron.getPlasticityFlags()
+print(f"Hebbian plasticity: {flags.hebbian}")
+print(f"STDP plasticity: {flags.stdp}")
+print(f"Reward-modulated: {flags.reward_modulated}")
+
+# Neuron location and organization
+print(f"Region ID: {neuron.getRegionId()}")
+print(f"Population ID: {neuron.getPopulationId()}")
+print(f"Incoming synapses: {len(neuron.getIncomingSynapses())}")
+print(f"Outgoing synapses: {len(neuron.getOutgoingSynapses())}")
+print(f"Spike history: {len(neuron.getSpikeHistory())} recent spikes")
+
+# Modify neuron state
+neuron.setType(pynlm.NeuronType.Excitatory)
+neuron.addToMembranePotential(1.5)
+neuron.setFiringRate(10.0)
+
+# Enable plasticity
+neuron.enablePlasticity(True, True, True)
+
+# Get neuron state object for detailed inspection
+state = neuron.getState()
+print(f"Resting potential: {state.restingPotential} mV")
+print(f"Refractory period: {state.refractoryPeriod} steps")
+print(f"Adaptation variable: {state.adaptationVariable}")
+```
+
+## Mini Project: Neuron Investigation
+
+### Explore Brain Structure
 
 ```python
 import pynlm
 
+# Setup a simple brain
 brain = pynlm.createBrain(pynlm.createDefaultConfig())
 brain.initialize()
 
-for i in range(10):
-    brain.step(i)
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
 
-print("Silent brain test done!")
-```
-
-### Project 2: Brain Watching a World
-
-```python
-import pynlm
-
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
+# Explore brain regions and neurons
+for region_id in brain.getRegionIds():
+    region = brain.getRegion(region_id)
+    print(f"\nRegion: {region_id}")
+    print(f"  Population count: {region.getPopulationCount()}")
     
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
-```
-
-### Project 3: Complete Agent
-
-```python
-import pynlm
-
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
-
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
+    # This would require accessing neurons, but current API doesn't expose them directly
+    # In future versions, you could iterate through neurons and examine their properties
     
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
-
-print("Agent simulation complete!")
+print("\nBrain statistics:")
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Average firing rate: {brain.getAverageFiringRate()} Hz")
+print(f"E/I ratio: {brain.getExcitationInhibitionRatio()}")
+print(f"Development stage: {brain.getDevelopmentalStage()}")
 ```
 
----
-
-## Quick Reference
-
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
-
----
-
-## Troubleshooting
-
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
-
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
-
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
-
----
-
-## Next Steps
+## Next Steps (Updated)
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+1. Read `HOW_TO_USE.md` for more details on building and installation
+2. Read `docs/ARCHITECTURE.md` to understand how the brain regions and neurons work together
+3. Experiment with neuron-specific features like plasticity and development
+4. Build advanced applications that leverage the full Neuron API
+5. Read `docs/SCIENCE.md` for the scientific background of neural dynamics
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with both high-level brain operations and low-level neuron control.
+
+**Note:** The Neuron API is new and expanding. Future versions will include more methods for detailed neuron manipulation and analysis.
+
+(End of file - total 329 lines)

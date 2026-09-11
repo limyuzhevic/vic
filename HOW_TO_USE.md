@@ -381,38 +381,191 @@ world.getMaxEnergy()
 world.setMaxEnergy(100.0)
 ```
 
-### Enumerations
+# Neuron Class
 
 ```python
-# Neuron types
-pynlm.NeuronType.Excitatory
-pynlm.NeuronType.Inhibitory
-pynlm.NeuronType.Sensory
-pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
-pynlm.NeuronType.Internal
+# Creation
+neuron = pynlm.Neuron(neuron_id)
 
-# Developmental stages
-pynlm.DevelopmentalStage.Initial
-pynlm.DevelopmentalStage.CriticalPeriod
-pynlm.DevelopmentalStage.Maturation
-pynlm.DevelopmentalStage.Adult
-pynlm.DevelopmentalStage.Aging
+# Identity and Type
+neuron.getId()                    # Get neuron ID
+neuron.getType()                  # Get neuron type (Excitatory, Inhibitory, etc.)
+neuron.setType(neuron_type)       # Set neuron type
 
-# Action types
-pynlm.ActionType.MoveForward
-pynlm.ActionType.TurnLeft
-pynlm.ActionType.Interact
-pynlm.ActionType.Eat
-# ... and more
+# Membrane Potential (LIF dynamics)
+neuron.getMembranePotential()     # Get current membrane potential (mV)
+neuron.setMembranePotential(voltage)      # Set membrane potential
+neuron.addToMembranePotential(delta)      # Add to membrane potential
 
-# World object types
-pynlm.WorldObjectType.Empty
-pynlm.WorldObjectType.Resource
-pynlm.WorldObjectType.Hazard
-pynlm.WorldObjectType.Wall
-pynlm.WorldObjectType.Marker
+# Firing and State
+neuron.isFiring()                # Check if neuron is firing
+neuron.isRefractory()            # Check if neuron is in refractory period
+neuron.setFiringState(state)     # Set firing state
+neuron.getFiringRate()           # Get firing rate (Hz)
+neuron.setFiringRate(rate)       # Set firing rate
+
+# LIF Parameters
+neuron.getThreshold()            # Get firing threshold (mV)
+neuron.setThreshold(threshold)   # Set firing threshold
+neuron.getRestingPotential()     # Get resting potential (mV)
+neuron.setRestingPotential(voltage)      # Set resting potential
+neuron.getResetPotential()       # Get reset potential (mV)
+neuron.setResetPotential(voltage)       # Set reset potential
+neuron.getLeakConductance()      # Get leak conductance (nS)
+neuron.setLeakConductance(conductance)  # Set leak conductance
+neuron.getRefractoryPeriod()     # Get refractory period (steps)
+neuron.setRefractoryPeriod(steps)       # Set refractory period
+
+# Spike Information
+neuron.checkThreshold()          # Check if neuron reached threshold
+neuron.getLastSpikeTime()        # Get last spike timestamp
+neuron.getSpikeHistory()         # Get list of recent spike timestamps
+
+# Synaptic Currents
+neuron.receiveExcitatoryInput(amplitude)    # Receive excitatory input
+neuron.receiveInhibitoryInput(amplitude)    # Receive inhibitory input
+neuron.receiveModulatoryInput(amplitude)    # Receive modulatory input
+neuron.injectCurrent(current)               # Inject external current
+neuron.getTotalCurrent()         # Get total synaptic current
+
+# Synapse Management
+neuron.getIncomingSynapses()     # Get handles of incoming synapses
+neuron.getOutgoingSynapses()     # Get handles of outgoing synapses
+
+# Plasticity Flags
+neuron.getPlasticityFlags()      # Get plasticity flags (const version)
+neuron.getPlasticityFlags()      # Get plasticity flags (non-const)
+neuron.enablePlasticity(hebbian, stdp, rewardModulated)  # Enable plasticity mechanisms
+
+# Development and Organization
+neuron.getRegionId()             # Get region ID where neuron is located
+neuron.setRegionId(region_id)    # Set region ID
+neuron.getPopulationId()         # Get population ID
+neuron.setPopulationId(population_id)      # Set population ID
+
+# State Management
+neuron.step(timestamp)           # Step neuron dynamics
+neuron.reset()                   # Reset to initial state
+neuron.initializeRandom(rng)      # Initialize with random parameters
+
+# Statistics and Monitoring
+neuron.recordSpike(timestamp)    # Record spike occurrence
+neuron.clearSpikeHistory()       # Clear spike history
+neuron.clearTotalCurrent()       # Clear synaptic current
 ```
+
+## Complete Neuron Example
+
+```python
+import pynlm
+from pynlm import NeuronType, FiringState
+
+# Create a brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Get neurons from brain regions (this would be implemented in future versions)
+# For now, let's manually create and test a neuron
+
+# Create a neuron with ID
+neuron = pynlm.Neuron(pynlm.INVALID_NEURON_ID)
+
+# Configure neuron properties
+neuron.setType(NeuronType.Excitatory)
+neuron.setThreshold(-55.0)      # Typical threshold
+neuron.setRestingPotential(-70.0)  # Typical resting potential
+neuron.setResetPotential(-75.0)    # Reset after spike
+neuron.setLeakConductance(10.0)    # Typical leak conductance
+neuron.setRefractoryPeriod(5)      # 5 steps refractory
+
+# Test neuron dynamics
+print("Initial state:")
+print(f"  Type: {neuron.getType()}")
+print(f"  Membrane potential: {neuron.getMembranePotential()} mV")
+print(f"  Threshold: {neuron.getThreshold()} mV")
+print(f"  Is firing: {neuron.isFiring()}")
+print(f"  Is refractory: {neuron.isRefractory()}")
+
+# Simulate some input
+neuron.injectCurrent(15.0)      # Inject excitatory current
+print(f"\nAfter current injection: {neuron.getMembranePotential()} mV")
+
+# Check if threshold would be reached
+print(f"  Would fire: {neuron.checkThreshold()}")
+
+# Test spike recording
+neuron.recordSpike(0.0)
+print(f"  Spike history: {len(neuron.getSpikeHistory())} spikes")
+
+# Enable plasticity
+neuron.enablePlasticity(True, True, True)  # Hebbian, STDP, reward-modulated
+print(f"  Plasticity flags: hebbian={neuron.getPlasticityFlags().hebbian}, "
+      f"stdp={neuron.getPlasticityFlags().stdp}, "
+      f"reward={neuron.getPlasticityFlags().reward_modulated}")
+
+# Test with RandomGenerator for initialization
+import random
+rng = pynlm.RandomGenerator()
+rng.seed(42)
+neuron.initializeRandom(rng)
+print(f"\nAfter random initialization:")
+print(f"  Membrane potential: {neuron.getMembranePotential()} mV")
+print(f"  Threshold: {neuron.getThreshold()} mV")
+print(f"  Refractory period: {neuron.getRefractoryPeriod()} steps")
+
+print("\nNeuron API test complete!")
+```
+
+### Neuron Type Enumeration
+
+```python
+# Available neuron types
+pynlm.NeuronType.Excitatory    # Excitatory neurons (typically +40 to +60 mV reversal)
+pynlm.NeuronType.Inhibitory    # Inhibitory neurons (typically -80 to -70 mV reversal)
+pynlm.NeuronType.Modulatory    # Neuromodulatory neurons (dopamine, acetylcholine, etc.)
+pynlm.NeuronType.Sensory       # Sensory input neurons
+pynlm.NeuronType.Motor         # Motor output neurons
+pynlm.NeuronType.Internal      # Internal interneurons
+```
+
+### Neuron State Structure
+
+The `neuron.getState()` method returns a `NeuronState` object containing:
+
+```python
+# NeuronState fields
+neuron_state.restingPotential     # Resting potential (mV)
+neuron_state.threshold           # Firing threshold (mV)
+neuron_state.resetPotential      # Reset potential (mV)
+neuron_state.leakConductance     # Leak conductance (nS)
+neuron_state.refractoryPeriod    # Refractory period (steps)
+neuron_state.refractoryRemaining # Steps remaining in refractory period
+neuron_state.adaptationVariable  # Spike-frequency adaptation variable
+neuron_state.lastSpikeTime       # Time of last spike (-1 if none)
+neuron_state.firingRate          # Current firing rate (Hz)
+neuron_state.firingState         # Current firing state (Resting, Active, Refractory, Inhibited)
+```
+
+## Notes on Neuron Development
+
+Neurons can be organized into regions and populations:
+
+- **Regions**: Anatomical groupings of neurons (e.g., "cortex", "hippocampus", "amygdala")
+- **Populations**: Functional groups within regions (e.g., "pyramidal", "interneuron")
+
+This allows for developmental changes to affect neurons based on their location and type, mimicking biological brain development.
+
+## Future Enhancements
+
+The Neuron API will continue to expand with:
+
+1. **Synaptic connections**: Direct manipulation of synaptic weights and connections
+2. **Region management**: Create and manage brain regions programmatically
+3. **Population dynamics**: Analyze and control groups of neurons
+4. **Advanced plasticity**: More sophisticated plasticity rules and mechanisms
+5. **Neuromodulation**: Direct control over neuromodulatory systems
+
+The current implementation provides the foundation for detailed neuron-level control, which is essential for advanced brain emulation and research applications.
 
 ---
 
