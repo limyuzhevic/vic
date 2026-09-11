@@ -1,11 +1,20 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 3: World Interaction Demo
 //
-// This phase implements real spiking neural computation with:
+// This demo implements real spiking neural computation with:
 // - Leaky Integrate-and-Fire (LIF) neurons
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+// - Working memory integration
+// - Neuromodulation (dopamine, curiosity)
+// - Episodic memory storage and replay
+// - Prediction system for temporal expectations
+// - Concept formation and generalization
+// - Attention and competitive selection
+// - Planning and action selection
+// - Self-modeling and prediction
+// - Developmental stages and plasticity modulation
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -332,12 +341,21 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("=== NLM Phase 3: World Interaction Demo ===");
     NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+    NLM_LOG_INFO("  - Real LIF neuron dynamics");
     NLM_LOG_INFO("  - Event-driven spike propagation with delays");
     NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("  - Working memory integration");
+    NLM_LOG_INFO("  - Neuromodulation (dopamine, curiosity)");
+    NLM_LOG_INFO("  - Episodic memory storage and replay");
+    NLM_LOG_INFO("  - Prediction system for temporal expectations");
+    NLM_LOG_INFO("  - Concept formation and generalization");
+    NLM_LOG_INFO("  - Attention and competitive selection");
+    NLM_LOG_INFO("  - Planning and action selection");
+    NLM_LOG_INFO("  - Self-modeling and prediction");
+    NLM_LOG_INFO("  - Developmental stages and plasticity modulation");
     NLM_LOG_INFO("");
     
     // Load configuration
