@@ -28,24 +28,47 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printHelp() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+NLM - Neural Learning Machine (熙然)
+===============================
+
+Experimental artificial developmental brain simulation.
+
+USAGE:
+    nlm [options]
+
+OPTIONS:
+    --help, -h                    Show this help message
+    --config=<file>              Load configuration from file
+    --verbose, -v                 Enable verbose logging
+    --log-level=<level>           Set log level (Error, Warning, Info, Debug)
+    --neuron-count=<n>            Override neuron count
+    --steps=<n>                   Run simulation for specified steps
+    --output=<file>               Save brain state to file
+    --load=<file>                 Load brain state from file
+    --seed=<n>                    Set random seed
+    --checkpoint-dir=<dir>        Directory for checkpoint files
+    --checkpoints=<n>              Number of checkpoints to keep
+    --version, -V                 Show version information
+
+EXAMPLES:
+    nlm --config=myconfig.cfg --steps=1000 --output=brain.bin
+    nlm --verbose --log-level=Debug --seed=42
+    nlm --neuron-count=500 --checkpoint-dir=./checkpoints
+
+For more information:
+    Visit https://github.com/nlm-project/nlm
+    Read the documentation in the docs/ directory
+
+Copyright (c) 2026 NLM Authors. MIT License.
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM v0.1.0 - Neural Learning Machine (熙然)" << std::endl;
+    std::cout << "Phase 6: Final Integration" << std::endl;
+    std::cout << "C++20, Python bindings via pybind11" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -322,9 +345,65 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
-    printBanner();
+    // Initialize config
+    auto config = std::make_shared<Config>();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    // Parse command line arguments
+    bool showHelp = false;
+    bool showVersion = false;
+    bool verbose = false;
+    std::string logLevel = "Info";
+    size_t steps = 0; // 0 = run all tests
+    std::string outputFile;
+    std::string loadFile;
+    int64_t neuronCount = -1; // -1 = use config
+    int64_t randomSeed = -1;  // -1 = use config
+    std::string checkpointDir;
+    size_t checkpoints = 10;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--version" || arg == "-V") {
+            showVersion = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+            logLevel = "Debug";
+        } else if (arg.substr(0, 12) == "--log-level=") {
+            logLevel = arg.substr(12);
+        } else if (arg.substr(0, 17) == "--neuron-count=") {
+            neuronCount = std::stoll(arg.substr(17));
+        } else if (arg.substr(0, 11) == "--steps=") {
+            steps = std::stoull(arg.substr(11));
+        } else if (arg.substr(0, 10) == "--output=") {
+            outputFile = arg.substr(10);
+        } else if (arg.substr(0, 9) == "--load=") {
+            loadFile = arg.substr(9);
+        } else if (arg.substr(0, 9) == "--seed=") {
+            randomSeed = std::stoll(arg.substr(9));
+        } else if (arg.substr(0, 19) == "--checkpoint-dir=") {
+            checkpointDir = arg.substr(19);
+        } else if (arg.substr(0, 15) == "--checkpoints=") {
+            checkpoints = std::stoull(arg.substr(15));
+        } else if (arg.substr(0, 8) == "--config") {
+            // Handled earlier
+        } else {
+            NLM_LOG_WARNING("Unknown argument: " + arg);
+        }
+    }
+    
+    // Show help/version and exit
+    if (showHelp) {
+        printHelp();
+        return 0;
+    }
+    
+    if (showVersion) {
+        printVersion();
+        return 0;
+    }
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -332,16 +411,18 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
-    
-    // Load configuration
-    auto config = std::make_shared<Config>();
+    // Configure logging based on verbosity
+    if (verbose) {
+        if (logLevel == "Debug") {
+            consoleLogger->setLevel(LogLevel::Debug);
+        } else if (logLevel == "Info") {
+            consoleLogger->setLevel(LogLevel::Info);
+        } else if (logLevel == "Warning") {
+            consoleLogger->setLevel(LogLevel::Warning);
+        } else if (logLevel == "Error") {
+            consoleLogger->setLevel(LogLevel::Error);
+        }
+    }
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
@@ -365,6 +446,25 @@ int main(int argc, char** argv) {
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
+    
+    // Apply config overrides
+    if (neuronCount >= 0) {
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::CommandLine);
+    }
+    if (randomSeed >= 0) {
+        config->set("random_seed", static_cast<int64_t>(randomSeed), ConfigSource::CommandLine);
+    }
+    if (!checkpointDir.empty()) {
+        config->set("checkpoint_dir", checkpointDir, ConfigSource::CommandLine);
+    }
+    config->set("checkpoint_max_files", static_cast<int64_t>(checkpoints), ConfigSource::CommandLine);
+    
+    // Apply load file if specified
+    if (!loadFile.empty()) {
+        if (!brain->load(loadFile)) {
+            NLM_LOG_ERROR("Failed to load brain state from: " + loadFile);
+        }
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);

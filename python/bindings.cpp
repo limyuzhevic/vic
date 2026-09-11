@@ -160,9 +160,31 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
+                .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Configuration setters/getters
+        .def("set", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value, ConfigSource::Python);
+        }, py::arg("key"), py::arg("value"), "Set integer configuration")
+        .def("set", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, ConfigSource::Python);
+        }, py::arg("key"), py::arg("value"), "Set float configuration")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, ConfigSource::Python);
+        }, py::arg("key"), py::arg("value"), "Set string configuration")
+        .def("get", [](Config& self, const std::string& key, int64_t defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = 0, "Get integer configuration")
+        .def("get", [](Config& self, const std::string& key, float defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = 0.0f, "Get float configuration")
+    py::enum_<ConfigSource>(m, "ConfigSource", R"pbdoc(Configuration source enumeration)")
+        .value("Default", ConfigSource::Default)
+        .value("File", ConfigSource::File)
+        .value("Args", ConfigSource::Args)
+        .value("Python", ConfigSource::Python)
+        .export_values();
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -172,7 +194,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
              "Set the timestamp");
 
-    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
+    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input - 2D grid of visual intensities)")
         .def(py::init<>())
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
              py::arg("channels") = 3)

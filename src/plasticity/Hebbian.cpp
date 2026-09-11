@@ -53,6 +53,21 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
+    // Validate inputs and parameters
+    if (!synapse) {
+        return;
+    }
+    
+    // Check for valid spike times
+    if (preSpikes.empty() || postSpikes.empty()) {
+        return;
+    }
+    
+    // Validate learning rate
+    if (pImpl->learningRate < 0.0f || pImpl->learningRate > 1.0f) {
+        return;
+    }
+    
     // Count correlated spike pairs (simplified covariance)
     size_t correlationCount = 0;
     for (Timestamp preTime : preSpikes) {
@@ -69,7 +84,7 @@ void Hebbian::update(Synapse* synapse,
     // More sophisticated: use actual spike counts and firing rates
     float delta = pImpl->learningRate * static_cast<float>(correlationCount);
     
-    // Apply with bounds
+    // Apply with bounds using enhanced error handling
     if (std::abs(delta) > 1e-6f) {
         applyWeightChange(synapse, delta);
     }

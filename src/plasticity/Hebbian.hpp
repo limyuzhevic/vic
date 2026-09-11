@@ -5,7 +5,11 @@
 namespace nlm {
 
 // Hebbian learning implementation
-class Hebbian : public PlasticityRule {
+// Current implementation: Covariance-based Hebbian learning
+// Mathematical formulation: Δw = η * (coactivity - baseline)
+// Simplified version: Δw = η * (correlationCount) with bounds clamping
+// Implements: "neurons that fire together, wire together" with threshold
+// Biological inspiration: AMPA receptor trafficking, hippocampal learning
 public:
     Hebbian();
     ~Hebbian() override;

@@ -59,6 +59,23 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
+    // Validate inputs and parameters
+    if (!synapse) {
+        return;
+    }
+    
+    // Check for valid spike times
+    if (preSpikes.empty() || postSpikes.empty()) {
+        return;
+    }
+    
+    // Validate time constants and weights
+    if (tau <= 0.0f || pImpl->ltpWeight < 0.0f || pImpl->ltdWeight < 0.0f) {
+        return;
+    }
+    
+    // Calculate time difference between spikes
+    float totalDelta = 0.0f;
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
@@ -84,8 +101,10 @@ void STDP::update(Synapse* synapse,
         float efficacy = synapse->getEfficacy();
         totalDelta *= efficacy;
         
-        // Apply weight change
-        synapse->addToWeight(totalDelta);
+        // Apply weight change with validation
+        if (!synapse->addToWeight(totalDelta)) {
+            return;
+        }
         
         // Update eligibility trace for reward-modulated learning
         float currentTrace = synapse->getEligibilityTrace();

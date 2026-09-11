@@ -5,7 +5,12 @@
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// Current implementation: Pairwise STDP with exponential trace
+// Mathematical formulation: 
+// Δw = A+ * exp(-Δt/τ+) for Δt > 0 (pre before post)
+// Δw = -A- * exp(Δt/τ-) for Δt < 0 (post before pre)
+// Where A+ = ltpWeight, A- = ltdWeight, τ+ = τ- = timeConstant
+// Supports: Weight change clamping, eligibility traces, neuromodulation
 
 class STDP : public PlasticityRule {
 public:
