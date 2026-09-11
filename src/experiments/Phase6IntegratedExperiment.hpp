@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_PHASE6_INTEGRATED_EXPERIMENT_HPP
+#define NLM_PHASE6_INTEGRATED_EXPERIMENT_HPP
 
 /**
  * Phase6IntegratedExperiment - Phase 6 final integration test
@@ -135,4 +136,4 @@ public:
     bool testReplay();
 };
 
-} // namespace nlm
+#endif // NLM_PHASE6_INTEGRATED_EXPERIMENT_HPP

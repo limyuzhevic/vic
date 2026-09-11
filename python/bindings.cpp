@@ -289,6 +289,117 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // Development system
+    py::class_<DevelopmentSystem>(m, "DevelopmentSystem", R"pbdoc(Developmental system for brain maturation)pbdoc")
+        .def("getCurrentStage", &DevelopmentSystem::getCurrentStage,
+             "Get current developmental stage")
+        .def("getAge", &DevelopmentSystem::getAge,
+             "Get current developmental age")
+        .def("getPlasticityRate", &DevelopmentSystem::getPlasticityRate,
+             "Get current plasticity rate")
+        .def("getCriticalPeriod", &DevelopmentSystem::getCriticalPeriod,
+             "Check if in critical period")
+        .def("enableDevelopment", &DevelopmentSystem::enableDevelopment,
+             py::arg("enable"), "Enable or disable development")
+        .def("getStatus", &DevelopmentSystem::getStatus,
+             "Get development system status");
+
+    // Prediction system
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(Prediction and planning system)pbdoc")
+        .def("getPredictionError", &PredictionSystem::getPredictionError,
+             "Get current prediction error")
+        .def("getConfidence", &PredictionSystem::getConfidence,
+             "Get prediction confidence")
+        .def("getPlan", &PredictionSystem::getPlan,
+             py::return_value_policy::reference_internal,
+             "Get current action plan")
+        .def("updatePrediction", &PredictionSystem::updatePrediction,
+             py::arg("error"), "Update prediction based on error")
+        .def("generatePlan", &PredictionSystem::generatePlan,
+             py::arg("goal"), "Generate action plan for goal")
+        .def("getStatus", &PredictionSystem::getStatus,
+             "Get prediction system status");
+
+    // Working memory
+    py::class_<WorkingMemory>(m, "WorkingMemory", R"pbdoc(Working memory for active information)pbdoc")
+        .def("getActiveTraces", &WorkingMemory::getActiveTraces,
+             "Get number of active memory traces")
+        .def("getMemoryCapacity", &WorkingMemory::getMemoryCapacity,
+             "Get working memory capacity")
+        .def("getMemoryLoad", &WorkingMemory::getMemoryLoad,
+             "Get current memory load")
+        .def("addTrace", &WorkingMemory::addTrace,
+             py::arg("trace"), "Add a memory trace")
+        .def("removeTrace", &WorkingMemory::removeTrace,
+             py::arg("traceId"), "Remove a memory trace")
+        .def("getTrace", &WorkingMemory::getTrace,
+             py::arg("traceId"), py::return_value_policy::reference_internal,
+             "Get a memory trace")
+        .def("getAllTraces", &WorkingMemory::getAllTraces,
+             py::return_value_policy::reference_internal,
+             "Get all memory traces")
+        .def("clear", &WorkingMemory::clear,
+             "Clear all memory traces")
+        .def("getStatus", &WorkingMemory::getStatus,
+             "Get working memory status");
+
+    // Episodic memory
+    py::class_<EpisodicMemory>(m, "EpisodicMemory", R"pbdoc(Episodic memory for experience episodes)pbdoc")
+        .def("getEpisodeCount", &EpisodicMemory::getEpisodeCount,
+             "Get number of stored episodes")
+        .def("getMemoryCapacity", &EpisodicMemory::getMemoryCapacity,
+             "Get episodic memory capacity")
+        .def("getReplayBuffer", &EpisodicMemory::getReplayBuffer,
+             py::return_value_policy::reference_internal,
+             "Get episodes available for replay")
+        .def("storeEpisode", &EpisodicMemory::storeEpisode,
+             py::arg("episode"), "Store an episode")
+        .def("recallEpisode", &EpisodicMemory::recallEpisode,
+             py::arg("episodeId"), py::return_value_policy::reference_internal,
+             "Recall an episode by ID")
+        .def("replayEpisodes", &EpisodicMemory::replayEpisodes,
+             py::arg("numEpisodes"), py::return_value_policy::reference_internal,
+             "Replay recent episodes")
+        .def("getConsolidationStatus", &EpisodicMemory::getConsolidationStatus,
+             "Get consolidation status")
+        .def("getStatus", &EpisodicMemory::getStatus,
+             "Get episodic memory status");
+
+    // Neuromodulators
+    py::class_<Curiosity>(m, "Curiosity", R"pbdoc(Curiosity-driven exploration)pbdoc")
+        .def("getLevel", &Curiosity::getLevel,
+             "Get current curiosity level")
+        .def("setLevel", &Curiosity::setLevel, py::arg("level"),
+             "Set curiosity level")
+        .def("getExplorationRate", &Curiosity::getExplorationRate,
+             "Get exploration rate")
+        .def("triggerNoveltyResponse", &Curiosity::triggerNoveltyResponse,
+             "Trigger response to novel stimuli")
+        .def("getStatus", &Curiosity::getStatus,
+             "Get curiosity system status");
+
+    py::class_<Novelty>(m, "Novelty", R"pbdoc(Novelty detection)pbdoc")
+        .def("getLevel", &Novelty::getLevel,
+             "Get current novelty level")
+        .def("detectNovelty", &Novelty::detectNovelty,
+             py::arg("input"), "Detect novelty in input")
+        .def("getNoveltyScore", &Novelty::getNoveltyScore,
+             py::arg("pattern"), "Get novelty score for pattern")
+        .def("getStatus", &Novelty::getStatus,
+             "Get novelty detection status");
+
+    py::class_<PredictionError>(m, "PredictionError", R"pbdoc(Prediction error signaling)pbdoc")
+        .def("getError", &PredictionError::getError,
+             "Get current prediction error")
+        .def("getMagnitude", &PredictionError::getMagnitude,
+             "Get error magnitude")
+        .def("getSign", &PredictionError::getSign,
+             "Get error sign (positive/negative)")
+        .def("reset", &PredictionError::reset,
+             "Reset prediction error")
+        .def("getStatus", &PredictionError::getStatus,
+             "Get prediction error status");
+
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
