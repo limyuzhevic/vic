@@ -58,16 +58,25 @@ struct LearningExperiment {
     std::vector<NeuronId> mostActiveNeurons;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+        : brain(b), seed(s), initialSynapseCount(0), initialWeights(), finalWeights() {}
     
     void recordInitialState() {
+        if (!brain) {
+            NLM_LOG_ERROR("Brain pointer is null in LearningExperiment::recordInitialState");
+            return;
+        }
+        
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
-        // Record initial weights from first region
+        // Record initial weights from first region with proper validation
         if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+            const auto& synapses = region->getSynapses();
+            initialWeights.reserve(synapses.size());
+            for (const auto& syn : synapses) {
+                if (syn) {
+                    initialWeights.push_back(syn->getWeight());
+                }
             }
         }
         
@@ -80,17 +89,35 @@ struct LearningExperiment {
         }
     }
     
+        NLM_LOG_INFO("Initial state recorded:");
+        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
+        if (!initialWeights.empty()) {
+            float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
+            float mean = sum / initialWeights.size();
+            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        }
+    }
+    
     void recordFinalState() {
         finalWeights.clear();
         
-        // Record final weights from first region
+        // Record final weights from first region with validation
         if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+            const auto& synapses = region->getSynapses();
+            finalWeights.reserve(synapses.size());
+            for (const auto& syn : synapses) {
+                if (syn) {
+                    finalWeights.push_back(syn->getWeight());
+                }
             }
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        // Get most active neurons safely
+        if (brain->getSpikeSystem()) {
+            mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        } else {
+            NLM_LOG_WARNING("Spike system not available for recording final state");
+        }
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
@@ -107,11 +134,11 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         
         if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
+            NLM_LOG_ERROR("ERROR: No weights recorded - learning experiment failed");
             return;
         }
         
-        // Compute weight changes
+        // Compute weight changes with proper validation
         float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
         float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
         float initialMean = initialSum / initialWeights.size();
@@ -146,9 +173,14 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
         NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
         
-        // Determine if learning occurred
-        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
-                                (strengthened > 0 || weakened > 0);
+        // Determine if learning occurred with more precise threshold
+        bool learningOccurred = false;
+        float weightChange = std::abs(finalMean - initialMean);
+        if (weightChange > 0.001f) {
+            learningOccurred = true;
+        } else if (strengthened > 0 || weakened > 0) {
+            learningOccurred = true;
+        }
         
         NLM_LOG_INFO("");
         if (learningOccurred) {

@@ -37,6 +37,10 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_improvements {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -119,6 +123,15 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << "Running Improvement tests..." << std::endl;
+    try {
+        test_improvements::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << std::endl;
     if (allPassed) {
         std::cout << "=== All Tests PASSED ===" << std::endl;
@@ -128,3 +141,4 @@ int main() {
         return 1;
     }
 }
+
