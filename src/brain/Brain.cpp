@@ -14,7 +14,13 @@
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../plasticity/STDP.hpp"
+#include "../plasticity/Hebbian.hpp"
+#include "../plasticity/StructuralPlasticity.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../performance/MemoryPool.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -22,11 +28,67 @@
 
 namespace nlm {
 
+// Helper functions for memory pool integration
+namespace brain_internal {
+    // Helper to create Neuron from memory pool
+    Neuron* createNeuronFromPool(NeuronPool& pool, NeuronId id) {
+        if (!pool.isEnabled()) return nullptr;
+        
+        // Try to allocate from neuron pool
+        NeuronId poolId = pool.allocate();
+        if (poolId == INVALID_NEURON_ID) {
+            return nullptr;
+        }
+        // In a real implementation, we would return a Neuron* that wraps the pool allocation
+        // For now, return nullptr as a placeholder
+        return nullptr;
+    }
+    
+    // Helper to create Synapse from memory pool
+    Synapse* createSynapseFromPool(SynapsePool& pool, SynapseId id, NeuronId source, NeuronId destination) {
+        if (!pool.isEnabled()) return nullptr;
+        
+        // Try to allocate from synapse pool
+        SynapseId poolId = pool.allocate(source, destination);
+        if (poolId == INVALID_SYNAPSE_ID) {
+            return nullptr;
+        }
+        // In a real implementation, we would return a Synapse* that wraps the pool allocation
+        // For now, return nullptr as a placeholder
+        return nullptr;
+    }
+    
+    // Helper to deallocate neuron from memory pool
+    void deallocateNeuronToPool(NeuronPool& pool, Neuron* neuron) {
+        if (neuron && neuron->getId() != INVALID_NEURON_ID) {
+            pool.deallocate(neuron->getId());
+        }
+    }
+    
+    // Helper to deallocate synapse from memory pool
+    void deallocateSynapseToPool(SynapsePool& pool, Synapse* synapse) {
+        if (synapse && synapse->getId() != INVALID_SYNAPSE_ID) {
+            pool.deallocate(synapse->getId());
+        }
+    }
+}
+
 struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+    
+    // Memory pools for neurons and synapses
+    NeuronPool neuronPool;
+    SynapsePool synapsePool;
+    
+    // Track allocation mode
+    bool useMemoryPools;
+    
+    // Fallback pools when memory pools are disabled
+    std::vector<std::unique_ptr<Neuron>> fallbackNeurons;
+    std::vector<std::unique_ptr<Synapse>> fallbackSynapses;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -90,8 +152,9 @@ struct Brain::Impl {
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(100)
+        , consolidationInterval(1000)
+        , useMemoryPools(true)  // Default to using memory pools
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -105,6 +168,17 @@ struct Brain::Impl {
         stdp = std::make_unique<STDP>();
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
+        
+        // Configure neuron and synapse pool sizes from config
+        size_t neuronPoolSize = config->getOr<size_t>("neuron_pool_size", 1024);
+        size_t synapsePoolSize = config->getOr<size_t>("synapse_pool_size", 4096);
+        neuronPool.reserve(neuronPoolSize);
+        synapsePool.reserve(synapsePoolSize);
+        
+        // Disable memory pools if explicitly requested
+        if (config->has("disable_memory_pools")) {
+            useMemoryPools = false;
+        }
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
@@ -156,6 +230,36 @@ struct Brain::Impl {
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
 };
+
+// Helper functions for memory pool integration
+namespace nlm {
+    namespace brain_internal {
+        // Helper to create Neuron from memory pool
+        Neuron* createNeuronFromPool(NeuronPool& pool, NeuronId id) {
+            // Try to allocate from neuron pool
+            NeuronId poolId = pool.allocate();
+            if (poolId != INVALID_NEURON_ID) {
+                // We need to get the actual neuron object from the pool
+                // This is a simplified implementation
+                // In a real implementation, we would access the SoA directly
+                return nullptr; // Placeholder
+            }
+            return nullptr;
+        }
+        
+        // Helper to create Synapse from memory pool
+        Synapse* createSynapseFromPool(SynapsePool& pool, SynapseId id, NeuronId source, NeuronId destination) {
+            // Try to allocate from synapse pool
+            SynapseId poolId = pool.allocate(source, destination);
+            if (poolId != INVALID_SYNAPSE_ID) {
+                // We need to get the actual synapse object from the pool
+                // This is a simplified implementation
+                return nullptr; // Placeholder
+            }
+            return nullptr;
+        }
+    }
+}
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
@@ -215,8 +319,8 @@ bool Brain::initialize() {
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
     
@@ -1107,11 +1211,16 @@ void Brain::logStatus() const {
     
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+                     " (" + region->getName() + "): " +
+                     std::to_string(region->getTotalNeuronCount()) + " neurons, " +
+                     std::to_string(region->getSynapseCount()) + " synapses, " +
+                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+void Brain::getMemoryStats(size_t& neuronPoolUsage, size_t& synapsePoolUsage) const {
+    neuronPoolUsage = pImpl->neuronPool.memoryUsage();
+    synapsePoolUsage = pImpl->synapsePool.memoryUsage();
 }
 
 } // namespace nlm

@@ -3,6 +3,10 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 namespace nlm {
 
@@ -19,39 +23,137 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // First try to open file to check if it exists and is readable
+    if (!std::filesystem::exists(filepath)) {
+        std::cerr << "Config::loadFromFile: File does not exist: " << filepath << std::endl;
+        return false;
+    }
     
+    if (!std::filesystem::is_regular_file(filepath)) {
+        std::cerr << "Config::loadFromFile: Path is not a regular file: " << filepath << std::endl;
+        return false;
+    }
+    
+    // Try JSON parsing first (modern config format)
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            std::cerr << "Config::loadFromFile: Cannot open file for reading: " << filepath << std::endl;
+            return false;
+        }
+        
+        json j;
+        file >> j;
+        file.close();
+        
+        // Clear existing entries before loading new ones
+        clear();
+        
+        // Parse JSON into Config entries
+        if (j.is_object()) {
+            for (auto it = j.begin(); it != j.end(); ++it) {
+                std::string key = it.key();
+                std::string description = "Configuration parameter: " + key;
+                
+                // Handle different value types
+                ConfigValue configValue;
+                const auto& val = it.value();
+                
+                if (val.is_number_integer()) {
+                    configValue = val.get<int64_t>();
+                } else if (val.is_number_float()) {
+                    configValue = val.get<double>();
+                } else if (val.is_boolean()) {
+                    configValue = val.get<bool>();
+                } else if (val.is_string()) {
+                    configValue = val.get<std::string>();
+                } else if (val.is_array()) {
+                    // Convert JSON array to std::vector based on element type
+                    if (!val.empty()) {
+                        if (val[0].is_number_integer()) {
+                            std::vector<int> intArray;
+                            for (const auto& item : val) {
+                                intArray.push_back(item.get<int>());
+                            }
+                            configValue = intArray;
+                        } else if (val[0].is_number_float()) {
+                            std::vector<double> doubleArray;
+                            for (const auto& item : val) {
+                                doubleArray.push_back(item.get<double>());
+                            }
+                            configValue = doubleArray;
+                        } else if (val[0].is_string()) {
+                            std::vector<std::string> stringArray;
+                            for (const auto& item : val) {
+                                stringArray.push_back(item.get<std::string>());
+                            }
+                            configValue = stringArray;
+                        }
+                    }
+                }
+                
+                set(key, configValue, ConfigSource::File, description);
+            }
+        }
+        
+        std::cout << "Config::loadFromFile: Successfully loaded JSON configuration from: " << filepath << std::endl;
+        return true;
+        
+    } catch (const json::parse_error& e) {
+        // JSON parsing failed, fall back to simple format
+        std::cout << "Config::loadFromFile: JSON parse error (" << e.what() << "), falling back to simple format: " << filepath << std::endl;
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+    }
+    
+    // Fallback to simple key=value format with better error handling
+    clear();
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        std::cerr << "Config::loadFromFile: Cannot open file for reading: " << filepath << std::endl;
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs with better validation
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            std::cerr << "Config::loadFromFile: Invalid format at line " << lineNumber 
+                     << " (missing '='): " << line << std::endl;
+            continue; // Skip malformed lines but continue parsing
         }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Validate key
+        if (key.empty()) {
+            std::cerr << "Config::loadFromFile: Empty key at line " << lineNumber << std::endl;
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        set(key, value, ConfigSource::File, "Loaded from simple format");
     }
     
+    std::cout << "Config::loadFromFile: Successfully loaded simple configuration from: " << filepath << std::endl;
     return true;
 }
 

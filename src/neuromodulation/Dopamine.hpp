@@ -1,5 +1,10 @@
+#pragma once
+
 #include "Neuromodulator.hpp"
 #include <algorithm>
+#include <cmath>
+#include <thread>
+#include <mutex>
 
 namespace nlm {
 
@@ -20,7 +25,7 @@ public:
     void signalRewardPredictionError(float error);
     
     // Additional methods for enhanced functionality
-    void initialize(class Brain* brain);
+    void initialize(Brain* brain);
     void setBaseline(float baseline);
     void setReleaseRate(float rate);
     void setDecayRate(float rate);

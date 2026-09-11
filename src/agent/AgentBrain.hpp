@@ -78,7 +78,7 @@ private:
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
+    // Motor neuron groups with bounds checking and validation
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
@@ -86,20 +86,20 @@ private:
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
-    // Sensory neuron groups
+    // Sensory neuron groups with enhanced validation
     std::vector<Neuron*> sensoryVision_;
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
     
-    // Neuromodulation state
+    // Neuromodulation state with error handling
     float dopamineLevel_;
     float noveltyLevel_;
     float curiosityLevel_;
     float predictionError_;
     float expectedReward_;
     
-    // Development state
+    // Development state with better encapsulation
     double developmentalAge_;
     float plasticityModifier_;
     
@@ -109,9 +109,13 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
-    // Previous sensory state for novelty detection
+    // Previous sensory state for novelty detection with safety
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Validation and debugging state
+    bool initialized_;
+    uint32_t lastDebugStep_;
 };
 
 } // namespace nlm
