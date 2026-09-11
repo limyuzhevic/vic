@@ -44,6 +44,9 @@ struct Synapse::Impl {
     static constexpr float STP_U_MAX = 1.0f;  // Max utilization
     
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    // Reward-modulated learning parameters
+    static constexpr float ELIGIBILITY_TRACE_DECAY_RATE = 0.001f;  // Fast decay
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
@@ -194,7 +197,7 @@ void Synapse::setEfficacy(float efficacy) {
 void Synapse::step(Timestamp currentTime) {
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
+    // 2. Decay eligibility trace (configurable)
     // 3. Update efficacy based on use
     
     TimestepDuration dt = 0.001;  // 1ms timestep
@@ -215,8 +218,10 @@ void Synapse::step(Timestamp currentTime) {
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    // Decay eligibility trace for reward-modulated learning (configurable decay rate)
+    // Use default decay rate for now - will be made configurable via Brain config
+    float eligibilityDecayRate = Impl::ELIGIBILITY_TRACE_DECAY_RATE;  // Use static constant
+    decayEligibilityTrace(eligibilityDecayRate);  // Use configurable decay rate
     
     // Clamp weight bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);

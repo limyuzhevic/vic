@@ -247,8 +247,9 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        // Update adaptation for spike-frequency adaptation (bounded to prevent runaway growth)
+        // Adaptation variable increases by 1.0f but is reset to a lower baseline after refractory period
+        pImpl->state.adaptationVariable = std::min(pImpl->state.adaptationVariable + 1.0f, Impl::MAX_ADAPTATION_VARIABLE);
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
