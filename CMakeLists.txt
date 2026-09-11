@@ -143,6 +143,16 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 enable_testing()
 add_subdirectory(tests)
 
+# Phase 6 Integration Test executable
+add_executable(nlm_phase6_tests
+    tests/test_phase6_integration.cpp
+)
+target_link_libraries(nlm_phase6_tests PUBLIC nlm_core)
+add_test(NAME phase6_integration
+    COMMAND nlm_phase6_tests
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
     ARCHIVE DESTINATION lib

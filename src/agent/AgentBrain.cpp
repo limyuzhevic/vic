@@ -279,37 +279,26 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     }
 }
 
-void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+void AgentBrain::step(Timestamp currentTime) {
+    // Main integration step: process all subsystems
+    // Called from world simulation loop, connects brain to environment
     
-    developmentalAge_ += timestep;
-    
-    // Simple developmental stages based on age
-    // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
-        plasticityModifier_ = 1.0f;  // High plasticity
-        brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
-        plasticityModifier_ = 0.8f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
-    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
-        plasticityModifier_ = 0.5f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
-    } else {
-        plasticityModifier_ = 0.2f;  // Adult - more stable
-        brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
+    // 1. Apply neuromodulation (dopamine, curiosity, etc.)
+    if (rewardModulationEnabled_) {
+        applyRewardModulation(0.0f, expectedReward_);  // Use prediction error from previous step
     }
     
-    // Structural plasticity changes with development
-    if (structuralPlasticityEnabled_) {
-        auto* sp = brain_->getStructuralPlasticity();
-        if (sp) {
-            // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
-            sp->setSynaptogenesisRate(synRate);
-            sp->setPruningRate(pruneRate);
-        }
+    // 2. Update development system (brain ages and matures)
+    if (developmentEnabled_) {
+        // Use a small timestep for development updates (e.g., 100ms per simulation step)
+        double developmentTimestep = 0.1;
+        updateDevelopment(developmentTimestep);
+    }
+    
+    // 3. Process any internal curiosity-driven updates
+    if (curiosityEnabled_) {
+        // Update novelty detection based on recent sensory changes
+        // This is already handled in processSensoryInput()
     }
 }
 
