@@ -140,28 +140,35 @@ public:
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
+    // TODO PHASE 2: Implement proper working memory integration with neural activity patterns
     NeuralWorkingMemory* getWorkingMemory();
     
     // Episodic memory - experience storage
+    // TODO PHASE 2: Implement proper episodic memory with neural pattern storage
     NeuralEpisodicMemory* getEpisodicMemory();
     
     // Associative memory - pattern associations
+    // TODO PHASE 2: Implement associative memory with neural connections and Hebbian learning
     NeuralAssociativeMemory* getAssociativeMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
+    // TODO PHASE 2: Integrate prediction system with brain's neural dynamics
     PredictionSystem* getPredictionSystem();
     
     // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
+    // TODO PHASE 2: Implement neural planning with attention and evaluation
     NeuralPlanner* getPlanner();
     
     // Concept formation for pattern discovery
+    // TODO PHASE 2: Implement concept formation from neural activity patterns
     ConceptFormation* getConceptFormation();
     
     // Attentional selection for focus
+    // TODO PHASE 2: Implement attentional selection to prioritize neural processing
     AttentionalSelection* getAttention();
     
     // ========== DEVELOPMENT SYSTEM ==========

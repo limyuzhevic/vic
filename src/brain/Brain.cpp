@@ -20,6 +20,16 @@
 #include <cmath>
 #include <sstream>
 
+// Forward declarations for helper classes used in Brain implementation
+namespace nlm {
+    class BrainInitializer;
+    class BrainStepProcessor;
+    class BrainMemoryManager;
+    class BrainNeuromodulationManager;
+    class BrainDevelopmentManager;
+    class BrainCheckpointManager;
+}
+
 namespace nlm {
 
 struct Brain::Impl {
