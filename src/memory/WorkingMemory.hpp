@@ -1,107 +1,58 @@
+// Memory System APIs
 namespace nlm {
 
-// Working memory: temporary active storage of information
 class WorkingMemory {
 public:
     WorkingMemory();
     ~WorkingMemory();
     
-    // Store item
     void store(NeuronId neuron, float value);
-    
-    // Retrieve item
     float retrieve(NeuronId neuron) const;
-    
-    // Check if item exists
     bool contains(NeuronId neuron) const;
-    
-    // Clear all
     void clear();
-    
-    // Get capacity
     size_t getCapacity() const;
     size_t getCurrentSize() const;
-    
-    // Decay all items
     void decay(float decayRate);
-    
-    // Get all items
     std::vector<std::pair<NeuronId, float>> getAllItems() const;
-    
-    // Get memory pressure (0.0 to 1.0)
     float getMemoryPressure() const;
-    
-    // Reset with new capacity
     void reset(size_t newCapacity);
 };
 
-// Episodic memory: storage of events and experiences
 class EpisodicMemory {
 public:
     EpisodicMemory();
     ~EpisodicMemory();
     
-    // Store episode
     void storeEpisode(const std::string& event, const std::vector<NeuronId>& neurons, 
                      const std::vector<float>& values, const std::string& metadata = "");
-    
-    // Retrieve episode
     std::tuple<SimulationStep, std::vector<NeuronId>, std::vector<float>, std::string> 
         retrieveEpisode(size_t index) const;
-    
-    // Get episode count
     size_t getEpisodeCount() const;
-    
-    // Get recent episodes
     std::vector<std::tuple<SimulationStep, std::string>> getRecentEpisodes(size_t count) const;
-    
-    // Clear all
     void clear();
-    
-    // Memory consolidation (move to long-term)
     void consolidate(float relevanceThreshold);
-    
-    // Get episode by event name
     std::tuple<SimulationStep, std::vector<NeuronId>, std::vector<float>, std::string> 
         getEpisodeByEvent(const std::string& event) const;
-    
-    // Get episodes with specific metadata tag
     std::vector<std::tuple<SimulationStep, std::string, std::string>> 
         getEpisodesByMetadata(const std::string& tag) const;
 };
 
-// Associative memory: relationships between representations
 class AssociativeMemory {
 public:
     AssociativeMemory();
     ~AssociativeMemory();
     
-    // Create association between concepts
     void associate(const std::string& conceptA, const std::string& conceptB, float strength);
     void associate(NeuronId neuronA, NeuronId neuronB, float strength);
-    
-    // Get associated concepts/neurons
     std::vector<std::string> getAssociations(const std::string& concept) const;
     std::vector<NeuronId> getAssociations(NeuronId neuron) const;
-    
-    // Get association strength
     float getAssociationStrength(const std::string& conceptA, const std::string& conceptB) const;
     float getAssociationStrength(NeuronId a, NeuronId b) const;
-    
-    // Update association
     void updateAssociation(const std::string& conceptA, const std::string& conceptB, float delta);
     void updateAssociation(NeuronId a, NeuronId b, float delta);
-    
-    // Clear all
     void clear();
-    
-    // Remove specific association
     bool removeAssociation(const std::string& conceptA, const std::string& conceptB);
-    
-    // Get all associations as pairs
     std::vector<std::tuple<std::string, std::string, float>> getAllAssociations() const;
-    
-    // Compute similarity between concepts
     float computeSimilarity(const std::string& conceptA, const std::string& conceptB) const;
     float computeSimilarity(NeuronId a, NeuronId b) const;
 };

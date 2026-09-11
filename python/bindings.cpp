@@ -15,6 +15,24 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/memory/WorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/brain/NeuralAssociativeMemory.hpp"
+#include "../src/memory/Memory.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/performance/CheckpointSystem.hpp"
+#include "../src/performance/Monitoring.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/plasticity/PlasticityRule.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/plasticity/StructuralPlasticity.hpp"
+#include "../src/dynamics/SpikeSystem.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -347,11 +365,22 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
+            .def("setSerotoninLevel", &Brain::setSerotoninLevel,
+             py::arg("level"), "Set serotonin neuromodulation level")
+        .def("getSerotoninLevel", &Brain::getSerotoninLevel,
+             "Get serotonin neuromodulation level")
+        .def("getDopamine", &Brain::getDopamine,
              py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Get dopamine neuromodulator object")
+        .def("getAcetylcholine", &Brain::getAcetylcholine,
+             py::return_value_policy::reference_internal,
+             "Get acetylcholine neuromodulator object")
+        .def("getNorepinephrine", &Brain::getNorepinephrine,
+             py::return_value_policy::reference_internal,
+             "Get norepinephrine neuromodulator object")
+        .def("getSerotonin", &Brain::getSerotonin,
+             py::return_value_policy::reference_internal,
+             "Get serotonin neuromodulator object");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

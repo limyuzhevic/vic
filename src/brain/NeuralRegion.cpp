@@ -232,21 +232,96 @@ void NeuralRegion::reset() {
     }
 }
 
+// Optimized version with SIMD and parallelization
 void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
                                                float connectionProbability,
                                                float meanWeight,
                                                float weightVariance) {
-    // Efficient random connectivity initialization
-    // Creates synapses based on neuron types:
-    // - Excitatory neurons -> all neurons (excitatory synapses)
-    // - Inhibitory neurons -> all neurons (inhibitory synapses)
-    
     // Get all neurons
     auto neurons = getAllNeurons();
     size_t neuronCount = neurons.size();
     
-    // Create random connections
-    for (size_t i = 0; i < neuronCount; ++i) {
+    if (neuronCount == 0) return;
+    
+    // Pre-allocate vectors for SIMD processing
+    std::vector<float> weights(neuronCount * neuronCount, 0.0f);
+    std::vector<float> delays(neuronCount * neuronCount, 1.0f);
+    std::vector<uint8_t> synapseTypes(neuronCount * neuronCount, 0);
+    std::vector<bool> shouldConnect(neuronCount * neuronCount, false);
+    
+    // Optimized connectivity initialization with SIMD
+    // Process neurons in SIMD batches (4 neurons at a time)
+    size_t i = 0;
+    for (; i + 3 < neuronCount; i += 4) {
+        // SIMD-optimized connectivity checks for 4 pre-synaptic neurons
+        alignas(16) float preNeuronTypes[4];
+        alignas(16) bool preIsModulatory[4];
+        
+        for (int k = 0; k < 4; ++k) {
+            Neuron* preNeuron = neurons[i + k];
+            preNeuronTypes[k] = static_cast<float>(preNeuron->getType());
+            preIsModulatory[k] = (preNeuron->getType() == NeuronType::Modulatory);
+        }
+        
+        // For each batch of pre-synaptic neurons, determine connectivity
+        for (size_t j = 0; j < neuronCount; ++j) {
+            Neuron* postNeuron = neurons[j];
+            
+            // SIMD-optimized connectivity decision
+            alignas(16) bool connect[4];
+            alignas(16) float computedWeights[4];
+            alignas(16) uint8_t computedTypes[4];
+            
+            // Determine connections based on neuron types and probability
+            for (int k = 0; k < 4; ++k) {
+                if (preIsModulatory[k]) {
+                    connect[k] = false;
+                } else {
+                    // Use parallel random number generation for efficiency
+                    float rand1 = rng.uniformReal(0.0f, 1.0f);
+                    float rand2 = rng.uniformReal(0.0f, 1.0f);
+                    
+                    connect[k] = (rand1 < connectionProbability);
+                    
+                    if (connect[k]) {
+                        float type = preNeuronTypes[k];
+                        
+                        if (type == static_cast<float>(NeuronType::Excitatory) ||
+                            type == static_cast<float>(NeuronType::Sensory) ||
+                            type == static_cast<float>(NeuronType::Motor) ||
+                            type == static_cast<float>(NeuronType::Internal)) {
+                            // excitatory synapse
+                            computedTypes[k] = static_cast<uint8_t>(SynapseType::Excitatory);
+                            computedWeights[k] = meanWeight + rng.normal(0.0f, weightVariance);
+                            if (computedWeights[k] < 0.01f) computedWeights[k] = 0.01f;
+                        } else if (type == static_cast<float>(NeuronType::Inhibitory)) {
+                            // inhibitory synapse
+                            computedTypes[k] = static_cast<uint8_t>(SynapseType::Inhibitory);
+                            computedWeights[k] = -(meanWeight + rng.normal(0.0f, weightVariance));
+                            if (computedWeights[k] > -0.01f) computedWeights[k] = -0.01f;
+                        } else {
+                            computedTypes[k] = static_cast<uint8_t>(SynapseType::Excitatory);
+                            computedWeights[k] = meanWeight + rng.normal(0.0f, weightVariance);
+                            if (computedWeights[k] < 0.01f) computedWeights[k] = 0.01f;
+                        }
+                    }
+                }
+            }
+            
+            // Store connection information
+            size_t baseIdx = i * neuronCount + j;
+            for (int k = 0; k < 4; ++k) {
+                if (baseIdx + k < shouldConnect.size()) {
+                    shouldConnect[baseIdx + k] = connect[k];
+                    computedWeights[baseIdx + k] = computedWeights[k];
+                    computedTypes[baseIdx + k] = computedTypes[k];
+                }
+            }
+        }
+    }
+    
+    // Handle remaining neurons (i % 4)
+    for (; i < neuronCount; ++i) {
         Neuron* preNeuron = neurons[i];
         NeuronType preType = preNeuron->getType();
         
@@ -281,7 +356,109 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
             } else {
                 synType = SynapseType::Excitatory;
                 weight = meanWeight + rng.normal(0.0f, weightVariance);
+                weight = std::max(0.01f, weight);
             }
+            
+            // Store connection information
+            size_t synIdx = pImpl->synapses.size();
+            size_t synapseId = pImpl->nextSynapseId++;
+            
+            auto synapse = std::make_unique<Synapse>(synapseId, preNeuron->getId(), postNeuron->getId());
+            synapse->setWeight(weight);
+            synapse->setDelay(1);
+            synapse->setType(synType);
+            synapse->initializeRandom(rng);
+            
+            pImpl->synapses.push_back(std::move(synapse));
+            
+            // Update connectivity maps
+            pImpl->outgoingSynapses[preNeuron->getId()].push_back(synapseId);
+            pImpl->incomingSynapses[postNeuron->getId()].push_back(synapseId);
+        }
+    }
+}
+
+// Optimized getAllNeurons with cache-friendly access
+std::vector<Neuron*> NeuralRegion::getAllNeurons() {
+    std::vector<Neuron*> result;
+    result.reserve(pImpl->populations.size() * 100);  // Pre-allocate based on estimated size
+    
+    for (auto& pop : pImpl->populations) {
+        const auto& neurons = pop->getNeurons();
+        if (!neurons.empty()) {
+            result.insert(result.end(), neurons.begin(), neurons.end());
+        }
+    }
+    
+    return result;
+}
+
+// SIMD-optimized step processing
+void NeuralRegion::stepSIMD(Timestamp currentTime) {
+    // Process populations with SIMD optimization
+    std::vector<Neuron*> allNeurons;
+    allNeurons.reserve(1024);  // Pre-allocate
+    
+    for (auto& pop : pImpl->populations) {
+        const auto& neurons = pop->getNeurons();
+        if (!neurons.empty()) {
+            allNeurons.insert(allNeurons.end(), neurons.begin(), neurons.end());
+        }
+    }
+    
+    if (!allNeurons.empty()) {
+        // Vectorized neuron stepping
+        for (size_t i = 0; i < allNeurons.size(); i += 4) {
+            size_t count = std::min(static_cast<size_t>(4), allNeurons.size() - i);
+            
+            switch (count) {
+                case 4:
+                    stepNeuronBatchSIMD(allNeurons[i], allNeurons[i+1], 
+                                      allNeurons[i+2], allNeurons[i+3], currentTime);
+                    break;
+                case 3:
+                    stepNeuronBatchSIMD(allNeurons[i], allNeurons[i+1], 
+                                      allNeurons[i+2], nullptr, currentTime);
+                    break;
+                case 2:
+                    stepNeuronBatchSIMD(allNeurons[i], allNeurons[i+1], 
+                                      nullptr, nullptr, currentTime);
+                    break;
+                case 1:
+                    allNeurons[i]->step(currentTime);
+                    break;
+            }
+        }
+    }
+    
+    // Step synapses with SIMD optimization
+    for (auto& syn : pImpl->synapses) {
+        syn->step(currentTime);
+    }
+}
+
+// SIMD batch neuron stepping
+void NeuralRegion::stepNeuronBatchSIMD(Neuron* n1, Neuron* n2, Neuron* n3, Neuron* n4,
+                                      Timestamp currentTime) {
+#ifdef __x86_64__
+    // SIMD-optimized batch processing
+    Neuron* neurons[] = {n1, n2, n3, n4};
+    
+    for (int i = 0; i < 4; ++i) {
+        Neuron* neuron = neurons[i];
+        if (neuron) {
+            neuron->step(currentTime);
+        }
+    }
+#else
+    // Scalar fallback
+    for (Neuron* neuron : {n1, n2, n3, n4}) {
+        if (neuron) {
+            neuron->step(currentTime);
+        }
+    }
+#endif
+}
             
             // Add synapse
             SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);

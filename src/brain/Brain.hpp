@@ -6,6 +6,7 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../core/AdvancedMemoryPool.hpp"
 #include <memory>
 #include <string>
 
@@ -19,15 +20,23 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class SemanticMemory;
+class ProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
+class Reward;
 class PredictionError;
+class CheckpointSystem;
+class PerformanceMonitor;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -98,13 +107,25 @@ public:
     std::unique_ptr<class Action> produceAction();
     
     // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    void applyNeuromodulation(const Neuromodulator& signal);
     
-    // Update plasticity rules (called automatically in step)
-    void updatePlasticity();
+    // Set neuromodulation levels
+    void setDopamineLevel(float level);
+    void setAcetylcholineLevel(float level);
+    void setNorepinephrineLevel(float level);
+    void setSerotoninLevel(float level);
     
-    // Apply developmental changes (called automatically in step)
-    void develop();
+    // Get neuromodulation levels
+    float getDopamineLevel() const;
+    float getAcetylcholineLevel() const;
+    float getNorepinephrineLevel() const;
+    float getSerotoninLevel() const;
+    
+    // Get neuromodulator objects
+    Dopamine* getDopamine();
+    Acetylcholine* getAcetylcholine();
+    Norepinephrine* getNorepinephrine();
+    Serotonin* getSerotonin();
     
     // Reset brain state
     void reset();
@@ -148,6 +169,12 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
+    // Semantic memory - acquired knowledge
+    SemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - learned skills
+    ProceduralMemory* getProceduralMemory();
+    
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
@@ -170,19 +197,130 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
+    // Get developmental parameters
+    float getMaturationRate() const;
+    float getSynaptogenesisRate() const;
+    float getPruningThreshold() const;
+    
     // ========== NEUROMODULATION SYSTEMS ==========
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
     
     // Novelty - novelty detection
     Novelty* getNovelty();
     
+    // Curiosity - exploration motivation
+    Curiosity* getCuriosity();
+    
+    // Reward - reward signal for reinforcement learning
+    Reward* getReward();
+    
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Apply neuromodulation signal
+    void applyNeuromodulation(const Neuromodulator& signal);
+    
+    // Set neuromodulation levels
+    void setDopamineLevel(float level);
+    void setAcetylcholineLevel(float level);
+    void setNorepinephrineLevel(float level);
+    void setSerotoninLevel(float level);
+    
+    // Get neuromodulation levels
+    float getDopamineLevel() const;
+    float getAcetylcholineLevel() const;
+    float getNorepinephrineLevel() const;
+    float getSerotoninLevel() const;
+    
+    // ========== CHECKPOINT MANAGEMENT ==========
+    
+    // Get checkpoint system
+    CheckpointSystem* getCheckpointSystem();
+    
+    // Create checkpoint
+    bool createCheckpoint(const std::string& name, const std::string& description = "");
+    
+    // Restore from checkpoint
+    bool restoreCheckpoint(const std::string& name);
+    
+    // List checkpoints
+    std::vector<std::string> listCheckpoints() const;
+    
+    // Get checkpoint metadata
+    std::string getCheckpointMetadata(const std::string& name) const;
+    
+    // ========== PERFORMANCE MONITORING ==========
+    
+    // Get performance monitor
+    PerformanceMonitor* getPerformanceMonitor();
+    
+    // Get brain state statistics
+    struct BrainStateStats {
+        size_t totalNeurons;
+        size_t activeNeurons;
+        size_t firingNeurons;
+        float averageFiringRate;
+        float excitationInhibitionRatio;
+        size_t totalSpikes;
+        size_t memoryPressure;
+        float neuromodulationLoad;
+        double simulationTime;
+    };
+    
+    BrainStateStats getBrainStateStats() const;
+    
+    // Get neural activity patterns
+    std::vector<float> getNeuralActivityPattern(size_t regionId = 0) const;
+    
+    // Get connectivity statistics
+    struct ConnectivityStats {
+        size_t totalSynapses;
+        float averageStrength;
+        float maxStrength;
+        float minStrength;
+        size_t denseConnections;
+    };
+    
+    ConnectivityStats getConnectivityStats() const;
+    
+    // Get visualization data
+    std::string getVisualizationData() const;
+    
+    // ========== DEVELOPMENT APIs ==========
+    
+    // Get developmental stage
+    DevelopmentalStage getDevelopmentalStage() const;
+    
+    // Methods for tracking developmental progress
+    float getDevelopmentalProgress() const;
+    
+    // Get developmental parameters
+    float getDevelopmentalParameter(const std::string& parameter) const;
+    void setDevelopmentalParameter(const std::string& parameter, float value);
+    
+    // Methods for accessing developmental stage
+    const char* getCurrentStageName() const;
+    float getTimeInCurrentStage() const;
+    
+    // Methods for accessing developmental parameters
+    float getCriticalPeriodProgress() const;
+    float getMaturationProgress() const;
+    float getPlasticityModifier() const;
+    
+    // Methods for tracking developmental progress
+    void advanceStage();
+    void completeDevelopment();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
