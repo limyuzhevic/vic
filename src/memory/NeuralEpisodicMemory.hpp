@@ -29,6 +29,8 @@ struct EpisodicMemoryItem {
     float reward;
     float energy;
     float novelty;
+    float spikeCount;  // Number of spikes in this episode
+    float memoryActivity;  // Working memory activity level
     
     // Consequence of action
     std::vector<float> resultingSensoryState;
@@ -41,10 +43,13 @@ struct EpisodicMemoryItem {
     // Time since this episode
     SimulationStep age;
     
+    // Additional metadata
+    std::vector<uint64_t> attendedRegions;  // Regions that received attention
+    
     EpisodicMemoryItem()
         : timestamp(0), positionX(0), positionY(0), orientation(0)
         , action(ActionType::Wait)
-        , reward(0), energy(0), novelty(0)
+        , reward(0), energy(0), novelty(0), spikeCount(0), memoryActivity(0)
         , resultingReward(0), age(0) {}
 };
 

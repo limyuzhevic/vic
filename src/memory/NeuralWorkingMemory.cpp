@@ -43,14 +43,18 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+        // Set neuron activation by finding the neuron in brain regions
+        bool found = false;
+        for (auto& region : brain_->getRegions()) {
+            auto neurons = region->getAllNeurons();
+            for (auto* nn : neurons) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
+                    found = true;
                     break;
                 }
             }
+            if (found) break;
         }
         
         // Update stored activation

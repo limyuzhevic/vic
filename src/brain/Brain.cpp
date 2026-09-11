@@ -261,9 +261,23 @@ bool Brain::initialize() {
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
+        // Store spike information in episodic memory
+        if (pImpl->episodicMemory) {
+            // Create a spike event for episodic memory
+            EpisodicMemoryItem spikeEvent;
+            spikeEvent.timestamp = pImpl->currentStep;
+            spikeEvent.action = ActionType::Wait;  // Neutral action for spike events
+            spikeEvent.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            spikeEvent.energy = 1.0f;
+            spikeEvent.novelty = 0.5f;
+            
+            // Record the spiking neuron
+            spikeEvent.activeNeurons.push_back(event.source_neuron);
+            spikeEvent.neuronActivations.push_back(1.0f);  // Full firing
+            
+            // Store spike as episode
+            pImpl->episodicMemory->storeEpisode(spikeEvent);
+        }
     });
     
     // Register delayed spike handler to deliver synaptic input
@@ -487,8 +501,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            episode.energy = 1.0f;  // Base energy
             
-            // Store active neurons
+            // Store active neurons and their activation levels
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,8 +517,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
+            // Store position/orientation as simplified representation
+            // This could come from motor neurons or internal state
+            episode.positionX = 0.0f;  // TODO: Get from actual position if available
+            episode.positionY = 0.0f;
+            episode.orientation = 0.0f;
+            
+            // Store current action based on motor neuron activity
+            if (!pImpl->motorNeurons.empty()) {
+                size_t firingMotor = 0;
+                for (auto* neuron : pImpl->motorNeurons) {
+                    if (neuron->isFiring()) {
+                        ++firingMotor;
+                    }
+                }
+                if (firingMotor > 0) {
+                    episode.action = ActionType::MoveForward;
+                }
+            }
+            
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Store novelty level
+            episode.novelty = 0.5f;  // Baseline, could be updated by novelty detector
+            
+            // Create sensory state encoding from active neurons
+            if (pImpl->sensoryNeurons.size() > 0) {
+                // Encode sensory input as simple pattern
+                episode.sensoryState.resize(std::min(size_t(50), pImpl->sensoryNeurons.size()));
+                for (size_t i = 0; i < episode.sensoryState.size(); ++i) {
+                    if (i < pImpl->sensoryNeurons.size()) {
+                        episode.sensoryState[i] = std::abs(pImpl->sensoryNeurons[i]->getState().membranePotential - 
+                                                         pImpl->sensoryNeurons[i]->getState().restingPotential) / 20.0f;
+                    }
+                }
+            }
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
@@ -828,6 +877,206 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+// Write random generator state
+        if (pImpl->rng) {
+            uint64_t seed = pImpl->rng->getSeed();
+            if (!writer.writeSection(CheckpointSection::RandomState, &seed, sizeof(uint64_t))) {
+                NLM_LOG_ERROR("Failed to write random generator state to checkpoint");
+            }
+        }
+        
+        // Write spike system state
+        if (pImpl->spikeSystem) {
+            // Get spike history
+            const auto& history = pImpl->spikeSystem->getSpikeHistory();
+            if (!history.empty()) {
+                // Write spike history section
+                size_t historySize = history.size();
+                if (!writer.writeSection(CheckpointSection::SpikeHistory, &historySize, sizeof(size_t))) {
+                    NLM_LOG_ERROR("Failed to write spike history size to checkpoint");
+                }
+                if (!writer.writeSection(CheckpointSection::SpikeHistory, history.data(), history.size() * sizeof(DetailedSpikeEvent))) {
+                    NLM_LOG_ERROR("Failed to write spike history to checkpoint");
+                }
+            }
+        }
+        
+        // Write neuromodulation systems
+        if (pImpl->dopamine) {
+            // Write dopamine state
+            float dopamineLevel = pImpl->dopamine->getDopamineLevel();
+            if (!writer.writeSection(CheckpointSection::Neuromodulation, &dopamineLevel, sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write dopamine state to checkpoint");
+            }
+        }
+        if (pImpl->curiosity) {
+            // Write curiosity state
+            float curiosityLevel = pImpl->curiosity->getCuriosityLevel();
+            if (!writer.writeSection(CheckpointSection::Neuromodulation, &curiosityLevel, sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write curiosity state to checkpoint");
+            }
+        }
+        if (pImpl->predictionError) {
+            // Write prediction error state
+            float predictionErrorLevel = pImpl->predictionError->getPredictionErrorLevel();
+            if (!writer.writeSection(CheckpointSection::Neuromodulation, &predictionErrorLevel, sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write prediction error state to checkpoint");
+            }
+        }
+        if (pImpl->novelty) {
+            // Write novelty state
+            float noveltyLevel = pImpl->novelty->getNoveltyLevel();
+            if (!writer.writeSection(CheckpointSection::Neuromodulation, &noveltyLevel, sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write novelty state to checkpoint");
+            }
+        }
+        
+        // Write prediction system
+        if (pImpl->predictionSystem) {
+            // Write prediction system state
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float confidence = pImpl->predictionSystem->getConfidence();
+            const auto& errorHistory = pImpl->predictionSystem->getErrorHistory();
+            
+            // Write error count and confidence
+            size_t errorHistorySize = errorHistory.size();
+            if (!writer.writeSection(CheckpointSection::Prediction, &predictionError, sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write prediction error to checkpoint");
+            }
+            if (!writer.writeSection(CheckpointSection::Prediction, &confidence, sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write prediction confidence to checkpoint");
+            }
+            if (!writer.writeSection(CheckpointSection::Prediction, &errorHistorySize, sizeof(size_t))) {
+                NLM_LOG_ERROR("Failed to write prediction error history size to checkpoint");
+            }
+            if (!errorHistory.empty() && !writer.writeSection(CheckpointSection::Prediction, errorHistory.data(), errorHistory.size() * sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write prediction error history to checkpoint");
+            }
+        }
+        
+        // Write cognitive systems
+        if (pImpl->planner) {
+            // Write neural planner state
+            float planningConfidence = pImpl->planner->getPlanningConfidence();
+            std::queue<bool> recentSuccess = pImpl->planner->getRecentPlanSuccess();
+            size_t recentSuccessSize = recentSuccess.size();
+            
+            if (!writer.writeSection(CheckpointSection::Neurons, &planningConfidence, sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write planning confidence to checkpoint");
+            }
+            if (!writer.writeSection(CheckpointSection::Neurons, &recentSuccessSize, sizeof(size_t))) {
+                NLM_LOG_ERROR("Failed to write recent success size to checkpoint");
+            }
+            // TODO: Write actual recent success data
+        }
+        if (pImpl->conceptFormation) {
+            // Write concept formation state
+            size_t conceptCount = pImpl->conceptFormation->getConceptCount();
+            if (!writer.writeSection(CheckpointSection::Neurons, &conceptCount, sizeof(size_t))) {
+                NLM_LOG_ERROR("Failed to write concept count to checkpoint");
+            }
+        }
+        if (pImpl->attention) {
+            // Write attention state
+            std::vector<RegionId> attendedRegions = pImpl->attention->getAttendedRegions();
+            size_t attendedRegionsSize = attendedRegions.size();
+            if (!writer.writeSection(CheckpointSection::Neurons, &attendedRegionsSize, sizeof(size_t))) {
+                NLM_LOG_ERROR("Failed to write attended regions size to checkpoint");
+            }
+            if (!attendedRegions.empty() && !writer.writeSection(CheckpointSection::Neurons, attendedRegions.data(), attendedRegions.size() * sizeof(RegionId))) {
+                NLM_LOG_ERROR("Failed to write attended regions to checkpoint");
+            }
+        }
+        
+        // Write development system
+        if (pImpl->developmentSystem) {
+            // Write development system state
+            DevelopmentalStage stage = pImpl->developmentSystem->getDevelopmentalStage();
+            float developmentRate = pImpl->developmentSystem->getDevelopmentRate();
+            
+            if (!writer.writeSection(CheckpointSection::Development, &stage, sizeof(DevelopmentalStage))) {
+                NLM_LOG_ERROR("Failed to write developmental stage to checkpoint");
+            }
+            if (!writer.writeSection(CheckpointSection::Development, &developmentRate, sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write development rate to checkpoint");
+            }
+        }
+        
+        // Write memory systems
+        if (pImpl->workingMemory) {
+            // Write working memory state
+            size_t activeTraces = pImpl->workingMemory->getActiveTraces();
+            float memoryActivity = pImpl->workingMemory->getMemoryActivity();
+            
+            if (!writer.writeSection(CheckpointSection::Memory, &activeTraces, sizeof(size_t))) {
+                NLM_LOG_ERROR("Failed to write working memory active traces to checkpoint");
+            }
+            if (!writer.writeSection(CheckpointSection::Memory, &memoryActivity, sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write working memory activity to checkpoint");
+            }
+        }
+        if (pImpl->episodicMemory) {
+            // Write episodic memory state
+            size_t episodeCount = pImpl->episodicMemory->getEpisodeCount();
+            float averageReward = pImpl->episodicMemory->getAverageReward();
+            
+            if (!writer.writeSection(CheckpointSection::Memory, &episodeCount, sizeof(size_t))) {
+                NLM_LOG_ERROR("Failed to write episodic memory count to checkpoint");
+            }
+            if (!writer.writeSection(CheckpointSection::Memory, &averageReward, sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write episodic memory average reward to checkpoint");
+            }
+        }
+        if (pImpl->associativeMemory) {
+            // Write associative memory state
+            size_t associationCount = pImpl->associativeMemory->getAssociationCount();
+            
+            if (!writer.writeSection(CheckpointSection::Memory, &associationCount, sizeof(size_t))) {
+                NLM_LOG_ERROR("Failed to write associative memory count to checkpoint");
+            }
+        }
+        
+        // Write simulation state
+        {
+            struct SimulationState {
+                SimulationStep step;
+                Timestamp time;
+                DevelopmentalStage developmentalStage;
+            } simState;
+            simState.step = pImpl->currentStep;
+            simState.time = pImpl->currentTime;
+            simState.developmentalStage = pImpl->developmentalStage;
+            
+            if (!writer.writeSection(CheckpointSection::SimulationState, &simState, sizeof(SimulationState))) {
+                NLM_LOG_ERROR("Failed to write simulation state to checkpoint");
+            }
+        }
+
+        // Finalize
+        if (!writer.finalize()) {
+            NLM_LOG_ERROR("Failed to finalize checkpoint");
+            return false;
+        }
+        
+        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
+        return true;
+        
+    // Write simulation state
+    {
+        struct SimulationState {
+            SimulationStep step;
+            Timestamp time;
+            DevelopmentalStage developmentalStage;
+        } simState;
+        simState.step = pImpl->currentStep;
+        simState.time = pImpl->currentTime;
+        simState.developmentalStage = pImpl->developmentalStage;
+        
+        if (!writer.writeSection(CheckpointSection::SimulationState, &simState, sizeof(SimulationState))) {
+            NLM_LOG_ERROR("Failed to write simulation state to checkpoint");
+        }
+    }
+
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -895,17 +1144,119 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - need to restore synapses to their saved states
+        // For each saved synapse, find the actual synapse and restore its state
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                if (synapseIdx < synapseData.weight.size()) {
+                    syn->setWeight(synapseData.weight[synapseIdx]);
+                    if (synapseIdx < synapseData.delay.size()) {
+                        syn->setDelay(synapseData.delay[synapseIdx]);
+                    }
+                    if (synapseIdx < synapseData.eligibilityTrace.size()) {
+                        syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx]);
+                    }
+                    if (synapseIdx < synapseData.efficacy.size()) {
+                        syn->setEfficacy(synapseData.efficacy[synapseIdx]);
+                    }
+                    if (synapseIdx < synapseData.shortTermDepression.size()) {
+                        syn->setShortTermDepression(synapseData.shortTermDepression[synapseIdx]);
+                    }
+            // Read simulation state
+        {
+            struct SimulationState {
+                SimulationStep step;
+                Timestamp time;
+                DevelopmentalStage developmentalStage;
+            } simState;
+            
+            std::vector<uint8_t> simSection = reader.readSection(CheckpointSection::SimulationState);
+            if (!simSection.empty()) {
+                if (simSection.size() >= sizeof(SimulationState)) {
+                    memcpy(&simState, simSection.data(), sizeof(SimulationState));
+                    pImpl->currentStep = simState.step;
+                    pImpl->currentTime = simState.time;
+                    pImpl->developmentalStage = simState.developmentalStage;
+                }
+            }
+        }
         
+        // Read memory systems state
+        {
+            std::vector<uint8_t> workingMemorySection = reader.readSection(CheckpointSection::Memory);
+            if (!workingMemorySection.empty()) {
+                // TODO: Deserialize working memory state
+            }
+        }
+        
+        // Read episodic memory state
+        {
+            std::vector<uint8_t> episodicMemorySection = reader.readSection(CheckpointSection::Memory);
+            if (!episodicMemorySection.empty()) {
+                // TODO: Deserialize episodic memory state
+            }
+        }
+        
+        // Read associative memory state
+        {
+            std::vector<uint8_t> associativeMemorySection = reader.readSection(CheckpointSection::Memory);
+            if (!associativeMemorySection.empty()) {
+                // TODO: Deserialize associative memory state
+            }
+        }
+        
+        // Read development system state
+        {
+            std::vector<uint8_t> developmentSection = reader.readSection(CheckpointSection::Development);
+            if (!developmentSection.empty()) {
+                // TODO: Deserialize development system state
+            }
+        }
+        
+        // Read neuromodulation systems state
+        {
+            std::vector<uint8_t> neuromodulationSection = reader.readSection(CheckpointSection::Neuromodulation);
+            if (!neuromodulationSection.empty()) {
+                // TODO: Deserialize neuromodulation systems state
+            }
+        }
+        
+        // Read prediction system state
+        {
+            std::vector<uint8_t> predictionSection = reader.readSection(CheckpointSection::Prediction);
+            if (!predictionSection.empty()) {
+                // TODO: Deserialize prediction system state
+            }
+        }
+        
+        // Read cognitive systems state
+        {
+            std::vector<uint8_t> cognitionSection = reader.readSection(CheckpointSection::Neurons);
+            if (!cognitionSection.empty()) {
+                // TODO: Deserialize cognitive systems state
+            }
+        }
+        
+        // Read random generator state
+        {
+            std::vector<uint8_t> randomSection = reader.readSection(CheckpointSection::RandomState);
+            if (!randomSection.empty() && pImpl->rng) {
+                // TODO: Deserialize random generator state
+            }
+        }
+        
+        // Read spike system state
+        {
+            std::vector<uint8_t> spikeSection = reader.readSection(CheckpointSection::SpikeHistory);
+            if (!spikeSection.empty()) {
+                // TODO: Deserialize spike system state
+            }
+        }
+        
+        // Finalize
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
-        
-    } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
-        return false;
-    }
 }
 
 RegionId Brain::addRegion(const std::string& name) {
