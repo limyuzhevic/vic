@@ -82,37 +82,168 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
-## Project Structure
-
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
+│   ├── agent/           # Agent systems (brain-body interface)
+│   │   ├── AgentBrain/     # Sensory processing, motor decoding
+│   │   ├── SensoryPercept/ # Sensory data packets
+│   │   └── AgentBody/      # Physical agent properties
+│   ├── brain/          # Neural components (working)
 │   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── neuromodulation/ # Neuromodulators
+│   ├── memory/        # Memory systems (partially disconnected)
+│   ├── prediction/     # Prediction systems (partially disconnected)
+│   ├── cognition/      # Cognitive mechanisms (implemented but disconnected)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
+│   ├── world/         # Environment interface
+│   ├── environment/   # Abstract environment
+│   ├── experiments/   # Experiment framework
 │   └── visualization/  # Visualization
-├── tests/
-└── configs/
+
+## Phase Summary
+
+### Phase 1 (Complete)
+- Project skeleton
+- Core types and configuration
+- Neural interfaces
+
+### Phase 2 (Complete)
+- Real membrane potential dynamics
+- Event-driven spike propagation
+- STDP and Hebbian plasticity
+- Structural plasticity
+
+### Phase 3 (Complete)
+- World interaction loop
+- Sensory input and motor output
+- Reward prediction error
+- Developmental stages
+- Novelty and curiosity
+
+### Phase 4 (Complete)
+- Neural prediction system
+- Working memory
+- Episodic memory
+- Concept formation
+- Neural attention
+- Predictive planning
+- Self-model
+- Social learning
+- Continual learning
+
+### Phase 5 (Complete)
+- Performance optimizations
+- Memory pools and event queues
+- SIMD vectorization
+- Parallel processing
+- Checkpoint system
+
+### Phase 6 (PLANNING - NOT COMPLETE)
+- **Status**: Integration planned, but not yet achieved
+- **Focus**: Connecting existing disconnected systems
+- **Key Challenges**: 
+  - NeuralWorkingMemory not integrated into brain loop
+  - EpisodicMemory never updated with experiences
+  - Prediction system not integrated
+  - Cognitive systems disconnected from action selection
+  - Reward modulation doesn't integrate with memory systems
+
+## Implementation Status
+
+### ✅ WORKING & INTEGRATED:
+- LIF neuron dynamics with event-driven spikes
+- STDP and Hebbian plasticity rules
+- Structural plasticity (synaptogenesis/pruning)
+- Sensory processing (vision, touch, internal, proprioception)
+- Motor decoding and action execution
+- Reward prediction error computation
+- Novelty and curiosity mechanisms
+- Developmental stages and plasticity modulation
+- Basic neuromodulation (dopamine-like signals)
+- Eligibility traces for reward-modulated learning
+- Agent/Body system with energy and state management
+- Phase 3 experiment demo working
+
+### ⚠️ PARTIALLY IMPLEMENTED/CONNECTED:
+- NeuralWorkingMemory: Implemented but not integrated into brain loop
+- NeuralEpisodicMemory: Exists but not used
+- PredictionSystem: Basic prediction implemented but not integrated
+- NeuralPlanner: Implemented but not used
+- ConceptFormation: Partially implemented
+- SocialLearning: Implemented but not integrated
+
+### ❌ MISSING/PLACEHOLDER:
+- Brain::save() and Brain::load() are stubs
+- NeuralWorkingMemory not integrated into brain loop
+- EpisodicMemory never updated with experiences
+- Prediction system never trained with real data
+- NeuralPlanner never used for action selection
+- Concept formation never processes experiences
+
+## Integration Test Availability
+
+### Phase 6 Integration Components
+Phase 6 will focus on connecting:
+
+1. **Memory Systems**: Working memory for active maintenance
+2. **Prediction Systems**: Temporal sequence learning
+3. **Cognition Systems**: Planning, attention, concept formation
+4. **Neuromodulation**: Reward, curiosity, novelty signals
+5. **Development**: Stage-based plasticity modulation
+
+### Current Status
+- **Phase 3**: Working and functional
+- **Phase 4**: Implemented but disconnected
+- **Phase 5**: Performance infrastructure in progress
+- **Phase 6**: Integration planned (connect existing systems)
+
+## Anti-Transformer Principle
+
+Throughout all phases, NLM must NEVER become:
+- A transformer architecture
+- An LLM
+- A pretrained model
+- A conventional deep learning system
+- "LLM + memory"
+- "LLM + tools"
+
+The architecture must always be based on:
+- Individual neurons
+- Synapses
+- Spike-based communication
+- Neural plasticity
+- Developmental processes
+
+If at any point the architecture begins to resemble a transformer, it should be redirected or the project renamed to clarify it is no longer NLM.
+
+## Running Examples
+
+### Phase 3 Demo (Working)
+```bash
+# Basic world interaction demo
+./nlm_phase3_demo [num_trials] [max_steps]
 ```
+
+### Phase 4 Demo (Disconnected Components)
+```bash
+# Cognitive experiments - note: systems are implemented but disconnected
+./nlm_phase4_demo [num_trials]
+```
+
+## Scientific Background
+
+For detailed scientific background, refer to:
+- `docs/SCIENCE.md` - Biological motivation and computational implementation
+- `docs/LIMITATIONS.md` - What NLM is not and current limitations
+- `docs/PHASE6_FINAL_AUDIT.md` - Detailed system integration analysis
+- `docs/EXPERIMENTS.md` - Experimental framework and test procedures
+
+## License
+
+MIT
+
+## Authors
+
+Research project — See docs for scientific background.
 
 ## Phase Summary
 

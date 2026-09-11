@@ -21,7 +21,7 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
+# Core library - ONLY files that actually exist
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
@@ -50,6 +50,7 @@ add_library(nlm_core STATIC
     src/development/Maturation.cpp
     # Neuromodulation
     src/neuromodulation/Neuromodulator.cpp
+    src/neuromodulation/Dopamine.cpp
     src/neuromodulation/Reward.cpp
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
@@ -119,7 +120,7 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Main executable
 add_executable(nlm

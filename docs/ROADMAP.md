@@ -142,17 +142,76 @@
 - [x] docs/RESEARCH_METHODS.md - Scientific methodology
 - [ ] docs/FAILURES.md - Failed experiments (to be created)
 
-## Phase 6 — Future Directions (NOT STARTED)
+## Phase 6 — FUTURE INTEGRATION (UPCOMING)
+**Status**: Planning
 
-### Potential Directions
-- GPU acceleration for large-scale simulations
-- Distributed simulation across machines
-- More detailed neuron models (Hodgkin-Huxley)
-- Calcium-based plasticity mechanisms
-- Glial cell interactions
-- Anatomically constrained connectivity
-- Reinforcement learning integration
-- Hierarchical planning structures
+### Phase 6 Goals
+Phase 6 will focus on integrating the existing disconnected systems into a coherent artificial brain. The brain has the *anatomy* of a cognitive system but lacks the *integration* that makes it function as a coherent artificial brain.
+
+### Key Integration Challenges (Phase 6)
+
+#### Priority 1: CONNECT EXISTING SYSTEMS
+1. Connect NeuralWorkingMemory to sensory processing
+2. Connect NeuralEpisodicMemory to experience logging
+3. Connect PredictionSystem to sensory processing
+4. Connect NeuralPlanner to action selection
+5. Connect ConceptFormation to experience processing
+
+#### Priority 2: IMPLEMENT MISSING MECHANISMS
+1. Implement Brain::save() and Brain::load() using CheckpointSystem
+2. Implement sleep/rest cycle with memory consolidation
+3. Implement replay mechanism
+4. Implement full dopamine effects on plasticity
+5. Implement attention mechanisms for neuromodulation
+6. Implement social learning integration
+
+#### Priority 3: VALIDATE INTEGRATION
+1. Test memory retention over time
+2. Test prediction accuracy improvement
+3. Test continual learning
+4. Test developmental progression
+5. Test multi-system interaction
+
+#### Priority 4: OPTIMIZE
+1. Profile and optimize hot paths
+2. Integrate performance infrastructure
+3. Enable multithreading where safe
+
+### Phase 6 Integration Architecture
+```
+WORLD → SENSORY PERCEPT → AgentBrain.processSensoryInput() →
+Brain.receiveSensoryInput() → Neural Processing → Memory Systems →
+Prediction System → Neuromodulation → AgentBrain.decodeMotorCommand() →
+WORLD.applyMotorCommand() → Reward → AgentBrain.applyRewardModulation()
+```
+
+## Anti-Transformer Reminder
+
+Throughout all phases, NLM must NEVER become:
+- A transformer architecture
+- An LLM
+- A pretrained model
+- A conventional deep learning system
+- "LLM + memory"
+- "LLM + tools"
+
+The architecture must always be based on:
+- Individual neurons
+- Synapses
+- Spike-based communication
+- Neural plasticity
+- Developmental processes
+
+If at any point the architecture begins to resemble a transformer, it should be redirected or the project renamed to clarify it is no longer NLM.
+
+## Version History
+
+- v0.1.0 (Phase 1): Initial skeleton release
+- v0.2.0 (Phase 2): Working neural core with real spiking dynamics
+- v0.3.0 (Phase 3): World interaction and developmental mechanisms
+- v0.4.0 (Phase 4): Emerging cognition - prediction, memory, attention, planning, self-model, social learning
+- v0.5.0 (Phase 5): Scaling + Research Platform - performance optimizations, biological fidelity, lifelong learning
+- v0.6.0 (Phase 6): Final Integration - coherent artificial brain with all systems working together
 
 ## Anti-Transformer Reminder
 

@@ -65,138 +65,99 @@ Neuromodulators (dopamine, acetylcholine, norepinephrine, serotonin) modulate ne
 - Receptor types, receptor distribution, and second-messenger systems not modeled
 - Effects on neural dynamics are simplified
 
-## Phase 4: Emerging Cognition
+## Phase 6: Integration Architecture
 
-### Prediction Systems
+### Overview
+Phase 6 focuses on integrating the existing disconnected systems into a coherent artificial brain. The key insight is that NLM has the *anatomy* of a cognitive system but lacks the *integration* that makes it function as a coherent artificial brain.
 
-#### Biological Inspiration
-The free energy principle and predictive coding suggest that brains are fundamentally prediction machines. Hierarchical predictive models allow organisms to anticipate future states and minimize prediction errors.
+### Integration Architecture
+The complete brain loop integrates all Phase 4 cognitive mechanisms:
 
-#### Computational Implementation
-- **NeuralPrediction**: Learns temporal sequences through repeated experience
-- **ActionConsequencePrediction**: Associates actions with their effects
-- **Multi-step Prediction**: Chains predictions to anticipate distant futures
+```
+WORLD → SENSORY PERCEPT → AgentBrain.processSensoryInput() →
+Brain.receiveSensoryInput() → Neural Processing → Memory Systems →
+Prediction System → Neuromodulation → AgentBrain.decodeMotorCommand() →
+WORLD.applyMotorCommand() → Reward → AgentBrain.applyRewardModulation()
+```
 
-#### Known Limitations
-- No hierarchical generative model
-- Limited temporal horizon
-- No explicit uncertainty representation
+### Integration Components
 
-### Working Memory
+#### Agent-Brain Interface Layer
+- **AgentBrain**: Connects NLM brain to world
+- **SensoryPercept**: Sensory data packet from agent
+- **AgentBody**: Physical agent properties and state
 
-#### Biological Inspiration
-Working memory in prefrontal cortex maintains information active for seconds to minutes through persistent neural activity and recurrent circuits.
+#### Integration Flow
+1. **Sensory Transduction**: Converts world percepts to neural input
+2. **Memory Storage**: Stores experiences in working/episodic memory
+3. **Prediction Training**: Uses predictions for action planning
+4. **Attention Mechanisms**: Selects relevant information
+5. **Concept Formation**: Discovers patterns from experiences
+6. **Action Planning**: Uses predictions to select actions
+7. **Self-Model Updates**: Learns body schema from experience
+8. **Neuromodulation**: Applies reward signals to plasticity
 
-#### Computational Implementation
-- **NeuralWorkingMemory**: Persistent activity in recurrent circuits
-- **Competition**: Winner-take-more dynamics for selective retention
-- **Decay**: Activity decays when not reinforced
+## Phase 4: Emerging Cognition (Updated)
 
-#### Known Limitations
-- No complex binding mechanisms
-- Limited capacity
-- Simplified recurrent architecture
+### Integration with Main Brain Loop
+Phase 4 cognitive mechanisms are now integrated into the main brain simulation:
 
-### Episodic Memory
+```
+WORLD (SimpleWorld)
+      ↓
+ATTENTION (integrated into AgentBrain)
+      ↓
+SENSORY INPUT
+      ↓
+PREDICTION (integrated into Brain)
+      ↓
+WORKING MEMORY (integrated into Brain)
+      ↓
+EPISODIC MEMORY (integrated into Brain)
+      ↓
+CONCEPTS (integrated into AgentBrain)
+      ↓
+PLANNING (integrated into AgentBrain)
+      ↓
+SELF-MODEL (integrated into AgentBrain)
+      ↓
+ACTION SELECTION
+      ↓
+MOTOR OUTPUT
+      ↓
+WORLD.applyMotorCommand()
+      ↓
+REWARD / CONSEQUENCE
+      ↓
+SOCIAL OBSERVATION (if others present)
+      ↓
+LEARNING UPDATES
+```
 
-#### Biological Inspiration
-Hippocampus stores episodes with temporal, spatial, and contextual information. Pattern completion allows retrieval from partial cues.
+### Neural Prediction System
+- **NeuralPrediction**: Temporal sequence learning
+- **Integrated into**: Brain prediction system
+- **Learning**: From sensory experiences
+- **Application**: Guides action selection
 
-#### Computational Implementation
-- **NeuralEpisodicMemory**: Stores experiences as neural activity patterns
-- **Pattern Completion**: Retrieves full episodes from partial cues
-- **Replay**: Reactivates past patterns
+### Working Memory Integration
+- **NeuralWorkingMemory**: Persistent activity for temporary storage
+- **Integration**: Part of main brain loop
+- **Function**: Maintains relevant information for cognitive processing
 
-#### Known Limitations
-- No hippocampal architecture
-- No pattern separation
-- Limited consolidation mechanisms
+### Episodic Memory Integration
+- **NeuralEpisodicMemory**: Experience encoding in neural patterns
+- **Integration**: Updated during each brain step
+- **Function**: Stores complete experiences for later retrieval
 
-### Concept Formation
+### Cognitive Mechanisms Integration
+- **AttentionalSelection**: Competitive processing of working memory
+- **NeuralPlanner**: Action sequence evaluation
+- **ConceptFormation**: Pattern discovery from sensory input
+- **SelfModel**: Sensorimotor self-awareness development
+- **SocialLearning**: Observation and imitation of other agents
 
-#### Biological Inspiration
-Cortex forms stable representations through repeated exposure. Similar experiences converge to share representations.
-
-#### Computational Implementation
-- **ConceptFormation**: Clusters similar patterns into stable prototypes
-- **Hebbian Averaging**: Prototype moves toward new instances
-- **Stability Measurement**: Tracks how consistent patterns are
-
-#### Known Limitations
-- No hierarchical concept structure
-- No symbolic representation
-- Limited abstraction
-
-### Attention
-
-#### Biological Inspiration
-Attention involves competitive dynamics where stronger signals inhibit weaker ones. Both bottom-up salience and top-down goals influence selection.
-
-#### Computational Implementation (NOT Transformer)
-- **AttentionalSelection**: Lateral inhibition competition
-- **Winner-Take-More**: Winners receive excitation, losers receive inhibition
-- **Top-Down Bias**: Goals can influence selection
-- **Bottom-Up Salience**: Stimulus strength affects selection
-
-#### IMPORTANT: NOT Transformer Attention
-NLM attention is NOT:
-- Query-Key-Value matrices
-- Softmax attention weights
-- Attention heads
-- Self-attention
-
-NLM attention IS:
-- Competitive dynamics
-- Lateral inhibition
-- Recurrent amplification
-- Neural circuit mechanism
-
-### Planning
-
-#### Biological Inspiration
-Prefrontal cortex uses learned models to simulate future outcomes and select actions that lead to goals.
-
-#### Computational Implementation
-- **NeuralPlanner**: Evaluates action sequences using predictions
-- **Action Quality**: Learns which actions work in which states
-- **Plan Adaptation**: Updates based on success/failure
-
-#### Known Limitations
-- Shallow planning depth
-- No tree search
-- Limited world model
-
-### Self-Model
-
-#### Biological Inspiration
-The brain maintains a model of the body (body schema) and distinguishes self-generated from externally generated events (agency).
-
-#### Computational Implementation
-- **SelfModel**: Learns forward model of sensory consequences
-- **Self-Generated Likeness**: Predicts whether change is self-caused
-- **Action Quality**: Tracks which actions lead to rewards
-
-#### Known Limitations
-- No sophisticated body schema
-- No self-recognition
-- No explicit agency computation
-
-### Social Learning
-
-#### Biological Inspiration
-Mirror neurons and social observation allow learning from others' actions and their consequences.
-
-#### Computational Implementation
-- **SocialLearning**: Observes other agents' actions
-- **Imitation**: Can reproduce observed actions
-- **Communication Signals**: Learns simple associated signals
-
-#### Known Limitations
-- No theory of mind
-- No sophisticated imitation learning
-- No cultural transmission
-
-## The Learning Loop
+## The Learning Loop (Updated)
 
 ### Phase 2: Isolated Neural Computation
 ```
@@ -211,60 +172,66 @@ PLASTICITY (STDP, Hebbian)
 NETWORK CHANGE
 ```
 
-### Phase 3: Environment Interaction
+### Phase 3: World Interaction (Updated)
 ```
-WORLD (2D environment with objects)
+WORLD (SimpleWorld)
       ↓
-SENSORY PERCEPT (vision, touch, internal)
+SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
+      ↓
+AgentBrain.processSensoryInput()
+      ↓
+Brain.receiveSensoryInput()
       ↓
 NEURAL ACTIVITY (LIF dynamics)
       ↓
-MOTOR OUTPUT (decoded from brain)
+SPIKE PROCESSING (event-driven)
       ↓
-ACTION (movement, interaction)
+Motor Decoding → MotorCommand
       ↓
-WORLD STATE CHANGE
+AgentBrain.decodeMotorCommand()
       ↓
-REWARD / CONSEQUENCE
+WORLD.applyMotorCommand()
       ↓
-PREDICTION ERROR
+ACTION RESULT (reward, success)
       ↓
-NEUROMODULATION (dopamine-like)
+Reward Prediction Error
       ↓
-ELIGIBILITY TRACES
+Neuromodulation (dopamine-like signal)
       ↓
-PLASTICITY UPDATE
+Eligibility Trace Update
       ↓
-DEVELOPMENTAL CHANGE
+PLASTICITY (STDP, Hebbian, Reward-Modulated)
       ↓
-BEHAVIORAL CHANGE
+Development System (stage progression)
 ```
 
-### Phase 4: Emerging Cognition
+### Phase 4: Integrated Cognition
 ```
-WORLD
+WORLD (SimpleWorld)
       ↓
-ATTENTION (competitive selection)
+SENSORY PERCEPT
+      ↓
+ATTENTION (integrated)
       ↓
 SENSORY INPUT
       ↓
-PREDICTION (learn temporal relationships)
+PREDICTION (integrated)
       ↓
-WORKING MEMORY (maintain information)
+WORKING MEMORY (integrated)
       ↓
-EPISODIC MEMORY (store experiences)
+EPISODIC MEMORY (integrated)
       ↓
-CONCEPTS (discover patterns)
+CONCEPT FORMATION (integrated)
       ↓
-PLANNING (simulate futures)
+PLANNING (integrated)
       ↓
-SELF-MODEL (predict self)
+SELF-MODEL (integrated)
       ↓
-ACTION SELECTION
+ACTION SELECTION (integrated)
       ↓
 MOTOR OUTPUT
       ↓
-WORLD
+WORLD.applyMotorCommand()
       ↓
 REWARD / CONSEQUENCE
       ↓
@@ -273,53 +240,46 @@ SOCIAL OBSERVATION (if others present)
 LEARNING UPDATES
 ```
 
-## Eligibility Traces and Credit Assignment
+### Phase 6: Final Integration
+```
+AGENT → WORLD → SENSORY PERCEPT → AgentBrain.processSensoryInput() →
+Brain.receiveSensoryInput() → Neural Processing → Memory Systems →
+Prediction System → Neuromodulation → AgentBrain.decodeMotorCommand() →
+WORLD.applyMotorCommand() → Reward → AgentBrain.applyRewardModulation()
+```
 
-### Biological Inspiration
-In biological brains, synaptic changes must be attributed to the correct action even when the consequence occurs later. Eligibility traces allow synapses to be "tagged" and modified when reward arrives.
+## Eligibility Traces and Credit Assignment (Updated)
 
-### Computational Implementation
-- Synapses maintain an eligibility trace during activity
-- When reward prediction error occurs, trace is converted to weight change
-- Traces decay over time if no reward signal arrives
+### Integration with Neuromodulation
+- **Eligibility Traces**: Maintain synaptic tags during activity
+- **Credit Assignment**: Bridge time gap between action and reward
+- **Reward Modulation**: Convert traces to weight changes
+- **Integration**: Part of main reward pathway in brain loop
 
-### Known Limitations
-- Real synaptic tagging involves complex molecular mechanisms
-- Timing requirements are simplified
-- Only recent activity is credited
+## Developmental Plasticity (Updated)
 
-## Developmental Plasticity
+### Developmental System Integration
+- **Stages**: Initial → CriticalPeriod → Maturation → Adult
+- **Plasticity Modifiers**: Affect all plasticity rules
+- **Integration**: Updates structural plasticity rates
+- **Function**: Guides developmental progression
 
-### Biological Inspiration
-Early development has higher plasticity ("critical periods") that decreases with age. This allows learning when young but provides stability later.
+## What NLM is NOT (Updated)
 
-### Computational Implementation
-- Developmental stages: Initial → CriticalPeriod → Maturation → Adult
-- Plasticity rates decrease with age
-- Synaptogenesis higher early, pruning higher later
-
-## What NLM is NOT
-
-NLM is NOT:
-- A claim that we can simulate a human brain
-- A model that accurately reproduces neural physiology
-- A replacement for neuroscience research
-- An intelligent system
-- A transformer or LLM
-- A pretrained AI system
-
+### Clarification
 NLM IS:
-- A computational exploration of brain-inspired architecture
-- A testbed for developmental learning hypotheses
-- A research platform for artificial neural systems
-- An educational tool for understanding neural computation
-- An investigation of whether cognition can emerge from spiking dynamics
+1. A **computational exploration** of brain-inspired architecture
+2. A **testbed** for developmental learning principles
+3. A **research platform** for artificial neural systems
+4. An **educational tool** for understanding neural computation
+5. An **investigation** of whether cognition can emerge from spiking dynamics
 
-## Acknowledging Uncertainty
+### Phase 6 Focus
+NLM Phase 6 specifically focuses on **integration over new features** - making existing disconnected systems work together as a coherent whole.
 
-We acknowledge that:
-1. Biological brains are far more complex than any current simulation
-2. Our understanding of the brain is incomplete
-3. Many approximations are necessary for computational tractability
-4. Claims of "brain-like" behavior should be critically examined
-5. Phase 4 does not claim human-like intelligence, consciousness, or genuine understanding
+### Anti-Transformer Principle (Updated)
+- **Preserved**: No transformer architectures
+- **Preserved**: No LLM replacements
+- **Preserved**: No pretrained knowledge
+- **Preserved**: Neural computation based on individual neurons and synapses
+- **Extended**: Now includes cognitive integration principles
