@@ -76,6 +76,9 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Curiosity level computation helper
+    float computeCuriosityLevel(const std::vector<float>& vision, float predictionError) const;
+    
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups

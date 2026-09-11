@@ -95,7 +95,8 @@ struct CheckpointHeader {
         , majorVersion(CHECKPOINT_VERSION_MAJOR)
         , minorVersion(CHECKPOINT_VERSION_MINOR)
         , patchVersion(CHECKPOINT_VERSION_PATCH)
-        , timestamp(0)
+        , timestamp(std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count())
         , totalSize(0)
         , neuronCount(0)
         , synapseCount(0)
