@@ -22,12 +22,21 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
+        auto regions = brain_->getRegions();
+        for (const auto& region : regions) {
+            if (!region) continue;
+            
+            auto populations = region->getPopulations();
+            for (auto& pop : populations) {
+                if (!pop) continue;
+                
                 NeuronType type = pop->getNeuronType();
+                auto neurons = pop->getNeurons();
                 
                 if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
+                    for (Neuron* n : neurons) {
+                        if (!n) continue;
+                        
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
@@ -43,7 +52,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
+                    for (Neuron* n : neurons) {
+                        if (!n) continue;
+                        
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
@@ -75,8 +86,39 @@ void AgentBrain::initialize(const SimpleWorld& world) {
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
+    // Calculate based on actual world configuration, not hardcoded values
+    size_t visionSize = 0;
+    if (!brain_) return 0;
+    
+    // Try to get world dimensions from brain's config if available
+    auto config = brain_->getConfig();
+    if (config) {
+        // Check if world configuration is stored in config
+        if (config->has("world.visionWidth") && config->has("world.visionHeight")) {
+            size_t visionWidth = config->get("world.visionWidth");
+            size_t visionHeight = config->get("world.visionHeight");
+            visionSize = visionWidth * visionHeight;
+        }
+    }
+    
+    // Fallback to defaults if not configured
+    if (visionSize == 0) {
+        visionSize = 256;  // 16x16 default
+    }
+    
+    // Touch sensors (8 contact points)
+    size_t touchSize = 8;
+    
+    // Internal signals (4 homeostatic)
+    size_t internalSize = 4;
+    
+    // Proprioception (6 body state signals)
+    size_t proprioceptionSize = 6;
+    
+    // Audio (if enabled - 0 for now)
+    size_t audioSize = 0;
+    
+    return visionSize + touchSize + internalSize + proprioceptionSize + audioSize;
 }
 
 size_t AgentBrain::getMotorOutputSize() const {

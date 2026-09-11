@@ -13,7 +13,9 @@ static uint64_t lcg(uint64_t& state) {
 
 static float urand(uint64_t& state, float min, float max) {
     uint64_t r = lcg(state);
-    float normalized = (r & 0xFFFFFFFFFFFFULL) / static_cast<float>(0xFFFFFFFFFFFFULL);
+    // Use all 64 bits of the LCG output for better uniformity
+    // Previous implementation only used 48 bits and had a non-power-of-2 divisor
+    float normalized = (static_cast<double>(r) / static_cast<double>(UINT64_MAX));
     return min + normalized * (max - min);
 }
 

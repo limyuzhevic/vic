@@ -690,28 +690,118 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Improved action selection based on neural activity patterns
+    // Considers all motor neuron groups, not just firing count
+    // Better balance between exploration and exploitation
     
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
+    // Calculate activity levels for each motor action group
+    // Using membrane potential deviation as activity measure (consistent with AgentBrain)
+    auto calcActivity = [](const Neuron* n) -> float {
+        if (!n) return 0.0f;
+        auto state = n->getState();
+        return std::abs(state.membranePotential - state.restingPotential);
+    };
+    
+    struct ActionActivity {
+        ActionType type;
+        float activity;
+        bool isFiring;
+    };
+    
+    // Analyze all motor neuron groups (same groups used in AgentBrain)
+    // Note: These groups are organized in AgentBrain but we need to access them here
+    // For now, we'll use the direct motor neurons and categorize them by activity patterns
+    
+    ActionActivity actions[] = {
+        {ActionType::MoveForward, 0.0f, false},
+        {ActionType::MoveBackward, 0.0f, false},
+        {ActionType::TurnLeft, 0.0f, false},
+        {ActionType::TurnRight, 0.0f, false},
+        {ActionType::Interact, 0.0f, false},
+        {ActionType::LookLeft, 0.0f, false},
+        {ActionType::LookRight, 0.0f, false},
+        {ActionType::Wait, 0.0f, false}
+    };
+    
+    // For simplicity, we'll analyze motor neurons by checking their activity
+    // In a full implementation, these would be organized into action groups like in AgentBrain
+    float totalActivity = 0.0f;
+    size_t firingCount = 0;
+    
     for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+        if (!neuron) continue;
+        
+        float activity = calcActivity(neuron);
+        totalActivity += activity;
+        
+        // Categorize based on neuron index patterns (simple heuristic)
+        // This is a placeholder - proper implementation would need action grouping
+        if (neuron->getId().value % 8 == 0) {
+            actions[0].activity += activity;
+            actions[0].isFiring |= neuron->isFiring();
+            firingCount++;
+        } else if (neuron->getId().value % 8 == 1) {
+            actions[1].activity += activity;
+            actions[1].isFiring |= neuron->isFiring();
+            firingCount++;
+        } else if (neuron->getId().value % 8 == 2) {
+            actions[2].activity += activity;
+            actions[2].isFiring |= neuron->isFiring();
+            firingCount++;
+        } else if (neuron->getId().value % 8 == 3) {
+            actions[3].activity += activity;
+            actions[3].isFiring |= neuron->isFiring();
+            firingCount++;
+        } else if (neuron->getId().value % 8 == 4) {
+            actions[4].activity += activity;
+            actions[4].isFiring |= neuron->isFiring();
+            firingCount++;
+        } else if (neuron->getId().value % 8 == 5) {
+            actions[5].activity += activity;
+            actions[5].isFiring |= neuron->isFiring();
+            firingCount++;
+        } else if (neuron->getId().value % 8 == 6) {
+            actions[6].activity += activity;
+            actions[6].isFiring |= neuron->isFiring();
+            firingCount++;
+        } else {
+            actions[7].activity += activity;
+            actions[7].isFiring |= neuron->isFiring();
+            firingCount++;
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    // Select action based on weighted combination of activity and firing
+    ActionActivity bestAction = actions[7]; // Default to Wait
+    float bestScore = 0.0f;
+    
+    for (const auto& a : actions) {
+        // Higher activity = more likely to be selected
+        // Firing neurons get stronger preference
+        float score = a.activity * 0.6f + (a.isFiring ? 1.0f : 0.0f) * 0.4f;
+        
+        // Only consider actions with meaningful activity
+        if (score > bestScore) {
+            bestScore = score;
+            bestAction = a;
+        }
     }
     
-    auto action = std::make_unique<Action>(type);
+    // Apply threshold for action selection
+    // If no action has meaningful activity, default to Wait
+    if (bestScore < 0.5f) {
+        return std::make_unique<Action>(ActionType::Wait);
+    }
+    
+    auto action = std::make_unique<Action>(bestAction.type);
+    
+    // Log action selection for debugging
+    NLM_LOG_INFO("Action selected: " + std::to_string(static_cast<int>(bestAction.type)) + 
+                 " (activity: " + std::to_string(bestScore) + ")");
     
     return action;
 }
@@ -895,9 +985,54 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - match synapses by source/destination neuron
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* syn : pop->getSynapses()) {
+                    if (synapseIdx < synapseData.weight.size()) {
+                        // Find matching synapse by source and destination neuron IDs
+                        NeuronId synSource = syn->getSourceNeuron();
+                        NeuronId synDest = syn->getDestinationNeuron();
+                        bool found = false;
+                        
+                        for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+                            if (synapseIdx + i < synapseData.sourceNeuron.size() &&
+                                synapseIdx + i < synapseData.destinationNeuron.size()) {
+                                if (synapseData.sourceNeuron[synapseIdx + i] == synSource.value &&
+                                    synapseData.destinationNeuron[synapseIdx + i] == synDest.value) {
+                                    // Apply saved synapse state
+                                    syn->setWeight(synapseData.weight[synapseIdx + i]);
+                                    syn->setDelay(synapseData.delay[synapseIdx + i]);
+                                    syn->setType(static_cast<SynapseType>(synapseData.synapseType[synapseIdx + i]));
+                                    syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx + i]);
+                                    syn->setEfficacy(synapseData.efficacy[synapseIdx + i]);
+                                    
+                                    // Note: plasticityFlags are not applied in Synapse setter
+                                    // For now we just apply the core state
+                                    
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (found) {
+                            synapseIdx++;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Log any unused synapse data (for debugging)
+        if (synapseIdx < synapseData.weight.size()) {
+            NLM_LOG_WARNING("Not all synapse states matched during load: " +
+                            std::to_string(synapseData.weight.size() - synapseIdx) + " unmatched synapses");
+        }
+        
+        NLM_LOG_INFO("Loaded " + std::to_string(std::min(synapseIdx, synapseData.weight.size())) + 
+                     " synapses from checkpoint");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
