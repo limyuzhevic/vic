@@ -62,7 +62,11 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->lastPostSpikeTime = -1.0f;
 }
 
-Synapse::~Synapse() = default;
+Synapse::~Synapse() {
+    if (pImpl) {
+        delete pImpl;
+    }
+}
 
 Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -70,7 +74,9 @@ Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl) {
+            delete pImpl;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
