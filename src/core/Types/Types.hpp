@@ -131,6 +131,21 @@ enum class DevelopmentalStage : uint8_t {
     Aging
 };
 
+// Integration methods for neuron dynamics
+enum class IntegrationMethod : uint8_t {
+    ExponentialEuler,  // Standard for LIF models
+    Euler,             // Basic Euler integration
+    RungeKutta2,       // Second-order Runge-Kutta
+    RungeKutta4        // Fourth-order Runge-Kutta (most accurate)
+};
+
+// Timestep calculation strategies
+enum class TimestepStrategy : uint8_t {
+    Fixed,             // Use constant timestep
+    Adaptive,          // Adjust based on refractory state and firing rate
+    Variable           // Variable timestep based on neural activity
+};
+
 // Spike event for event-driven computation
 struct SpikeEvent {
     NeuronId source_neuron;

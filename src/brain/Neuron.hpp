@@ -3,12 +3,28 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <memory>
 
 namespace nlm {
 
 // Forward declarations
 class Synapse;
 class RandomGenerator;
+
+// Integration methods for neuron dynamics
+enum class IntegrationMethod : uint8_t {
+    ExponentialEuler,  // Standard for LIF models
+    Euler,             // Basic Euler integration
+    RungeKutta2,       // Second-order Runge-Kutta
+    RungeKutta4        // Fourth-order Runge-Kutta (most accurate)
+};
+
+// Timestep calculation strategies
+enum class TimestepStrategy : uint8_t {
+    Fixed,             // Use constant timestep
+    Adaptive,          // Adjust based on refractory state and firing rate
+    Variable           // Variable timestep based on neural activity
+};
 
 // Neuron state structure for efficient storage
 struct NeuronState {
@@ -44,6 +60,21 @@ struct NeuronState {
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
 class Neuron {
 public:
+    // Integration methods for neuron dynamics
+    enum class IntegrationMethod {
+        ExponentialEuler,  // Standard for LIF models
+        Euler,             // Basic Euler integration
+        RungeKutta2,       // Second-order Runge-Kutta
+        RungeKutta4        // Fourth-order Runge-Kutta (most accurate)
+    };
+    
+    // Timestep calculation strategies
+    enum class TimestepStrategy {
+        Fixed,             // Use constant timestep
+        Adaptive,          // Adjust based on refractory state and firing rate
+        Variable           // Variable timestep based on neural activity
+    };
+    
     // Create neuron with ID
     explicit Neuron(NeuronId id);
     
@@ -133,9 +164,10 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
+    // Update neuron for one simulation step with advanced interface
+    void step(Timestamp currentTime, TimestepDuration dt = 0.001,
+             IntegrationMethod method = IntegrationMethod::ExponentialEuler,
+             TimestepStrategy strategy = TimestepStrategy::Adaptive);
     
     // Reset to initial state
     void reset();
@@ -145,7 +177,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

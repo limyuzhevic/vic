@@ -1,5 +1,3 @@
-#pragma once
-
 #include "../core/Types/Types.hpp"
 #include "Neuron.hpp"
 #include <vector>
@@ -53,8 +51,10 @@ public:
     // Initialize all neurons randomly
     void initializeRandom(class RandomGenerator& rng);
     
-    // Step all neurons
-    void step(Timestamp currentTime);
+    // Step all neurons with enhanced interface
+    void step(Timestamp currentTime, TimestepDuration dt = 0.001,
+              IntegrationMethod method = IntegrationMethod::ExponentialEuler,
+              TimestepStrategy strategy = TimestepStrategy::Adaptive);
     
     // Reset all neurons
     void reset();

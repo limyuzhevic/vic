@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include "core/Logger/Logger.hpp"
 
 namespace nlm {
 

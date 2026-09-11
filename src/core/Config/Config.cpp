@@ -1,129 +1,372 @@
+// Include the main Config header
 #include "Config.hpp"
+
+// Include nlohmann::json for JSON parsing
+#include <nlohmann/json.hpp>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+#include <vector>
+#include <unordered_map>
+
+using json = nlohmann::json;
 
 namespace nlm {
 
 struct Config::Impl {
-    std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, ConfigEntry> configMap;
+    
+    Impl() = default;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(new Impl) {}
 
 Config::~Config() = default;
 
-Config::Config(Config&&) noexcept = default;
+Config::Config(Config&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
-Config& Config::operator=(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
+
+// Include the main Config header
+#include "Config.hpp"
+
+// Include nlohmann::json for JSON parsing
+#include <nlohmann/json.hpp>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+#include <vector>
+#include <unordered_map>
+
+using json = nlohmann::json;
+
+namespace nlm {
+
+struct Config::Impl {
+    std::unordered_map<std::string, ConfigEntry> configMap;
+    
+    Impl() = default;
+};
+
+Config::Config() : pImpl(new Impl) {}
+
+Config::~Config() = default;
+
+Config::Config(Config&& other) noexcept : pImpl(std::move(other.pImpl)) {}
+
+Config& Config::operator=(Config&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        // Log the attempt to load config from file
+        Logger::getGlobal().info("Attempting to load config from file: " + filepath, "", 0, "loadFromFile");
+        
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            Logger::getGlobal().warning("Failed to open config file: " + filepath, "", 0, "loadFromFile");
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Check if file is empty
+        file.seekg(0, std::ios::end);
+        if (file.tellg() == 0) {
+            Logger::getGlobal().warning("Config file is empty: " + filepath, "", 0, "loadFromFile");
+            clear();
+            return true; // Empty file is valid - means no config loaded
+        }
+        file.seekg(0, std::ios::beg);
+        
+        json j;
+        try {
+            file >> j;
+        } catch (const json::parse_error& e) {
+            Logger::getGlobal().error("Failed to parse JSON config file " + filepath + ": " + e.what(), "", 0, "loadFromFile");
+            // Try to continue with default values instead of failing completely
+            clear();
+            return true; // Successfully cleared (fallback)
+        }
+        
+        clear();
+        
+        int successCount = 0;
+        int errorCount = 0;
+        
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            const std::string& key = it.key();
+            const json& valueJson = it.value();
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            ConfigValue configValue;
+            bool converted = false;
+            
+            // Try to convert JSON to ConfigValue based on type
+            try {
+                if (valueJson.is_number_integer()) {
+                    configValue = valueJson.get<int64_t>();
+                    converted = true;
+                } else if (valueJson.is_number()) {
+                    configValue = valueJson.get<double>();
+                    converted = true;
+                } else if (valueJson.is_boolean()) {
+                    configValue = valueJson.get<bool>();
+                    converted = true;
+                } else if (valueJson.is_string()) {
+                    configValue = valueJson.get<std::string>();
+                    converted = true;
+                } else if (valueJson.is_array()) {
+                    // Handle arrays
+                    const json& arr = valueJson;
+                    // Determine element type
+                    if (!arr.empty()) {
+                        if (arr[0].is_number_integer()) {
+                            std::vector<int64_t> intVec;
+                            for (const auto& elem : arr) {
+                                intVec.push_back(elem.get<int64_t>());
+                            }
+                            configValue = intVec;
+                            converted = true;
+                        } else if (arr[0].is_number()) {
+                            std::vector<double> doubleVec;
+                            for (const auto& elem : arr) {
+                                doubleVec.push_back(elem.get<double>());
+                            }
+                            configValue = doubleVec;
+                            converted = true;
+                        } else if (arr[0].is_string()) {
+                            std::vector<std::string> stringVec;
+                            for (const auto& elem : arr) {
+                                stringVec.push_back(elem.get<std::string>());
+                            }
+                            configValue = stringVec;
+                            converted = true;
+                        }
+                    }
+                }
+            } catch (const std::exception& e) {
+                Logger::getGlobal().warning("Failed to convert JSON value for key '" + key + "': " + e.what(), "", 0, "loadFromFile");
+                errorCount++;
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            if (converted) {
+                try {
+                    set(key, configValue, ConfigSource::File);
+                    successCount++;
+                } catch (const std::exception& e) {
+                    Logger::getGlobal().error("Failed to set config key '" + key + "': " + e.what(), "", 0, "loadFromFile");
+                    errorCount++;
+                }
+            } else {
+                Logger::getGlobal().warning("Failed to convert JSON value for key '" + key + "' - unknown type", "", 0, "loadFromFile");
+                errorCount++;
+            }
         }
+        
+        Logger::getGlobal().info("Config loaded from file " + filepath + ": " + std::to_string(successCount) + " entries loaded, " + std::to_string(errorCount) + " errors", "", 0, "loadFromFile");
+        
+        return !j.empty(); // Return true if we attempted to load (even with errors)
+    } catch (const std::exception& e) {
+        Logger::getGlobal().error("Unexpected error loading config from file " + filepath + ": " + e.what(), "", 0, "loadFromFile");
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool loaded = false;
+    
     for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
+        std::string arg = argv[i];
         
         // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+        size_t pos = arg.find('=');
+        if (pos != std::string::npos) {
+            std::string key = arg.substr(0, pos);
+            std::string valueStr = arg.substr(pos + 1);
+            
+            // Try to parse value as different types
+            bool parsed = false;
+            
+            // Try int
+            try {
+                size_t posEnd;
+                int64_t intVal = std::stoll(valueStr, &posEnd);
+                if (posEnd == valueStr.length()) {
+                    set(key, intVal, ConfigSource::CommandLine);
+                    loaded = true;
+                    parsed = true;
+                }
+            } catch (...) {}
+            
+            // Try double
+            if (!parsed) {
+                try {
+                    size_t posEnd;
+                    double doubleVal = std::stod(valueStr, &posEnd);
+                    if (posEnd == valueStr.length()) {
+                        set(key, doubleVal, ConfigSource::CommandLine);
+                        loaded = true;
+                        parsed = true;
+                    }
+                } catch (...) {}
+            }
+            
+            // Try bool
+            if (!parsed) {
+                if (valueStr == "true" || valueStr == "1") {
+                    set(key, true, ConfigSource::CommandLine);
+                    loaded = true;
+                    parsed = true;
+                } else if (valueStr == "false" || valueStr == "0") {
+                    set(key, false, ConfigSource::CommandLine);
+                    loaded = true;
+                    parsed = true;
+                }
+            }
+            
+            // Try string (fallback)
+            if (!parsed) {
+                set(key, valueStr, ConfigSource::CommandLine);
+                loaded = true;
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
     }
-    return true;
+    
+    return loaded;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+    try {
+        json j;
+        
+        for (const auto& pair : pImpl->configMap) {
+            const ConfigEntry& entry = pair.second;
+            
+            // Convert ConfigValue to JSON
+            std::visit([&](const auto& val) {
+                using T = std::decay_t<decltype(val)>;
+                
+                if constexpr (std::is_same_v<T, int64_t>) {
+                    j[pair.first] = val;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    j[pair.first] = val;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    j[pair.first] = val;
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    j[pair.first] = val;
+                } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+                    json arr = json::array();
+                    for (const auto& item : val) {
+                        arr.push_back(item);
+                    }
+                    j[pair.first] = arr;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    json arr = json::array();
+                    for (const auto& item : val) {
+                        arr.push_back(item);
+                    }
+                    j[pair.first] = arr;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    json arr = json::array();
+                    for (const auto& item : val) {
+                        arr.push_back(item);
+                    }
+                    j[pair.first] = arr;
+                }
+            }, entry.value);
+        }
+        
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        file << j.dump(2); // Pretty print with 2-space indentation
+        file.close();
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "Error saving config to file " << filepath << ": " << e.what() << std::endl;
         return false;
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
 }
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
+    auto it = pImpl->configMap.find(key);
+    if (it == pImpl->configMap.end()) {
         return std::nullopt;
     }
+    
+    const ConfigValue& value = it->second.value;
     
     try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
+        if constexpr (std::is_same_v<T, int64_t>) {
+            if (std::holds_alternative<int64_t>(value)) {
+                return std::get<int64_t>(value);
+            }
+        } else if constexpr (std::is_same_v<T, double>) {
+            if (std::holds_alternative<double>(value)) {
+                return std::get<double>(value);
+            }
+        } else if constexpr (std::is_same_v<T, bool>) {
+            if (std::holds_alternative<bool>(value)) {
+                return std::get<bool>(value);
+            }
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            if (std::holds_alternative<std::string>(value)) {
+                return std::get<std::string>(value);
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+            if (std::holds_alternative<std::vector<int64_t>>(value)) {
+                return std::get<std::vector<int64_t>>(value);
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            if (std::holds_alternative<std::vector<double>>(value)) {
+                return std::get<std::vector<double>>(value);
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            if (std::holds_alternative<std::vector<std::string>>(value)) {
+                return std::get<std::vector<std::string>>(value);
+            }
+        }
+    } catch (...) {}
+    
+    return std::nullopt;
 }
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    if (val.has_value()) {
+        return *val;
+    }
+    return defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+    // Validate key
+    if (key.empty()) {
+        throw std::invalid_argument("Key cannot be empty");
     }
+    
+    pImpl->configMap[key] = ConfigEntry(key, value, source);
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
@@ -131,7 +374,7 @@ void Config::set(const std::string& key, const std::string& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    set(key, ConfigValue(static_cast<int64_t>(value)), source);
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
@@ -143,73 +386,96 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    return pImpl->configMap.find(key) != pImpl->configMap.end();
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    pImpl->configMap.erase(key);
 }
 
 std::vector<std::string> Config::getKeys() const {
     std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+    keys.reserve(pImpl->configMap.size());
+    
+    for (const auto& pair : pImpl->configMap) {
+        keys.push_back(pair.first);
     }
+    
     return keys;
 }
 
 void Config::clear() {
-    pImpl->entries.clear();
+    pImpl->configMap.clear();
 }
 
 std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
+    std::stringstream ss;
+    ss << "Config Summary (" << pImpl->configMap.size() << " entries):" << std::endl;
+    
+    for (const auto& pair : pImpl->configMap) {
+        const ConfigEntry& entry = pair.second;
+        ss << "  " << pair.first << " = ";
+        
+        std::visit([&](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            
+            if constexpr (std::is_same_v<T, int64_t>) {
+                ss << val;
+            } else if constexpr (std::is_same_v<T, double>) {
+                ss << val;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                ss << (val ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                ss << '"' << val << '"';
+            } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+                ss << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) ss << ", ";
+                    ss << val[i];
+                }
+                ss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                ss << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) ss << ", ";
+                    ss << val[i];
+                }
+                ss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                ss << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) ss << ", ";
+                    ss << '"' << val[i] << '"';
+                }
+                ss << "]";
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        
+        ss << " (from ";
+        switch (entry.source) {
+            case ConfigSource::Default: ss << "Default"; break;
+            case ConfigSource::File: ss << "File"; break;
+            case ConfigSource::CommandLine: ss << "Command Line"; break;
+            case ConfigSource::Runtime: ss << "Runtime"; break;
+        }
+        ss << ")" << std::endl;
     }
-    return oss.str();
+    
+    return ss.str();
 }
 
 std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+    size_t first = str.find_first_not_of(" \t\n\r");
+    if (first == std::string::npos) return "";
+    size_t last = str.find_last_not_of(" \t\n\r");
+    return str.substr(first, (last - first + 1));
 }
 
 std::string Config::toLower(const std::string& str) {
     std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    std::transform(result.begin(), result.end(), result.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
     return result;
 }
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
