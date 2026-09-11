@@ -4,6 +4,43 @@
 #include <algorithm>
 #include <filesystem>
 
+// Simple JSON support - check for nlohmann/json.h or json.hpp
+// This is a simplified JSON implementation that doesn't require external dependencies
+namespace json_internal {
+
+struct JsonValue {
+    std::string stringValue;
+    int64_t intValue;
+    double floatValue;
+    bool boolValue;
+    bool isString;
+    bool isNumber;
+    bool isBool;
+    
+    JsonValue() : isString(false), isNumber(false), isBool(false) {}
+};
+
+class SimpleJsonParser {
+public:
+    static bool parse(const std::string& jsonStr, JsonValue& result) {
+        // Very basic JSON parsing for key=value format
+        // This is a simplified implementation to demonstrate the concept
+        if (jsonStr.empty()) return false;
+        
+        size_t pos = jsonStr.find('"');
+        if (pos == std::string::npos) return false;
+        
+        size_t endQuote = jsonStr.find('"', pos + 1);
+        if (endQuote == std::string::npos) return false;
+        
+        result.stringValue = jsonStr.substr(pos + 1, endQuote - pos - 1);
+        result.isString = true;
+        return true;
+    }
+};
+
+} // namespace json_internal
+
 namespace nlm {
 
 struct Config::Impl {
@@ -19,9 +56,42 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to load as JSON first
+    std::ifstream jsonFile(filepath);
+    if (jsonFile.is_open()) {
+        try {
+            json j;
+            jsonFile >> j;
+            
+            // Load JSON entries
+            if (j.is_object()) {
+                for (auto it = j.begin(); it != j.end(); ++it) {
+                    std::string key = it.key();
+                    
+                    // Try to parse value based on type
+                    json value = it.value();
+                    if (value.is_string()) {
+                        set(key, value.get<std::string>(), ConfigSource::File);
+                    } else if (value.is_number_integer()) {
+                        set(key, value.get<int64_t>(), ConfigSource::File);
+                    } else if (value.is_number_float()) {
+                        set(key, value.get<double>(), ConfigSource::File);
+                    } else if (value.is_boolean()) {
+                        set(key, value.get<bool>(), ConfigSource::File);
+                    } else {
+                        // Default to string
+                        set(key, value.dump(), ConfigSource::File);
+                    }
+                }
+                return true;
+            }
+        } catch (const json::parse_error&) {
+            // JSON parsing failed, try key=value format
+            jsonFile.close();
+        }
+    }
     
+    // Fallback to key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -48,7 +118,44 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Try to convert to appropriate type
+            bool converted = false;
+            
+            // Try integer
+            try {
+                size_t intPos;
+                int64_t intVal = std::stoll(value, &intPos);
+                if (intPos == value.size()) {
+                    set(key, intVal, ConfigSource::File);
+                    converted = true;
+                }
+            } catch (...) {}
+            
+            if (!converted) {
+                // Try double
+                try {
+                    size_t doublePos;
+                    double doubleVal = std::stod(value, &doublePos);
+                    if (doublePos == value.size()) {
+                        set(key, doubleVal, ConfigSource::File);
+                        converted = true;
+                    }
+                } catch (...) {}
+            }
+            
+            if (!converted) {
+                // Try boolean
+                if (value == "true" || value == "false") {
+                    bool boolVal = (value == "true");
+                    set(key, boolVal, ConfigSource::File);
+                    converted = true;
+                }
+            }
+            
+            if (!converted) {
+                // Default to string
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -86,32 +193,27 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Visit to get the value
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;
-}
-
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {

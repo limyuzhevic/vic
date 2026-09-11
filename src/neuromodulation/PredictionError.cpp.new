@@ -36,16 +36,13 @@ float PredictionError::getError() const {
 }
 
 void PredictionError::computeError(float predicted, float actual) {
-    pImpl->predictedValue = predicted;
-    pImpl->actualValue = actual;
-    pImpl->error = actual - predicted;
-    lastError_ = pImpl->error;  // Keep both in sync for backward compatibility
+    lastError_ = actual - predicted;
     
     // Multi-dimensional error computation for neuromodulation
     // Error has different components: temporal, spatial, intensity
     float temporalError = 0.0f;
     float spatialError = 0.0f;
-    float intensityError = std::abs(pImpl->error);
+    float intensityError = std::abs(lastError_);
     
     // If we have a brain, use its current state for context-sensitive error
     if (pImpl->brain) {
@@ -53,7 +50,7 @@ void PredictionError::computeError(float predicted, float actual) {
         pImpl->isSurprising = (intensityError > surpriseThreshold_);
         
         // For temporal error, check against learned timing
-        temporalError = std::min(1.0f, pImpl->error * 2.0f);  // Scale temporal sensitivity
+        temporalError = std::min(1.0f, lastError_ * 2.0f);  // Scale temporal sensitivity
         
         // For spatial error, check against predicted locations
         // This would require access to spatial prediction models
@@ -75,11 +72,10 @@ void PredictionError::computeError(float predicted, float actual) {
                                            spatialError * spatialError + 
                                            temporalError * temporalError);
     
-    pImpl->history.push_back(pImpl->error);
+    pImpl->history.push_back(lastError_);
 }
 
 void PredictionError::updatePrediction(float newPrediction) {
-    pImpl->predictedValue = newPrediction;
     lastError_ = newPrediction;
 }
 
@@ -90,28 +86,26 @@ const std::vector<float>& PredictionError::getHistory() const {
 void PredictionError::clearHistory() {
     pImpl->history.clear();
     pImpl->errorComponents.clear();
-    errorHistory_.clear();
 }
 
 float PredictionError::getMagnitude() const {
-    return std::abs(pImpl->error);
+    return std::abs(lastError_);
 }
 
 float PredictionError::getModulationSignal() const {
     // Convert error to modulation signal (0-1)
     // Higher error = stronger modulation for learning
-    return std::min(1.0f, std::abs(pImpl->error) * 2.0f);
+    return std::min(1.0f, std::abs(lastError_) * 2.0f);
 }
 
 bool PredictionError::isSurprising() const {
-    return std::abs(pImpl->error) > surpriseThreshold_;
+    return std::abs(lastError_) > surpriseThreshold_;
 }
 
 void PredictionError::recordError(float error, SimulationStep step) {
     pImpl->history.push_back(error);
-    errorHistory_.push_back(error);
-    if (errorHistory_.size() > 10000) {
-        errorHistory_.erase(errorHistory_.begin());
+    if (pImpl->history.size() > 10000) {
+        pImpl->history.erase(pImpl->history.begin());
     }
 }
 
