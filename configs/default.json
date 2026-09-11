@@ -1,0 +1,34 @@
+{
+  "neuron_count": 1000,
+  "region_count": 2,
+  "connection_probability": 0.1,
+  
+  "stdp_ltp_weight": 0.01,
+  "stdp_ltd_weight": 0.012,
+  "stdp_time_constant": 20.0,
+  "stdp_tau": 20.0,
+  
+  "simulation_timestep": 0.001,
+  "simulation_time_limit": 0.0,
+  "max_simulation_steps": 10000,
+  
+  "random_seed": 42,
+  
+  "development_synaptogenesis_rate": 0.001,
+  "development_pruning_rate": 0.0001,
+  
+  "dopamine_baseline": 0.1,
+  
+  "reward_discount_factor": 0.99,
+  
+  "environment_name": "GridWorld",
+  "environment_width": 10,
+  "environment_height": 10,
+  
+  "log_level": "INFO",
+  "log_to_file": false,
+  "log_filename": "nlm.log",
+  
+  "visualization_enabled": false,
+  "visualization_update_rate": 30.0
+}

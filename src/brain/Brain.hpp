@@ -1,6 +1,15 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "BrainInitializer.hpp"
+#include "NeuralMemorySystem.hpp"
+#include "NeuromodulationSystem.hpp"
+#include "CognitiveSystem.hpp"
+#include "DevelopmentSystem.hpp"
+#include "PredictionSystemWrapper.hpp"
+#include "IOSystem.hpp"
+#include "SimulationManager.hpp"
+#include "MainBrainLoop.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
@@ -28,6 +37,18 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class CheckpointManager;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+class NeuralMemorySystem;
+class NeuromodulationSystem;
+class CognitiveSystem;
+class PredictionSystemWrapper;
+class IOSystem;
+class SimulationManager;
+class MainBrainLoop;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -170,8 +191,8 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
+// ========== NEUROMODULATION SYSTEMS ==========
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
@@ -183,6 +204,10 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // ========== CHECKPOINT SYSTEM ==========
+
+    CheckpointManager* getCheckpointManager();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
