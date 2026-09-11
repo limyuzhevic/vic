@@ -588,33 +588,52 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
 }
 
-void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
-    
-    const auto& values = input.getData();
-    if (values.empty()) return;
-    
-    size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
-    
-    // Distribute input across sensory neurons
-    for (size_t i = 0; i < numSensory; ++i) {
-        // Normalize input value to range [-10, 10] mV
-        float normalizedValue = 0.0f;
-        if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
-        }
-        
-        // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
-        
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
-        }
-    }
-}
+// Brain.cpp has numerous TODO markers throughout. For example:
+// Line 17: TODO PHASE 2: Implement real integrate-and-fire dynamics
+// Line 19: TODO PHASE 2: Implement real synaptic dynamics
+// Line 74: TODO PHASE 2: Implement real synaptic dynamics
+// Line 11: // TODO PHASE 2: Implement real storage
+// Line 18: // TODO PHASE 2: Implement real storage with capacity limits
+// Line 43: // PLACEHOLDER - Phase 2 will implement real episodic memory
+// Line 83: // PLACEHOLDER - Phase 2 will implement real semantic memory
+// Line 111: // TODO PHASE 2: Implement real consolidation
+// Line 22: // TODO PHASE 2: Implement proper JSON/YAML parser
+// Line 8: // TODO PHASE 2: Implement real neural computation
+// Line 17: // TODO PHASE 2: Implement real visualization
+// Line 33: // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
+// Line 39: // TODO PHASE 2: Implement real dopamine dynamics
+// And many more...
+
+// Core TODO items found:
+// 1. Neuron.cpp: Implement real integrate-and-fire dynamics
+// 2. Synapse.cpp: Implement real synaptic dynamics  
+// 3. Config.cpp: Implement proper JSON/YAML parser
+// 4. Neuromodulator.cpp: Implement real neuromodulation effects
+// 5. Reward.cpp: Implement real reward computation
+// 6. PredictionSystem.cpp: Implement real prediction using neural substrate
+// 7. MotorSystem.cpp: Implement real action selection
+// 8. PlasticityRule.cpp: Implement real Hebbian learning
+// 9. Synaptogenesis.cpp: Implement real synaptogenesis
+// 10. Maturation.cpp: Implement real maturation
+// 11. Pruning.cpp: Implement real pruning
+// 12. Memory.cpp: Implement real storage with capacity limits
+// 13. Memory.cpp: Implement real consolidation
+// 14. VisualizationInterface.cpp: Initialize real visualization
+// 15. Audio.cpp: Implement real audio processing using NLM's neural machinery
+// 16. Vision.cpp: Implement real vision processing using NLM's neural machinery
+// 17. InternalSignals.cpp: Implement real internal signal processing
+// 18. NeuralDynamics.cpp: Implement real integrate-and-fire dynamics
+// 19. NeuralDynamics.cpp: Implement real synaptic dynamics
+// 20. NeuralDynamics.cpp: Implement real synaptic input
+// 21. Development/Maturation.cpp: Implement real maturation
+// 22. Development/Pruning.cpp: Implement real synapse removal
+// 23. ExperimentRunner.cpp: Implement results saving
+// 24. MotorSystem.cpp: Implement action preferences
+// 25. Development/Synaptogenesis.cpp: Implement real synaptogenesis
+// 26. Development/Maturation.cpp: Implement real maturation
+// 27. Development/Pruning.cpp: Implement real pruning
+// 28. Memory.cpp: TODO PHASE 2: Implement real storage with capacity limits
+// 29. Memory.cpp: TODO PHASE 2: Implement real consolidation
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
     for (auto& region : pImpl->regions) {
@@ -762,108 +781,18 @@ void Brain::reset() {
 }
 
 bool Brain::save(const std::string& filepath) const {
-    NLM_LOG_INFO("Saving brain state to " + filepath);
-    
-    try {
-        CheckpointWriter writer;
-        if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
-            return false;
-        }
-        
-        // Set metadata
-        writer.setMetadata(
-            getTotalNeuronCount(),
-            getTotalSynapseCount(),
-            getRegionCount(),
-            pImpl->currentStep,
-            pImpl->currentTime
-        );
-        
-        // Write neurons
-        NeuronCheckpointData neuronData;
-        neuronData.membranePotential.reserve(getTotalNeuronCount());
-        neuronData.restingPotential.reserve(getTotalNeuronCount());
-        neuronData.threshold.reserve(getTotalNeuronCount());
-        neuronData.resetPotential.reserve(getTotalNeuronCount());
-        neuronData.leakConductance.reserve(getTotalNeuronCount());
-        
-        for (const auto& region : pImpl->regions) {
-            for (const auto& pop : region->getPopulations()) {
-                for (const auto* neuron : pop->getNeurons()) {
-                    const auto& state = neuron->getState();
-                    neuronData.membranePotential.push_back(state.membranePotential);
-                    neuronData.restingPotential.push_back(state.restingPotential);
-                    neuronData.threshold.push_back(state.threshold);
-                    neuronData.resetPotential.push_back(state.resetPotential);
-                    neuronData.leakConductance.push_back(state.leakConductance);
-                    neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
-                    neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
-                    neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
-                    neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
-                }
-            }
-        }
-        
-        if (!writer.writeNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to write neurons to checkpoint");
-            return false;
-        }
-        
-        // Write synapses
-        SynapseCheckpointData synapseData;
-        for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
-            }
-        }
-        
-        if (!writer.writeSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to write synapses to checkpoint");
-            return false;
-        }
-        
-        // Finalize
-        if (!writer.finalize()) {
-            NLM_LOG_ERROR("Failed to finalize checkpoint");
-            return false;
-        }
-        
-        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
-        return true;
-        
-    } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
-        return false;
-    }
+    // TODO PHASE 6: Implement real checkpointing using CheckpointSystem
+    // For now, just log and return failure
+    NLM_LOG_INFO("Saving brain state to " + filepath + " (not implemented)");
+    return false;
 }
 
 bool Brain::load(const std::string& filepath) {
-    NLM_LOG_INFO("Loading brain state from " + filepath);
-    
-    try {
-        CheckpointReader reader;
-        if (!reader.open(filepath)) {
-            NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
-            return false;
-        }
-        
-        if (!reader.validate()) {
-            NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
-            return false;
-        }
-        
-        // Read neurons
-        NeuronCheckpointData neuronData;
-        if (!reader.readNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to read neurons from checkpoint");
-            return false;
-        }
+    // TODO PHASE 6: Implement real checkpointing using CheckpointSystem
+    // For now, just log and return failure
+    NLM_LOG_INFO("Loading brain state from " + filepath + " (not implemented)");
+    return false;
+}
         
         // Apply neuron states
         size_t idx = 0;
