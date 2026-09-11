@@ -243,6 +243,14 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
+    // Test 6: Checkpoint system exists
+    if (brain->getCheckpointManager() != nullptr) {
+        NLM_LOG_INFO("[PASS] Checkpoint system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Checkpoint system is NOT integrated");
+        success = false;
+    }
+    
     return success;
 }
 

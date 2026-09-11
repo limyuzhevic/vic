@@ -72,6 +72,12 @@ void AgentBrain::initialize(const SimpleWorld& world) {
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    
+    // Initialize novelty detection
+    noveltyLevel_ = 0.0f;
+    curiosityLevel_ = 0.0f;
+    predictionError_ = 0.0f;
+    expectedReward_ = 0.0f;
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -279,8 +285,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     }
 }
 
-void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+if (!brain_ || !developmentEnabled_) return;
     
     developmentalAge_ += timestep;
     

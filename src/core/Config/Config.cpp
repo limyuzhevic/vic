@@ -1,8 +1,4 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <filesystem>
+#include <iomanip>
 
 namespace nlm {
 
@@ -84,13 +80,52 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write config in key=value format (same as loadFromFile expects)
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Add comment for description if present
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Convert value to string based on type
+        file << entry.key << " = ";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format with reasonable precision
+                file << std::fixed << std::setprecision(6) << arg;
+            } else if constexpr (is_vector<T>::value) {
+                // For vectors, format as comma-separated list
+                const auto& vec = arg;
+                file << "[";
+                for (size_t i = 0; i < vec.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << vec[i];
+                }
+                file << "]";
+            } else {
+                // Fallback for any other type
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;
 }
+
+// Helper to check if type is a vector
+template<typename T>
+struct is_vector : std::false_type {};
+
+template<typename T>
+struct is_vector<std::vector<T>> : std::true_type {};
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
