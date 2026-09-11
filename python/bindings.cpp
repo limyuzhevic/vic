@@ -1,3 +1,8 @@
+#include <chrono>
+#include <sstream>
+#include <iomanip>
+#include <map>
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
@@ -15,31 +20,6 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
-
-namespace py = pybind11;
-namespace nlm {
-
-PYBIND11_MODULE(pynlm, m) {
-    m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
-    )pbdoc";
-
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
-
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const NeuronId& id) {
-            return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
         .def(py::init<>())
@@ -400,26 +380,205 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    // Additional convenience factory functions
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, size_t steps) {
+        for (SimulationStep step = 0; step < steps; ++step) {
+            brain->step(step);
+        }
+    }, py::arg("brain"), py::arg("steps"),
+        "Run a complete simulation with the given brain");
+    
+    m.def("createAgentSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        for (size_t step = 0; step < 1000; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            if (step % 100 == 0) {
+                std::cout << "Step " << step << ": "
+                          << "Firing: " << brain->getFiringNeuronCount()
+                          << ", Curiosity: " << agent->getCuriosityLevel()
+                          << ", Novelty: " << agent->getNoveltyLevel()
+                          << ", Dev Stage: " << static_cast<int>(agent->getDevelopmentalStage())
+                          << std::endl;
+            }
+        }
+        
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+        "Run a complete agent simulation with brain and world");
+    
+    // Error handling convenience functions
+    m.def("validateConfiguration", [](const Config& config) {
+        std::vector<std::string> errors;
+        if (!config.has("brain.neuron_count")) {
+            errors.push_back("Missing required parameter: brain.neuron_count");
+        }
+        if (!config.has("brain.synapse_density")) {
+            errors.push_back("Missing recommended parameter: brain.synapse_density");
+        }
+        return errors;
+    }, py::arg("config"),
+        "Validate configuration and return list of errors");
+    
+    // Utility functions
+    m.def("printBrainStats", [](const Brain& brain) {
+        brain.logStatus();
+    }, py::arg("brain"),
+        "Print detailed brain status information");
+    
+    m.def("saveBrainWithTimestamp", [](const Brain& brain, const std::string& prefix) {
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
+        std::stringstream ss;
+        ss << prefix << "_" << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S") << ".bin";
+        brain.save(ss.str());
+        return ss.str();
+    }, py::arg("brain"), py::arg("prefix"),
+        "Save brain state with timestamp in filename");
+    
+    // Debug and profiling utilities
+    m.def("profileStep", [](Brain& brain, SimulationStep step, Timestamp time) {
+        auto start = std::chrono::high_resolution_clock::now();
+        brain.step(step, time);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        return duration.count();
+    }, py::arg("brain"), py::arg("step"), py::arg("time"),
+        "Execute a brain step and return execution time in microseconds");
+    
+    // Advanced configuration utilities
+    m.def("createDevelopmentConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(5000));
+        config->set("brain.synapse_density", 0.15f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("development.enabled", true);
+        return config;
+    }, "Create a development-oriented configuration");
+    
+    m.def("createCuriosityDrivenConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(3000));
+        config->set("brain.synapse_density", 0.1f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.curiosity.sensitivity", 0.5f);
+        config->set("neuromod.novelty.enable", true);
+        config->set("neuromod.novelty.threshold", 0.3f);
+        config->set("plasticity.structural.enable", true);
+        return config;
+    }, "Create a curiosity-driven exploration configuration");
+    
+    m.def("createExplorationConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(2000));
+        config->set("brain.synapse_density", 0.05f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.curiosity.sensitivity", 1.0f);
+        config->set("neuromod.novelty.enable", true);
+        config->set("plasticity.structural.enable", true);
+        config->set("development.enabled", true);
+        return config;
+    }, "Create an exploration-focused configuration");
+    
+    m.def("createStableConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(10000));
+        config->set("brain.synapse_density", 0.2f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", false);  // Less structural change
+        config->set("development.enabled", false);  // Stable development
+        return config;
+    }, "Create a stable configuration for long-term learning");
+    
+    // AgentBrain configuration helpers
+    m.def("configureAgentForWorld", [](AgentBrain& agent, size_t visionWidth, size_t visionHeight) {
+        auto brain = agent.getBrain();
+        if (brain) {
+            auto config = brain->getConfig();
+            config->set("world.vision.width", static_cast<int64_t>(visionWidth));
+            config->set("world.vision.height", static_cast<int64_t>(visionHeight));
+        }
+    }, py::arg("agent"), py::arg("visionWidth"), py::arg("visionHeight"),
+        "Configure agent for world with specific vision dimensions");
+    
+    m.def("enableAllModulation", [](AgentBrain& agent) {
+        agent.enableRewardModulation(true);
+        agent.enableStructuralPlasticity(true);
+        agent.enableDevelopment(true);
+        agent.enableCuriosity(true);
+    }, py::arg("agent"),
+        "Enable all neuromodulation systems");
+    
+    // Brain system access helpers
+    m.def("getAllSystems", [](Brain& brain) {
+        std::map<std::string, std::string> systems;
+        
+        auto spikeSystem = brain.getSpikeSystem();
+        if (spikeSystem) systems["spike_system"] = "Active";
+        
+        auto stdp = brain.getSTDP();
+        if (stdp) systems["stdp"] = "Active";
+        
+        auto hebbian = brain.getHebbian();
+        if (hebbian) systems["hebbian"] = "Active";
+        
+        auto structural = brain.getStructuralPlasticity();
+        if (structural) systems["structural_plasticity"] = "Active";
+        
+        auto workingMem = brain.getWorkingMemory();
+        if (workingMem) systems["working_memory"] = "Active";
+        
+        auto episodicMem = brain.getEpisodicMemory();
+        if (episodicMem) systems["episodic_memory"] = "Active";
+        
+        auto associativeMem = brain.getAssociativeMemory();
+        if (associativeMem) systems["associative_memory"] = "Active";
+        
+        auto predictionSys = brain.getPredictionSystem();
+        if (predictionSys) systems["prediction_system"] = "Active";
+        
+        auto planner = brain.getPlanner();
+        if (planner) systems["neural_planner"] = "Active";
+        
+        auto conceptForm = brain.getConceptFormation();
+        if (conceptForm) systems["concept_formation"] = "Active";
+        
+        auto attention = brain.getAttention();
+        if (attention) systems["attention"] = "Active";
+        
+        auto devSys = brain.getDevelopmentSystem();
+        if (devSys) systems["development_system"] = "Active";
+        
+        auto dopamine = brain.getDopamine();
+        if (dopamine) systems["dopamine"] = "Active";
+        
+        auto curiosity = brain.getCuriosity();
+        if (curiosity) systems["curiosity"] = "Active";
+        
+        auto novelty = brain.getNovelty();
+        if (novelty) systems["novelty"] = "Active";
+        
+        auto predError = brain.getPredictionErrorSignal();
+        if (predError) systems["prediction_error"] = "Active";
+        
+        auto randomGen = brain.getRandomGenerator();
+        if (randomGen) systems["random_generator"] = "Active";
+        
+        return systems;
+    }, py::arg("brain"),
+        "Get information about all active brain systems");
 }
 
 } // namespace nlm
