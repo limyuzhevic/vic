@@ -287,6 +287,96 @@ print("Agent simulation complete!")
 
 ---
 
+## Configuration Options
+
+### Core Simulation
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `random_seed` | int | 42 | Random seed for reproducible experiments |
+| `simulation_timestep` | float | 0.001 | Simulation timestep in seconds |
+| `max_simulation_steps` | int | 10000 | Maximum number of simulation steps |
+| `simulation_time_limit` | float | 0.0 | Simulation time limit (0 = unlimited) |
+| `checkpoint_interval` | int | 1000 | Checkpoint interval in steps |
+
+### Neural Network
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `brain.neuron_count` | int | 1000 | Total number of neurons |
+| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
+| `brain.connection_probability` | float | 0.05 | Probability of connection between neurons |
+| `brain.initial_weight_mean` | float | 0.5 | Mean initial synaptic weight |
+| `brain.initial_weight_std` | float | 0.1 | Standard deviation of initial weights |
+| `brain.v_thresh` | float | -50.0 | Neuron threshold potential (mV) |
+| `brain.v_rest` | float | -70.0 | Resting potential (mV) |
+| `brain.v_reset` | float | -75.0 | Reset potential after spike (mV) |
+| `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
+| `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
+
+### Plasticity Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `plasticity.stdp.enable` | bool | true | Enable STDP |
+| `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
+| `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (ms) |
+| `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
+| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
+| `plasticity.structural.enable` | bool | true | Enable structural plasticity |
+| `development_synaptogenesis_rate` | float | 0.001 | Synaptogenesis rate |
+| `development_pruning_rate` | float | 0.0001 | Pruning rate |
+
+### Neuromodulation Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
+| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
+| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+| `dopamine_baseline` | float | 0.1 | Baseline dopamine level |
+| `curiosity_baseline` | float | 0.5 | Baseline curiosity level |
+| `novelty_threshold` | float | 0.3 | Novelty detection threshold |
+| `reward_decay` | float | 0.95 | Reward decay factor |
+| `prediction_error_weight` | float | 0.7 | Prediction error weight |
+
+### Memory Systems
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `memory.working.enable` | bool | true | Enable working memory |
+| `memory.episodic.enable` | bool | true | Enable episodic memory |
+| `memory.associative.enable` | bool | true | Enable associative memory |
+| `memory.replay.enable` | bool | true | Enable memory replay |
+| `memory.consolidation.enable` | bool | true | Enable memory consolidation |
+
+### Cognition
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `cognition.planner.enable` | bool | true | Enable neural planner |
+| `cognition.concept_formation.enable` | bool | true | Enable concept formation |
+| `cognition.attention.enable` | bool | true | Enable attention system |
+| `cognition.planning.enable` | bool | true | Enable planning system |
+
+### Environment
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `environment_name` | str | GridWorld | Environment type |
+| `environment_width` | int | 10 | World width |
+| `environment_height` | int | 10 | World height |
+
+### Development
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `development.enabled` | bool | true | Enable development |
+| `development.critical_period` | int | 100 | Critical period duration |
+| `development.maturation_stage` | int | 500 | Maturation stage |
+
+---
+
 ## Next Steps
 
 When you're comfortable:

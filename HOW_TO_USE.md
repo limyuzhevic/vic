@@ -418,7 +418,17 @@ pynlm.WorldObjectType.Marker
 
 ## Part 4: Configuration Options
 
-### Brain Configuration
+### Core Simulation
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `random_seed` | int | 42 | Random seed for reproducible experiments |
+| `simulation_timestep` | float | 0.001 | Simulation timestep in seconds |
+| `max_simulation_steps` | int | 10000 | Maximum number of simulation steps |
+| `simulation_time_limit` | float | 0.0 | Simulation time limit (0 = unlimited) |
+| `checkpoint_interval` | int | 1000 | Checkpoint interval in steps |
+
+### Neural Network
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -443,6 +453,8 @@ pynlm.WorldObjectType.Marker
 | `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
 | `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
 | `plasticity.structural.enable` | bool | true | Enable structural plasticity |
+| `development_synaptogenesis_rate` | float | 0.001 | Synaptogenesis rate |
+| `development_pruning_rate` | float | 0.0001 | Pruning rate |
 
 ### Neuromodulation Configuration
 
@@ -451,8 +463,62 @@ pynlm.WorldObjectType.Marker
 | `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
 | `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
 | `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+| `dopamine_baseline` | float | 0.1 | Baseline dopamine level |
+| `curiosity_baseline` | float | 0.5 | Baseline curiosity level |
+| `novelty_threshold` | float | 0.3 | Novelty detection threshold |
+| `reward_decay` | float | 0.95 | Reward decay factor |
+| `prediction_error_weight` | float | 0.7 | Prediction error weight |
 
----
+### Memory Systems
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `memory.working.enable` | bool | true | Enable working memory |
+| `memory.episodic.enable` | bool | true | Enable episodic memory |
+| `memory.associative.enable` | bool | true | Enable associative memory |
+| `memory.replay.enable` | bool | true | Enable memory replay |
+| `memory.consolidation.enable` | bool | true | Enable memory consolidation |
+
+### Cognition
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `cognition.planner.enable` | bool | true | Enable neural planner |
+| `cognition.concept_formation.enable` | bool | true | Enable concept formation |
+| `cognition.attention.enable` | bool | true | Enable attention system |
+| `cognition.planning.enable` | bool | true | Enable planning system |
+
+### Environment
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `environment_name` | str | GridWorld | Environment type |
+| `environment_width` | int | 10 | World width |
+| `environment_height` | int | 10 | World height |
+| `visualization_enabled` | bool | false | Enable visualization |
+| `visualization_update_rate` | float | 30.0 | Visualization update rate |
+
+### Development
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `development.enabled` | bool | true | Enable development |
+| `development.critical_period` | int | 100 | Critical period duration |
+| `development.maturation_stage` | int | 500 | Maturation stage |
+
+### Reward
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `reward_discount_factor` | float | 0.99 | Reward discount factor |
+
+### Logging
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `log_level` | str | INFO | Logging level |
+| `log_to_file` | bool | false | Log to file |
+| `log_filename` | str | nlm.log | Log filename |
 
 ## Part 5: Example Scripts
 

@@ -135,4 +135,11 @@ public:
     bool testReplay();
 };
 
+    /**
+     * Validate Phase 6 experiment configuration
+     * @param config Configuration to validate
+     * @return True if configuration is valid
+     */
+    bool validatePhase6Config(const Phase6Config& config) const;
+
 } // namespace nlm

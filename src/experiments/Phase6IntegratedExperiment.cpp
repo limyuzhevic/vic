@@ -13,7 +13,7 @@ Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
 
 Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
 
-Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
+void Phase6IntegratedExperiment::run(const Phase6Config& config) {
     Phase6IntegrationResult result;
     result.startTime = time(nullptr);
     
@@ -28,10 +28,21 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
     cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    
+    // Validate configuration
+    cfg->addValidationDescriptor(ConfigValidationDescriptor(
+        Config::BRAIN_NEURON_COUNT, "int", "Number of neurons", true, 0, 1000000
+    ));
+    cfg->addValidationDescriptor(ConfigValidationDescriptor(
+        Config::BRAIN_CONNECTION_PROBABILITY, "double", "Connection probability", true, 0.0, 1.0
+    ));
+    
+    if (!cfg->validate()) {
+        auto error = cfg->getLastValidationError();
+        NLM_LOG_ERROR("Configuration validation failed: " + std::string(error.what()));
+        result.endTime = time(nullptr);
+        return result;
+    }
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
@@ -48,10 +59,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Create agent
     AgentBrain agent(brain);
     agent.initialize(world);
-    agent.enableRewardModulation(true);
+    agent.enableRewardModulation(config.enableRewardModulation);
     agent.enableStructuralPlasticity(config.enableDevelopment);
     agent.enableDevelopment(config.enableDevelopment);
-    agent.enableCuriosity(true);
+    agent.enableCuriosity(config.enableCuriosity);
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     

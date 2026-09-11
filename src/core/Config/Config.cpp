@@ -3,13 +3,19 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <numeric>
+#include <unordered_set>
+#include <stdexcept>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    ConfigSchema schema;
+    mutable std::vector<ValidationError> validationErrors;
 };
 
+// Constructor and destructor
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
 Config::~Config() = default;
@@ -18,10 +24,8 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Load from file
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -29,19 +33,16 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::string line;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
@@ -55,6 +56,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
+// Load from command line arguments
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -86,7 +88,7 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = " << configValueToString(entry.value) << "\n";
     }
     
     return true;
@@ -166,6 +168,8 @@ std::vector<std::string> Config::getKeys() const {
 
 void Config::clear() {
     pImpl->entries.clear();
+    pImpl->schema.descriptors.clear();
+    pImpl->validationErrors.clear();
 }
 
 std::string Config::summary() const {
@@ -186,30 +190,283 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+void Config::addValidationDescriptor(const ConfigValidationDescriptor& descriptor) {
+    pImpl->schema.addDescriptor(descriptor);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+bool Config::validate() const {
+    pImpl->validationErrors.clear();
+    
+    if (pImpl->schema.descriptors.empty()) {
+        return true;
+    }
+    
+    bool valid = true;
+    for (const auto& descriptor : pImpl->schema.descriptors) {
+        ValidationError error = validateSingleValue(descriptor.key, get<ConfigValue>(descriptor.key), descriptor);
+        if (error.getType() != ValidationErrorType::None) {
+            pImpl->validationErrors.push_back(error);
+            valid = false;
+        }
+    }
+    
+    return valid;
+}
+
+std::vector<ValidationError> Config::validateWithDetails() const {
+    pImpl->validationErrors.clear();
+    
+    if (pImpl->schema.descriptors.empty()) {
+        return pImpl->validationErrors;
+    }
+    
+    for (const auto& descriptor : pImpl->schema.descriptors) {
+        ValidationError error = validateSingleValue(descriptor.key, get<ConfigValue>(descriptor.key), descriptor);
+        if (error.getType() != ValidationErrorType::None) {
+            pImpl->validationErrors.push_back(error);
+        }
+    }
+    
+    return pImpl->validationErrors;
+}
+
+ValidationError Config::getLastValidationError() const {
+    if (pImpl->validationErrors.empty()) {
+        return ValidationError();
+    }
+    return pImpl->validationErrors.back();
+}
+
+bool Config::setSchema(const ConfigSchema& schema) {
+    pImpl->schema = schema;
+    return true;
+}
+
+const ConfigSchema& Config::getSchema() const {
+    return pImpl->schema;
+}
+
+void Config::clearSchema() {
+    pImpl->schema.descriptors.clear();
+}
+
+template<typename T>
+bool Config::isInBounds(const T& value, const std::optional<double>& min, const std::optional<double>& max) {
+    if (!min.has_value() && !max.has_value()) {
+        return true;
+    }
+    
+    double numValue = 0.0;
+    bool isNum = false;
+    
+    if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+        numValue = static_cast<double>(value);
+        isNum = true;
+    } else if constexpr (std::is_same_v<T, double>) {
+        numValue = value;
+        isNum = true;
+    }
+    
+    if (!isNum) {
+        return true;
+    }
+    
+    if (min.has_value() && numValue < min.value()) {
+        return false;
+    }
+    
+    if (max.has_value() && numValue > max.value()) {
+        return false;
+    }
+    
+    return true;
+}
+
+std::string Config::configValueToString(const ConfigValue& value) {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        if constexpr (std::is_same_v<decltype(arg), std::string>) {
+            oss << "\"" << arg << "\"";
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
+}
+
+bool Config::configValueToBool(const ConfigValue& value) {
+    bool result = false;
+    std::visit([&result](auto&& arg) {
+        if constexpr (std::is_same_v<decltype(arg), bool>) {
+            result = arg;
+        }
+    }, value);
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+double Config::configValueToDouble(const ConfigValue& value) {
+    double result = 0.0;
+    std::visit([&result](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            result = static_cast<double>(arg);
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            result = static_cast<double>(arg);
+        } else if constexpr (std::is_same_v<T, double>) {
+            result = arg;
+        }
+    }, value);
+    return result;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+int64_t Config::configValueToInt64(const ConfigValue& value) {
+    int64_t result = 0;
+    std::visit([&result](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            result = static_cast<int64_t>(arg);
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            result = static_cast<int64_t>(arg);
+        }
+    }, value);
+    return result;
+}
+
+// Validation helper method implementations
+ValidationError Config::validateSingleValue(const std::string& key, const ConfigValue& value, const ConfigValidationDescriptor& descriptor) {
+    if (descriptor.required && !has(key)) {
+        return ValidationError("Missing required configuration key: " + key, 
+                             ValidationErrorType::MissingRequired, key);
+    }
+    
+    if (!has(key)) {
+        return ValidationError();
+    }
+    
+    auto actualValue = get<ConfigValue>(key);
+    if (!actualValue) {
+        return ValidationError("Could not retrieve configuration value for key: " + key,
+                             ValidationErrorType::InvalidValue, key);
+    }
+    
+    ValidationError typeError = validateType(key, actualValue.value(), descriptor.type);
+    if (typeError.getType() != ValidationErrorType::None) {
+        return typeError;
+    }
+    
+    ValidationError rangeError = validateRange(key, actualValue.value(), descriptor.minValue, descriptor.maxValue);
+    if (rangeError.getType() != ValidationErrorType::None) {
+        return rangeError;
+    }
+    
+    ValidationError allowedError = validateAllowedValues(key, actualValue.value(), descriptor.allowedValues);
+    if (allowedError.getType() != ValidationErrorType::None) {
+        return allowedError;
+    }
+    
+    return ValidationError();
+}
+
+std::string Config::valueTypeToString(const ConfigValue& value) {
+    std::string typeName;
+    std::visit([&typeName](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) typeName = "int";
+        else if constexpr (std::is_same_v<T, int64_t>) typeName = "int64";
+        else if constexpr (std::is_same_v<T, double>) typeName = "double";
+        else if constexpr (std::is_same_v<T, bool>) typeName = "bool";
+        else if constexpr (std::is_same_v<T, std::string>) typeName = "string";
+        else if constexpr (std::is_same_v<T, std::vector<int>>) typeName = "int_vector";
+        else if constexpr (std::is_same_v<T, std::vector<double>>) typeName = "double_vector";
+        else if constexpr (std::is_same_v<T, std::vector<std::string>>) typeName = "string_vector";
+    }, value);
+    return typeName;
+}
+
+bool Config::isNumber(const ConfigValue& value, double& outValue) {
+    bool result = false;
+    std::visit([&result, &outValue](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) { outValue = static_cast<double>(arg); result = true; }
+        else if constexpr (std::is_same_v<T, int64_t>) { outValue = static_cast<double>(arg); result = true; }
+        else if constexpr (std::is_same_v<T, double>) { outValue = arg; result = true; }
+        else if constexpr (std::is_same_v<T, std::vector<int>>) { result = false; }
+        else if constexpr (std::is_same_v<T, std::vector<double>>) { result = false; }
+        else if constexpr (std::is_same_v<T, std::vector<std::string>>) { result = false; }
+        else if constexpr (std::is_same_v<T, bool>) { result = false; }
+        else if constexpr (std::is_same_v<T, std::string>) { result = false; }
+    }, value);
+    return result;
+}
+
+ValidationError Config::validateType(const std::string& key, const ConfigValue& value, const std::string& expectedType) {
+    std::string actualType = valueTypeToString(value);
+    if (actualType != expectedType) {
+        return ValidationError("Type mismatch for key " + key + ": expected " + expectedType + 
+                             " but got " + actualType, ValidationErrorType::InvalidType, key, expectedType);
+    }
+    return ValidationError();
+}
+
+ValidationError Config::validateRange(const std::string& key, const ConfigValue& value, 
+                                     const std::optional<double>& min, const std::optional<double>& max) {
+    double numValue;
+    if (!isNumber(value, numValue)) {
+        return ValidationError();
+    }
+    
+    if (min.has_value() && numValue < min.value()) {
+        return ValidationError("Value for key " + key + " is below minimum allowed: " + 
+                             std::to_string(numValue) + " < " + std::to_string(min.value()),
+                             ValidationErrorType::OutOfRange, key, ">=" + std::to_string(min.value()));
+    }
+    
+    if (max.has_value() && numValue > max.value()) {
+        return ValidationError("Value for key " + key + " is above maximum allowed: " + 
+                             std::to_string(numValue) + " > " + std::to_string(max.value()),
+                             ValidationErrorType::OutOfRange, key, "<=" + std::to_string(max.value()));
+    }
+    
+    return ValidationError();
+}
+
+ValidationError Config::validateAllowedValues(const std::string& key, const ConfigValue& value,
+                                             const std::vector<std::string>& allowed) {
+    if (allowed.empty()) {
+        return ValidationError();
+    }
+    
+    std::string strValue;
+    std::visit([&strValue](auto&& arg) {
+        if constexpr (std::is_same_v<decltype(arg), std::string>) {
+            strValue = arg;
+        } else {
+            strValue = std::to_string(arg);
+        }
+    }, value);
+    
+    if (std::find(allowed.begin(), allowed.end(), strValue) == allowed.end()) {
+        std::string allowedStr;
+        for (size_t i = 0; i < allowed.size(); ++i) {
+            if (i > 0) allowedStr += ", ";
+            allowedStr += "'" + allowed[i] + "'";
+        }
+        return ValidationError("Value for key " + key + " is not in allowed set: '" + 
+                             strValue + "' (allowed: " + allowedStr + ")",
+                             ValidationErrorType::InvalidValue, key, allowedStr);
+    }
+    
+    return ValidationError();
+}
+
+// Configuration key constants
+const std::string Config::BRAIN_NEURON_COUNT = "brain.neuron_count";
+const std::string Config::BRAIN_SYNAPSE_DENSITY = "brain.synapse_density";
+const std::string Config::BRAIN_CONNECTION_PROBABILITY = "brain.connection_probability";
+const std::string Config::PLASTICITY_STDP_ENABLE = "plasticity.stdp.enable";
+const std::string Config::PLASTICITY_STDP_LEARNING_RATE = "plasticity.stdp.learning_rate";
+const std::string Config::NEUROMOD_DOPAMINE_SCALE = "neuromod.dopamine.scale";
 
 } // namespace nlm

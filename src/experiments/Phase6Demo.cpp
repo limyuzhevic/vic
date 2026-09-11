@@ -3,6 +3,17 @@
  * 
  * This demo runs the Phase 6 integration experiment to verify
  * that all brain systems are properly connected.
+ * 
+ * Usage:
+ *   ./nlm_phase6_demo
+ * 
+ * The demo performs the following tests:
+ * 1. Integration verification (checks all systems are connected)
+ * 2. Memory integration test
+ * 3. Neuromodulation integration test
+ * 4. Checkpoint save/load test
+ * 5. Replay system test
+ * 6. Full integration experiment with real simulation
  */
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
