@@ -6,6 +6,7 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <algorithm>
 
 namespace nlm {
 
@@ -76,9 +77,13 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Clean up neuron pointer vectors
+    void cleanupNeuronPointers();
+    
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
+    // Motor neuron groups - using raw pointers since Brain owns them
+    // These are temporary references that must be rebuilt when brain changes
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
@@ -113,5 +118,18 @@ private:
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
 };
+
+inline void AgentBrain::cleanupNeuronPointers() {
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+}
 
 } // namespace nlm

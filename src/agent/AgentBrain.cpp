@@ -20,8 +20,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Rebuild neuron pointers when brain changes
     if (brain_) {
+        cleanupNeuronPointers();
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();

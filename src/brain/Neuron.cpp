@@ -260,9 +260,105 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Use physiological parameters from configuration if available
+    // For now, use default biological parameters
+    TimestepDuration dt = 0.001;  // 1ms timestep (standard for LIF neurons)
+    
+    // Check for external input if any
+    // In real implementation, this would check for spikes from pre-synaptic neurons
+    // For now, stepLIF handles the basic integration
+    
+    // Step the LIF neuron with proper biological dynamics
+    // stepLIF returns true if neuron fired during this timestep
+    bool fired = stepLIF(currentTime, dt);
+    
+    if (fired) {
+        // Record the spike time for synaptic propagation and STDP
+        recordSpike(currentTime);
+        
+        // Update firing rate for statistical tracking
+        pImpl->state.firingRate = 1000.0f;  // For 1ms timestep, this represents firing rate
+        
+        // Note: In a full implementation, this would:
+        // 1. Signal post-synaptic neurons via spike propagation system
+        // 2. Trigger STDP events based on pre-synaptic spike
+        // 3. Update neuromodulatory state if applicable
+        // 4. Record for memory systems
+    }
+}
+
+void Neuron::updateBiophysicalParameters(const Brain& brain) {
+    // TODO PHASE 2: Implement biophysical parameter modulation based on brain state
+    // In real implementation, this would update neuron parameters based on:
+    // - Neuromodulatory signals (dopamine, acetylcholine, etc.)
+    // - Development stage (critical period vs adult)
+    // - Learning history (synaptic modifications)
+    // - Environmental inputs and behavioral context
+    
+    // For now, keep parameters constant
+    
+    // Example future implementation:
+    // 1. Check dopamine level for plasticity modulation
+    // 2. Apply developmental changes (excitatory/inhibitory balance)
+    // 3. Integrate experience-dependent changes
+    // 4. Update ion channel properties based on learning history
+    
+    // Placeholder for advanced dynamics
+    float neuromodulatoryFactor = 1.0f;
+    
+    // Apply neuromodulatory modulation to membrane properties
+    if (neuromodulatoryFactor != 1.0f) {
+        // Example: Dopamine can modulate excitability
+        pImpl->state.threshold *= neuromodulatoryFactor;
+        // Other parameters would be adjusted similarly
+    }
+}
+
+void Neuron::applyPlasticity() {
+    // TODO PHASE 2: Implement activity-dependent plasticity
+    // This would integrate with brain plasticity systems
+    
+    // In real implementation, this would:
+    // 1. Check for pre-synaptic spikes (from spikeHistory)
+    // 2. Compute STDP eligibility traces
+    // 3. Apply Hebbian learning if enabled
+    // 4. Record in brain's plasticity system
+    
+    // For now, just track spike timing for potential future STDP
+    if (!pImpl->spikeHistory.empty()) {
+        // Record recent spike timing for STDP calculations
+        float lastSpikeTime = pImpl->spikeHistory.back();
+        
+        // In real implementation, this would update eligibility traces
+        // in the brain's plasticity system
+    }
+}
+
+void Neuron::updateMembraneProperties(double timeStep) {
+    // TODO PHASE 2: Implement advanced membrane dynamics
+    // Current implementation uses simple LIF, but real neurons have:
+    // - Multiple ion channels with dynamics
+    // - Spike-frequency adaptation
+    // - Calcium dynamics
+    // - Metabolic constraints
+    
+    // For now, keep simple LIF dynamics
+    // Future implementation would include:
+    
+    // Example advanced features:
+    // 1. Hodgkin-Huxley ion channel dynamics
+    // 2. Calcium-dependent potassium currents
+    // 3. Sodium-potassium pump dynamics
+    // 4. Metabolic state affecting excitability
+    
+    // Placeholder for advanced membrane models
+    
+    // Example adaptation (simple implementation):
+    // if (pImpl->state.adaptationVariable > 0.0f) {
+    //     pImpl->state.restingPotential -= pImpl->state.adaptationVariable * 0.01f;
+    //     pImpl->state.adaptationVariable *= 0.95f;
+    // }
 }
 
 void Neuron::reset() {

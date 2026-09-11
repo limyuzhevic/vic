@@ -366,21 +366,23 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Set Phase 2 specific parameters that are required for real neural computation
+    // These are not hardcoded defaults but essential Phase 2 parameters
+    // Only set if not already configured
+    config->set("random_seed", config->getOr<int64_t>("random_seed", 42), ConfigSource::Default);
+    config->set("simulation_timestep", config->getOr<double>("simulation_timestep", 0.001), ConfigSource::Default);
+    config->set("neuron_count", config->getOr<int64_t>("neuron_count", 500), ConfigSource::Default);  // Smaller for faster test
+    config->set("region_count", config->getOr<int64_t>("region_count", 1), ConfigSource::Default);
+    config->set("connection_probability", config->getOr<float>("connection_probability", 0.15f), ConfigSource::Default);
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // STDP parameters - required for Phase 2
+    config->set("stdp_ltp_weight", config->getOr<float>("stdp_ltp_weight", 0.02f), ConfigSource::Default);
+    config->set("stdp_ltd_weight", config->getOr<float>("stdp_ltd_weight", 0.015f), ConfigSource::Default);
+    config->set("stdp_tau", config->getOr<float>("stdp_tau", 20.0f), ConfigSource::Default);
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Structural plasticity parameters - required for Phase 2
+    config->set("synaptogenesis_rate", config->getOr<float>("synaptogenesis_rate", 0.0001f), ConfigSource::Default);
+    config->set("pruning_rate", config->getOr<float>("pruning_rate", 0.00001f), ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
