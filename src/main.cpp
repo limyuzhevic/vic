@@ -75,7 +75,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
         if (!initialWeights.empty()) {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-            float mean = sum / initialWeights.size();
+            float mean = sum / static_cast<float>(initialWeights.size());
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
         }
     }

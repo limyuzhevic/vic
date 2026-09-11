@@ -80,7 +80,6 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -200,7 +199,7 @@ bool Brain::initialize() {
             auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
             auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
             
-            // Collect sensory and motor neurons for I/O
+            // Collect sensory neurons for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
@@ -220,30 +219,53 @@ bool Brain::initialize() {
         }
     }
     
-    // Initialize connectivity with random weights
-    for (size_t i = 0; i < regionCount; ++i) {
-        auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Initialize random connectivity and synapse weights
-            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
-        }
+if (pImpl->sensoryNeurons.size() < neuronCount / 10) {
+        NLM_LOG_WARNING("Warning: Only " + std::to_string(pImpl->sensoryNeurons.size()) + 
+                       " sensory neurons available, need " + std::to_string(neuronCount / 10));
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
+    if (pImpl->motorNeurons.size() < neuronCount / 10) {
+        NLM_LOG_WARNING("Warning: Only " + std::to_string(pImpl->motorNeurons.size()) + 
+                       " motor neurons available, need " + std::to_string(neuronCount / 10));
+    }
     
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    // Check for valid configuration
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Error: neuron_count cannot be zero");
+        return false;
+    }
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Error: region_count cannot be zero");
+        return false;
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    } else {
+        NLM_LOG_ERROR("Error: Failed to allocate episodic memory");
+        return false;
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Error: Failed to allocate associative memory");
+        return false;
+    }
+    } else {
+        NLM_LOG_ERROR("Error: Failed to allocate associative memory");
+        return false;
+    }
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    if (predictionSystem) {
+        // Configure prediction system with parameters from config
+        float predictionTimeWindow = config->getOr<float>("prediction_time_window", 10.0f);
+        predictionSystem->configure(predictionTimeWindow);
+    }
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -861,11 +883,19 @@ bool Brain::load(const std::string& filepath) {
         // Read neurons
         NeuronCheckpointData neuronData;
         if (!reader.readNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to read neurons from checkpoint");
+            NLM_LOG_ERROR("Failed to read neurons from checkpoint: " + reader.getError());
             return false;
         }
         
-        // Apply neuron states
+        // Validate neuron data before applying
+        size_t expectedNeurons = getTotalNeuronCount();
+        if (neuronData.membranePotential.size() != expectedNeurons) {
+            NLM_LOG_ERROR("Neuron data corruption: expected " + std::to_string(expectedNeurons) + 
+                         " neurons, got " + std::to_string(neuronData.membranePotential.size()));
+            return false;
+        }
+        
+        // Apply neuron states with validation
         size_t idx = 0;
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
@@ -888,10 +918,24 @@ bool Brain::load(const std::string& filepath) {
             }
         }
         
+        if (idx != expectedNeurons) {
+            NLM_LOG_ERROR("Neuron index mismatch: processed " + std::to_string(idx) + 
+                         " but expected " + std::to_string(expectedNeurons));
+            return false;
+        }
+        
         // Read synapses
         SynapseCheckpointData synapseData;
         if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
+            NLM_LOG_ERROR("Failed to read synapses from checkpoint: " + reader.getError());
+            return false;
+        }
+        
+        // Validate synapse data
+        size_t expectedSynapses = getTotalSynapseCount();
+        if (synapseData.weight.size() != expectedSynapses) {
+            NLM_LOG_ERROR("Synapse data corruption: expected " + std::to_string(expectedSynapses) + 
+                         " synapses, got " + std::to_string(synapseData.weight.size()));
             return false;
         }
         

@@ -193,9 +193,24 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== ENHANCED API ==========
+    
+    // Batch operations for efficiency
+    std::vector<Neuron*> getNeuronsByType(NeuronType type) const;
+    std::vector<Neuron*> getActiveNeurons() const;
+    std::vector<Synapse*> getSynapsesByType(SynapseType type) const;
+    
+    // Get regions by developmental stage
+    std::vector<NeuralRegion*> getRegionsByStage(DevelopmentalStage stage) const;
+    
+    // Check if systems are initialized
+    bool isInitialized() const { return pImpl != nullptr; }
+    
 private:
     struct Impl;
     Impl* pImpl;
 };
+
+} // namespace nlm
 
 } // namespace nlm

@@ -14,6 +14,11 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Configure prediction system parameters
+    void configure(float timeWindow) {
+        predictionTimeWindow_ = timeWindow;
+    }
+    
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
@@ -37,6 +42,7 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    float predictionTimeWindow_ = 10.0f;  // Default time window
 };
 
 } // namespace nlm
