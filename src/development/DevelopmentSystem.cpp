@@ -65,14 +65,26 @@ void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
     age_ += 0.001;  // Approximate timestep
     pImpl->stageAge += 0.001;
     
-    // Auto-advance stage based on time in stage
-    // Initial: 60 steps, CriticalPeriod: 300 steps, Maturation: 600 steps
-    if (pImpl->stage == DevelopmentalStage::Initial && pImpl->stageAge > 60.0) {
-        advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::CriticalPeriod && pImpl->stageAge > 300.0) {
-        advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::Maturation && pImpl->stageAge > 600.0) {
-        advanceStage();
+    // Apply developmental plasticity changes
+    if (brain) {
+        // Enhanced memory consolidation during sleep
+        if (auto* episodicMemory = brain->getEpisodicMemory()) {
+            // During sleep, consolidate all memory traces more thoroughly
+            episodicMemory->consolidate(0.5f);  // Stronger consolidation during sleep
+        }
+        
+        // Strengthen working memory traces during sleep
+        if (auto* workingMemory = brain->getWorkingMemory()) {
+            workingMemory->strengthenMemory(1.2f);  // 20% stronger during sleep
+        }
+        
+        // Apply developmental plasticity changes
+        brain->getDevelopmentSystem()->update(brain->getRandomGenerator(), 0.001);
+        
+        // During sleep, enhance structural plasticity for learning consolidation
+        if (brain->getStructuralPlasticity()) {
+            brain->getStructuralPlasticity()->update(brain, *brain->getRandomGenerator());
+        }
     }
 }
 

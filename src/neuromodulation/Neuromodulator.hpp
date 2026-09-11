@@ -54,14 +54,25 @@ private:
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
-class Acetylcholine : public Neuromodulator {
+class AcetylCholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    AcetylCholine();
+    ~AcetylCholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Memory and attention enhancement
+    void enhanceMemoryConsolidation(class Brain* brain, float consolidationStrength);
+    void enhanceAttention(class Brain* brain, float focusStrength);
+    void signalNovelEvent(float novelty);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
@@ -79,11 +90,67 @@ public:
 // PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Mood modulation functions
+    void signalMoodChange(float moodDelta);
+    void reduceImpulsivity(class Brain* brain, float currentImpulsivity);
+    void modulateSocialBehavior(class Brain* brain, bool isSocialContext);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Acetylcholine: Attention and memory consolidation
+class AcetylCholine : public Neuromodulator {
+public:
+    AcetylCholine();
+    ~AcetylCholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Memory and attention enhancement
+    void enhanceMemoryConsolidation(class Brain* brain, float consolidationStrength);
+    void enhanceAttention(class Brain* brain, float focusStrength);
+    void signalNovelEvent(float novelty);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Norepinephrine: Arousal and vigilance
+class Norepinephrine : public Neuromodulator {
+public:
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Arousal and vigilance enhancement
+    void increaseArousal(class Brain* brain, float arousalDelta);
+    void enhanceVigilance(class Brain* brain, float vigilanceDelta);
+    void signalStress(float stressLevel);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm
