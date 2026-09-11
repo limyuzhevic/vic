@@ -83,7 +83,9 @@ std::vector<NeuralPopulation*> NeuralRegion::getAllPopulations() {
     std::vector<NeuralPopulation*> result;
     result.reserve(pImpl->populations.size());
     for (auto& pop : pImpl->populations) {
-        result.push_back(pop.get());
+        if (pop) {
+            result.push_back(pop.get());
+        }
     }
     return result;
 }
