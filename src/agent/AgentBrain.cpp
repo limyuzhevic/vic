@@ -238,6 +238,12 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     
+    // Validate input parameters
+    if (std::isnan(reward) || std::isnan(predictedReward)) {
+        NLM_LOG_ERROR("Invalid reward/predictedReward values in applyRewardModulation");
+        return;
+    }
+    
     // Compute prediction error
     predictionError_ = reward - predictedReward;
     
@@ -251,17 +257,21 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
     // Apply to all synapses with eligibility traces
-    for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
-            
-            if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
-                syn->addToWeight(delta);
+    if (!brain_->getRegions().empty()) {
+        for (const auto& region : brain_->getRegions()) {
+            for (auto* syn : region->getSynapses()) {
+                if (!syn) continue; // Safety check
                 
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+                float eligibility = syn->getEligibilityTrace();
+                
+                if (std::abs(eligibility) > 0.001f) {
+                    // Apply reward-modulated weight change
+                    float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                    syn->addToWeight(delta);
+                    
+                    // Decay eligibility trace
+                    syn->decayEligibilityTrace(0.1f);
+                }
             }
         }
     }
@@ -276,6 +286,21 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (stdp) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
+    }
+    
+    // Apply to Hebbian if available
+    auto* hebbian = brain_->getHebbian();
+    if (hebbian) {
+        hebbian->setLearningRate(0.001f * plasticityFactor);
+    }
+    
+    // Apply to Structural Plasticity if available
+    auto* structuralPlasticity = brain_->getStructuralPlasticity();
+    if (structuralPlasticity) {
+        float synRate = 0.0001f * plasticityFactor;
+        float pruneRate = 0.00001f * (2.0f - plasticityFactor);
+        structuralPlasticity->setSynaptogenesisRate(synRate);
+        structuralPlasticity->setPruningRate(pruneRate);
     }
 }
 
