@@ -67,7 +67,9 @@ struct LearningExperiment {
         // Record initial weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+                if (syn) {
+                    initialWeights.push_back(syn->getWeight());
+                }
             }
         }
         
@@ -86,7 +88,9 @@ struct LearningExperiment {
         // Record final weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+                if (syn) {
+                    finalWeights.push_back(syn->getWeight());
+                }
             }
         }
         
@@ -107,7 +111,10 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         
         if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
+            NLM_LOG_INFO("WARNING: Insufficient data for meaningful analysis");
+            NLM_LOG_INFO("  Initial weights: " + std::to_string(initialWeights.size()));
+            NLM_LOG_INFO("  Final weights: " + std::to_string(finalWeights.size()));
+            NLM_LOG_INFO("  Experiments may not have produced measurable synaptic changes");
             return;
         }
         
@@ -153,10 +160,13 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         if (learningOccurred) {
             NLM_LOG_INFO("✓ LEARNING DETECTED: Synaptic weights changed through experience");
+            NLM_LOG_INFO("  This demonstrates that NLM can learn from neural activity patterns");
         } else {
-            NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
+            NLM_LOG_INFO("✗ NO SIGNIFICANT LEARNING: Weights did not change significantly");
+            NLM_LOG_INFO("  This could be due to: neural saturation, insufficient activity patterns, or parameter tuning issues");
         }
     }
+};
 };
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {

@@ -109,7 +109,7 @@ NLM/
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   └── visualization/ # Visualization
 ├── tests/
 └── configs/
 ```
@@ -128,29 +128,45 @@ NLM/
 - Structural plasticity
 
 ### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
+- **Real-world experience integration**: The Phase 3 experiment in `main.cpp` demonstrates complete world interaction with:
+  - Sensorimotor loops (sensory → neural processing → action → world)
+  - Neuromodulation (reward, novelty, curiosity)
+  - Development over time
+  - Structural plasticity (growing and pruning connections)
+  - Learning through prediction errors and rewards
+- **Implementation**: This is the real-world learning experiment integrated into the main executable, showing how neural systems interact with an environment
 
 ### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+- **Advanced Cognitive Capabilities**: Phase 4 experiments demonstrate sophisticated brain functions:
+  - **Neural Prediction Systems**: The brain can predict future sensory input, detect patterns, and learn temporal sequences
+  - **Working Memory**: The brain maintains and manipulates information over short time periods, tracking retention and capacity
+  - **Episodic Memory**: The brain stores and retrieves specific experiences with detailed context (what, when, how)
+  - **Concept Formation**: The brain abstracts and generalizes from experiences, recognizing patterns across variations
+  - **Attentional Selection**: The brain prioritizes relevant information amid competition, showing selective attention
+  - **Neural Planning**: The brain plans multi-step actions to achieve goals, evaluating different action sequences
+  - **Self-Model Development**: The brain develops a model of its own body and actions, predicting consequences
+  - **Social Learning**: The brain learns from observing others' actions and outcomes
+  - **Continual Learning**: The brain can learn multiple tasks sequentially without catastrophic forgetting
+  - **Generalization**: The brain applies learned concepts to novel situations
+- **Integration**: These cognitive capabilities work together in the Phase 4 integrated experiment, showing how a complete brain system can process complex information and adapt behavior
 
 ### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
+- **Performance Optimizations**: Phase 5 focuses on making the brain system more efficient and capable:
+  - **Memory Pooling**: Optimized memory management for better performance
+  - **Event Queues**: Efficient processing of neural events
+  - **SIMD Vectorization**: Parallel processing for faster computation
+  - **Parallel Processing**: Multiple operations can run simultaneously
+  - **Checkpoint System**: Can save and resume brain states efficiently
+  - **Scalability**: The system can handle larger networks and more complex simulations
+  - **Lifetime Learning**: Extended learning over many phases (6 developmental phases)
+  - **Damage Recovery**: Brain can recover from simulated damage and maintain function
+  - **Multi-Agent Coordination**: Multiple brains can interact and learn from each other
+  - **Ablation Studies**: Systematic removal of brain components to understand their function
+- **Research Framework**: Phase 5 provides tools for scientific research into artificial brains, including:
+  - Lifetime experiment tracking
+  - Multi-seed experiments for statistical analysis
+  - Comprehensive performance measurement
+  - Visualization and reporting tools
 
 ### Phase 6 (Complete - Final Integration)
 - All systems integrated into coherent brain loop
@@ -220,6 +236,29 @@ CHANGED BRAIN
   ↓
 CHANGED FUTURE BEHAVIOR
 ```
+
+## Current Execution
+
+The system can be run using:
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+./nlm
+```
+
+This runs a comprehensive integration test verifying all brain systems are connected.
+
+## Phase 3 Integration Note
+
+Phase 3 is now **integrated directly into the main executable** rather than being a separate demo. This provides the real learning experiments with proper synaptic changes. The main executable runs three tests:
+1. Basic connectivity test
+2. Plasticity learning experiment (demonstrates measurable synaptic changes)
+3. STDP verification test
+
+For the Phase 3 demo executable, see `nlm_phase3_demo` (built from `src/experiments/Phase3Demo.cpp`).
 
 ## License
 

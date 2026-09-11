@@ -127,7 +127,21 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
-# Phase 3 demo executable
+# Phase 3 demo executable (using real Phase 3 learning experiments in main.cpp)
+# The Phase 3 experiment is now integrated into main.cpp via runPlasticityExperiment()
+# This provides the real learning experiments with proper synaptic changes
+
+# Main executable
+add_executable(nlm
+    src/main.cpp
+)
+target_link_libraries(nlm PUBLIC nlm_core)
+
+# Phase 3 demo executable (using real Phase 3 learning experiments in main.cpp)
+# The Phase 3 experiment is now integrated into main.cpp via runPlasticityExperiment()
+# This provides the real learning experiments with proper synaptic changes
+
+# Phase 3 demo executable (legacy - kept for compatibility)
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )

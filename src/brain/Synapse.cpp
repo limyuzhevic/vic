@@ -197,7 +197,10 @@ void Synapse::step(Timestamp currentTime) {
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
+    // Use actual timestep from simulation configuration
+    // This should be made dynamic based on config, but for now we use the
+    // standard 1ms timestep used throughout the NLM simulation
+    TimestepDuration dt = 0.001;  // Standard NLM timestep (1ms)
     
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
@@ -216,7 +219,7 @@ void Synapse::step(Timestamp currentTime) {
     }
     
     // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    decayEligibilityTrace(0.001f);  // Fast decay - proportional to timestep
     
     // Clamp weight bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
