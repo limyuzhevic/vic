@@ -142,26 +142,77 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    // Add enhanced error handling to key functions for better user experience
+    // Error handling for Config class
+    
+    // Wrap key functions to provide better error messages
+    auto originalGet = &Config::get<int>;
+    auto wrappedGet = [](const Config& self, const std::string& key) -> std::optional<int> {
+        try {
+            return originalGet(self, key);
+        } catch (const std::exception& e) {
+            throw py::value_error("Error getting integer value for key '" + key + "': " + e.what());
+        }
+    };
+    
+    // Add validation to key methods
+    auto originalSet = &Config::set;
+    auto wrappedSet = [](Config& self, const std::string& key, const ConfigValue& value) {
+        try {
+            originalSet(self, key, value, ConfigSource::Runtime);
+        } catch (const std::exception& e) {
+            throw py::value_error("Error setting value for key '" + key + "': " + e.what());
+        }
+    };
+    
+    // Wrap getOr for better error handling
+    auto originalGetOr = &Config::getOr<int>;
+    auto wrappedGetOr = [](const Config& self, const std::string& key, int defaultValue) -> int {
+        try {
+            return originalGetOr(self, key, defaultValue);
+        } catch (const std::exception& e) {
+            throw py::value_error("Error getting value with default for key '" + key + "': " + e.what());
+        }
+    };
+    
+    // Wrap has for validation
+    auto originalHas = &Config::has;
+    auto wrappedHas = [](const Config& self, const std::string& key) -> bool {
+        return originalHas(self, key);
+    };
+    
+    // Register enhanced config methods
+    py::class_<Config> enhancedConfig = py::class_<Config>(m, "ConfigEnhanced", R"pbdoc(Enhanced Configuration class with improved error handling)pbdoc");
+    enhancedConfig
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file with enhanced error handling")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
+             "Save configuration to a file with enhanced error handling")
+        .def("has", wrappedHas, py::arg("key"),
              "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+        .def("get", [](const Config& self, const std::string& key) {
+            // Try all types automatically
+            if (auto val = self.get<int>(key)) return py::cast(*val);
+            if (auto val = self.get<double>(key)) return py::cast(*val);
+            if (auto val = self.get<bool>(key)) return py::cast(*val);
+            if (auto val = self.get<std::string>(key)) return py::cast(*val);
+            return py::none();
+        }, py::arg("key"), "Get configuration value with automatic type detection")
+        .def("getOr", wrappedGetOr, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value with default, with enhanced error handling")
+        .def("set", wrappedSet, py::arg("key"), py::arg("value"),
+             "Set configuration value with enhanced error handling")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+             "Get a summary string of the configuration with error information")
         .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
+            return "<ConfigEnhanced: " + cfg.summary() + ">";
         });
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
@@ -400,21 +451,225 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
+    // ========== FACTORY FUNCTIONS (MAIN ENTRY POINTS) ==========
+    
+    // Simplified factory for common use cases
+    m.def("createBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        return std::make_shared<Brain>(config);
+    }, "Create a new brain with default configuration");
+    
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
+    }, py::arg("config"), "Create a new brain with specific configuration");
+    
+    // World factory with presets
+    m.def("createWorld", []() -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20.0f, 20.0f, 16, 16);
+        return world;
+    }, "Create a new world with default settings");
+    
+    m.def("createWorld", [](size_t width, size_t height, 
+                          size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(static_cast<float>(width), static_cast<float>(height), 
+                        visionWidth, visionHeight);
+        return world;
+    }, py::arg("width") = 20, py::arg("height") = 20,
+       py::arg("visionWidth") = 16, py::arg("visionHeight") = 16,
+       "Create a new world with custom dimensions");
+    
+    // Agent factory with convenience methods
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create an agent brain interface");
+    
+    // ========== ADDITIONAL FACTORY FUNCTIONS ==========
+    
+    // Quick setup for simple demonstrations
+    m.def("createDemoSetup", []() {
+        py::dict result;
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        auto world = std::make_shared<SimpleWorld>();
+        
+        // Basic setup
+        world->configure(20.0f, 20.0f, 16, 16);
+        agent->initialize(*world);
+        
+        // Enable core subsystems
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        // Store initialized components
+        result["brain"] = brain;
+        result["agent"] = agent;
+        result["world"] = world;
+        
+        // Run quick test
+        for (int step = 0; step < 50; ++step) {
+            world->update(0.1);
+            agent->processSensoryInput(world->getSensoryPercept());
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return result;
+    }, "Create a demo setup with brain, agent, and world, and run initial steps");
+
+    // Complete simulation runner with statistics
+    m.def("runSimulation", [](int numSteps = 1000, bool verbose = false) {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        auto world = std::make_shared<SimpleWorld>();
+        
+        world->configure(20.0f, 20.0f, 16, 16);
+        world->setAgentStart(10.0f, 10.0f);
+        
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        
+        py::dict history;
+        std::vector<py::dict> steps;
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            agent->processSensoryInput(world->getSensoryPercept());
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            auto result = world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Store step data
+            py::dict stepData;
+            stepData["step"] = step;
+            stepData["time"] = world->getSimulationTime();
+            stepData["reward"] = result.reward;
+            stepData["success"] = result.success;
+            stepData["firing_neurons"] = static_cast<size_t>(brain->getFiringNeuronCount());
+            stepData["total_spikes"] = static_cast<size_t>(brain->getTotalSpikeCount());
+            stepData["curiosity"] = agent->getCuriosityLevel();
+            stepData["novelty"] = agent->getNoveltyLevel();
+            stepData["action"] = static_cast<int>(action);
+            
+            steps.push_back(stepData);
+            
+            if (verbose && step % 100 == 0) {
+                py::print(f"Step {step}: {stepData["firing_neurons"]} firing, "
+                         f"{agent->getCuriosityLevel():.3f} curiosity");
+            }
+        }
+        
+        history["steps"] = steps;
+        
+        // Final statistics
+        py::dict finalStats;
+        finalStats["total_steps"] = numSteps;
+        finalStats["final_spikes"] = static_cast<size_t>(brain->getTotalSpikeCount());
+        finalStats["final_curiosity"] = agent->getCuriosityLevel();
+        finalStats["final_novelty"] = agent->getNoveltyLevel();
+        finalStats["final_stage"] = static_cast<int>(agent->getDevelopmentalStage());
+        
+        // Calculate summary statistics
+        if (!steps.empty()) {
+            size_t totalFiring = 0;
+            float totalCuriosity = 0.0f;
+            for (const auto& step : steps) {
+                totalFiring += py::cast<size_t>(step["firing_neurons"]);
+                totalCuriosity += py::cast<float>(step["curiosity"]);
+            }
+            
+            finalStats["avg_firing"] = static_cast<double>(totalFiring) / steps.size();
+            finalStats["avg_curiosity"] = totalCuriosity / steps.size();
+        }
+        
+        history["stats"] = finalStats;
+        return history;
+    }, py::arg("numSteps") = 1000, py::arg("verbose") = false,
+       "Run a complete simulation and return detailed statistics and history");
+
+    // Create world with objects
+    m.def("createWorldWithObjects", [](const std::vector<py::dict>& objectConfigs) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20.0f, 20.0f, 16, 16);
+        
+        for (const auto& config : objectConfigs) {
+            WorldObject obj;
+            obj.x = py::cast<float>(config["x"]);
+            obj.y = py::cast<float>(config["y"]);
+            obj.radius = py::cast<float>(config["radius"]);
+            obj.type = py::cast<WorldObjectType>(config["type"]);
+            obj.value = py::cast<float>(config["value"]);
+            obj.active = true;
+            
+            world->addObject(obj);
+        }
+        
+        return world;
+    }, py::arg("objectConfigs"), "Create a world with custom objects");
+
+    // Get default configurations as Python dictionaries
+    m.def("getConfigTemplates", []() {
+        py::dict templates;
+        
+        // Small brain for quick testing
+        py::dict smallBrain;
+        smallBrain["neuron_count"] = 500;
+        smallBrain["region_count"] = 1;
+        smallBrain["connection_probability"] = 0.05f;
+        templates["small"] = smallBrain;
+        
+        // Medium brain for balanced simulation
+        py::dict mediumBrain;
+        mediumBrain["neuron_count"] = 2000;
+        mediumBrain["region_count"] = 2;
+        mediumBrain["connection_probability"] = 0.1f;
+        templates["medium"] = mediumBrain;
+        
+        // Large brain for complex simulations
+        py::dict largeBrain;
+        largeBrain["neuron_count"] = 10000;
+        largeBrain["region_count"] = 4;
+        largeBrain["connection_probability"] = 0.15f;
+        templates["large"] = largeBrain;
+        
+        return templates;
+    }, "Get predefined configuration templates");
+
+    // Utility: create sensory input for testing
+    m.def("createTestSensory", [](const std::string& type, const py::dict& data) {
+        if (type == "vision") {
+            std::vector<float> visionData;
+            if (data.contains("width") && data.contains("height")) {
+                size_t width = py::cast<size_t>(data["width"]);
+                size_t height = py::cast<size_t>(data["height"]);
+                visionData.resize(width * height, 0.0f);
+                
+                if (data.contains("value")) {
+                    float value = py::cast<float>(data["value"]);
+                    for (size_t i = 0; i < visionData.size(); ++i) {
+                        visionData[i] = value;
+                    }
+                }
+            }
+            return SensoryInputPtr(std::make_shared<Vision>(visionData));
+        } else if (type == "internal") {
+            std::vector<float> internalData(4, 0.0f);
+            if (data.contains("energy")) internalData[0] = py::cast<float>(data["energy"]);
+            if (data.contains("health")) internalData[1] = py::cast<float>(data["health"]);
+            if (data.contains("moving")) internalData[2] = py::cast<float>(data["moving"]);
+            if (data.contains("turning")) internalData[3] = py::cast<float>(data["turning"]);
+            
+            return SensoryInputPtr(std::make_shared<InternalSignals>(internalData));
+        }
+        return SensoryInputPtr(std::make_shared<SensoryInput>());
+    }, py::arg("type"), py::arg("data"), "Create test sensory input for testing");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

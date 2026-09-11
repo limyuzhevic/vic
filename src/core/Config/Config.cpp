@@ -10,7 +10,39 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Set up default configuration parameters
+    set("neuron_count", 1000, ConfigSource::Default);
+    set("region_count", 1, ConfigSource::Default);
+    set("connection_probability", 0.1f, ConfigSource::Default);
+    set("initial_weight_mean", 0.5f, ConfigSource::Default);
+    set("initial_weight_std", 0.1f, ConfigSource::Default);
+    set("v_thresh", -50.0f, ConfigSource::Default);
+    set("v_rest", -70.0f, ConfigSource::Default);
+    set("v_reset", -75.0f, ConfigSource::Default);
+    set("tau_mem", 20.0f, ConfigSource::Default);
+    set("tau_ref", 2.0f, ConfigSource::Default);
+    set("simulation_timestep", 0.001, ConfigSource::Default);
+    set("random_seed", 42, ConfigSource::Default);
+    set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    set("pruning_rate", 0.00001f, ConfigSource::Default);
+    set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+    set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    set("stdp_tau", 20.0f, ConfigSource::Default);
+    set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+    set("neuromod.curiosity.enable", true, ConfigSource::Default);
+    set("neuromod.novelty.enable", true, ConfigSource::Default);
+    set("development.enable", true, ConfigSource::Default);
+    set("checkpoint_dir", "./checkpoints", ConfigSource::Default);
+    set("max_energy", 100.0f, ConfigSource::Default);
+    set("energy_decay_rate", 0.01f, ConfigSource::Default);
+    set("world.width", 20.0f, ConfigSource::Default);
+    set("world.height", 20.0f, ConfigSource::Default);
+    set("world.vision_width", 8, ConfigSource::Default);
+    set("world.vision_height", 8, ConfigSource::Default);
+    set("world.max_energy", 100.0f, ConfigSource::Default);
+    set("world.energy_decay_rate", 0.01f, ConfigSource::Default);
+}
 
 Config::~Config() = default;
 
@@ -19,16 +51,21 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
+    // TODO PHASE 4: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
+    bool hasErrors = false;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,11 +85,49 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse boolean values
+            if (value == "true" || value == "false") {
+                bool boolValue = (value == "true");
+                set(key, boolValue, ConfigSource::File);
+            }
+            // Parse integer values (decimal and hex)
+            else if (value.find_first_not_of("0123456789-+") == std::string::npos) {
+                try {
+                    size_t posEnd;
+                    long long intValue = std::stoll(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        set(key, intValue, ConfigSource::File);
+                    } else {
+                        // Try as float
+                        float floatValue = std::stof(value);
+                        set(key, floatValue, ConfigSource::File);
+                    }
+                } catch (const std::exception&) {
+                    NLM_LOG_WARNING(std::string("Failed to parse value for key '") + key + "' on line " + std::to_string(lineNumber));
+                    hasErrors = true;
+                }
+            }
+            // Parse float values
+            else {
+                try {
+                    float floatValue = std::stof(value);
+                    set(key, floatValue, ConfigSource::File);
+                } catch (const std::exception&) {
+                    NLM_LOG_WARNING(std::string("Failed to parse value for key '") + key + "' on line " + std::to_string(lineNumber));
+                    hasErrors = true;
+                }
+            }
+        } else {
+            NLM_LOG_WARNING(std::string("Invalid config format on line ") + std::to_string(lineNumber) + ": missing '='");
+            hasErrors = true;
         }
     }
     
-    return true;
+    if (hasErrors) {
+        NLM_LOG_WARNING("Config file parsing completed with warnings");
+    }
+    
+    return !file.bad();
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

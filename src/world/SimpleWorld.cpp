@@ -35,15 +35,56 @@ SimpleWorld::SimpleWorld()
 SimpleWorld::~SimpleWorld() = default;
 
 void SimpleWorld::configure(float width, float height, size_t visionWidth, size_t visionHeight) {
-    width_ = width;
-    height_ = height;
-    visionWidth_ = visionWidth;
-    visionHeight_ = visionHeight;
+    // Validate input parameters
+    if (width <= 0.0f) {
+        NLM_LOG_WARNING("Invalid world width " + std::to_string(width) + ", using default 20.0f");
+        width_ = 20.0f;
+    } else if (width > 1000.0f) {
+        NLM_LOG_WARNING("World width " + std::to_string(width) + " exceeds reasonable limit, clamping to 1000.0f");
+        width_ = 1000.0f;
+    } else {
+        width_ = width;
+    }
+    
+    if (height <= 0.0f) {
+        NLM_LOG_WARNING("Invalid world height " + std::to_string(height) + ", using default 20.0f");
+        height_ = 20.0f;
+    } else if (height > 1000.0f) {
+        NLM_LOG_WARNING("World height " + std::to_string(height) + " exceeds reasonable limit, clamping to 1000.0f");
+        height_ = 1000.0f;
+    } else {
+        height_ = height;
+    }
+    
+    if (visionWidth == 0) {
+        NLM_LOG_WARNING("Invalid vision width " + std::to_string(visionWidth) + ", using default 16");
+        visionWidth_ = 16;
+    } else if (visionWidth > 256) {
+        NLM_LOG_WARNING("Vision width " + std::to_string(visionWidth) + " exceeds reasonable limit, clamping to 256");
+        visionWidth_ = 256;
+    } else {
+        visionWidth_ = visionWidth;
+    }
+    
+    if (visionHeight == 0) {
+        NLM_LOG_WARNING("Invalid vision height " + std::to_string(visionHeight) + ", using default 16");
+        visionHeight_ = 16;
+    } else if (visionHeight > 256) {
+        NLM_LOG_WARNING("Vision height " + std::to_string(visionHeight) + " exceeds reasonable limit, clamping to 256");
+        visionHeight_ = 256;
+    } else {
+        visionHeight_ = visionHeight;
+    }
 }
 
 void SimpleWorld::setRandomSeed(uint64_t seed) {
-    rngSeed_ = seed;
-    rngState_ = seed;
+    if (seed == 0) {
+        NLM_LOG_WARNING("Random seed is 0, using 1 for reproducibility");
+        rngSeed_ = 1;
+    } else {
+        rngSeed_ = seed;
+    }
+    rngState_ = rngSeed_;
 }
 
 void SimpleWorld::reset() {
