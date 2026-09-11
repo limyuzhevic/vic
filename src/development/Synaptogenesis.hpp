@@ -20,12 +20,37 @@ public:
     float getTargetDensity() const;
     void setTargetDensity(float density);
     
+    // Get minimum weight for new synapses
+    float getMinWeight() const;
+    void setMinWeight(float weight);
+    
+    // Get activity threshold for synapse formation
+    float getActivityThreshold() const;
+    void setActivityThreshold(float threshold);
+    
+    // Get maximum outgoing synapses per neuron
+    size_t getMaxSynapsesPerNeuron() const;
+    void setMaxSynapsesPerNeuron(size_t max);
+    
+    // Get statistics
+    size_t getTotalSynapsesCreated() const;
+    void resetStats();
+    
     // Update synapse formation
     void update(class Brain* brain, class RandomGenerator& rng);
+    
+    // Finalize development phase
+    void finalizeDevelopment(class Brain* brain);
     
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Helper methods for implementation
+    NeuronId createSynapseInBrain(class Brain* brain, NeuronId source, 
+                                 NeuronId destination, SynapticWeight weight);
+    NeuronId selectNeuronByActivity(std::vector<struct NeuronActivity>& activities);
+    float calculateInitialWeight(const NeuronActivity& source, const NeuronActivity& dest);
 };
 
 } // namespace nlm

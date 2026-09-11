@@ -106,29 +106,28 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+    // Initialize development system
+    developmentSystem = std::make_unique<DevelopmentSystem>();
+    
+    // Initialize neuromodulation systems
+    dopamine = std::make_unique<Dopamine>();
+    curiosity = std::make_unique<Curiosity>();
+    predictionError = std::make_unique<PredictionError>();
+    novelty = std::make_unique<Novelty>();
+    
+    // Configure dopamine baseline from config
+    float dopamineBaseline = config->getOr<float>("dopamine_baseline", 0.1f);
+    dopamine->setBaselineLevel(dopamineBaseline);
+    
+    // Configure development parameters
+    developmentSystem->setDevelopmentalRate(config->getOr<float>("development_rate", 1.0f));
+    
+    // Configure neuromodulation parameters
+    curiosity->setExplorationThreshold(config->getOr<float>("curiosity_threshold", 0.5f));
+    novelty->setNoveltyThreshold(config->getOr<float>("novelty_threshold", 0.3f));
+    
+    // Configure reward prediction error sensitivity
+    predictionError->setLearningRate(config->getOr<float>("prediction_error_rate", 0.1f));
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -509,10 +508,54 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+    // Integrate prediction system into brain loop
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get sensory input from environment through the neural regions
+        // For now, create a simple placeholder observation
+        Observation currentObservation;
+        currentObservation.timestamp = currentStep;
+        currentObservation.step = currentStep;
+        
+        // Extract sensory neuron activations
+        float totalSensoryActivation = 0.0f;
+        size_t sensoryCount = 0;
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                NeuronType type = pop->getNeuronType();
+                if (type == NeuronType::Sensory) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        currentObservation.sensoryActivations.push_back(
+                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                        totalSensoryActivation += std::abs(state.membranePotential - state.restingPotential) / 10.0f;
+                        ++sensoryCount;
+                    }
+                }
+            }
+        }
+        
+        currentObservation.overallActivation = sensoryCount > 0 ? totalSensoryActivation / sensoryCount : 0.0f;
+        
+        // Update prediction system with current observation
+        pImpl->predictionSystem->update(currentObservation);
+        
+        // Get prediction error
+        PredictionError prediction = pImpl->predictionSystem->getPredictionError();
+        
+        // Update neuromodulation systems with prediction error
+        if (pImpl->predictionError) {
+            pImpl->predictionError->update(prediction.error);
+        }
+        if (pImpl->curiosity) {
+            pImpl->curiosity->update(prediction.error);
+        }
+        
+        // Update dopamine with reward prediction error
+        if (pImpl->dopamine) {
+            float reward = prediction.error > 0 ? 1.0f : 0.0f;
+            pImpl->dopamine->update(reward);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========

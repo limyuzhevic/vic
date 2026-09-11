@@ -356,11 +356,37 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
+    // Better configuration loading with validation
+    // Load config from file (with validation if found)
+    bool configLoaded = config->loadFromFile(configFile);
+    if (configLoaded) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        
+        // Validate critical configuration parameters
+        if (auto neuronCount = config->getOr<size_t>("neuron_count", 0)) {
+            if (*neuronCount == 0) {
+                NLM_LOG_WARNING("Warning: neuron_count is 0, using default");
+                config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Override);
+            }
+        }
+        
+        if (auto regionCount = config->getOr<size_t>("region_count", 0)) {
+            if (*regionCount == 0) {
+                NLM_LOG_WARNING("Warning: region_count is 0, using default");
+                config->set("region_count", static_cast<int64_t>(1), ConfigSource::Override);
+            }
+        }
+        
+        if (auto simTimestep = config->getOr<double>("simulation_timestep", 0.0)) {
+            if (*simTimestep <= 0.0) {
+                NLM_LOG_WARNING("Warning: simulation_timestep must be positive, using default");
+                config->set("simulation_timestep", 0.001, ConfigSource::Override);
+            }
+        }
     } else {
         NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Create configs/default.cfg to customize behavior");
+        NLM_LOG_INFO("See easy_usage.md for detailed configuration options");
     }
     
     // Override with command line args
@@ -402,9 +428,33 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
     
+    // Check for configuration issues before initialization
+    if (!brain) {
+        NLM_LOG_ERROR("Failed to create brain object!");
+        return 1;
+    }
+    
+    // Initialize brain with better error handling
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_LOG_ERROR("Common causes:")
+        NLM_LOG_ERROR("  - Invalid configuration values")
+        NLM_LOG_ERROR("  - Insufficient memory for neuron count")
+        NLM_LOG_ERROR("  - Memory pool initialization failure")
+        NLM_LOG_ERROR("  - Invalid neural population configuration")
         return 1;
+    }
+    
+    // Additional validation after initialization
+    if (brain->getTotalNeuronCount() == 0) {
+        NLM_LOG_ERROR("Brain initialized but has no neurons!");
+        NLM_LOG_ERROR("Check configuration: neuron_count and region_count");
+        return 1;
+    }
+    
+    if (brain->getTotalSynapseCount() == 0) {
+        NLM_LOG_WARNING("Warning: Brain initialized but has no synapses");
+        NLM_LOG_WARNING("Connectivity may be limited. Check connection_probability");
     }
     
     brain->logStatus();
