@@ -1,3 +1,5 @@
+#pragma once
+
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
@@ -22,17 +24,21 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
+        const auto& regions = brain_->getRegions();
+        for (const auto& region : regions) {
+            const auto& populations = region->getPopulations();
+            for (const auto& pop : populations) {
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
+                    const auto& neurons = pop->getNeurons();
+                    for (Neuron* n : neurons) {
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
                         
+                        // Use enum index for better readability
                         switch (idx % 6) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
@@ -43,11 +49,13 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
+                    const auto& neurons = pop->getNeurons();
+                    for (Neuron* n : neurons) {
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
+                        // Use enum index for better readability
                         switch (idx % 4) {
                             case 0: sensoryVision_.push_back(n); break;
                             case 1: sensoryTouch_.push_back(n); break;
@@ -133,7 +141,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
         
         // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        noveltyLevel_ = totalDiff / static_cast<float>(std::max<size_t>(vision.size(), 1));
         
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;

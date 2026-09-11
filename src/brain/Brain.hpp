@@ -1,16 +1,3 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 class RandomGenerator;
@@ -196,6 +183,24 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Helper methods for brain stepping
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateAllNeurons(Timestamp currentTime);
+    void detectSpikesAndSchedule(SimulationStep currentStep, Timestamp currentTime);
+    void updateWorkingMemory();
+    void applyNeuromodulationEffects();
+    void applyPlasticityRules();
+    void updateEpisodicMemory(SimulationStep currentStep);
+    void updatePredictionSystem();
+    void updateAttentionSystem();
+    void updateConceptFormation();
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    void replayImportantMemories(SimulationStep currentStep);
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    void periodicMemoryConsolidation(SimulationStep currentStep);
+    void updateCheckpointManager(SimulationStep currentStep, Timestamp currentTime);
+    void collectStatistics();
 };
 
 } // namespace nlm

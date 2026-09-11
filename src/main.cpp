@@ -65,8 +65,10 @@ struct LearningExperiment {
         initialWeights.clear();
         
         // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
+        auto* region = brain->getRegion(RegionId(1));
+        if (region) {
+            const auto& synapses = region->getSynapses();
+            for (const auto& syn : synapses) {
                 initialWeights.push_back(syn->getWeight());
             }
         }
@@ -75,7 +77,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
         if (!initialWeights.empty()) {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-            float mean = sum / initialWeights.size();
+            float mean = sum / static_cast<float>(initialWeights.size());
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
         }
     }
@@ -84,8 +86,10 @@ struct LearningExperiment {
         finalWeights.clear();
         
         // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
+        auto* region = brain->getRegion(RegionId(1));
+        if (region) {
+            const auto& synapses = region->getSynapses();
+            for (const auto& syn : synapses) {
                 finalWeights.push_back(syn->getWeight());
             }
         }
@@ -96,7 +100,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
         if (!finalWeights.empty()) {
             float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-            float mean = sum / finalWeights.size();
+            float mean = sum / static_cast<float>(finalWeights.size());
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
         }
     }
@@ -114,8 +118,8 @@ struct LearningExperiment {
         // Compute weight changes
         float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
         float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-        float initialMean = initialSum / initialWeights.size();
-        float finalMean = finalSum / finalWeights.size();
+        float initialMean = initialSum / static_cast<float>(initialWeights.size());
+        float finalMean = finalSum / static_cast<float>(finalWeights.size());
         
         NLM_LOG_INFO("Weight Statistics:");
         NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
@@ -347,12 +351,14 @@ int main(int argc, char** argv) {
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        if (arg.size() >= 7 && arg.substr(0, 7) == "--config") {  // More robust comparison with bounds check
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        }
+    }
         }
     }
     
