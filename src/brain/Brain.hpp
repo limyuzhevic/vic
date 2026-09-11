@@ -23,6 +23,10 @@ class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
+class TemporalRelation;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
@@ -155,11 +159,17 @@ public:
     
     // ========== COGNITION SYSTEMS ==========
     
-    // Neural planner for action planning
+// Neural planner for action planning
     NeuralPlanner* getPlanner();
-    
+
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
+
+    // Self-model for body awareness and agency
+    SelfModel* getSelfModel();
+
+    // Social learning from observing others
+    SocialLearning* getSocialLearning();
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
