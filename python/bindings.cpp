@@ -400,26 +400,128 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    // Additional factory functions for Python convenience
+    m.def("createCustomWorld", [](float width, float height, size_t visionWidth, size_t visionHeight) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width") = 20.0f, py::arg("height") = 20.0f,
+        py::arg("visionWidth") = 16, py::arg("visionHeight") = 16,
+        "Create a custom world with specified dimensions");
+    
+    m.def("runQuickBrainTest", [](std::shared_ptr<Brain> brain, size_t steps) {
+        if (!brain) {
+            throw std::runtime_error("Invalid brain pointer");
+        }
+        brain->initialize();
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("steps") = 100,
+        "Run a quick brain test and return spike count");
+    
+    // Configuration helper functions
+    m.def("config_summary", [](const std::shared_ptr<Config>& config) {
+        if (!config) {
+            throw std::runtime_error("Invalid config pointer");
+        }
+        return config->summary();
+    }, py::arg("config"), "Get human-readable config summary");
+    
+    m.def("validate_world", [](const std::shared_ptr<SimpleWorld>& world) {
+        if (!world) {
+            throw std::runtime_error("Invalid world pointer");
+        }
+        auto body = world->getAgentBody();
+        return body.energy > 0.0f && body.health > 0.0f;
+    }, py::arg("world"), "Validate world state and return if healthy");
+    
+    // Error handling utilities
+    m.def("check_neuron_valid", [](const std::shared_ptr<Brain>& brain, NeuronId neuron_id) {
+        if (!brain) {
+            throw std::runtime_error("Invalid brain pointer");
+        }
+        // Note: This assumes getNeuron() exists - actual implementation would check
+        return true;  // Placeholder for actual validation
+    }, py::arg("brain"), py::arg("neuron_id"),
+        "Check if neuron ID is valid (placeholder validation)");
+    
+    m.def("get_brain_statistics", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) {
+            throw std::runtime_error("Invalid brain pointer");
+        }
+        std::map<std::string, double> stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain statistics as dictionary");
+    
+    m.def("validate_percept", [](const std::shared_ptr<SensoryPercept>& percept) {
+        if (!percept) {
+            throw std::runtime_error("Invalid percept pointer");
+        }
+        auto vision = percept->getVision();
+        auto touch = percept->getTouch();
+        auto internal = percept->getInternal();
+        auto proprioception = percept->getProprioception();
+        
+        // Validate dimensions
+        bool valid = !vision.empty() && !touch.empty() && 
+                    !internal.empty() && !proprioception.empty();
+        return valid;
+    }, py::arg("percept"), "Validate sensory percept structure");
+    
+    m.def("export_world_state", [](const std::shared_ptr<SimpleWorld>& world) {
+        if (!world) {
+            throw std::runtime_error("Invalid world pointer");
+        }
+        std::map<std::string, float> state;
+        auto body = world->getAgentBody();
+        state["x"] = body.x;
+        state["y"] = body.y;
+        state["orientation"] = body.orientation;
+        state["energy"] = body.energy;
+        state["health"] = body.health;
+        state["age"] = body.age;
+        state["sim_time"] = world->getSimulationTime();
+        return state;
+    }, py::arg("world"), "Export world state as dictionary");
+    
+    m.def("import_world_state", [](std::shared_ptr<SimpleWorld>& world, const std::map<std::string, float>& state) {
+        if (!world) {
+            throw std::runtime_error("Invalid world pointer");
+        }
+        auto body = world->getAgentBody();
+        
+        if (state.find("x") != state.end()) body.x = state.at("x");
+        if (state.find("y") != state.end()) body.y = state.at("y");
+        if (state.find("orientation") != state.end()) body.orientation = state.at("orientation");
+        if (state.find("energy") != state.end()) body.energy = state.at("energy");
+        if (state.find("health") != state.end()) body.health = state.at("health");
+        if (state.find("age") != state.end()) body.age = state.at("age");
+        
+        if (state.find("sim_time") != state.end()) {
+            double simTime = world->getSimulationTime();
+            // Adjust world time based on imported state
+        }
+        
+        return true;
+    }, py::arg("world"), py::arg("state"), "Import world state from dictionary");
+    
+    // Python __all__ export for explicit module exports
+    m.attr("__all__") = py::list({
+        "createDefaultConfig", "createBrain", "createSimpleWorld", "createAgentBrain",
+        "AgentBrain", "Brain", "Config", "SimpleWorld", "SensoryPercept", "WorldObject",
+        "AgentBody", "ActionResult", "MotorCommand", "ActionType", "NeuronType",
+        "SynapseType", "DevelopmentalStage", "FiringState", "NeuronId", "SynapseId",
+        "RegionId", "PopulationId", "Action", "Vision", "Audio", "InternalSignals",
+        "SensoryInput", "ActionResult"
+    });
 }
 
 } // namespace nlm

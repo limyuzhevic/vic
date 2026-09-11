@@ -414,86 +414,75 @@ pynlm.WorldObjectType.Wall
 pynlm.WorldObjectType.Marker
 ```
 
----
+### Complete Working Memory Integration Example
 
-## Part 4: Configuration Options
-
-### Brain Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `brain.neuron_count` | int | 1000 | Total number of neurons |
-| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
-| `brain.connection_probability` | float | 0.05 | Probability of connection between neurons |
-| `brain.initial_weight_mean` | float | 0.5 | Mean initial synaptic weight |
-| `brain.initial_weight_std` | float | 0.1 | Standard deviation of initial weights |
-| `brain.v_thresh` | float | -50.0 | Neuron threshold potential (mV) |
-| `brain.v_rest` | float | -70.0 | Resting potential (mV) |
-| `brain.v_reset` | float | -75.0 | Reset potential after spike (mV) |
-| `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
-| `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
-
-### Plasticity Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `plasticity.stdp.enable` | bool | true | Enable STDP |
-| `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
-| `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
-| `plasticity.structural.enable` | bool | true | Enable structural plasticity |
-
-### Neuromodulation Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
-| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
-| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
-
----
-
-## Part 5: Example Scripts
-
-### Minimal Example
+This example demonstrates how to use NLM's working memory to maintain persistent activity patterns across simulation steps:
 
 ```python
 import pynlm
 
-# Create and initialize
+# Create configuration with memory features
 config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2000)  # More neurons for complex patterns
+config.set("plasticity_learning_rate", 0.005)
+config.set("development_synaptogenesis_rate", 0.001)
+
 brain = pynlm.createBrain(config)
 brain.initialize()
 
-# Simulate
-for i in range(100):
-    brain.step(i)
-
-print("Simulation complete!")
-```
-
-### Environment Interaction
-
-```python
-import pynlm
-
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
+# Create agent with memory tracking
 agent = pynlm.createAgentBrain(brain)
 world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.configure(width=30, height=30, visionWidth=12, visionHeight=12)
 world.reset()
 agent.initialize(world)
 
-# Run episode
-for _ in range(500):
+# Enable memory systems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+
+print("Starting working memory demonstration...")
+memory_patterns = []
+
+# Learn and maintain persistent patterns
+for step in range(300):
     world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Record working memory state every 50 steps
+    if step % 50 == 0:
+        # Get working memory statistics
+        firing_neurons = brain.getFiringNeuronCount()
+        total_spikes = brain.getTotalSpikeCount()
+        developmental_stage = agent.getDevelopmentalStage()
+        
+        memory_patterns.append({
+            'step': step,
+            'firing_neurons': firing_neurons,
+            'total_spikes': total_spikes,
+            'stage': developmental_stage.name,
+            'curiosity': agent.getCuriosityLevel(),
+            'novelty': agent.getNoveltyLevel()
+        })
+        
+        print(f"Step {step}: "
+              f"Firing={firing_neurons}, "
+              f"Stage={developmental_stage.name}, "
+              f"Curiosity={agent.getCuriosityLevel():.2f}, "
+              f"Novelty={agent.getNoveltyLevel():.2f}")
+
+print("\nWorking Memory Analysis:")
+for pattern in memory_patterns:
+    print(f"  Step {pattern['step']}: "
+          f"Firing={pattern['firing_neurons']}, "
+          f"Spikes={pattern['total_spikes']}, "
+          f"Stage={pattern['stage']}")
 ```
 
 ---
