@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>  // JSON parsing library
+
+using json = nlohmann::json;
 
 namespace nlm {
 
@@ -19,9 +22,16 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to parse as JSON first
+    if (tryLoadAsJSON(filepath)) {
+        return true;
+    }
     
+    // Fall back to simple key=value format
+    return loadFromSimpleFile(filepath);
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -55,6 +65,66 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
+bool Config::tryLoadAsJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        json j;
+        file >> j;
+        
+        // Recursively load from JSON object
+        loadFromJSON(j, "");
+        
+        return true;
+    } catch (const json::parse_error& e) {
+        // Not a valid JSON file, fall back to simple format
+        return false;
+    } catch (...) {
+        // Other error
+        return false;
+    }
+}
+
+void Config::loadFromJSON(const json& j, const std::string& prefix) {
+    if (j.is_object()) {
+        for (const auto& item : j.items()) {
+            std::string fullKey = prefix.empty() ? item.key() : prefix + "." + item.key();
+            loadFromJSON(item.value(), fullKey);
+        }
+    } else if (j.is_array()) {
+        // Handle arrays (convert to string representation)
+        std::string arrayStr = "[";
+        for (size_t i = 0; i < j.size(); ++i) {
+            if (i > 0) arrayStr += ",";
+            arrayStr += j[i].dump();
+        }
+        arrayStr += "]";
+        set(prefix, arrayStr, ConfigSource::File);
+    } else {
+        // Primitive value
+        std::string valueStr;
+        
+        if (j.is_string()) {
+            valueStr = j.get<std::string>();
+        } else if (j.is_number_integer()) {
+            valueStr = std::to_string(j.get<int64_t>());
+        } else if (j.is_number_unsigned()) {
+            valueStr = std::to_string(j.get<uint64_t>());
+        } else if (j.is_number_float()) {
+            valueStr = std::to_string(j.get<double>());
+        } else if (j.is_boolean()) {
+            valueStr = j.get<bool>() ? "true" : "false";
+        } else if (j.is_null()) {
+            valueStr = "";
+        }
+        
+        set(prefix, valueStr, ConfigSource::File);
+    }
+}
+
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -84,10 +154,53 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write as JSON for modern configs
+    json j;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Parse the key to handle nested structure
+        std::string key = entry.key;
+        size_t dotPos = key.find('.');
+        
+        if (dotPos != std::string::npos) {
+            // Create nested JSON object
+            std::string prefix = key.substr(0, dotPos);
+            std::string subkey = key.substr(dotPos + 1);
+            
+            if (!j.contains(prefix)) {
+                j[prefix] = json::object();
+            }
+            
+            // Set the nested value (simplified - would need recursive handling)
+            std::visit([&](const auto& val) {
+                if constexpr (std::is_same_v<decltype(val), std::string>) {
+                    j[prefix][subkey] = val;
+                } else if constexpr (std::is_same_v<decltype(val), int64_t>) {
+                    j[prefix][subkey] = val;
+                } else if constexpr (std::is_same_v<decltype(val), double>) {
+                    j[prefix][subkey] = val;
+                } else if constexpr (std::is_same_v<decltype(val), bool>) {
+                    j[prefix][subkey] = val;
+                }
+            }, entry.value);
+        } else {
+            // Top-level key
+            std::visit([&](const auto& val) {
+                if constexpr (std::is_same_v<decltype(val), std::string>) {
+                    j[key] = val;
+                } else if constexpr (std::is_same_v<decltype(val), int64_t>) {
+                    j[key] = val;
+                } else if constexpr (std::is_same_v<decltype(val), double>) {
+                    j[key] = val;
+                } else if constexpr (std::is_same_v<decltype(val), bool>) {
+                    j[key] = val;
+                }
+            }, entry.value);
+        }
     }
+    
+    // Write JSON to file with indentation
+    file << j.dump(2);
     
     return true;
 }
