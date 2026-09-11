@@ -58,8 +58,8 @@ size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
 }
 
 size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
-                                       const std::vector<float>& features,
-                                       float reward) {
+                                     const std::vector<float>& features,
+                                     float reward) {
     DiscoveredConcept concept;
     concept.id = nextConceptId_++;
     concept.prototype = pattern;
@@ -94,7 +94,7 @@ size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
 }
 
 void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>& newPattern,
-                                    const std::vector<float>& features, float reward) {
+                                     const std::vector<float>& features, float reward) {
     DiscoveredConcept* concept = nullptr;
     for (auto& c : concepts_) {
         if (c.id == conceptId) {
@@ -157,7 +157,7 @@ void ConceptFormation::updatePrototype(size_t conceptId, const std::vector<float
 }
 
 size_t ConceptFormation::getMatchingConcept(const std::vector<float>& pattern,
-                                           float similarityThreshold) const {
+                                        float similarityThreshold) const {
     return findConceptForPattern(pattern);
 }
 
@@ -230,7 +230,7 @@ void ConceptFormation::mergeConcepts(size_t conceptA, size_t conceptB) {
 }
 
 bool ConceptFormation::isNovel(const std::vector<float>& pattern,
-                               float similarityThreshold) const {
+                             float similarityThreshold) const {
     return findConceptForPattern(pattern) == 0;
 }
 
@@ -252,7 +252,7 @@ size_t ConceptFormation::findConceptForPattern(const std::vector<float>& pattern
 }
 
 float ConceptFormation::computeSimilarity(const std::vector<float>& a,
-                                         const std::vector<float>& b) const {
+                                        const std::vector<float>& b) const {
     if (a.size() != b.size() || a.empty()) return 0.0f;
     
     // Cosine similarity

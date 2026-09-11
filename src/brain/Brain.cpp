@@ -511,8 +511,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input
+        // This would require sensory observations to be passed
+        // For now, placeholder for integration
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +529,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This requires sensory state encoding from current brain state
+        // Placeholder for full integration
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

@@ -67,6 +67,9 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
         createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
     }
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
