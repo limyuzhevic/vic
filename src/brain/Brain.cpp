@@ -620,7 +620,7 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
-            if (n->getId() == neuron) {
+            if (n && n->getId() == neuron) {
                 n->injectCurrent(current);
                 return;
             }
@@ -631,9 +631,11 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
-            if (pop->getNeuronType() == type) {
+            if (pop && pop->getNeuronType() == type) {
                 for (auto* neuron : pop->getNeurons()) {
-                    neuron->injectCurrent(current);
+                    if (neuron) {
+                        neuron->injectCurrent(current);
+                    }
                 }
             }
         }
@@ -666,6 +668,7 @@ float Brain::getExcitationInhibitionRatio() const {
     
     for (const auto& region : pImpl->regions) {
         for (const auto& syn : region->getSynapses()) {
+            if (!syn) continue; // Safety check
             float weight = syn->getWeight();
             if (weight > 0) {
                 totalExcitatory += weight;
@@ -675,10 +678,15 @@ float Brain::getExcitationInhibitionRatio() const {
         }
     }
     
+    // Check for division by zero
     if (totalInhibitory > 0.0f) {
         return totalExcitatory / totalInhibitory;
+    } else if (totalExcitatory > 0.0f) {
+        // Return large positive number instead of infinity for floating point
+        return 1000000.0f;  // Represents infinity for practical purposes
+    } else {
+        return 0.0f;
     }
-    return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
 }
 
 size_t Brain::getTotalSpikeCount() const {

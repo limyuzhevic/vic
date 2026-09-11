@@ -58,17 +58,25 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
 }
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
+    // Validate population ID: must be 1-based and within bounds
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    
+    // Additional null check for safety
+    auto* pop = pImpl->populations[id.index() - 1].get();
+    return pop;
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
+    // Validate population ID: must be 1-based and within bounds
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    
+    // Additional null check for safety
+    const auto* pop = pImpl->populations[id.index() - 1].get();
+    return pop;
 }
 
 size_t NeuralRegion::getPopulationCount() const {
@@ -89,11 +97,24 @@ std::vector<NeuralPopulation*> NeuralRegion::getAllPopulations() {
 }
 
 SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
-                                   SynapticWeight weight, Delay delay) {
+                              SynapticWeight weight, Delay delay) {
+    // Validate input
+    if (!pImpl || source.index() == 0 || destination.index() == 0) {
+        return INVALID_SYNAPSE_ID;
+    }
+    
     SynapseId synId(pImpl->nextSynapseId++);
     auto synapse = std::make_unique<Synapse>(synId, source, destination);
     synapse->setWeight(weight);
     synapse->setDelay(delay);
+    
+    // Add to synapse maps only if valid
+    if (pImpl->outgoingSynapses.count(source) == 0) {
+        pImpl->outgoingSynapses[source] = std::vector<SynapseId>();
+    }
+    if (pImpl->incomingSynapses.count(destination) == 0) {
+        pImpl->incomingSynapses[destination] = std::vector<SynapseId>();
+    }
     
     pImpl->outgoingSynapses[source].push_back(synId);
     pImpl->incomingSynapses[destination].push_back(synId);
@@ -103,8 +124,13 @@ SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
 }
 
 Synapse* NeuralRegion::getSynapse(SynapseId id) {
+    // Null check and input validation
+    if (!pImpl || id.index() == 0) {
+        return nullptr;
+    }
+    
     for (auto& syn : pImpl->synapses) {
-        if (syn->getId() == id) {
+        if (syn && syn->getId() == id) {
             return syn.get();
         }
     }
@@ -112,8 +138,13 @@ Synapse* NeuralRegion::getSynapse(SynapseId id) {
 }
 
 const Synapse* NeuralRegion::getSynapse(SynapseId id) const {
-    for (auto& syn : pImpl->synapses) {
-        if (syn->getId() == id) {
+    // Null check and input validation
+    if (!pImpl || id.index() == 0) {
+        return nullptr;
+    }
+    
+    for (const auto& syn : pImpl->synapses) {
+        if (syn && syn->getId() == id) {
             return syn.get();
         }
     }
