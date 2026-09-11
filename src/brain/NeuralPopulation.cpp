@@ -124,8 +124,10 @@ void NeuralPopulation::initializeRandom(RandomGenerator& rng) {
 }
 
 void NeuralPopulation::step(Timestamp currentTime) {
+    // Default timestep for population-level stepping
+    TimestepDuration dt = pImpl->timestep;
     for (auto* neuron : pImpl->neurons) {
-        neuron->step(currentTime);
+        neuron->step(currentTime, dt);
     }
 }
 

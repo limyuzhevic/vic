@@ -36,27 +36,43 @@ private:
 };
 
 // Reward-modulated STDP (R-STDP)
-// PLACEHOLDER - Phase 2
 class RewardModulatedSTDP : public PlasticityRule {
 public:
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "R-STDP"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // Configuration parameters
+    void configure(float ltpWeight, float ltdWeight, float tau, float rewardWeight, float learningRate);
+    void setLTPWeight(float weight);
+    float getLTPWeight() const;
+    void setLTDWeight(float weight);
+    float getLTDWeight() const;
+    void setTimeConstant(float tau);
+    float getTimeConstant() const;
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Spike-timing dependent plasticity with triplet interactions
-// PLACEHOLDER - Phase 2
 class TripletSTDP : public PlasticityRule {
 public:
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "TripletSTDP"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // Configuration parameters
+    void configure(float weightPlus, float weightMinus, float tauPlus, float tauMinus, float minWeight, float maxWeight);
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm
