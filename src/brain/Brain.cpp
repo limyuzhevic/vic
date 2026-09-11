@@ -32,14 +32,21 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    bool workingMemoryInitialized;
+    bool episodicMemoryInitialized;
+    bool associativeMemoryInitialized;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
+    bool predictionSystemInitialized;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    bool plannerInitialized;
+    bool conceptFormationInitialized;
+    bool attentionInitialized;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -49,6 +56,8 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    bool noveltyInitialized;
+    bool curiosityInitialized;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -92,6 +101,15 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , workingMemoryInitialized(false)
+        , episodicMemoryInitialized(false)
+        , associativeMemoryInitialized(false)
+        , predictionSystemInitialized(false)
+        , plannerInitialized(false)
+        , conceptFormationInitialized(false)
+        , attentionInitialized(false)
+        , noveltyInitialized(false)
+        , curiosityInitialized(false)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -129,6 +147,17 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize all memory systems with brain reference
+        workingMemory->initialize(this);
+        episodicMemory->initialize(this);
+        associativeMemory->initialize(this);
+        predictionSystem->initialize(this);
+        planner->initialize(this);
+        conceptFormation->initialize(this);
+        attention->initialize(this);
+        novelty->initialize(this);
+        curiosity->initialize(this);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -234,13 +263,16 @@ bool Brain::initialize() {
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
+    pImpl->workingMemoryInitialized = true;
     
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
+    pImpl->episodicMemoryInitialized = true;
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
+    pImpl->associativeMemoryInitialized = true;
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -248,16 +280,21 @@ bool Brain::initialize() {
     // Initialize cognition systems
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
+    pImpl->plannerInitialized = true;
     
     pImpl->conceptFormation->initialize(this);
+    pImpl->conceptFormationInitialized = true;
     
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
+    pImpl->attentionInitialized = true;
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
+    pImpl->noveltyInitialized = true;
     pImpl->curiosity->initialize(this);
+    pImpl->curiosityInitialized = true;
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
