@@ -3,11 +3,20 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <ctime>
+#include <iomanip>
+#include <iostream>
+
+// nlohmann/json for serialization
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, std::string> keyToDescription; // For backward compatibility
+    std::unordered_map<std::string, std::vector<std::pair<std::string, std::unique_ptr<ConfigValidator>>>> validators;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,36 +28,141 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
+
+    std::string content((std::istreambuf_iterator<char>(file)),
+                       std::istreambuf_iterator<char>());
     
+    try {
+        // Try to parse as JSON first
+        auto json = nlohmann::json::parse(content);
+        return parseJSON(json);
+    } catch (const nlohmann::json::parse_error&) {
+        // If JSON fails, try to parse as simple key=value format
+        return parseSimpleFormat(content);
+    }
+}
+
+bool Config::parseJSON(const nlohmann::json& json) {
+    clear();
+    
+    if (!json.is_object()) {
+        return false;
+    }
+    
+    for (const auto& [key, value] : json.items()) {
+        ConfigValue configValue;
+        if (value.is_string()) {
+            configValue = value.get<std::string>();
+        } else if (value.is_number_integer()) {
+            configValue = value.get<int>();
+        } else if (value.is_number_unsigned()) {
+            configValue = static_cast<int64_t>(value.get<uint64_t>());
+        } else if (value.is_number_float()) {
+            configValue = value.get<double>();
+        } else if (value.is_boolean()) {
+            configValue = value.get<bool>();
+        } else if (value.is_array()) {
+            // Try to determine array type
+            if (!value.empty()) {
+                if (std::all_of(value.begin(), value.end(), 
+                            [](const auto& v) { return v.is_number_integer(); })) {
+                    configValue = value.get<std::vector<int>>();
+                } else if (std::all_of(value.begin(), value.end(),
+                            [](const auto& v) { return v.is_number_float(); })) {
+                    configValue = value.get<std::vector<double>>();
+                } else if (std::all_of(value.begin(), value.end(),
+                            [](const auto& v) { return v.is_string(); })) {
+                    configValue = value.get<std::vector<std::string>>();
+                } else {
+                    // Mixed types - store as string
+                    configValue = value.dump();
+                }
+            }
+        } else {
+            // For null or other types
+            configValue = "";
+        }
+        
+        // Check for description field
+        std::string description = "";
+        auto descIt = json.find("_description_");
+        if (descIt != json.end() && descIt->is_object()) {
+            auto keyDesc = descIt->find(key);
+            if (keyDesc != descIt->end() && keyDesc->is_string()) {
+                description = keyDesc->get<std::string>();
+            }
+        }
+        
+        // Validate before setting
+        validateKey(key, configValue);
+        
+        set(key, configValue, ConfigSource::File);
+        if (!description.empty()) {
+            pImpl->keyToDescription[key] = description;
+        }
+    }
+    
+    return true;
+}
+
+bool Config::parseSimpleFormat(const std::string& content) {
+    clear();
+    
+    std::istringstream stream(content);
     std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
+    std::string currentDescription;
+    
+    while (std::getline(stream, line)) {
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty()) continue;
+        
+        // Skip comments
+        if (line[0] == '#' || line[0] == '/') {
+            currentDescription = line.substr(1);
             continue;
         }
         
-        // Parse simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+            std::string valueStr = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            ConfigValue configValue;
+            
+            // Parse numeric values
+            try {
+                if (valueStr.find('.') != std::string::npos) {
+                    configValue = std::stod(valueStr);
+                } else {
+                    configValue = std::stoll(valueStr);
+                }
+            } catch (...) {
+                // Check for boolean
+                if (valueStr == "true" || valueStr == "false") {
+                    configValue = (valueStr == "true");
+                } else {
+                    // String value - remove quotes
+                    if (valueStr.size() >= 2 && 
+                        ((valueStr.front() == '"' && valueStr.back() == '"') ||
+                         (valueStr.front() == '\'' && valueStr.back() == '\''))) {
+                        valueStr = valueStr.substr(1, valueStr.size() - 2);
+                    }
+                    configValue = valueStr;
+                }
             }
             
-            set(key, value, ConfigSource::File);
+            // Validate before setting
+            validateKey(key, configValue);
+            
+            set(key, configValue, ConfigSource::File);
+            if (!currentDescription.empty()) {
+                pImpl->keyToDescription[key] = currentDescription;
+                currentDescription.clear();
+            }
         }
     }
     
@@ -84,11 +198,40 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    nlohmann::json json;
+    
+    // Add description metadata
+    if (!pImpl->keyToDescription.empty()) {
+        nlohmann::json descJson;
+        for (const auto& [key, desc] : pImpl->keyToDescription) {
+            descJson[key] = desc;
+        }
+        json["_description_"] = descJson;
     }
     
+    // Add configuration values
+    for (const auto& entry : pImpl->entries) {
+        nlohmann::json valueJson;
+        
+        std::visit([&](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                valueJson = val;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                valueJson = val;
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                valueJson = val;
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                valueJson = val;
+            } else {
+                valueJson = val;
+            }
+        }, entry.value);
+        
+        json[entry.key] = valueJson;
+    }
+    
+    file << json.dump(4) << std::endl;
     return true;
 }
 
@@ -153,6 +296,8 @@ void Config::remove(const std::string& key) {
             [&key](const ConfigEntry& e) { return e.key == key; }),
         pImpl->entries.end()
     );
+    pImpl->keyToDescription.erase(key);
+    pImpl->validators.erase(key);
 }
 
 std::vector<std::string> Config::getKeys() const {
@@ -166,6 +311,8 @@ std::vector<std::string> Config::getKeys() const {
 
 void Config::clear() {
     pImpl->entries.clear();
+    pImpl->keyToDescription.clear();
+    pImpl->validators.clear();
 }
 
 std::string Config::summary() const {
@@ -177,6 +324,19 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                std::is_same_v<T, std::vector<double>> ||
+                                std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                        oss << "\"" << arg[i] << "\"";
+                    } else {
+                        oss << arg[i];
+                    }
+                }
+                oss << "]";
             } else {
                 oss << arg;
             }
@@ -184,6 +344,40 @@ std::string Config::summary() const {
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
+}
+
+void Config::addValidator(const std::string& key, std::unique_ptr<ConfigValidator> validator) {
+    pImpl->validators[key].emplace_back(validator->name(), std::move(validator));
+}
+
+void Config::removeValidator(const std::string& key) {
+    pImpl->validators.erase(key);
+}
+
+void Config::clearValidators(const std::string& key) {
+    if (auto it = pImpl->validators.find(key); it != pImpl->validators.end()) {
+        it->second.clear();
+    }
+}
+
+void Config::clearAllValidators() {
+    pImpl->validators.clear();
+}
+
+const std::vector<std::pair<std::string, std::unique_ptr<ConfigValidator>>>&
+Config::getValidators(const std::string& key) const {
+    static const std::vector<std::pair<std::string, std::unique_ptr<ConfigValidator>>> empty;
+    auto it = pImpl->validators.find(key);
+    return (it != pImpl->validators.end()) ? it->second : empty;
+}
+
+void Config::validateKey(const std::string& key, const ConfigValue& value) const {
+    auto it = pImpl->validators.find(key);
+    if (it != pImpl->validators.end()) {
+        for (const auto& validatorPair : it->second) {
+            validatorPair.second->validate(key, value);
+        }
+    }
 }
 
 std::string Config::trim(const std::string& str) {

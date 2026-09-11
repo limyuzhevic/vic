@@ -6,6 +6,15 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# nlohmann/json dependency (fetch from GitHub)
+include(FetchContent)
+FetchContent_Declare(
+  nlohmann_json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG v3.11.2
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -41,6 +50,8 @@ add_library(nlm_core STATIC
     # Plasticity
     src/plasticity/PlasticityRule.cpp
     src/plasticity/Hebbian.cpp
+    src/plasticity/AntiHebbianRule.cpp
+    src/plasticity/BCMRule.cpp
     src/plasticity/STDP.cpp
     src/plasticity/StructuralPlasticity.cpp
     # Development
@@ -54,7 +65,11 @@ add_library(nlm_core STATIC
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
+    src/neuromodulation/Acetylcholine.cpp
+    src/neuromodulation/Norepinephrine.cpp
+    src/neuromodulation/Serotonin.cpp
     # Memory
+    src/memory/Memory.cpp
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
     src/memory/SemanticMemory.cpp
@@ -121,6 +136,13 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Phase 5 experiments
+add_library(nlm_phase5 STATIC
+    src/experiments/Phase5Experiment.cpp
+)
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
+
 # Main executable
 add_executable(nlm
     src/main.cpp
@@ -133,15 +155,13 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+# Performance
+add_library(nlm_performance STATIC
+    src/performance/Performance.cpp
+    src/performance/CheckpointSystem.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
-
-# Testing
-enable_testing()
-add_subdirectory(tests)
+target_include_directories(nlm_performance PUBLIC src)
+target_link_libraries(nlm_performance PUBLIC nlm_core)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo

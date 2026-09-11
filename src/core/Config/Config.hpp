@@ -5,6 +5,17 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <regex>
+#include <stdexcept>
+
+// nlohmann/json for serialization
+#include <nlohmann/json.hpp>
+
+// For YAML support
+#ifdef YAML_AVAILABLE
+#include <yaml-cpp/yaml.h>
+#endif
 
 namespace nlm {
 
@@ -31,16 +42,117 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
+// Configuration validation error
+class ConfigValidationError : public std::runtime_error {
+public:
+    explicit ConfigValidationError(const std::string& message)
+        : std::runtime_error(message) {}
+};
+
+// Validation rules
+class ConfigValidator {
+public:
+    virtual ~ConfigValidator() = default;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    // Validate a key-value pair
+    virtual void validate(const std::string& key, const ConfigValue& value) = 0;
+    
+    // Returns the validator type name
+    virtual const char* name() const = 0;
+};
+
+// Integer range validator
+class IntegerRangeValidator : public ConfigValidator {
+private:
+    int64_t min;
+    int64_t max;
+    bool inclusive;
+public:
+    IntegerRangeValidator(int64_t min, int64_t max, bool inclusive = true)
+        : min(min), max(max), inclusive(inclusive) {}
+    
+    void validate(const std::string& key, const ConfigValue& value) override {
+        if (const int64_t* val = std::get_if<int64_t>(&value)) {
+            if (inclusive) {
+                if (*val < min || *val > max) {
+                    throw ConfigValidationError(
+                        "Key \"" + key + "\" has value " + std::to_string(*val) +
+                        " which is outside the range [" + std::to_string(min) + ", " + std::to_string(max) + "]"
+                    );
+                }
+            } else {
+                if (*val <= min || *val >= max) {
+                    throw ConfigValidationError(
+                        "Key \"" + key + "\" has value " + std::to_string(*val) +
+                        " which is outside the range (" + std::to_string(min) + ", " + std::to_string(max) + ")"
+                    );
+                }
+            }
+        }
+    }
+    
+    const char* name() const override { return "IntegerRangeValidator"; }
+};
+
+// Double range validator
+class DoubleRangeValidator : public ConfigValidator {
+private:
+    double min;
+    double max;
+    bool inclusive;
+public:
+    DoubleRangeValidator(double min, double max, bool inclusive = true)
+        : min(min), max(max), inclusive(inclusive) {}
+    
+    void validate(const std::string& key, const ConfigValue& value) override {
+        if (const double* val = std::get_if<double>(&value)) {
+            if (inclusive) {
+                if (*val < min || *val > max) {
+                    throw ConfigValidationError(
+                        "Key \"" + key + "\" has value " + std::to_string(*val) +
+                        " which is outside the range [" + std::to_string(min) + ", " + std::to_string(max) + "]"
+                    );
+                }
+            } else {
+                if (*val <= min || *val >= max) {
+                    throw ConfigValidationError(
+                        "Key \"" + key + "\" has value " + std::to_string(*val) +
+                        " which is outside the range (" + std::to_string(min) + ", " + std::to_string(max) + ")"
+                    );
+                }
+            }
+        }
+    }
+    
+    const char* name() const override { return "DoubleRangeValidator"; }
+};
+
+// String pattern validator
+class StringPatternValidator : public ConfigValidator {
+private:
+    std::regex pattern;
+    std::string errorMessage;
+public:
+    StringPatternValidator(const std::string& pattern, const std::string& errorMessage = "")
+        : pattern(pattern), errorMessage(errorMessage) {}
+    
+    void validate(const std::string& key, const ConfigValue& value) override {
+        if (const std::string* val = std::get_if<std::string>(&value)) {
+            if (!std::regex_match(*val, pattern)) {
+                if (errorMessage.empty()) {
+                    throw ConfigValidationError(
+                        "Key \"" + key + "\" has value \"" + *val + "\" which does not match pattern"
+                    );
+                } else {
+                    throw ConfigValidationError(
+                        "Key \"" + key + "\": " + errorMessage
+                    );
+                }
+            }
+        }
+    }
+    
+    const char* name() const override { return "StringPatternValidator"; }
 };
 
 // Main configuration class
@@ -55,7 +167,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON or YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,6 +205,18 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    void addValidator(const std::string& key, std::unique_ptr<ConfigValidator> validator);
+    void removeValidator(const std::string& key);
+    void clearValidators(const std::string& key);
+    void clearAllValidators();
+    
+    // Get validators for a key
+    const std::vector<std::pair<std::string, std::unique_ptr<ConfigValidator>>>& 
+        getValidators(const std::string& key) const;
+    
+    // Validation for a key-value pair
+    void validateKey(const std::string& key, const ConfigValue& value) const;
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +224,25 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper for YAML parsing
+#ifdef YAML_AVAILABLE
+    bool parseYAML(const std::string& content);
+#endif
 };
+
+// Explicit template instantiations
+// This needs to be outside the class to be properly instantiated
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
