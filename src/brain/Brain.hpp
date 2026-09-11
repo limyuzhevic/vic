@@ -153,36 +153,31 @@ public:
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
     
-    // ========== COGNITION SYSTEMS ==========
+    // ============ COGNITION SYSTEM ACCESSORS =========
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
-    
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
-    
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    NeuralPlanner* getPlanner() { return pImpl ? pImpl->planner.get() : nullptr; }
+    ConceptFormation* getConceptFormation() { return pImpl ? pImpl->conceptFormation.get() : nullptr; }
+    AttentionalSelection* getAttention() { return pImpl ? pImpl->attention.get() : nullptr; }
     
     // ========== DEVELOPMENT SYSTEM ==========
     
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
+    DevelopmentSystem* getDevelopmentSystem() { return pImpl ? pImpl->developmentSystem.get() : nullptr; }
+    DevelopmentalStage getDevelopmentalStage() const { return pImpl ? pImpl->developmentalStage : DevelopmentalStage::Initial; }
+    void setDevelopmentalStage(DevelopmentalStage stage) { if (pImpl) pImpl->developmentalStage = stage; }
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
     // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    Dopamine* getDopamine() { return pImpl ? pImpl->dopamine.get() : nullptr; }
     
     // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    Curiosity* getCuriosity() { return pImpl ? pImpl->curiosity.get() : nullptr; }
     
     // Novelty - novelty detection
-    Novelty* getNovelty();
+    Novelty* getNovelty() { return pImpl ? pImpl->novelty.get() : nullptr; }
     
     // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    PredictionError* getPredictionErrorSignal() { return pImpl ? pImpl->predictionError.get() : nullptr; }
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
