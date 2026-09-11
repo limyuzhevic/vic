@@ -163,50 +163,52 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
-        float sum = 0.0f;
-        for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+    // Store sensory state for concept formation and planning
+    if (brain_) {
+        // Get current sensory state for cognition systems
+        std::vector<float> currentState;
+        
+        // Store in concept formation
+        if (auto* conceptFormation = brain_->getConceptFormation()) {
+            conceptFormation->presentExperience(currentState, currentState, expectedReward_, brain_->getTotalSpikeCount());
         }
-        return sum / neurons.size();
-    };
-    
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
-    
-    // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
-        {MotorCommand::MoveForward, forwardAct},
-        {MotorCommand::MoveBackward, backwardAct},
-        {MotorCommand::TurnLeft, leftAct},
-        {MotorCommand::TurnRight, rightAct},
-        {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
-    };
-    
-    MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
-    
-    for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
-            best = c.cmd;
+        
+        // Update neural planner with current state
+        if (auto* planner = brain_->getPlanner()) {
+            // Extract action preferences from motor activity
+            std::vector<float> actionPreferences(6, 0.0f);
+            actionPreferences[0] = calcActivity(motorForward_);
+            actionPreferences[1] = calcActivity(motorBackward_);
+            actionPreferences[2] = calcActivity(motorTurnLeft_);
+            actionPreferences[3] = calcActivity(motorTurnRight_);
+            actionPreferences[4] = calcActivity(motorInteract_);
+            actionPreferences[5] = calcActivity(motorWait_);
+            
+            // Set planner goal based on current state
+            if (auto* conceptFormation = brain_->getConceptFormation()) {
+                // Use current action preferences as planner goal
+                planner->setCurrentGoal(actionPreferences);
+                
+                // Plan action based on current state
+                ActionType plannedAction = planner->planAction(actionPreferences, expectedReward_);
+                
+                // Apply curiosity-based exploration if high
+                if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+                    float exploreChance = curiosityLevel_ * 0.3f;
+                    float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+                    if (r < exploreChance) {
+                        // Use curiosity-based action
+                        return selectWithCuriosity(plannedAction);
+                    }
+                }
+                
+                return plannedAction;
+            }
         }
     }
     
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
-        return MotorCommand::Wait;
-    }
-    
-    return best;
+    // Fall back to motor decoding if cognition systems not available
+    return decodeFromMotorNeurons();
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {

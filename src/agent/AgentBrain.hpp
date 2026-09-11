@@ -55,8 +55,10 @@ public:
     // Reset agent for new episode
     void reset();
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Get cognition systems
+    NeuralPlanner* getNeuralPlanner() const { return brain_ ? brain_->getPlanner() : nullptr; }
+    ConceptFormation* getConceptFormation() const { return brain_ ? brain_->getConceptFormation() : nullptr; }
+    AttentionalSelection* getAttentionalSelection() const { return brain_ ? brain_->getAttention() : nullptr; }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
