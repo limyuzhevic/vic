@@ -100,6 +100,13 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File parsing helpers
+    bool parseJsonFile(std::ifstream& file);
+    bool parseYamlFile(std::ifstream& file);
+    bool loadFromSimpleFormat(std::ifstream& file);
+    std::string getFileExtension(const std::string& filepath);
+    size_t findMatchingBracket(const std::string& str, size_t start, char openBracket);
 };
 
 } // namespace nlm

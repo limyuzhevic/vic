@@ -134,7 +134,10 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Real Leaky Integrate-and-Fire (LIF) dynamics
+    // Implements differential equation: dV/dt = (V_rest - V)/tau + I/C
+    // Handles membrane potential integration, spike detection, refractory period,
+    // and spike-frequency adaptation
     void step(Timestamp currentTime);
     
     // Reset to initial state

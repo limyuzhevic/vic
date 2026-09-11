@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// Real predictive coding implementation using neural substrate
 
 class PredictionSystem {
 public:
@@ -15,10 +15,11 @@ public:
     ~PredictionSystem();
     
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
+    // Real predictive coding: uses neural networks to predict sensory input
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
+    // Computes prediction error for learning
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
     // Get prediction error
@@ -33,6 +34,9 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Reset prediction system
+    void reset();
     
 private:
     struct Impl;
