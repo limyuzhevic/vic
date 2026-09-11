@@ -75,6 +75,9 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    MotorCommand selectRandomAction(bool includeLookCommands);
+    MotorCommand selectSmartExploration(MotorCommand defaultCmd);
+    MotorCommand biasedRandomAction(MotorCommand reference, float biasRange);
     
     std::shared_ptr<Brain> brain_;
     
@@ -85,6 +88,8 @@ private:
     std::vector<Neuron*> motorTurnRight_;
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
+    std::vector<Neuron*> motorLookLeft_;
+    std::vector<Neuron*> motorLookRight_;
     
     // Sensory neuron groups
     std::vector<Neuron*> sensoryVision_;

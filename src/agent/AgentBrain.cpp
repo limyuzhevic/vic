@@ -31,15 +31,18 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                                    motorInteract_.size() + motorWait_.size() +
+                                    motorLookLeft_.size() + motorLookRight_.size();
                         
-                        switch (idx % 6) {
+                        switch (idx % 8) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
                             case 3: motorTurnRight_.push_back(n); break;
                             case 4: motorInteract_.push_back(n); break;
                             case 5: motorWait_.push_back(n); break;
+                            case 6: motorLookLeft_.push_back(n); break;
+                            case 7: motorLookRight_.push_back(n); break;
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
@@ -97,6 +100,16 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
+    // Apply reward modulation based on novelty to encourage exploration
+    if (rewardModulationEnabled_ && !vision.empty()) {
+        // Novelty affects reward prediction error to drive learning
+        float noveltyReward = noveltyLevel_ * 0.1f;
+        applyRewardModulation(noveltyReward, expectedReward_);
+    }
+    
+    // Decay novelty
+    noveltyLevel_ *= sensoryNoveltyDecay_;
+    
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
@@ -142,9 +155,18 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
-    if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+    // Enhance curiosity based on both novelty and prediction error for better exploration
+    if (curiosityEnabled_ && (!vision.empty() || predictionError_ != 0.0f)) {
+        // Combine novelty and prediction error for sophisticated curiosity drive
+        float noveltyCuriosity = noveltyLevel_ * 0.7f; // Weight novelty more heavily
+        float errorCuriosity = std::abs(predictionError_) * 0.3f;
+        
+        // Apply adaptive weighting based on developmental stage
+        float developmentalWeight = std::clamp(plasticityModifier_, 0.1f, 1.0f);
+        curiosityLevel_ = (noveltyCuriosity + errorCuriosity) * developmentalWeight;
+        
+        // Apply non-linear response for better behavior
+        curiosityLevel_ = 1.0f - std::exp(-curiosityLevel_ * 3.0f);
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
@@ -209,30 +231,70 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     return best;
 }
 
-MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
-        
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
-        }
+    // Multi-stage exploration strategy based on curiosity intensity
+    if (curiosityLevel_ > 0.8f) {
+        // Very high curiosity: random exploration across all actions including Look commands
+        return selectRandomAction(true);
+    } else if (curiosityLevel_ > 0.6f) {
+        // High curiosity: expanded exploration including Look commands
+        return selectRandomAction(false);
+    } else {
+        // Moderate curiosity: smart exploration based on prediction error
+        return selectSmartExploration(defaultCmd);
     }
+}
+
+MotorCommand AgentBrain::selectRandomAction(bool includeLookCommands) {
+    // Random action selection with configurable scope
+    int maxChoice = includeLookCommands ? 8 : 6;
+    int choice = brain_->getRandomGenerator()->uniformInt(0, maxChoice - 1);
     
-    return defaultCmd;
+    switch (choice) {
+        case 0: return MotorCommand::MoveForward;
+        case 1: return MotorCommand::MoveBackward;
+        case 2: return MotorCommand::TurnLeft;
+        case 3: return MotorCommand::TurnRight;
+        case 4: return MotorCommand::Interact;
+        case 5: return MotorCommand::Wait;
+        case 6: return MotorCommand::LookLeft;
+        case 7: return MotorCommand::LookRight;
+        default: return MotorCommand::Wait;
+    }
+}
+
+MotorCommand AgentBrain::selectSmartExploration(MotorCommand defaultCmd) {
+    // Smart exploration based on prediction error and action history
+    float errorMagnitude = std::abs(predictionError_);
+    
+    if (errorMagnitude > 0.5f) {
+        // High prediction error: try different actions
+        return selectRandomAction(false);
+    } else if (errorMagnitude > 0.2f) {
+        // Medium error: try action near current direction
+        return biasedRandomAction(defaultCmd, 0.3f);
+    } else {
+        // Low error: stick with current action or slight variation
+        return defaultCmd;
+    }
+}
+
+MotorCommand AgentBrain::biasedRandomAction(MotorCommand reference, float biasRange) {
+    // Generate random action biased toward the reference action
+    int refValue = static_cast<int>(reference);
+    
+    // Generate random choice within bias range
+    int choice = brain_->getRandomGenerator()->uniformInt(0, 5);
+    int biasedChoice = (refValue + choice) % 6; // Modulo to stay within 6 basic actions
+    
+    switch (biasedChoice) {
+        case 0: return MotorCommand::MoveForward;
+        case 1: return MotorCommand::MoveBackward;
+        case 2: return MotorCommand::TurnLeft;
+        case 3: return MotorCommand::TurnRight;
+        case 4: return MotorCommand::Interact;
+        case 5: return MotorCommand::Wait;
+        default: return MotorCommand::Wait;
+    }
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
@@ -279,7 +341,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     }
 }
 
-void AgentBrain::updateDevelopment(double timestep) {
+    void AgentBrain::updateDevelopment(double timestep) {
     if (!brain_ || !developmentEnabled_) return;
     
     developmentalAge_ += timestep;
@@ -312,6 +374,42 @@ void AgentBrain::updateDevelopment(double timestep) {
         }
     }
 }
+
+DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
+    if (!brain_) return DevelopmentalStage::Initial;
+    return brain_->getDevelopmentalStage();
+}
+
+float AgentBrain::getNeuromodulationLevel() const {
+    return dopamineLevel_;
+}
+
+float AgentBrain::getCuriosityLevel() const {
+    return curiosityLevel_;
+}
+
+float AgentBrain::getNoveltyLevel() const {
+    return noveltyLevel_;
+}
+
+float AgentBrain::getPredictionError() const {
+    return predictionError_;
+}
+
+void AgentBrain::reset() {
+    dopamineLevel_ = 0.0f;
+    noveltyLevel_ = 0.0f;
+    curiosityLevel_ = 0.0f;
+    predictionError_ = 0.0f;
+    expectedReward_ = 0.0f;
+    developmentalAge_ = 0.0;
+    plasticityModifier_ = 1.0f;
+    
+    // Clear previous vision
+    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+} // namespace nlm
 
 DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
     if (!brain_) return DevelopmentalStage::Initial;
