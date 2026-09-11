@@ -120,21 +120,43 @@ float Neuron::getLastSpikeTime() const {
 }
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
+    // Safety check: ensure pImpl exists
+    if (!pImpl) {
+        NLM_LOG_ERROR("Neuron pImpl is null in receiveExcitatoryInput");
+        return;
+    }
+    
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
-    pImpl->synapticInput += amplitude;
+    // Clamp to reasonable values to prevent instability
+    pImpl->synapticInput += std::clamp(amplitude, -100.0f, 100.0f);
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
+    // Safety check: ensure pImpl exists
+    if (!pImpl) {
+        NLM_LOG_ERROR("Neuron pImpl is null in receiveInhibitoryInput");
+        return;
+    }
+    
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
-    pImpl->synapticInput -= amplitude;
+    // Clamp to reasonable values to prevent instability
+    pImpl->synapticInput -= std::clamp(amplitude, -100.0f, 100.0f);
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
+    // Safety check: ensure pImpl exists
+    if (!pImpl) {
+        NLM_LOG_ERROR("Neuron pImpl is null in receiveModulatoryInput");
+        return;
+    }
+    
     // Modulatory input affects plasticity but not directly integrated
     // Used for neuromodulation (e.g., dopamine, acetylcholine)
-    pImpl->state.adaptationVariable += amplitude * 0.1f;
+    // Apply bounds checking
+    float clampedAmplitude = std::clamp(amplitude * 0.1f, -10.0f, 10.0f);
+    pImpl->state.adaptationVariable += clampedAmplitude;
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
@@ -189,6 +211,12 @@ void Neuron::setPopulationId(PopulationId population) {
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    // Safety check: ensure pImpl is not null
+    if (!pImpl) {
+        NLM_LOG_ERROR("Neuron pImpl is null in stepLIF");
+        return false;
+    }
+    
     bool fired = false;
     
     // Handle refractory period
@@ -248,13 +276,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
-    } else {
-        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.adaptationVariable += 5.0f;
     }
-    
-    // Clear synaptic input for next step
-    pImpl->synapticInput = 0.0f;
     
     return fired;
 }

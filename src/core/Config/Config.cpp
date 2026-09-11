@@ -19,37 +19,54 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Check if file exists and can be opened
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        std::cerr << "[WARNING] Config file not found: " << filepath << ". Using defaults." << std::endl;
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty() || line.find_first_not_of('#') == 0) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value format
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            std::cerr << "[WARNING] Config syntax error in " << filepath << ": line " << lineNumber 
+                     << " - missing '=' operator" << std::endl;
+            continue;  // Skip malformed line, don't fail entire file
         }
+        
+        // Extract key and value with bounds checking
+        std::string key = line.substr(0, pos);
+        std::string value = line.substr(pos + 1);
+        
+        // Trim whitespace
+        key = Config::trim(key);
+        value = Config::trim(value);
+        
+        if (key.empty()) {
+            std::cerr << "[WARNING] Config syntax error in " << filepath << ": line " << lineNumber 
+                     << " - empty key" << std::endl;
+            continue;
+        }
+        
+        // Store configuration
+        set(key, value, ConfigSource::File);
+    }
+    
+    // Validate that we loaded something
+    if (pImpl->entries.empty()) {
+        std::cerr << "[WARNING] Config file " << filepath << " is empty. Using defaults." << std::endl;
+        return false;
     }
     
     return true;

@@ -43,14 +43,18 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
+        // Set neuron activation - safely traverse regions
+        bool neuronFound = false;
+        for (auto& region : brain_->getRegions()) {
+            // Use getAllNeurons() to get all neurons in the region
+            for (auto* neuronPtr : region->getAllNeurons()) {
+                if (neuronPtr && neuronPtr->getId() == neuron) {
+                    neuronPtr->injectCurrent(activation * 5.0f);
+                    neuronFound = true;
                     break;
                 }
             }
+            if (neuronFound) break;
         }
         
         // Update stored activation
@@ -166,19 +170,23 @@ void NeuralWorkingMemory::runCompetition() {
     // Find neurons with above-threshold activation
     float threshold = 0.3f;
     
+    // Single pass to find winners (O(n) instead of O(n²))
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         if (memoryActivations_[i] >= threshold) {
             winners_.push_back(memoryNeurons_[i]);
         }
     }
     
-    // Inhibitory competition - suppress non-winners
-    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
+    // If we have winners, apply inhibition to non-winners in a single pass
+    if (!winners_.empty() && brain_) {
+        // Create a set of winner neuron IDs for fast lookup (O(1) per check)
+        std::unordered_set<NeuronId, uint64_t> winnerSet(winners_.begin(), winners_.end());
         
-        if (!isWinner && brain_) {
-            // Apply strong inhibition
-            brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
+        for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+            if (winnerSet.find(memoryNeurons_[i]) == winnerSet.end()) {
+                // Apply strong inhibition to non-winners
+                brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
+            }
         }
     }
 }

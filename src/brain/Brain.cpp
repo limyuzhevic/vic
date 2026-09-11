@@ -510,9 +510,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Update prediction system with working memory patterns
+        // This helps predict future sensory input based on current activity
+        auto workingMemoryPattern = pImpl->workingMemory->retrieve();
+        if (!workingMemoryPattern.empty()) {
+            pImpl->predictionSystem->update(workingMemoryPattern, currentTime);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,9 +531,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory && pImpl->attention) {
+        // Process current neural activity patterns to form abstract concepts
+        // Integrate working memory content with attentional focus
+        auto workingMemoryPattern = pImpl->workingMemory->retrieve();
+        if (!workingMemoryPattern.empty()) {
+            // Get attended neurons to focus concept formation
+            const auto& winners = pImpl->attention->getWinners();
+            
+            // Form concepts from attended working memory patterns
+            pImpl->conceptFormation->update(this, workingMemoryPattern, winners, currentTime);
+        }
+    }
+    
+    // ========== STEP 11: Use neural planner for action planning ==========
+    if (pImpl->planner && pImpl->workingMemory && pImpl->attention) {
+        // Neural planner evaluates possible actions based on working memory and attention
+        auto workingMemoryPattern = pImpl->workingMemory->retrieve();
+        const auto& winners = pImpl->attention->getWinners();
+        
+        // Get current motor neuron activity for planning context
+        std::vector<float> motorActivity;
+        for (auto* neuron : pImpl->motorNeurons) {
+            motorActivity.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential));
+        }
+        
+        // Plan actions based on current state
+        pImpl->planner->planActions(this, workingMemoryPattern, winners, motorActivity, currentTime);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
