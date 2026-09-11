@@ -243,21 +243,15 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->initialize(this);
+    }
     
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
-    
-    pImpl->conceptFormation->initialize(this);
-    
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
-    
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    // Connect attention to working memory competition
+    if (pImpl->conceptFormation) {
+        // Would process current neural activity patterns to form concepts
+        // This requires sensory state encoding
+    }
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -509,13 +503,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    // Update prediction system
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Update prediction based on current working memory state
+        pImpl->predictionSystem->updatePrediction(pImpl->workingMemory->retrieve());
+        
+        // Apply prediction error to neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (pImpl->predictionError) {
+            pImpl->predictionError->computeError(
+                pImpl->predictionSystem->getLastPrediction(),
+                pImpl->predictionSystem->getCurrentObservation()
+            );
+        }
     }
     
-    // ========== STEP 9: Update attention system ==========
+    // Connect attention to working memory competition
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -526,10 +529,114 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // Connect attention to working memory competition
+    if (pImpl->attention) {
+        pImpl->attention->update(pImpl->timestep);
+        
+        // Apply attention to working memory winners
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+        }
+    }
+    
+    // Connect concept formation to working memory
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Get current working memory activation as input to concept formation
+        std::vector<float> currentMemoryPattern = pImpl->workingMemory->retrieve();
+        if (!currentMemoryPattern.empty()) {
+            pImpl->conceptFormation->processWorkingMemory(currentMemoryPattern);
+        }
+    }
+    
+    // Connect prediction system to sensory input
+    if (pImpl->predictionSystem && pImpl->sensoryNeurons.size() > 0) {
+        // For now, we'll simulate prediction error based on working memory changes
+        if (pImpl->workingMemory) {
+            pImpl->predictionSystem->updatePrediction(pImpl->workingMemory->retrieve());
+        }
+    }
+    
+    // Connect neuromodulation to memory consolidation
+    if (pImpl->dopamine && pImpl->episodicMemory) {
+        // Dopamine modulates memory consolidation strength
+        float consolidationStrength = 0.5f + 0.5f * pImpl->dopamine->getLevel();
+        pImpl->episodicMemory->setConsolidationStrength(consolidationStrength);
+    }
+    
+    // Apply curiosity-driven exploration to working memory
+    if (pImpl->curiosity && pImpl->workingMemory) {
+        float explorationLevel = pImpl->curiosity->getExplorationDrive();
+        if (explorationLevel > 0.3f) {
+            // Increase working memory capacity for exploration
+            pImpl->workingMemory->setCapacity(
+                static_cast<size_t>(pImpl->workingMemory->getCapacity() * (1.0f + explorationLevel))
+            );
+        }
+    }
+    
+    // Apply developmental effects to attention system
+    if (pImpl->developmentSystem && pImpl->attention) {
+        float developmentalMaturity = 1.0f;
+        DevelopmentalStage stage = pImpl->developmentalStage;
+        if (stage == DevelopmentalStage::Maturation || stage == DevelopmentalStage::Adult) {
+            developmentalMaturity = 0.5f;
+        } else if (stage == DevelopmentalStage::CriticalPeriod) {
+            developmentalMaturity = 0.8f;
+        }
+        
+        // Development affects attention threshold
+        pImpl->attention->setCompetitionThreshold(
+            0.3f + 0.4f * (1.0f - developmentalMaturity)
+        );
+    }
+    
+    // Connect neuromodulation to working memory strengthening
+    if (pImpl->novelty && pImpl->workingMemory) {
+        // Novelty can strengthen working memory traces for new information
+        float noveltyLevel = pImpl->novelty->getLevel();
+        if (noveltyLevel > 0.5f) {
+            pImpl->workingMemory->strengthenMemory(1.0f + noveltyLevel * 0.5f);
+        }
+    }
+    
+    // Apply neuromodulation to neural excitability
+    if (pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        if (dopamineLevel > 0.0f) {
+            // Dopamine increases neural excitability
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Dopamine modulates excitability by injecting additional current
+                        float excitabilityMod = dopamineLevel * 0.5f;
+                        if (excitabilityMod > 0.0f) {
+                            neuron->injectCurrent(excitabilityMod);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Apply curiosity to motor selection
+    if (pImpl->curiosity) {
+        float curiosityLevel = pImpl->curiosity->getExplorationDrive();
+        if (curiosityLevel > 0.3f) {
+            // Increase motor neuron exploration bias
+            for (auto* neuron : pImpl->motorNeurons) {
+                neuron->injectCurrent(curiosityLevel * 0.2f);
+            }
+        }
+    }
+    
+    // Connect neuromodulation to working memory strengthening
+    if (pImpl->novelty && pImpl->workingMemory) {
+        // Novelty can strengthen working memory traces for new information
+        float noveltyLevel = pImpl->novelty->getLevel();
+        if (noveltyLevel > 0.5f) {
+            pImpl->workingMemory->strengthenMemory(1.0f + noveltyLevel * 0.5f);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -765,77 +872,13 @@ bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
-        CheckpointWriter writer;
-        if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+        if (!pImpl->checkpointManager) {
+            NLM_LOG_ERROR("Checkpoint manager not initialized");
             return false;
         }
         
-        // Set metadata
-        writer.setMetadata(
-            getTotalNeuronCount(),
-            getTotalSynapseCount(),
-            getRegionCount(),
-            pImpl->currentStep,
-            pImpl->currentTime
-        );
-        
-        // Write neurons
-        NeuronCheckpointData neuronData;
-        neuronData.membranePotential.reserve(getTotalNeuronCount());
-        neuronData.restingPotential.reserve(getTotalNeuronCount());
-        neuronData.threshold.reserve(getTotalNeuronCount());
-        neuronData.resetPotential.reserve(getTotalNeuronCount());
-        neuronData.leakConductance.reserve(getTotalNeuronCount());
-        
-        for (const auto& region : pImpl->regions) {
-            for (const auto& pop : region->getPopulations()) {
-                for (const auto* neuron : pop->getNeurons()) {
-                    const auto& state = neuron->getState();
-                    neuronData.membranePotential.push_back(state.membranePotential);
-                    neuronData.restingPotential.push_back(state.restingPotential);
-                    neuronData.threshold.push_back(state.threshold);
-                    neuronData.resetPotential.push_back(state.resetPotential);
-                    neuronData.leakConductance.push_back(state.leakConductance);
-                    neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
-                    neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
-                    neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
-                    neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
-                }
-            }
-        }
-        
-        if (!writer.writeNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to write neurons to checkpoint");
-            return false;
-        }
-        
-        // Write synapses
-        SynapseCheckpointData synapseData;
-        for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
-            }
-        }
-        
-        if (!writer.writeSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to write synapses to checkpoint");
-            return false;
-        }
-        
-        // Finalize
-        if (!writer.finalize()) {
-            NLM_LOG_ERROR("Failed to finalize checkpoint");
-            return false;
-        }
-        
-        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
-        return true;
+        // Save using checkpoint manager
+        return pImpl->checkpointManager->saveBrainState(filepath);
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
