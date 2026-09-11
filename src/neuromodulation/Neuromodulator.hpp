@@ -27,6 +27,9 @@ public:
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
+    // Update neuromodulator state
+    virtual void update(TimestepDuration dt) = 0;
+    
 protected:
     Neuromodulator() = default;
 };

@@ -262,7 +262,63 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
     TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    
+    // Step 1: Apply synaptic currents to membrane potential
+    // If there are any synaptic inputs, add them to the membrane potential
+    if (pImpl->synapticInput != 0.0f) {
+        addToMembranePotential(pImpl->synapticInput);
+    }
+    
+    // Step 2: Apply leak dynamics
+    // dV/dt = (V_rest - V)/tau
+    MembranePotential& V = pImpl->state.membranePotential;
+    MembranePotential V_rest = pImpl->state.restingPotential;
+    float tau = Impl::TIME_CONSTANT;  // ms
+    
+    // Apply leak in discrete time
+    float leak = (V_rest - V) / tau;
+    V += static_cast<float>(dt) * leak;
+    
+    // Step 3: Apply spike-frequency adaptation
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        V -= pImpl->state.adaptationVariable * 0.01f;
+        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    }
+    
+    // Step 4: Clamp to prevent instability
+    V = std::clamp(V, -100.0f, 50.0f);
+    
+    // Step 5: Check for spike threshold crossing
+    bool fired = false;
+    if (V >= pImpl->state.threshold) {
+        fired = true;
+        
+        // Record spike
+        recordSpike(currentTime);
+        
+        // Reset membrane potential
+        V = pImpl->state.resetPotential;
+        
+        // Enter refractory period
+        pImpl->state.firingState = FiringState::Refractory;
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        
+        // Update adaptation for spike-frequency adaptation
+        pImpl->state.adaptationVariable += 1.0f;
+    }
+    
+    // Update firing state (non-refractory case)
+    if (!fired && pImpl->state.refractoryRemaining == 0) {
+        pImpl->state.firingState = FiringState::Active;
+    }
+    
+    // Decrement refractory period if active
+    if (pImpl->state.refractoryRemaining > 0) {
+        --pImpl->state.refractoryRemaining;
+        if (pImpl->state.refractoryRemaining == 0) {
+            pImpl->state.firingState = FiringState::Resting;
+        }
+    }
 }
 
 void Neuron::reset() {
