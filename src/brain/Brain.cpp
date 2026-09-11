@@ -511,8 +511,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // Get sensory input from sensory neurons (simulate current input)
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Create a simplified sensory input based on current sensory neuron activities
+            std::vector<float> sensoryValues;
+            sensoryValues.reserve(pImpl->sensoryNeurons.size());
+            
+            for (size_t i = 0; i < std::min(pImpl->sensoryNeurons.size(), size_t(16)); ++i) {
+                Neuron* neuron = pImpl->sensoryNeurons[i];
+                const auto& state = neuron->getState();
+                // Convert membrane potential to sensory value (normalized)
+                float value = (state.membranePotential - state.restingPotential) / 20.0f;
+                value = std::max(-1.0f, std::min(1.0f, value)); // Clamp to [-1, 1]
+                sensoryValues.push_back(value);
+            }
+            
+            // Create a SensoryInput for the prediction system
+            // For now, we'll use the prediction error tracking from existing data
+            // In a full implementation, this would integrate with the actual
+            // prediction system and agent-brain interface
+            
+            // Track prediction error for learning
+            float avgActivity = 0.0f;
+            for (float val : sensoryValues) avgActivity += std::abs(val);
+            avgActivity /= sensoryValues.size();
+            
+            // Use prediction error to drive learning
+            float predictionError = std::max(0.0f, avgActivity - 0.3f);  // Error when activity > threshold
+            pImpl->predictionSystem->updatePredictionError(predictionError);
+            
+            // Update confidence based on prediction accuracy
+            float confidence = std::max(0.1f, 1.0f - predictionError);
+            pImpl->predictionSystem->updateConfidence(confidence);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -1011,6 +1043,14 @@ NeuralWorkingMemory* Brain::getWorkingMemory() {
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
+}
+
+NeuralSemanticMemory* Brain::getSemanticMemory() {
+    return nullptr;  // Semantic memory not yet implemented
+}
+
+NeuralProceduralMemory* Brain::getProceduralMemory() {
+    return nullptr;  // Procedural memory not yet implemented
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {

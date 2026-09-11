@@ -21,6 +21,12 @@ public:
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
+    // Update prediction error from neuromodulation or learning
+    void updatePredictionError(float error);
+    
+    // Update prediction confidence
+    void updateConfidence(float confidence);
+    
     // Get prediction error
     float getPredictionError() const;
     
