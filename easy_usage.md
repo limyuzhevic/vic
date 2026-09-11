@@ -106,6 +106,208 @@ print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 
 ## Common Patterns
 
+### Pattern 1: Run a Complete Agent Simulation
+
+```python
+def run_agent_simulation(brain, world, agent, num_steps):
+    """Run a complete agent simulation with all subsystems."""
+    for step in range(num_steps):
+        # 1. Update world dynamics
+        world.update(0.1)
+        
+        # 2. Get what the agent perceives
+        percept = world.getSensoryPercept()
+        
+        # 3. Process sensory input into brain
+        agent.processSensoryInput(percept)
+        
+        # 4. Brain processes internal state
+        brain.step(step)
+        
+        # 5. Get action from brain activity
+        action = agent.decodeMotorCommand()
+        
+        # 6. Execute action in world
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # 7. Enable learning if configured
+        if agent.isRewardModulationEnabled():
+            # Get reward from world state (simple example)
+            reward = 0.0
+            if percept.getInternal():
+                reward = percept.getInternal()[0]
+            agent.applyRewardModulation(reward, 0.0)
+        
+        # 8. Update brain development
+        if agent.isDevelopmentEnabled():
+            agent.updateDevelopment(0.1)
+
+# Use it like this:
+run_simulation(brain, world, agent, 1000)
+```
+
+### Pattern 2: Advanced Agent with Learning
+
+```python
+def run_learning_agent_simulation(num_steps=2000, enable_all_features=True):
+    """Run an agent with all learning capabilities enabled."""
+    
+    # 1. Create configuration with learning settings
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 800)
+    config.set("plasticity.stdp.enable", True)
+    config.set("plasticity.stdp.learning_rate", 0.001)
+    config.set("neuromod.dopamine.scale", 1.0)
+    config.set("neuromod.curiosity.enable", True)
+    config.set("neuromod.novelty.enable", True)
+    
+    # 2. Create and initialize brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 3. Create agent brain interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 4. Create and configure world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=30, height=30, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(15.0, 15.0)
+    
+    # 5. Initialize agent with world
+    agent.initialize(world)
+    
+    # 6. Enable all learning subsystems
+    if enable_all_features:
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(True)
+    
+    # 7. Store statistics for analysis
+    stats = {
+        'steps': 0,
+        'firing_rates': [],
+        'curiosity_levels': [],
+        'novelty_levels': [],
+        'predictions': [],
+        'actions_taken': []
+    }
+    
+    # 8. Run simulation loop
+    for step in range(num_steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input
+        agent.processSensoryInput(percept)
+        
+        # Run brain step
+        brain.step(step)
+        
+        # Decode motor command
+        motor_cmd = agent.decodeMotorCommand()
+        
+        # Apply motor command to world
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = 0.0
+        if percept.getInternal():
+            reward = percept.getInternal()[0]
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        if agent.isDevelopmentEnabled():
+            agent.updateDevelopment(0.1)
+        
+        # Collect statistics periodically
+        if step % 100 == 0:
+            stats['steps'] += 1
+            stats['firing_rates'].append(brain.getAverageFiringRate())
+            stats['curiosity_levels'].append(agent.getCuriosityLevel())
+            stats['novelty_levels'].append(agent.getNoveltyLevel())
+            stats['predictions'].append(agent.getPredictionError())
+            stats['actions_taken'].append(motor_cmd)
+        
+        # Print progress
+        if step % 500 == 0:
+            print(f"Step {step}: "
+                  f"Firing rate: {brain.getAverageFiringRate():.2f} Hz, "
+                  f"Curiosity: {agent.getCuriosityLevel():.3f}, "
+                  f"Novelty: {agent.getNoveltyLevel():.3f}, "
+                  f"Action: {motor_cmd}")
+    
+    return stats
+
+# Run advanced learning agent
+if __name__ == "__main__":
+    print("Running advanced NLM agent with learning...")
+    results = run_learning_agent_simulation(2000, enable_all_features=True)
+    print(f"\nSimulation complete!")
+    print(f"Average firing rate: {sum(results['firing_rates'])/len(results['firing_rates']):.2f} Hz")
+    print(f"Average curiosity: {sum(results['curiosity_levels'])/len(results['curiosity_levels']):.3f}")
+```
+
+### Pattern 3: Brain Exploration
+
+```python
+def explore_brain_configuration(base_config, neuron_variations):
+    """Explore different brain configurations to find optimal settings."""
+    
+    results = []
+    
+    for variation in neuron_variations:
+        # Create modified config
+        config = pynlm.createDefaultConfig()
+        
+        # Copy base config settings
+        for key in base_config.getKeys():
+            config.set(key, base_config.get(key))
+        
+        # Apply variation
+        config.set("brain.neuron_count", variation['neuron_count'])
+        config.set("brain.synapse_density", variation['synapse_density'])
+        config.set("plasticity.stdp.learning_rate", variation['learning_rate'])
+        
+        # Create brain
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Run test simulation
+        for step in range(100):
+            brain.step(step)
+        
+        # Record statistics
+        result = {
+            'neuron_count': variation['neuron_count'],
+            'synapse_density': variation['synapse_density'],
+            'learning_rate': variation['learning_rate'],
+            'total_spikes': brain.getTotalSpikeCount(),
+            'avg_firing_rate': brain.getAverageFiringRate(),
+            'e_i_ratio': brain.getExcitationInhibitionRatio()
+        }
+        
+        results.append(result)
+        print(f"Completed: {result}")
+    
+    return results
+
+# Example exploration
+base_config = pynlm.createDefaultConfig()
+variations = [
+    {'neuron_count': 500, 'synapse_density': 0.05, 'learning_rate': 0.001},
+    {'neuron_count': 1000, 'synapse_density': 0.1, 'learning_rate': 0.001},
+    {'neuron_count': 1500, 'synapse_density': 0.15, 'learning_rate': 0.001},
+    {'neuron_count': 2000, 'synapse_density': 0.2, 'learning_rate': 0.001},
+]
+
+exploration_results = explore_brain_configuration(base_config, variations)
+```
+
 ### Pattern 1: Run a Simulation
 
 ```python

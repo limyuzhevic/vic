@@ -12,6 +12,8 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Touch.hpp"
+#include "../src/sensory/Proprioception.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
@@ -193,10 +195,26 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getSampleRate", &Audio::getSampleRate)
         .def("getNumSamples", &Audio::getNumSamples);
 
-    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
+py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
+    .def(py::init<>())
+    .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
+    .def("clearSignals", &InternalSignals::clearSignals);
+
+    py::class_<Touch, SensoryInput>(m, "Touch", R"pbdoc(Touch sensory input)pbdoc")
         .def(py::init<>())
-        .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+        .def(py::init<size_t>(), py::arg("numSensors"))
+        .def("setData", [](Touch& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"))
+        .def("getNumSensors", &Touch::getNumSensors);
+
+    py::class_<Proprioception, SensoryInput>(m, "Proprioception", R"pbdoc(Proprioception sensory input)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t>(), py::arg("numJoints"), py::arg("numVelocities"))
+        .def("setData", [](Proprioception& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"))
+        .def("getNumJointSignals", &Proprioception::getNumJointSignals);
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -408,6 +426,14 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
+    m.def("createTouch", [](size_t numSensors) -> std::shared_ptr<Touch> {
+        return std::make_shared<Touch>(numSensors);
+    }, py::arg("numSensors"), "Create a Touch sensory input instance");
+
+    m.def("createProprioception", [](size_t numJoints, size_t numVelocities) -> std::shared_ptr<Proprioception> {
+        return std::make_shared<Proprioception>(numJoints, numVelocities);
+    }, py::arg("numJoints"), py::arg("numVelocities"), "Create a Proprioception sensory input instance");
+
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
@@ -415,6 +441,38 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Convenience factory functions for complete agent setup
+    m.def("createReadyAgent", [](size_t neuronCount) -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        // Create configuration
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<size_t>(neuronCount));
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.001f);
+        config->set("neuromod.curiosity.enable", true);
+        
+        // Create brain
+        auto brain = std::make_shared<Brain>(config);
+        
+        // Create world
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        // Create agent
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable learning
+        agent->enableRewardModulation(true);
+        agent->enableDevelopment(true);
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("neuronCount") = 1000, "Create a complete agent system (brain + world + agent) with default settings");
+
+    m.def("createDefaultAgentSystem", []() -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        return createReadyAgent(1000);
+    }, "Create a default agent system with standard parameters");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

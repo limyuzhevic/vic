@@ -70,6 +70,8 @@ add_library(nlm_core STATIC
     src/sensory/Vision.cpp
     src/sensory/Audio.cpp
     src/sensory/InternalSignals.cpp
+    src/sensory/Touch.cpp
+    src/sensory/Proprioception.cpp
     # Prediction
     src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
