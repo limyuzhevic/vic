@@ -103,7 +103,7 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -137,5 +137,8 @@ private:
 };
 
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+
+// Backward compatibility: getInstance() alias for getGlobal()
+inline Logger& getInstance() { return getGlobal(); }
 
 } // namespace nlm
