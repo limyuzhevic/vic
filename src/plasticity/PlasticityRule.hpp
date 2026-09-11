@@ -59,28 +59,4 @@ private:
     Impl* pImpl;
 };
 
-// Anti-Hebbian rule: decrease weight when neurons fire together
-// PLACEHOLDER - Phase 2
-class AntiHebbianRule : public PlasticityRule {
-public:
-    void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "AntiHebbian"; }
-};
-
-// Bienenstock-Cooper-Munro (BCM) rule
-// PLACEHOLDER - Phase 2
-class BCMRule : public PlasticityRule {
-public:
-    void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "BCM"; }
-};
-
 } // namespace nlm

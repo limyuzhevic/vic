@@ -43,6 +43,7 @@ add_library(nlm_core STATIC
     src/plasticity/Hebbian.cpp
     src/plasticity/STDP.cpp
     src/plasticity/StructuralPlasticity.cpp
+    src/plasticity/AdditionalPlasticityRules.cpp
     # Development
     src/development/DevelopmentSystem.cpp
     src/development/Synaptogenesis.cpp
