@@ -19,16 +19,30 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON first
+    if (loadFromJSON(filepath)) {
+        NLM_LOG_INFO("Configuration loaded from JSON: " + filepath);
+        return true;
+    }
     
+    // Try YAML second  
+    if (loadFromYAML(filepath)) {
+        NLM_LOG_INFO("Configuration loaded from YAML: " + filepath);
+        return true;
+    }
+    
+    // Fall back to simple key=value format
+    NLM_LOG_INFO("Configuration loaded from simple key=value format: " + filepath);
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
+        ++lineNum;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,7 +62,13 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+            } catch (const std::exception& e) {
+                NLM_LOG_WARNING(std::string("Warning: Failed to parse line ") + std::to_string(lineNum) + ": " + e.what());
+            }
+        } else {
+            NLM_LOG_WARNING(std::string("Warning: Invalid format on line ") + std::to_string(lineNum) + ": missing '='");
         }
     }
     
