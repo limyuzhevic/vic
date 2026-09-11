@@ -4,6 +4,8 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
 #include <memory>
 #include <vector>
 
@@ -11,6 +13,7 @@ namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Integrates NeuralPlanner for cognitive action selection
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -69,49 +72,78 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Neural planning for cognitive action selection
+    void useNeuralPlanner(float curiosityLevel, const std::vector<float>& sensoryInput,
+                         const std::vector<ActionType>& recentActions, float reward);
+    
+    // Get planned action sequences
+    std::vector<std::vector<ActionType>> getPlannedActionSequences(size_t depth = 3) const;
+    
+    // Get plan quality and confidence
+    float getPlanQuality() const { return planningQuality_; }
+    float getPlanningConfidence() const { return planningConfidence_; }
+    
+    // Update NeuralPlanner with experience
+    void recordActionOutcome(const std::vector<ActionType>& plannedActions,
+                            const std::vector<ActionType>& actualActions,
+                            float reward);
+    
+    // Set planning depth
+    void setPlanningDepth(size_t depth) { if (neuralPlanner_) { neuralPlanner_->setPlanningDepth(depth); } }
+    
+    // Set action quality function
+    void setActionQuality(ActionType action, float quality) {
+        if (neuralPlanner_) neuralPlanner_->setActionQuality(action, quality);
+    }
+    
+    // Set current goal for planning
+    void setPlanningGoal(const std::vector<float>& goal) {
+        if (neuralPlanner_) neuralPlanner_->setCurrentGoal(goal);
+    }
+    
+    // Get concept for current state
+    size_t getCurrentConcept() const { return currentConceptId_; }
+    
+    // Get concept stability for current concept
+    float getCurrentConceptStability() const { return currentConceptStability_; }
+
 private:
+    // Neural planning system for cognitive action selection
+    std::unique_ptr<NeuralPlanner> neuralPlanner_;
+    
+    // Concept formation for pattern discovery
+    std::unique_ptr<ConceptFormation> conceptFormation_;
+    
+    // Planning state
+    float planningQuality_;
+    float planningConfidence_;
+    std::vector<ActionType> lastPlannedAction_;
+    
+    // Current concept state
+    size_t currentConceptId_;
+    float currentConceptStability_;
+    
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
-    std::shared_ptr<Brain> brain_;
+    // Process planned action sequence
+    std::vector<ActionType> processPlannedAction(const std::vector<ActionType>& plannedSequence);
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    // Evaluate action sequence quality
+    float evaluateActionSequence(const std::vector<ActionType>& sequence,
+                                const std::vector<float>& state) const;
     
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    // Get sensory state vector for planning
+    std::vector<float> getSensoryStateVector() const;
     
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
+    // Extract pattern from sensory percept
+    std::vector<float> extractPatternFromPercept(const SensoryPercept& percept) const;
     
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
-    
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
-    
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
-};
+    // Extract features from state and action
+    std::vector<float> extractFeatures(const std::vector<float>& state,
+                                       const ActionType& action) const;
 
 } // namespace nlm

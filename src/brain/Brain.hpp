@@ -1,13 +1,4 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
+#include "../neuromodulation/Neuromodulator.hpp"
 
 namespace nlm {
 
@@ -25,6 +16,9 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
@@ -170,19 +164,20 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
     
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
     
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Get all neuromodulators for coordinated application
+    const Dopamine* getDopamine() const;
+    const Acetylcholine* getAcetylcholine() const;
+    const Norepinephrine* getNorepinephrine() const;
+    const Serotonin* getSerotonin() const;
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

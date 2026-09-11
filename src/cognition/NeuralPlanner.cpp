@@ -329,39 +329,39 @@ float SelfModel::getSelfModelConfidence(ActionType action) const {
     if (effects.empty()) return 0.0f;
     
     float totalConf = 0.0f;
-    for (const auto& e : effects) {
-        totalConf += e.confidence;
+        for (const auto& e : effects) {
+            totalConf += e.confidence;
+        }
+        return totalConf / effects.size();
     }
-    return totalConf / effects.size();
-}
 
-float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeState,
-                                              const std::vector<float>& afterState,
-                                              ActionType action) const {
-    // If we have a good prediction for this action, it's likely self-generated
-    auto predicted = findMatchingEffect(action, beforeState);
-    
-    if (predicted.empty()) return 0.0f;
-    
-    float similarity = computeSimilarity(predicted, afterState);
-    return similarity;
-}
+    float SelfModel::computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
+                                                  const std::vector<float>& afterState,
+                                                  ActionType action) const {
+        // If we have a good prediction for this action, it's likely self-generated
+        auto predicted = findMatchingEffect(action, beforeState);
 
-ActionType SelfModel::getPreferredAction(const std::vector<float>& state) {
-    ActionType best = ActionType::Wait;
-    float bestValue = -1000.0f;
-    
-    for (size_t i = 0; i < actionEffects_.size(); ++i) {
-        if (actionEffects_[i].empty()) continue;
-        
-        // Check how well this action would work in current state
-        auto predicted = findMatchingEffect(static_cast<ActionType>(i), state);
-        if (!predicted.empty()) {
-            // Value = how much the state changes toward reward
-            float value = computeSimilarity(predicted, state);
-            if (value > bestValue) {
-                bestValue = value;
-                best = static_cast<ActionType>(i);
+        if (predicted.empty()) return 0.0f;
+
+        float similarity = computeSimilarity(predicted, afterState);
+        return similarity;
+    }
+
+    ActionType SelfModel::getPreferredAction(const std::vector<float>& state) {
+        ActionType best = ActionType::Wait;
+        float bestValue = -1000.0f;
+
+        for (size_t i = 0; i < actionEffects_.size(); ++i) {
+            if (actionEffects_[i].empty()) continue;
+
+            // Check how well this action would work in current state
+            auto predicted = findMatchingEffect(static_cast<ActionType>(i), state);
+            if (!predicted.empty()) {
+                // Value = how much the state changes toward reward
+                float value = computeSimilarity(predicted, state);
+                if (value > bestValue) {
+                    bestValue = value;
+                    best = static_cast<ActionType>(i);
             }
         }
     }
