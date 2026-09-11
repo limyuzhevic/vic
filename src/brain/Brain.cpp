@@ -510,31 +510,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->curiosity) {
+        // The prediction system updates with curiosity-driven exploration
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Compute prediction error for learning
+        if (pImpl->predictionError) {
+            pImpl->predictionError->update(pImpl->timestep, pImpl->predictionSystem->getPredictionError());
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
+    if (pImpl->attention && pImpl->workingMemory) {
         pImpl->attention->update(pImpl->timestep);
         
         // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+        if (!pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
-    }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Process current neural activity patterns to form concepts
+        std::vector<float> currentPattern = pImpl->workingMemory->retrieve();
+        if (!currentPattern.empty()) {
+            pImpl->conceptFormation->update(pImpl->timestep, currentPattern);
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========
@@ -1031,10 +1034,6 @@ NeuralPlanner* Brain::getPlanner() {
 
 ConceptFormation* Brain::getConceptFormation() {
     return pImpl->conceptFormation.get();
-}
-
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
