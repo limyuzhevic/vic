@@ -30,11 +30,40 @@ void ConceptFormation::initialize(Brain* brain) {
     NLM_LOG_INFO("ConceptFormation initialized");
 }
 
-size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
+void ConceptFormation::update(const TimestepDuration dt) {
+    // Update concept formation with current neural activity
+    // This integrates concept formation into the brain simulation loop
+    
+    // Decay concept stability over time (forgetting)
+    for (auto& concept : concepts_) {
+        // Stability decays naturally over time
+        for (auto& instance : concept.instances) {
+            instance.stability *= (1.0f - dt * 0.001f);
+        }
+        
+        // Recalculate average stability
+        if (!concept.instances.empty()) {
+            float totalStability = 0.0f;
+            for (const auto& instance : concept.instances) {
+                totalStability += instance.stability;
+            }
+            concept.avgStability = totalStability / concept.instances.size();
+        }
+    }
+    
+    // Remove unstable concepts (stability below threshold)
+    concepts_.erase(
+        std::remove_if(concepts_.begin(), concepts_.end(),
+            [this](const DiscoveredConcept& c) { return c.avgStability < stabilityThreshold_; }),
+        concepts_.end()
+    );
+}
+
+void ConceptFormation::presentExperience(const std::vector<float>& pattern,
                                           const std::vector<float>& features,
                                           float reward,
                                           SimulationStep currentTime) {
-    if (pattern.empty()) return 0;
+    if (pattern.empty()) return;
     
     // Check if this pattern matches any existing concept
     size_t matchingConcept = findConceptForPattern(pattern);
@@ -42,7 +71,7 @@ size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
     if (matchingConcept > 0) {
         // Update existing concept
         updateConcept(matchingConcept, pattern, features, reward);
-        return matchingConcept;
+        return;
     }
     
     // Check if this is novel enough to form a new concept
@@ -53,8 +82,6 @@ size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
         // For now, create concept if sufficiently different from all others
         return createConcept(pattern, features, reward);
     }
-    
-    return 0;  // Not yet classifiable
 }
 
 size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
