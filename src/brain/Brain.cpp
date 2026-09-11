@@ -511,8 +511,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural state
+        // This includes temporal prediction and action outcome prediction
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Get prediction error signal
+        float predictionError = 0.0f;
+        if (pImpl->predictionError) {
+            predictionError = pImpl->predictionError->getPredictionErrorValue();
+            
+            // Apply prediction error to dopamine system
+            if (predictionError > 0.0f) {
+                pImpl->dopamine->signalRewardPredictionError(predictionError);
+            }
+        }
+        
+        // Apply prediction error to plasticity
+        float plasticityMod = 1.0f + predictionError * 0.5f;  // High prediction error = more plasticity
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                if (syn->getPlasticityFlags().stdp) {
+                    float weight = syn->getWeight();
+                    weight *= plasticityMod;
+                    syn->setWeight(weight);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +552,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This requires encoding the current sensory and neural state
+        
+        // Get current neural activity as features for concept formation
+        std::vector<float> neuralFeatures;
+        
+        // Sample neural activity across regions
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                // Get average firing rate of this population
+                float firingRate = pop->getAverageFiringRate();
+                neuralFeatures.push_back(firingRate);
+            }
+        }
+        
+        // Present features to concept formation system
+        pImpl->conceptFormation->presentExperience(neuralFeatures, 
+                                                   pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                                                   pImpl->currentStep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

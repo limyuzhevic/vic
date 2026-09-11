@@ -1,53 +1,61 @@
-#include "PredictionError.hpp"
-#include "../core/Logger/Logger.hpp"
+#include "Neuromodulator.hpp"
+#include <algorithm>
 #include <cmath>
+#include <unordered_map>
 
 namespace nlm {
 
 struct PredictionError::Impl {
-    class Brain* brain;
-    float error;
-    float predictedValue;
-    float actualValue;
-    std::vector<float> history;
+    float level;
+    float baseline;
+    float peak;
+    float decayRate;
+    float releaseRate;
+    float predictionErrorValue;
     
-    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
+    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f), predictionErrorValue(0.0f) {}
 };
 
 PredictionError::PredictionError() : pImpl(new Impl) {}
 
 PredictionError::~PredictionError() = default;
 
-void PredictionError::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    NLM_LOG_INFO("PredictionError system initialized");
+const char* PredictionError::getName() const {
+    return "PredictionError";
 }
 
-float PredictionError::getError() const {
-    return pImpl->error;
+float PredictionError::getLevel() const {
+    return pImpl->level;
 }
 
-void PredictionError::computeError(float predicted, float actual) {
-    pImpl->predictedValue = predicted;
-    pImpl->actualValue = actual;
-    pImpl->error = actual - predicted;
-    pImpl->history.push_back(pImpl->error);
+void PredictionError::setLevel(float level) {
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
 }
 
-void PredictionError::updatePrediction(float newPrediction) {
-    pImpl->predictedValue = newPrediction;
+float PredictionError::getPlasticityFactor() const {
+    // Prediction error affects plasticity by signaling unexpected outcomes
+    return 0.1f + 0.9f * pImpl->level;
 }
 
-const std::vector<float>& PredictionError::getHistory() const {
-    return pImpl->history;
+void PredictionError::update(TimestepDuration dt) {
+    // Decay prediction error over time
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
-void PredictionError::clearHistory() {
-    pImpl->history.clear();
+void PredictionError::computeError(float predicted, float actual, float confidence) {
+    // Compute prediction error as absolute difference weighted by confidence
+    float error = std::abs(predicted - actual) * confidence;
+    
+    // Level responds to prediction error
+    if (error > pImpl->level) {
+        pImpl->level = std::min(pImpl->peak, pImpl->level + error * pImpl->releaseRate);
+    }
+    
+    pImpl->predictionErrorValue = error;
 }
 
-float PredictionError::getMagnitude() const {
-    return std::abs(pImpl->error);
+float PredictionError::getPredictionErrorValue() const {
+    return pImpl->predictionErrorValue;
 }
 
 } // namespace nlm
