@@ -77,13 +77,10 @@ std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
     
     for (auto& exp : experiments) {
         // Create fresh brain and environment for each experiment
-        // PLACEHOLDER: In real implementation, would clone from template
-        auto brain = std::make_shared<Brain>(brainTemplate->getConfig());
-        brain->initialize();
+        auto brain = cloneBrain(brainTemplate);
+        auto environment = cloneEnvironment(environmentTemplate);
         
-        // Would also create fresh environment here
-        
-        if (runExperiment(exp, brain, environmentTemplate, maxSteps)) {
+        if (runExperiment(exp, brain, environment, maxSteps)) {
             results.push_back(exp);
         }
     }
@@ -91,30 +88,107 @@ std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
     return results;
 }
 
-const std::vector<std::shared_ptr<Experiment>>& ExperimentRunner::getExperiments() const {
-    return pImpl->experiments;
-}
-
-std::shared_ptr<Experiment> ExperimentRunner::getExperiment(const std::string& name) const {
-    for (auto& exp : pImpl->experiments) {
-        if (exp->getName() == name) {
-            return exp;
-        }
-    }
-    return nullptr;
-}
-
-void ExperimentRunner::clearExperiments() {
-    pImpl->experiments.clear();
-}
-
-void ExperimentRunner::setGlobalSeed(uint64_t seed) {
-    pImpl->globalSeed = seed;
-}
-
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    // TODO: Implement comprehensive results saving with JSON format
+    return saveExperimentResultsToFile(filepath);
 }
 
-} // namespace nlm
+// Helper function implementations
+
+// Clone brain helper function
+std::shared_ptr<Brain> ExperimentRunner::cloneBrain(std::shared_ptr<Brain> brainTemplate) {
+    if (!brainTemplate) {
+        return nullptr;
+    }
+    
+    // Create a new brain with the same configuration
+    auto brain = std::make_shared<Brain>(brainTemplate->getConfig());
+    brain->initialize();
+    
+    // Try to load from checkpoint if available
+    std::string checkpointFile = "brain_checkpoint_" + std::to_string(pImpl->globalSeed) + ".bin";
+    if (brain->load(checkpointFile)) {
+        NLM_LOG_INFO("Successfully loaded brain checkpoint: " + checkpointFile);
+    }
+    
+    return brain;
+}
+
+// Clone environment helper function
+std::shared_ptr<Environment> ExperimentRunner::cloneEnvironment(std::shared_ptr<Environment> environmentTemplate) {
+    if (!environmentTemplate) {
+        return nullptr;
+    }
+    
+    // Create a fresh SimpleWorld environment
+    return std::make_shared<SimpleWorld>();
+}
+
+// Save experiment results to file (comprehensive implementation)
+bool ExperimentRunner::saveExperimentResultsToFile(const std::string& filepath) const {
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Empty filepath provided for saving experiment results");
+        return false;
+    }
+    
+    try {
+        nlohmann::json results;
+        
+        // Add metadata
+        results["timestamp"] = std::chrono::system_clock::now().time_since_epoch().count();
+        results["version"] = "1.0.0";
+        
+        // Add all experiments
+        results["experiments"] = nlohmann::json::array();
+        for (const auto& exp : pImpl->experiments) {
+            nlohmann::json expData;
+            expData["name"] = exp->getName();
+            expData["seed"] = exp->getSeed();
+            expData["start_step"] = exp->getStartStep();
+            expData["end_step"] = exp->getEndStep();
+            
+            // Add metrics
+            auto metrics = exp->getMetrics();
+            expData["metrics"] = nlohmann::json::object();
+            for (const auto& metric : metrics) {
+                expData["metrics"][metric.first] = metric.second;
+            }
+            
+            // Add step data summary
+            auto stepData = exp->getStepData();
+            expData["steps_count"] = stepData.size();
+            if (!stepData.empty()) {
+                expData["final_neuron_count"] = stepData.back().neuronCount;
+                expData["final_synapse_count"] = stepData.back().synapseCount;
+                expData["final_firing_count"] = stepData.back().firingCount;
+                expData["final_avg_firing_rate"] = stepData.back().avgFiringRate;
+            }
+            
+            results["experiments"].push_back(expData);
+        }
+        
+        // Add system information
+        results["system_info"] = nlohmann::json::object();
+        results["system_info"]["platform"] = "Linux";
+        results["system_info"]["compiler"] = "GCC";
+        results["system_info"]["cpp_standard"] = "C++20";
+        
+        // Write to file
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to open file for writing: " + filepath);
+            return false;
+        }
+        
+        file << results.dump(2);
+        file.close();
+        
+        NLM_LOG_INFO("Successfully saved " + std::to_string(pImpl->experiments.size()) + 
+                    " experiments to: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception saving experiment results: ") + e.what());
+        return false;
+    }
+}

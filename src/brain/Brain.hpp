@@ -164,34 +164,84 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
-    // ========== DEVELOPMENT SYSTEM ==========
-    
+// ========== DEVELOPMENT SYSTEM ==========
+
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
-    
+
     // ========== NEUROMODULATION SYSTEMS ==========
-    
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
-    
+
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
-    
+
     // Novelty - novelty detection
     Novelty* getNovelty();
-    
+
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
-    
+
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
-    
+
     // Get random generator
     RandomGenerator* getRandomGenerator();
-    
+
     // Logging
     void logStatus() const;
+
+    // Utility functions for batch operations
+    void forEachNeuronInAllRegions(const std::function<void(Neuron*)>& processor);
+    void forEachNeuronInRegion(RegionId regionId, const std::function<void(Neuron*)>& processor);
+    size_t countFiringNeurons() const;
+    float calculateAverageNeuronActivity() const;
+    std::vector<NeuronId> getFiringNeuronIds() const;
+    size_t countNeuronsByType(NeuronType type) const;
+    float getExcitementInhibitionRatio() const;
+
+    // Statistics and monitoring
+    size_t getTotalSpikeCount() const;
+    size_t getPendingSpikeEventCount() const;
+    size_t getActiveNeuronCount() const;
+    size_t getFiringNeuronCount() const;
+    float getAverageFiringRate() const;
+
+    // Step processing methods (extracted from large step() method)
+    void stepProcessDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void stepUpdateNeurons(SimulationStep currentStep, Timestamp currentTime);
+    void stepDetectSpikesAndScheduleEvents(SimulationStep currentStep, Timestamp currentTime);
+    void stepUpdateWorkingMemory(SimulationStep currentStep, Timestamp currentTime);
+    void stepApplyNeuromodulationEffects(SimulationStep currentStep, Timestamp currentTime);
+    void stepApplyPlasticityRules(SimulationStep currentStep, Timestamp currentTime);
+    void stepUpdateEpisodicMemory(SimulationStep currentStep, Timestamp currentTime);
+    void stepUpdatePredictionSystem(SimulationStep currentStep, Timestamp currentTime);
+    void stepUpdateAttentionSystem(SimulationStep currentStep, Timestamp currentTime);
+    void stepUpdateConceptFormation(SimulationStep currentStep, Timestamp currentTime);
+    void stepApplyStructuralPlasticity(SimulationStep currentStep, Timestamp currentTime);
+    void stepReplayImportantMemories(SimulationStep currentStep, Timestamp currentTime);
+    void stepApplyDevelopmentEffects(SimulationStep currentStep, Timestamp currentTime);
+    void stepCollectStatistics(SimulationStep currentStep, Timestamp currentTime);
+    void stepManageCheckpoints(SimulationStep currentStep, Timestamp currentTime);
+
+    // Step processing methods (extracted from large step() method)
+    void stepProcessDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void stepUpdateNeurons(SimulationStep currentStep, Timestamp currentTime);
+    void stepDetectSpikesAndScheduleEvents(SimulationStep currentStep, Timestamp currentTime);
+    void stepUpdateWorkingMemory(SimulationStep currentStep, Timestamp currentTime);
+    void stepApplyNeuromodulationEffects(SimulationStep currentStep, Timestamp currentTime);
+    void stepApplyPlasticityRules(SimulationStep currentStep, Timestamp currentTime);
+    void stepUpdateEpisodicMemory(SimulationStep currentStep, Timestamp currentTime);
+    void stepUpdatePredictionSystem(SimulationStep currentStep, Timestamp currentTime);
+    void stepUpdateAttentionSystem(SimulationStep currentStep, Timestamp currentTime);
+    void stepUpdateConceptFormation(SimulationStep currentStep, Timestamp currentTime);
+    void stepApplyStructuralPlasticity(SimulationStep currentStep, Timestamp currentTime);
+    void stepReplayImportantMemories(SimulationStep currentStep, Timestamp currentTime);
+    void stepApplyDevelopmentEffects(SimulationStep currentStep, Timestamp currentTime);
+    void stepCollectStatistics(SimulationStep currentStep, Timestamp currentTime);
+    void stepManageCheckpoints(SimulationStep currentStep, Timestamp currentTime);
     
 private:
     struct Impl;

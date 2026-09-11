@@ -42,12 +42,30 @@ public:
     // Set random seed for reproducibility
     void setGlobalSeed(uint64_t seed);
     
+// Get all experiments
+    const std::vector<std::shared_ptr<Experiment>>& getExperiments() const;
+
+    // Get experiment by name
+    std::shared_ptr<Experiment> getExperiment(const std::string& name) const;
+
+    // Clear all experiments
+    void clearExperiments();
+
+    // Set random seed for reproducibility
+    void setGlobalSeed(uint64_t seed);
+
     // Save experiment results
     bool saveResults(const std::string& filepath) const;
-    
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-};
+
+    // Helper functions for cloning and saving
+    std::shared_ptr<Brain> cloneBrain(std::shared_ptr<Brain> brainTemplate);
+    std::shared_ptr<Environment> cloneEnvironment(std::shared_ptr<Environment> environmentTemplate);
+    bool saveExperimentResultsToFile(const std::string& filepath) const;
+
+}; // class ExperimentRunner
 
 } // namespace nlm

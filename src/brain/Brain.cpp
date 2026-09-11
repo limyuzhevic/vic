@@ -681,6 +681,104 @@ float Brain::getExcitationInhibitionRatio() const {
     return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
 }
 
+void Brain::forEachNeuronInAllRegions(const std::function<void(Neuron*)>& processor) {
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                processor(neuron);
+            }
+        }
+    }
+}
+
+void Brain::forEachNeuronInRegion(RegionId regionId, const std::function<void(Neuron*)>& processor) {
+    auto* region = getRegion(regionId);
+    if (region) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                processor(neuron);
+            }
+        }
+    }
+}
+
+size_t Brain::countFiringNeurons() const {
+    size_t count = 0;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                if (neuron->isFiring()) count++;
+            }
+        }
+    }
+    return count;
+}
+
+float Brain::calculateAverageNeuronActivity() const {
+    if (pImpl->regions.empty()) return 0.0f;
+    
+    float totalActivity = 0.0f;
+    size_t neuronCount = 0;
+    
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                totalActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                neuronCount++;
+            }
+        }
+    }
+    
+    return neuronCount > 0 ? totalActivity / static_cast<float>(neuronCount) : 0.0f;
+}
+
+std::vector<NeuronId> Brain::getFiringNeuronIds() const {
+    std::vector<NeuronId> firingIds;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                if (neuron->isFiring()) {
+                    firingIds.push_back(neuron->getId());
+                }
+            }
+        }
+    }
+    return firingIds;
+}
+
+size_t Brain::countNeuronsByType(NeuronType type) const {
+    size_t count = 0;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == type) {
+                count += pop->getNeuronCount();
+            }
+        }
+    }
+    return count;
+}
+
+float Brain::getExcitementInhibitionRatio() const {
+    float totalExcitatory = 0.0f;
+    float totalInhibitory = 0.0f;
+    
+    for (const auto& region : pImpl->regions) {
+        for (const auto& syn : region->getSynapses()) {
+            float weight = syn->getWeight();
+            if (weight > 0) {
+                totalExcitatory += weight;
+            } else {
+                totalInhibitory += std::abs(weight);
+            }
+        }
+    }
+    
+    if (totalInhibitory > 0.0f) {
+        return totalExcitatory / totalInhibitory;
+    }
+    return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
+}
+
 size_t Brain::getTotalSpikeCount() const {
     return pImpl->totalSpikesTotal;
 }
@@ -689,31 +787,25 @@ size_t Brain::getPendingSpikeEventCount() const {
     return pImpl->spikeSystem->getPendingSpikeCount() + pImpl->spikeSystem->getPendingDelayedCount();
 }
 
-std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
-    
-    if (pImpl->motorNeurons.empty()) {
-        return std::make_unique<Action>(ActionType::Wait);
+size_t Brain::getActiveNeuronCount() const {
+    size_t total = 0;
+    for (const auto& region : pImpl->regions) {
+        total += region->getActiveNeuronCount();
     }
-    
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
-        }
+    return total;
+}
+
+size_t Brain::getFiringNeuronCount() const {
+    return pImpl->totalSpikesThisStep;
+}
+
+float Brain::getAverageFiringRate() const {
+    if (pImpl->regions.empty()) return 0.0f;
+    float sum = 0.0f;
+    for (const auto& region : pImpl->regions) {
+        sum += region->getAverageFiringRate();
     }
-    
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
-    }
-    
-    auto action = std::make_unique<Action>(type);
-    
-    return action;
+    return sum / static_cast<float>(pImpl->regions.size());
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {

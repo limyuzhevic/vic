@@ -5,6 +5,19 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
+
+namespace nlohmann {
+    template<typename T>
+    class json;
+}
+
+namespace YAML {
+    class Node;
+}
 
 namespace nlm {
 
@@ -43,6 +56,26 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Statistics about configuration
+struct ConfigStats {
+    size_t totalEntries;
+    size_t fromFile;
+    size_t fromCommandLine;
+    size_t fromRuntime;
+    std::chrono::system_clock::time_point timestamp;
+};
+
+// Schema validation
+struct ConfigSchema {
+    std::string type;
+    std::string description;
+    bool required;
+    std::variant<int, double> min;
+    std::variant<int, double> max;
+    std::vector<std::string> allowedValues;
+    std::map<std::string, ConfigSchema> children;
+};
+
 // Main configuration class
 class Config {
 public:
@@ -55,11 +88,14 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load from JSON string
+    bool loadFromJSON(const std::string& jsonString);
+    
+    // Load from YAML string
+    bool loadFromYAML(const std::string& yamlString);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -93,6 +129,29 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Get statistics
+    ConfigStats getStats() const;
+    
+    // Export/import
+    bool exportToJSON(std::string& jsonString) const;
+    bool importFromJSON(const std::string& jsonString);
+    bool exportToYAML(std::string& yamlString) const;
+    bool importFromYAML(const std::string& yamlString);
+    
+    // Merge with another config
+    void merge(const Config& other);
+    
+    // Validation
+    bool validate() const;
+    bool validateAgainstSchema(const ConfigSchema& schema) const;
+    
+    // Convert to other formats
+    nlohmann::json convertToJSON() const;
+    std::string convertToYAML() const;
+    
+    // Debug information
+    std::string debugInfo() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +159,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool validateConfigEntry(const ConfigEntry& entry);
+    static void mergeConfigs(std::vector<ConfigEntry>& target, const std::vector<ConfigEntry>& source);
 };
 
 } // namespace nlm
