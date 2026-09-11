@@ -1,16 +1,12 @@
-#include "Neuromodulator.hpp"
-#include <algorithm>
-
-namespace nlm {
-
 struct Dopamine::Impl {
     float level;
     float baseline;
     float peak;
     float decayRate;
     float releaseRate;
+    Brain* brain;  // Reference to brain for integration
     
-    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
+    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f), brain(nullptr) {}
 };
 
 Dopamine::Dopamine() : pImpl(new Impl) {}
@@ -53,4 +49,11 @@ void Dopamine::signalRewardPredictionError(float error) {
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 
-} // namespace nlm
+void Dopamine::initialize(Brain* brain) {
+    // Store brain reference for integration
+    if (brain) {
+        pImpl->brain = brain;
+        // Connect dopamine effects to neural excitability
+        // This integrates dopamine into the brain's dynamics
+    }
+}

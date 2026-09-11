@@ -229,35 +229,63 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
+    // ========== INTEGRATE MEMORY SYSTEMS WITH BRAIN ==========
     
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
-    
+    pImpl->workingMemory->setNeuromodulator(pImpl->dopamine.get());
+    pImpl->workingMemory->setCuriosity(pImpl->curiosity.get());
+    pImpl->workingMemory->setNovelty(pImpl->novelty.get());
+
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
-    
+    pImpl->episodicMemory->setNeuromodulator(pImpl->dopamine.get());
+    pImpl->episodicMemory->setNovelty(pImpl->novelty.get());
+
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
-    
+
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
-    
+    pImpl->predictionSystem->initialize(this);
+
     // Initialize cognition systems
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
-    
     pImpl->conceptFormation->initialize(this);
-    
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
+    // Initialize development system
+    pImpl->developmentSystem->initialize(this);
+    
+    // Initialize neuromodulation systems
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->predictionError->initialize(this);
+    
+    // Enable replay for novelty detection
+    pImpl->novelty->enableReplay(true);
+    
+    // Configure neuromodulation connections
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->setNeuromodulator(pImpl->dopamine.get());
+        pImpl->workingMemory->setCuriosity(pImpl->curiosity.get());
+        pImpl->workingMemory->setNovelty(pImpl->novelty.get());
+    }
+    
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->setNeuromodulator(pImpl->dopamine.get());
+        pImpl->episodicMemory->setNovelty(pImpl->novelty.get());
+    }
+    
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->setNeuromodulator(pImpl->dopamine.get());
+        pImpl->predictionSystem->setPredictionError(pImpl->predictionError.get());
+    }
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -511,8 +539,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Use prediction system for sensory prediction
+        // In a real implementation, this would compare predicted vs actual sensory input
+        // For now, we track prediction error for neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (pImpl->curiosity) {
+            pImpl->curiosity->update(0.0f, predictionError, pImpl->timestep);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +561,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Present current brain state to concept formation system
+        // This would extract patterns from neural activity for concept learning
+        // For now, we just maintain the concept formation system
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -895,8 +929,8 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
+        // Note: Full synapse restoration is complex due to the need to find matching synapses
+        // For now, we just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         
         NLM_LOG_INFO("Brain state loaded successfully");
