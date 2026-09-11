@@ -37,12 +37,20 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
     }
 }
 
-float PredictionSystem::getPredictionError() const {
-    return pImpl->predictionError;
+void PredictionSystem::update(float predictionError) {
+    if (predictionError > 0.0f) {
+        pImpl->predictionError = predictionError;
+        pImpl->confidence = std::max(0.0f, 1.0f - predictionError);
+        if (pImpl->confidence > 0.0f) {
+            pImpl->errorHistory.push_back(predictionError);
+        }
+    }
 }
 
-float PredictionSystem::getConfidence() const {
-    return pImpl->confidence;
+void PredictionSystem::updateConfidence(float confidence) {
+    if (confidence > 0.0f && confidence <= 1.0f) {
+        pImpl->confidence = confidence;
+    }
 }
 
 const std::vector<float>& PredictionSystem::getErrorHistory() const {

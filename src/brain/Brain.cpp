@@ -510,9 +510,51 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->sensoryNeurons.size() > 0) {
+        // Create prediction system input from recent sensory activity
+        std::vector<float> sensoryActivity;
+        sensoryActivity.reserve(pImpl->sensoryNeurons.size());
+        
+        // Extract recent sensory activity levels
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            // Convert firing rate to activity level (0-1)
+            float activity = neuron->isFiring() ? 1.0f : 
+                           std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 50.0f;
+            sensoryActivity.push_back(activity);
+        }
+        
+        if (!sensoryActivity.empty()) {
+            // Store current sensory pattern for prediction error calculation
+            if (!pImpl->previousSensoryActivity.empty() && pImpl->predictionSystem) {
+                // Calculate prediction error between last step and current
+                float predictionError = 0.0f;
+                for (size_t i = 0; i < std::min(pImpl->previousSensoryActivity.size(), sensoryActivity.size()); ++i) {
+                    predictionError += std::abs(pImpl->previousSensoryActivity[i] - sensoryActivity[i]);
+                }
+                if (pImpl->previousSensoryActivity.size() > 0) {
+                    predictionError /= pImpl->previousSensoryActivity.size();
+                }
+                
+                // Update prediction error in the system
+                pImpl->predictionSystem->update(predictionError);
+            }
+            
+            // Store current sensory activity for next comparison
+            pImpl->previousSensoryActivity = sensoryActivity;
+            
+            // Update prediction system confidence based on stability
+            if (pImpl->predictionSystem && pImpl->previousSensoryActivity.size() > 0) {
+                float predictionError = 0.0f;
+                for (size_t i = 0; i < std::min(pImpl->previousSensoryActivity.size(), sensoryActivity.size()); ++i) {
+                    predictionError += std::abs(pImpl->previousSensoryActivity[i] - sensoryActivity[i]);
+                }
+                if (pImpl->previousSensoryActivity.size() > 0) {
+                    predictionError /= pImpl->previousSensoryActivity.size();
+                }
+                float stability = 1.0f / (1.0f + predictionError);
+                pImpl->predictionSystem->updateConfidence(stability);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========

@@ -21,6 +21,12 @@ public:
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
+    // Update prediction system state with error and confidence
+    void update(float predictionError);
+    
+    // Update prediction confidence based on stability
+    void updateConfidence(float confidence);
+    
     // Get prediction error
     float getPredictionError() const;
     
@@ -29,6 +35,8 @@ public:
     
     // Get prediction history
     const std::vector<float>& getErrorHistory() const;
+    
+    // Clear history
     void clearHistory();
     
     // Train prediction model
