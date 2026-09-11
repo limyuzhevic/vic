@@ -37,12 +37,21 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_phase2 {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "  - Neuromodulation Integration" << std::endl;
+    std::cout << "  - Memory System Integration" << std::endl;
+    std::cout << "  - Prediction System Integration" << std::endl;
+    std::cout << "  - Development System Integration" << std::endl;
+    std::cout << "  - Complete Brain Loop" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -101,15 +110,14 @@ int main() {
         allPassed = false;
     }
     
-    std::cout << "Running STDP tests..." << std::endl;
+    std::cout << "Running Phase 2 integration tests..." << std::endl;
     try {
-        test_stdp::runAll();
+        test_phase2::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
         allPassed = false;
     }
-    
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
