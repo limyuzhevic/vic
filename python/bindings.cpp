@@ -379,22 +379,33 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
              "Get curiosity level")
         .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
+              "Get novelty level")
         .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
+              "Get prediction error")
         .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
+              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+              py::return_value_policy::reference_internal,
+              "Get the underlying brain instance")
+        .def("getBrainPtr", [](const AgentBrain& self) {
+              auto* brain = self.getBrain();
+              if (!brain) {
+                  throw std::runtime_error("Brain is null");
+              }
+              return brain;
+          }, py::return_value_policy::reference_internal,
+              "Get brain pointer with null safety and explicit naming")
+        .def("hasBrain", [](const AgentBrain& self) {
+              return self.getBrain() != nullptr;
+          }, "Check if brain is present")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)

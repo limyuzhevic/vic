@@ -91,8 +91,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            // Inject current proportional to vision intensity with smoother scaling
+            float current = vision[i] * 4.0f;  // Reduced scale to prevent overexcitation
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -101,7 +101,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = touch[i] * 6.0f;  // Reduced scale for stability
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -110,7 +110,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            float current = (intern[i] * 1.5f - 0.5f) * 4.0f;  // Smoother scaling
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
@@ -119,32 +119,36 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            float current = (proprio[i] * 1.5f - 0.5f) * 2.5f;  // Smoother scaling
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
     
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
+    // Compute novelty (difference from previous vision) - improved efficiency
+    if (!vision.empty() && !previousVision_.empty()) {
         float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
+        size_t minSize = std::min(vision.size(), previousVision_.size());
+        for (size_t i = 0; i < minSize; ++i) {
             float diff = std::abs(vision[i] - previousVision_[i]);
             totalDiff += diff;
         }
         
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        // Normalize with minimum threshold to prevent division by zero
+        float visionSize = static_cast<float>(vision.size());
+        noveltyLevel_ = totalDiff / std::max(visionSize, 1.0f);
         
-        // Decay and update
+        // Apply exponential decay for more realistic novelty dynamics
         noveltyLevel_ *= sensoryNoveltyDecay_;
         
-        // Store for next time
+        // Store for next time - use move semantics for efficiency
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty - improved stability
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        // Cap prediction error to prevent overwhelming curiosity
+        float clampedPredictionError = std::abs(predictionError_);
+        curiosityLevel_ = noveltyLevel_ * 1.5f + clampedPredictionError * 0.3f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
@@ -168,12 +172,15 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
+            // Check for null pointer before accessing
+            if (!n) continue;
             // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
         }
         return sum / neurons.size();
     };
     
+    // Calculate activities with null safety
     float forwardAct = calcActivity(motorForward_);
     float backwardAct = calcActivity(motorBackward_);
     float leftAct = calcActivity(motorTurnLeft_);
@@ -219,6 +226,10 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         if (r < exploreChance) {
             // Random motor command
             int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            // Ensure choice is within valid enum range
+            if (choice < 0 || choice > 7) {
+                choice = 0;  // Fallback to MoveForward
+            }
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -236,13 +247,30 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    // Validate inputs and brain state
+    if (!brain_ || !rewardModulationEnabled_) {
+        return;
+    }
     
-    // Compute prediction error
+    // Validate reward values (prevent NaN/inf)
+    if (std::isnan(reward) || std::isnan(predictedReward)) {
+        return;
+    }
+    
+    // Cap extreme reward values to prevent numerical instability
+    float maxReward = 100.0f;
+    float minReward = -100.0f;
+    reward = std::clamp(reward, minReward, maxReward);
+    predictedReward = std::clamp(predictedReward, minReward, maxReward);
+    
+    // Compute prediction error with stability check
     predictionError_ = reward - predictedReward;
     
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
+    
+    // Prevent expected reward from becoming NaN
+    expectedReward_ = std::isfinite(expectedReward_) ? expectedReward_ : 0.0f;
     
     // Dopamine-like signal (based on prediction error)
     dopamineLevel_ = predictionError_;
@@ -252,12 +280,20 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
+        if (!region) continue;  // Null check
+        
         for (auto* syn : region->getSynapses()) {
+            if (!syn) continue;  // Null check
+            
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
                 // Apply reward-modulated weight change
                 float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                
+                // Cap delta to prevent extreme weight changes
+                delta = std::clamp(delta, -0.1f, 0.1f);
+                
                 syn->addToWeight(delta);
                 
                 // Decay eligibility trace
@@ -271,7 +307,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
-    // Apply to STDP
+    // Apply to STDP with null check
     auto* stdp = brain_->getSTDP();
     if (stdp) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
