@@ -24,6 +24,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
@@ -48,10 +49,19 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Remove leading/trailing whitespace from key
+            key = trim(key);
+            
+            // Skip if key is empty
+            if (key.empty()) {
+                continue;
+            }
+            
             set(key, value, ConfigSource::File);
         }
     }
     
+    NLM_LOG_INFO("Loaded " + std::to_string(pImpl->entries.size()) + " configuration entries from " + filepath);
     return true;
 }
 

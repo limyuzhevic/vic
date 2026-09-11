@@ -260,8 +260,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Use neuron-specific timestep from state (initialized in initializeRandom)
+    // Default to 1ms if not set (LIF dynamics depend on dt)
+    TimestepDuration dt = pImpl->state.leakConductance > 0.0f ? 
+                          1.0f / pImpl->state.leakConductance : 0.001f;
     stepLIF(currentTime, dt);
 }
 
