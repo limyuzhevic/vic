@@ -513,6 +513,108 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        // TODO: Connect actual sensory input to prediction system
+        // Get current sensory observation
+        static std::vector<float> lastSensoryPattern;
+        
+        // For now, use a simple activity pattern from active neurons
+        std::vector<float> currentPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        currentPattern.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+        }
+        
+        // Update prediction system
+        pImpl->predictionSystem->train(currentPattern);
+        
+        // Compare with last pattern for prediction error
+        if (!lastSensoryPattern.empty()) {
+            float error = 0.0f;
+            size_t minSize = std::min(currentPattern.size(), lastSensoryPattern.size());
+            for (size_t i = 0; i < minSize; ++i) {
+                error += std::abs(currentPattern[i] - lastSensoryPattern[i]);
+            }
+            error /= static_cast<float>(minSize > 0 ? minSize : 1);
+            
+            // Use prediction error to modulate neuromodulators
+            if (pImpl->predictionError) {
+                pImpl->predictionError->update(error, pImpl->timestep);
+            }
+            if (pImpl->novelty) {
+                pImpl->novelty->update(error, pImpl->timestep);
+            }
+        }
+        
+        lastSensoryPattern = currentPattern;
+    }
+    
+    // ========== STEP 16: Enhanced neuromodulation integration ==========
+    
+    // Update reward prediction error for learning
+    if (pImpl->dopamine) {
+        // Get reward from world or internal sources
+        float reward = 0.0f;  // Would come from agent/brain loop
+        pImpl->dopamine->updateRewardPredictionError(reward, pImpl->timestep);
+    }
+    
+    // Update curiosity based on prediction errors
+    if (pImpl->curiosity && pImpl->predictionError) {
+        float error = pImpl->predictionError->getCurrentError();
+        pImpl->curiosity->updateExplorationDrive(error, pImpl->timestep);
+    }
+    
+    // Update novelty based on sensory surprises
+    if (pImpl->novelty) {
+        float noveltySignal = pImpl->novelty->updateNovelty(currentPattern, pImpl->timestep);
+        
+        // Novelty affects plasticity and attention
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Novelty modulates neural excitability
+                    neuron->injectCurrent(noveltySignal * 0.2f);
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 17: Enhanced plasticity modulation ==========
+    
+    // Apply neuromodulation to plasticity rules
+    float neuromodulationFactor = 1.0f;
+    if (pImpl->dopamine) {
+        neuromodulationFactor *= pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    if (pImpl->curiosity) {
+        neuromodulationFactor *= pImpl->curiosity->getExplorationFactor();
+    }
+    
+    if (pImpl->novelty) {
+        neuromodulationFactor *= (1.0f + pImpl->novelty->getNoveltyEffect());
+    }
+    
+    // Apply neuromodulation to STDP
+    if (pImpl->stdp) {
+        pImpl->stdp->setModulationFactor(neuromodulationFactor);
+    }
+    
+    // Apply neuromodulation to Hebbian
+    if (pImpl->hebbian) {
+        pImpl->hebbian->setModulationFactor(neuromodulationFactor);
+    }
+    
+    // Update eligibility traces with neuromodulation
+    for (auto& region : pImpl->regions) {
+        for (auto& syn : region->getSynapses()) {
+            syn->updateEligibilityTrace(neuromodulationFactor, pImpl->timestep);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -780,15 +882,15 @@ bool Brain::save(const std::string& filepath) const {
             pImpl->currentTime
         );
         
-        // Write neurons
-        NeuronCheckpointData neuronData;
-        neuronData.membranePotential.reserve(getTotalNeuronCount());
-        neuronData.restingPotential.reserve(getTotalNeuronCount());
-        neuronData.threshold.reserve(getTotalNeuronCount());
-        neuronData.resetPotential.reserve(getTotalNeuronCount());
-        neuronData.leakConductance.reserve(getTotalNeuronCount());
-        
-        for (const auto& region : pImpl->regions) {
+        // Write neurons (organized by regions)
+        for (size_t regionIdx = 0; regionIdx < pImpl->regions.size(); ++regionIdx) {
+            auto* region = pImpl->regions[regionIdx].get();
+            
+            // Write neurons for this region only
+            NeuronCheckpointData neuronData;
+            neuronData.regionId = regionIdx + 1; // Region IDs are 1-based
+            neuronData.populationId = 0; // We'll write per-population later if needed
+            
             for (const auto& pop : region->getPopulations()) {
                 for (const auto* neuron : pop->getNeurons()) {
                     const auto& state = neuron->getState();
@@ -801,18 +903,28 @@ bool Brain::save(const std::string& filepath) const {
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
                     neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    neuronData.neuronType.push_back(static_cast<uint8_t>(pop->getNeuronType()));
+                    neuronData.populationId = pop->getId();
+                }
+            }
+            
+            if (!neuronData.membranePotential.empty()) {
+                if (!writer.writeNeurons(neuronData)) {
+                    NLM_LOG_ERROR("Failed to write neurons to checkpoint for region " + 
+                                std::to_string(regionIdx + 1));
+                    return false;
                 }
             }
         }
         
-        if (!writer.writeNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to write neurons to checkpoint");
-            return false;
-        }
-        
-        // Write synapses
-        SynapseCheckpointData synapseData;
-        for (const auto& region : pImpl->regions) {
+        // Write synapses organized by regions
+        for (size_t regionIdx = 0; regionIdx < pImpl->regions.size(); ++regionIdx) {
+            auto* region = pImpl->regions[regionIdx].get();
+            
+            // Write synapses for this region only
+            SynapseCheckpointData synapseData;
+            synapseData.regionId = regionIdx + 1;
+            
             for (const auto* syn : region->getSynapses()) {
                 synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
                 synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
@@ -820,12 +932,125 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.plasticityFlags = syn->getPlasticityFlags();
+            }
+            
+            if (!synapseData.weight.empty()) {
+                if (!writer.writeSynapses(synapseData)) {
+                    NLM_LOG_ERROR("Failed to write synapses to checkpoint for region " + 
+                                std::to_string(regionIdx + 1));
+                    return false;
+                }
             }
         }
         
-        if (!writer.writeSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to write synapses to checkpoint");
-            return false;
+        // Save integrated systems state
+        
+        // Save working memory
+        if (pImpl->workingMemory) {
+            auto memoryData = pImpl->workingMemory->exportMemoryData();
+            if (!writer.writeWorkingMemory(memoryData)) {
+                NLM_LOG_ERROR("Failed to write working memory to checkpoint");
+            }
+        }
+        
+        // Save episodic memory
+        if (pImpl->episodicMemory) {
+            auto episodeData = pImpl->episodicMemory->exportEpisodeData();
+            if (!writer.writeEpisodicMemory(episodeData)) {
+                NLM_LOG_ERROR("Failed to write episodic memory to checkpoint");
+            }
+        }
+        
+        // Save prediction system
+        if (pImpl->predictionSystem) {
+            auto predictionData = pImpl->predictionSystem->exportPredictionData();
+            if (!writer.writePredictionData(predictionData)) {
+                NLM_LOG_ERROR("Failed to write prediction system to checkpoint");
+            }
+        }
+        
+        // Save cognition systems
+        if (pImpl->planner) {
+            auto plannerData = pImpl->planner->exportPlannerData();
+            if (!writer.writePlannerData(plannerData)) {
+                NLM_LOG_ERROR("Failed to write planner to checkpoint");
+            }
+        }
+        
+        if (pImpl->conceptFormation) {
+            auto conceptData = pImpl->conceptFormation->exportConceptData();
+            if (!writer.writeConceptData(conceptData)) {
+                NLM_LOG_ERROR("Failed to write concept formation to checkpoint");
+            }
+        }
+        
+        if (pImpl->attention) {
+            auto attentionData = pImpl->attention->exportAttentionData();
+            if (!writer.writeAttentionData(attentionData)) {
+                NLM_LOG_ERROR("Failed to write attention system to checkpoint");
+            }
+        }
+        
+        // Save development system
+        if (pImpl->developmentSystem) {
+            auto devData = pImpl->developmentSystem->exportDevelopmentData();
+            if (!writer.writeDevelopmentData(devData)) {
+                NLM_LOG_ERROR("Failed to write development system to checkpoint");
+            }
+        }
+        
+        // Save neuromodulation systems
+        if (pImpl->dopamine) {
+            auto dopamineData = pImpl->dopamine->exportNeuromodulatorData();
+            if (!writer.writeNeuromodulatorData(dopamineData, "dopamine")) {
+                NLM_LOG_ERROR("Failed to write dopamine to checkpoint");
+            }
+        }
+        
+        if (pImpl->curiosity) {
+            auto curiosityData = pImpl->curiosity->exportNeuromodulatorData();
+            if (!writer.writeNeuromodulatorData(curiosityData, "curiosity")) {
+                NLM_LOG_ERROR("Failed to write curiosity to checkpoint");
+            }
+        }
+        
+        if (pImpl->novelty) {
+            auto noveltyData = pImpl->novelty->exportNeuromodulatorData();
+            if (!writer.writeNeuromodulatorData(noveltyData, "novelty")) {
+                NLM_LOG_ERROR("Failed to write novelty to checkpoint");
+            }
+        }
+        
+        if (pImpl->predictionError) {
+            auto errorData = pImpl->predictionError->exportNeuromodulatorData();
+            if (!writer.writeNeuromodulatorData(errorData, "prediction_error")) {
+                NLM_LOG_ERROR("Failed to write prediction error to checkpoint");
+            }
+        }
+        
+        // Save structural plasticity parameters
+        if (pImpl->structuralPlasticity) {
+            auto structData = pImpl->structuralPlasticity->exportPlasticityData();
+            if (!writer.writeStructuralPlasticityData(structData)) {
+                NLM_LOG_ERROR("Failed to write structural plasticity to checkpoint");
+            }
+        }
+        
+        // Save development parameters
+        if (pImpl->developmentSystem) {
+            auto devParams = pImpl->developmentSystem->exportDevelopmentParameters();
+            if (!writer.writeDevelopmentParameters(devParams)) {
+                NLM_LOG_ERROR("Failed to write development parameters to checkpoint");
+            }
+        }
+        
+        // Save development state
+        if (pImpl->developmentSystem) {
+            auto devState = pImpl->developmentSystem->exportDevelopmentState();
+            if (!writer.writeDevelopmentState(devState)) {
+                NLM_LOG_ERROR("Failed to write development state to checkpoint");
+            }
         }
         
         // Finalize
