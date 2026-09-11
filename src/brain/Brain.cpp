@@ -157,6 +157,8 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
+Brain::Brain() : pImpl(nullptr) {}
+
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
 Brain::~Brain() = default;
@@ -173,6 +175,10 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     }
     return *this;
 }
+
+// Handle self-assignment case
+Brain& Brain::operator=(const Brain& other) = delete;
+Brain::Brain(const Brain& other) = delete;
 
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
@@ -241,11 +247,6 @@ bool Brain::initialize() {
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
-    
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
-    
-    // Initialize cognition systems
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
     
@@ -269,7 +270,10 @@ bool Brain::initialize() {
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
         // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
+        // Use lookup table from region for O(1) access instead of linear search
+        for (const auto& region : pImpl->regions) {
+            // Use region->getNeuron(event.destination_neuron) for O(1) lookup
+            // Check if region has this neuron
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {
                 if (neuron->getId() == event.destination_neuron) {

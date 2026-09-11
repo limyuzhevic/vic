@@ -50,6 +50,9 @@ struct InterRegionConnection {
 
 class Brain {
 public:
+    // Default constructor
+    Brain();
+    
     // Create brain with configuration
     explicit Brain(std::shared_ptr<Config> config);
     

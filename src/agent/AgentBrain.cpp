@@ -132,10 +132,14 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             totalDiff += diff;
         }
         
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        // Normalize first, then decay
+        if (vision.size() > 0) {
+            noveltyLevel_ = totalDiff / static_cast<float>(vision.size());
+        } else {
+            noveltyLevel_ = 0.0f;
+        }
         
-        // Decay and update
+        // Apply decay
         noveltyLevel_ *= sensoryNoveltyDecay_;
         
         // Store for next time
