@@ -95,23 +95,41 @@ NLM/
 │   ├── EXPERIMENTS.md
 │   ├── LIMITATIONS.md
 │   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+├── python/                         # Python bindings
+│   └── bindings.cpp
 ├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+│   ├── core/
+│   │   ├── Config/               # Core utilities
+│   │   ├── Logger/              # Logging system
+│   │   ├── Random/              # Random number generation
+│   │   ├── SimulationClock/     # Time management
+│   │   └── Types/               # Type definitions
+│   ├── brain/                    # Neural components (integrated)
+│   │   ├── Brain.cpp
+│   │   ├── Neuron.cpp
+│   │   ├── Synapse.cpp
+│   │   ├── NeuralPopulation.cpp
+│   │   └── NeuralRegion.cpp
+│   ├── agent/                    # Agent system
+│   │   ├── AgentBrain.cpp
+│   │   ├── SensoryPercept.cpp
+│   │   └── AgentBody.cpp
+│   ├── world/                    # World simulation
+│   │   └── SimpleWorld.cpp
+│   ├── environment/              # Environment interface
+│   ├── sensory/                  # Sensory processing
+│   ├── motor/                    # Motor system
+│   ├── plasticity/               # Plasticity rules
+│   ├── development/              # Developmental system
+│   ├── neuromodulation/          # Neuromodulators (integrated)
+│   ├── memory/                   # Memory systems (integrated)
+│   ├── prediction/                # Prediction systems (integrated)
+│   ├── cognition/                # Cognitive mechanisms (integrated)
+│   └── experiments/              # Experiment framework
+├── tests/                        # Unit tests
+├── configs/                      # Configuration files
+└── python/                        # Python bindings
+    └── bindings.cpp
 ```
 
 ## Phase Summary
