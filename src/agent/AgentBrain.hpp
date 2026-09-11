@@ -58,16 +58,50 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+// Helper functions for Neuron distribution
+    void distributeMotorNeurons();
+    void distributeSensoryNeurons();
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Configuration for sensory scaling
+    void setVisionScale(float scale) { visionScale_ = scale; }
+    void setTouchScale(float scale) { touchScale_ = scale; }
+    void setInternalScale(float scale) { internalScale_ = scale; }
+    void setProprioceptionScale(float scale) { proprioceptionScale_ = scale; }
+    
+    // Configuration for curiosity/exploration
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = threshold; }
+    void setExplorationRate(float rate) { explorationRate_ = rate; }
+    
+    // Configuration for novelty detection
+    void setNoveltyThreshold(float threshold) { noveltyThreshold_ = threshold; }
+    void setNoveltyDecay(float decay) { noveltyDecay_ = decay; }
+    
+    // Get current configuration values
+    float getVisionScale() const { return visionScale_; }
+    float getTouchScale() const { return touchScale_; }
+    float getInternalScale() const { return internalScale_; }
+    float getProprioceptionScale() const { return proprioceptionScale_; }
+    float getCuriosityThreshold() const { return curiosityThreshold_; }
+    float getExplorationRate() const { return explorationRate_; }
+    float getNoveltyThreshold() const { return noveltyThreshold_; }
+    float getNoveltyDecay() const { return noveltyDecay_; }
+    
+    // Statistics and debugging
+    size_t getMotorForwardCount() const { return motorForward_.size(); }
+    size_t getMotorBackwardCount() const { return motorBackward_.size(); }
+    size_t getMotorTurnLeftCount() const { return motorTurnLeft_.size(); }
+    size_t getMotorTurnRightCount() const { return motorTurnRight_.size(); }
+    size_t getMotorInteractCount() const { return motorInteract_.size(); }
+    size_t getMotorWaitCount() const { return motorWait_.size(); }
+    
+    size_t getVisionSensoryCount() const { return sensoryVision_.size(); }
+    size_t getTouchSensoryCount() const { return sensoryTouch_.size(); }
+    size_t getInternalSensoryCount() const { return sensoryInternal_.size(); }
+    size_t getProprioceptionSensoryCount() const { return sensoryProprioception_.size(); }
+    
+    // Validation methods
+    bool validateNeuronPointers() const;
+    bool validateBrainConnectivity() const;
     
 private:
     // Motor decoding: convert neural activity to motor command
