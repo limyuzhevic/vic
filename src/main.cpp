@@ -349,7 +349,10 @@ int main(int argc, char** argv) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
+                size_t equalsPos = arg.find('=');
+                if (equalsPos + 1 < arg.length()) {
+                    configFile = arg.substr(equalsPos + 1);
+                }
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
