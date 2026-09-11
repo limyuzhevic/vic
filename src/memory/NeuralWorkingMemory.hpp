@@ -62,6 +62,9 @@ public:
     // Get neurons currently in working memory
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
 
+    // Get current activity levels (for prediction system)
+    const std::vector<float>& getCurrentActivity() const { return memoryActivations_; }
+
     // Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);
 

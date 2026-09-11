@@ -29,6 +29,10 @@ void NeuralEpisodicMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralEpisodicMemory initialized");
+    
+    // Create additional member variables that were missing
+    episodes_.clear();
+    pImpl->episodeNeurons.clear();
 }
 
 void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {

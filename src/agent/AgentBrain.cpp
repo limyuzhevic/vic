@@ -87,13 +87,14 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
-    const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+    // Check if we have suitable sensory neurons in the brain
+    if (!sensoryVision_.empty()) {
+        for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+            if (sensoryVision_[i]) {
+                // Inject current proportional to vision intensity
+                float current = vision[i] * 5.0f;  // Scale factor
+                sensoryVision_[i]->injectCurrent(current);
+            }
         }
     }
     

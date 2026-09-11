@@ -1,35 +1,65 @@
 #include "InternalSignals.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <algorithm>
 
 namespace nlm {
 
-struct InternalSignalsProcessor::Impl {
-    std::vector<float> processedSignals;
-    std::vector<float> homeostaticSignals;
+struct InternalSignals::Impl {
+    std::vector<float> signals;
     
     Impl() = default;
 };
 
-InternalSignalsProcessor::InternalSignalsProcessor() : pImpl(new Impl) {}
-
-InternalSignalsProcessor::~InternalSignalsProcessor() = default;
-
-void InternalSignalsProcessor::process(const InternalSignals& signals) {
-    // TODO PHASE 2: Implement real internal signal processing
-    // PLACEHOLDER: Just pass through
-    pImpl->processedSignals = signals.getData();
-    
-    // Generate some homeostatic signals
-    pImpl->homeostaticSignals.clear();
-    pImpl->homeostaticSignals.push_back(1.0f);  // Allostatic load
-    pImpl->homeostaticSignals.push_back(0.5f);  // Metabolic state
+InternalSignals::InternalSignals() : pImpl(new Impl) {
+    timestamp_ = 0.0;
 }
 
-const std::vector<float>& InternalSignalsProcessor::getProcessedSignals() const {
-    return pImpl->processedSignals;
+InternalSignals::~InternalSignals() = default;
+
+const char* InternalSignals::getType() const {
+    return "InternalSignals";
 }
 
-const std::vector<float>& InternalSignalsProcessor::getHomeostaticSignals() const {
-    return pImpl->homeostaticSignals;
+const std::vector<float>& InternalSignals::getData() const {
+    return pImpl->signals;
+}
+
+size_t InternalSignals::getDimensions() const {
+    return pImpl->signals.size();
+}
+
+double InternalSignals::getTimestamp() const {
+    return timestamp_;
+}
+
+void InternalSignals::setTimestamp(double timestamp) {
+    timestamp_ = timestamp;
+}
+
+std::unique_ptr<SensoryInput> InternalSignals::clone() const {
+    auto cloned = std::make_unique<InternalSignals>();
+    cloned->pImpl->signals = pImpl->signals;
+    cloned->timestamp_ = timestamp_;
+    return cloned;
+}
+
+void InternalSignals::addSignal(float value) {
+    pImpl->signals.push_back(value);
+}
+
+void InternalSignals::clearSignals() {
+    pImpl->signals.clear();
+}
+
+size_t InternalSignals::getSignalCount() const {
+    return pImpl->signals.size();
+}
+
+float InternalSignals::getSignal(size_t index) const {
+    if (index < pImpl->signals.size()) {
+        return pImpl->signals[index];
+    }
+    return 0.0f;
 }
 
 } // namespace nlm

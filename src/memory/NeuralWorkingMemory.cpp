@@ -36,37 +36,52 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    // Clear and reinitialize memory with new pattern
+    memoryNeurons_.clear();
+    memoryActivations_.clear();
+    memoryTimestamps_.clear();
+    activeTraces_.clear();
+    pImpl->maintenanceSynapses.clear();
+    winners_.clear();
     
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
-        
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
+    // Find neurons to encode this pattern - scan all regions for suitable neurons
+    std::vector<NeuronId> allAvailableNeurons;
+    for (const auto& region : brain_->getRegions()) {
+        for (const auto& pop : region->getPopulations()) {
+            for (Neuron* neuron : pop->getNeurons()) {
+                allAvailableNeurons.push_back(neuron->getId());
             }
         }
-        
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
-        }
     }
     
-    // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+    if (allAvailableNeurons.empty()) return;
+    
+    // Select neurons proportional to pattern strength
+    size_t neuronsToActivate = std::min(pattern.size(), std::min(allAvailableNeurons.size(), 
+                              static_cast<size_t>(capacity_ * 0.5f)));
+    
+    for (size_t i = 0; i < neuronsToActivate; ++i) {
+        NeuronId neuron = allAvailableNeurons[i % allAvailableNeurons.size()];
+        float activation = pattern[i % pattern.size()] * strength;
+        
+        memoryNeurons_.push_back(neuron);
+        memoryActivations_.push_back(activation);
+        memoryTimestamps_.push_back(0);
+        
+        // Inject current to activate the neuron
+        brain_->injectCurrent(neuron, activation * 5.0f);
+        
+        // Mark as active trace
+        activeTraces_.push_back(i);
+    }
+    
+    // Create maintenance connections for memory stability
+    for (size_t i = 1; i < memoryNeurons_.size() && i < 3; ++i) {
         createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
     }
+    
+    // Run competition to select winning neurons
+    runCompetition();
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
@@ -78,9 +93,13 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
     } else if (memoryNeurons_.size() < capacity_) {
+        // Add to memory if there's capacity
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        
+        // Add to active traces
+        activeTraces_.push_back(memoryNeurons_.size() - 1);
     }
     
     // Inject current to maintain activation
@@ -116,19 +135,19 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
     
-    // Update maintenance - reinforce active memory neurons
+    // Update maintenance - strengthen active memory neurons
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         NeuronId neuron = memoryNeurons_[i];
         float activation = memoryActivations_[i];
         
         if (activation > 0.1f) {
-            // Inject maintenance current
+            // Inject maintenance current to sustain activity
             brain_->injectCurrent(neuron, activation * 2.0f);
             
-            // Age the trace
+            // Age the trace for decay calculation
             memoryTimestamps_[i]++;
             
-            // Check if trace is too old
+            // Apply decay for old traces
             if (memoryTimestamps_[i] > 1000) {
                 activation *= (1.0f - decayRate_);
             }
@@ -137,10 +156,10 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         }
     }
     
-    // Decay weak traces
+    // Decay weak traces over time
     decayWeakTraces();
     
-    // Run competition to select winners
+    // Run competition to select winning memory traces
     runCompetition();
 }
 
