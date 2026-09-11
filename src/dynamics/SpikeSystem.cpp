@@ -60,20 +60,24 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         detailed.timestamp = event.timestamp;
         detailed.step = event.step;
         
-        // Add to history
-        pImpl->spikeHistory.push_back(detailed);
+        // Add to history with bounds checking
+        if (pImpl->spikeHistory.size() < pImpl->maxHistorySize) {
+            pImpl->spikeHistory.push_back(detailed);
+        }
         
         // Track spike count per neuron
         pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
         
         // Trim history if needed
-        if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
+        while (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
             pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
         }
         
-        // Call handlers
+        // Call handlers with null checks
         for (auto& handler : pImpl->handlers) {
-            handler(detailed);
+            if (handler) {
+                handler(detailed);
+            }
         }
     }
 }
@@ -86,7 +90,9 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
         for (const auto& delayedEvent : it->second) {
             // Call delayed spike handlers (these will deliver synaptic input)
             for (auto& handler : pImpl->delayedHandlers) {
-                handler(delayedEvent);
+                if (handler) {
+                    handler(delayedEvent);
+                }
             }
         }
         // Remove processed spikes

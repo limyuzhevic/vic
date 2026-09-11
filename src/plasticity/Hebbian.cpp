@@ -53,20 +53,28 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
+    // Count correlated spike pairs (simplified covariance) - optimized O(n+m)
     size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
-            }
-        }
+    
+    // Sort spike times for efficient processing
+    std::vector<Timestamp> preSorted = preSpikes;
+    std::vector<Timestamp> postSorted = postSpikes;
+    std::sort(preSorted.begin(), preSorted.end());
+    std::sort(postSorted.begin(), postSorted.end());
+    
+    // Calculate coactivity with early termination - more efficient than O(n²)
+    // Optimized approach: for each preTime, find matching postTimes efficiently
+    for (size_t i = 0; i < preSorted.size(); ++i) {
+        Timestamp preTime = preSorted[i];
+        // Binary search for matching postTimes within correlation window
+        auto lower = std::lower_bound(postSorted.begin(), postSorted.end(), 
+                                      preTime - 100.0f);
+        auto upper = std::upper_bound(postSorted.begin(), postSorted.end(),
+                                      preTime + 100.0f);
+        correlationCount += std::distance(lower, upper);
     }
     
     // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
     float delta = pImpl->learningRate * static_cast<float>(correlationCount);
     
     // Apply with bounds

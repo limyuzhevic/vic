@@ -80,7 +80,13 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
+        , rng(std::make_unique<RandomGenerator>([cfg]() {
+            uint64_t seed = 42;  // Default seed
+            if (auto seedOpt = cfg->get<uint64_t>("random_seed")) {
+                seed = *seedOpt;
+            }
+            return seed;
+        }()))
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -92,19 +98,47 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , workingMemory(nullptr)
+        , episodicMemory(nullptr)
+        , associativeMemory(nullptr)
+        , predictionSystem(nullptr)
+        , planner(nullptr)
+        , conceptFormation(nullptr)
+        , attention(nullptr)
+        , developmentSystem(nullptr)
+        , dopamine(nullptr)
+        , curiosity(nullptr)
+        , predictionError(nullptr)
+        , novelty(nullptr)
+        , spikeSystem(std::make_unique<SpikeSystem>())
+        , stdp(std::make_unique<STDP>())
+        , hebbian(std::make_unique<Hebbian>())
+        , structuralPlasticity(std::make_unique<StructuralPlasticity>())
+        , checkpointManager(nullptr)
     {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
+        // Validate configuration and initialize systems
+        if (!config) {
+            NLM_LOG_ERROR("Configuration is null in Brain::Impl constructor");
+            return;
         }
-        rng = std::make_unique<RandomGenerator>(seed);
         
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
+        // Validate plasticity systems were created successfully
+        if (!spikeSystem) {
+            NLM_LOG_ERROR("Failed to initialize SpikeSystem");
+            return;
+        }
+        if (!stdp) {
+            NLM_LOG_ERROR("Failed to initialize STDP");
+            return;
+        }
+        if (!hebbian) {
+            NLM_LOG_ERROR("Failed to initialize Hebbian");
+            return;
+        }
+        if (!structuralPlasticity) {
+            NLM_LOG_ERROR("Failed to initialize StructuralPlasticity");
+            return;
+        }
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
@@ -113,16 +147,52 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
+        // Validate memory systems
+        if (!workingMemory) {
+            NLM_LOG_ERROR("Failed to initialize NeuralWorkingMemory");
+            return;
+        }
+        if (!episodicMemory) {
+            NLM_LOG_ERROR("Failed to initialize NeuralEpisodicMemory");
+            return;
+        }
+        if (!associativeMemory) {
+            NLM_LOG_ERROR("Failed to initialize NeuralAssociativeMemory");
+            return;
+        }
+        
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
+        if (!predictionSystem) {
+            NLM_LOG_ERROR("Failed to initialize PredictionSystem");
+            return;
+        }
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
+        // Validate cognition systems
+        if (!planner) {
+            NLM_LOG_ERROR("Failed to initialize NeuralPlanner");
+            return;
+        }
+        if (!conceptFormation) {
+            NLM_LOG_ERROR("Failed to initialize ConceptFormation");
+            return;
+        }
+        if (!attention) {
+            NLM_LOG_ERROR("Failed to initialize AttentionalSelection");
+            return;
+        }
+        
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
+        if (!developmentSystem) {
+            NLM_LOG_ERROR("Failed to initialize DevelopmentSystem");
+            return;
+        }
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
@@ -130,27 +200,70 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        // Validate neuromodulation systems
+        if (!dopamine) {
+            NLM_LOG_ERROR("Failed to initialize Dopamine");
+            return;
+        }
+        if (!curiosity) {
+            NLM_LOG_ERROR("Failed to initialize Curiosity");
+            return;
+        }
+        if (!predictionError) {
+            NLM_LOG_ERROR("Failed to initialize PredictionError");
+            return;
+        }
+        if (!novelty) {
+            NLM_LOG_ERROR("Failed to initialize Novelty");
+            return;
+        }
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        if (!checkpointManager) {
+            NLM_LOG_ERROR("Failed to initialize CheckpointManager");
+            return;
+        }
+        
+        // Configure STDP parameters with validation
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        
+        if (stdp) {
+            stdp->configure(ltpWeight, ltdWeight, tau);
+        }
+        
+        // Configure structural plasticity with validation
+        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        if (structuralPlasticity) {
+            structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+            structuralPlasticity->setPruningRate(pruningRate);
+        }
+        
+        // Get timestep with validation
+        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        if (timestep <= 0.0) {
+            NLM_LOG_WARNING("Invalid timestep, using default 0.001");
+            timestep = 0.001;
+        }
+        
+        // Get integration intervals from config with validation
+        replayInterval = config->getOr<size_t>("replay_interval", 100);
+        if (replayInterval == 0) {
+            NLM_LOG_WARNING("Invalid replay interval, using default 100");
+            replayInterval = 100;
+        }
+        
+        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        if (consolidationInterval == 0) {
+            NLM_LOG_WARNING("Invalid consolidation interval, using default 1000");
+            consolidationInterval = 1000;
+        }
+        
+        NLM_LOG_INFO("Brain initialized successfully with " + std::to_string(neuronCount) + 
+                    " neurons and " + std::to_string(regionCount) + " regions");
     }
     
     DevelopmentalStage developmentalStage;
@@ -231,64 +344,109 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    // Initialize working memory with null check
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    } else {
+        NLM_LOG_ERROR("Working memory not initialized");
+    }
     
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    // Initialize episodic memory with null check
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    } else {
+        NLM_LOG_ERROR("Episodic memory not initialized");
+    }
     
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    // Initialize associative memory with null check
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Associative memory not initialized");
+    }
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // Initialize prediction system with null check
+    if (pImpl->predictionSystem) {
+        // (PredictionSystem doesn't have initialize method currently)
+    } else {
+        NLM_LOG_ERROR("Prediction system not initialized");
+    }
     
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    // Initialize cognition systems with null checks
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+    } else {
+        NLM_LOG_ERROR("Planner not initialized");
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Concept formation not initialized");
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+    } else {
+        NLM_LOG_ERROR("Attention system not initialized");
+    }
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    // Initialize neuromodulation with null checks
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Novelty system not initialized");
+    }
     
-    // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
+    if (pImpl->curiosity) {
+        pImpl->curiosity->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Curiosity system not initialized");
+    }
     
-    // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
+    // Register spike handlers with null check
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+            // Count spikes
+            ++pImpl->totalSpikesThisStep;
+            ++pImpl->totalSpikesTotal;
+        });
+        
+        // Register delayed spike handler to deliver synaptic input
+        pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+            // Find destination neuron and deliver synaptic input
+            for (auto& region : pImpl->regions) {
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron->getId() == event.destination_neuron) {
+                        // Apply synaptic weight as current
+                        MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                        if (event.is_excitatory) {
+                            neuron->receiveExcitatoryInput(synapticCurrent);
+                        } else {
+                            neuron->receiveInhibitoryInput(-synapticCurrent);
+                        }
+                        return;
                     }
-                    return;
                 }
             }
-        }
-    });
+        });
+    } else {
+        NLM_LOG_ERROR("Spike system not initialized");
+    }
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    // Configure checkpoint manager with null check
+    if (pImpl->checkpointManager) {
+        std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    } else {
+        NLM_LOG_ERROR("Checkpoint manager not initialized");
+    }
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));

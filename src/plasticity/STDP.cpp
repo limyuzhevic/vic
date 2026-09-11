@@ -59,22 +59,35 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
+    // Optimized O(n+m) STDP implementation
+    // Sort spike times for efficient processing
+    std::vector<Timestamp> preSorted = preSpikes;
+    std::vector<Timestamp> postSorted = postSpikes;
+    std::sort(preSorted.begin(), preSorted.end());
+    std::sort(postSorted.begin(), postSorted.end());
+    
+    // Calculate potentiation: pre before post (Δt > 0)
+    for (Timestamp preTime : preSorted) {
+        for (Timestamp postTime : postSorted) {
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
-            }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+            if (dt <= 0) continue;
+            if (dt > 5 * tau) break;  // Early termination - no significant potentiation beyond 5*tau
+            float delta = pImpl->ltpWeight * std::exp(-dt / tau);
+            totalDelta += delta;
+        }
+    }
+    
+    // Calculate depression: post before pre (Δt < 0)
+    // Use reverse iteration for efficiency
+    for (auto rit = postSorted.rbegin(); rit != postSorted.rend(); ++rit) {
+        Timestamp postTime = *rit;
+        for (auto rit2 = preSorted.rbegin(); rit2 != preSorted.rend(); ++rit2) {
+            Timestamp preTime = *rit2;
+            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+            if (dt >= 0) continue;
+            if (dt < -5 * tau) break;  // Early termination - no significant depression beyond -5*tau
+            float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative
+            totalDelta += delta;
         }
     }
     

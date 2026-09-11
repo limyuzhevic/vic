@@ -400,26 +400,272 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Batch operations for efficiency
+    m.def("initializeBrain", &nlm::initializeBrain,
+         py::arg("config"),
+         "Initialize a brain with configuration and return initialized brain object");
+    
+    // Enhanced batch processing
+    m.def("stepBrains", &nlm::stepBrains,
+         py::arg("brains"),
+         py::arg("step"),
+         "Perform a simulation step on multiple brains simultaneously");
+    
+    // Batch sensory input
+    m.def("receiveSensoryInputs", &nlm::receiveSensoryInputs,
+         py::arg("brain"),
+         py::arg("inputs"),
+         "Inject multiple sensory inputs into brain");
+    
+    // Batch action production
+    m.def("produceActions", &nlm::produceActions,
+         py::arg("brains"),
+         "Produce actions from multiple brains");
+    
+    // Memory system batch operations
+    m.def("batchMemoryUpdate", &nlm::batchMemoryUpdate,
+         py::arg("brain"),
+         py::arg("step"),
+         "Update working memory for all neurons in batch");
+    
+    // Network analysis functions
+    m.def("analyzeNetworkConnectivity", &nlm::analyzeNetworkConnectivity,
+         py::arg("brain"),
+         py::arg("threshold"),
+         "Analyze network connectivity and return connected components");
+    
+    m.def("calculateCommunityStructure", &nlm::calculateCommunityStructure,
+         py::arg("brain"),
+         "Detect communities in the neural network using graph clustering");
+    
+    // Visualization support
+    m.def("getNetworkAdjacencyMatrix", &nlm::getNetworkAdjacencyMatrix,
+         py::arg("brain"),
+         "Generate adjacency matrix for network visualization");
+    
+    m.def("getNeuronActivations", &nlm::getNeuronActivations,
+         py::arg("brain"),
+         "Get current neuron activations for visualization");
+    
+    // Advanced plasticity operations
+    m.def("batchSTDPUpdate", &nlm::batchSTDPUpdate,
+         py::arg("brain"),
+         py::arg("synapses"),
+         py::arg("preEvents"),
+         py::arg("postEvents"),
+         "Perform batch STDP update on multiple synapses");
+    
+    m.def("batchHebbianUpdate", &nlm::batchHebbianUpdate,
+         py::arg("brain"),
+         py::arg("synapses"),
+         py::arg("preEvents"),
+         py::arg("postEvents"),
+         "Perform batch Hebbian update on multiple synapses");
+    
+    // Development batch operations
+    m.def("developBrains", &nlm::developBrains,
+         py::arg("brains"),
+         py::arg("steps"),
+         "Perform development updates on multiple brains");
+    
+    // Checkpoint batch operations
+    m.def("saveBrainState", &nlm::saveBrainState,
+         py::arg("brain"),
+         py::arg("filepath"),
+         "Save brain state to file with compression");
+    
+    m.def("loadBrainState", &nlm::loadBrainState,
+         py::arg("brain"),
+         py::arg("filepath"),
+         "Load brain state from file with validation");
+    
+    // Statistics and analytics
+    m.def("computeGlobalStatistics", &nlm::computeGlobalStatistics,
+         py::arg("brain"),
+         "Compute global statistics across the entire brain network");
+    
+    m.def("analyzeFiringPatterns", &nlm::analyzeFiringPatterns,
+         py::arg("brain"),
+         py::arg("window"),
+         "Analyze firing patterns over time window");
+    
+    // Simulation control
+    m.def("runSimulation", &nlm::runSimulation,
+         py::arg("brain"),
+         py::arg("steps"),
+         py::arg("sensoryInputs"),
+         "Run complete simulation with sensory inputs");
+    
+    m.def("runBatchSimulation", &nlm::runBatchSimulation,
+         py::arg("brains"),
+         py::arg("steps"),
+         py::arg("inputSequences"),
+         "Run simulation on multiple brains in parallel");
+    
+    // neuromodulation batch operations
+    m.def("applyRewardModulation", &nlm::applyRewardModulation,
+         py::arg("brain"),
+         py::arg("reward"),
+         py::arg("predictedReward"),
+         "Apply reward modulation to brain");
+    
+    m.def("batchApplyNeuromodulation", &nlm::batchApplyNeuromodulation,
+         py::arg("brains"),
+         py::arg("modulationLevels"),
+         "Apply neuromodulation to multiple brains");
+    
+    // Utility functions for advanced usage
+    m.def("createConfigWithDefaults", &nlm::createConfigWithDefaults,
+         "Create configuration with optimized defaults for research");
+    
+    m.def("validateBrainConfiguration", &nlm::validateBrainConfiguration,
+         py::arg("config"),
+         "Validate configuration and return list of issues");
+    
+    m.def("benchmarkBrainOperations", &nlm::benchmarkBrainOperations,
+         py::arg("brain"),
+         py::arg("operation"),
+         py::arg("iterations"),
+         "Benchmark brain operations performance");
+    
+    // Network utility functions
+    m.def("findShortestPath", &nlm::findShortestPath,
+         py::arg("brain"),
+         py::arg("source"),
+         py::arg("target"),
+         "Find shortest path between neurons in network");
+    
+    m.def("computeNetworkDiameter", &nlm::computeNetworkDiameter,
+         py::arg("brain"),
+         "Compute network diameter (longest shortest path)");
+    
+    m.def("getNetworkClusteringCoefficient", &nlm::getNetworkClusteringCoefficient,
+         py::arg("brain"),
+         "Compute network clustering coefficient");
+    
+    m.def("detectNetworkHubNodes", &nlm::detectNetworkHubNodes,
+         py::arg("brain"),
+         py::arg("threshold"),
+         "Detect hub nodes in network based on degree");
+    
+    // Memory and learning analysis
+    m.def("analyzeMemoryRetention", &nlm::analyzeMemoryRetention,
+         py::arg("brain"),
+         "Analyze memory retention and consolidation patterns");
+    
+    m.def("evaluateLearningRate", &nlm::evaluateLearningRate,
+         py::arg("brain"),
+         "Evaluate learning rate adaptation over time");
+    
+    m.def("analyzePlasticityBalance", &nlm::analyzePlasticityBalance,
+         py::arg("brain"),
+         "Analyze balance between potentiation and depression");
+    
+    // Visualization and export
+    m.def("exportNetworkGraphML", &nlm::exportNetworkGraphML,
+         py::arg("brain"),
+         py::arg("filepath"),
+         "Export network as GraphML for visualization tools");
+    
+    m.def("exportNeuralDataCSV", &nlm::exportNeuralDataCSV,
+         py::arg("brain"),
+         py::arg("filepath"),
+         "Export neural data in CSV format for analysis");
+    
+    m.def("generateVisualizationData", &nlm::generateVisualizationData,
+         py::arg("brain"),
+         "Generate comprehensive visualization data structure");
+    
+    // Specialized analysis functions
+    m.def("analyzeCriticalPeriods", &nlm::analyzeCriticalPeriods,
+         py::arg("brain"),
+         "Analyze critical period development");
+    
+    m.def("evaluateCuriosityDrivenLearning", &nlm::evaluateCuriosityDrivenLearning,
+         py::arg("brain"),
+         "Evaluate curiosity-driven learning efficiency");
+    
+    m.def("analyzePredictionError", &nlm::analyzePredictionError,
+         py::arg("brain"),
+         "Analyze prediction error statistics");
+    
+    m.def("computeNoveltyDetection", &nlm::computeNoveltyDetection,
+         py::arg("brain"),
+         "Compute novelty detection metrics");
+    
+    m.def("analyzeStructuralPlasticity", &nlm::analyzeStructuralPlasticity,
+         py::arg("brain"),
+         "Analyze structural plasticity events");
+    
+    // System optimization and tuning
+    m.def("tunePlasticityParameters", &nlm::tunePlasticityParameters,
+         py::arg("brain"),
+         py::arg("targetPerformance"),
+         "Automatically tune plasticity parameters for target performance");
+    
+    m.def("optimizeSimulationSpeed", &nlm::optimizeSimulationSpeed,
+         py::arg("brain"),
+         "Optimize simulation settings for maximum speed");
+    
+    m.def("profileBrainPerformance", &nlm::profileBrainPerformance,
+         py::arg("brain"),
+         "Profile brain performance and identify bottlenecks");
+    
+    // Research utilities
+    m.def("reproduceExperiment", &nlm::reproduceExperiment,
+         py::arg("experimentConfig"),
+         "Reproduce a specific experiment configuration");
+    
+    m.def("analyzeExperimentResults", &nlm::analyzeExperimentResults,
+         py::arg("brain"),
+         py::arg("experimentName"),
+         "Analyze results from a specific experiment");
+    
+    m.def("createResearchDataset", &nlm::createResearchDataset,
+         py::arg("brain"),
+         py::arg("numSamples"),
+         "Create research dataset from brain simulations");
+    
+    // Integration with external tools
+    m.def("exportForMATLAB", &nlm::exportForMATLAB,
+         py::arg("brain"),
+         py::arg("filename"),
+         "Export brain data for MATLAB integration");
+    
+    m.def("exportForNeuroML", &nlm::exportForNeuroML,
+         py::arg("brain"),
+         py::arg("filename"),
+         "Export brain model in NeuroML format");
+    
+    m.def("importFromHDF5", &nlm::importFromHDF5,
+         py::arg("brain"),
+         py::arg("filename"),
+         "Import brain data from HDF5 file");
+    
+    m.def("exportToHDF5", &nlm::exportToHDF5,
+         py::arg("brain"),
+         py::arg("filename"),
+         "Export brain data to HDF5 format");
+    
+    // Advanced debugging and analysis
+    m.def("getDetailedSpikeHistory", &nlm::getDetailedSpikeHistory,
+         py::arg("brain"),
+         "Get detailed spike history with metadata");
+    
+    m.def("analyzeSynapticDynamics", &nlm::analyzeSynapticDynamics,
+         py::arg("brain"),
+         "Analyze synaptic dynamics over time");
+    
+    m.def("computeInformationFlow", &nlm::computeInformationFlow,
+         py::arg("brain"),
+         "Compute information flow through network");
+    
+    m.def("analyzeMemoryEncoding", &nlm::analyzeMemoryEncoding,
+         py::arg("brain"),
+         "Analyze memory encoding efficiency");
+    
+    m.def("evaluatePredictiveCoding", &nlm::evaluatePredictiveCoding,
+         py::arg("brain"),
+         "Evaluate predictive coding performance");
 
 } // namespace nlm
