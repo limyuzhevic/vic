@@ -1020,6 +1020,9 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->update(pImpl->timestep);
+    }
     return pImpl->predictionSystem.get();
 }
 
