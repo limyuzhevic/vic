@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <limits>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -37,11 +40,38 @@ struct ConfigEntry {
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    std::string type;  // JSON type string (optional)
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description(), type() {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "", const std::string& t = "")
+        : key(k), value(v), source(s), description(desc), type(t) {}
 };
+
+// Configuration schema definition
+struct ConfigSchemaEntry {
+    std::string key;
+    std::string type;  // "int", "double", "bool", "string", "array"
+    std::string description;
+    std::string defaultValue;
+    bool required = false;
+    double min = std::numeric_limits<double>::lowest();
+    double max = std::numeric_limits<double>::max();
+    std::vector<std::string> allowedValues;
+};
+
+// Type checking utilities
+namespace ConfigUtils {
+    bool isNumberType(const ConfigValue& value);
+    bool isStringType(const ConfigValue& value);
+    bool isBoolType(const ConfigValue& value);
+    bool isArrayType(const ConfigValue& value);
+    
+    std::string getTypeString(const ConfigValue& value);
+    
+    // JSON conversion helpers
+    ConfigValue fromJson(const nlohmann::json& j);
+    nlohmann::json toJson(const ConfigValue& value);
+}
 
 // Main configuration class
 class Config {
@@ -58,11 +88,17 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from JSON string
+    bool loadFromJsonString(const std::string& jsonString);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
+    
+    // Get JSON string representation
+    std::string toJsonString() const;
     
     // Get values
     template<typename T>
@@ -92,6 +128,18 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Validation
+    std::vector<std::string> validate(const std::vector<ConfigSchemaEntry>& schema) const;
+    
+    // Apply schema with defaults
+    void applySchema(const std::vector<ConfigSchemaEntry>& schema);
+    
+    // Set default schema
+    void setDefaultSchema(const std::vector<ConfigSchemaEntry>& schema);
+    
+    // Get default schema
+    std::vector<ConfigSchemaEntry> getDefaultSchema() const;
     
 private:
     struct Impl;

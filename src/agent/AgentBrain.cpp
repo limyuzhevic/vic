@@ -64,6 +64,12 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
+    // Check if brain is properly initialized
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain not properly initialized: brain_ is null");
+        return;
+    }
+    
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
@@ -85,43 +91,84 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    // Check if brain is properly initialized
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain not properly initialized: brain_ is null");
+        return;
+    }
+    
+    if (brain_->getRandomGenerator() == nullptr) {
+        NLM_LOG_ERROR("Random generator is null in processSensoryInput");
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
+    
+    if (sensoryVision_.empty() && vision.empty()) {
+        NLM_LOG_DEBUG("No vision sensory neurons or vision data available");
+    }
+    
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+        if (!sensoryVision_[i]) {
+            NLM_LOG_ERROR("Vision sensory neuron at index " + std::to_string(i) + " is null");
+            continue;
         }
+        
+        // Inject current proportional to vision intensity
+        float current = vision[i] * 5.0f;  // Scale factor
+        sensoryVision_[i]->injectCurrent(current);
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
+    
+    if (sensoryTouch_.empty() && touch.empty()) {
+        NLM_LOG_DEBUG("No touch sensory neurons or touch data available");
+    }
+    
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+        if (!sensoryTouch_[i]) {
+            NLM_LOG_ERROR("Touch sensory neuron at index " + std::to_string(i) + " is null");
+            continue;
         }
+        
+        float current = touch[i] * 8.0f;  // Collision signal
+        sensoryTouch_[i]->injectCurrent(current);
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
+    
+    if (sensoryInternal_.empty() && intern.empty()) {
+        NLM_LOG_DEBUG("No internal sensory neurons or internal data available");
+    }
+    
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+        if (!sensoryInternal_[i]) {
+            NLM_LOG_ERROR("Internal sensory neuron at index " + std::to_string(i) + " is null");
+            continue;
         }
+        
+        float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+        sensoryInternal_[i]->injectCurrent(current);
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
+    
+    if (sensoryProprioception_.empty() && proprio.empty()) {
+        NLM_LOG_DEBUG("No proprioception sensory neurons or proprioception data available");
+    }
+    
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+        if (!sensoryProprioception_[i]) {
+            NLM_LOG_ERROR("Proprioception sensory neuron at index " + std::to_string(i) + " is null");
+            continue;
         }
+        
+        float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+        sensoryProprioception_[i]->injectCurrent(current);
     }
     
     // Compute novelty (difference from previous vision)
@@ -150,7 +197,16 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    // Check if brain is properly initialized
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain not properly initialized: brain_ is null");
+        return MotorCommand::Wait;
+    }
+    
+    if (brain_->getRandomGenerator() == nullptr) {
+        NLM_LOG_ERROR("Random generator is null in decodeMotorCommand");
+        return MotorCommand::Wait;
+    }
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
@@ -210,10 +266,21 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
+    // Check if brain is properly initialized
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain not properly initialized: brain_ is null");
+        return defaultCmd;
+    }
+    
     // Exploration: occasionally choose random action when curiosity is high
     if (curiosityLevel_ > 0.5f) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        
+        if (brain_->getRandomGenerator() == nullptr) {
+            NLM_LOG_ERROR("Random generator is null in selectWithCuriosity");
+            return defaultCmd;
+        }
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
@@ -236,7 +303,32 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    // Check if brain is properly initialized
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain not properly initialized: brain_ is null");
+        return;
+    }
+    
+    if (!rewardModulationEnabled_) {
+        NLM_LOG_DEBUG("Reward modulation is disabled");
+        return;
+    }
+    
+    if (brain_->getRandomGenerator() == nullptr) {
+        NLM_LOG_ERROR("Random generator is null in applyRewardModulation");
+        return;
+    }
+    
+    // Validate reward values
+    if (std::isnan(reward) || std::isinf(reward)) {
+        NLM_LOG_ERROR("Invalid reward value: " + std::to_string(reward));
+        return;
+    }
+    
+    if (std::isnan(predictedReward) || std::isinf(predictedReward)) {
+        NLM_LOG_ERROR("Invalid predicted reward value: " + std::to_string(predictedReward));
+        return;
+    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -250,9 +342,24 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
+    // Validate plasticity modifier
+    if (std::isnan(plasticityModifier_) || std::isinf(plasticityModifier_)) {
+        NLM_LOG_ERROR("Invalid plasticity modifier: " + std::to_string(plasticityModifier_));
+        plasticityModifier_ = 1.0f;
+    }
+    
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
+        if (!region) {
+            NLM_LOG_ERROR("Region is null in applyRewardModulation");
+            continue;
+        }
         for (auto* syn : region->getSynapses()) {
+            if (!syn) {
+                NLM_LOG_ERROR("Synapse is null in applyRewardModulation");
+                continue;
+            }
+            
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
@@ -280,9 +387,29 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+    // Check if brain is properly initialized
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain not properly initialized: brain_ is null");
+        return;
+    }
+    
+    if (!developmentEnabled_) {
+        NLM_LOG_DEBUG("Development is disabled");
+        return;
+    }
+    
+    if (std::isnan(timestep) || std::isinf(timestep)) {
+        NLM_LOG_ERROR("Invalid timestep value: " + std::to_string(timestep));
+        return;
+    }
     
     developmentalAge_ += timestep;
+    
+    // Validate developmental age
+    if (std::isnan(developmentalAge_) || std::isinf(developmentalAge_)) {
+        NLM_LOG_ERROR("Invalid developmental age: " + std::to_string(developmentalAge_));
+        developmentalAge_ = 0.0;
+    }
     
     // Simple developmental stages based on age
     // This is a biologically inspired approximation
@@ -298,6 +425,12 @@ void AgentBrain::updateDevelopment(double timestep) {
     } else {
         plasticityModifier_ = 0.2f;  // Adult - more stable
         brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
+    }
+    
+    // Validate plasticity modifier
+    if (std::isnan(plasticityModifier_) || std::isinf(plasticityModifier_)) {
+        NLM_LOG_ERROR("Invalid plasticity modifier after update: " + std::to_string(plasticityModifier_));
+        plasticityModifier_ = 0.2f;  // Default to adult
     }
     
     // Structural plasticity changes with development

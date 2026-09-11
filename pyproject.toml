@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "nlohmann-json>=3.11.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -27,12 +27,17 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+    "nlohmann-json>=3.11.0",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "matplotlib>=3.0",
+    "jupyter>=1.0",
 ]
 
 [project.urls]
@@ -47,10 +52,12 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DNLOHMANN_JSON_INCLUDE_PATH=${CONDA_PREFIX}/include",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+JSON_Include = "nlohmann/json.hpp"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
