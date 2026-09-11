@@ -55,11 +55,20 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
-    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
+    
+    // Show help information
+    static void printHelp();
+    
+    // Show configuration summary
+    void printConfigSummary() const;
+    
+    // Show version information
+    static void printVersion();
+    
+    // Check if verbose mode is enabled
+    bool isVerbose() const;
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;

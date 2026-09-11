@@ -197,9 +197,59 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+// Show help information
+void Config::printHelp() {
+    std::cout << "=== NLM Configuration Options ===\n\n";
+    std::cout << "General Options:\n";
+    std::cout << "  --help, -h          Show this help message\n";
+    std::cout << "  --version, -v       Show version information\n";
+    std::cout << "  --verbose, -V       Enable verbose output\n\n";
+    
+    std::cout << "Configuration File Options:\n";
+    std::cout << "  --config=file.cfg    Load configuration from file\n";
+    std::cout << "  --config file.cfg    Load configuration from file (alternative format)\n\n";
+    
+    std::cout << "Configuration Override Options:\n";
+    std::cout << "  --key=value          Override configuration value\n";
+    std::cout << "  -key value           Override configuration value (alternative format)\n\n";
+    
+    std::cout << "Example:\n";
+    std::cout << "  ./nlm --config=custom.cfg --neuron_count=2000 --verbose\n";
+    
+    std::cout << "\nConfiguration values can be any of the keys defined in configs/default.cfg\n";
 }
 
-// Explicit template instantiations
+// Show configuration summary
+void Config::printConfigSummary() const {
+    std::cout << "=== Configuration Summary ===\n";
+    
+    std::cout << "Loaded configuration entries: " << pImpl->entries.size() << "\n\n";
+    
+    for (const auto& entry : pImpl->entries) {
+        std::cout << "  " << entry.key << " = ";
+        std::visit([](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                std::cout << '"' << arg << '"';
+            } else {
+                std::cout << arg;
+            }
+        }, entry.value);
+        std::cout << "  [Source: " << static_cast<int>(entry.source) << "]";
+        if (!entry.description.empty()) {
+            std::cout << "  # " << entry.description;
+        }
+        std::cout << "\n";
+    }
+}
+
+// Print version information
+void Config::printVersion() {
+    std::cout << "NLM Neural Learning Machine - Phase 2\n";
+    std::cout << "Version: 2.0\n";
+    std::cout << "Built on: " << __DATE__ << " " << __TIME__ << "\n";
+}
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
@@ -211,5 +261,18 @@ template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) cons
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Check if verbose mode is enabled
+bool Config::isVerbose() const {
+    auto val = get<bool>("verbose");
+    return val.has_value() ? val.value() : false;
+}
+
+// Print version information
+void Config::printVersion() {
+    std::cout << "NLM Neural Learning Machine - Phase 2\n";
+    std::cout << "Version: 2.0\n";
+    std::cout << "Built on: " << __DATE__ << " " << __TIME__ << "\n";
+}
 
 } // namespace nlm
