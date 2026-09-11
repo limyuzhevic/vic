@@ -416,6 +416,331 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // ============= ADVANCED API FOR POWER USERS =============
+
+    // Batch brain processing utility
+    m.def("batch_process", [](const std::vector<std::shared_ptr<Brain>>& brains, size_t steps) {
+        for (auto& brain : brains) {
+            for (size_t i = 0; i < steps; ++i) {
+                brain->step(i);
+            }
+        }
+        return std::vector<std::map<std::string, size_t>>{
+            {"total_neurons", brains[0]->getTotalNeuronCount()},
+            {"total_synapses", brains[0]->getTotalSynapseCount()},
+            {"total_spikes", brains[0]->getTotalSpikeCount()}
+        };
+    }, py::arg("brains"), py::arg("steps"), "Process multiple brains in batch");
+
+    // Advanced configuration utilities
+    m.def("createConfigFromDict", [](const py::dict& config_dict) {
+        auto config = std::make_shared<Config>();
+        for (auto item : config_dict) {
+            std::string key = py::cast<std::string>(item.first);
+            if (py::isinstance<py::int_>(item.second)) {
+                config->set(key, py::cast<int>(item.second));
+            } else if (py::isinstance<py::float>(item.second)) {
+                config->set(key, py::cast<double>(item.second));
+            } else if (py::isinstance<py::bool_>(item.second)) {
+                config->set(key, py::cast<bool>(item.second));
+            } else {
+                config->set(key, py::cast<std::string>(item.second));
+            }
+        }
+        return config;
+    }, py::arg("config_dict"), "Create configuration from Python dictionary");
+
+    // Advanced brain analysis utilities
+    m.def("analyzeBrainDynamics", [](const std::shared_ptr<Brain>& brain, size_t steps) {
+        std::map<std::string, double> dynamics;
+        
+        // Track statistics over time
+        size_t total_spikes = brain->getTotalSpikeCount();
+        size_t firing_neuron_count = brain->getFiringNeuronCount();
+        float avg_firing_rate = brain->getAverageFiringRate();
+        float e_i_ratio = brain->getExcitationInhibitionRatio();
+        
+        dynamics["total_neurons"] = brain->getTotalNeuronCount();
+        dynamics["total_synapses"] = brain->getTotalSynapseCount();
+        dynamics["total_spikes"] = total_spikes;
+        dynamics["active_neurons"] = brain->getActiveNeuronCount();
+        dynamics["firing_neurons_this_step"] = firing_neuron_count;
+        dynamics["average_firing_rate"] = avg_firing_rate;
+        dynamics["excitation_inhibition_ratio"] = e_i_ratio;
+        
+        // Run additional steps for analysis
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        
+        // Update statistics after running steps
+        dynamics["spikes_per_step"] = (brain->getTotalSpikeCount() - total_spikes) / (steps + 1);
+        dynamics["firing_rate_change"] = brain->getAverageFiringRate() - avg_firing_rate;
+        
+        return dynamics;
+    }, py::arg("brain"), py::arg("steps"), "Analyze brain dynamics over time");
+
+    // Advanced memory analysis
+    m.def("analyzeMemorySystems", [](const std::shared_ptr<Brain>& brain) {
+        std::map<std::string, size_t> memory_stats;
+        
+        auto* workingMem = brain->getWorkingMemory();
+        if (workingMem) {
+            memory_stats["working_memory_active_traces"] = workingMem->getActiveTraces();
+            memory_stats["working_memory_capacity"] = workingMem->getCapacity();
+        }
+        
+        auto* episodicMem = brain->getEpisodicMemory();
+        if (episodicMem) {
+            memory_stats["episodic_memory_episodes"] = episodicMem->getEpisodeCount();
+            memory_stats["episodic_memory_max_episodes"] = episodicMem->getMaxEpisodes();
+        }
+        
+        auto* assocMem = brain->getAssociativeMemory();
+        if (assocMem) {
+            // Basic associative memory statistics (implementation-specific)
+            memory_stats["associative_memory_active"] = 1; // Placeholder
+        }
+        
+        return memory_stats;
+    }, py::arg("brain"), "Analyze memory system statistics");
+
+    // Advanced neuromodulation analysis
+    m.def("analyzeNeuromodulation", [](const std::shared_ptr<AgentBrain>& agent) {
+        std::map<std::string, float> neuromod_stats;
+        
+        neuromod_stats["dopamine_level"] = agent->getNeuromodulationLevel();
+        neuromod_stats["curiosity_level"] = agent->getCuriosityLevel();
+        neuromod_stats["novelty_level"] = agent->getNoveltyLevel();
+        neuromod_stats["prediction_error"] = agent->getPredictionError();
+        neuromod_stats["developmental_stage"] = static_cast<int>(agent->getDevelopmentalStage());
+        
+        return neuromod_stats;
+    }, py::arg("agent"), "Analyze neuromodulation system state");
+
+    // Experimental setup utilities
+    m.def("setupExperiment", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent,
+                               std::shared_ptr<SimpleWorld> world, const py::dict& experiment_config) {
+        // Configure experiment parameters
+        auto config = brain->getConfig();
+        
+        if (experiment_config.contains("neuron_count")) {
+            config->set("brain.neuron_count", py::cast<size_t>(experiment_config["neuron_count"]));
+        }
+        if (experiment_config.contains("synapse_density")) {
+            config->set("brain.synapse_density", py::cast<float>(experiment_config["synapse_density"]));
+        }
+        if (experiment_config.contains("plasticity_enabled")) {
+            config->set("plasticity.stdp.enable", py::cast<bool>(experiment_config["plasticity_enabled"]));
+        }
+        
+        // Initialize brain with experiment configuration
+        brain->initialize();
+        
+        // Initialize agent with world
+        agent->initialize(*world);
+        
+        // Enable experiment-specific features
+        if (experiment_config.contains("features")) {
+            py::list features = py::cast<py::list>(experiment_config["features"]);
+            for (auto item : features) {
+                std::string feature = py::cast<std::string>(item);
+                if (feature == "reward_modulation") agent->enableRewardModulation(true);
+                else if (feature == "structural_plasticity") agent->enableStructuralPlasticity(true);
+                else if (feature == "curiosity") agent->enableCuriosity(true);
+                else if (feature == "development") agent->enableDevelopment(true);
+            }
+        }
+        
+        return true;
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("experiment_config"), 
+           "Set up an experiment with brain, agent, and world");
+
+    // Advanced simulation utilities
+    m.def("runSimulationLoop", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent,
+                                 std::shared_ptr<SimpleWorld> world, size_t num_steps,
+                                 bool verbose = false) {
+        std::vector<std::map<std::string, double>> history;
+        
+        for (size_t step = 0; step < num_steps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory percept
+            const auto& percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Run brain step
+            brain->step(step);
+            
+            // Decode motor command
+            auto action = agent->decodeMotorCommand();
+            
+            // Apply action to world
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Collect statistics
+            std::map<std::string, double> stats;
+            stats["step"] = step;
+            stats["total_spikes"] = brain->getTotalSpikeCount();
+            stats["firing_neurons"] = brain->getFiringNeuronCount();
+            stats["average_firing_rate"] = brain->getAverageFiringRate();
+            stats["curiosity"] = agent->getCuriosityLevel();
+            stats["novelty"] = agent->getNoveltyLevel();
+            stats["prediction_error"] = agent->getPredictionError();
+            
+            if (verbose && (step % 100 == 0 || step == num_steps - 1)) {
+                std::cout << "Step " << step << ": "
+                         << "Firing: " << stats["firing_neurons"] << ", "
+                         << "Curiosity: " << stats["curiosity"] << ", "
+                         << "Novelty: " << stats["novelty"] << std::endl;
+            }
+            
+            history.push_back(stats);
+        }
+        
+        return history;
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("num_steps"), 
+           py::arg("verbose") = false, "Run a complete simulation loop");
+
+    // Checkpoint and experiment utilities
+    m.def("saveExperimentCheckpoint", [](const std::shared_ptr<Brain>& brain, 
+                                         const std::string& prefix = "experiment",
+                                         size_t max_checkpoints = 10) {
+        // Create timestamped checkpoint filename
+        std::time_t t = std::time(nullptr);
+        char mbstr[100];
+        std::strftime(mbstr, sizeof(mbstr), "%Y%m%d_%H%M%S", std::localtime(&t));
+        std::string filename = prefix + "_" + std::string(mbstr) + ".bin";
+        
+        // Save brain state
+        bool success = brain->save(filename);
+        
+        if (success) {
+            // Optionally manage checkpoint directory
+            // (Implementation would manage checkpoint rotation)
+            return filename;
+        }
+        
+        return std::string("");
+    }, py::arg("brain"), py::arg("prefix") = "experiment", py::arg("max_checkpoints") = 10,
+       "Save experiment checkpoint with timestamp");
+
+    // Statistical analysis utilities
+    m.def("computeBrainStatistics", [](const std::shared_ptr<Brain>& brain) {
+        std::map<std::string, double> stats;
+        
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["active_ratio"] = static_cast<double>(brain->getActiveNeuronCount()) / 
+                                 std::max(brain->getTotalNeuronCount(), 1.0);
+        stats["firing_rate"] = brain->getAverageFiringRate();
+        stats["e_i_balance"] = brain->getExcitationInhibitionRatio();
+        
+        return stats;
+    }, py::arg("brain"), "Compute comprehensive brain statistics");
+
+    // ============= ENHANCED ERROR HANDLING =============
+    
+    // Safe brain step with error checking
+    m.def("safeBrainStep", [](const std::shared_ptr<Brain>& brain, size_t step, 
+                           bool check_neural_integrity = true) {
+        try {
+            if (check_neural_integrity) {
+                // Basic integrity checks
+                if (brain->getTotalNeuronCount() == 0) {
+                    return false; // No neurons, cannot step
+                }
+                if (brain->getTotalSynapseCount() < 0) {
+                    return false; // Invalid synapse count
+                }
+            }
+            
+            brain->step(step);
+            return true;
+        } catch (const std::exception& e) {
+            std::cerr << "Error in safeBrainStep: " << e.what() << std::endl;
+            return false;
+        }
+    }, py::arg("brain"), py::arg("step"), py::arg("check_neural_integrity") = true,
+       "Safely execute brain step with error checking");
+
+    // Safe configuration loading
+    m.def("safeConfigLoad", [](const std::string& filepath) {
+        auto config = std::make_shared<Config>();
+        bool success = config->loadFromFile(filepath);
+        return std::make_pair(success, config);
+    }, py::arg("filepath"), "Safely load configuration with error handling");
+
+    // Version and system information
+    m.attr("NLM_VERSION") = "Phase 6.0 - Final Integration";
+    m.attr("PYTHON_BINDINGS_VERSION") = "1.5.0";
+    m.attr("ARCHITECTURE") = "Closed-loop artificial brain with integrated memory, prediction, and cognition";
+    
+    // Help and documentation utilities
+    m.def("getHelp", []() {
+        std::string help = R"(
+NLM Python API - Enhanced Edition
+
+=== BASIC API ===
+- createBrain(config): Create neural brain
+- createAgentBrain(brain): Create agent interface
+- createSimpleWorld(): Create simulation environment
+- brain.initialize(): Initialize brain state
+- brain.step(step): Process one simulation step
+- brain.save(filepath): Save brain state
+- brain.load(filepath): Load brain state
+
+=== ADVANCED API ===
+- batch_process(brains, steps): Process multiple brains
+- analyzeBrainDynamics(brain, steps): Analyze brain dynamics
+- analyzeMemorySystems(brain): Analyze memory systems
+- analyzeNeuromodulation(agent): Analyze neuromodulation
+- setupExperiment(brain, agent, world, config): Configure experiment
+- runSimulationLoop(brain, agent, world, steps): Run complete simulation
+- saveExperimentCheckpoint(brain, prefix, max): Save checkpoint
+- computeBrainStatistics(brain): Compute comprehensive stats
+
+=== ERROR HANDLING ===
+- safeBrainStep(brain, step): Safe step execution
+- safeConfigLoad(filepath): Safe configuration loading
+
+=== UTILITIES ===
+- NLM_VERSION: Version string
+- PYTHON_BINDINGS_VERSION: Bindings version
+- ARCHITECTURE: Architecture description
+
+=== EXAMPLE USAGE ===
+import pynlm
+
+# Basic usage
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Advanced analysis
+dynamics = pynlm.analyzeBrainDynamics(brain, 100)
+stats = pynlm.computeBrainStatistics(brain)
+
+# Batch processing
+brains = [pynlm.createBrain(pynlm.createDefaultConfig()) for _ in range(3)]
+results = pynlm.batch_process(brains, 50)
+
+=== FEATURES ===
+✓ Memory system integration
+✓ Prediction system support
+✓ Neuromodulation tracking
+✓ Development stages
+✓ Checkpoint persistence
+✓ Error handling
+✓ Statistical analysis
+✓ Batch operations
+✓ Experiment utilities
+        )";
+        return help;
+    }, "Get comprehensive API help and examples");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

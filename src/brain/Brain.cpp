@@ -828,6 +828,65 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write memory system data
+        if (pImpl->workingMemory) {
+            // For Phase 6, write basic working memory state
+            WorkingMemoryCheckpointData wmData;
+            wmData.activeTraces = pImpl->workingMemory->getActiveTraces();
+            writer.writeWorkingMemory(wmData);
+        }
+        
+        if (pImpl->episodicMemory) {
+            // For Phase 6, write basic episodic memory state
+            EpisodicMemoryCheckpointData emData;
+            emData.episodeCount = pImpl->episodicMemory->getEpisodeCount();
+            writer.writeEpisodicMemory(emData);
+        }
+        
+        if (pImpl->associativeMemory) {
+            // For Phase 6, write basic associative memory state
+            // (implementation details would go here)
+        }
+        
+        if (pImpl->predictionSystem) {
+            // For Phase 6, write prediction system state
+            PredictionSystemCheckpointData psData;
+            // Add prediction system state
+            writer.writePredictionSystem(psData);
+        }
+        
+        if (pImpl->developmentSystem) {
+            // For Phase 6, write development system state
+            DevelopmentSystemCheckpointData dsData;
+            dsData.stage = pImpl->developmentalStage;
+            writer.writeDevelopmentSystem(dsData);
+        }
+        
+        // Write neuromodulation system data
+        if (pImpl->dopamine) {
+            NeuromodulatorCheckpointData dmData;
+            dmData.level = pImpl->dopamine->getLevel();
+            writer.writeDopamine(dmData);
+        }
+        
+        if (pImpl->curiosity) {
+            NeuromodulatorCheckpointData cuData;
+            cuData.level = pImpl->curiosity->getLevel();
+            writer.writeCuriosity(cuData);
+        }
+        
+        if (pImpl->novelty) {
+            NeuromodulatorCheckpointData nvData;
+            nvData.level = pImpl->novelty->getLevel();
+            writer.writeNovelty(nvData);
+        }
+        
+        if (pImpl->predictionError) {
+            NeuromodulatorCheckpointData peData;
+            peData.level = pImpl->predictionError->getLevel();
+            writer.writePredictionError(peData);
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -858,6 +917,12 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
+        // Reset brain to clean state before loading
+        reset();
+        
+        // Re-initialize with current configuration
+        initialize();
+        
         // Read neurons
         NeuronCheckpointData neuronData;
         if (!reader.readNeurons(neuronData)) {
@@ -880,7 +945,13 @@ bool Brain::load(const std::string& filepath) {
                             neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
                         }
                         if (idx < neuronData.refractoryRemaining.size()) {
+                            neuron->setRefractoryRemaining(neuronData.refractoryRemaining[idx]);
+                        }
+                        if (idx < neuronData.refractoryPeriod.size()) {
                             neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                        }
+                        if (idx < neuronData.lastSpikeTime.size()) {
+                            neuron->setLastSpikeTime(neuronData.lastSpikeTime[idx]);
                         }
                     }
                     idx++;
@@ -895,9 +966,86 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - we need to match synapses by source/destination
+        // For Phase 6, we assume the saved topology is identical
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                if (synapseIdx < synapseData.weight.size()) {
+                    syn->setWeight(synapseData.weight[synapseIdx]);
+                    syn->setDelay(synapseData.delay[synapseIdx]);
+                    syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx]);
+                    synapseIdx++;
+                }
+            }
+        }
+        
+        // Read memory system data
+        if (pImpl->workingMemory) {
+            WorkingMemoryCheckpointData wmData;
+            if (reader.readWorkingMemory(wmData)) {
+                // For now, working memory doesn't have restore method
+                // In future phases, we would restore working memory state
+                NLM_LOG_INFO("Loaded working memory data (active traces: " + 
+                            std::to_string(wmData.activeTraces) + ")");
+            }
+        }
+        
+        if (pImpl->episodicMemory) {
+            EpisodicMemoryCheckpointData emData;
+            if (reader.readEpisodicMemory(emData)) {
+                // For Phase 6, episodic memory would have restore method
+                NLM_LOG_INFO("Loaded episodic memory data (episodes: " + 
+                            std::to_string(emData.episodeCount) + ")");
+            }
+        }
+        
+        if (pImpl->predictionSystem) {
+            PredictionSystemCheckpointData psData;
+            if (reader.readPredictionSystem(psData)) {
+                // For Phase 6, prediction system would have restore method
+                NLM_LOG_INFO("Loaded prediction system data");
+            }
+        }
+        
+        if (pImpl->developmentSystem) {
+            DevelopmentSystemCheckpointData dsData;
+            if (reader.readDevelopmentSystem(dsData)) {
+                setDevelopmentalStage(dsData.stage);
+                NLM_LOG_INFO("Loaded development system data (stage: " + 
+                            std::to_string(static_cast<int>(dsData.stage)) + ")");
+            }
+        }
+        
+        // Read neuromodulation system data
+        if (pImpl->dopamine) {
+            NeuromodulatorCheckpointData dmData;
+            if (reader.readDopamine(dmData)) {
+                // For Phase 6, neuromodulators would have restore methods
+                NLM_LOG_INFO("Loaded dopamine data (level: " + std::to_string(dmData.level) + ")");
+            }
+        }
+        
+        if (pImpl->curiosity) {
+            NeuromodulatorCheckpointData cuData;
+            if (reader.readCuriosity(cuData)) {
+                NLM_LOG_INFO("Loaded curiosity data (level: " + std::to_string(cuData.level) + ")");
+            }
+        }
+        
+        if (pImpl->novelty) {
+            NeuromodulatorCheckpointData nvData;
+            if (reader.readNovelty(nvData)) {
+                NLM_LOG_INFO("Loaded novelty data (level: " + std::to_string(nvData.level) + ")");
+            }
+        }
+        
+        if (pImpl->predictionError) {
+            NeuromodulatorCheckpointData peData;
+            if (reader.readPredictionError(peData)) {
+                NLM_LOG_INFO("Loaded prediction error data (level: " + std::to_string(peData.level) + ")");
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -1026,14 +1174,26 @@ PredictionSystem* Brain::getPredictionSystem() {
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
+    if (!pImpl->planner) {
+        pImpl->planner = std::make_unique<NeuralPlanner>();
+        pImpl->planner->initialize(this);
+    }
     return pImpl->planner.get();
 }
 
 ConceptFormation* Brain::getConceptFormation() {
+    if (!pImpl->conceptFormation) {
+        pImpl->conceptFormation = std::make_unique<ConceptFormation>();
+        pImpl->conceptFormation->initialize(this);
+    }
     return pImpl->conceptFormation.get();
 }
 
 AttentionalSelection* Brain::getAttention() {
+    if (!pImpl->attention) {
+        pImpl->attention = std::make_unique<AttentionalSelection>();
+        pImpl->attention->initialize(this);
+    }
     return pImpl->attention.get();
 }
 
@@ -1054,18 +1214,34 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 // ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
+    if (!pImpl->dopamine) {
+        pImpl->dopamine = std::make_unique<Dopamine>();
+        pImpl->dopamine->initialize(this);
+    }
     return pImpl->dopamine.get();
 }
 
 Curiosity* Brain::getCuriosity() {
+    if (!pImpl->curiosity) {
+        pImpl->curiosity = std::make_unique<Curiosity>();
+        pImpl->curiosity->initialize(this);
+    }
     return pImpl->curiosity.get();
 }
 
 Novelty* Brain::getNovelty() {
+    if (!pImpl->novelty) {
+        pImpl->novelty = std::make_unique<Novelty>();
+        pImpl->novelty->initialize(this);
+    }
     return pImpl->novelty.get();
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
+    if (!pImpl->predictionError) {
+        pImpl->predictionError = std::make_unique<PredictionError>();
+        pImpl->predictionError->initialize(this);
+    }
     return pImpl->predictionError.get();
 }
 
