@@ -175,6 +175,79 @@ struct SynapseCheckpointData {
 };
 
 /**
+ * Working memory state for checkpointing
+ */
+struct WorkingMemoryCheckpointData {
+    size_t activeTraces;
+    std::vector<NeuronId> memoryNeurons;
+    std::vector<float> memoryActivations;
+    std::vector<uint64_t> memoryTimestamps;
+};
+
+/**
+ * Episodic memory state for checkpointing
+ */
+struct EpisodicMemoryCheckpointData {
+    size_t maxEpisodes;
+    bool replayEnabled;
+    // For simplicity, just store basic info; actual implementation would store full episodes
+    std::vector<std::string> episodeTags;  // Placeholder for episode metadata
+};
+
+/**
+ * Prediction system state for checkpointing
+ */
+struct PredictionCheckpointData {
+    std::vector<float> errorHistory;
+    float confidence;
+};
+
+/**
+ * Attention system state for checkpointing
+ */
+struct AttentionCheckpointData {
+    std::vector<NeuronId> winners;
+    std::vector<RegionId> attendedRegions;
+};
+
+/**
+ * Concept formation state for checkpointing
+ */
+struct ConceptCheckpointData {
+    std::vector<std::string> conceptIds;  // Placeholder for concept metadata
+};
+
+/**
+ * Planner state for checkpointing
+ */
+struct PlannerCheckpointData {
+    std::vector<std::string> planIds;  // Placeholder for plan metadata
+};
+
+/**
+ * Neuromodulator state for checkpointing
+ */
+struct NeuromodulatorCheckpointData {
+    float level;
+    float plasticityFactor;
+};
+
+/**
+ * Development system state for checkpointing
+ */
+struct DevelopmentCheckpointData {
+    uint32_t stage;  // DevelopmentalStage as integer
+};
+
+/**
+ * Curiosity system state for checkpointing
+ */
+struct CuriosityCheckpointData {
+    float level;
+    float explorationDrive;
+};
+
+/**
  * Checkpoint reader
  */
 class CheckpointReader {
