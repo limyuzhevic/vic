@@ -1,8 +1,10 @@
 #include "Config.hpp"
+#include <nlohmann/json.hpp>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
-#include <filesystem>
+
+using json = nlohmann::json;
 
 namespace nlm {
 
@@ -14,14 +16,50 @@ Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
 Config::~Config() = default;
 
-Config::Config(Config&&) noexcept = default;
+Config::Config(Config&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
-Config& Config::operator=(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Check if file is JSON format by file extension
+    if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".json") {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string jsonStr = buffer.str();
+        
+        // Parse JSON
+        try {
+            auto j = json::parse(jsonStr);
+            for (auto& [key, value] : j.items()) {
+                if (value.is_string()) {
+                    set(key, value.get<std::string>(), ConfigSource::File);
+                } else if (value.is_number_integer()) {
+                    set(key, value.get<int64_t>(), ConfigSource::File);
+                } else if (value.is_number_unsigned()) {
+                    set(key, value.get<uint64_t>(), ConfigSource::File);
+                } else if (value.is_number_float()) {
+                    set(key, value.get<double>(), ConfigSource::File);
+                } else if (value.is_boolean()) {
+                    set(key, value.get<bool>(), ConfigSource::File);
+                }
+            }
+        } catch (const std::exception&) {
+            return false;
+        }
+        return true;
+    }
     
+    // Otherwise parse as key=value format (legacy)
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -86,9 +124,49 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Output value based on type
+        std::visit([&](const auto& val) {
+            if constexpr (std::is_same_v<decltype(val), std::string>) {
+                file << "\"" << val << "\"";
+            } else if constexpr (std::is_same_v<decltype(val), int> || 
+                                 std::is_same_v<decltype(val), int64_t>) {
+                file << val;
+            } else if constexpr (std::is_same_v<decltype(val), double>) {
+                file << val;
+            } else if constexpr (std::is_same_v<decltype(val), bool>) {
+                file << (val ? "true" : "false");
+            } else {
+                file << "";
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
+    return true;
+}
+
+bool Config::saveToJSONFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    json j;
+    j["config"] = json::object();
+    
+    for (const auto& entry : pImpl->entries) {
+        j["config"][entry.key] = entry.value;
+        
+        // Add metadata
+        j["metadata"][entry.key] = {
+            {"source", static_cast<int>(entry.source)},
+            {"description", entry.description}
+        };
+    }
+    
+    file << j.dump(4);
     return true;
 }
 
@@ -184,6 +262,26 @@ std::string Config::summary() const {
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
+}
+
+ConfigSource Config::getEntrySource(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    return (it != pImpl->entries.end()) ? it->source : ConfigSource::Default;
+}
+
+std::string Config::getEntryDescription(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    return (it != pImpl->entries.end()) ? it->description : "";
+}
+
+void Config::setEntryDescription(const std::string& key, const std::string& description) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    if (it != pImpl->entries.end()) {
+        it->description = description;
+    }
 }
 
 std::string Config::trim(const std::string& str) {

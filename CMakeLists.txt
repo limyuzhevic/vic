@@ -6,11 +6,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
-
 # Enable warnings
 if(MSVC)
     add_compile_options(/W4)
@@ -142,6 +137,17 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 # Testing
 enable_testing()
 add_subdirectory(tests)
+
+# Python bindings (optional - requires pybind11)
+if(PYTHON_BINDINGS_ENABLED)
+    enable_language(PYTHON)
+    find_package(Python REQUIRED COMPONENTS Interpreter Development)
+    find_package(pybind11 CONFIG REQUIRED)
+    
+    pybind11_add_module(pynlm python/bindings.cpp)
+    target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+    target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+endif()
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo

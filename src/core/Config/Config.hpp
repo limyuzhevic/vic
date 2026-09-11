@@ -5,11 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
-
-// Forward declarations
-class Config;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -43,7 +41,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Main configuration class with JSON support
 class Config {
 public:
     Config();
@@ -55,14 +53,17 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file - supports both key=value and JSON formats
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file - key=value format
     bool saveToFile(const std::string& filepath) const;
+    
+    // Save to JSON file
+    bool saveToJSONFile(const std::string& filepath) const;
     
     // Get values
     template<typename T>
@@ -93,6 +94,15 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Get entry source for JSON conversion
+    ConfigSource getEntrySource(const std::string& key) const;
+    
+    // Get entry description for JSON conversion
+    std::string getEntryDescription(const std::string& key) const;
+    
+    // Set entry description
+    void setEntryDescription(const std::string& key, const std::string& description);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +110,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool parseJSONFile(const std::string& filepath, std::string& jsonStr);
+    static bool isJSONFile(const std::string& filepath);
 };
 
 } // namespace nlm
