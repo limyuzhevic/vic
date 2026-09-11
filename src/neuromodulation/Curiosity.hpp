@@ -28,6 +28,9 @@ public:
     void setNoveltyWeight(float weight);
     void setPredictionErrorWeight(float weight);
     
+    // Increase curiosity (for prediction errors)
+    void increaseCuriosity(float amount);
+    
     // Reset
     void reset();
     

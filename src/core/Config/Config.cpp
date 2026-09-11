@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <rapidjson/document.h>
+#include <rapidjson/istreamwrapper.h>
 
 namespace nlm {
 
@@ -19,14 +21,120 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to parse as JSON first
+    if (tryParseJSON(file, filepath)) {
+        return true;
+    }
+    
+    // Try to parse as YAML if JSON failed
+    file.clear();
+    file.seekg(0);
+    if (tryParseYAML(file, filepath)) {
+        return true;
+    }
+    
+    // Fall back to simple key=value format
+    file.clear();
+    file.seekg(0);
+    return loadFromSimpleFormat(file, filepath);
+}
+
+bool Config::tryParseJSON(std::ifstream& file, const std::string& filepath) {
+    try {
+        rapidjson::IStreamWrapper wrapper(file);
+        rapidjson::Document doc;
+        doc.ParseStream(wrapper);
+        
+        if (doc.HasParseError() || !doc.IsObject()) {
+            return false;
+        }
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Recursively parse JSON into config entries
+        parseJSONObject(doc.GetObject(), ConfigSource::File);
+        return true;
+        
+    } catch (...) {
+        return false;
+    }
+}
+
+bool Config::tryParseYAML(std::ifstream& file, const std::string& filepath) {
+    try {
+        // TODO: Implement YAML parsing with a YAML library
+        // For now, just return false to fall back to simple format
+        return false;
+    } catch (...) {
+        return false;
+    }
+}
+
+void Config::parseJSONObject(const rapidjson::Value& obj, ConfigSource source) {
+    for (auto it = obj.MemberBegin(); it != obj.MemberEnd(); ++it) {
+        const std::string& key = it->name.GetString();
+        
+        if (it->value.IsString()) {
+            set(key, it->value.GetString(), source);
+        } else if (it->value.IsInt()) {
+            set(key, it->value.GetInt64(), source);
+        } else if (it->value.IsUint()) {
+            set(key, it->value.GetUint64(), source);
+        } else if (it->value.IsInt64()) {
+            set(key, it->value.GetInt64(), source);
+        } else if (it->value.IsUint64()) {
+            set(key, it->value.GetUint64(), source);
+        } else if (it->value.IsDouble()) {
+            set(key, it->value.GetDouble(), source);
+        } else if (it->value.IsFloat()) {
+            set(key, it->value.GetFloat(), source);
+        } else if (it->value.IsBool()) {
+            set(key, it->value.GetBool(), source);
+        } else if (it->value.IsArray()) {
+            // Handle arrays as JSON format
+            std::ostringstream oss;
+            oss << "[";
+            bool first = true;
+            for (const auto& element : it->value.GetArray()) {
+                if (!first) oss << ",";
+                if (element.IsString()) {
+                    oss << "\"" << element.GetString() << "\"";
+                } else {
+                    oss << element;
+                }
+                first = false;
+            }
+            oss << "]";
+            set(key, oss.str(), source);
+        } else if (it->value.IsObject()) {
+            // Nested objects - convert to string representation
+            std::ostringstream oss;
+            oss << "{";
+            bool first = true;
+            for (auto it2 = it->value.GetObject().MemberBegin(); 
+                 it2 != it->value.GetObject().MemberEnd(); ++it2) {
+                if (!first) oss << ", ";
+                oss << "\"" << it2->name.GetString() << "\": ";
+                if (it2->value.IsString()) {
+                    oss << "\"" << it2->value.GetString() << "\"";
+                } else {
+                    oss << it2->value;
+                }
+                first = false;
+            }
+            oss << "}";
+            set(key, oss.str(), source);
+        }
+    }
+}
+
+bool Config::loadFromSimpleFormat(std::ifstream& file, const std::string& filepath) {
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -43,7 +151,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -207,7 +315,7 @@ template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
 template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int6464_t&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;

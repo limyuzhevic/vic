@@ -477,6 +477,49 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 6.5: Update prediction system ==========
+    if (pImpl->predictionSystem && pImpl->sensoryNeurons.size() > 0) {
+        // Create a simplified sensory input from sensory neurons
+        SensoryInput predictedInput;
+        std::vector<float> sensoryData;
+        
+        // Sample sensory neuron activities
+        for (size_t i = 0; i < std::min(size_t(10), pImpl->sensoryNeurons.size()); ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            if (neuron) {
+                float activity = neuron->getState().membranePotential;
+                sensoryData.push_back(activity);
+            }
+        }
+        
+        if (!sensoryData.empty()) {
+            // Create prediction based on current state
+            auto predicted = pImpl->predictionSystem->predictNextState(SensoryInput(sensoryData));
+            
+            // Update predictions
+            pImpl->predictionSystem->updatePredictions(SensoryInput(sensoryData), 
+                                                       predicted ? *predicted : SensoryInput(sensoryData));
+            
+            // Train prediction system with current observation
+            pImpl->predictionSystem->train(SensoryInput(sensoryData));
+            
+            // Check for prediction error and adjust learning
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (predictionError > 0.1f) {
+                // High prediction error -> adjust neuromodulators
+                if (pImpl->dopamine) {
+                    // Increase dopamine for unexpected prediction error
+                    float currentDopamine = pImpl->dopamine->getLevel();
+                    pImpl->dopamine->setLevel(std::min(1.0f, currentDopamine + 0.05f));
+                }
+                if (pImpl->curiosity) {
+                    // Increase curiosity for novel prediction errors
+                    pImpl->curiosity->increaseCuriosity(0.1f);
+                }
+            }
+        }
+    }
+    
     // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
@@ -509,10 +552,79 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    // ========== STEP 6.5: Update prediction system ==========
+    if (pImpl->predictionSystem && pImpl->sensoryNeurons.size() > 0) {
+        // Create a simplified sensory input from sensory neurons
+        SensoryInput predictedInput;
+        std::vector<float> sensoryData;
+        
+        // Sample sensory neuron activities
+        for (size_t i = 0; i < std::min(size_t(10), pImpl->sensoryNeurons.size()); ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            if (neuron) {
+                float activity = neuron->getState().membranePotential;
+                sensoryData.push_back(activity);
+            }
+        }
+        
+        if (!sensoryData.empty()) {
+            // Create prediction based on current state
+            auto predicted = pImpl->predictionSystem->predictNextState(SensoryInput(sensoryData));
+            
+            // Update predictions
+            pImpl->predictionSystem->updatePredictions(SensoryInput(sensoryData), 
+                                                       predicted ? *predicted : SensoryInput(sensoryData));
+            
+            // Train prediction system with current observation
+            pImpl->predictionSystem->train(SensoryInput(sensoryData));
+            
+            // Check for prediction error and adjust learning
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (predictionError > 0.1f) {
+                // High prediction error -> adjust neuromodulators
+                if (pImpl->dopamine) {
+                    // Increase dopamine for unexpected prediction error
+                    float currentDopamine = pImpl->dopamine->getLevel();
+                    pImpl->dopamine->setLevel(std::min(1.0f, currentDopamine + 0.05f));
+                }
+                if (pImpl->curiosity) {
+                    // Increase curiosity for novel prediction errors
+                    pImpl->curiosity->increaseCuriosity(0.1f);
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 7: Update episodic memory ==========
+    pImpl->stepsSinceLastEpisode++;
+    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+        pImpl->stepsSinceLastEpisode = 0;
+        
+        if (pImpl->episodicMemory) {
+            // Capture current brain state as an episode
+            EpisodicMemoryItem episode;
+            episode.timestamp = currentStep;
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Store active neurons
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring() || 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            episode.activeNeurons.push_back(neuron->getId());
+                            episode.neuronActivations.push_back(
+                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                        }
+                    }
+                }
+            }
+            
+            // Store reward in episode
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            pImpl->episodicMemory->storeEpisode(episode);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -717,17 +829,10 @@ std::unique_ptr<class Action> Brain::produceAction() {
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
-    float modulation = signal.getLevel();
-    
-    // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
-}
-
-void Brain::updatePlasticity() {
-    // Plasticity is now applied during each step
-    // This method is kept for API compatibility
+    // Apply neuromodulatory signal to system
+    float error = std::max(0.0f, signal.getLevel() - 0.5f);  // Convert to error signal
+    pImpl->dopamine->signalRewardPredictionError(error);
+    pImpl->curiosity->increaseCuriosity(error * 0.1f);
 }
 
 void Brain::develop() {

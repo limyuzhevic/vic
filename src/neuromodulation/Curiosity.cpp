@@ -59,4 +59,8 @@ void Curiosity::reset() {
     pImpl->level = 0.0f;
 }
 
+void Curiosity::increaseCuriosity(float amount) {
+    pImpl->level = std::min(1.0f, pImpl->level + amount);
+}
+
 } // namespace nlm
