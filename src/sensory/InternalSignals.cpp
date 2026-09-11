@@ -1,35 +1,37 @@
-#include "InternalSignals.hpp"
-
 namespace nlm {
 
-struct InternalSignalsProcessor::Impl {
-    std::vector<float> processedSignals;
-    std::vector<float> homeostaticSignals;
-    
-    Impl() = default;
-};
+SensoryInput::SensoryInput() : timestamp_(0.0) {}
 
-InternalSignalsProcessor::InternalSignalsProcessor() : pImpl(new Impl) {}
+InternalSignals::InternalSignals() : pImpl(new Impl) {}
 
-InternalSignalsProcessor::~InternalSignalsProcessor() = default;
+InternalSignals::~InternalSignals() = default;
 
-void InternalSignalsProcessor::process(const InternalSignals& signals) {
-    // TODO PHASE 2: Implement real internal signal processing
-    // PLACEHOLDER: Just pass through
-    pImpl->processedSignals = signals.getData();
-    
-    // Generate some homeostatic signals
-    pImpl->homeostaticSignals.clear();
-    pImpl->homeostaticSignals.push_back(1.0f);  // Allostatic load
-    pImpl->homeostaticSignals.push_back(0.5f);  // Metabolic state
+const char* InternalSignals::getType() const {
+    return "InternalSignals";
 }
 
-const std::vector<float>& InternalSignalsProcessor::getProcessedSignals() const {
-    return pImpl->processedSignals;
+const std::vector<float>& InternalSignals::getData() const {
+    return pImpl->signals;
 }
 
-const std::vector<float>& InternalSignalsProcessor::getHomeostaticSignals() const {
-    return pImpl->homeostaticSignals;
+size_t InternalSignals::getDimensions() const {
+    return pImpl->signals.size();
+}
+
+std::unique_ptr<SensoryInput> InternalSignals::clone() const {
+    auto clone = std::make_unique<InternalSignals>();
+    for (float sig : pImpl->signals) {
+        clone->addSignal(sig);
+    }
+    return clone;
+}
+
+void InternalSignals::addSignal(float value) {
+    pImpl->signals.push_back(value);
+}
+
+void InternalSignals::clearSignals() {
+    pImpl->signals.clear();
 }
 
 } // namespace nlm

@@ -21,6 +21,9 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Find nlohmann/json library
+find_package(nlohmann_json REQUIRED)
+
 # Core library
 add_library(nlm_core STATIC
     # Core
@@ -87,10 +90,8 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include>
 )
+target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC

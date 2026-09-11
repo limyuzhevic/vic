@@ -345,48 +345,131 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
+              py::arg("stage"),
+              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+              "Log brain status")
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+        // ========== ADVANCED BRAIN CONFIGURATION COMMANDS ==========
+
+        .def("batchLoadFromFiles", &Brain::batchLoadFromFiles,
+              py::arg("filepaths"),
+              "Batch load configuration from multiple files")
+        .def("saveCheckpoint", &Brain::saveCheckpoint,
+              py::arg("name"), py::arg("compression") = CompressionLevel::Balanced,
+              "Save brain state to checkpoint with custom name")
+        .def("loadCheckpoint", &Brain::loadCheckpoint,
+              py::arg("name"),
+              "Load brain state from checkpoint with custom name")
+        .def("batchSaveCheckpoints", &Brain::batchSaveCheckpoints,
+              py::arg("names"), py::arg("compression") = CompressionLevel::Balanced,
+              "Batch save brain state to multiple checkpoints")
+        .def("batchLoadCheckpoints", &Brain::batchLoadCheckpoints,
+              py::arg("names"),
+              "Batch load brain state from multiple checkpoints")
+        .def("listCheckpoints", &Brain::listCheckpoints,
+              "List available checkpoints")
+        .def("resumeFromCheckpoint", &Brain::resumeFromCheckpoint,
+              py::arg("checkpointPath"),
+              "Resume simulation from checkpoint")
+        .def("getCheckpointStep", &Brain::getCheckpointStep,
+              py::arg("checkpointPath"),
+              "Get simulation step from checkpoint")
+        .def("getCheckpointTime", &Brain::getCheckpointTime,
+              py::arg("checkpointPath"),
+              "Get simulation time from checkpoint")
+
+        // ========== EXPERT SIMULATION CONTROL ==========
+
+        .def("setSimulationSpeed", &Brain::setSimulationSpeed,
+              py::arg("speed"),
+              "Set simulation speed (1.0 = normal, >1.0 = fast-forward, <1.0 = slow-motion)")
+        .def("getSimulationSpeed", &Brain::getSimulationSpeed,
+              "Get current simulation speed")
+        .def("setTimeScale", &Brain::setTimeScale,
+              py::arg("scale"),
+              "Set time scale multiplier")
+        .def("getTimeScale", &Brain::getTimeScale,
+              "Get current time scale")
+        .def("enableParallelExecution", &Brain::enableParallelExecution,
+              py::arg("enable"),
+              "Enable/disable parallel simulation execution")
+        .def("isParallelExecutionEnabled", &Brain::isParallelExecutionEnabled,
+              "Check if parallel execution is enabled")
+        .def("getParallelRegionCount", &Brain::getParallelRegionCount,
+              "Get number of parallel regions")
+        .def("setParallelRegionCount", &Brain::setParallelRegionCount,
+              py::arg("count"),
+              "Set number of parallel regions")
+
+        // ========== ADVANCED PLASTICITY CONTROL ==========
+
+        .def("setPlasticityEnabled", &Brain::setPlasticityEnabled,
+              py::arg("enabled"),
+              "Enable/disable plasticity")
+        .def("isPlasticityEnabled", &Brain::isPlasticityEnabled,
+              "Check if plasticity is enabled")
+        .def("adjustPlasticityParameters", &Brain::adjustPlasticityParameters,
+              py::arg("stdpLTP"), py::arg("stdpLTD"), py::arg("hebbianRate"),
+              "Adjust plasticity parameters")
+        .def("configurePlasticityRule", &Brain::configurePlasticityRule,
+              py::arg("ruleType"), py::arg("strength") = 1.0f,
+              "Configure plasticity rule")
+        .def("getSTDPPower", &Brain::getSTDPPower,
+              "Get STDP power")
+        .def("getHebbianPower", &Brain::getHebbianPower,
+              "Get Hebbian power")
+        .def("getRewardModulationPower", &Brain::getRewardModulationPower,
+              "Get reward modulation power")
+        .def("applyPlasticitySignal", &Brain::applyPlasticitySignal,
+              py::arg("signal"),
+              "Apply external plasticity signal")
+
+        // ========== MEMORY MANAGEMENT COMMANDS ==========
+
+        .def("compactWorkingMemory", &Brain::compactWorkingMemory,
+              "Manually compact working memory")
+        .def("profileMemoryUsage", &Brain::profileMemoryUsage,
+              "Profile memory usage")
+        .def("getMemoryState", &Brain::getMemoryState,
+              "Get memory state as string")
+
+        // ========== ADVANCED ANALYSIS COMMANDS ==========
+
+        .def("analyzeNetworkTopology", &Brain::analyzeNetworkTopology,
+              "Analyze network topology")
+        .def("suggestLearningRates", &Brain::suggestLearningRates,
+              "Suggest optimal learning rates")
+        .def("analyzePatternRecognition", &Brain::analyzePatternRecognition,
+              "Analyze pattern recognition capabilities")
+
+        // ========== CONFIGURATION MANAGEMENT ==========
+
+        .def("validateSchema", &Brain::validateSchema,
+              "Validate configuration schema")
+        .def("compareConfigurations", &Brain::compareConfigurations,
+              py::arg("other"),
+              "Compare configurations")
+        .def("optimizeConfiguration", &Brain::optimizeConfiguration,
+              "Optimize configuration")
+
+        // ========== MONITORING & DEBUGGING COMMANDS ==========
+
+        .def("startPerformanceMonitoring", &Brain::startPerformanceMonitoring,
+              "Start performance monitoring")
+        .def("stopPerformanceMonitoring", &Brain::stopPerformanceMonitoring,
+              "Stop performance monitoring")
+        .def("isPerformanceMonitoringActive", &Brain::isPerformanceMonitoringActive,
+              "Check if performance monitoring is active")
+        .def("getPerformanceMetrics", &Brain::getPerformanceMetrics,
+              "Get performance metrics")
+        .def("getMemoryUsage", &Brain::getMemoryUsage,
+              "Get memory usage string")
+        .def("profileNeuralActivity", &Brain::profileNeuralActivity,
+              "Profile neural activity")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
