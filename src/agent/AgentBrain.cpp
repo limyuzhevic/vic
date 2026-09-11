@@ -101,7 +101,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            // Scale collision signals to meaningful current injection range
+            // touch values are typically in [0, 1], collision signal is stronger
+            float current = touch[i] * 8.0f;  // Enhanced collision detection
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
