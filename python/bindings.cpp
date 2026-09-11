@@ -15,6 +15,9 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -399,6 +402,33 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    // Add Curiosity bindings
+    py::class_<Curiosity>(m, "Curiosity", R"pbdoc(Curiosity-driven exploration)pbdoc")
+        .def("getLevel", &Curiosity::getLevel,
+             "Get current curiosity level")
+        .def("initialize", &Curiosity::initialize,
+             py::arg("brain"), "Initialize curiosity system");
+
+    // Add Novelty bindings  
+    py::class_<Novelty>(m, "Novelty", R"pbdoc(Ne novelty detection)pbdoc")
+        .def("getLevel", &Novelty::getLevel,
+             "Get current novelty level")
+        .def("update", &Novelty::update,
+             py::arg("dt"), "Update novelty detection")
+        .def("initialize", &Novelty::initialize,
+             py::arg("brain"), "Initialize novelty detection");
+
+    // Add PredictionError bindings
+    py::class_<PredictionError>(m, "PredictionError", R"pbdoc(Prediction error signal)pbdoc")
+        .def("getLevel", &PredictionError::getLevel,
+             "Get current prediction error level")
+        .def("update", &PredictionError::update,
+             py::arg("dt"), "Update prediction error")
+        .def("signalPredictionError", &PredictionError::signalPredictionError,
+             py::arg("error"), "Signal prediction error")
+        .def("initialize", &PredictionError::initialize,
+             py::arg("brain"), "Initialize prediction error system");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

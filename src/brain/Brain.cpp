@@ -269,20 +269,38 @@ bool Brain::initialize() {
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
         // Find destination neuron and deliver synaptic input
+        bool found = false;
+        
+        // Iterate directly over regions and neurons without creating temporary copies
         for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
+            // Check if region has populations before proceeding
+            const auto& populations = region->getPopulations();
+            if (populations.empty()) continue;
+            
+            for (const auto& pop : populations) {
+                // Check if population has neurons before proceeding
+                const auto& neurons = pop->getNeurons();
+                if (neurons.empty()) continue;
+                
+                for (const auto& neuron : neurons) {
+                    // Check null pointer before accessing
+                    if (!neuron) continue;
+                    
+                    if (neuron->getId() == event.destination_neuron) {
+                        // Apply synaptic weight as current
+                        MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                        if (event.is_excitatory) {
+                            neuron->receiveExcitatoryInput(synapticCurrent);
+                        } else {
+                            neuron->receiveInhibitoryInput(-synapticCurrent);
+                        }
+                        found = true;
+                        break;
                     }
-                    return;
                 }
+                if (found) break;
             }
+            if (found) break;
         }
     });
     
