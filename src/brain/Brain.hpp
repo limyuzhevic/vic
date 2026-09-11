@@ -97,24 +97,30 @@ public:
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
     
-    // Apply neuromodulatory signals
+// Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
-    
+
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();
-    
+
     // Apply developmental changes (called automatically in step)
     void develop();
-    
+
     // Reset brain state
     void reset();
-    
+
+    // Replay episodes from episodic memory
+    void replayEpisodes();
+
+    // Consolidate working memory to episodic memory
+    void consolidateMemory();
+
     // Save brain state to file (checkpointing)
     bool save(const std::string& filepath) const;
-    
+
     // Load brain state from file
     bool load(const std::string& filepath);
-    
+
     // Region management
     RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);
@@ -139,19 +145,19 @@ public:
     
     // ========== MEMORY SYSTEMS ==========
     
-    // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
-    
+// Working memory - transient active information
+    NeuralWorkingMemory* getWorkingMemory() { return pImpl->workingMemory.get(); }
+
     // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
-    
+    NeuralEpisodicMemory* getEpisodicMemory() { return pImpl->episodicMemory.get(); }
+
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
-    
+    NeuralAssociativeMemory* getAssociativeMemory() { return pImpl->associativeMemory.get(); }
+
     // ========== PREDICTION SYSTEM ==========
-    
+
     // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    PredictionSystem* getPredictionSystem() { return pImpl->predictionSystem.get(); }
     
     // ========== COGNITION SYSTEMS ==========
     

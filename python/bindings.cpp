@@ -15,8 +15,23 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/Memory.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/AttentionalSelection.hpp"
 
+// Wrapper classes to expose systems with Pythonic interfaces
 namespace py = pybind11;
+
 namespace nlm {
 
 PYBIND11_MODULE(pynlm, m) {
@@ -24,11 +39,13 @@ PYBIND11_MODULE(pynlm, m) {
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        Provides complete Phase 6 integration with working memory, episodic memory,
+        prediction, cognition, development, and neuromodulation systems.
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
+    // Type definitions for Python
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -73,6 +90,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
 
+    // Enumerations
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
         .value("Inhibitory", NeuronType::Inhibitory)
@@ -142,6 +160,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // ===== CONFIGURATION CLASS =====
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -164,6 +183,7 @@ PYBIND11_MODULE(pynlm, m) {
             return "<Config: " + cfg.summary() + ">";
         });
 
+    // ===== SENSORY INPUT CLASSES =====
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
@@ -198,6 +218,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
+    // ===== MOTOR CLASSES =====
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
         .def(py::init<ActionType>(), py::arg("type"))
@@ -209,6 +230,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getName", &Action::getName)
         .def("clone", &Action::clone);
 
+    // ===== WORLD OBJECTS =====
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
         .def(py::init<float, float, WorldObjectType, float, float>(),
@@ -263,6 +285,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
+    // ===== WORLD CLASS =====
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
@@ -289,6 +312,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // ===== BRAIN CLASS BINDINGS (COMPLETE) =====
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -342,6 +366,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get pending spike event count")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -351,8 +377,51 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // ===== PHASE 6 INTEGRATED SYSTEMS =====
+        // Memory Systems
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        // Prediction System
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        // Cognition Systems
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+        // Development System
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        // Neuromodulation Systems
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity neuromodulator")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty neuromodulator")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error signal");
 
+    // ===== AGENT BRAIN CLASS =====
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -387,19 +456,42 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        // Pythonic APIs
+        .def("with_configs", [](AgentBrain& self, const std::vector<std::string>& configKeys) {
+            for (const auto& key : configKeys) {
+                self.getBrain()->getConfig()->set(key, true);
+            }
+            return self;
+        }, py::arg("configKeys"),
+             "Enable multiple configuration options (returns self for chaining)")
+        .def("enable_all_systems", [](AgentBrain& self) {
+            self.enableRewardModulation(true);
+            self.enableStructuralPlasticity(true);
+            self.enableDevelopment(true);
+            self.enableCuriosity(true);
+            return self;
+        }, "Enable all neuromodulation and development systems (returns self for chaining)")
+        .def("disable_all_systems", [](AgentBrain& self) {
+            self.enableRewardModulation(false);
+            self.enableStructuralPlasticity(false);
+            self.enableDevelopment(false);
+            self.enableCuriosity(false);
+            return self;
+        }, "Disable all neuromodulation and development systems (returns self for chaining)")
+        .def("get_system_status", [](const AgentBrain& self) {
+            py::dict status;
+            status["rewardModulation"] = self.isRewardModulationEnabled();
+            status["structuralPlasticity"] = self.isStructuralPlasticityEnabled();
+            status["development"] = self.isDevelopmentEnabled();
+            status["curiosity"] = self.isCuriosityEnabled();
+            status["neuromodulationLevel"] = self.getNeuromodulationLevel();
+            status["curiosityLevel"] = self.getCuriosityLevel();
+            status["noveltyLevel"] = self.getNoveltyLevel();
+            status["predictionError"] = self.getPredictionError();
+            return status;
+        }, "Get system status as a Python dictionary");
 
+    // ===== FACTORY FUNCTIONS =====
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,10 +508,48 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Phase 6 Integration: Python factory functions for complete system setup
+    m.def("createPhase6Brain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("workingMemory.capacity", 1000);
+        config->set("episodicMemory.maxSize", 1000);
+        config->set("predictionSystem.enabled", true);
+        config->set("cognition.planner.enabled", true);
+        config->set("cognition.conceptFormation.enabled", true);
+        config->set("cognition.attention.enabled", true);
+        config->set("developmentSystem.enabled", true);
+        config->set("neuromodulation.dopamine.enabled", true);
+        config->set("neuromodulation.curiosity.enabled", true);
+        config->set("neuromodulation.novelty.enabled", true);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a Phase 6 integrated brain with all systems enabled");
+
+    // Power User: Low-level system accessors
+    m.def("getWorkingMemory", [](std::shared_ptr<Brain> brain) -> std::unique_ptr<NeuralWorkingMemory> {
+        return std::make_unique<NeuralWorkingMemory>(brain->getWorkingMemory());
+    }, py::arg("brain"), "Get working memory system reference");
+    
+    m.def("getEpisodicMemory", [](std::shared_ptr<Brain> brain) -> std::unique_ptr<NeuralEpisodicMemory> {
+        return std::make_unique<NeuralEpisodicMemory>(brain->getEpisodicMemory());
+    }, py::arg("brain"), "Get episodic memory system reference");
+    
+    m.def("getAssociativeMemory", [](std::shared_ptr<Brain> brain) -> std::unique_ptr<NeuralAssociativeMemory> {
+        return std::make_unique<NeuralAssociativeMemory>(brain->getAssociativeMemory());
+    }, py::arg("brain"), "Get associative memory system reference");
+    
+    m.def("getPredictionSystem", [](std::shared_ptr<Brain> brain) -> std::unique_ptr<PredictionSystem> {
+        return std::make_unique<PredictionSystem>(brain->getPredictionSystem());
+    }, py::arg("brain"), "Get prediction system reference");
+    
+    m.def("getDevelopmentSystem", [](std::shared_ptr<Brain> brain) -> std::unique_ptr<DevelopmentSystem> {
+        return std::make_unique<DevelopmentSystem>(brain->getDevelopmentSystem());
+    }, py::arg("brain"), "Get development system reference");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
-
-} // namespace nlm

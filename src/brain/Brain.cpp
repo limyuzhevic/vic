@@ -9,11 +9,17 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../brain/AttentionalSelection.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -49,6 +55,11 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    
+    // Phase 3: Additional neuromodulators
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -106,8 +117,8 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
+// ========== INITIALIZE INTEGRATED SYSTEMS ==========
+
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
@@ -129,6 +140,11 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Phase 3: Add remaining neuromodulators
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -511,8 +527,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input
+        // Prediction system predicts next state and computes prediction error
+        std::unique_ptr<SensoryInput> prediction = pImpl->predictionSystem->predictNextState(sensoryInput);
+        
+        // Update prediction error signal
+        float predictedValue = pImpl->predictionSystem->getPredictionError();
+        float actualValue = 0.0f;
+        if (!sensoryInput.empty()) {
+            actualValue = sensoryInput[0];
+        }
+        pImpl->predictionError->computeError(predictedValue, actualValue);
+        
+        // Update curiosity with prediction error
+        float curiosityInput = pImpl->predictionError->getMagnitude();
+        pImpl->curiosity->update(pImpl->novelty->getLevel(), curiosityInput, pImpl->timestep);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +557,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Get current sensory input for concept formation
+        std::vector<float> currentFeatures;
+        if (!sensoryInput.empty()) {
+            currentFeatures = sensoryInput;
+        }
+        
+        // Present experience to concept formation system
+        if (!currentFeatures.empty()) {
+            pImpl->conceptFormation->presentExperience(
+                currentFeatures, 
+                currentFeatures, 
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                pImpl->currentStep
+            );
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -761,6 +803,233 @@ void Brain::reset() {
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
+void Brain::replayEpisodes() {
+    if (!pImpl->episodicMemory) return;
+    
+    // Select important episodes for replay based on:
+    // 1. Recency (more recent episodes)
+    // 2. Reward (higher reward episodes)
+    // 3. Unpredictability (higher prediction error episodes)
+    
+    std::vector<const EpisodicMemoryItem*> episodesToReplay = 
+        pImpl->episodicMemory->getEpisodesForReplay(3);
+    
+    for (const auto* episode : episodesToReplay) {
+        pImpl->episodicMemory->replayEpisode(episode);
+    }
+    
+    // During replay, increase neuromodulation for consolidation
+    if (pImpl->dopamine) {
+        float currentLevel = pImpl->dopamine->getLevel();
+        pImpl->dopamine->setLevel(currentLevel * 1.2f);  // Boost dopamine during replay
+    }
+    
+    NLM_LOG_INFO("Replayed " + std::to_string(episodesToReplay.size()) + " episodes");
+}
+
+void Brain::consolidateMemory() {
+    if (!pImpl->episodicMemory || !pImpl->workingMemory) return;
+    
+    // Consolidate episodic memory
+    pImpl->episodicMemory->consolidate(0.3f);
+    
+    // Transfer important working memory traces to episodic memory
+    std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+    if (!memoryNeurons.empty()) {
+        // Create a simple episodic memory from working memory
+        EpisodicMemoryItem episode;
+        episode.timestamp = pImpl->currentStep;
+        episode.action = ActionType::Wait;  // Default action
+        episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Store active neurons from working memory
+        for (size_t i = 0; i < std::min(memoryNeurons.size(), size_t(10)); ++i) {
+            episode.activeNeurons.push_back(memoryNeurons[i]);
+            // Use activation level from working memory
+            float activation = pImpl->workingMemory->getNeuronActivation(memoryNeurons[i]);
+            episode.neuronActivations.push_back(activation);
+        }
+        
+        pImpl->episodicMemory->storeEpisode(episode);
+        NLM_LOG_INFO("Consolidated working memory to episodic memory");
+    }
+    
+    // Clear working memory after consolidation
+    pImpl->workingMemory->clear();
+}
+
+void Brain::enterRest() {
+    if (pImpl->isResting) return;
+    
+    NLM_LOG_INFO("Entering resting phase for memory consolidation...");
+    pImpl->isResting = true;
+    
+    // Reduce neural activity during rest
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                // Inject inhibitory current to reduce activity
+                neuron->injectCurrent(-5.0f);
+            }
+        }
+    }
+    
+    // Reduce neuromodulation levels
+    if (pImpl->dopamine) {
+        pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() * 0.5f);
+    }
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->setLevel(pImpl->acetylcholine->getLevel() * 0.3f);
+    }
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->setLevel(pImpl->norepinephrine->getLevel() * 0.4f);
+    }
+    
+    // Increase cholinergic tone for memory consolidation
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->setLevel(0.8f);
+    }
+    
+    // Schedule replay and consolidation during rest
+    replayEpisodes();
+    consolidateMemory();
+}
+
+void Brain::exitRest() {
+    if (!pImpl->isResting) return;
+    
+    NLM_LOG_INFO("Exiting resting phase - returning to normal activity");
+    pImpl->isResting = false;
+    
+    // Restore neuromodulation levels
+    if (pImpl->dopamine) {
+        pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() * 1.5f);  // Return to normal
+    }
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->setLevel(pImpl->acetylcholine->getLevel() * 1.2f);
+    }
+    
+    // Restore neural activity
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                // Reduce inhibitory current
+                neuron->injectCurrent(2.0f);
+            }
+        }
+    }
+}
+
+void Brain::replayEpisodes() {
+    if (!pImpl->episodicMemory) return;
+    
+    // Select important episodes for replay based on:
+    // 1. Recency (more recent episodes)
+    // 2. Reward (higher reward episodes)
+    // 3. Unpredictability (higher prediction error episodes)
+    
+    std::vector<const EpisodicMemoryItem*> episodesToReplay = 
+        pImpl->episodicMemory->getEpisodesForReplay(3);
+    
+    for (const auto* episode : episodesToReplay) {
+        pImpl->episodicMemory->replayEpisode(episode);
+    }
+    
+    // During replay, increase neuromodulation for consolidation
+    if (pImpl->dopamine) {
+        float currentLevel = pImpl->dopamine->getLevel();
+        pImpl->dopamine->setLevel(currentLevel * 1.2f);  // Boost dopamine during replay
+    }
+    
+    NLM_LOG_INFO("Replayed " + std::to_string(episodesToReplay.size()) + " episodes");
+}
+
+void Brain::consolidateMemory() {
+    if (!pImpl->episodicMemory || !pImpl->workingMemory) return;
+    
+    // Consolidate episodic memory
+    pImpl->episodicMemory->consolidate(0.3f);
+    
+    // Transfer important working memory traces to episodic memory
+    std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+    if (!memoryNeurons.empty()) {
+        // Create a simple episodic memory from working memory
+        EpisodicMemoryItem episode;
+        episode.timestamp = pImpl->currentStep;
+        episode.action = ActionType::Wait;  // Default action
+        episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Store active neurons from working memory
+        for (size_t i = 0; i < std::min(memoryNeurons.size(), size_t(10)); ++i) {
+            episode.activeNeurons.push_back(memoryNeurons[i]);
+            // Use activation level from working memory
+            float activation = pImpl->workingMemory->getNeuronActivation(memoryNeurons[i]);
+            episode.neuronActivations.push_back(activation);
+        }
+        
+        pImpl->episodicMemory->storeEpisode(episode);
+        NLM_LOG_INFO("Consolidated working memory to episodic memory");
+    }
+    
+    // Clear working memory after consolidation
+    pImpl->workingMemory->clear();
+}
+
+void Brain::replayEpisodes() {
+    if (!pImpl->episodicMemory) return;
+    
+    // Select important episodes for replay based on:
+    // 1. Recency (more recent episodes)
+    // 2. Reward (higher reward episodes)
+    // 3. Unpredictability (higher prediction error episodes)
+    
+    std::vector<const EpisodicMemoryItem*> episodesToReplay = 
+        pImpl->episodicMemory->getEpisodesForReplay(3);
+    
+    for (const auto* episode : episodesToReplay) {
+        pImpl->episodicMemory->replayEpisode(episode);
+    }
+    
+    // During replay, increase neuromodulation for consolidation
+    if (pImpl->dopamine) {
+        float currentLevel = pImpl->dopamine->getLevel();
+        pImpl->dopamine->setLevel(currentLevel * 1.2f);  // Boost dopamine during replay
+    }
+    
+    NLM_LOG_INFO("Replayed " + std::to_string(episodesToReplay.size()) + " episodes");
+}
+
+void Brain::consolidateMemory() {
+    if (!pImpl->episodicMemory || !pImpl->workingMemory) return;
+    
+    // Consolidate episodic memory
+    pImpl->episodicMemory->consolidate(0.3f);
+    
+    // Transfer important working memory traces to episodic memory
+    std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+    if (!memoryNeurons.empty()) {
+        // Create a simple episodic memory from working memory
+        EpisodicMemoryItem episode;
+        episode.timestamp = pImpl->currentStep;
+        episode.action = ActionType::Wait;  // Default action
+        episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Store active neurons from working memory
+        for (size_t i = 0; i < std::min(memoryNeurons.size(), size_t(10)); ++i) {
+            episode.activeNeurons.push_back(memoryNeurons[i]);
+            // Use activation level from working memory
+            float activation = pImpl->workingMemory->getNeuronActivation(memoryNeurons[i]);
+            episode.neuronActivations.push_back(activation);
+        }
+        
+        pImpl->episodicMemory->storeEpisode(episode);
+        NLM_LOG_INFO("Consolidated working memory to episodic memory");
+    }
+    
+    // Clear working memory after consolidation
+    pImpl->workingMemory->clear();
+}
+
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
@@ -827,6 +1096,50 @@ bool Brain::save(const std::string& filepath) const {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
             return false;
         }
+        
+        // Write development state
+        // TODO: Add development state checkpointing
+        DevelopmentSystemData devData;
+        devData.developmentalStage = pImpl->developmentalStage;
+        devData.developmentalAge = pImpl->developmentSystem ? pImpl->developmentSystem->getDevelopmentalAge() : 0.0;
+        devData.stageStartStep = pImpl->developmentSystem ? pImpl->developmentSystem->getStageStartStep() : 0;
+        devData.stepsInCurrentStage = pImpl->developmentSystem ? pImpl->developmentSystem->getStepsInCurrentStage() : 0;
+        devData.stageAge = pImpl->developmentSystem ? pImpl->developmentSystem->getStageAge() : 0.0;
+        
+        writer.writeSection(CheckpointSection::Development, &devData, sizeof(DevelopmentSystemData));
+        
+        // Write neuromodulation states
+        // TODO: Add neuromodulation checkpointing
+        NeuromodulationState neuromodData;
+        if (pImpl->dopamine) {
+            neuromodData.dopamineLevel = pImpl->dopamine->getLevel();
+        }
+        if (pImpl->novelty) {
+            neuromodData.noveltyLevel = pImpl->novelty->getLevel();
+        }
+        if (pImpl->curiosity) {
+            neuromodData.curiosityLevel = pImpl->curiosity->getLevel();
+        }
+        if (pImpl->predictionError) {
+            neuromodData.predictionErrorLevel = pImpl->predictionError->getMagnitude();
+        }
+        
+        writer.writeSection(CheckpointSection::Neuromodulation, &neuromedData, sizeof(NeuromodulationState));
+        
+        // Write memory states
+        MemoryState memoryData;
+        // Working memory
+        if (pImpl->workingMemory) {
+            memoryData.workingMemoryActiveTraces = pImpl->workingMemory->getActiveTraces();
+            memoryData.workingMemoryCapacity = pImpl->workingMemory->getCapacity();
+        }
+        // Episodic memory
+        if (pImpl->episodicMemory) {
+            memoryData.episodicMemoryCount = pImpl->episodicMemory->getEpisodeCount();
+            memoryData.episodicMemoryMaxEpisodes = pImpl->episodicMemory->getMaxEpisodes();
+        }
+        
+        writer.writeSection(CheckpointSection::Memory, &memoryData, sizeof(MemoryState));
         
         // Finalize
         if (!writer.finalize()) {
