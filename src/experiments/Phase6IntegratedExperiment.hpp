@@ -130,9 +130,23 @@ public:
     bool testCheckpointing();
     
     /**
-     * Test replay system
+     * Test plasticity integration
      */
-    bool testReplay();
-};
+    bool testPlasticityIntegration();
+    
+    /**
+     * Test development integration
+     */
+    bool testDevelopmentIntegration();
+    
+    /**
+     * Test reward-based learning
+     */
+    bool testRewardLearning();
+    
+    /**
+     * Test curiosity-driven exploration
+     */
+    bool testCuriosityDrivenExploration();
 
 } // namespace nlm

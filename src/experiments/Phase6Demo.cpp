@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
     
     std::cout << "Integration verification passed!" << std::endl << std::endl;
     
-    // Test individual systems
+    // Test individual systems with better error handling
     std::cout << "--- Memory Integration Test ---" << std::endl;
     experiment.testMemoryIntegration();
     std::cout << std::endl;
@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
+        // Run full experiment with smaller settings for demo
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;
     config.neuronCount = 500;

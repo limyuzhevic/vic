@@ -11,6 +11,7 @@ namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// IMPROVED: Cleaner organization, better documentation, and more user-friendly configuration
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -69,6 +70,36 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Configuration utility methods
+    void setSensoryNoveltyDecay(float decay) { sensoryNoveltyDecay_ = decay; }
+    float getSensoryNoveltyDecay() const { return sensoryNoveltyDecay_; }
+    
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = threshold; }
+    float getCuriosityThreshold() const { return curiosityThreshold_; }
+    
+    void setExplorationRate(float rate) { explorationRate_ = rate; }
+    float getExplorationRate() const { return explorationRate_; }
+    
+    // State inspection methods for debugging and monitoring
+    int getVisionSensoryCount() const { return static_cast<int>(sensoryVision_.size()); }
+    int getTouchSensoryCount() const { return static_cast<int>(sensoryTouch_.size()); }
+    int getInternalSensoryCount() const { return static_cast<int>(sensoryInternal_.size()); }
+    int getProprioceptionSensoryCount() const { return static_cast<int>(sensoryProprioception_.size()); }
+    
+    int getMotorActionCount() const { return static_cast<int>(motorForward_.size() + motorBackward_.size() + 
+        motorTurnLeft_.size() + motorTurnRight_.size() + motorInteract_.size() + motorWait_.size()); }
+    
+    float getTotalMotorNeuronActivity() const {
+        float total = 0.0f;
+        for (const auto* n : motorForward_) total += n->getState().membranePotential;
+        for (const auto* n : motorBackward_) total += n->getState().membranePotential;
+        for (const auto* n : motorTurnLeft_) total += n->getState().membranePotential;
+        for (const auto* n : motorTurnRight_) total += n->getState().membranePotential;
+        for (const auto* n : motorInteract_) total += n->getState().membranePotential;
+        for (const auto* n : motorWait_) total += n->getState().membranePotential;
+        return total;
+    }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -109,9 +140,13 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
+    // Advanced configuration
+    float sensoryNoveltyDecay_;
+    float curiosityThreshold_;
+    float explorationRate_;
+    
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
 };
 
 } // namespace nlm
