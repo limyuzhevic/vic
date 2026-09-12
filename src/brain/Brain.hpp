@@ -28,6 +28,14 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+class CheckpointManager;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -183,6 +191,15 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Acetylcholine - attention and learning
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and exploration
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and behavioral inhibition
+    Serotonin* getSerotonin();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
