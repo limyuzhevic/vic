@@ -1,4 +1,17 @@
 #include "SensoryPercept.hpp"
+#include "../brain/Brain.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 
 namespace nlm {
 
@@ -11,7 +24,7 @@ SensoryPercept::SensoryPercept()
     touch_.resize(8, 0.0f);
     internal_.resize(4, 0.0f);
     proprioception_.resize(6, 0.0f);
-    audio_.resize(0, 0.0f);
+    // Audio signals are optional - size 0 means not used
 }
 
 std::vector<float> SensoryPercept::getAllSignals() const {

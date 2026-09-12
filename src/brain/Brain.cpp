@@ -229,35 +229,82 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
+// Verify that all integrated systems are properly initialized
+    NLM_LOG_INFO("Verifying system integration...");
     
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    // Check working memory - if it's nullptr, create it
+    if (!pImpl->workingMemory) {
+        NLM_LOG_WARNING("Working memory not initialized, creating...");
+        pImpl->workingMemory = std::make_unique<NeuralWorkingMemory>();
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    }
     
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    // Check episodic memory - if it's nullptr, create it
+    if (!pImpl->episodicMemory) {
+        NLM_LOG_WARNING("Episodic memory not initialized, creating...");
+        pImpl->episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    }
     
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    // Check associative memory - if it's nullptr, create it
+    if (!pImpl->associativeMemory) {
+        NLM_LOG_WARNING("Associative memory not initialized, creating...");
+        pImpl->associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        pImpl->associativeMemory->initialize(this);
+    }
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // Check prediction system - if it's nullptr, create it
+    if (!pImpl->predictionSystem) {
+        NLM_LOG_WARNING("Prediction system not initialized, creating...");
+        pImpl->predictionSystem = std::make_unique<PredictionSystem>();
+        pImpl->predictionSystem->initialize(this);
+    }
     
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    // Check cognition systems
+    if (!pImpl->planner) {
+        NLM_LOG_WARNING("Neural planner not initialized, creating...");
+        pImpl->planner = std::make_unique<NeuralPlanner>();
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (!pImpl->conceptFormation) {
+        NLM_LOG_WARNING("Concept formation not initialized, creating...");
+        pImpl->conceptFormation = std::make_unique<ConceptFormation>();
+        pImpl->conceptFormation->initialize(this);
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    if (!pImpl->attention) {
+        NLM_LOG_WARNING("Attentional selection not initialized, creating...");
+        pImpl->attention = std::make_unique<AttentionalSelection>();
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+    }
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    // Check neuromodulation systems
+    if (!pImpl->novelty) {
+        NLM_LOG_WARNING("Novelty detector not initialized, creating...");
+        pImpl->novelty = std::make_unique<Novelty>();
+        pImpl->novelty->initialize(this);
+    }
+    
+    if (!pImpl->curiosity) {
+        NLM_LOG_WARNING("Curiosity system not initialized, creating...");
+        pImpl->curiosity = std::make_unique<Curiosity>();
+        pImpl->curiosity->initialize(this);
+    }
+    
+    // Check development system
+    if (!pImpl->developmentSystem) {
+        NLM_LOG_WARNING("Development system not initialized, creating...");
+        pImpl->developmentSystem = std::make_unique<DevelopmentSystem>();
+        pImpl->developmentSystem->initialize(this);
+    }
+    
+    NLM_LOG_INFO("System integration complete - all components initialized successfully");
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -1035,6 +1082,148 @@ ConceptFormation* Brain::getConceptFormation() {
 
 AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
+}
+
+// Connect cognitive systems to brain operation for Phase 6 integration
+void Brain::connectCognitiveSystems() {
+    if (!pImpl->planner || !pImpl->conceptFormation || !pImpl->attention) {
+        NLM_LOG_ERROR("Cannot connect cognitive systems - missing components");
+        return;
+    }
+    
+    NLM_LOG_INFO("Connecting cognitive systems to brain loop");
+    
+    // Connect neural planner to action selection
+    pImpl->planner->setActionSelector([this]() {
+        return produceAction();
+    });
+    
+    // Connect concept formation to sensory processing
+    pImpl->conceptFormation->setInputProvider([this]() {
+        // Collect current neural activity patterns
+        std::vector<float> patterns;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        patterns.push_back(1.0f);
+                    } else {
+                        patterns.push_back(0.0f);
+                    }
+                }
+            }
+        }
+        return patterns;
+    });
+    
+    // Connect attention system to working memory
+    pImpl->attention->setWorkingMemorySource([this]() {
+        if (pImpl->workingMemory) {
+            return pImpl->workingMemory->getMemoryNeurons();
+        }
+        return std::vector<NeuronId>();
+    });
+    
+    // Initialize cognitive system integration
+    pImpl->planner->initializeCognitiveIntegration(this);
+    pImpl->conceptFormation->initializeConceptIntegration(this);
+    pImpl->attention->initializeAttentionIntegration(this);
+    
+    NLM_LOG_INFO("Cognitive systems integration complete");
+}
+
+// Simplified action selection based on motor neuron activity
+std::unique_ptr<Action> Brain::produceAction() {
+    // Simple action selection based on motor neuron activity
+    // The motor neuron population with highest average activity determines action
+    
+    if (pImpl->motorNeurons.empty()) {
+        return std::make_unique<Action>(ActionType::Wait);
+    }
+    
+    // Calculate activity of motor neuron groups
+    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
+        if (neurons.empty()) return 0.0f;
+        float sum = 0.0f;
+        for (Neuron* n : neurons) {
+            // Use membrane potential deviation from rest as activity measure
+            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+        }
+        return sum / neurons.size();
+    };
+    
+    // Group motor neurons by functional type
+    std::vector<Neuron*> motorForward;
+    std::vector<Neuron*> motorBackward;
+    std::vector<Neuron*> motorTurnLeft;
+    std::vector<Neuron*> motorTurnRight;
+    std::vector<Neuron*> motorInteract;
+    std::vector<Neuron*> motorWait;
+    
+    // Categorize motor neurons
+    for (auto* neuron : pImpl->motorNeurons) {
+        auto* pop = neuron->getPopulation();
+        if (!pop) continue;
+        
+        if (pop->getName().find("forward") != std::string::npos || 
+            pop->getName().find("move_forward") != std::string::npos) {
+            motorForward.push_back(neuron);
+        } else if (pop->getName().find("backward") != std::string::npos || 
+                   pop->getName().find("move_backward") != std::string::npos) {
+            motorBackward.push_back(neuron);
+        } else if (pop->getName().find("left") != std::string::npos || 
+                   pop->getName().find("turn_left") != std::string::npos) {
+            motorTurnLeft.push_back(neuron);
+        } else if (pop->getName().find("right") != std::string::npos || 
+                   pop->getName().find("turn_right") != std::string::npos) {
+            motorTurnRight.push_back(neuron);
+        } else if (pop->getName().find("interact") != std::string::npos || 
+                   pop->getName().find("use") != std::string::npos) {
+            motorInteract.push_back(neuron);
+        } else {
+            motorWait.push_back(neuron);
+        }
+    }
+    
+    // Calculate activity of each motor group
+    float forwardAct = calcActivity(motorForward);
+    float backwardAct = calcActivity(motorBackward);
+    float leftAct = calcActivity(motorTurnLeft);
+    float rightAct = calcActivity(motorTurnRight);
+    float interactAct = calcActivity(motorInteract);
+    float waitAct = calcActivity(motorWait);
+    
+    // Find maximum activity
+    float bestActivity = waitAct;
+    ActionType bestAction = ActionType::Wait;
+    
+    if (forwardAct > bestActivity) {
+        bestActivity = forwardAct;
+        bestAction = ActionType::MoveForward;
+    }
+    if (backwardAct > bestActivity) {
+        bestActivity = backwardAct;
+        bestAction = ActionType::MoveBackward;
+    }
+    if (leftAct > bestActivity) {
+        bestActivity = leftAct;
+        bestAction = ActionType::TurnLeft;
+    }
+    if (rightAct > bestActivity) {
+        bestActivity = rightAct;
+        bestAction = ActionType::TurnRight;
+    }
+    if (interactAct > bestActivity) {
+        bestActivity = interactAct;
+        bestAction = ActionType::Interact;
+    }
+    
+    // Only act if there's meaningful activity
+    if (bestActivity < 0.5f) {
+        bestAction = ActionType::Wait;
+    }
+    
+    return std::make_unique<Action>(bestAction);
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
