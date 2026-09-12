@@ -511,8 +511,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory activity
+        // This enables prediction error signals for learning
+        
+        // Get current sensory activity as a simple vector of activations
+        std::vector<float> currentSensoryActivity;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == NeuronType::Sensory) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        currentSensoryActivity.push_back(
+                            std::abs(neuron->getState().membranePotential - 
+                                    neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+        }
+        
+        if (!currentSensoryActivity.empty()) {
+            // Create a simple sensory input for prediction
+            // In a full implementation, this would use the actual sensory input pipeline
+            auto predicted = pImpl->predictionSystem->predictNextState(
+                SensoryInput(currentSensoryActivity));
+            
+            // Update predictions using actual and predicted states
+            // This generates prediction errors for learning
+            pImpl->predictionSystem->updatePredictions(
+                SensoryInput(currentSensoryActivity), *predicted);
+            
+            // Use prediction error for neuromodulation
+            float error = pImpl->predictionSystem->getPredictionError();
+            if (error > 0.01f) {
+                // Apply prediction error to curiosity and exploration
+                if (pImpl->curiosity) {
+                    pImpl->curiosity->updatePredictionError(error);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
