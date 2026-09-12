@@ -98,16 +98,123 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
 }
 
 NeuronId StructuralPlasticity::createNeuron(Brain* brain, NeuronType type) {
-    // Neuron creation would require adding to a population
-    // For Phase 2, we focus on synaptic structural plasticity
-    // and don't implement neuronal creation
-    return INVALID_NEURON_ID;
+    // Real neuron creation: Add neuron to appropriate population in a region
+    if (!brain) {
+        return INVALID_NEURON_ID;
+    }
+    
+    // Find the region with most available capacity (smallest current neuron count)
+    NeuralRegion* targetRegion = nullptr;
+    size_t minNeurons = SIZE_MAX;
+    
+    for (auto& region : brain->getRegions()) {
+        size_t neuronCount = region->getTotalNeuronCount();
+        if (neuronCount < minNeurons) {
+            minNeurons = neuronCount;
+            targetRegion = region.get();
+        }
+    }
+    
+    if (!targetRegion) {
+        return INVALID_NEURON_ID;
+    }
+    
+    // Create a new neuron with unique ID
+    NeuronId newNeuronId(minNeurons + 1);  // Simple ID based on count
+    
+    // Initialize neuron parameters based on type
+    Neuron* newNeuron = new Neuron(newNeuronId);
+    newNeuron->setType(type);
+    
+    // Type-specific parameters
+    switch (type) {
+        case NeuronType::Sensory:
+            newNeuron->setMembranePotential(-60.0f);  // More depolarized
+            newNeuron->setThreshold(-50.0f);
+            newNeuron->setRestingPotential(-60.0f);
+            newNeuron->setResetPotential(-65.0f);
+            newNeuron->setLeakConductance(15.0f);
+            break;
+        case NeuronType::Motor:
+            newNeuron->setMembranePotential(-65.0f);
+            newNeuron->setThreshold(-55.0f);
+            newNeuron->setRestingPotential(-70.0f);
+            newNeuron->setResetPotential(-70.0f);
+            newNeuron->setLeakConductance(12.0f);
+            break;
+        case NeuronType::Excitatory:
+            newNeuron->setMembranePotential(-68.0f);
+            newNeuron->setThreshold(-55.0f);
+            newNeuron->setRestingPotential(-70.0f);
+            newNeuron->setResetPotential(-70.0f);
+            newNeuron->setLeakConductance(10.0f);
+            newNeuron->setRefractoryPeriod(3);
+            break;
+        case NeuronType::Inhibitory:
+            newNeuron->setMembranePotential(-66.0f);
+            newNeuron->setThreshold(-50.0f);
+            newNeuron->setRestingPotential(-70.0f);
+            newNeuron->setResetPotential(-70.0f);
+            newNeuron->setLeakConductance(8.0f);
+            newNeuron->setRefractoryPeriod(2);
+            break;
+        case NeuronType::Modulatory:
+            newNeuron->setMembranePotential(-67.0f);
+            newNeuron->setThreshold(-52.0f);
+            newNeuron->setRestingPotential(-70.0f);
+            newNeuron->setResetPotential(-70.0f);
+            newNeuron->setLeakConductance(9.0f);
+            newNeuron->setRefractoryPeriod(5);
+            break;
+        default:  // Internal
+            newNeuron->setMembranePotential(-70.0f);
+            newNeuron->setThreshold(-55.0f);
+            newNeuron->setRestingPotential(-70.0f);
+            newNeuron->setResetPotential(-70.0f);
+            newNeuron->setLeakConductance(10.0f);
+            newNeuron->setRefractoryPeriod(5);
+            break;
+    }
+    
+    // Add to region
+    targetRegion->addNeuron(newNeuron);
+    
+    return newNeuronId;
 }
 
 bool StructuralPlasticity::removeNeuron(Brain* brain, NeuronId neuron) {
-    // Neuron removal would require removing all synapses and the neuron itself
-    // For Phase 2, we focus on synaptic structural plasticity
-    return false;
+    if (!brain || neuron == INVALID_NEURON_ID) {
+        return false;
+    }
+    
+    // Find and remove neuron from all regions
+    bool neuronFound = false;
+    for (auto& region : brain->getRegions()) {
+        auto neurons = region->getAllNeurons();
+        for (auto it = neurons.begin(); it != neurons.end(); ++it) {
+            if ((*it)->getId() == neuron) {
+                // Remove all outgoing synapses first
+                auto outgoingSynapses = region->getSynapsesFrom(neuron);
+                for (Synapse* syn : outgoingSynapses) {
+                    region->removeSynapse(syn->getId());
+                }
+                
+                // Remove all incoming synapses
+                auto incomingSynapses = region->getSynapsesTo(neuron);
+                for (Synapse* syn : incomingSynapses) {
+                    region->removeSynapse(syn->getId());
+                }
+                
+                // Remove the neuron
+                region->removeNeuron(neuron);
+                neuronFound = true;
+                break;
+            }
+        }
+        if (neuronFound) break;
+    }
+    
+    return neuronFound;
 }
 
 float StructuralPlasticity::getSynaptogenesisRate() const {
