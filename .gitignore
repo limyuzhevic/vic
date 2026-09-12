@@ -1,0 +1,45 @@
+# Build artifacts
+build/
+develop/
+debug/
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Python artifacts
+*.pyc
+*.pyo
+__pycache__/
+*.egg-info/
+dist/
+build/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# CMake cache files
+cmake_install.cmake
+CPackConfig.cmake
+CPackSourceConfig.cmake
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Debug output
+debug_output.txt
+performance_stats.json
