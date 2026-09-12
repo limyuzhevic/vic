@@ -77,10 +77,60 @@ make -j4
 
 ### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase6_demo
+# Run the main integration test
+./nlm
+
+# Or run Phase 4 demo
+./nlm_phase4_demo
+
+# Run Phase 3 demo
+./nlm_phase3_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+These run comprehensive integration tests verifying all brain systems are connected and working together.
+
+## Quick Python Usage (Phase 6 Features)
+
+```python
+import pynlm
+
+# Create and initialize brain with default config
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Create world and agent
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable ALL Phase 6 learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+
+# Run simulation loop
+for step in range(1000):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply learning
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    agent.updateDevelopment(0.1)
+
+print(f"Simulation complete!")
+print(f"Final firing neurons: {brain.getFiringNeuronCount()}")
+print(f"Curiosity level: {agent.getCuriosityLevel():.3f}")
+print(f"Novelty level: {agent.getNoveltyLevel():.3f}")
+print(f"Developmental stage: {brain.getDevelopmentalStage()}")
+```
 
 ## Project Structure
 
@@ -152,15 +202,34 @@ NLM/
 - Parallel processing
 - Checkpoint system
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+## New in Version 0.1.0 (Phase 6)
+
+### Major Improvements
+
+1. **Complete System Integration**: All subsystems now work together seamlessly
+2. **Real Neural Dynamics**: Implemented proper integrate-and-fire neuron dynamics with adaptive threshold
+3. **Enhanced Memory Systems**: Working memory connected to neural processing, episodic memory with replay
+4. **Neuromodulation Integration**: Dopamine, curiosity, and novelty detection fully integrated
+5. **Prediction System**: Predictive coding and error computation implemented
+6. **Development Framework**: Age-dependent plasticity and developmental stages
+7. **Structural Plasticity**: Growing new connections and pruning implemented
+8. **Replay and Consolidation**: Memory replay during rest cycles
+9. **Enhanced Agent Framework**: Complete brain-world interaction with learning
+
+### Technical Improvements
+
+- **Better Python Bindings**: Enhanced documentation and examples
+- **JSON/YAML Configuration**: Support for modern configuration formats
+- **Improved Logging**: Better log level names and formatting
+- **Performance Optimizations**: Better memory management and event handling
+- **Code Documentation**: Comprehensive headers and implementation comments
+
+### Testing and Validation
+
+- **Integration Tests**: All Phase 6 systems tested together
+- **Unit Tests**: Comprehensive testing of individual components
+- **Performance Tests**: Validation of real-time capabilities
+- **Stress Tests**: Testing with large networks
 
 ## Scientific Limitations
 

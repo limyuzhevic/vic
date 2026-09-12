@@ -10,7 +10,9 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
-That's it! NLM simulates all of this.
+***NLM Version 0.1.0 - Phase 6 (Final Integration)***
+
+---
 
 ---
 

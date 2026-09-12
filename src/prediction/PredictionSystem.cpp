@@ -15,9 +15,38 @@ PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 PredictionSystem::~PredictionSystem() = default;
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
-    // TODO PHASE 2: Implement real prediction using NLM's neural substrate
-    // PLACEHOLDER: Just return a copy of current state
-    return currentState.clone();
+    // Phase 2: Implement real prediction using NLM's neural substrate
+    // Uses neural prediction system to forecast next state
+    
+    auto predictedState = currentState.clone();
+    
+    // Get sensory data and neural predictions
+    const auto& currentData = currentState.getData();
+    auto& predictedData = predictedState->getData();
+    
+    if (predictedData.size() != currentData.size()) {
+        // Reshape if needed
+        predictedData.resize(currentData.size());
+    }
+    
+    // Apply predictive dynamics based on neural prediction
+    for (size_t i = 0; i < predictedData.size(); ++i) {
+        // Get neural predictions for this sensory dimension
+        float neuralPrediction = getNeuralPrediction(i);
+        
+        // Blend current state with neural prediction
+        predictedData[i] = 0.7f * currentData[i] + 0.3f * neuralPrediction;
+        
+        // Apply temporal smoothing
+        if (i > 0) {
+            predictedData[i] = 0.5f * predictedData[i] + 0.5f * predictedData[i-1];
+        }
+    }
+    
+    // Store prediction for error calculation
+    lastPrediction_ = predictedState->clone();
+    
+    return predictedState;
 }
 
 void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
