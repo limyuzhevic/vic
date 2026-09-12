@@ -356,36 +356,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
                     pImpl->spikeSystem->queueSpike(event);
 
-                    // Record post-synaptic spike for incoming synapses (plasticity)
-                    auto incomingSynapses = region->getSynapsesTo(neuron->getId());
-                    for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
-                    }
-
-                    // Get outgoing synapses and schedule delayed spike events
-                    auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
-                    for (Synapse* syn : outgoingSynapses) {
-                        // Create delayed spike event
-                        Delay delay = syn->getDelay();
-                        SimulationStep deliveryStep = currentStep + delay;
-                        Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
-
-                        DelayedSpikeEvent delayedEvent(
-                            neuron->getId(),
-                            syn->getDestinationNeuron(),
-                            syn->getId(),
-                            syn->getWeight(),
-                            syn->getType(),
-                            currentTime,
-                            deliveryTime,
-                            currentStep,
-                            deliveryStep
-                        );
-
-                        pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
-
-                        // Record pre-synaptic spike for plasticity
-                        syn->recordPreSpike(currentTime);
+                    // Store to working memory - neurons that fire become part of working memory
+                    if (pImpl->workingMemory) {
+                        float activation = std::abs(state.membranePotential - state.restingPotential) / 10.0f;
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), activation);
                     }
                     
                     // Store to working memory - neurons that fire become part of working memory
@@ -403,7 +377,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // Update working memory with competition and decay
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Store active neuron activations from the current step
+        for (size_t i = 0; i < pImpl->totalSpikesThisStep; ++i) {
+            // Use neurons that just fired this step for working memory
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring()) {
+                            float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f;
+                            pImpl->workingMemory->storeToNeuron(neuron->getId(), activation);
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -511,8 +501,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system using working memory patterns
+        // Working memory contains the most recent active patterns
+        std::vector<float> workingMemoryPattern;
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            workingMemoryPattern = pImpl->workingMemory->retrieve();
+            
+            // Get prediction error signal
+            float predictionError = 0.0f;
+            if (pImpl->predictionError) {
+                predictionError = pImpl->predictionError->getError();
+            }
+            
+            // Update prediction system with working memory pattern
+            // This helps predict next states based on recent activity patterns
+            if (!workingMemoryPattern.empty()) {
+                pImpl->predictionSystem->update(workingMemoryPattern, predictionError);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -522,19 +528,88 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Apply attention to working memory winners
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            
+            // Get activations of competitors for attention processing
+            std::vector<float> competitorActivations;
+            competitorActivations.reserve(competitors.size());
+            for (const auto& neuronId : competitors) {
+                float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+                competitorActivations.push_back(activation);
+            }
+            
+            // Apply bottom-up salience to attention system based on working memory
+            for (size_t i = 0; i < competitors.size(); ++i) {
+                pImpl->attention->applyBottomUpSalience(competitors[i], competitorActivations[i]);
+            }
+            
+            // Process competition using attention system
             pImpl->attention->processCompetition(competitors);
+            
+            // Also apply top-down bias from concept formation to attended neurons
+            if (pImpl->conceptFormation && !pImpl->conceptFormation->getConcepts().empty()) {
+                const auto& concepts = pImpl->conceptFormation->getConcepts();
+                // Use concept prototypes to bias attention
+                for (size_t c = 0; c < concepts.size(); ++c) {
+                    const auto& concept = concepts[c];
+                    if (!concept.prototype.empty()) {
+                        // Find neuron with highest activation matching concept
+                        // This is a simplified example - in practice would need proper pattern matching
+                        for (const auto& neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                            float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+                            if (activation > 0.5f) {
+                                pImpl->attention->applyTopDownBias(neuronId, activation * 0.5f);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
-    
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
     }
+    
+    // Convert working memory to features for concept formation
+        std::vector<float> workingMemoryFeatures;
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            workingMemoryFeatures = pImpl->workingMemory->retrieve();
+            
+            // Get reward signal
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Present working memory pattern to concept formation
+            if (!workingMemoryFeatures.empty()) {
+                pImpl->conceptFormation->presentExperience(
+                    workingMemoryFeatures,
+                    workingMemoryFeatures,  // Use same data for features initially
+                    reward,
+                    currentStep
+                );
+            }
+        }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
+        
+        // Apply working memory guidance to structural plasticity
+        // Working memory highlights important neuron pairs for strengthening
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            
+            // Strengthen connections between co-active memory neurons
+            if (memoryNeurons.size() >= 2) {
+                // Rehearse and consolidate working memory patterns
+                pImpl->workingMemory->strengthenMemory(1.1f);  // Slight strengthening
+                
+                // Use attention winners to guide synaptogenesis
+                const auto& attentionWinners = pImpl->attention->getWinners();
+                if (!attentionWinners.empty()) {
+                    // Enhance connections to attention winners
+                    for (const auto& winnerId : attentionWinners) {
+                        pImpl->workingMemory->storeToNeuron(winnerId, 1.0f);  // Boost to 1.0
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========
@@ -543,6 +618,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
             pImpl->episodicMemory->replayEpisode(episode);
+        }
+        
+        // Also rehearse important working memory patterns
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Boost attention winners based on replayed memories
+            const auto& attentionWinners = pImpl->attention->getWinners();
+            for (const auto& winnerId : attentionWinners) {
+                pImpl->workingMemory->storeToNeuron(winnerId, 1.0f);  // Consolidate
+            }
         }
     }
     
@@ -580,6 +664,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
+        
+        // Also consolidate working memory
+        if (pImpl->workingMemory) {
+            // Run competition to select winners for consolidation
+            pImpl->workingMemory->runCompetition();
+            
+            // Strengthen winning traces
+            const auto& winners = pImpl->workingMemory->getMemoryNeurons();
+            for (const auto& winnerId : winners) {
+                pImpl->workingMemory->storeToNeuron(winnerId, 1.0f);  // Full consolidation
+            }
+        }
     }
     
     // ========== STEP 15: Checkpoint management ==========

@@ -47,6 +47,26 @@ size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
     
     // Check if this is novel enough to form a new concept
     if (isNovel(pattern, formationThreshold_)) {
+        // Get current working memory content if available
+        size_t currentWMSize = 0;
+        if (brain_) {
+            NeuralWorkingMemory* workingMem = brain_->getWorkingMemory();
+            if (workingMem) {
+                currentWMSize = workingMem->getActiveTraces();
+            }
+        }
+        
+        // Influence concept formation based on working memory load
+        // High working memory load indicates active maintenance - may favor
+        // integration with existing concepts rather than forming new ones
+        if (currentWMSize > 5) {
+            // Working memory is full - integrate with existing concepts
+            // Don't create new concepts immediately
+            NLM_LOG_INFO("ConceptFormation: Working memory saturated (" + std::to_string(currentWMSize) + 
+                        "), delaying concept formation");
+            return 0;
+        }
+        
         // But wait - we need a few observations before committing to a concept
         // This prevents forming concepts from noise
         

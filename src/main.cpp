@@ -163,9 +163,18 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
+    // Validate brain pointer
+    if (!brain) {
+        NLM_LOG_ERROR("Brain is null");
+        return;
+    }
+    
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_INFO("  No region 1 found!");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -177,8 +186,9 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     size_t initialSpikes = brain->getTotalSpikeCount();
     
     // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
+    size_t neuronsToStimulate = std::min(size_t(10), neurons.size());
+    NLM_LOG_INFO("  Injecting current into " + std::to_string(neuronsToStimulate) + " neurons...");
+    for (size_t i = 0; i < neuronsToStimulate; ++i) {
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
     }
     
@@ -195,9 +205,11 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
+            const auto& neuron = neurons[i];
             NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+                        " V=" + std::to_string(neuron->getMembranePotential()) +
+                        " thresh=" + std::to_string(neuron->getThreshold()) +
+                        " isFiring=" + std::to_string(neuron->isFiring()));
         }
     }
 }

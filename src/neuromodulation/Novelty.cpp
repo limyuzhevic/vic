@@ -1,4 +1,5 @@
 #include "Novelty.hpp"
+#include "../performance/NoveltyOptimizer.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
@@ -48,19 +49,24 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
         return;
     }
     
-    // Compute difference between patterns
-    float totalDiff = 0.0f;
-    size_t compareLen = std::min(currentPattern.size(), previousPattern.size());
-    
-    for (size_t i = 0; i < compareLen; ++i) {
-        float diff = std::abs(currentPattern[i] - previousPattern[i]);
-        totalDiff += diff;
+    // Use optimized novelty detection for vectors
+    if (currentPattern.empty() || previousPattern.empty()) {
+        pImpl->level = 0.0f;
+        return;
     }
     
-    // Normalize by pattern size
-    float avgDiff = totalDiff / compareLen;
+    size_t minSize = std::min(currentPattern.size(), previousPattern.size());
+    if (minSize == 0) {
+        pImpl->level = 0.0f;
+        return;
+    }
     
-    // Update novelty level based on difference
+    // Use optimized absolute difference computation
+    float totalDiff = NoveltyOptimizer::computeAbsDiffSum(
+        currentPattern, previousPattern, minSize);
+    
+    // Normalize by pattern size and apply threshold
+    float avgDiff = totalDiff / static_cast<float>(minSize);
     pImpl->level = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
     pImpl->history.push_back(pImpl->level);
     
