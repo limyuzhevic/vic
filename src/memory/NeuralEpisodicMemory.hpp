@@ -77,8 +77,8 @@ public:
 
     // Retrieve episodes from a specific time window
     std::vector<const EpisodicMemoryItem*> retrieveTemporal(SimulationStep startTime,
-                                                            SimulationStep endTime,
-                                                            size_t maxResults = 10) const;
+                                                           SimulationStep endTime,
+                                                           size_t maxResults = 10) const;
 
     // Retrieve episodes by location
     std::vector<const EpisodicMemoryItem*> retrieveByLocation(float x, float y,
@@ -87,7 +87,7 @@ public:
 
     // Retrieve episodes following a specific action
     std::vector<const EpisodicMemoryItem*> retrieveAfterAction(ActionType action,
-                                                              size_t maxResults = 5) const;
+                                                               size_t maxResults = 5) const;
 
     // Replay an episode - reactivates the neural patterns associated with it
     // This allows the brain to "relive" the experience
@@ -124,10 +124,8 @@ public:
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
 
-private:
-    // Compute similarity between query and stored episode
-    float computeSimilarity(const std::vector<float>& query,
-                          const EpisodicMemoryItem& episode) const;
+    // Enhance an existing episode with additional context
+    void enhanceEpisode(const EpisodicMemoryItem& episode, float newRelevance = 0.5f);
 
     // Check if episode matches criteria
     bool matchesCriteria(const EpisodicMemoryItem& episode,
@@ -136,6 +134,11 @@ private:
                         SimulationStep* endTime,
                         ActionType* actionQuery) const;
 
+private:
+    // Compute similarity between query and stored episode
+    float computeSimilarity(const std::vector<float>& query,
+                          const EpisodicMemoryItem& episode) const;
+
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
@@ -143,6 +146,7 @@ private:
     std::deque<EpisodicMemoryItem> episodes_;
     size_t maxEpisodes_;
     bool replayEnabled_;
+    std::vector<std::pair<float, size_t>> episodeRelevance_;  // (relevance score, episode index)
 };
 
 // AssociativeMemory: Creates and retrieves relationships between experiences

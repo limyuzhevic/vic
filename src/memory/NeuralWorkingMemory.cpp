@@ -89,6 +89,30 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     }
 }
 
+void NeuralWorkingMemory::storeSensoryInput(const std::vector<float>& sensoryPattern) {
+    if (sensoryPattern.empty() || !brain_) return;
+    
+    // Store the sensory pattern
+    if (sensoryPatterns_.size() < capacity_) {
+        sensoryPatterns_.push_back(sensoryPattern);
+        sensoryTimestamps_.push_back(0);
+        
+        // Also store a compressed representation in working memory
+        // Create neural pattern from sensory input
+        std::vector<float> neuralPattern;
+        neuralPattern.reserve(sensoryPattern.size());
+        
+        for (size_t i = 0; i < sensoryPattern.size() && i < 100; ++i) {
+            float activation = sensoryPattern[i] * 0.8f; // Normalize to working memory range
+            storeToNeuron(NeuronId(i + 10000), activation); // Use unique IDs for sensory neurons
+            neuralPattern.push_back(activation);
+        }
+        
+        // Store the neural pattern
+        store(neuralPattern, 1.0f);
+    }
+}
+
 std::vector<float> NeuralWorkingMemory::retrieve() const {
     std::vector<float> result;
     result.reserve(memoryActivations_.size());
