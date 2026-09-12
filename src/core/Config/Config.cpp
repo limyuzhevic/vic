@@ -18,10 +18,140 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+#include "Config.hpp"
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
+#include <nlohmann/json.hpp>  // JSON library for config
+#include <yaml-cpp/yaml.h>   // YAML library for config
+
+using json = nlohmann::json;
+
+namespace nlm {
+
+struct Config::Impl {
+    std::vector<ConfigEntry> entries;
+};
+
+Config::Config() : pImpl(std::make_unique<Impl>()) {}
+
+Config::~Config() = default;
+
+Config::Config(Config&&) noexcept = default;
+
+Config& Config::operator=(Config&&) noexcept = default;
+
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Check file extension to determine parser
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
     
+    if (ext == ".json") {
+        return loadFromJSON(filepath);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Default to simple key=value format
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_WARNING("Cannot open JSON config file: " + filepath);
+            return false;
+        }
+        
+        json j;
+        file >> j;
+        
+        // Convert JSON to Config entries
+        // TODO: Implement proper JSON to Config mapping
+        // For now, just store as string values
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            std::string key = it.key();
+            std::string value;
+            
+            if (it->is_string()) {
+                value = it->get<std::string>();
+            } else if (it->is_number()) {
+                if (it->is_number_integer()) {
+                    value = std::to_string(it->get<int64_t>());
+                } else {
+                    value = std::to_string(it->get<double>());
+                }
+            } else if (it->is_boolean()) {
+                value = it->get<bool>() ? "true" : "false";
+            } else {
+                NLM_LOG_WARNING("Unsupported JSON type for key: " + key);
+                continue;
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+        
+        NLM_LOG_INFO("Loaded JSON configuration from: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON config file " + filepath + ": " + e.what());
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    try {
+        YAML::Loader loader;
+        loader.LoadFile(filepath);
+        
+        // Convert YAML to Config entries
+        // TODO: Implement proper YAML to Config mapping
+        // For now, just store as string values
+        for (const auto& it : loader) {
+            std::string key = it.first.as<std::string>();
+            std::string value;
+            
+            if (it.second.IsScalar()) {
+                value = it.second.as<std::string>();
+            } else if (it.second.IsSequence()) {
+                // Convert sequence to JSON string for now
+                std::stringstream ss;
+                for (size_t i = 0; i < it.second.size(); ++i) {
+                    if (i > 0) ss << ",";
+                    ss << it.second[i].as<std::string>();
+                }
+                value = ss.str();
+            } else if (it.second.IsMap()) {
+                // Convert nested map to JSON string for now
+                std::stringstream ss;
+                ss << "{";
+                for (const auto& nested : it.second) {
+                    ss << "\"" << nested.first.as<std::string>() << "\":";
+                    ss << nested.second.as<std::string>() << ",";
+                }
+                ss << "}";
+                value = ss.str();
+            } else {
+                NLM_LOG_WARNING("Unsupported YAML type for key: " + key);
+                continue;
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+        
+        NLM_LOG_INFO("Loaded YAML configuration from: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing YAML config file " + filepath + ": " + e.what());
+        return false;
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -52,6 +182,7 @@ bool Config::loadFromFile(const std::string& filepath) {
         }
     }
     
+    NLM_LOG_INFO("Loaded simple configuration from: " + filepath);
     return true;
 }
 
@@ -81,14 +212,44 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot save configuration to file: " + filepath);
         return false;
     }
     
+    // Write configuration in simple key=value format
+    // For better compatibility, could also write in JSON or YAML format
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM Configuration System\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Format value appropriately
+        std::visit([&file](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << val << "\"";
+            } else if constexpr (std::is_same_v<T, int64_t> || 
+                                 std::is_same_v<T, int32_t> ||
+                                 std::is_same_v<T, uint64_t> ||
+                                 std::is_same_v<T, uint32_t>) {
+                file << val;
+            } else if constexpr (std::is_same_v<T, double> || 
+                                 std::is_same_v<T, float>) {
+                // Format float/double to avoid scientific notation
+                file << std::fixed << std::setprecision(6) << val;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (val ? "true" : "false");
+            } else {
+                file << val;  // Fallback
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
+    NLM_LOG_INFO("Configuration saved to file: " + filepath);
     return true;
 }
 

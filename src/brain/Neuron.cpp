@@ -23,8 +23,11 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
+    // Simulation timestep (in ms)
+    TimestepDuration timestep;
+    
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f), timestep(0.001) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -37,15 +40,22 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(nullptr) {
+    if (other.pImpl) {
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
         delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        if (other.pImpl) {
+            pImpl = other.pImpl;
+            other.pImpl = nullptr;
+        } else {
+            pImpl = nullptr;
+        }
     }
     return *this;
 }
@@ -260,9 +270,18 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    if (!pImpl) {
+        return;
+    }
+    
+    // Use the LIF implementation as the base
+    TimestepDuration dt = pImpl->timestep;
+    bool fired = stepLIF(currentTime, dt);
+    
+    // Record spike in history for STDP
+    if (fired) {
+        recordSpike(currentTime);
+    }
 }
 
 void Neuron::reset() {

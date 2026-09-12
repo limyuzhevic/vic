@@ -60,6 +60,29 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->shortTermFacilitation = 0.0f;
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+    pImpl->plasticityFlags.hebbian = false;
+    pImpl->plasticityFlags.stdp = false;
+    pImpl->plasticityFlags.reward_modulated = false;
+}
+
+Synapse::Synapse(Synapse&& other) noexcept : pImpl(nullptr) {
+    if (other.pImpl) {
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+}
+
+Synapse& Synapse::operator=(Synapse&& other) noexcept {
+    if (this != &other) {
+        delete pImpl;
+        if (other.pImpl) {
+            pImpl = other.pImpl;
+            other.pImpl = nullptr;
+        } else {
+            pImpl = nullptr;
+        }
+    }
+    return *this;
 }
 
 Synapse::~Synapse() = default;
