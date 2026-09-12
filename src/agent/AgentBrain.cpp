@@ -347,4 +347,111 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
+void AgentBrain::logExperience(const SimpleWorld& world, const ActionResult& actionResult) {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
+    
+    // Create an episodic memory item from current experience
+    EpisodicMemoryItem episode;
+    episode.timestamp = static_cast<SimulationStep>(world.getSimulationTime() / 0.001);  // Convert time to steps
+    
+    // Store sensory state (from agent's accumulated percept)
+    // This would ideally come from the brain's working memory or recent sensory input
+    // For now, we'll use a simplified version
+    episode.sensoryState = brain_->getWorkingMemory()->retrieve();
+    
+    // Store agent's body state
+    const AgentBody& body = world.getAgentBody();
+    episode.positionX = body.x;
+    episode.positionY = body.y;
+    episode.orientation = body.orientation;
+    
+    // Store action and reward
+    episode.action = ActionType::MoveForward;  // Default - would come from actual action
+    episode.reward = actionResult.reward;
+    episode.energy = body.energy;
+    episode.novelty = noveltyLevel_;
+    
+    // Store neural activity
+    for (auto* region : brain_->getRegions()) {
+        for (auto* pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                if (neuron->isFiring() || std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                    episode.activeNeurons.push_back(neuron->getId());
+                    episode.neuronActivations.push_back(
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                }
+            }
+        }
+    }
+    
+    // Store the episode
+    brain_->getEpisodicMemory()->storeEpisode(episode);
+    
+    NLM_LOG_INFO("Logged experience to episodic memory: reward=" + std::to_string(actionResult.reward) +
+                 ", neurons=" + std::to_string(episode.activeNeurons.size()) +
+                 ", novelty=" + std::to_string(episode.novelty));
+}
+
+void AgentBrain::storePerceptInWorkingMemory(const SensoryPercept& percept, float reward) {
+    if (!brain_ || !brain_->getWorkingMemory()) return;
+    
+    // Convert sensory percept to neural activity pattern
+    std::vector<float> pattern;
+    
+    // Vision (256 values)
+    const auto& vision = percept.getVision();
+    pattern.insert(pattern.end(), vision.begin(), vision.end());
+    
+    // Touch (8 values)
+    const auto& touch = percept.getTouch();
+    pattern.insert(pattern.end(), touch.begin(), touch.end());
+    
+    // Internal signals (4 values)
+    const auto& internal = percept.getInternal();
+    pattern.insert(pattern.end(), internal.begin(), internal.end());
+    
+    // Proprioception (6 values)
+    const auto& proprio = percept.getProprioception();
+    pattern.insert(pattern.end(), proprio.begin(), proprio.end());
+    
+    // Store in working memory with reward as strength
+    brain_->getWorkingMemory()->store(pattern, reward);
+    
+    // Also update dopaminergic learning
+    if (rewardModulationEnabled_) {
+        float predictionError = reward;  // Simple prediction error for now
+        applyRewardModulation(reward, predictionError);
+    }
+}
+
+void AgentBrain::retrieveRelevantExperiences() {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
+    
+    // Get recent working memory content for comparison
+    std::vector<float> currentWorkingMemory = brain_->getWorkingMemory()->retrieve();
+    
+    // Retrieve similar episodes from episodic memory
+    auto similarEpisodes = brain_->getEpisodicMemory()->retrieveSimilar(
+        currentWorkingMemory, 5);  // Get up to 5 similar episodes
+    
+    // Apply the retrieved patterns to influence current processing
+    // This would typically involve:
+    // 1. Injecting the retrieved patterns into working memory
+    // 2. Using them to guide attention or action selection
+    // 3. Updating conceptual knowledge
+    
+    if (!similarEpisodes.empty()) {
+        NLM_LOG_INFO("Retrieved " + std::to_string(similarEpisodes.size()) + 
+                     " relevant experiences for guidance");
+        
+        // Mark that we should use the retrieved information
+        // Implementation would depend on specific cognitive architecture
+        for (const auto* episode : similarEpisodes) {
+            // This is where episodic memory would influence current behavior
+            // For example, the successful actions from retrieved episodes
+            // could bias current action selection
+        }
+    }
+}
+
 } // namespace nlm

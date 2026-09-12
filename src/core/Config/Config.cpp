@@ -14,6 +14,18 @@ Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
 Config::~Config() = default;
 
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Check for duplicate keys to prevent overwrites
+    auto existing = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+                                [&key](const ConfigEntry& e) { return e.key == key; });
+    if (existing != pImpl->entries.end() && existing->source == ConfigSource::Default) {
+        // Allow overriding default values
+        *existing = ConfigEntry{key, value, source, ""};
+    } else {
+        pImpl->entries.push_back(ConfigEntry{key, value, source, ""});
+    }
+}
+
 Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
