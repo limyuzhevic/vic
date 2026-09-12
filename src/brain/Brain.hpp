@@ -9,9 +9,9 @@
 #include <memory>
 #include <string>
 
-namespace nlm {
+namespace nlm;
 
-// Forward declarations
+// Forward declarations for PImpl idiom
 class Config;
 class RandomGenerator;
 class SimulationClock;

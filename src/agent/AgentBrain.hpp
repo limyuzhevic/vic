@@ -6,6 +6,7 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <array>
 
 namespace nlm {
 
@@ -13,6 +14,12 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
+    // Constants for neuron group organization
+    static constexpr size_t MOTOR_GROUPS = 6;        // Forward, Backward, Left, Right, Interact, Wait
+    static constexpr size_t SENSORY_GROUPS = 4;      // Vision, Touch, Internal, Proprioception
+    static constexpr size_t MAX_MOTOR_GROUPS = MOTOR_GROUPS;
+    static constexpr size_t MAX_SENSORY_GROUPS = SENSORY_GROUPS;
+    
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
     
@@ -76,21 +83,23 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Helper: distribute neurons into groups
+    void distributeMotorNeurons();
+    void distributeSensoryNeurons();
+    
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    // Motor neuron groups - organized for easy decoding
+    std::array<std::vector<Neuron*>, MOTOR_GROUPS> motorGroups_;
+    static constexpr const char* MOTOR_GROUP_NAMES[MOTOR_GROUPS] = {
+        "Forward", "Backward", "Left", "Right", "Interact", "Wait"
+    };
     
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    // Sensory neuron groups - organized for easy processing
+    std::array<std::vector<Neuron*>, SENSORY_GROUPS> sensoryGroups_;
+    static constexpr const char* SENSORY_GROUP_NAMES[SENSORY_GROUPS] = {
+        "Vision", "Touch", "Internal", "Proprioception"
+    };
     
     // Neuromodulation state
     float dopamineLevel_;
