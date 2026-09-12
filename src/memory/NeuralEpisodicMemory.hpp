@@ -111,16 +111,15 @@ public:
     // Clear old episodes
     void consolidate(float relevanceThreshold);
 
-    // Clear all episodes
+// Clear all episodes
     void clear();
-
-    // Enable/disable replay
-    void enableReplay(bool enable) { replayEnabled_ = enable; }
-    bool isReplayEnabled() const { return replayEnabled_; }
-
+    
+    // Set maximum number of episodes (clears excess)
+    void setMaxEpisodes(size_t maxEpisodes);
+    
     // Get episodes for replay (selection based on relevance and recency)
     std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
-
+    
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
 

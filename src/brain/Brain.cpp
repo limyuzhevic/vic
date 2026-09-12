@@ -110,8 +110,11 @@ struct Brain::Impl {
         
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
+        workingMemory->initialize(this);
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        episodicMemory->initialize(this);
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        associativeMemory->initialize(this);
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -231,33 +234,29 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
+    // Initialize working memory (already initialized in constructor)
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
+    // Initialize episodic memory (already initialized in constructor)
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    // Initialize associative memory (already initialized in constructor)
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
     
-    pImpl->conceptFormation->initialize(this);
-    
-    pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    // Update neuromodulation
+    pImpl->novelty->setLevel(0.5f);
+    pImpl->curiosity->reset();
+    
+    // Update dopamine with baseline activity
+    pImpl->dopamine->setLevel(0.3f);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -414,7 +413,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        // Use current novelty and prediction error for curiosity update
+        float novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        float predictionError = pImpl->predictionError ? pImpl->predictionError->getPredictionError() : 0.0f;
+        pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
+    }
+    
+    // Update dopamine (reward prediction error)
+    if (pImpl->dopamine) {
+        // Connect to working memory activity patterns
+        if (pImpl->workingMemory) {
+            // Dopamine reinforces active working memory traces
+            std::vector<float> wmActivity = pImpl->workingMemory->retrieve();
+            if (!wmActivity.empty()) {
+                float avgActivity = 0.0f;
+                for (float act : wmActivity) avgActivity += act;
+                avgActivity /= wmActivity.size();
+                pImpl->dopamine->setLevel(avgActivity);
+            }
+        }
+        
+        // Apply dopamine effects on neural excitability (dopamine modulates neural excitability by adjusting effective current injection)
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Dopamine modulates excitability by injecting additional current
+                    // Positive dopamine adds excitatory bias
+                    float excitabilityMod = dopamineLevel * 0.5f;
+                    if (excitabilityMod > 0.0f) {
+                        neuron->injectCurrent(excitabilityMod);
+                    }
+                }
+            }
+        }
     }
     
     // Update dopamine (reward prediction error)
