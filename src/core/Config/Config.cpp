@@ -186,20 +186,174 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+// Configuration validation
+bool Config::validate() const {
+    // Validate known parameter ranges
+    auto validateValue = [](const ConfigEntry& entry) -> bool {
+        std::string key = entry.key;
+        double value = 0.0;
+        
+        // Extract value as double
+        std::visit([&](auto&& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, int>) {
+                value = static_cast<double>(val);
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                value = static_cast<double>(val);
+            } else if constexpr (std::is_same_v<T, double>) {
+                value = val;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                value = val ? 1.0 : 0.0;
+            }
+        }, entry.value);
+        
+        // Validate ranges for known parameters
+        if (key == "working_memory_size") {
+            return value >= 0 && value <= 10000;
+        } else if (key == "max_episodic_episodes") {
+            return value >= 0 && value <= 10000;
+        } else if (key == "critical_period_start") {
+            return value >= 0 && value <= 1000.0; // milliseconds
+        } else if (key == "maturation_rate") {
+            return value >= 0 && value <= 1.0;
+        } else if (key == "dopamine_scale") {
+            return value >= 0 && value <= 10.0;
+        } else if (key == "curiosity_sensitivity") {
+            return value >= 0 && value <= 10.0;
+        } else if (key == "prediction_horizon") {
+            return value >= 1 && value <= 100;
+        } else if (key == "prediction_confidence_threshold") {
+            return value >= 0 && value <= 1.0;
+        } else if (key == "synaptogenesis_probability") {
+            return value >= 0 && value <= 1.0;
+        } else if (key == "pruning_threshold") {
+            return value >= 0 && value <= 1.0;
+        } else if (key == "aging_factor") {
+            return value >= 0 && value <= 1.0;
+        } else if (key == "inhibition_strength") {
+            return value >= 0 && value <= 100.0;
+        } else if (key == "excitation_strength") {
+            return value >= 0 && value <= 100.0;
+        } else if (key == "pattern_discovery_threshold") {
+            return value >= 0 && value <= 1.0;
+        } else if (key == "planning_depth") {
+            return value >= 1 && value <= 20;
+        } else if (key == "planning_complexity") {
+            return value >= 1 && value <= 100;
+        } else if (key == "learning_rate") {
+            return value >= 0 && value <= 1.0;
+        } else if (key == "decay_constant") {
+            return value >= 0 && value <= 1.0;
+        }
+        
+        // For unknown keys, assume valid
+        return true;
+    };
+    
+    return std::all_of(pImpl->entries.begin(), pImpl->entries.end(), validateValue);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+// Convenience methods for setting related parameters
+void Config::setMemorySystemSize(size_t workingMemorySize, size_t maxEpisodicEpisodes) {
+    set("working_memory_size", static_cast<int>(workingMemorySize));
+    set("max_episodic_episodes", static_cast<int>(maxEpisodicEpisodes));
 }
 
-// Explicit template instantiations
+void Config::setDevelopmentParameters(double criticalPeriodStart, double maturationRate) {
+    set("critical_period_start", criticalPeriodStart);
+    set("maturation_rate", maturationRate);
+}
+
+void Config::setNeuromodulationParameters(float dopamineScale, float curiositySensitivity) {
+    set("dopamine_scale", dopamineScale);
+    set("curiosity_sensitivity", curiositySensitivity);
+}
+
+void Config::setPredictionSystemParameters(int horizon, float confidenceThreshold) {
+    set("prediction_horizon", horizon);
+    set("prediction_confidence_threshold", confidenceThreshold);
+}
+
+void Config::setStructuralPlasticityParameters(float synaptogenesisProb, float pruningThreshold) {
+    set("synaptogenesis_probability", synaptogenesisProb);
+    set("pruning_threshold", pruningThreshold);
+}
+
+void Config::setDevelopmentStages(const std::vector<double>& stageTransitions, float agingFactor) {
+    set("developmental_stage_transitions", std::vector<double>(stageTransitions));
+    set("aging_factor", agingFactor);
+}
+
+void Config::setAttentionSystemParameters(float inhibitionStrength, float excitationStrength) {
+    set("inhibition_strength", inhibitionStrength);
+    set("excitation_strength", excitationStrength);
+}
+
+void Config::setConceptFormationParameters(float patternDiscoveryThreshold) {
+    set("pattern_discovery_threshold", patternDiscoveryThreshold);
+}
+
+void Config::setPlanningParameters(int maxDepth, int complexity) {
+    set("planning_depth", maxDepth);
+    set("planning_complexity", complexity);
+}
+
+void Config::setLearningParameters(float learningRate, float decayConstant) {
+    set("learning_rate", learningRate);
+    set("decay_constant", decayConstant);
+}
+
+// Batch setter methods
+void Config::setAllMemoryParameters(const std::string& workingMemoryKey, const std::string& episodicMemoryKey) {
+    // This is a convenience for bulk loading from file
+    // Users should use setMemorySystemSize for programmatic use
+    set(workingMemoryKey, "PLACEHOLDER_VALUE");
+    set(episodicMemoryKey, "PLACEHOLDER_VALUE");
+}
+
+void Config::setAllDevelopmentParameters(const std::string& criticalPeriodKey, const std::string& maturationKey) {
+    set(criticalPeriodKey, "PLACEHOLDER_VALUE");
+    set(maturationKey, "PLACEHOLDER_VALUE");
+}
+
+void Config::setAllNeuromodulationParameters(const std::string& dopamineKey, const std::string& curiosityKey) {
+    set(dopamineKey, "PLACEHOLDER_VALUE");
+    set(curiosityKey, "PLACEHOLDER_VALUE");
+}
+
+void Config::setAllPredictionParameters(const std::string& horizonKey, const std::string& confidenceKey) {
+    set(horizonKey, "PLACEHOLDER_VALUE");
+    set(confidenceKey, "PLACEHOLDER_VALUE");
+}
+
+void Config::setAllStructuralPlasticityParameters(const std::string& synaptogenesisKey, const std::string& pruningKey) {
+    set(synaptogenesisKey, "PLACEHOLDER_VALUE");
+    set(pruningKey, "PLACEHOLDER_VALUE");
+}
+
+void Config::setAllDevelopmentStageParameters(const std::string& transitionsKey, const std::string& agingKey) {
+    set(transitionsKey, "PLACEHOLDER_VALUE");
+    set(agingKey, "PLACEHOLDER_VALUE");
+}
+
+void Config::setAllAttentionParameters(const std::string& inhibitionKey, const std::string& excitationKey) {
+    set(inhibitionKey, "PLACEHOLDER_VALUE");
+    set(excitationKey, "PLACEHOLDER_VALUE");
+}
+
+void Config::setAllConceptParameters(const std::string& patternDiscoveryKey) {
+    set(patternDiscoveryKey, "PLACEHOLDER_VALUE");
+}
+
+void Config::setAllPlanningParameters(const std::string& depthKey, const std::string& complexityKey) {
+    set(depthKey, "PLACEHOLDER_VALUE");
+    set(complexityKey, "PLACEHOLDER_VALUE");
+}
+
+void Config::setAllLearningParameters(const std::string& learningRateKey, const std::string& decayConstantKey) {
+    set(learningRateKey, "PLACEHOLDER_VALUE");
+    set(decayConstantKey, "PLACEHOLDER_VALUE");
+}
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;

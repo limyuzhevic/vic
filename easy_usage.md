@@ -58,15 +58,22 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
-
+    # Run for 50 steps
+    for step in range(50):
+        # 1. Update world
+        world.update(0.1)  # Update world
+        percept = world.getSensoryPercept()  # What does the agent see?
+        agent.processSensoryInput(percept)  # Brain sees it
+        brain.step(step)  # Brain thinks
+        action = agent.decodeMotorCommand()  # Brain decides action
+        
+        # 2. Do action in world and get result
+        action_result = world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+        reward = action_result.reward  # Extract reward from action result
+        
+        # 3. Brain learns from results (simplified)
+        print(f"Step {step}: Reward = {reward}")
+        
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
@@ -211,14 +218,8 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
-    
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
+        print("Watched world for 30 steps")
+        print("Firing rate:", brain.getAverageFiringRate())
 ```
 
 ### Project 3: Complete Agent
@@ -226,31 +227,46 @@ print("Firing rate:", brain.getAverageFiringRate())
 ```python
 import pynlm
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
-
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
+    # Setup
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    world = pynlm.createSimpleWorld()
+    world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+    world.reset()
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
     
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
-
+        # 7. Enable learning
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    agent.enableDevelopment(True)
+    agent.enableStructuralPlasticity(True)
+    
+    # 8. Run agent
+    for step in range(100):
+        world.update(0.1)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        
+        # Apply motor command to world and get action result
+        action_result = world.applyMotorCommand(action, world.getSimulationTime())
+        reward = action_result.reward
+        
+        # Apply reward modulation
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        if step % 20 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty level: {agent.getNoveltyLevel():.3f}")
+            print(f"  Development stage: {brain.getDevelopmentalStage()}")
+        
 print("Agent simulation complete!")
 ```
 

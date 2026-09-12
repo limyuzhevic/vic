@@ -294,8 +294,9 @@ while (running) {
     // 5. Apply action to world ✅
     world.applyAction(agent, cmd);
     
-    // 6. Compute reward ✅
-    float reward = world.computeReward(agent);
+    // 6. Get reward from action result ✅
+    ActionResult action_result = world.applyMotorCommand(cmd, step * 0.001);
+    float reward = action_result.reward;
     
     // 7. Apply reward modulation ✅
     agentBrain.applyRewardModulation(reward, predictedReward);

@@ -93,6 +93,33 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    
+    // Convenience methods for setting related parameters
+    void setMemorySystemSize(size_t workingMemorySize, size_t maxEpisodicEpisodes);
+    void setDevelopmentParameters(double criticalPeriodStart, double maturationRate);
+    void setNeuromodulationParameters(float dopamineScale, float curiositySensitivity);
+    void setPredictionSystemParameters(int horizon, float confidenceThreshold);
+    void setStructuralPlasticityParameters(float synaptogenesisProb, float pruningThreshold);
+    void setDevelopmentStages(const std::vector<double>& stageTransitions, float agingFactor);
+    void setAttentionSystemParameters(float inhibitionStrength, float excitationStrength);
+    void setConceptFormationParameters(float patternDiscoveryThreshold);
+    void setPlanningParameters(int maxDepth, int complexity);
+    void setLearningParameters(float learningRate, float decayConstant);
+    
+    // Batch setter methods
+    void setAllMemoryParameters(const std::string& workingMemoryKey, const std::string& episodicMemoryKey);
+    void setAllDevelopmentParameters(const std::string& criticalPeriodKey, const std::string& maturationKey);
+    void setAllNeuromodulationParameters(const std::string& dopamineKey, const std::string& curiosityKey);
+    void setAllPredictionParameters(const std::string& horizonKey, const std::string& confidenceKey);
+    void setAllStructuralPlasticityParameters(const std::string& synaptogenesisKey, const std::string& pruningKey);
+    void setAllDevelopmentStageParameters(const std::string& transitionsKey, const std::string& agingKey);
+    void setAllAttentionParameters(const std::string& inhibitionKey, const std::string& excitationKey);
+    void setAllConceptParameters(const std::string& patternDiscoveryKey);
+    void setAllPlanningParameters(const std::string& depthKey, const std::string& complexityKey);
+    void setAllLearningParameters(const std::string& learningRateKey, const std::string& decayConstantKey);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

@@ -234,15 +234,14 @@ def run_agent_simulation(num_steps=1000):
         # Decode motor command from brain activity
         motor_cmd = agent.decodeMotorCommand()
         
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        # Apply motor command to world and get action result
+        action_result = world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Extract reward from action result
+        reward = action_result.reward
         
         # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
         agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
         
         # Print progress
         if step % 100 == 0:
