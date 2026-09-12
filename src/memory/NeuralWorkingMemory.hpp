@@ -48,19 +48,19 @@ public:
     // Clear working memory
     void clear();
 
-    // Get number of active memory traces
-    size_t getActiveTraces() const { return activeTraces_.size(); }
-
-    // Get capacity
-    size_t getCapacity() const { return capacity_; }
-    void setCapacity(size_t cap) { capacity_ = cap; }
-
-    // Decay rate for memory traces
-    float getDecayRate() const { return decayRate_; }
-    void setDecayRate(float rate) { decayRate_ = rate; }
-
-    // Get neurons currently in working memory
-    const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
+    // Get all winning neurons (replaces getActiveTraces() for clarity)
+    const std::vector<NeuronId>& getWinners() const { return winners_; }
+    
+    // Get current active memory traces
+    const std::vector<size_t>& getActiveTraces() const { return activeTraces_; }
+    
+    // Get all recurrent connections for memory maintenance
+    const std::vector<std::pair<NeuronId, NeuronId>>& getRecurrentConnections() const { return recurrentConnections_; }
+    
+    // Set/recurrent connection for memory maintenance
+    void setRecurrentConnections(const std::vector<std::pair<NeuronId, NeuronId>>& connections) { 
+        recurrentConnections_ = connections; 
+    }
 
     // Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);

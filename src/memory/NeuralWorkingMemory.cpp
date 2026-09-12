@@ -150,6 +150,7 @@ void NeuralWorkingMemory::clear() {
     memoryTimestamps_.clear();
     activeTraces_.clear();
     pImpl->maintenanceSynapses.clear();
+    pImpl->traceAges.clear();
 }
 
 void NeuralWorkingMemory::strengthenMemory(float factor) {
