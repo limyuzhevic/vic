@@ -17,20 +17,19 @@ SensoryPercept::SensoryPercept()
 std::vector<float> SensoryPercept::getAllSignals() const {
     std::vector<float> all;
     
-    // Vision (flattened)
+    // Vision (flattened) - 16x16 = 256
     all.insert(all.end(), vision_.begin(), vision_.end());
     
-    // Touch
+    // Touch - 8 proximity sensors
     all.insert(all.end(), touch_.begin(), touch_.end());
     
-    // Internal
+    // Internal - 4 homeostatic signals
     all.insert(all.end(), internal_.begin(), internal_.end());
     
-    // Proprioception
+    // Proprioception - 6 body position/velocity signals
     all.insert(all.end(), proprioception_.begin(), proprioception_.end());
     
-    // Audio
-    all.insert(all.end(), audio_.begin(), audio_.end());
+    // Note: Audio signals removed (not implemented)
     
     return all;
 }
