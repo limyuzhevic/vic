@@ -38,7 +38,7 @@ public:
         auto brain = std::make_shared<Brain>(config);
         brain->initialize();
         
-        // Create agent brain interface
+// Create agent brain interface
         AgentBrain agentBrain(brain);
         agentBrain.initialize(world);
         
@@ -49,8 +49,14 @@ public:
         agentBrain.enableCuriosity(true);
         
         std::cout << "Initial brain state:\n";
-        std::cout << "  Neurons: " << brain->getTotalNeuronCount() << "\n";
-        std::cout << "  Synapses: " << brain->getTotalSynapseCount() << "\n";
+        if (brain) {
+            std::cout << "  Neurons: " << brain->getTotalNeuronCount() << "\n";
+            std::cout << "  Synapses: " << brain->getTotalSynapseCount() << "\n";
+        }
+        if (!agentBrain.getBrain()) {
+            std::cout << "  ERROR: AgentBrain is null!\n";
+            return 1;
+        }
         std::cout << "  Sensory input size: " << agentBrain.getSensoryInputSize() << "\n";
         std::cout << "  Motor output size: " << agentBrain.getMotorOutputSize() << "\n\n";
         
@@ -75,34 +81,94 @@ public:
             for (int step = 0; step < stepsPerEpisode; ++step) {
                 // 1. Get sensory percept from world
                 const SensoryPercept& percept = world.getSensoryPercept();
+                // Check if percept is valid
+                if (percept.getVision().empty() && 
+                    percept.getTouch().empty() && 
+                    percept.getInternal().empty() && 
+                    percept.getProprioception().empty()) {
+                    std::cout << "WARNING: Invalid sensory percept detected, skipping step\n";
+                    continue;
+                }
+                // Check if world is valid before using getSensoryPercept
+                if (!&world) {
+                    std::cout << "ERROR: World is null!\n";
+                    return 1;
+                }
                 
                 // 2. Inject sensory input into brain
+                if (!agentBrain.getBrain()) {
+                    std::cout << "ERROR: AgentBrain brain pointer is null!\n";
+                    return 1;
+                }
+                if (!&agentBrain) {
+                    std::cout << "ERROR: AgentBrain is null before processSensoryInput!\n";
+                    return 1;
+                }
                 agentBrain.processSensoryInput(percept);
                 
-                // 3. Simulate brain (multiple steps per action)
                 for (int neuralStep = 0; neuralStep < 10; ++neuralStep) {
+                    if (!brain) {
+                        std::cout << "ERROR: Brain pointer is null during neural step!\n";
+                        return 1;
+                    }
                     brain->step(neuralStep);
                 }
                 
                 // 4. Decode motor command from brain activity
+                if (!agentBrain.getBrain()) {
+                    std::cout << "ERROR: AgentBrain brain pointer is null!\n";
+                    return 1;
+                }
+                if (!&agentBrain) {
+                    std::cout << "ERROR: AgentBrain is null before decodeMotorCommand!\n";
+                    return 1;
+                }
                 MotorCommand cmd = agentBrain.decodeMotorCommand();
                 
                 // 5. Apply motor command to world
+                if (!agentBrain.getBrain()) {
+                    std::cout << "ERROR: AgentBrain brain pointer is null before applying motor command!\n";
+                    return 1;
+                }
+                if (!&agentBrain) {
+                    std::cout << "ERROR: AgentBrain is null before applying motor command!\n";
+                    return 1;
+                }
                 ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
                 
                 // 6. Apply reward modulation
+                if (!agentBrain.getBrain()) {
+                    std::cout << "ERROR: AgentBrain brain pointer is null before reward modulation!\n";
+                    return 1;
+                }
+                if (!&agentBrain) {
+                    std::cout << "ERROR: AgentBrain is null before applyRewardModulation!\n";
+                    return 1;
+                }
                 agentBrain.applyRewardModulation(result.reward, 0.0f);
                 
                 // 7. Update world
                 world.update(0.01);  // 10ms timestep
                 
                 // 8. Update development
+                if (!agentBrain.getBrain()) {
+                    std::cout << "ERROR: AgentBrain brain pointer is null during development update!\n";
+                    return 1;
+                }
+                if (!&agentBrain) {
+                    std::cout << "ERROR: AgentBrain is null before updateDevelopment!\n";
+                    return 1;
+                }
                 agentBrain.updateDevelopment(0.01);
                 
                 // Track metrics
                 episodeReward += result.reward;
                 metrics.steps++;
                 metrics.totalReward += result.reward;
+                if (!brain) {
+                    std::cout << "ERROR: Brain pointer is null during metrics tracking!\n";
+                    return 1;
+                }
                 metrics.totalSpikes += brain->getFiringNeuronCount();
                 
                 // Count actions
@@ -116,15 +182,20 @@ public:
                 }
                 
                 // Print periodic updates
-                if (step % 50 == 0) {
-                    std::cout << "  Step " << step 
-                              << ": reward=" << result.reward
-                              << ", action=" << motorCommandToString(cmd)
-                              << ", neuromod=" << agentBrain.getNeuromodulationLevel()
-                              << ", novelty=" << agentBrain.getNoveltyLevel()
-                              << ", energy=" << world.getAgentBody().energy
-                              << "\n";
+if (step % 50 == 0) {
+                if (!agentBrain.getBrain()) {
+                    std::cout << "  Step " << step << ": ERROR - brain is null!\n";
+                    continue;
                 }
+                std::cout << "  Step " << step 
+                          << ": reward=" << result.reward
+                          << ", action=" << motorCommandToString(cmd)
+                          << ", neuromod=" << agentBrain.getNeuromodulationLevel()
+                          << ", novelty=" << agentBrain.getNoveltyLevel()
+                          << ", energy=" << world.getAgentBody().energy
+                          << ", health=" << world.getAgentBody().health
+                          << "\n";
+            }
             }
             
             // Record final metrics
@@ -132,6 +203,10 @@ public:
             metrics.finalCuriosity = agentBrain.getCuriosityLevel();
             metrics.finalEnergy = world.getAgentBody().energy;
             metrics.predictionError = agentBrain.getPredictionError();
+            if (!agentBrain.getBrain()) {
+                std::cout << "ERROR: AgentBrain is null when recording metrics!\n";
+                return 1;
+            }
             metrics.developmentalAge = agentBrain.getBrain()->getTotalSynapseCount();  // Use as proxy
             metrics.developmentalStage = stageToString(agentBrain.getDevelopmentalStage());
             metrics.totalSynapses = brain->getTotalSynapseCount();
