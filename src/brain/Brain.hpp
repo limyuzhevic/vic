@@ -11,24 +11,6 @@
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
-
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -139,19 +121,31 @@ public:
     
     // ========== MEMORY SYSTEMS ==========
     
-    // Working memory - transient active information
+// Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
     
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
     
+    // Semantic memory - gradually acquired knowledge
+    SemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - learned skills and habits
+    ProceduralMemory* getProceduralMemory();
+    
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    AssociativeMemory* getAssociativeMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    // Neural prediction system
+    NeuralPrediction* getNeuralPrediction();
+    
+    // Prediction error signal
+    PredictionErrorSignal* getPredictionErrorSignal();
+    
+    // Action consequence predictor
+    ActionConsequencePredictor* getActionConsequencePredictor();
     
     // ========== COGNITION SYSTEMS ==========
     
@@ -180,9 +174,6 @@ public:
     
     // Novelty - novelty detection
     Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
