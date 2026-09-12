@@ -321,8 +321,247 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+// Helper functions for command-line argument parsing
+namespace nlm::cli {
+    
+    // Parse integer argument with default
+    template<typename T>
+    T parseArg(const char* arg, T defaultValue, bool& found) {
+        found = false;
+        if (!arg || std::strlen(arg) < 2) return defaultValue;
+        if (arg[0] != '-' || arg[1] != '=') return defaultValue;
+        
+        const char* valueStr = arg + 2;
+        try {
+            T value = static_cast<T>(std::stoll(valueStr));
+            found = true;
+            return value;
+        } catch (...) {
+            return defaultValue;
+        }
+    }
+    
+    // Parse float argument with default
+    float parseFloatArg(const char* arg, float defaultValue, bool& found) {
+        found = false;
+        if (!arg || std::strlen(arg) < 2) return defaultValue;
+        if (arg[0] != '-' || arg[1] != '=') return defaultValue;
+        
+        const char* valueStr = arg + 2;
+        try {
+            float value = std::stof(valueStr);
+            found = true;
+            return value;
+        } catch (...) {
+            return defaultValue;
+        }
+    }
+    
+    // Parse string argument with default
+    std::string parseStringArg(const char* arg, const std::string& defaultValue, bool& found) {
+        found = false;
+        if (!arg || std::strlen(arg) < 2) return defaultValue;
+        if (arg[0] != '-' || arg[1] != '=') return defaultValue;
+        
+        found = true;
+        return std::string(arg + 2);
+    }
+    
+    // Check if argument exists (improved with exact match)
+    bool hasArg(const char** argv, int argc, const char* flag) {
+        if (!flag) return false;
+        std::string flagStr(flag);
+        for (int i = 0; i < argc; ++i) {
+            if (argv[i] && std::string(argv[i]) == flagStr) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    // Get argument value (improved with bounds checking)
+    const char* getArgValue(const char** argv, int argc, const char* flag) {
+        if (!flag || !argv) return nullptr;
+        std::string flagStr(flag);
+        for (int i = 0; i < argc - 1; ++i) {
+            if (argv[i] && std::string(argv[i]) == flagStr) {
+                return argv[i + 1];
+            }
+        }
+        return nullptr;
+    }
+}
+
+// Command-line options struct
+struct RunOptions {
+    int testMode = 0;  // 0: all tests, 1: basic connectivity, 2: plasticity, 3: stdp, 4: custom
+    std::string configFile = "configs/default.cfg";
+    int neuronCount = 500;
+    int regionCount = 1;
+    float connectionProbability = 0.15f;
+    int simulationSteps = 1000;
+    bool verbose = false;
+    bool help = false;
+};
+
+// Parse command-line arguments
+RunOptions parseCommandLine(int argc, char** argv) {
+    RunOptions options;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            options.help = true;
+        } else if (arg == "--test" || arg == "-t") {
+            if (i + 1 < argc) {
+                try {
+                    options.testMode = std::stoi(argv[++i]);
+                } catch (...) {
+                    options.testMode = 0;
+                }
+            }
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                options.configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                options.configFile = argv[++i];
+            }
+        } else if (arg == "--neurons" || arg == "-n") {
+            if (i + 1 < argc) {
+                try {
+                    options.neuronCount = std::stoi(argv[++i]);
+                } catch (...) {
+                    options.neuronCount = 500;
+                }
+            }
+        } else if (arg == "--regions" || arg == "-r") {
+            if (i + 1 < argc) {
+                try {
+                    options.regionCount = std::stoi(argv[++i]);
+                } catch (...) {
+                    options.regionCount = 1;
+                }
+            }
+        } else if (arg == "--connection" || arg == "-c") {
+            if (i + 1 < argc) {
+                try {
+                    options.connectionProbability = std::stof(argv[++i]);
+                } catch (...) {
+                    options.connectionProbability = 0.15f;
+                }
+            }
+        } else if (arg == "--steps" || arg == "-s") {
+            if (i + 1 < argc) {
+                try {
+                    options.simulationSteps = std::stoi(argv[++i]);
+                } catch (...) {
+                    options.simulationSteps = 1000;
+                }
+            }
+        } else if (arg == "--verbose" || arg == "-v") {
+            options.verbose = true;
+        }
+    }
+    
+    return options;
+}
+
+// Print help message
+void printHelp() {
+    std::cout << R"(
+NLM Phase 2 Neural Computation - Command Line Interface
+
+Usage:
+    nlm_phase2 [options]
+
+Options:
+    --help, -h              Show this help message
+    --test MODE, -t MODE     Test mode (0=all, 1=basic, 2=plasticity, 3=stdp, 4=custom)
+    --config FILE, -c FILE   Configuration file (default: configs/default.cfg)
+    --neurons N, -n N        Number of neurons (default: 500)
+    --regions R, -r R        Number of regions (default: 1)
+    --connection P, -c P     Connection probability (default: 0.15)
+    --steps S, -s S           Simulation steps (default: 1000)
+    --verbose, -v            Enable verbose output
+
+Test Modes:
+    0: Run all tests (default)
+    1: Basic connectivity test only
+    2: Plasticity learning experiment only
+    3: STDP verification test only
+    4: Custom single experiment
+
+Example:
+    nlm_phase2 --test 2 --neurons 1000 --steps 5000 --verbose
+    nlm_phase2 --config custom.cfg --test 0
+)" << std::endl;
+}
+
+void runAllTests(std::shared_ptr<Brain> brain, bool verbose) {
+    if (verbose) NLM_LOG_INFO("Running all test modes...");
+    
+    // Test 1: Basic connectivity
+    if (verbose) NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
+    runBasicConnectivityTest(brain);
+    
+    // Reset and Test 2: Plasticity
+    if (verbose) NLM_LOG_INFO("Resetting brain for plasticity test...");
+    brain->reset();
+    brain->initialize();
+    
+    if (verbose) NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
+    runPlasticityExperiment(brain);
+    
+    // Reset and Test 3: STDP
+    if (verbose) NLM_LOG_INFO("Resetting brain for STDP test...");
+    brain->reset();
+    brain->initialize();
+    
+    if (verbose) NLM_LOG_INFO("=== Test 3: STDP Verification ===");
+    runStdpVerification(brain);
+}
+
+void runTestMode(std::shared_ptr<Brain> brain, int testMode, bool verbose) {
+    switch (testMode) {
+        case 1:
+            if (verbose) NLM_LOG_INFO("Running Test 1: Basic Connectivity Only");
+            runBasicConnectivityTest(brain);
+            break;
+        case 2:
+            if (verbose) NLM_LOG_INFO("Running Test 2: Plasticity Learning Experiment Only");
+            brain->reset();
+            brain->initialize();
+            runPlasticityExperiment(brain);
+            break;
+        case 3:
+            if (verbose) NLM_LOG_INFO("Running Test 3: STDP Verification Only");
+            brain->reset();
+            brain->initialize();
+            runStdpVerification(brain);
+            break;
+        case 4:
+            if (verbose) NLM_LOG_INFO("Running Custom Experiment (single plasticity test)");
+            brain->reset();
+            brain->initialize();
+            runPlasticityExperiment(brain);
+            break;
+        default:
+            runAllTests(brain, verbose);
+            break;
+    }
+}
+
 int main(int argc, char** argv) {
     printBanner();
+    
+    // Parse command line options
+    RunOptions options = parseCommandLine(argc, argv);
+    
+    if (options.help) {
+        printHelp();
+        return 0;
+    }
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
@@ -343,35 +582,22 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
     // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    if (config->loadFromFile(options.configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + options.configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Using default configuration (file not found: " + options.configFile + ")");
     }
     
-    // Override with command line args
+    // Load config from args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 (override with command line if provided)
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(options.neuronCount), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(options.regionCount), ConfigSource::Default);
+    config->set("connection_probability", options.connectionProbability, ConfigSource::Default);
     
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
@@ -384,12 +610,19 @@ int main(int argc, char** argv) {
     
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Configuration (from command line):");
+    NLM_LOG_INFO("  test_mode: " + std::to_string(options.testMode));
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(options.neuronCount));
+    NLM_LOG_INFO("  region_count: " + std::to_string(options.regionCount));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(options.connectionProbability));
+    NLM_LOG_INFO("  simulation_steps: " + std::to_string(options.simulationSteps));
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration (from config file):");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", options.neuronCount)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", options.regionCount)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", options.connectionProbability)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
@@ -409,20 +642,8 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run tests based on mode
+    runTestMode(brain, options.testMode, options.verbose);
     
     // Final brain status
     NLM_LOG_INFO("");

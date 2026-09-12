@@ -76,6 +76,31 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // === NEW UTILITY METHODS ===
+    
+    // Helper function to calculate average activity in a group of neurons
+    float calcAverageActivity(const std::vector<Neuron*>& neurons) const;
+    
+    // Get the most active motor group
+    MotorCommand getMostActiveMotorGroup() const;
+    
+    // Configure neuromodulation system
+    void configureNeuromodulation(float dopamineBase, float curiosityBase, float noveltyBase);
+    
+    // Compute prediction error and update learning
+    void computeAndApplyPredictionError(float actualReward, float expectedReward);
+    
+    // Get comprehensive system status
+    std::string getSystemStatus() const;
+    
+    // Check if agent is in exploratory mode
+    bool isExploring() const;
+    
+    // Get exploration bias (0.0 = no exploration, 1.0 = maximum exploration)
+    float getExplorationBias() const;
+    
+    // === END NEW METHODS ===
+    
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups
