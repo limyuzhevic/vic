@@ -106,19 +106,19 @@ private:
     std::vector<NeuronId> winners_;
 };
 
-// AttentionalSelection: Neural attention through competition
+// NeuralAttentionalSelection: Neural attention through competition
 // NOT Transformer attention - uses lateral inhibition and gain modulation
 //
-// Mechanisms:
+// Key mechanisms:
 // - Competition between neural populations
 // - Salience-based selection
 // - Recurrent amplification of winners
 // - Inhibitory surround suppression
 
-class AttentionalSelection {
+class NeuralAttentionalSelection {
 public:
-    AttentionalSelection();
-    ~AttentionalSelection();
+    NeuralAttentionalSelection();
+    ~NeuralAttentionalSelection();
 
     // Initialize with brain reference
     void initialize(Brain* brain);
