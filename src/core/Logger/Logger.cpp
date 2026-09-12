@@ -102,13 +102,15 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
     }
 }
 
-// Logger class implementation
+    // Logger class implementation
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
 };
 
 Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+
+Logger::~Logger() = default;
 
 Logger::~Logger() = default;
 

@@ -41,11 +41,18 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         return result;
     }
     
+// Create environment
+    Environment environment;
+    
     // Create simple world
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.configure(16, 16, 16, 16);  // width, height, visionWidth, visionHeight
+    world.reset();
     
-    // Create agent
+    // Note: Environment doesn't have setWorld method, but we can still run the simulation
+    // The SimpleWorld provides all necessary functionality for this experiment
+    
+    // Create agent with proper initialization
     AgentBrain agent(brain);
     agent.initialize(world);
     agent.enableRewardModulation(true);
@@ -61,43 +68,43 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get observation from world
+        const SensoryPercept& percept = world.getSensoryPercept();
         
-        // Process sensory input
+        // Process sensory input through agent
         agent.processSensoryInput(percept);
         
         // Brain step
         brain->step(step, step * 0.001);
         
-        // Get motor command
+        // Decode motor command from brain
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        // Apply motor command to world using correct API
+        ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
         
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Get current reward from action result
+        float reward = actionResult.reward;
         totalReward += reward;
         
         // Apply reward modulation
         agent.applyRewardModulation(reward, 0.0f);
         
-        // Update development
+        // Update development if enabled
         if (config.enableDevelopment) {
             agent.updateDevelopment(0.001);
         }
         
-        // Collect metrics
+        // Collect statistics
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
         
-        // Periodic status
+        // Periodic status output
         if (step % 1000 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 
-                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
+                        " | AvgReward: " + std::to_string(totalReward / (step + 1)) +
+                        " | FiringRate: " + std::to_string(brain->getAverageFiringRate()) +
+                        " | WMTraces: " + std::to_string(brain->getWorkingMemory() ? 
                             brain->getWorkingMemory()->getActiveTraces() : 0));
         }
     }
