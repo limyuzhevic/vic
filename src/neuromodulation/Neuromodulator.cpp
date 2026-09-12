@@ -9,8 +9,29 @@ struct Dopamine::Impl {
     float peak;
     float decayRate;
     float releaseRate;
+    float curiosityWeight;
+    float noveltyWeight;
+    float predictionErrorWeight;
     
-    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
+    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f),
+              curiosityWeight(1.0f), noveltyWeight(1.0f), predictionErrorWeight(1.0f) {}
+    
+    void configure(float baseline, float curiosityWeight, float noveltyWeight, float predictionErrorWeight) {
+        this->baseline = baseline;
+        this->curiosityWeight = curiosityWeight;
+        this->noveltyWeight = noveltyWeight;
+        this->predictionErrorWeight = predictionErrorWeight;
+    }
+    
+    float getBaseline() const { return baseline; }
+    float getCuriosityWeight() const { return curiosityWeight; }
+    float getNoveltyWeight() const { return noveltyWeight; }
+    float getPredictionErrorWeight() const { return predictionErrorWeight; }
+    
+    void setBaseline(float baseline) { this->baseline = baseline; }
+    void setCuriosityWeight(float weight) { this->curiosityWeight = weight; }
+    void setNoveltyWeight(float weight) { this->noveltyWeight = weight; }
+    void setPredictionErrorWeight(float weight) { this->predictionErrorWeight = weight; }
 };
 
 Dopamine::Dopamine() : pImpl(new Impl) {}

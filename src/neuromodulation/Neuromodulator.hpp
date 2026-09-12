@@ -44,6 +44,21 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
+    // Configure dopamine parameters
+    void configure(float baseline, float curiosityWeight, float noveltyWeight, float predictionErrorWeight);
+    
+    // Get neuromodulation weights
+    float getBaseline() const;
+    float getCuriosityWeight() const;
+    float getNoveltyWeight() const;
+    float getPredictionErrorWeight() const;
+    
+    // Set neuromodulation weights
+    void setBaseline(float baseline);
+    void setCuriosityWeight(float weight);
+    void setNoveltyWeight(float weight);
+    void setPredictionErrorWeight(float weight);
+    
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);

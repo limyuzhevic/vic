@@ -149,6 +149,23 @@ struct Brain::Impl {
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
+        // Get neuromodulation weights
+        float dopamineBaseline = config->getOr<float>("dopamine_baseline", 0.1f);
+        float dopamineCuriosityWeight = config->getOr<float>("dopamine_curiosity_weight", 1.0f);
+        float dopamineNoveltyWeight = config->getOr<float>("dopamine_novelty_weight", 1.0f);
+        float dopaminePredictionErrorWeight = config->getOr<float>("dopamine_prediction_error_weight", 1.0f);
+        float dopamineNoveltyNoiseWeight = config->getOr<float>("dopamine_novelty_noise_weight", 0.5f);
+        float dopamineCuriosityNoiseWeight = config->getOr<float>("dopamine_curiosity_noise_weight", 0.5f);
+        
+        // Configure neuromodulators with proper weights
+        if (dopamineCuriosityWeight > 0.0f || dopamineNoveltyWeight > 0.0f || dopaminePredictionErrorWeight > 0.0f) {
+            dopamine->configure(dopamineBaseline, dopamineCuriosityWeight, dopamineNoveltyWeight, dopaminePredictionErrorWeight);
+        }
+        if (dopamineNoveltyWeight > 0.0f) {
+            curiosity->configure(0.1f, dopamineCuriosityWeight);
+            novelty->configure(0.1f, dopamineNoveltyWeight);
+        }
+        
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
     }
