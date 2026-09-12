@@ -1,8 +1,10 @@
 #include "Config.hpp"
-#include <fstream>
+#include <iomanip>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <chrono>
+#include <ctime>
 
 namespace nlm {
 
@@ -19,38 +21,73 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Enhanced error handling and validation
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
+    int validLines = 0;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs with validation
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
+        if (pos == std::string::npos) {
+            NLM_LOG_WARNING("Config file " + filepath + " line " + std::to_string(lineNumber) + 
+                          ": Missing '=' sign, skipping line");
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Validate key format
+        if (key.empty()) {
+            NLM_LOG_WARNING("Config file " + filepath + " line " + std::to_string(lineNumber) + ": Empty key, skipping");
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '\"' && value.back() == '\"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Validate value
+        if (value.empty()) {
+            NLM_LOG_WARNING("Config file " + filepath + " line " + std::to_string(lineNumber) + ": Empty value for key " + key);
+        }
+        
+        try {
             set(key, value, ConfigSource::File);
+            validLines++;
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Config file " + filepath + " line " + std::to_string(lineNumber) + ": " + std::string(e.what()) + 
+                          ". Failed to set key: " + key);
+            continue;
         }
     }
+    
+    file.close();
+    
+    if (validLines == 0 && !pImpl->entries.empty()) {
+        NLM_LOG_WARNING("Config file " + filepath + ": No valid entries found");
+    }
+    
+    NLM_LOG_INFO("Loaded configuration from " + filepath + ": " + 
+                std::to_string(validLines) + " entries processed");
     
     return true;
 }
@@ -59,20 +96,45 @@ bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
+        // Handle --key=value format with validation
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key format
+                if (key.empty()) {
+                    NLM_LOG_ERROR("Invalid command line argument: -- (empty key)");
+                    continue;
+                }
+                
+                if (value.empty()) {
+                    NLM_LOG_WARNING("Empty value for command line key: " + key);
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_ERROR("Invalid command line argument format: " + arg + ". Expected --key=value");
             }
         }
-        // Handle -key value format
+        // Handle -key value format with validation
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            if (key.empty()) {
+                NLM_LOG_ERROR("Invalid command line argument: - (empty key)");
+                continue;
+            }
+            
+            if (value.empty()) {
+                NLM_LOG_WARNING("Empty value for command line key: " + key);
+            }
+            
             set(key, value, ConfigSource::CommandLine);
+        } else {
+            NLM_LOG_ERROR("Invalid command line argument: " + arg + ". Expected --key=value or -key value");
         }
     }
     return true;
@@ -81,14 +143,47 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
+    // Write header comment
+    file << "# NLM Configuration File" << std::endl;
+    file << "# Generated on: " << getCurrentTimestamp() << std::endl;
+    file << std::endl;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write description as comment
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << std::endl;
+        }
+        
+        // Write actual value using proper formatting
+        file << entry.key << " = ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format double with reasonable precision
+                file << std::fixed << std::setprecision(6) << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << " (Source: " << static_cast<int>(entry.source) << ")" << std::endl;
+        file << std::endl;
     }
     
+    file.close();
+    
+    NLM_LOG_INFO("Configuration saved to: " + filepath);
     return true;
 }
 
@@ -186,17 +281,16 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+std::string Config::getCurrentTimestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()) % 1000;
+    
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
+    ss << "." << std::setfill('0') << std::setw(3) << ms.count();
+    return ss.str();
 }
 
 // Explicit template instantiations

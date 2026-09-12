@@ -32,22 +32,48 @@ void NeuralEpisodicMemory::initialize(Brain* brain) {
 }
 
 void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
+    // Validate input episode
+    if (episode.timestamp == 0) {
+        NLM_LOG_ERROR("Cannot store episode with zero timestamp");
+        return;
+    }
+    
     // Create episode copy with age 0
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
     
-    episodes_.push_back(stored);
-    
-    // Create episode neuron for pattern completion
-    if (brain_ && !episode.sensoryState.empty()) {
-        NeuronId epNeuron(episodes_.size() + 20000);
-        pImpl->episodeNeurons.push_back(epNeuron);
-        
-        // Store episode index in the neuron
-        // (This is a simplified approach - real implementation would use more distributed encoding)
+    // Ensure we don't exceed maximum capacity
+    if (episodes_.size() >= maxEpisodes_ * 0.9f) {
+        NLM_LOG_WARNING("Approaching episode memory capacity, pruning old episodes");
+        // More aggressive pruning
+        size_t targetSize = maxEpisodes_ * 0.8f;
+        while (episodes_.size() > targetSize) {
+            // Remove lowest relevance episodes (oldest first)
+            episodes_.erase(episodes_.begin());
+            if (!pImpl->episodeNeurons.empty()) {
+                pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
+            }
+        }
     }
     
-    // Remove old episodes if over capacity
+    // Store episode with bounds checking
+    try {
+        episodes_.push_back(std::move(stored));
+        
+        // Create episode neuron for pattern completion
+        if (brain_ && !episode.sensoryState.empty()) {
+            NeuronId epNeuron(episodes_.size() + 20000);
+            pImpl->episodeNeurons.push_back(epNeuron);
+            
+            // Store episode index in the neuron
+            // (This is a simplified approach - real implementation would use more distributed encoding)
+        }
+    } catch (const std::bad_alloc&) {
+        NLM_LOG_ERROR("Failed to allocate memory for episode - memory pool may be exhausted");
+        return;
+    }
+    
+    // Remove old episodes if over capacity (using stable removal)
     while (episodes_.size() > maxEpisodes_) {
         episodes_.erase(episodes_.begin());
         if (!pImpl->episodeNeurons.empty()) {

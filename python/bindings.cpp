@@ -420,6 +420,158 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Convenience functions for common use cases
+    m.def("run_complete_agent_example", 
+        [](size_t numSteps) {
+            auto config = std::make_shared<Config>();
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            
+            auto agent = std::make_shared<AgentBrain>(brain);
+            auto world = std::make_shared<SimpleWorld>();
+            world->configure(20, 20, 8, 8);
+            world->reset();
+            agent->initialize(*world);
+            
+            // Enable key features
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+            agent->enableDevelopment(true);
+            agent->enableStructuralPlasticity(true);
+            
+            for (size_t step = 0; step < numSteps; ++step) {
+                world->update(0.1);
+                
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                brain->step(step);
+                
+                auto motorCmd = agent->decodeMotorCommand();
+                world->applyMotorCommand(motorCmd, world->getSimulationTime());
+                
+                // Apply reward modulation
+                float reward = 0.0f;
+                if (world->getSensoryPercept().getInternal() && 
+                    !world->getSensoryPercept().getInternal()->empty()) {
+                    reward = world->getSensoryPercept().getInternal()->at(0);
+                }
+                agent->applyRewardModulation(reward, 0.0f);
+                
+                agent->updateDevelopment(0.1);
+                
+                // Print progress every 100 steps
+                if (step % 100 == 0) {
+                    std::cout << "Step " << step << ": "
+                              << "Neurons: " << brain->getFiringNeuronCount() << ", "
+                              << "Curiosity: " << agent->getCuriosityLevel() << ", "
+                              << "Novelty: " << agent->getNoveltyLevel() << "\n";
+                }
+            }
+            
+            return std::make_tuple(brain, agent, world);
+        },
+        py::arg("numSteps") = 100,
+        "Run a complete agent example with brain, world, and agent. Returns tuple of (brain, agent, world).");
+
+    m.def("create_silent_brain_example",
+        [](size_t neuronCount) {
+            auto config = std::make_shared<Config>();
+            config->set("neuron_count", static_cast<int64_t>(neuronCount));
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            return brain;
+        },
+        py::arg("neuronCount") = 1000,
+        "Create a brain without any sensory or motor connections for simple testing.");
+
+    m.def("create_simple_world_example",
+        [](size_t width, size_t height) {
+            auto world = std::make_shared<SimpleWorld>();
+            world->configure(width, height, 8, 8);
+            world->reset();
+            return world;
+        },
+        py::arg("width") = 10,
+        py::arg("height") = 10,
+        "Create a simple 2D world with given dimensions.");
+
+    m.def("create_agent_with_features_example",
+        [](std::shared_ptr<Brain> brain, bool rewardMod, bool curiosity, bool development) {
+            auto agent = std::make_shared<AgentBrain>(brain);
+            agent->enableRewardModulation(rewardMod);
+            agent->enableCuriosity(curiosity);
+            agent->enableDevelopment(development);
+            return agent;
+        },
+        py::arg("brain"), py::arg("rewardMod") = true, py::arg("curiosity") = true, py::arg("development") = true,
+        "Create an agent brain with specified features enabled.");
+
+    m.def("run_plasticity_experiment",
+        [](std::shared_ptr<Brain> brain, size_t steps) {
+            auto agent = std::make_shared<AgentBrain>(brain);
+            auto world = std::make_shared<SimpleWorld>();
+            world->configure(10, 10, 8, 8);
+            world->reset();
+            agent->initialize(*world);
+            agent->enableRewardModulation(true);
+            
+            // Record initial weights
+            float initialWeightSum = 0.0f;
+            if (auto region = brain->getRegion(RegionId(1))) {
+                for (const auto& syn : region->getSynapses()) {
+                    initialWeightSum += syn->getWeight();
+                }
+            }
+            
+            for (size_t step = 0; step < steps; ++step) {
+                // Apply input patterns to stimulate learning
+                brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+                brain->step(step);
+                
+                if (step % 100 == 0) {
+                    std::cout << "Step " << step << ": "
+                              << "Total spikes: " << brain->getTotalSpikeCount() << ", "
+                              << "Firing neurons: " << brain->getFiringNeuronCount() << "\n";
+                }
+            }
+            
+            // Record final weights
+            float finalWeightSum = 0.0f;
+            if (auto region = brain->getRegion(RegionId(1))) {
+                for (const auto& syn : region->getSynapses()) {
+                    finalWeightSum += syn->getWeight();
+                }
+            }
+            
+            float weightChange = finalWeightSum - initialWeightSum;
+            std::cout << "Plasticity experiment complete. Weight change: " << weightChange << std::endl;
+            
+            return std::make_tuple(brain, agent, world, weightChange);
+        },
+        py::arg("brain"), py::arg("steps") = 1000,
+        "Run a plasticity learning experiment and return weight change.");
+
+    m.def("create_config_example",
+        [](const std::string& configJson) {
+            auto config = std::make_shared<Config>();
+            config->loadFromFile(configJson);
+            return config;
+        },
+        py::arg("configJson"),
+        "Create configuration from JSON file.");
+
+    m.def("save_config_example",
+        [](std::shared_ptr<Config> config, const std::string& filepath) {
+            return config->saveToFile(filepath);
+        },
+        py::arg("config"), py::arg("filepath"),
+        "Save configuration to file.");
+
+    // Version and info
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Authors";
+    m.attr("__description__") = "Python bindings for NLM (Neural Learning Machine) neural simulation framework";
 }
 
 } // namespace nlm

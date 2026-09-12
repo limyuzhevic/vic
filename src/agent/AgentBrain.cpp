@@ -2,9 +2,186 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cstdlib> // For rand()
 
 namespace nlm {
 
+// MotorCommandSelector - Handles motor decoding logic
+class MotorCommandSelector {
+public:
+    MotorCommandSelector() : curiosityThreshold_(0.3f), minimumActivity_(0.5f) {}
+    
+    MotorCommand decodeFromMotorNeurons(const std::vector<Neuron*>& motorForward,
+                                       const std::vector<Neuron*>& motorBackward,
+                                       const std::vector<Neuron*>& motorTurnLeft,
+                                       const std::vector<Neuron*>& motorTurnRight,
+                                       const std::vector<Neuron*>& motorInteract,
+                                       const std::vector<Neuron*>& motorWait) {
+        auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
+            if (neurons.empty()) return 0.0f;
+            float sum = 0.0f;
+            for (Neuron* n : neurons) {
+                sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            }
+            return sum / neurons.size();
+        };
+        
+        float forwardAct = calcActivity(motorForward);
+        float backwardAct = calcActivity(motorBackward);
+        float leftAct = calcActivity(motorTurnLeft);
+        float rightAct = calcActivity(motorTurnRight);
+        float interactAct = calcActivity(motorInteract);
+        float waitAct = calcActivity(motorWait);
+        
+        // Find maximum activity
+        struct CommandWithActivity {
+            MotorCommand cmd;
+            float activity;
+        };
+        
+        CommandWithActivity commands[] = {
+            {MotorCommand::MoveForward, forwardAct},
+            {MotorCommand::MoveBackward, backwardAct},
+            {MotorCommand::TurnLeft, leftAct},
+            {MotorCommand::TurnRight, rightAct},
+            {MotorCommand::Interact, interactAct},
+            {MotorCommand::Wait, waitAct}
+        };
+        
+        MotorCommand best = MotorCommand::Wait;
+        float bestActivity = waitAct;  // Default to wait if nothing stronger
+        
+        for (const auto& c : commands) {
+            if (c.activity > bestActivity) {
+                bestActivity = c.activity;
+                best = c.cmd;
+            }
+        }
+        
+        // Only act if there's meaningful activity
+        if (bestActivity < minimumActivity_) {
+            return MotorCommand::Wait;
+        }
+        
+        return best;
+    }
+    
+    float getCuriosityThreshold() const { return curiosityThreshold_; }
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = threshold; }
+    
+    float getMinimumActivity() const { return minimumActivity_; }
+    void setMinimumActivity(float activity) { minimumActivity_ = activity; }
+    
+private:
+    float curiosityThreshold_;
+    float minimumActivity_;
+};
+
+// NoveltyDetector - Handles novelty detection logic
+class NoveltyDetector {
+public:
+    NoveltyDetector(float decayRate = 0.99f, size_t historySize = 256) 
+        : noveltyDecay_(decayRate), maxHistorySize_(historySize) {}
+    
+    float computeNovelty(const std::vector<float>& currentVision,
+                        std::vector<float>& previousVision,
+                        float& noveltyLevel) {
+        if (currentVision.empty()) {
+            return 0.0f;
+        }
+        
+        // Resize previous vision if needed
+        if (previousVision.size() < currentVision.size()) {
+            previousVision.resize(currentVision.size(), 0.0f);
+        }
+        
+        // Compute novelty (difference from previous vision)
+        float totalDiff = 0.0f;
+        for (size_t i = 0; i < currentVision.size(); ++i) {
+            float diff = std::abs(currentVision[i] - previousVision[i]);
+            totalDiff += diff;
+        }
+        
+        // Normalize
+        noveltyLevel = totalDiff / std::max<size_t>(currentVision.size(), 1);
+        
+        // Decay and update previous vision
+        noveltyLevel *= noveltyDecay_;
+        previousVision = currentVision;
+        
+        return noveltyLevel;
+    }
+    
+    float getDecayRate() const { return noveltyDecay_; }
+    void setDecayRate(float rate) { noveltyDecay_ = rate; }
+    
+    size_t getMaxHistorySize() const { return maxHistorySize_; }
+    void setMaxHistorySize(size_t size) { maxHistorySize_ = size; }
+    
+private:
+    float noveltyDecay_;
+    size_t maxHistorySize_;
+};
+
+// CuriosityEngine - Handles curiosity-driven exploration
+class CuriosityEngine {
+public:
+    CuriosityEngine(float noveltyWeight = 2.0f, float errorWeight = 0.5f,
+                   float maxCuriosity = 1.0f, float explorationChance = 0.3f)
+        : noveltyWeight_(noveltyWeight), errorWeight_(errorWeight),
+          maxCuriosity_(maxCuriosity), explorationChance_(explorationChance) {}
+    
+    float calculateCuriosity(float noveltyLevel, float predictionError) {
+        float curiosity = noveltyLevel * noveltyWeight_ + 
+                         std::abs(predictionError) * errorWeight_;
+        return std::clamp(curiosity, 0.0f, maxCuriosity_);
+    }
+    
+    bool shouldExplore(float curiosityLevel) {
+        if (curiosityLevel <= 0.5f) return false;
+        
+        // Higher curiosity = more exploration
+        float exploreChance = curiosityLevel * explorationChance_;
+        
+        // This would use brain random generator in real implementation
+        // For now, use simple random
+        return (static_cast<float>(rand()) / RAND_MAX) < exploreChance;
+    }
+    
+    MotorCommand selectRandomAction() {
+        int choice = rand() % 8;  // 8 different actions
+        switch (choice) {
+            case 0: return MotorCommand::MoveForward;
+            case 1: return MotorCommand::MoveBackward;
+            case 2: return MotorCommand::TurnLeft;
+            case 3: return MotorCommand::TurnRight;
+            case 4: return MotorCommand::LookLeft;
+            case 5: return MotorCommand::LookRight;
+            case 6: return MotorCommand::Interact;
+            default: return MotorCommand::Wait;
+        }
+    }
+    
+    float getNoveltyWeight() const { return noveltyWeight_; }
+    void setNoveltyWeight(float weight) { noveltyWeight_ = weight; }
+    
+    float getErrorWeight() const { return errorWeight_; }
+    void setErrorWeight(float weight) { errorWeight_ = weight; }
+    
+    float getMaxCuriosity() const { return maxCuriosity_; }
+    void setMaxCuriosity(float max) { maxCuriosity_ = max; }
+    
+    float getExplorationChance() const { return explorationChance_; }
+    void setExplorationChance(float chance) { explorationChance_ = chance; }
+    
+private:
+    float noveltyWeight_;
+    float errorWeight_;
+    float maxCuriosity_;
+    float explorationChance_;
+};
+
+// AgentBrain implementation using components
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
@@ -19,6 +196,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , motorSelector_(new MotorCommandSelector())
+    , noveltyDetector_(new NoveltyDetector())
+    , curiosityEngine_(new CuriosityEngine())
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -61,7 +241,12 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::~AgentBrain() {
+    // Clean up component objects
+    delete motorSelector_;
+    delete noveltyDetector_;
+    delete curiosityEngine_;
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
@@ -124,29 +309,19 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
-    // Compute novelty (difference from previous vision)
+    // Compute novelty using dedicated detector
     if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
-        }
-        
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
+        noveltyDetector_->computeNovelty(vision, previousVision_, noveltyLevel_);
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity using dedicated engine
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        curiosityLevel_ = curiosityEngine_->calculateCuriosity(noveltyLevel_, predictionError_);
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // Store vision for next novelty computation
+    previousVision_ = vision;
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
@@ -154,7 +329,7 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
-    // Apply curiosity-based exploration
+    // Apply curiosity-based exploration using dedicated engine
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
     }
@@ -163,75 +338,17 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
-        float sum = 0.0f;
-        for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
-        }
-        return sum / neurons.size();
-    };
-    
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
-    
-    // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
-        {MotorCommand::MoveForward, forwardAct},
-        {MotorCommand::MoveBackward, backwardAct},
-        {MotorCommand::TurnLeft, leftAct},
-        {MotorCommand::TurnRight, rightAct},
-        {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
-    };
-    
-    MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
-    
-    for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
-            best = c.cmd;
-        }
-    }
-    
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
-        return MotorCommand::Wait;
-    }
-    
-    return best;
+    // Delegate to component
+    return motorSelector_->decodeFromMotorNeurons(
+        motorForward_, motorBackward_, motorTurnLeft_, 
+        motorTurnRight_, motorInteract_, motorWait_);
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
-        
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
-        }
+    // Delegate to component
+    if (curiosityEngine_->shouldExplore(curiosityLevel_)) {
+        return curiosityEngine_->selectRandomAction();
     }
-    
     return defaultCmd;
 }
 

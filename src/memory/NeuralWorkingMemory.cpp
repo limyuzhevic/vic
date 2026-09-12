@@ -36,28 +36,44 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
+    // Validate strength
+    if (strength < 0.0f || strength > 1.0f) {
+        NLM_LOG_WARNING("Invalid strength value " + std::to_string(strength) + ", clamping to [0,1]");
+        strength = std::clamp(strength, 0.0f, 1.0f);
+    }
+    
+    // Calculate and validate neurons needed
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
+        // Validate neuron access before using
+        auto* region = brain_->getRegion(neuron.getId() / 1000);
+        if (!region) {
+            NLM_LOG_ERROR("Cannot access region for neuron " + std::to_string(neuron.value));
+            continue;
+        }
+        
+        bool found = false;
+        for (auto* nn : region->getAllNeurons()) {
+            if (nn->getId() == neuron) {
+                nn->injectCurrent(activation * 5.0f);
+                found = true;
+                break;
             }
         }
         
-        // Update stored activation
+        if (!found) {
+            NLM_LOG_WARNING("Neuron " + std::to_string(neuron.value) + " not found in region");
+        }
+        
+        // Update stored activation with bounds checking
         if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
+            memoryActivations_[i] = std::clamp(activation, 0.0f, 1.0f);
         } else {
-            memoryActivations_.push_back(activation);
+            memoryActivations_.push_back(std::clamp(activation, 0.0f, 1.0f));
             memoryTimestamps_.push_back(0);
             memoryNeurons_.push_back(neuron);
         }
