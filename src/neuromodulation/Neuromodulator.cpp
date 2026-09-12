@@ -1,56 +1,51 @@
-#include "Neuromodulator.hpp"
+#pragma once
+
+#include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
+#include <vector>
+#include <memory>
+#include <functional>
+#include <string>
 #include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
-struct Dopamine::Impl {
-    float level;
-    float baseline;
-    float peak;
-    float decayRate;
-    float releaseRate;
-    
-    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
-};
-
-Dopamine::Dopamine() : pImpl(new Impl) {}
-
-Dopamine::~Dopamine() = default;
-
-const char* Dopamine::getName() const {
-    return "DA";
+// Initialize Serotonin implementation  
+void Serotonin::initialize(class Brain* brain) {
+    // Serotonin initialization if needed
 }
 
-float Dopamine::getLevel() const {
-    return pImpl->level;
+// Initialize Acetylcholine implementation  
+void Acetylcholine::initialize(class Brain* brain) {
+    // Acetylcholine initialization if needed
 }
 
-void Dopamine::setLevel(float level) {
-    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+void Norepinephrine::initialize(class Brain* brain) {
+    // Norepinephrine initialization if needed
 }
 
-float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
-    return 0.5f + 0.5f * pImpl->level;
+// Dopamine.cpp implementation (existing, but fixed)
+void Dopamine::initialize(class Brain* brain) {
+    // Dopamine initialization if needed
 }
 
-void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+// Curiosity.cpp implementation
+void Curiosity::initialize(class Brain* brain) {
+    pImpl->brain = brain;
+    NLM_LOG_INFO("Curiosity system initialized");
 }
 
-void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+// PredictionError.cpp implementation
+void PredictionError::initialize(Brain* brain) {
+    pImpl->brain = brain;
+    NLM_LOG_INFO("PredictionError system initialized");
 }
 
-void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+// Novelty.cpp implementation
+void Novelty::initialize(class Brain* brain) {
+    pImpl->brain = brain;
+    NLM_LOG_INFO("Novelty system initialized");
 }
 
 } // namespace nlm

@@ -106,29 +106,23 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize all neuromodulation systems with brain reference
+        dopamine->initialize(this);
+        acetylcholine->initialize(this);
+        norepinephrine->initialize(this);
+        serotonin->initialize(this);
+        curiosity->initialize(this);
+        predictionError->initialize(this);
+        novelty->initialize(this);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -151,6 +145,7 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+    }
     }
     
     DevelopmentalStage developmentalStage;
@@ -711,7 +706,18 @@ std::unique_ptr<class Action> Brain::produceAction() {
         type = ActionType::MoveForward;
     }
     
+    // Integrate with attention system for action selection
+    if (pImpl->attention) {
+        // Use attention to select among motor options
+        type = pImpl->attention->selectAction(type);
+    }
+    
     auto action = std::make_unique<Action>(type);
+    
+    // Apply reward-based modulation if reward modulation is enabled
+    if (pImpl->dopamine && pImpl->dopamine->isActive()) {
+        action->setRewardModulation(pImpl->dopamine->getCurrentValue());
+    }
     
     return action;
 }
@@ -723,6 +729,16 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     // Scale STDP learning rates
     pImpl->stdp->setLTPWeight(0.01f * modulation);
     pImpl->stdp->setLTDWeight(0.012f * modulation);
+    
+    // Update dopamine system
+    if (pImpl->dopamine) {
+        pImpl->dopamine->applyModulation(signal);
+    }
+    
+    // Update curiosity system
+    if (pImpl->curiosity) {
+        pImpl->curiosity->applyModulation(signal);
+    }
 }
 
 void Brain::updatePlasticity() {

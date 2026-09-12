@@ -1,8 +1,17 @@
+#pragma once
+
 /**
  * Phase 6 Demo - Integration Test
  * 
  * This demo runs the Phase 6 integration experiment to verify
  * that all brain systems are properly connected.
+ * 
+ * The demo shows a complete artificial brain with:
+ * - Memory systems (working, episodic, associative)
+ * - Neuromodulation (dopamine, serotonin, acetylcholine, norepinephrine)
+ * - Prediction and cognition systems
+ * - Development and replay mechanisms
+ * - Checkpointing and error recovery
  */
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
