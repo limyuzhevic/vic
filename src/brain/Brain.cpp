@@ -15,10 +15,13 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../performance/PerformanceMonitor.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <unordered_map>
+#include <chrono>
 
 namespace nlm {
 
@@ -78,6 +81,14 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Performance monitoring
+    std::unique_ptr<PerformanceMonitor> performanceMonitor;
+    
+    // Performance timing for hooks
+    std::unordered_map<std::string, double> stepTimes;
+    std::unordered_map<std::string, double> plasticityTimes;
+    std::unordered_map<std::string, double> developmentTimes;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -91,8 +102,11 @@ struct Brain::Impl {
         , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , consolidationInterval(1000)  // Consolidate every 1000 steps)
     {
+        // Initialize performance monitor
+        performanceMonitor = std::make_unique<PerformanceMonitor>();
+        
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
@@ -286,15 +300,42 @@ bool Brain::initialize() {
         }
     });
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    std::unordered_map<std::string, double> plasticityTimes;
+    std::unordered_map<std::string, double> developmentTimes;
     
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
-    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    pImpl->developmentSystem->setPerformanceMonitor(pImpl->performanceMonitor);
+    
+    if (pImpl->dopamine) {
+        pImpl->dopamine->setPerformanceMonitor(pImpl->performanceMonitor);
+    }
+    
+    if (pImpl->curiosity) {
+        pImpl->curiosity->setPerformanceMonitor(pImpl->performanceMonitor);
+    }
+    
+    if (pImpl->novelty) {
+        pImpl->novelty->setPerformanceMonitor(pImpl->performanceMonitor);
+    }
+    
+    if (pImpl->predictionError) {
+        pImpl->predictionError->setPerformanceMonitor(pImpl->performanceMonitor);
+    }
+    
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->setPerformanceMonitor(pImpl->performanceMonitor);
+    }
+    
+    if (pImpl->stdp) {
+        pImpl->stdp->setPerformanceMonitor(pImpl->performanceMonitor);
+    }
+    
+    if (pImpl->hebbian) {
+        pImpl->hebbian->setPerformanceMonitor(pImpl->performanceMonitor);
+    }
+    
+    if (pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->setPerformanceMonitor(pImpl->performanceMonitor);
+    }
     
     return true;
 }

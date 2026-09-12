@@ -37,6 +37,26 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_command_line_utils {
+    void runAll();
+}
+
+namespace test_performance_monitor {
+    void runAll();
+}
+
+namespace test_benchmark {
+    void runAll();
+}
+
+namespace test_error_handler {
+    void runAll();
+}
+
+namespace test_debug_utils {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
