@@ -1,8 +1,10 @@
 #include "Config.hpp"
+#include "../../core/Logger/Logger.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cmath>
 
 namespace nlm {
 
@@ -24,11 +26,14 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Could not open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNum = 0;
     while (std::getline(file, line)) {
+        ++lineNum;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -37,21 +42,31 @@ bool Config::loadFromFile(const std::string& filepath) {
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNum) + ": missing '='");
+            continue;
         }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        if (key.empty()) {
+            NLM_LOG_WARNING("Empty key at line " + std::to_string(lineNum));
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        set(key, value, ConfigSource::File);
+        NLM_LOG_INFO("Loaded config: " + key + " = " + value);
     }
     
+    NLM_LOG_INFO("Loaded configuration from: " + filepath);
     return true;
 }
 
@@ -81,12 +96,43 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Could not write to config file: " + filepath);
         return false;
     }
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << "\"" << arg[i] << "\"";
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n";
     }
     
     return true;
@@ -101,11 +147,11 @@ std::optional<T> Config::get(const std::string& key) const {
         return std::nullopt;
     }
     
-    try {
+    if (std::holds_alternative<T>(it->value)) {
         return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
     }
+    
+    return std::nullopt;
 }
 
 template<typename T>
