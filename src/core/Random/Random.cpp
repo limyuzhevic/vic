@@ -60,6 +60,17 @@ uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
     return dist(pImpl->gen);
 }
 
+int RandomGenerator::uniformInt(int min, int max) {
+    if (min > max) {
+        throw std::invalid_argument("min must be <= max");
+    }
+    if (min == max) {
+        return min;
+    }
+    std::uniform_int_distribution<int> dist(min, max);
+    return dist(pImpl->gen);
+}
+
 double RandomGenerator::uniformReal(double min, double max) {
     if (min >= max) {
         throw std::invalid_argument("min must be < max");

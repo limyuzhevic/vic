@@ -56,6 +56,42 @@ struct Brain::Impl {
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
+    // Performance optimization: Lookup tables for O(1) neuron/synapse access
+    std::unordered_map<NeuronId, Neuron*> neuronLookup;
+    std::unordered_map<SynapseId, Synapse*> synapseLookup;
+    
+    // ========== INTEGRATED MEMORY SYSTEMS ==========
+    std::unique_ptr<NeuralWorkingMemory> workingMemory;
+    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
+    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    
+    // ========== INTEGRATED PREDICTION SYSTEM ==========
+    std::unique_ptr<PredictionSystem> predictionSystem;
+    
+    // ========== INTEGRATED COGNITION SYSTEMS ==========
+    std::unique_ptr<NeuralPlanner> planner;
+    std::unique_ptr<ConceptFormation> conceptFormation;
+    std::unique_ptr<AttentionalSelection> attention;
+    
+    // ========== DEVELOPMENT SYSTEM ==========
+    std::unique_ptr<DevelopmentSystem> developmentSystem;
+    
+    // ========== NEUROMODULATION SYSTEMS ==========
+    std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Curiosity> curiosity;
+    std::unique_ptr<PredictionError> predictionError;
+    std::unique_ptr<Novelty> novelty;
+    
+    // Phase 2: Real neural computation components
+    std::unique_ptr<SpikeSystem> spikeSystem;
+    std::unique_ptr<STDP> stdp;
+    std::unique_ptr<Hebbian> hebbian;
+    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    
+    // Performance optimization: Lookup tables for O(1) neuron/synapse access
+    std::unordered_map<NeuronId, Neuron*> neuronLookup;
+    std::unordered_map<SynapseId, Synapse*> synapseLookup;
+    
     // Simulation parameters
     TimestepDuration timestep;
     SimulationStep currentStep;
@@ -814,8 +850,8 @@ bool Brain::save(const std::string& filepath) const {
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
             for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().value);
+                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().value);
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));

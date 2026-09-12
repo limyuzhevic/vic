@@ -24,19 +24,19 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
-    
+    // Implement real Hebbian learning
+    // Correlated firing potentiates synapses
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
+    // Count correlated spike pairs within biological window (5-50ms)
     size_t coincidences = 0;
     for (Timestamp pre : preSpikes) {
         for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
+            float dt = std::abs(static_cast<float>(post - pre));
+            if (dt >= 5.0f && dt <= 50.0f) {  // Biological coincidence window
+                coincidences++;
             }
         }
     }

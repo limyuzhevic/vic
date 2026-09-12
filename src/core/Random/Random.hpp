@@ -34,9 +34,10 @@ public:
     uint64_t getSeed() const;
     
     // Random number generation
-    // Uniform integer in [min, max]
+    // Uniform integer in [min, max] - support for different integer types
     uint32_t uniformInt(uint32_t min, uint32_t max);
     uint64_t uniformInt(uint64_t min, uint64_t max);
+    int uniformInt(int min, int max);  // Added for compatibility with existing code
     
     // Uniform real in [min, max)
     double uniformReal(double min, double max);
