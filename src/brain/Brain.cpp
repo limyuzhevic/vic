@@ -50,11 +50,14 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
-    // Phase 2: Real neural computation components
+            // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    
+    // Simulation clock
+    std::unique_ptr<SimulationClock> clock;
     
     // Simulation parameters
     TimestepDuration timestep;
@@ -106,7 +109,8 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+        // Initialize simulation clock
+        clock = std::make_unique<SimulationClock>(timestep);
         
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
@@ -159,7 +163,9 @@ struct Brain::Impl {
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
-Brain::~Brain() = default;
+Brain::~Brain() {
+    delete pImpl;
+}
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -184,6 +190,11 @@ bool Brain::initialize() {
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
+    
+    // Initialize simulation clock
+    pImpl->clock->reset();
+    pImpl->currentStep = pImpl->clock->getStep();
+    pImpl->currentTime = pImpl->clock->getTime();
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {

@@ -142,10 +142,6 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
-    
-private:
-    struct Impl;
-    Impl* pImpl;
 };
 
 } // namespace nlm

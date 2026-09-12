@@ -37,7 +37,7 @@ bool Config::loadFromFile(const std::string& filepath) {
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
+        if (pos != std::stringnpos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
