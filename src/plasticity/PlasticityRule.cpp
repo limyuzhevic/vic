@@ -24,31 +24,49 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
+    // REAL IMPLEMENTATION: Hebbian learning based on spike timing:
+    // - Stably correlated pre-post spikes induce LTP (weight increase)
+    // - Anti-correlated timing can induce LTD (weight decrease)
+    // - Temporal window determines learning strength
     
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
-    for (Timestamp pre : preSpikes) {
-        for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
+    // Process all pre-post spike pairings
+    float totalDelta = 0.0f;
+    float maxTemporalWindow = 30.0f;  // 30ms learning window
+    
+    for (Timestamp preTime : preSpikes) {
+        for (Timestamp postTime : postSpikes) {
+            float deltaT = postTime - preTime;  // Post minus Pre
+            
+            if (std::abs(deltaT) < maxTemporalWindow) {
+                // STDP-like weight change based on temporal difference
+                float weightChange = 0.0f;
+                
+                if (deltaT > 0) {
+                    // Post after Pre: Long-Term Potentiation (LTP)
+                    // Stronger when timing is optimal (around 10-20ms)
+                    float optimalDeltaT = 15.0f;
+                    float timingFactor = std::exp(-std::abs(deltaT - optimalDeltaT) / 10.0f);
+                    weightChange = pImpl->learningRate * timingFactor;
+                } else {
+                    // Pre after Post: Long-Term Depression (LTD)
+                    // Weaker when timing is more negative
+                    float timingFactor = std::exp(deltaT / 20.0f);  // deltaT is negative
+                    weightChange = -pImpl->learningRate * timingFactor;
+                }
+                
+                totalDelta += weightChange;
             }
         }
     }
     
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
+    // Apply cumulative weight change
+    if (totalDelta != 0.0f) {
+        applyWeightChange(synapse, totalDelta);
     }
-}
-
-void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    synapse->addToWeight(delta);
 }
 
 const char* HebbianRule::getName() const {
@@ -56,7 +74,8 @@ const char* HebbianRule::getName() const {
 }
 
 void HebbianRule::setLearningRate(float rate) {
-    pImpl->learningRate = rate;
+    // Clamp learning rate to reasonable bounds
+    pImpl->learningRate = std::clamp(rate, 0.001f, 0.1f);
 }
 
 float HebbianRule::getLearningRate() const {
