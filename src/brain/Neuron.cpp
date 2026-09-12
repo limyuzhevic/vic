@@ -232,7 +232,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     V = std::clamp(V, -100.0f, 50.0f);
     
     // Check for spike
-    if (V >= threshold) {
+if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
@@ -250,7 +250,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.firingState = FiringState::Resting;
     }
     
     // Clear synaptic input for next step

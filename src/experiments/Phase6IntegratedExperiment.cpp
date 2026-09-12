@@ -60,38 +60,36 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
     
-    for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
-        
+for (uint64_t step = 0; step < config.maxSteps; ++step) {
+        // Get observation from world
+        const SensoryPercept& percept = world.getSensoryPercept();
+
         // Process sensory input
         agent.processSensoryInput(percept);
-        
+
         // Brain step
         brain->step(step, step * 0.001);
-        
+
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
-        
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
-        
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+
+        // Apply motor command to world and get reward
+        ActionResult actionResult = world.applyMotorCommand(cmd, world.getSimulationTime());
+        float reward = actionResult.reward;
         totalReward += reward;
-        
+
         // Apply reward modulation
         agent.applyRewardModulation(reward, 0.0f);
-        
+
         // Update development
         if (config.enableDevelopment) {
             agent.updateDevelopment(0.001);
         }
-        
+
         // Collect metrics
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
-        
+
         // Periodic status
         if (step % 1000 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 
