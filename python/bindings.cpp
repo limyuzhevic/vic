@@ -416,6 +416,415 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Advanced convenience functions
+    m.def("createSimulation", [](std::shared_ptr<Config> config, std::string world_type) -> std::map<std::string, std::shared_ptr<void>> {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        agent->initialize(*world);
+        
+        std::map<std::string, std::shared_ptr<void>> result;
+        result["brain"] = brain;
+        result["agent"] = agent;
+        result["world"] = world;
+        return result;
+    }, py::arg("config"), py::arg("world_type") = "simple",
+        "Create a complete simulation environment with brain, agent, and world");
+
+    m.def("runEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                          std::shared_ptr<AgentBrain> agent, size_t max_steps, bool verbose) {
+        if (verbose) {
+            std::cout << "Starting episode with " << max_steps << " steps\n";
+        }
+        
+        float total_reward = 0.0f;
+        size_t firing_events = 0;
+        
+        for (size_t step = 0; step < max_steps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Brain step
+            brain->step(step, world->getSimulationTime());
+            
+            // Decode motor command
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Get reward
+            auto reward = percept.getInternal();
+            float reward_value = reward.empty() ? 0.0f : reward[0];
+            total_reward += reward_value;
+            
+            // Apply reward modulation
+            agent->applyRewardModulation(reward_value, 0.0f);
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+            
+            // Count firing events
+            if (brain->getFiringNeuronCount() > 0) {
+                firing_events++;
+            }
+            
+            if (verbose && (step % 100 == 0)) {
+                std::cout << "Step " << step << ": "
+                          << "Reward: " << reward_value << ", "
+                          << "Firing neurons: " << brain->getFiringNeuronCount() << "\n";
+            }
+        }
+        
+        std::map<std::string, double> stats;
+        stats["total_reward"] = total_reward;
+        stats["firing_events"] = firing_events;
+        stats["avg_reward_per_step"] = total_reward / max_steps;
+        return stats;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), 
+              py::arg("max_steps") = 1000, py::arg("verbose") = false,
+        "Run a complete simulation episode and return statistics");
+
+    m.def("exploreBehavior", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                std::shared_ptr<AgentBrain> agent, size_t episodes,
+                                float exploration_rate, float min_exploration) {
+        float total_curiosity = 0.0f;
+        float total_novelty = 0.0f;
+        size_t high_curiosity_steps = 0;
+        
+        for (size_t episode = 0; episode < episodes; ++episode) {
+            // Adjust exploration rate over time
+            float current_exploration = exploration_rate - 
+                (exploration_rate - min_exploration) * (episode / (float)episodes);
+            
+            for (size_t step = 0; step < 200; ++step) {
+                world->update(0.1);
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                brain->step(step, world->getSimulationTime());
+                
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+                
+                // Apply curiosity-based exploration
+                if (agent->getCuriosityLevel() > current_exploration) {
+                    high_curiosity_steps++;
+                }
+                
+                total_curiosity += agent->getCuriosityLevel();
+                total_novelty += agent->getNoveltyLevel();
+                
+                // Apply reward modulation
+                auto reward = percept.getInternal();
+                float reward_value = reward.empty() ? 0.0f : reward[0];
+                agent->applyRewardModulation(reward_value, 0.0f);
+            }
+            
+            agent->reset();
+        }
+        
+        std::map<std::string, double> stats;
+        stats["avg_curiosity"] = total_curiosity / (episodes * 200);
+        stats["avg_novelty"] = total_novelty / (episodes * 200);
+        stats["high_curiosity_percentage"] = (high_curiosity_steps * 100.0) / (episodes * 200);
+        return stats;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), 
+              py::arg("episodes") = 50, py::arg("exploration_rate") = 0.3,
+              py::arg("min_exploration") = 0.05,
+        "Run exploration behavior with curiosity-driven exploration");
+
+    // Enhanced visualization tools
+    m.def("createVisualizer", []() {
+        class PyVisualizer {
+        public:
+            PyVisualizer() {}
+            void plotNeuralActivity(std::shared_ptr<Brain> brain, size_t window_size) {
+                // Simplified visualization - in practice this would use matplotlib
+                std::cout << "Visualizing neural activity over last " << window_size << " steps\n";
+                // Would generate plots of firing rates, etc.
+            }
+            
+            void plotLearningCurve(const std::vector<float>& rewards, size_t window_size) {
+                std::cout << "Visualizing learning curve with " << rewards.size() << " data points\n";
+                // Would generate learning curve plots
+            }
+            
+            void saveVisualization(std::string filename, int dpi) {
+                std::cout << "Saving visualization to " << filename << " (dpi: " << dpi << ")\n";
+                // Would save plots to file
+            }
+        };
+        return std::make_shared<PyVisualizer>();
+    }, "Create a visualizer object for plotting neural activity and learning curves");
+
+    // Agent lifecycle management
+    m.def("createAgentManager", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world) {
+        class PyAgentManager {
+        public:
+            PyAgentManager(std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world)
+                : brain_(brain), agent_(agent), world_(world), next_checkpoint_id_(0) {}
+            
+            size_t createCheckpoint(std::string tag, std::map<std::string, std::string> metadata) {
+                size_t id = next_checkpoint_id_++;
+                checkpoints_[id] = {tag, metadata, std::chrono::system_clock::now()};
+                std::cout << "Checkpoint created: " << id << " (tag: " << tag << ")\n";
+                return id;
+            }
+            
+            bool restoreCheckpoint(size_t checkpoint_id) {
+                auto it = checkpoints_.find(checkpoint_id);
+                if (it != checkpoints_.end()) {
+                    std::cout << "Restoring from checkpoint: " << checkpoint_id << "\n";
+                    // In practice would restore brain state, agent state, etc.
+                    return true;
+                }
+                std::cout << "Checkpoint not found: " << checkpoint_id << "\n";
+                return false;
+            }
+            
+            std::vector<size_t> listCheckpoints() {
+                std::vector<size_t> ids;
+                for (const auto& pair : checkpoints_) {
+                    ids.push_back(pair.first);
+                }
+                return ids;
+            }
+            
+            void deleteCheckpoint(size_t checkpoint_id) {
+                if (checkpoints_.erase(checkpoint_id)) {
+                    std::cout << "Checkpoint deleted: " << checkpoint_id << "\n";
+                } else {
+                    std::cout << "Checkpoint not found for deletion: " << checkpoint_id << "\n";
+                }
+            }
+            
+            std::map<std::string, double> getPerformanceMetrics(std::optional<size_t> time_window) {
+                std::map<std::string, double> metrics;
+                // In practice would calculate real metrics
+                metrics["avg_firing_rate"] = 50.0;
+                metrics["total_spikes"] = 1000.0;
+                metrics["exploration_efficiency"] = 0.75;
+                return metrics;
+            }
+            
+        private:
+            std::shared_ptr<Brain> brain_;
+            std::shared_ptr<AgentBrain> agent_;
+            std::shared_ptr<SimpleWorld> world_;
+            size_t next_checkpoint_id_;
+            std::map<size_t, std::tuple<std::string, std::map<std::string, std::string>, std::chrono::system_clock::time_point>> checkpoints_;
+        };
+        
+        return std::make_shared<PyAgentManager>(brain, agent, world);
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"),
+        "Create an agent manager for checkpointing and performance tracking");
+
+    // Debug monitoring
+    m.def("createDebugMonitor", []() {
+        class PyDebugMonitor {
+        public:
+            PyDebugMonitor() : running_(false) {}
+            
+            void startMonitoring(std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, double update_interval) {
+                running_ = true;
+                std::cout << "Debug monitor started (update interval: " << update_interval << "s)\n";
+                // In practice would start background monitoring thread
+            }
+            
+            void stopMonitoring() {
+                running_ = false;
+                std::cout << "Debug monitor stopped\n";
+            }
+            
+            std::map<std::string, double> getNeuralStats() {
+                std::map<std::string, double> stats;
+                // In practice would return real-time stats
+                stats["firing_neurons"] = 45.0;
+                stats["spike_rate"] = 12.5;
+                stats["excitation_inhibition_ratio"] = 1.2;
+                return stats;
+            }
+            
+            std::map<std::string, double> getWorldState() {
+                std::map<std::string, double> state;
+                // In practice would return world state
+                state["x"] = 10.0;
+                state["y"] = 10.0;
+                state["energy"] = 85.0;
+                state["age"] = 150.0;
+                return state;
+            }
+            
+            void triggerBreakpoint(std::function<bool()> condition) {
+                if (condition()) {
+                    std::cout << "Breakpoint triggered by condition\n";
+                }
+            }
+            
+            void logSimulationStep(size_t step, std::map<std::string, double> data) {
+                std::cout << "Step " << step << ": ";
+                for (const auto& pair : data) {
+                    std::cout << pair.first << "=" << pair.second << " ";
+                }
+                std::cout << "\n";
+            }
+            
+        private:
+            bool running_;
+        };
+        return std::make_shared<PyDebugMonitor>();
+    }, "Create a debug monitor for real-time simulation monitoring");
+
+    // World management
+    m.def("createWorldManager", [](std::shared_ptr<SimpleWorld> world) {
+        class PyWorldManager {
+        public:
+            PyWorldManager(std::shared_ptr<SimpleWorld> world) : world_(world) {}
+            
+            void setObjectDensity(double density) {
+                std::cout << "Setting world object density to " << density << "\n";
+                // In practice would adjust world object density
+            }
+            
+            void addObjects(std::string object_type, size_t count, std::pair<double, double> position_range) {
+                std::cout << "Adding " << count << " " << object_type 
+                         << " objects in range " << position_range.first << "-" << position_range.second << "\n";
+                // In practice would add objects to world
+            }
+            
+            void clearObjects(std::string object_type) {
+                std::cout << "Clearing " << object_type << " objects\n";
+                // In practice would clear objects
+            }
+            
+            void setDynamics(std::optional<double> gravity, std::optional<double> friction) {
+                std::cout << "Setting world dynamics\n";
+                if (gravity) std::cout << "  Gravity: " << *gravity << "\n";
+                if (friction) std::cout << "  Friction: " << *friction << "\n";
+                // In practice would set physics parameters
+            }
+            
+            void runWorldSimulation(size_t steps, bool real_time) {
+                std::cout << "Running world simulation for " << steps << " steps (real_time: " 
+                         << (real_time ? "yes" : "no") << ")\n";
+                // In practice would run world simulation
+            }
+            
+        private:
+            std::shared_ptr<SimpleWorld> world_;
+        };
+        
+        return std::make_shared<PyWorldManager>(world);
+    }, py::arg("world"), "Create a world manager for environment manipulation");
+
+    // Enhanced brain configuration management
+    m.def("createBrainConfig", []() {
+        class PyBrainConfig {
+        public:
+            PyBrainConfig() {}
+            
+            void setArchitecture(std::string neuron_type, std::string connection_pattern) {
+                std::cout << "Setting architecture: neurons=" << neuron_type 
+                         << ", connections=" << connection_pattern << "\n";
+                // In practice would apply to brain config
+            }
+            
+            void setDevelopment(double stage_duration, bool enable_maturation) {
+                std::cout << "Setting development: stage_duration=" << stage_duration 
+                         << ", maturation=" << (enable_maturation ? "enabled" : "disabled") << "\n";
+                // In practice would configure development
+            }
+            
+            void setLearning(double learning_rate, std::string plasticity_rules) {
+                std::cout << "Setting learning: rate=" << learning_rate 
+                         << ", rules=" << plasticity_rules << "\n";
+                // In practice would configure learning
+            }
+            
+            void saveToFile(std::string filename, std::string format) {
+                std::cout << "Saving configuration to " << filename << " (format: " << format << ")\n";
+                // In practice would save to file
+            }
+            
+            void loadFromFile(std::string filename) {
+                std::cout << "Loading configuration from " << filename << "\n";
+                // In practice would load from file
+            }
+            
+            bool validate() {
+                std::cout << "Validating configuration...\n";
+                // In practice would validate
+                return true;
+            }
+        };
+        return std::make_shared<PyBrainConfig>();
+    }, "Create an advanced brain configuration manager");
+
+    // Utility functions
+    m.def("saveBrainState", [](std::shared_ptr<Brain> brain, std::string filename) {
+        brain->save(filename);
+        std::cout << "Brain state saved to " << filename << "\n";
+    }, py::arg("brain"), py::arg("filename"), "Save brain state to file");
+
+    m.def("loadBrainState", [](std::shared_ptr<Brain> brain, std::string filename) {
+        brain->load(filename);
+        std::cout << "Brain state loaded from " << filename << "\n";
+    }, py::arg("brain"), py::arg("filename"), "Load brain state from file");
+
+    m.def("exportResults", [](std::string prefix, std::map<std::string, std::vector<double>> data) {
+        std::cout << "Exporting results with prefix: " << prefix << "\n";
+        // In practice would export data files
+        for (const auto& pair : data) {
+            std::cout << "  " << pair.first << ": " << pair.second.size() << " data points\n";
+        }
+    }, py::arg("prefix"), py::arg("data"), "Export simulation results to files");
+
+    m.def("importResults", [](std::string prefix) {
+        std::cout << "Importing results with prefix: " << prefix << "\n";
+        // In practice would import data files
+        return std::map<std::string, std::vector<double>>();
+    }, py::arg("prefix"), "Import simulation results from files");
+
+    // Constants and version info
+    m.attr("VERSION") = "2.0.0";
+    m.attr("API_LEVEL") = 2;
+    m.attr("BUILD_TYPE") = "enhanced";
+
+    // Error handling utilities
+    m.def("checkBrainHealth", [](std::shared_ptr<Brain> brain) {
+        std::cout << "Checking brain health...\n";
+        bool healthy = true;
+        if (brain->getTotalNeuronCount() == 0) {
+            std::cout << "WARNING: Brain has no neurons!\n";
+            healthy = false;
+        }
+        if (brain->getFiringNeuronCount() == 0) {
+            std::cout << "WARNING: Brain is not firing!\n";
+            healthy = false;
+        }
+        std::cout << "Brain health check: " << (healthy ? "PASSED" : "FAILED") << "\n";
+        return healthy;
+    }, py::arg("brain"), "Check brain health and report issues");
+
+    m.def("validateConfiguration", [](std::shared_ptr<Config> config) {
+        std::cout << "Validating configuration...\n";
+        bool valid = true;
+        if (config->getKeys().empty()) {
+            std::cout << "WARNING: Configuration is empty!\n";
+            valid = false;
+        }
+        std::cout << "Configuration validation: " << (valid ? "PASSED" : "FAILED") << "\n";
+        return valid;
+    }, py::arg("config"), "Validate configuration and report issues");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

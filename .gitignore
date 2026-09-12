@@ -1,0 +1,87 @@
+# NLM Project Configuration
+# Generated: $(date)
+# Purpose: .gitignore for NLM (Neural Learning Machine) project
+
+# Build directories
+cmake-build*
+cmake-install
+cmake-build-release
+cmake-build-debug
+build
+*.cmake*
+
+# Compiled binaries
+*.so
+*.a
+*.dll
+*.exe
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.Python3
+.Python3.*
+env/
+venv/
+ENV/
+env.bakwards/
+.tox/
+.nox/
+.pytest_cache/
+doc/_build/
+cover/
+
+# IDE and editor artifacts
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+logs/
+
+# Test artifacts
+xunit.xml
+junit.xml
+junit-html.xml
+
+# Coverage reports
+coverage*
+*.coverage
+htmlcov/
+
+# Configuration files (example config should not be committed)
+configs/*.cfg.example
+configs/*.cfg.test
+
+# Documentation build output
+docs/build/
+docs/_build/
+
+# Temporary files
+.tmp
+*tmp*
+
+# Performance artifacts
+perf*
+perf*
+
+# System swap files
+*swap*
+
+# All .cfg files (except configs/) should not be committed
+*.cfg
+
+# Project specific
+debug.log
+perf.data
+checkpoint.*
