@@ -39,6 +39,8 @@ struct Brain::Impl {
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
     std::unique_ptr<AttentionalSelection> attention;
     
     // ========== DEVELOPMENT SYSTEM ==========
@@ -119,6 +121,8 @@ struct Brain::Impl {
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
+        selfModel = std::make_unique<SelfModel>();
+        socialLearning = std::make_unique<SocialLearning>();
         attention = std::make_unique<AttentionalSelection>();
         
         // Initialize development system
@@ -528,8 +532,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Extract features from active neurons for concept formation
+        if (pImpl->workingMemory) {
+            std::vector<float> features = pImpl->workingMemory->getCurrentFeatures();
+            if (!features.empty()) {
+                // Present current state to concept formation system
+                float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                size_t conceptId = pImpl->conceptFormation->presentExperience(
+                    features, features, reward, currentStep);
+                
+                // Use concept to influence planning
+                if (pImpl->planner) {
+                    pImpl->planner->recordSuccess(conceptId, reward > 0.0f);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1031,6 +1049,16 @@ NeuralPlanner* Brain::getPlanner() {
 
 ConceptFormation* Brain::getConceptFormation() {
     return pImpl->conceptFormation.get();
+}
+
+// SelfModel: Represents the agent's internal model of itself
+SelfModel* Brain::getSelfModel() {
+    return pImpl->selfModel.get();
+}
+
+// SocialLearning: Enables learning from observing other agents
+SocialLearning* Brain::getSocialLearning() {
+    return pImpl->socialLearning.get();
 }
 
 AttentionalSelection* Brain::getAttention() {

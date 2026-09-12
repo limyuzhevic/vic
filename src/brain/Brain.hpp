@@ -22,6 +22,8 @@ class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
+class SelfModel;
+class SocialLearning;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
@@ -155,11 +157,11 @@ public:
     
     // ========== COGNITION SYSTEMS ==========
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    // Self-model: Represents the agent's internal model of itself
+    SelfModel* getSelfModel();
     
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    // Social learning: Enables learning from observing other agents
+    SocialLearning* getSocialLearning();
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
