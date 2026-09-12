@@ -71,7 +71,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &PopulationId::value)
         .def("index", &PopulationId::index)
         .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def("__ne__", &PopulationId::operator!=)
+        .def("__repr__", [](const PopulationId& id) {
+            return "<PopulationId: " + std::to_string(id.value) + ">";
+        });
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -160,6 +163,73 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // Pythonic value access methods
+        .def("get", [](const Config& self, const std::string& key) {
+            auto value = self.get<bool>(key);
+            if (value) return *value;
+            value = self.get<int>(key);
+            if (value) return *value;
+            value = self.get<double>(key);
+            if (value) return *value;
+            value = self.get<std::string>(key);
+            if (value) return *value;
+            value = self.get<std::vector<int>>(key);
+            if (value) return *value;
+            value = self.get<std::vector<double>>(key);
+            if (value) return *value;
+            value = self.get<std::vector<std::string>>(key);
+            if (value) return *value;
+            return py::none();
+        }, py::arg("key"), "Get configuration value with type detection")
+        
+        .def("getBool", &Config::get<bool>, py::arg("key"), "Get boolean configuration value")
+        .def("getInt", &Config::get<int>, py::arg("key"), "Get integer configuration value")
+        .def("getFloat", &Config::get<double>, py::arg("key"), "Get float/double configuration value")
+        .def("getString", &Config::get<std::string>, py::arg("key"), "Get string configuration value")
+        
+        .def("getBoolOr", [](const Config& self, const std::string& key, bool defaultValue) {
+            auto value = self.get<bool>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get boolean with default")
+        
+        .def("getIntOr", [](const Config& self, const std::string& key, int defaultValue) {
+            auto value = self.get<int>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get integer with default")
+        
+        .def("getFloatOr", [](const Config& self, const std::string& key, double defaultValue) {
+            auto value = self.get<double>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get float with default")
+        
+        .def("getStringOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            auto value = self.get<std::string>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get string with default")
+        
+        // Python property setters for common types (convenience methods)
+        .def("setBool", [](Config& self, const std::string& key, bool value, nlm::ConfigSource source = nlm::ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = nlm::ConfigSource::Runtime, "Set boolean configuration value")
+        
+        .def("setInt", [](Config& self, const std::string& key, int value, nlm::ConfigSource source = nlm::ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = nlm::ConfigSource::Runtime, "Set integer configuration value")
+        
+        .def("setFloat", [](Config& self, const std::string& key, double value, nlm::ConfigSource source = nlm::ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = nlm::ConfigSource::Runtime, "Set float configuration value")
+        
+        .def("setString", [](Config& self, const std::string& key, const std::string& value, nlm::ConfigSource source = nlm::ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = nlm::ConfigSource::Runtime, "Set string configuration value")
+        
+        // Convenience methods for creating default configs
+        .def_static("createDefaultConfig", []() -> std::shared_ptr<Config> {
+            return std::make_shared<Config>();
+        }, "Create a default configuration")
+        
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -348,10 +418,75 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("stage"),
              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Placitity system access
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get spike system")
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get STDP plasticity rule")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get Hebbian plasticity rule")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get structural plasticity system");
+        
+        // Memory systems access
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        
+        // Prediction system access
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system");
+        
+        // Cognition systems access
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system");
+        
+        // Development system access
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system");
+        
+        // Neuromodulation systems access
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity neuromodulator")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty neuromodulator")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error neuromodulator");
+        
+        // Utility systems access
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get random number generator");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
