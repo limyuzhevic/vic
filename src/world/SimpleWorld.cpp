@@ -301,16 +301,16 @@ void SimpleWorld::removeObject(float x, float y) {
 void SimpleWorld::generateVision() {
     // Simple raycasting-based vision
     // Cast rays in a cone in front of the agent
+    // Now scales with actual world dimensions and configured vision size
     
-    const int rayCount = 16;
     const float fov = M_PI / 2.0f;  // 90 degree FOV
     const float maxRange = 8.0f;
     
-    std::vector<float> vision(rayCount, 1.0f);  // Default: far/empty
+    std::vector<float> vision(visionWidth_, 1.0f);  // Default: far/empty
     
-    for (int i = 0; i < rayCount; ++i) {
-        // Angle for this ray
-        float angle = agent_.orientation - fov / 2.0f + (fov * i / (rayCount - 1));
+    for (int i = 0; i < visionWidth_; ++i) {
+        // Angle for this ray - distribute across FOV
+        float angle = agent_.orientation - fov / 2.0f + (fov * i / (visionWidth_ - 1));
         
         // Cast ray
         float dx = std::cos(angle);
@@ -321,8 +321,8 @@ void SimpleWorld::generateVision() {
             float px = agent_.x + dx * t;
             float py = agent_.y + dy * t;
             
-            // Check wall collision
-            if (!isValidPosition(px, py)) {
+            // Check world boundaries (actual world dimensions)
+            if (px < 0.0f || px >= width_ || py < 0.0f || py >= height_) {
                 vision[i] = t / maxRange;
                 break;
             }

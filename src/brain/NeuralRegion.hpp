@@ -41,9 +41,8 @@ public:
     const std::vector<std::unique_ptr<NeuralPopulation>>& getPopulations() const;
     std::vector<NeuralPopulation*> getAllPopulations();
     
-    // Synapse management (local connections within this region)
-    SynapseId addSynapse(NeuronId source, NeuronId destination, 
-                         SynapticWeight weight = 0.0f, Delay delay = 1);
+    bool addSynapse(NeuronId source, NeuronId destination, 
+                    SynapticWeight weight = 0.0f, Delay delay = 1);
     Synapse* getSynapse(SynapseId id);
     const Synapse* getSynapse(SynapseId id) const;
     size_t getSynapseCount() const;

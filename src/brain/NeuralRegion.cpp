@@ -58,7 +58,7 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
 }
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    if (id.index() == 0 || id.index() >= pImpl->populations.size()) {
         return nullptr;
     }
     return pImpl->populations[id.index() - 1].get();
@@ -88,8 +88,25 @@ std::vector<NeuralPopulation*> NeuralRegion::getAllPopulations() {
     return result;
 }
 
-SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
+void NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
                                    SynapticWeight weight, Delay delay) {
+    // Validate that source and destination neurons exist in this region
+    auto sourceNeuronExists = std::find_if(pImpl->populations.begin(), pImpl->populations.end(),
+        [source](const auto& pop) {
+            return std::any_of(pop->getNeurons().begin(), pop->getNeurons().end(),
+                [source](const Neuron* neuron) { return neuron->getId() == source; });
+        });
+    
+    auto destinationNeuronExists = std::find_if(pImpl->populations.begin(), pImpl->populations.end(),
+        [destination](const auto& pop) {
+            return std::any_of(pop->getNeurons().begin(), pop->getNeurons().end(),
+                [destination](const Neuron* neuron) { return neuron->getId() == destination; });
+        });
+    
+    if (!sourceNeuronExists || !destinationNeuronExists) {
+        throw std::invalid_argument("Source or destination neuron does not exist in region");
+    }
+    
     SynapseId synId(pImpl->nextSynapseId++);
     auto synapse = std::make_unique<Synapse>(synId, source, destination);
     synapse->setWeight(weight);
@@ -99,7 +116,7 @@ SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
     pImpl->incomingSynapses[destination].push_back(synId);
     
     pImpl->synapses.push_back(std::move(synapse));
-    return synId;
+    // Return void to indicate success
 }
 
 Synapse* NeuralRegion::getSynapse(SynapseId id) {

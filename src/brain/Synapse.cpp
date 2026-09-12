@@ -1,4 +1,6 @@
-#include "Synapse.hpp"
+#pragma once
+
+#include "../core/Types/Types.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -44,93 +46,48 @@ struct Synapse::Impl {
     static constexpr float STP_U_MAX = 1.0f;  // Max utilization
     
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    // STDP parameters
+    static constexpr float STDP_WINDOW = 20.0f;  // STDP window in ms
+    static constexpr float STDP_LTP_WEIGHT = 0.02f;  // LTP magnitude
+    static constexpr float STDP_LTD_WEIGHT = 0.015f;  // LTD magnitude
 };
 
-Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
-    : pImpl(new Impl) {
-    pImpl->id = id;
-    pImpl->sourceNeuron = source;
-    pImpl->destinationNeuron = destination;
-    pImpl->weight = 0.0f;
-    pImpl->delay = 1;  // Default: 1 step delay
-    pImpl->type = SynapseType::Excitatory;
-    pImpl->eligibilityTrace = 0.0f;
-    pImpl->efficacy = 1.0f;
-    pImpl->shortTermDepression = 1.0f;
-    pImpl->shortTermFacilitation = 0.0f;
-    pImpl->lastPreSpikeTime = -1.0f;
-    pImpl->lastPostSpikeTime = -1.0f;
-}
-
-Synapse::~Synapse() = default;
-
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
-
-Synapse& Synapse::operator=(Synapse&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
-}
-
-SynapseId Synapse::getId() const {
-    return pImpl->id;
-}
-
-NeuronId Synapse::getSourceNeuron() const {
-    return pImpl->sourceNeuron;
-}
-
-NeuronId Synapse::getDestinationNeuron() const {
-    return pImpl->destinationNeuron;
-}
-
-SynapticWeight Synapse::getWeight() const {
-    return pImpl->weight;
-}
-
-void Synapse::setWeight(SynapticWeight weight) {
-    pImpl->weight = weight;
-}
-
-void Synapse::addToWeight(SynapticWeight delta) {
-    pImpl->weight += delta;
-    // Clamp to reasonable bounds to prevent instability
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
-}
-
-Delay Synapse::getDelay() const {
-    return pImpl->delay;
-}
-
-void Synapse::setDelay(Delay delay) {
-    pImpl->delay = delay;
-}
-
-SynapseType Synapse::getType() const {
-    return pImpl->type;
-}
-
-void Synapse::setType(SynapseType type) {
-    pImpl->type = type;
-}
-
-bool Synapse::isExcitatory() const {
-    return pImpl->type == SynapseType::Excitatory;
-}
-
-bool Synapse::isInhibitory() const {
-    return pImpl->type == SynapseType::Inhibitory;
-}
-
+// Fix the STDP_WINDOW reference typo
 void Synapse::recordPreSpike(Timestamp timestamp) {
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+    }
+    
+    // Update last pre-synaptic spike time for short-term plasticity
+    pImpl->lastPreSpikeTime = static_cast<float>(timestamp);
+    
+    // Implement STDP rule: if post has spiked recently, induce LTP
+    if (pImpl->plasticityFlags.stdp && !pImpl->postSpikeHistory.empty()) {
+        auto& postHistory = pImpl->postSpikeHistory;
+        bool recentPostSpike = false;
+        
+        // Check if there was a post-synaptic spike within the STDP window
+        for (auto it = postHistory.rbegin(); it != postHistory.rend(); ++it) {
+            if (static_cast<float>(timestamp - *it) <= Impl::STDP_WINDOW) {
+                recentPostSpike = true;
+                break;
+            } else {
+                break; // Older spikes won't affect this synapse
+            }
+        }
+        
+        if (recentPostSpike) {
+            // Long-term potentiation (LTP): pre-before-post
+            float delta = pImpl->STDP_LTP_WEIGHT;
+            addToWeight(delta);
+            
+            // Update eligibility trace for reward-modulated learning
+            if (pImpl->plasticityFlags.reward_modulated) {
+                pImpl->eligibilityTrace += delta;
+            }
+        }
     }
 }
 
@@ -138,6 +95,36 @@ void Synapse::recordPostSpike(Timestamp timestamp) {
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+    }
+    
+    // Update last post-synaptic spike time for short-term plasticity
+    pImpl->lastPostSpikeTime = static_cast<float>(timestamp);
+    
+    // Implement STDP rule: if pre has spiked recently, induce LTD
+    if (pImpl->plasticityFlags.stdp && !pImpl->preSpikeHistory.empty()) {
+        auto& preHistory = pImpl->preSpikeHistory;
+        bool recentPreSpike = false;
+        
+        // Check if there was a pre-synaptic spike within the STDP window
+        for (auto it = preHistory.rbegin(); it != preHistory.rend(); ++it) {
+            if (static_cast<float>(timestamp - *it) <= Impl::STDP_WINDOW) {
+                recentPreSpike = true;
+                break;
+            } else {
+                break; // Older spikes won't affect this synapse
+            }
+        }
+        
+        if (recentPreSpike) {
+            // Long-term depression (LTD): post-before-pre
+            float delta = -pImpl->STDP_LTD_WEIGHT;
+            addToWeight(delta);
+            
+            // Update eligibility trace for reward-modulated learning
+            if (pImpl->plasticityFlags.reward_modulated) {
+                pImpl->eligibilityTrace += delta;
+            }
+        }
     }
 }
 

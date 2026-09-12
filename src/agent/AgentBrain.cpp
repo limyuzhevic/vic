@@ -20,39 +20,82 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups more flexibly
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
+                    // More flexible motor neuron grouping
+                    // Use neuron characteristics to determine action type
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                        // Analyze neuron properties to determine action
+                        float activity = n->getState().membranePotential;
+                        float threshold = n->getState().threshold;
+                        NeuronId neuronId = n->getId();
                         
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                        // Use multiple criteria to classify motor neurons
+                        bool isForward = false;
+                        bool isBackward = false;
+                        bool isLeft = false;
+                        bool isRight = false;
+                        bool isInteract = false;
+                        bool isWait = false;
+                        
+                        // Heuristic-based classification
+                        if (activity > threshold * 1.5f) {
+                            // High activity could indicate movement
+                            if (neuronId.index() % 6 < 2) isForward = true;
+                            else if (neuronId.index() % 6 < 4) isBackward = true;
+                            else isWait = true;
                         }
+                        
+                        if (neuronId.index() % 7 == 0) isLeft = true;
+                        else if (neuronId.index() % 7 == 1) isRight = true;
+                        else if (neuronId.index() % 7 == 2) isInteract = true;
+                        
+                        // Assign neuron to appropriate group
+                        if (isForward) motorForward_.push_back(n);
+                        else if (isBackward) motorBackward_.push_back(n);
+                        else if (isLeft) motorTurnLeft_.push_back(n);
+                        else if (isRight) motorTurnRight_.push_back(n);
+                        else if (isInteract) motorInteract_.push_back(n);
+                        else motorWait_.push_back(n);
                     }
                 } else if (type == NeuronType::Sensory) {
+                    // More flexible sensory neuron grouping
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
+                        // Use neuron ID and position to determine sensory modality
+                        NeuronId neuronId = n->getId();
                         
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
+                        // Distribute sensory neurons more intelligently
+                        size_t visionCount = sensoryVision_.size();
+                        size_t touchCount = sensoryTouch_.size();
+                        size_t internalCount = sensoryInternal_.size();
+                        size_t proprioceptionCount = sensoryProprioception_.size();
+                        
+                        // Determine based on neuron ID modulo
+                        size_t total = visionCount + touchCount + internalCount + proprioceptionCount;
+                        if (total == 0) {
+                            // First distribution - use ID modulo
+                            switch (neuronId.index() % 4) {
+                                case 0: sensoryVision_.push_back(n); break;
+                                case 1: sensoryTouch_.push_back(n); break;
+                                case 2: sensoryInternal_.push_back(n); break;
+                                case 3: sensoryProprioception_.push_back(n); break;
+                            }
+                        } else {
+                            // Balanced distribution based on current counts
+                            if (visionCount <= touchCount && visionCount <= internalCount && visionCount <= proprioceptionCount) {
+                                sensoryVision_.push_back(n);
+                            } else if (touchCount <= internalCount && touchCount <= proprioceptionCount) {
+                                sensoryTouch_.push_back(n);
+                            } else if (internalCount <= proprioceptionCount) {
+                                sensoryInternal_.push_back(n);
+                            } else {
+                                sensoryProprioception_.push_back(n);
+                            }
                         }
                     }
                 }
