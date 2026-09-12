@@ -41,7 +41,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         return result;
     }
     
-    // Create simple world
+// Create simple world
     SimpleWorld world;
     world.initialize(16, 16);
     
@@ -55,14 +55,24 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
+    // Create a reference to the region once to avoid repeated .get() calls
+    auto* region = agent.getBrain()->getRegions()[0].get();
+    
+    // Create references for the brain to avoid repeated .get() calls
+    auto* workingMemory = brain->getWorkingMemory();
+    auto* episodicMemory = brain->getEpisodicMemory();
+    auto* dopamine = brain->getDopamine();
+    auto* predictionSystem = brain->getPredictionSystem();
+    auto* developmentSystem = brain->getDevelopmentSystem();
+    
     // Run simulation
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get observation using region reference
+        SensoryPercept percept = world.observe(region);
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -73,11 +83,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        // Apply action to world using region reference
+        world.applyAction(region, cmd);
         
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Compute reward using region reference
+        float reward = world.computeReward(region);
         totalReward += reward;
         
         // Apply reward modulation
@@ -87,6 +97,20 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         if (config.enableDevelopment) {
             agent.updateDevelopment(0.001);
         }
+        
+        // Collect metrics using references
+        totalFiringRate += brain->getAverageFiringRate();
+        if (brain->getFiringNeuronCount() > 0) firingCount++;
+        
+        // Periodic status
+        if (step % 1000 == 0) {
+            NLM_LOG_INFO("Step " + std::to_string(step) + 
+                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
+                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
+                        " | WorkingMem: " + std::to_string(workingMemory ? 
+                            workingMemory->getActiveTraces() : 0));
+        }
+    }
         
         // Collect metrics
         totalFiringRate += brain->getAverageFiringRate();

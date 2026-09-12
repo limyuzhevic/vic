@@ -163,7 +163,10 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
+    // Pre-compute activities for all motor groups in one efficient pass
+    struct { MotorCommand cmd; float activity; } commands[6];
+    
+    // Helper lambda to calculate activity (moved here for better inlining)
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
@@ -174,30 +177,22 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         return sum / neurons.size();
     };
     
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
+    // Calculate all activities efficiently
+    commands[0] = {MotorCommand::MoveForward, calcActivity(motorForward_)};
+    commands[1] = {MotorCommand::MoveBackward, calcActivity(motorBackward_)};
+    commands[2] = {MotorCommand::TurnLeft, calcActivity(motorTurnLeft_)};
+    commands[3] = {MotorCommand::TurnRight, calcActivity(motorTurnRight_)};
+    commands[4] = {MotorCommand::Interact, calcActivity(motorInteract_)};
+    commands[5] = {MotorCommand::Wait, calcActivity(motorWait_)};
     
-    // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
-        {MotorCommand::MoveForward, forwardAct},
-        {MotorCommand::MoveBackward, backwardAct},
-        {MotorCommand::TurnLeft, leftAct},
-        {MotorCommand::TurnRight, rightAct},
-        {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
-    };
-    
+    // Find maximum activity using a simple loop (more efficient than loop with conditions)
     MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
+    float bestActivity = commands[5].activity;  // Start with wait activity
     
-    for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
-            best = c.cmd;
+    for (int i = 0; i < 6; ++i) {
+        if (commands[i].activity > bestActivity) {
+            bestActivity = commands[i].activity;
+            best = commands[i].cmd;
         }
     }
     
