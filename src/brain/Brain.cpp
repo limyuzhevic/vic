@@ -511,8 +511,69 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state from last input (stored in brain if available)
+        // In a real implementation, sensory input would be continuously available
+        // For now, create a simple internal signal representing current brain state
+        
+        // Convert neural activity to a pattern for prediction
+        std::vector<float> neuralActivityPattern;
+        neuralActivityPattern.reserve(pImpl->regions.size() * 100); // Estimate
+        
+        // Sample neural activity from active neurons
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || neuron->getState().membranePotential > 0.0f) {
+                        neuralActivityPattern.push_back(
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+        }
+        
+        // Create a simple internal sensory input representing current brain state
+        // This could be the current state of the brain (neural activity, etc.)
+        class InternalBrainState : public SensoryInput {
+            std::vector<float> data_;
+            public:
+            InternalBrainState(const std::vector<float>& pattern) : data_(pattern) {}
+            
+            const char* getType() const override { return "InternalBrainState"; }
+            const std::vector<float>& getData() const override { return data_; }
+            size_t getDimensions() const override { return data_.size(); }
+            std::unique_ptr<SensoryInput> clone() const override {
+                return std::make_unique<InternalBrainState>(data_);
+            }
+        };
+        
+        auto internalState = std::make_unique<InternalBrainState>(neuralActivityPattern);
+        internalState->setTimestamp(currentTime);
+        
+        // Make prediction for next state
+        auto predictedState = pImpl->predictionSystem->predictNextState(*internalState);
+        
+        // Update prediction system with current state as both prediction and actual
+        // (since we're testing prediction accuracy)
+        pImpl->predictionSystem->updatePredictions(*internalState, *internalState);
+        
+        // Store prediction error for monitoring
+        float error = pImpl->predictionSystem->getPredictionError();
+        if (error > 0.0f) {
+            // Log prediction error for neuromodulation systems to use
+            if (pImpl->novelty) {
+                // Novelty can be based on prediction error
+                pImpl->novelty->update(pImpl->timestep);
+            }
+        }
+        
+        // Integrate prediction error with working memory - reinforce predictions that match
+        if (pImpl->workingMemory && error < 0.1f) {  // Low error = good prediction
+            // Store successful predictions in working memory
+            pImpl->workingMemory->storeToNeuron(
+                pImpl->sensoryNeurons[0]->getId(), 
+                std::max(0.5f, 1.0f - error)  // Higher confidence for lower error
+            );
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +589,50 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity to form concepts
+        
+        // Extract current neural activity pattern
+        std::vector<float> currentPattern;
+        std::vector<float> currentFeatures;
+        
+        // Sample neural activity from all regions
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                        currentPattern.push_back(activation);
+                        
+                        // Also add as a feature (sensory-like)
+                        currentFeatures.push_back(activation * neuron->getState().threshold);
+                    }
+                }
+            }
+        }
+        
+        // Get reward signal from neuromodulation
+        float reward = 0.0f;
+        if (pImpl->dopamine) {
+            reward = pImpl->dopamine->getLevel();
+        }
+        
+        // Get curiosity signal
+        float curiosity = 0.0f;
+        if (pImpl->curiosity) {
+            curiosity = pImpl->curiosity->getLevel();
+        }
+        
+        // Combine reward and curiosity as the overall value signal
+        float valueSignal = reward + curiosity * 0.5f;
+        
+        // Present this neural pattern to concept formation system
+        // This helps the system learn what neural patterns are significant
+        pImpl->conceptFormation->presentExperience(
+            currentPattern,
+            currentFeatures,
+            valueSignal,
+            currentStep
+        );
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

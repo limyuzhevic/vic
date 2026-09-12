@@ -61,7 +61,20 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::~AgentBrain() {
+    // Clean up neuron pointer vectors to prevent memory leaks
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    previousVision_.clear();
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
@@ -76,11 +89,12 @@ void AgentBrain::initialize(const SimpleWorld& world) {
 
 size_t AgentBrain::getSensoryInputSize() const {
     // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
+    // These are configuration values - make them configurable
     return 256 + 8 + 4 + 6;
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
+    // One motor neuron per action group (forward, backward, turn_left, turn_right, interact, wait)
     return 6;
 }
 
@@ -89,38 +103,50 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+    if (!vision.empty()) {
+        for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+            if (sensoryVision_[i]) {
+                // Inject current proportional to vision intensity
+                // Scale factor: vision normalized [0,1] to [0, 5] mV
+                float current = vision[i] * 5.0f;  // Scale factor
+                sensoryVision_[i]->injectCurrent(current);
+            }
         }
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+    if (!touch.empty()) {
+        for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
+            if (sensoryTouch_[i]) {
+                // Scale factor: binary touch collision to [0, 8] mV
+                float current = touch[i] * 8.0f;  // Collision signal
+                sensoryTouch_[i]->injectCurrent(current);
+            }
         }
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+    if (!intern.empty()) {
+        for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+            if (sensoryInternal_[i]) {
+                // Center and scale internal signals from [-1,1] to [-5,5] mV
+                float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+                sensoryInternal_[i]->injectCurrent(current);
+            }
         }
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+    if (!proprio.empty()) {
+        for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
+            if (sensoryProprioception_[i]) {
+                // Center and scale proprioception from [-1,1] to [-3,3] mV
+                float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+                sensoryProprioception_[i]->injectCurrent(current);
+            }
         }
     }
     
@@ -144,6 +170,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
+        // Curiosity incorporates novelty and prediction error
+        // Formula: curiosity = novelty * 2.0 + |predictionError| * 0.5
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
@@ -227,9 +255,11 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
+                case 7: return MotorCommand::Wait;
                 default: return MotorCommand::Wait;
             }
         }
+    }
     }
     
     return defaultCmd;
