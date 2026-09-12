@@ -895,9 +895,34 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - match loaded synapses with existing ones
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                if (synapseIdx < synapseData.weight.size()) {
+                    syn->setWeight(synapseData.weight[synapseIdx]);
+                    syn->setDelay(synapseData.delay[synapseIdx]);
+                    syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx]);
+                    
+                    // Restore plasticity flags
+                    uint8_t flags = synapseData.plasticityFlags[synapseIdx];
+                    syn->enablePlasticity(
+                        (flags & 0x01) != 0,  // hebbian
+                        (flags & 0x02) != 0,  // stdp
+                        (flags & 0x04) != 0   // structural
+                    );
+                    
+                    // Restore other synapse state if available
+                    if (!synapseData.shortTermDepression.empty() && synapseIdx < synapseData.shortTermDepression.size()) {
+                        syn->setEfficacy(synapseData.shortTermDepression[synapseIdx]);
+                    }
+                    
+                    synapseIdx++;
+                }
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded " + std::to_string(synapseIdx) + " synapses successfully");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
