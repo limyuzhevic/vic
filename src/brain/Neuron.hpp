@@ -134,8 +134,15 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
+    
+    // LIF neuron parameters
+    void setLeakConductance(MembranePotential conductance);
+    MembranePotential getLeakConductance() const;
+    uint32_t getRefractoryPeriod() const;
+    void setRestingPotential(MembranePotential potential);
+    MembranePotential getRestingPotential() const;
+    void setResetPotential(MembranePotential potential);
     
     // Reset to initial state
     void reset();

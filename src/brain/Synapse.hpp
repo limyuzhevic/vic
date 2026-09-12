@@ -66,13 +66,17 @@ public:
     void setEligibilityTrace(float trace);
     void decayEligibilityTrace(float decayRate);
     
-    // Synaptic efficacy (use-dependent modulation)
-    float getEfficacy() const;
-    void setEfficacy(float efficacy);
+    // Short-term plasticity state
+    float getShortTermDepression() const;
+    float getShortTermFacilitation() const;
+    void setShortTermDepression(float depression);
+    void setShortTermFacilitation(float facilitation);
     
-    // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
-    void step(Timestamp currentTime);
+    // Short-term dynamics
+    float getLastPreSpikeTime() const;
+    float getLastPostSpikeTime() const;
+    void setLastPreSpikeTime(float time);
+    void setLastPostSpikeTime(float time);
     
     // Reset to initial state
     void reset();

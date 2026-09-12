@@ -348,3 +348,15 @@ void AgentBrain::reset() {
 }
 
 } // namespace nlm
+
+// Check for any additional methods that should be implemented
+// Currently all methods declared in AgentBrain.hpp are implemented:
+// - decodeFromMotorNeurons() (line 165)
+// - selectWithCuriosity() (line 212)
+// - applyRewardModulation() (line 238)
+// - updateDevelopment() (line 282)
+// - getDevelopmentalStage() (line 316)
+// - getNeuromodulationLevel() (line 321)
+// - getCuriosityLevel() (line 325)
+// - getNoveltyLevel() (line 329)
+// - getPredictionError() (line 333)

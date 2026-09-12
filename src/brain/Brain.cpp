@@ -820,6 +820,14 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.plasticityFlags.push_back(
+                    (syn->getPlasticityFlags().hebbian ? 0x01 : 0) |
+                    (syn->getPlasticityFlags().stdp ? 0x02 : 0) |
+                    (syn->getPlasticityFlags().reward_modulated ? 0x04 : 0)
+                );
+                synapseData.efficacy.push_back(syn->getEfficacy());
+                synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+                synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
             }
         }
         
@@ -896,8 +904,90 @@ bool Brain::load(const std::string& filepath) {
         }
         
         // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Create a map from neuron ID to neuron pointer for quick lookup
+        std::unordered_map<NeuronId, Neuron*> neuronMap;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    neuronMap[neuron->getId()] = neuron;
+                }
+            }
+        }
+        
+        // Match synapses from checkpoint back to existing neurons and restore properties
+        size_t matchedSynapses = 0;
+        size_t missingSynapses = 0;
+        size_t idx_syn = 0;
+        
+        for (size_t i = 0; i < synapseData.sourceNeuron.size(); ++i) {
+            NeuronId sourceId = synapseData.sourceNeuron[i];
+            NeuronId destId = synapseData.destinationNeuron[i];
+            
+            // Find source and destination neurons
+            auto* sourceNeuron = neuronMap.find(sourceId) != neuronMap.end() ? neuronMap[sourceId] : nullptr;
+            auto* destNeuron = neuronMap.find(destId) != neuronMap.end() ? neuronMap[destId] : nullptr;
+            
+            if (!sourceNeuron || !destNeuron) {
+                // Log warning for missing neuron(s) and skip this synapse
+                if (!sourceNeuron && !destNeuron) {
+                    NLM_LOG_WARN("Skipping synapse: both source neuron " + std::to_string(sourceId) + 
+                                " and destination neuron " + std::to_string(destId) + " not found");
+                } else if (!sourceNeuron) {
+                    NLM_LOG_WARN("Skipping synapse: source neuron " + std::to_string(sourceId) + " not found");
+                } else {
+                    NLM_LOG_WARN("Skipping synapse: destination neuron " + std::to_string(destId) + " not found");
+                }
+                ++missingSynapses;
+                continue;
+            }
+            
+            // Find existing synapse between these neurons in the regions
+            bool synapseFound = false;
+            for (auto& region : pImpl->regions) {
+                // Get all synapses in the region
+                auto allSynapses = region->getSynapses();
+                for (auto& synPtr : allSynapses) {
+                    Synapse* syn = synPtr.get();
+                    
+                    // Check if this is the matching synapse
+                    if (syn->getSourceNeuron() == sourceId && syn->getDestinationNeuron() == destId) {
+                        // Restore synapse properties
+                        syn->setWeight(synapseData.weight[i]);
+                        syn->setDelay(synapseData.delay[i]);
+                        syn->setType(static_cast<SynapseType>(synapseData.synapseType[i]));
+                        
+                        // Restore plasticity flags
+                        PlasticityFlags& flags = syn->getPlasticityFlags();
+                        flags.hebbian = (synapseData.plasticityFlags[i] & 0x01) != 0;
+                        flags.stdp = (synapseData.plasticityFlags[i] & 0x02) != 0;
+                        flags.reward_modulated = (synapseData.plasticityFlags[i] & 0x04) != 0;
+                        
+                        // Restore eligibility trace and efficacy
+                        syn->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                        syn->setEfficacy(synapseData.efficacy[i]);
+                        
+                        // Note: shortTermDepression and shortTermFacilitation are not directly accessible
+                        // They are updated during step() based on spike history
+                        
+                        synapseFound = true;
+                        ++matchedSynapses;
+                        break;
+                    }
+                }
+                if (synapseFound) break;
+            }
+            
+            if (!synapseFound) {
+                NLM_LOG_WARN("Synapse from " + std::to_string(sourceId) + " to " + std::to_string(destId) + 
+                            " not found in any region (will create new synapse during next development)");
+                ++missingSynapses;
+            }
+        }
+        
+        NLM_LOG_INFO("Restored " + std::to_string(matchedSynapses) + " synapses from checkpoint");
+        if (missingSynapses > 0) {
+            NLM_LOG_WARN("Skipped/missing " + std::to_string(missingSynapses) + " synapses (neurons or connections not found)");
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
