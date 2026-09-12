@@ -64,7 +64,36 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot initialize AgentBrain: brain is not set");
+        return;
+    }
+    
+    if (!brain_->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize underlying brain");
+        return;
+    }
+    
+    // Validate world dimensions
+    int width = world.getWidth();
+    int height = world.getHeight();
+    int visionWidth = world.getVisionWidth();
+    int visionHeight = world.getVisionHeight();
+    
+    if (width <= 0 || height <= 0) {
+        NLM_LOG_ERROR("Invalid world dimensions: width=" + std::to_string(width) + 
+                     ", height=" + std::to_string(height));
+        return;
+    }
+    
+    if (visionWidth <= 0 || visionHeight <= 0) {
+        NLM_LOG_ERROR("Invalid vision dimensions: visionWidth=" + std::to_string(visionWidth) +
+                     ", visionHeight=" + std::to_string(visionHeight));
+        return;
+    }
+    
+    // Resize vision buffer to match world dimensions
+    previousVision_.resize(visionWidth * visionHeight, 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
@@ -75,7 +104,6 @@ void AgentBrain::initialize(const SimpleWorld& world) {
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
     return 256 + 8 + 4 + 6;
 }
 
@@ -84,69 +112,417 @@ size_t AgentBrain::getMotorOutputSize() const {
     return 6;
 }
 
-void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+float AgentBrain::calculateMotorActivity(const std::vector<Neuron*>& neurons) const {
+    if (neurons.empty()) {
+        NLM_LOG_WARNING("Cannot calculate motor activity: neuron group is empty");
+        return 0.0f;
+    }
     
-    // Vision input (256 values -> sensoryVision_ neurons)
-    const auto& vision = percept.getVision();
+    float sum = 0.0f;
+    size_t validNeurons = 0;
+    
+    for (Neuron* n : neurons) {
+        if (!n) {
+            NLM_LOG_WARNING("Null neuron pointer encountered in motor activity calculation");
+            continue;
+        }
+        
+        // Validate neuron state before accessing
+        if (!n->getState().isValid()) {
+            NLM_LOG_WARNING("Invalid neuron state encountered");
+            continue;
+        }
+        
+        sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+        validNeurons++;
+    }
+    
+    if (validNeurons == 0) {
+        NLM_LOG_ERROR("No valid neurons for motor activity calculation");
+        return 0.0f;
+    }
+    
+    return sum / validNeurons;
+}
+
+MotorCommand AgentBrain::findBestMotorCommand(
+    const std::vector<MotorCommand>& commands,
+    const std::vector<float>& activities,
+    float bestActivity,
+    MotorCommand defaultCmd
+) {
+    if (commands.empty()) {
+        NLM_LOG_ERROR("Cannot find best motor command: commands vector is empty");
+        return MotorCommand::Wait;
+    }
+    
+    if (activities.empty()) {
+        NLM_LOG_ERROR("Cannot find best motor command: activities vector is empty");
+        return MotorCommand::Wait;
+    }
+    
+    if (commands.size() != activities.size()) {
+        NLM_LOG_WARNING("Command and activity vector size mismatch: " + 
+                        std::to_string(commands.size()) + " vs " + std::to_string(activities.size()));
+    }
+    
+    MotorCommand best = defaultCmd;
+    float bestActivityValue = bestActivity;
+    
+    for (size_t i = 0; i < commands.size() && i < activities.size(); ++i) {
+        if (activities[i] > bestActivityValue) {
+            bestActivityValue = activities[i];
+            best = commands[i];
+        }
+    }
+    
+    // Only act if there's meaningful activity
+    if (bestActivityValue < 0.5f) {
+        return MotorCommand::Wait;
+    }
+    
+    return best;
+}
+
+MotorCommand AgentBrain::decodeFromMotorNeurons() {
+    // Validate brain pointer
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot decode motor command: brain is not initialized");
+        return MotorCommand::Wait;
+    }
+    
+    // Validate motor neuron groups exist
+    if (motorForward_.empty() && motorBackward_.empty() && 
+        motorTurnLeft_.empty() && motorTurnRight_.empty() && 
+        motorInteract_.empty() && motorWait_.empty()) {
+        NLM_LOG_WARNING("No motor neurons configured for decoding");
+        return MotorCommand::Wait;
+    }
+    
+    // Calculate activity in each motor group using helper functions
+    float forwardAct = calculateMotorActivity(motorForward_);
+    float backwardAct = calculateMotorActivity(motorBackward_);
+    float leftAct = calculateMotorActivity(motorTurnLeft_);
+    float rightAct = calculateMotorActivity(motorTurnRight_);
+    float interactAct = calculateMotorActivity(motorInteract_);
+    float waitAct = calculateMotorActivity(motorWait_);
+    
+    // Find best motor command
+    MotorCommand defaultCmd = MotorCommand::Wait;
+    float bestActivity = waitAct;
+    
+    std::vector<MotorCommand> commands = {
+        MotorCommand::MoveForward,
+        MotorCommand::MoveBackward,
+        MotorCommand::TurnLeft,
+        MotorCommand::TurnRight,
+        MotorCommand::Interact,
+        MotorCommand::Wait
+    };
+    
+    std::vector<float> activities = {forwardAct, backwardAct, leftAct, rightAct, interactAct, waitAct};
+    
+    MotorCommand bestCmd = findBestMotorCommand(commands, activities, bestActivity, defaultCmd);
+    
+    return bestCmd;
+}
+
+MotorCommand AgentBrain::decodeMotorCommand() {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot decode motor command: brain is not initialized");
+        return MotorCommand::Wait;
+    }
+    
+    MotorCommand decoded = decodeFromMotorNeurons();
+    
+    // Apply curiosity-based exploration with validation
+    if (curiosityEnabled_) {
+        if (curiosityLevel_ > 1.0f) {
+            NLM_LOG_WARNING("Curiosity level exceeds maximum: " + std::to_string(curiosityLevel_));
+            curiosityLevel_ = 1.0f;
+        }
+        
+        if (curiosityLevel_ > 0.3f) {
+            decoded = selectWithCuriosity(decoded);
+        }
+    }
+    
+    return decoded;
+}
+
+MotorCommand AgentBrain::selectWithCuriosityHelper(MotorCommand defaultCmd) {
+    // Validate curiosity level
+    if (curiosityLevel_ < 0.0f) {
+        NLM_LOG_WARNING("Curiosity level is negative: " + std::to_string(curiosityLevel_));
+        curiosityLevel_ = 0.0f;
+    }
+    
+    // Exploration: occasionally choose random action when curiosity is high
+    if (curiosityLevel_ > 0.5f) {
+        // Higher curiosity = more exploration
+        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        
+        // Cap explore chance to prevent excessive randomness
+        exploreChance = std::clamp(exploreChance, 0.0f, 1.0f);
+        
+        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+        if (r < exploreChance) {
+            return selectRandomMotorCommand();
+        }
+    }
+    
+    return defaultCmd;
+}
+
+MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
+    return selectWithCuriosityHelper(defaultCmd);
+}
+
+float AgentBrain::getMaxMotorActivity(const std::vector<float>& activities) {
+    if (activities.empty()) {
+        NLM_LOG_WARNING("Cannot get max motor activity: activities vector is empty");
+        return 0.0f;
+    }
+    
+    float maxActivity = 0.0f;
+    for (float activity : activities) {
+        if (activity > maxActivity) {
+            maxActivity = activity;
+        }
+    }
+    
+    // Cap max activity to prevent overflow
+    return std::min(maxActivity, 10.0f);
+}
+
+MotorCommand AgentBrain::selectRandomMotorCommand() {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot select random motor command: brain is not initialized");
+        return MotorCommand::Wait;
+    }
+    
+    // Validate random generator exists
+    if (!brain_->getRandomGenerator()) {
+        NLM_LOG_ERROR("Cannot select random motor command: random generator is null");
+        return MotorCommand::Wait;
+    }
+    
+    int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+    switch (choice) {
+        case 0: return MotorCommand::MoveForward;
+        case 1: return MotorCommand::MoveBackward;
+        case 2: return MotorCommand::TurnLeft;
+        case 3: return MotorCommand::TurnRight;
+        case 4: return MotorCommand::LookLeft;
+        case 5: return MotorCommand::LookRight;
+        case 6: return MotorCommand::Interact;
+        default: return MotorCommand::Wait;
+    }
+}
+
+void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
+    if (!brain_) {
+        NLM_LOG_WARNING("Cannot process sensory input: brain is not initialized");
+        return;
+    }
+    
+    if (brain_->getTotalNeuronCount() == 0) {
+        NLM_LOG_WARNING("Cannot process sensory input: brain has no neurons");
+        return;
+    }
+    
+    // Process different sensory modalities
+    processVisionInput(percept.getVision());
+    processTouchInput(percept.getTouch());
+    processInternalInput(percept.getInternal());
+    processProprioceptionInput(percept.getProprioception());
+    
+    // Update novelty and curiosity
+    updateNoveltyAndCuriosity(percept.getVision());
+}
+
+void AgentBrain::processVisionInput(const std::vector<float>& vision) {
+    if (!brain_ || sensoryVision_.empty()) {
+        return;
+    }
+    
+    // Validate input
+    if (vision.empty()) {
+        NLM_LOG_WARNING("Received empty vision input");
+        // Clear vision neurons if vision is empty
+        for (Neuron* neuron : sensoryVision_) {
+            if (neuron) neuron->injectCurrent(0.0f);
+        }
+        return;
+    }
+    
+    // Cap the scale factor to prevent excessive current injection
+    const float visionScale = std::min(5.0f, 50.0f / 255.0f);
+    
+    // Process vision input safely
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            // Clamp the vision value to valid range
+            float normalizedVision = std::clamp(vision[i], 0.0f, 1.0f);
+            float current = normalizedVision * visionScale;
             sensoryVision_[i]->injectCurrent(current);
         }
     }
+}
+
+void AgentBrain::processTouchInput(const std::vector<float>& touch) {
+    if (sensoryTouch_.empty()) return;
     
-    // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
+    // Validate input
+    if (touch.empty()) {
+        NLM_LOG_WARNING("Received empty touch input");
+        return;
+    }
+    
+    // Cap the scale factor to prevent excessive current injection
+    const float touchScale = std::min(8.0f, 20.0f / 1.0f);
+    
+    // Process touch input safely
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            // Clamp the touch value to valid range
+            float normalizedTouch = std::clamp(touch[i], -1.0f, 1.0f);
+            float current = normalizedTouch * touchScale;
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
+}
+
+void AgentBrain::processInternalInput(const std::vector<float>& internal) {
+    if (sensoryInternal_.empty()) return;
     
-    // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+    // Validate input
+    if (internal.empty()) {
+        NLM_LOG_WARNING("Received empty internal input");
+        return;
+    }
+    
+    // Use capped scale factors to prevent excessive current injection
+    const float internalCenterScale = std::min(2.0f, 5.0f);
+    const float internalScale = std::min(5.0f, 10.0f / 1.0f);
+    
+    // Process internal input safely
+    for (size_t i = 0; i < sensoryInternal_.size() && i < internal.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            // Normalize internal signal to [-1, 1] range
+            float normalized = (internal[i] * internalCenterScale - 1.0f);
+            normalized = std::clamp(normalized, -1.0f, 1.0f);
+            float current = normalized * internalScale;
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
+}
+
+void AgentBrain::processProprioceptionInput(const std::vector<float>& proprioception) {
+    if (sensoryProprioception_.empty()) return;
     
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
+    // Validate input
+    if (proprioception.empty()) {
+        NLM_LOG_WARNING("Received empty proprioception input");
+        return;
+    }
+    
+    // Use capped scale factors to prevent excessive current injection
+    const float proprioceptionCenterScale = std::min(2.0f, 3.0f);
+    const float proprioceptionScale = std::min(3.0f, 6.0f / 1.0f);
+    
+    // Process proprioception input safely
+    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprioception.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            // Normalize proprioception signal to [-1, 1] range
+            float normalized = (proprioception[i] * proprioceptionCenterScale - 1.0f);
+            normalized = std::clamp(normalized, -1.0f, 1.0f);
+            float current = normalized * proprioceptionScale;
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
-    
+}
+
+void AgentBrain::updateNoveltyAndCuriosity(const std::vector<float>& vision) {
     // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
-        }
-        
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
+    if (vision.empty()) {
+        NLM_LOG_WARNING("Cannot compute novelty: vision input is empty");
+        return;
     }
     
-    // Update curiosity based on novelty
-    if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
-        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    if (previousVision_.empty()) {
+        NLM_LOG_WARNING("Cannot compute novelty: previous vision buffer is empty");
+        return;
     }
+    
+    float totalDiff = computeVisionDifference(vision);
+    size_t validSize = std::min(vision.size(), previousVision_.size());
+    
+    if (validSize == 0) {
+        NLM_LOG_WARNING("Cannot compute novelty: no valid vision pixels to compare");
+        return;
+    }
+    
+    noveltyLevel_ = totalDiff / static_cast<float>(validSize);
+    
+    // Cap novelty level to prevent overflow
+    noveltyLevel_ = std::clamp(noveltyLevel_, 0.0f, 1.0f);
+    
+    // Decay novelty with configurable decay rate
+    noveltyLevel_ *= sensoryNoveltyDecay_;
+    
+    // Store for next time
+    previousVision_ = vision;
+    
+    // Update curiosity based on novelty and prediction error
+    if (curiosityEnabled_) {
+        updateCuriosityLevel();
+    }
+}
+
+float AgentBrain::computeVisionDifference(const std::vector<float>& vision) const {
+    float totalDiff = 0.0f;
+    for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
+        totalDiff += std::abs(vision[i] - previousVision_[i]);
+    }
+    return totalDiff;
+}
+
+void AgentBrain::updateCuriosityLevel() {
+    const float curiosityNoveltyFactor = 2.0f;
+    const float curiosityPredictionErrorFactor = 0.5f;
+    curiosityLevel_ = noveltyLevel_ * curiosityNoveltyFactor + 
+                    std::abs(predictionError_) * curiosityPredictionErrorFactor;
+    curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+}
+
+MotorCommand AgentBrain::decodeFromMotorNeurons() {
+    // Calculate activity in each motor group using helper functions
+    float forwardAct = calculateMotorActivity(motorForward_);
+    float backwardAct = calculateMotorActivity(motorBackward_);
+    float leftAct = calculateMotorActivity(motorTurnLeft_);
+    float rightAct = calculateMotorActivity(motorTurnRight_);
+    float interactAct = calculateMotorActivity(motorInteract_);
+    float waitAct = calculateMotorActivity(motorWait_);
+    
+    // Find best motor command
+    MotorCommand defaultCmd = MotorCommand::Wait;
+    float bestActivity = waitAct;
+    
+    std::vector<MotorCommand> commands = {
+        MotorCommand::MoveForward,
+        MotorCommand::MoveBackward,
+        MotorCommand::TurnLeft,
+        MotorCommand::TurnRight,
+        MotorCommand::Interact,
+        MotorCommand::Wait
+    };
+    
+    std::vector<float> activities = {forwardAct, backwardAct, leftAct, rightAct, interactAct, waitAct};
+    
+    MotorCommand bestCmd = findBestMotorCommand(commands, activities, bestActivity, defaultCmd);
+    
+    return bestCmd;
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
@@ -162,54 +538,7 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     return decoded;
 }
 
-MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
-        float sum = 0.0f;
-        for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
-        }
-        return sum / neurons.size();
-    };
-    
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
-    
-    // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
-        {MotorCommand::MoveForward, forwardAct},
-        {MotorCommand::MoveBackward, backwardAct},
-        {MotorCommand::TurnLeft, leftAct},
-        {MotorCommand::TurnRight, rightAct},
-        {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
-    };
-    
-    MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
-    
-    for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
-            best = c.cmd;
-        }
-    }
-    
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
-        return MotorCommand::Wait;
-    }
-    
-    return best;
-}
-
-MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
+MotorCommand AgentBrain::selectWithCuriosityHelper(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action when curiosity is high
     if (curiosityLevel_ > 0.5f) {
         // Higher curiosity = more exploration
@@ -217,18 +546,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
+            return selectRandomMotorCommand();
         }
     }
     
@@ -347,4 +665,65 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
-} // namespace nlm
+float AgentBrain::calculateMotorActivity(const std::vector<Neuron*>& neurons) const {
+    if (neurons.empty()) return 0.0f;
+    
+    float sum = 0.0f;
+    for (Neuron* n : neurons) {
+        if (!n) continue;
+        sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+    }
+    return sum / neurons.size();
+}
+
+MotorCommand AgentBrain::findBestMotorCommand(
+    const std::vector<MotorCommand>& commands,
+    const std::vector<float>& activities,
+    float bestActivity,
+    MotorCommand defaultCmd
+) {
+    MotorCommand best = defaultCmd;
+    float bestActivityValue = bestActivity;
+    
+    for (size_t i = 0; i < commands.size() && i < activities.size(); ++i) {
+        if (activities[i] > bestActivityValue) {
+            bestActivityValue = activities[i];
+            best = commands[i];
+        }
+    }
+    
+    // Only act if there's meaningful activity
+    if (bestActivityValue < 0.5f) {
+        return MotorCommand::Wait;
+    }
+    
+    return best;
+}
+
+float AgentBrain::getMaxMotorActivity(const std::vector<float>& activities) {
+    if (activities.empty()) return 0.0f;
+    
+    float maxActivity = 0.0f;
+    for (float activity : activities) {
+        if (activity > maxActivity) {
+            maxActivity = activity;
+        }
+    }
+    return maxActivity;
+}
+
+MotorCommand AgentBrain::selectRandomMotorCommand() {
+    if (!brain_) return MotorCommand::Wait;
+    
+    int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+    switch (choice) {
+        case 0: return MotorCommand::MoveForward;
+        case 1: return MotorCommand::MoveBackward;
+        case 2: return MotorCommand::TurnLeft;
+        case 3: return MotorCommand::TurnRight;
+        case 4: return MotorCommand::LookLeft;
+        case 5: return MotorCommand::LookRight;
+        case 6: return MotorCommand::Interact;
+        default: return MotorCommand::Wait;
+    }
+}
