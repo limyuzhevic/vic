@@ -1,4 +1,4 @@
-#include "ConceptFormation.hpp"
+#include "../cognition/ConceptFormation.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
@@ -28,6 +28,9 @@ void ConceptFormation::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("ConceptFormation initialized");
+    
+    // Create concept formation system
+    NLM_LOG_INFO("ConceptFormation system ready for error-driven learning");
 }
 
 size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
@@ -93,8 +96,9 @@ size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
     return concept.id;
 }
 
-void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>& newPattern,
-                                    const std::vector<float>& features, float reward) {
+void ConceptFormation::updateConceptFromPredictionError(size_t conceptId, float predictionError) {
+    if (conceptId == 0) return;
+    
     DiscoveredConcept* concept = nullptr;
     for (auto& c : concepts_) {
         if (c.id == conceptId) {
@@ -105,38 +109,42 @@ void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>&
     
     if (!concept) return;
     
-    // Add new instance
-    ConceptInstance instance;
-    instance.pattern = newPattern;
-    instance.features = features;
-    instance.observationCount = 1;
-    instance.lastObserved = concept->totalObservations;
-    instance.avgReward = reward;
-    
-    concept->instances.push_back(instance);
-    concept->totalObservations++;
-    
-    // Update prototype using exponential moving average (Hebbian-like)
-    updatePrototype(conceptId, newPattern);
-    
-    // Update stability
-    float newStability = 1.0f;
-    if (concept->instances.size() > 1) {
-        // Compute stability as average similarity to prototype
-        float totalSim = 0.0f;
-        size_t recentCount = std::min(concept->instances.size(), stabilityWindow_);
+    // High prediction error triggers concept refinement
+    if (std::abs(predictionError) > 0.5f) {
+        // Significant prediction error means concept needs updating
+        float learningRate = std::min(0.5f, std::abs(predictionError) * 0.3f);
         
-        for (size_t i = concept->instances.size() - recentCount; 
-             i < concept->instances.size(); ++i) {
-            totalSim += computeSimilarity(concept->instances[i].pattern, concept->prototype);
+        // Update concept with higher confidence in predictions
+        if (!concept->instances.empty()) {
+            // Increase stability of concept (more confident after learning)
+            concept->avgStability = std::min(1.0f, concept->avgStability + 0.1f * learningRate);
+            
+            // Add a new instance reflecting the prediction error
+            ConceptInstance errorInstance;
+            errorInstance.pattern = concept->prototype;  // Use current prototype as base
+            errorInstance.features = concept->instances.back().features;
+            errorInstance.observationCount = 1;
+            errorInstance.lastObserved = 0;
+            errorInstance.avgReward = predictionError * 0.5f - 0.5f;  // Normalize to [-1, 1]
+            errorInstance.stability = 0.5f * learningRate;  // New instance has lower stability
+            
+            concept->instances.push_back(errorInstance);
+            concept->totalObservations++;
+            
+            // Update prototype to incorporate prediction error signal
+            for (size_t i = 0; i < concept->prototype.size() && i < errorInstance.pattern.size(); ++i) {
+                // Modify prototype based on prediction error
+                // Positive error -> increase prototype values, negative error -> decrease
+                float adjustment = predictionError * 0.1f * learningRate;
+                concept->prototype[i] += adjustment;
+                // Clamp to reasonable range
+                concept->prototype[i] = std::max(0.0f, std::min(concept->prototype[i], 1.0f));
+            }
+            
+            NLM_LOG_INFO("ConceptFormation: Updated concept " + std::to_string(conceptId) +
+                        " based on prediction error " + std::to_string(predictionError));
         }
-        
-        newStability = totalSim / recentCount;
-        concept->avgStability = concept->avgStability * 0.9f + newStability * 0.1f;
     }
-    
-    // Update instance stability
-    concept->instances.back().stability = newStability;
 }
 
 void ConceptFormation::updatePrototype(size_t conceptId, const std::vector<float>& newInstance) {

@@ -4,9 +4,6 @@
 
 namespace nlm {
 
-// Curiosity drive: exploration motivation based on novelty and prediction error
-// Computed as weighted combination of novelty and prediction error
-
 class Curiosity {
 public:
     Curiosity();

@@ -78,9 +78,29 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
     } else if (memoryNeurons_.size() < capacity_) {
-        memoryNeurons_.push_back(neuron);
-        memoryActivations_.push_back(activation);
-        memoryTimestamps_.push_back(0);
+        // Check if neuron exists in brain before storing
+        bool neuronExists = false;
+        if (brain_) {
+            for (const auto& region : brain_->getRegions()) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* n : pop->getNeurons()) {
+                        if (n->getId() == neuron) {
+                            neuronExists = true;
+                            break;
+                        }
+                    }
+                    if (neuronExists) break;
+                }
+                if (neuronExists) break;
+            }
+        }
+        
+        if (neuronExists) {
+            memoryNeurons_.push_back(neuron);
+            memoryActivations_.push_back(activation);
+            memoryTimestamps_.push_back(0);
+            activeTraces_.push_back(static_cast<size_t>(memoryNeurons_.size() - 1));
+        }
     }
     
     // Inject current to maintain activation

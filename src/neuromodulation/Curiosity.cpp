@@ -20,9 +20,11 @@ struct Curiosity::Impl {
 
 Curiosity::Curiosity() : pImpl(new Impl) {}
 
-Curiosity::~Curiosity() = default;
+Curiosity::~Curiosity() {
+    delete pImpl;
+}
 
-void Curiosity::initialize(Brain* brain) {
+void Curiosity::initialize(class Brain* brain) {
     pImpl->brain = brain;
     NLM_LOG_INFO("Curiosity system initialized");
 }
@@ -34,7 +36,7 @@ float Curiosity::getLevel() const {
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
     // Curiosity increases with novelty and prediction error
     float target = pImpl->noveltyWeight * novelty + 
-                   pImpl->predictionErrorWeight * predictionError;
+                    pImpl->predictionErrorWeight * predictionError;
     
     // Smooth update
     pImpl->level += (target - pImpl->level) * 0.1f;

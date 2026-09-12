@@ -16,9 +16,11 @@ struct PredictionError::Impl {
 
 PredictionError::PredictionError() : pImpl(new Impl) {}
 
-PredictionError::~PredictionError() = default;
+PredictionError::~PredictionError() {
+    delete pImpl;
+}
 
-void PredictionError::initialize(Brain* brain) {
+void PredictionError::initialize(class Brain* brain) {
     pImpl->brain = brain;
     NLM_LOG_INFO("PredictionError system initialized");
 }

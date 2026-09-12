@@ -25,9 +25,12 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Norepinephrine;
+class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -175,6 +178,9 @@ public:
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
     
@@ -183,6 +189,12 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and behavioral regulation
+    Serotonin* getSerotonin();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

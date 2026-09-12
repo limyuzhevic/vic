@@ -18,9 +18,11 @@ struct Novelty::Impl {
 
 Novelty::Novelty() : pImpl(new Impl) {}
 
-Novelty::~Novelty() = default;
+Novelty::~Novelty() {
+    delete pImpl;
+}
 
-void Novelty::initialize(Brain* brain) {
+void Novelty::initialize(class Brain* brain) {
     pImpl->brain = brain;
     NLM_LOG_INFO("Novelty detection initialized");
 }
@@ -33,16 +35,21 @@ void Novelty::setLevel(float level) {
     pImpl->level = level;
 }
 
-void Novelty::detectNovelty(const Observation& observation, 
-                            const Observation& previousObservation) {
-    // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
-    pImpl->history.push_back(pImpl->level);
+void Novelty::update(TimestepDuration dt) {
+    // Decay novelty
+    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+}
+
+const std::vector<float>& Novelty::getHistory() const {
+    return pImpl->history;
+}
+
+void Novelty::clearHistory() {
+    pImpl->history.clear();
 }
 
 void Novelty::detectNovelty(const std::vector<float>& currentPattern,
-                            const std::vector<float>& previousPattern) {
+                             const std::vector<float>& previousPattern) {
     if (currentPattern.empty() || previousPattern.empty()) {
         pImpl->level = 0.0f;
         return;
@@ -66,19 +73,6 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
     
     // Store current pattern for next comparison
     pImpl->lastPattern = currentPattern;
-}
-
-void Novelty::update(TimestepDuration dt) {
-    // Decay novelty
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
-}
-
-const std::vector<float>& Novelty::getHistory() const {
-    return pImpl->history;
-}
-
-void Novelty::clearHistory() {
-    pImpl->history.clear();
 }
 
 } // namespace nlm

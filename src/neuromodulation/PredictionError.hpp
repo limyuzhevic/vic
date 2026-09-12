@@ -4,9 +4,6 @@
 
 namespace nlm {
 
-// Prediction error signal for curiosity and learning
-// Computes difference between predicted and actual values
-
 class PredictionError {
 public:
     PredictionError();
@@ -18,6 +15,9 @@ public:
     // Get error value
     float getError() const;
     
+    // Get error magnitude for neuromodulation
+    float getMagnitude() const;
+    
     // Compute prediction error
     void computeError(float predicted, float actual);
     
@@ -27,9 +27,6 @@ public:
     // Get history
     const std::vector<float>& getHistory() const;
     void clearHistory();
-    
-    // Get error magnitude for neuromodulation
-    float getMagnitude() const;
     
 private:
     struct Impl;
