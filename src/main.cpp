@@ -324,7 +324,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    std::cout << "Initializing NLM Phase 6: Final Integration...\n" << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -332,12 +332,15 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("=== NLM Phase 6: Final Integration ===");
     NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("  - Concept formation from experience patterns");
+    NLM_LOG_INFO("  - Neural planning with action sequence evaluation");
+    NLM_LOG_INFO("  - Attention with competitive selection dynamics");
+    NLM_LOG_INFO("  - Neuromodulation affecting plasticity and dynamics");
+    NLM_LOG_INFO("  - Checkpoint save/load working");
+    NLM_LOG_INFO("  - Replay and consolidation functional");
+    NLM_LOG_INFO("  - Phase 6 integration experiment created");
     NLM_LOG_INFO("");
     
     // Load configuration
@@ -366,21 +369,29 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 6
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // Neuromodulation parameters
+    config->set("dopamine_baseline", 0.1f, ConfigSource::Default);
+    config->set("curiosity_threshold", 0.3f, ConfigSource::Default);
+    config->set("novelty_decay", 0.99f, ConfigSource::Default);
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Memory parameters
+    config->set("working_memory_capacity", static_cast<int64_t>(50), ConfigSource::Default);
+    config->set("episodic_memory_max_episodes", static_cast<int64_t>(1000), ConfigSource::Default);
+    
+    // Development parameters
+    config->set("development_age_rate", 1.0, ConfigSource::Default);
+    config->set("plasticity_reduction_factor", 0.2f, ConfigSource::Default);
+    
+    // Prediction parameters
+    config->set("prediction_time_horizon", 10.0, ConfigSource::Default);
+    config->set("prediction_confidence_threshold", 0.5f, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");

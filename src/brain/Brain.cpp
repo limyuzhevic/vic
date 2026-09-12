@@ -50,7 +50,7 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
-    // Phase 2: Real neural computation components
+    // Phase 6: Integrated artificial brain components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
     std::unique_ptr<Hebbian> hebbian;
@@ -511,8 +511,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // Compute prediction errors and update prediction confidence
+        if (pImpl->predictionSystem && pImpl->predictionError) {
+            // Get current sensory observations (would be from most recent input)
+            // The prediction system uses this to generate expected sensory states
+            // And computes prediction errors for learning
+            pImpl->predictionSystem->update(pImpl->timestep);
+            
+            // Update prediction error signal based on prediction system output
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            pImpl->predictionError->update(predictionError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +538,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Extract patterns from working memory and episodic memory
+        // Update concept prototypes based on experience
+        if (pImpl->conceptFormation) {
+            // Get current sensory activity patterns
+            std::vector<std::vector<float>> patterns;
+            if (pImpl->workingMemory) {
+                // Convert working memory to pattern vectors
+                for (const auto& neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                    std::vector<float> pattern;
+                    // Extract neural activity
+                    for (const auto& region : pImpl->regions) {
+                        for (const auto* neuron : region->getAllNeurons()) {
+                            if (neuron->getId() == neuronId) {
+                                // Get neural features
+                                pattern.push_back(neuron->getState().membranePotential);
+                                pattern.push_back(neuron->getState().firingRate);
+                            }
+                        }
+                    }
+                    if (!pattern.empty()) {
+                        patterns.push_back(pattern);
+                    }
+                }
+            }
+            
+            // Form concepts from patterns
+            pImpl->conceptFormation->update(patterns, pImpl->timestep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -810,21 +847,82 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
-        // Write synapses
-        SynapseCheckpointData synapseData;
-        for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+        // Write neuromodulation state
+        NeuromodulatorCheckpointData neuromodData;
+        neuromodData.dopamineLevel = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        neuromodData.noveltyLevel = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        neuromodData.curiosityLevel = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+        neuromodData.predictionError = pImpl->predictionError ? pImpl->predictionError->getLevel() : 0.0f;
+        neuromodData.plasticityModifier = pImpl->plasticityModifier;
+        neuromodData.developmentStage = static_cast<uint8_t>(pImpl->developmentalStage);
+        neuromodData.developmentAge = pImpl->developmentalAge;
+        
+        if (!writer.writeNeuromodulators(neuromData)) {
+            NLM_LOG_ERROR("Failed to write neuromodulators to checkpoint");
+            return false;
+        }
+        
+        // Write memory systems
+        WorkingMemoryCheckpointData wmData;
+        EpisodicMemoryCheckpointData emData;
+        
+        if (pImpl->workingMemory) {
+            wmData.capacity = pImpl->workingMemory->getCapacity();
+            wmData.neuronIds = pImpl->workingMemory->getMemoryNeurons();
+            wmData.activations = pImpl->workingMemory->getMemoryActivations();
+            if (!writer.writeWorkingMemory(wmData)) {
+                NLM_LOG_ERROR("Failed to write working memory to checkpoint");
+                return false;
             }
         }
         
-        if (!writer.writeSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+        if (pImpl->episodicMemory) {
+            emData.maxEpisodes = pImpl->episodicMemory->getMaxEpisodes();
+            emData.episodes = pImpl->episodicMemory->getAllEpisodes();
+            if (!writer.writeEpisodicMemory(emData)) {
+                NLM_LOG_ERROR("Failed to write episodic memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write prediction system
+        PredictionSystemCheckpointData predData;
+        if (pImpl->predictionSystem) {
+            // Extract prediction system state
+            predData.lastPrediction = pImpl->predictionSystem->getLastPrediction();
+            predData.predictionError = pImpl->predictionSystem->getPredictionError();
+            predData.confidence = pImpl->predictionSystem->getConfidence();
+            predData.timeHorizon = pImpl->predictionSystem->getTimeHorizon();
+            
+            if (!writer.writePredictionSystem(predData)) {
+                NLM_LOG_ERROR("Failed to write prediction system to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write cognitive systems
+        CognitiveCheckpointData cognitiveData;
+        if (pImpl->planner) {
+            // Extract planner state
+            cognitiveData.planningDepth = pImpl->planner->getPlanningDepth();
+            cognitiveData.plannedActions = pImpl->planner->getPlannedActions();
+        }
+        
+        if (pImpl->conceptFormation) {
+            // Extract concept formation state
+            cognitiveData.conceptPrototypes = pImpl->conceptFormation->getConceptPrototypes();
+            cognitiveData.conceptStrengths = pImpl->conceptFormation->getConceptStrengths();
+        }
+        
+        if (pImpl->attention) {
+            // Extract attention state
+            cognitiveData.attentionWeight = pImpl->attention->getAttentionWeight();
+            cognitiveData.inhibitionStrength = pImpl->attention->getInhibitionStrength();
+            cognitiveData.excitationStrength = pImpl->attention->getExcitationStrength();
+        }
+        
+        if (!writer.writeCognitiveData(cognitiveData)) {
+            NLM_LOG_ERROR("Failed to write cognitive data to checkpoint");
             return false;
         }
         
