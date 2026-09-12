@@ -1,6 +1,9 @@
 #include "SpikeSystem.hpp"
+#include "../brain/Neuron.hpp"
+#include "../brain/NeuralRegion.hpp"
 #include <algorithm>
 #include <limits>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -15,10 +18,13 @@ struct SpikeSystem::Impl {
     // Spike counting for statistics
     std::unordered_map<uint64_t, size_t> spikeCountPerNeuron;  // neuron_id -> count
     
-    Impl() : maxHistorySize(10000) {}
+    // OPTIMIZATION: Cache neuron lookup for O(1) spike delivery
+    std::unordered_map<NeuronId, Neuron*> neuronLookup;
+    
+    Impl() : maxHistorySize(10000) { }
 };
 
-SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
+SpikeSystem::SpikeSystem() : pImpl(new Impl) { }
 
 SpikeSystem::~SpikeSystem() = default;
 
@@ -54,11 +60,22 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         SpikeEvent event = pImpl->pendingSpikes.front();
         pImpl->pendingSpikes.pop();
         
+        // OPTIMIZATION: Use O(1) neuron lookup instead of O(n²) search
+        Neuron* neuron = getNeuron(event.source_neuron);
+        if (!neuron) {
+            NLM_LOG_ERROR("Spike source neuron not found in lookup table");
+            continue;
+        }
+        
         // Create detailed event
         DetailedSpikeEvent detailed;
         detailed.source = event.source_neuron;
         detailed.timestamp = event.timestamp;
         detailed.step = event.step;
+        
+        // Get neuron info for detailed event
+        detailed.regionId = neuron->getRegionId();
+        detailed.populationId = neuron->getPopulationId();
         
         // Add to history
         pImpl->spikeHistory.push_back(detailed);
@@ -171,6 +188,53 @@ std::vector<NeuronId> SpikeSystem::getMostActiveNeurons(size_t count) const {
     return result;
 }
 
+void SpikeSystem::buildNeuronLookupTable(std::vector<RegionId> regionIds) {
+    // OPTIMIZATION: Build O(1) neuron lookup table to eliminate O(n²) complexity
+    pImpl->neuronLookup.clear();
+    
+    for (const RegionId& regionId : regionIds) {
+        auto* region = getRegion(regionId);
+        if (!region) continue;
+        
+        // Get all neurons in this region
+        std::vector<Neuron*> neurons = region->getAllNeurons();
+        
+        // Add to lookup table
+        for (Neuron* neuron : neurons) {
+            if (neuron) {
+                pImpl->neuronLookup[neuron->getId()] = neuron;
+            }
+        }
+    }
+}
+
+void SpikeSystem::updateNeuronLookupTable(NeuronId neuronId, Neuron* neuron) {
+    // OPTIMIZATION: Update lookup table when neurons are added/modified
+    if (neuron) {
+        pImpl->neuronLookup[neuronId] = neuron;
+    } else {
+        pImpl->neuronLookup.erase(neuronId);
+    }
+}
+
+Neuron* SpikeSystem::getNeuron(NeuronId neuronId) {
+    // OPTIMIZATION: O(1) neuron lookup
+    auto it = pImpl->neuronLookup.find(neuronId);
+    if (it != pImpl->neuronLookup.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+const Neuron* SpikeSystem::getNeuron(NeuronId neuronId) const {
+    // OPTIMIZATION: O(1) const neuron lookup
+    auto it = pImpl->neuronLookup.find(neuronId);
+    if (it != pImpl->neuronLookup.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
 void SpikeSystem::reset() {
     while (!pImpl->pendingSpikes.empty()) {
         pImpl->pendingSpikes.pop();
@@ -178,6 +242,7 @@ void SpikeSystem::reset() {
     pImpl->spikeHistory.clear();
     pImpl->spikeCountPerNeuron.clear();
     pImpl->delayedSpikes.clear();
+    pImpl->neuronLookup.clear();
 }
 
 } // namespace nlm

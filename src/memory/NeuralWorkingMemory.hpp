@@ -74,6 +74,12 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // Integrate with spike system (Priority 1 fix)
+    void integrateSpikes(const SpikeSystem& spikeSystem, TimestepDuration dt);
+
+    // Maintain memory traces through spike system
+    void maintainMemoryTrails(const SpikeSystem& spikeSystem, TimestepDuration dt);
+
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);

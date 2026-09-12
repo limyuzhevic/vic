@@ -69,6 +69,13 @@ public:
     float getAverageSpikeRate() const;
     std::vector<NeuronId> getMostActiveNeurons(size_t count) const;
     
+    // OPTIMIZATION: O(1) neuron lookup - replaces O(n²) search through regions
+    Neuron* getNeuron(NeuronId neuronId);
+    const Neuron* getNeuron(NeuronId neuronId) const;
+    
+    void buildNeuronLookupTable(std::vector<RegionId> regionIds);
+    void updateNeuronLookupTable(NeuronId neuronId, Neuron* neuron);
+    
     // Reset
     void reset();
     

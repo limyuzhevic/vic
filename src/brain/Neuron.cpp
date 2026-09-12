@@ -228,9 +228,6 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
-    
     // Check for spike
     if (V >= threshold) {
         fired = true;
@@ -240,7 +237,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Record spike
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential to reset potential
         V = V_reset;
         
         // Enter refractory period
@@ -253,8 +250,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Active;
     }
     
-    // Clear synaptic input for next step
-    pImpl->synapticInput = 0.0f;
+    // IMPORTANT: Remove membrane potential clamping to allow natural dynamics
+    // The LIF equation will naturally evolve within reasonable bounds
+    // Clamp only to prevent numerical overflow (extreme values)
+    V = std::clamp(V, -150.0f, 100.0f);
     
     return fired;
 }

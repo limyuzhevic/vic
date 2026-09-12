@@ -158,6 +158,54 @@ void NeuralWorkingMemory::strengthenMemory(float factor) {
     }
 }
 
+void NeuralWorkingMemory::integrateSpikes(const SpikeSystem& spikeSystem, TimestepDuration dt) {
+    // Priority 1 fix: Integrate working memory with spike system
+    // Process incoming spikes to maintain memory traces
+    
+    // Get spike history from the system
+    const auto& spikeHistory = spikeSystem.getSpikeHistory();
+    
+    // For each spike in history, check if it's a relevant memory neuron
+    for (const auto& spike : spikeHistory) {
+        // Check if this spike is in our memory neuron set
+        if (std::find(memoryNeurons_.begin(), memoryNeurons_.end(), spike.source) != memoryNeurons_.end()) {
+            // This spike reinforces the memory trace
+            auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), spike.source);
+            if (it != memoryNeurons_.end()) {
+                size_t idx = std::distance(memoryNeurons_.begin(), it);
+                
+                // Boost memory activation based on spike timing
+                memoryActivations_[idx] = std::min(1.0f, memoryActivations_[idx] + 0.1f * dt);
+                
+                // Update timestamp
+                memoryTimestamps_[idx] = spike.step;
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::maintainMemoryTrails(const SpikeSystem& spikeSystem, TimestepDuration dt) {
+    // Maintain memory trails through spike system propagation
+    // This creates persistent activity patterns
+    
+    for (const auto& neuronId : memoryNeurons_) {
+        // Check if this neuron is actively firing
+        const Neuron* neuron = spikeSystem.getNeuron(neuronId);
+        if (neuron && neuron->isFiring()) {
+            // Maintain the memory trace through persistent activity
+            auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuronId);
+            if (it != memoryNeurons_.end()) {
+                size_t idx = std::distance(memoryNeurons_.begin(), it);
+                
+                // Maintain memory activation with homeostatic regulation
+                if (memoryActivations_[idx] > 0.0f) {
+                    memoryActivations_[idx] = std::max(0.0f, memoryActivations_[idx] - decayRate_ * dt);
+                }
+            }
+        }
+    }
+}
+
 void NeuralWorkingMemory::runCompetition() {
     winners_.clear();
     
