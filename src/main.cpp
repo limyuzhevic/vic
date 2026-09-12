@@ -77,6 +77,9 @@ struct LearningExperiment {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        } else {
+            NLM_LOG_ERROR("No synapses found in first region - cannot record weights");
+            return 1; // Exit with error
         }
     }
     
@@ -85,9 +88,16 @@ struct LearningExperiment {
         
         // Record final weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+            const auto& synapses = region->getSynapses();
+            if (synapses.empty()) {
+                NLM_LOG_WARN("No synapses found in first region during final state recording");
+            } else {
+                for (const auto& syn : synapses) {
+                    finalWeights.push_back(syn->getWeight());
+                }
             }
+        } else {
+            NLM_LOG_WARN("First region not found - cannot record final weights");
         }
         
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
@@ -159,18 +169,21 @@ struct LearningExperiment {
     }
 };
 
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+int runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Region 1 not found!");
+        return 1;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
-        return;
+        NLM_LOG_ERROR("No neurons found!");
+        return 1;
     }
     
     // Get initial spike count
@@ -179,7 +192,10 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        // Added bounds check for neurons[i]
+        if (neurons[i]) {
+            neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        }
     }
     
     // Run a few steps
@@ -195,11 +211,14 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            if (neurons[i]) {
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                             " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                             " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            }
         }
     }
+    return 0;
 }
 
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
@@ -410,7 +429,9 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    if (!runBasicConnectivityTest(brain)) {
+        NLM_LOG_WARN("Basic connectivity test completed with warnings");
+    }
     
     // Reset brain for plasticity experiment
     brain->reset();
@@ -446,4 +467,17 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+// Entry point for the main program with improved error handling
+int mainWithErrorHandling(int argc, char** argv) {
+    try {
+        return main(argc, argv);
+    } catch (const std::exception& e) {
+        std::cerr << "Fatal error: " << e.what() << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "Unknown fatal error occurred" << std::endl;
+        return 1;
+    }
 }

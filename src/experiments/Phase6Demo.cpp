@@ -59,6 +59,14 @@ int main(int argc, char* argv[]) {
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
+    // Set advanced parameters from default config
+    config.stdpLTPWeight = 0.01f;
+    config.stdpLTDWeight = 0.012f;
+    config.synaptogenesisRate = 0.0001f;
+    config.pruningRate = 0.00001f;
+    config.motorActivityThreshold = 0.5f;
+    config.curiosityThreshold = 0.3f;
+    config.noveltyDecay = 0.99f;
     
     auto result = experiment.run(config);
     

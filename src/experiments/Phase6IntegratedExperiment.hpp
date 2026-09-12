@@ -85,6 +85,16 @@ struct Phase6Config {
     bool enableDevelopment;
     std::string checkpointPath;
     
+    // Advanced configuration options (Phase 2+ features)
+    // These make the experiment configurable for advanced use cases
+    float stdpLTPWeight;        // STDP LTP weight
+    float stdpLTDWeight;        // STDP LTD weight  
+    float synaptogenesisRate;    // Structural plasticity rate
+    float pruningRate;          // Structural pruning rate
+    float motorActivityThreshold; // Threshold for motor neuron activation
+    float curiosityThreshold;    // Threshold for curiosity-based exploration
+    float noveltyDecay;          // Novelty decay rate
+    
     Phase6Config()
         : maxSteps(10000)
         , neuronCount(1000)
@@ -93,7 +103,15 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , checkpointPath("./checkpoint_test.bin")
+        // Advanced settings - better defaults for advanced use
+        , stdpLTPWeight(0.01f)
+        , stdpLTDWeight(0.012f)
+        , synaptogenesisRate(0.0001f)
+        , pruningRate(0.00001f)
+        , motorActivityThreshold(0.5f)
+        , curiosityThreshold(0.3f)
+        , noveltyDecay(0.99f) {}
 };
 
 /**

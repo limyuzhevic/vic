@@ -7,24 +7,68 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
-
+/**
+ * @class Neuromodulator
+ * @brief Abstract base class for neuromodulators (dopamine, curiosity, novelty, etc.)
+ * 
+ * Neuromodulators are chemical signals that modulate neural activity and plasticity
+ * throughout the brain. They provide teaching signals for learning and help regulate
+ * attention, arousal, reward prediction, and exploration behaviors.
+ * 
+ * Neuromodulators affect:
+ * - Neural excitability and firing rates
+ * - Synaptic plasticity (learning)
+ * - Memory consolidation
+ * - Attention and focus
+ * - Motivation and exploration
+ * 
+ * @note Phase 2: Implementation ongoing. Current placeholder implementations
+ *       need proper biological mechanisms and integration with brain systems.
+ * 
+ * @author NLM Development Team
+ * @date Phase 2 Implementation
+ */
 class Neuromodulator {
 public:
+    /**
+     * @brief Virtual destructor
+     */
     virtual ~Neuromodulator() = default;
     
-    // Get modulator name
+    /**
+     * @brief Get neuromodulator name
+     * 
+     * @return Human-readable name of neuromodulator
+     */
     virtual const char* getName() const = 0;
     
-    // Get current concentration/level
+    /**
+     * @brief Get current concentration/level of neuromodulator
+     * 
+     * @return Current level (typically normalized 0-1)
+     */
     virtual float getLevel() const = 0;
+    
+    /**
+     * @brief Set neuromodulator level
+     * 
+     * @param level New level (typically normalized 0-1)
+     */
     virtual void setLevel(float level) = 0;
     
-    // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    /**
+     * @brief Get plasticity factor influenced by neuromodulator
+     * 
+     * @return Factor to multiply synaptic plasticity rates by
+     *         (1.0 = normal, >1.0 = enhanced, <1.0 = suppressed)
+     */
     virtual float getPlasticityFactor() const = 0;
     
-    // Update neuromodulator state
+    /**
+     * @brief Update neuromodulator state based on neural activity
+     * 
+     * @param dt Timestep duration
+     */
     virtual void update(TimestepDuration dt) = 0;
     
 protected:

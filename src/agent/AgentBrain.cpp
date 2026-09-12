@@ -18,7 +18,14 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
+    , visionInputScale_(5.0f)
+    , touchInputScale_(8.0f)
+    , internalInputScale_(5.0f)
+    , proprioceptionInputScale_(3.0f)
+    , noveltyDecay_(0.99f)
+    , curiosityThreshold_(0.3f)
+    , motorActivityThreshold_(0.5f)
+    , explorationRate_(0.3f)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -90,37 +97,41 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
+        Neuron* neuron = sensoryVision_[i];
+        if (neuron) {  // Null check
             // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+            float current = vision[i] * visionInputScale_;  // Use configurable scale factor
+            neuron->injectCurrent(current);
         }
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+        Neuron* neuron = sensoryTouch_[i];
+        if (neuron) {  // Null check
+            float current = touch[i] * touchInputScale_;  // Use configurable scale factor
+            neuron->injectCurrent(current);
         }
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+        Neuron* neuron = sensoryInternal_[i];
+        if (neuron) {  // Null check
+            float current = (intern[i] * 2.0f - 1.0f) * internalInputScale_;  // Use configurable scale factor
+            neuron->injectCurrent(current);
         }
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+        Neuron* neuron = sensoryProprioception_[i];
+        if (neuron) {  // Null check
+            float current = (proprio[i] * 2.0f - 1.0f) * proprioceptionInputScale_;  // Use configurable scale factor
+            neuron->injectCurrent(current);
         }
     }
     
@@ -142,11 +153,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
-    if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
-        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
-    }
+    // Initialize with sensory novelty decay factor (use new member variable)
+    sensoryNoveltyDecay_ = noveltyDecay_;
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {

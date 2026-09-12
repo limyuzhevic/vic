@@ -9,9 +9,30 @@
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
-class AgentBrain {
+// ========== AGENT BRAIN DOCUMENTATION ==========
+/**
+ * @class AgentBrain
+ * @brief Connects NLM brain to the world - handles sensory transduction and motor decoding
+ * 
+ * The AgentBrain class serves as the interface between the internal neural processing
+ * and the external world. It transduces sensory information from the environment
+ * into neural currents and decodes neural activity into motor commands that control
+ * the agent's interaction with the world.
+ * 
+ * This class implements the agent's perception-action cycle:
+ * 1. Sensory Percept → Neural Current Injection (transduction)
+ * 2. Neural Activity → Motor Commands (decoding)
+ * 3. Motor Commands → World Actions (execution)
+ * 
+ * The agent also integrates neuromodulation signals from reward and novelty
+ * to guide learning and exploration behavior.
+ * 
+ * @note This class is part of Phase 6 (Integrated Artificial Brain)
+ *       demonstrating complete brain-world integration.
+ * 
+ * @author NLM Development Team
+ * @date Phase 6 Implementation
+ */
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
@@ -69,6 +90,17 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Configuration parameters (made public for easier testing and modification)
+    // Scale factors for sensory input injection - should be configured via Config
+    float visionInputScale_ = 5.0f;      // Scale factor for vision input (was hardcoded)
+    float touchInputScale_ = 8.0f;       // Scale factor for touch input (was hardcoded)
+    float internalInputScale_ = 5.0f;    // Scale factor for internal signals (was hardcoded)
+    float proprioceptionInputScale_ = 3.0f; // Scale factor for proprioception (was hardcoded)
+    float noveltyDecay_ = 0.99f;         // Novelty decay factor (was hardcoded)
+    float curiosityThreshold_ = 0.3f;   // Curiosity threshold for exploration (was hardcoded)
+    float motorActivityThreshold_ = 0.5f; // Motor activity threshold (was hardcoded)
+    float explorationRate_ = 0.3f;      // Maximum exploration rate (was hardcoded)
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -109,7 +141,7 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
-    // Previous sensory state for novelty detection
+        // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
 };
