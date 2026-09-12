@@ -22,6 +22,8 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , consolidationRate_(0.0f)
+    , consolidationThreshold_(1000)
 {
 }
 

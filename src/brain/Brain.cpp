@@ -1,20 +1,5 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
+// Include Neuromodulator first (before other brain headers that might need it)
 #include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -511,8 +496,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural state
+        // For now, create a simple prediction based on average neural activity
+        // This would be replaced with Phase 6 prediction implementation
+        float totalActivity = 0.0f;
+        size_t neuronCount = 0;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    totalActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                    neuronCount++;
+                }
+            }
+        }
+        
+        if (neuronCount > 0) {
+            float avgActivity = totalActivity / static_cast<float>(neuronCount);
+            pImpl->predictionSystem->updatePrediction(avgActivity);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +530,37 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Extract patterns from working memory and episodic memory
+        
+        // Create a vector of recent memory patterns to analyze for concepts
+        std::vector<std::vector<float>> memoryPatterns;
+        
+        // Get patterns from working memory
+        if (pImpl->workingMemory) {
+            auto workingPatterns = pImpl->workingMemory->retrieve();
+            if (!workingPatterns.empty()) {
+                memoryPatterns.push_back(workingPatterns);
+            }
+        }
+        
+        // Get recent episodic memory episodes for pattern analysis
+        if (pImpl->episodicMemory && pImpl->episodicMemory->getEpisodeCount() > 0) {
+            auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+            for (const auto* episode : recentEpisodes) {
+                // Extract activation pattern from episode
+                std::vector<float> pattern;
+                for (size_t i = 0; i < episode->neuronActivations.size(); ++i) {
+                    pattern.push_back(episode->neuronActivations[i]);
+                }
+                memoryPatterns.push_back(pattern);
+            }
+        }
+        
+        // Process patterns to form new concepts
+        if (!memoryPatterns.empty()) {
+            pImpl->conceptFormation->processPatterns(memoryPatterns, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -728,6 +759,51 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
 void Brain::updatePlasticity() {
     // Plasticity is now applied during each step
     // This method is kept for API compatibility
+    
+    // Apply neuromodulation effects on plasticity
+    if (pImpl->dopamine) {
+        float plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        
+        // Modify structural plasticity rates based on development stage
+        auto* sp = pImpl->structuralPlasticity;
+        if (sp) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            float devPlasticityMod = 1.0f;
+            
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    devPlasticityMod = 1.0f;  // High plasticity
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    devPlasticityMod = 0.8f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    devPlasticityMod = 0.5f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    devPlasticityMod = 0.2f;  // Stable
+                    break;
+            }
+            
+            // Combine neuromodulation and development effects
+            float totalPlasticityMod = plasticityMod * devPlasticityMod;
+            
+            // Apply to structural plasticity
+            float currentSynaptogenesisRate = sp->getSynaptogenesisRate();
+            sp->setSynaptogenesisRate(currentSynaptogenesisRate * totalPlasticityMod);
+            
+            // Development also affects working memory consolidation
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->updateConsolidationRate(totalPlasticityMod);
+            }
+            
+            // Development affects concept formation stability
+            if (pImpl->conceptFormation) {
+                pImpl->conceptFormation->setFormationThreshold(
+                    0.5f + 0.5f * totalPlasticityMod);
+            }
+        }
+    }
 }
 
 void Brain::develop() {

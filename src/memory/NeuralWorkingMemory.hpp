@@ -75,14 +75,21 @@ public:
     float getMemoryActivity() const;
 
 private:
-    // Create recurrent connection for maintenance
-    void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
+    // Update consolidation rate based on neuromodulation
+    void updateConsolidationRate(float rate) {
+        if (rate > 0.0f) {
+            consolidationRate_ = std::min(1.0f, consolidationRate_ + (1.0f - consolidationRate_) * (rate - 0.5f) * 0.5f);
+        }
+    }
 
-    // Update recurrent connections for maintenance
-    void updateRecurrentConnections();
+    // Process consolidation of mature memories
+    void consolidateMatureMemories();
 
-    // Decay weak memory traces
-    void decayWeakTraces();
+    // Get consolidation rate
+    float getConsolidationRate() const { return consolidationRate_; }
+
+    // Set consolidation threshold
+    void setConsolidationThreshold(float threshold) { consolidationThreshold_ = threshold; }
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -90,6 +97,8 @@ private:
     Brain* brain_;
     size_t capacity_;
     float decayRate_;
+    float consolidationRate_;      // Rate at which memories are consolidated
+    float consolidationThreshold_; // Age threshold for consolidation
     
     // Memory content
     std::vector<NeuronId> memoryNeurons_;

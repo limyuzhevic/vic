@@ -128,6 +128,10 @@ public:
     // Get concept for a given pattern
     size_t findConceptForPattern(const std::vector<float>& pattern) const;
 
+    // Process patterns to form concepts (used by brain integration)
+    void processPatterns(const std::vector<std::vector<float>>& patterns,
+                        SimulationStep currentTime);
+
     // Clear all concepts
     void clear();
 

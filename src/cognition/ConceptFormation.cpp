@@ -291,6 +291,41 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
     return 1.0f - (totalVariance / concept->instances.size());
 }
 
+void ConceptFormation::processPatterns(const std::vector<std::vector<float>>& patterns,
+                                         SimulationStep currentTime) {
+    if (patterns.empty()) return;
+    
+    // Process each pattern batch to form concepts
+    for (const auto& pattern : patterns) {
+        if (pattern.empty()) continue;
+        
+        // Create synthetic features based on pattern statistics
+        std::vector<float> features;
+        float mean = std::accumulate(pattern.begin(), pattern.end(), 0.0f) / pattern.size();
+        float stddev = 0.0f;
+        for (float val : pattern) {
+            stddev += (val - mean) * (val - mean);
+        }
+        stddev = std::sqrt(stddev / pattern.size());
+        
+        // Extract pattern characteristics
+        float maxVal = *std::max_element(pattern.begin(), pattern.end());
+        float minVal = *std::min_element(pattern.begin(), pattern.end());
+        float range = maxVal - minVal;
+        
+        // Create feature vector representing pattern properties
+        features.push_back(mean);
+        features.push_back(stddev);
+        features.push_back(range);
+        features.push_back(maxVal);
+        features.push_back(minVal);
+        
+        // Present the pattern to concept formation system
+        // Use a neutral reward for passive observation
+        presentExperience(pattern, features, 0.0f, currentTime);
+    }
+}
+
 void ConceptFormation::clear() {
     concepts_.clear();
     nextConceptId_ = 1;
