@@ -24,6 +24,9 @@ public:
     // TODO PHASE 2: Implement real modulation
     virtual float getPlasticityFactor() const = 0;
     
+    // Apply plasticity modulation based on other neuromodulators
+    virtual void applyPlasticityModulation(const Neuromodulator& source) const = 0;
+    
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
@@ -62,6 +65,10 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    void applyPlasticityModulation(const Neuromodulator& source) const override {
+        // TODO PHASE 2: Implement attention effects on learning
+        // PLACEHOLDER: Enhances memory consolidation
+    }
 };
 
 // Norepinephrine: Arousal and vigilance
@@ -73,6 +80,10 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    void applyPlasticityModulation(const Neuromodulator& source) const override {
+        // TODO PHASE 2: Implement arousal effects on learning
+        // PLACEHOLDER: Increases alertness and processing speed
+    }
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
@@ -84,6 +95,10 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    void applyPlasticityModulation(const Neuromodulator& source) const override {
+        // TODO PHASE 2: Implement mood effects on learning
+        // PLACEHOLDER: Modulates social behavior and impulsivity
+    }
 };
 
 } // namespace nlm
