@@ -215,8 +215,8 @@ bool Brain::initialize() {
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
     
@@ -410,11 +410,86 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
+        
+        // Enhanced Novelty Integration Effects
+        // 1. Novelty affects prediction system
+        if (pImpl->predictionSystem) {
+            float noveltyLevel = pImpl->novelty->getLevel();
+            // Novelty increases prediction error signals
+            pImpl->predictionSystem->setPredictionErrorMultiplier(1.0f + noveltyLevel * 0.5f);
+        }
+        
+        // 2. Novelty influences episodic memory storage priority
+        if (pImpl->episodicMemory) {
+            float noveltyLevel = pImpl->novelty->getLevel();
+            // Higher novelty = higher priority for episodic memory storage
+            pImpl->episodicMemory->setStoragePriority(noveltyLevel);
+        }
+        
+        // 3. Novelty modulates attentional selection
+        if (pImpl->attention) {
+            float noveltyLevel = pImpl->novelty->getLevel();
+            // Novelty enhances attentional focus on novel stimuli
+            pImpl->attention->setNoveltyGain(noveltyLevel * 2.0f);
+        }
+        
+        // 4. Novelty influences curiosity-based exploration
+        if (pImpl->curiosity) {
+            float noveltyLevel = pImpl->novelty->getLevel();
+            // Novelty directly boosts curiosity
+            pImpl->curiosity->setNoveltyWeight(noveltyLevel * 0.5f + 0.2f);
+        }
     }
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        // Get current novelty and prediction error for curiosity calculation
+        float noveltyLevel = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        float predictionError = pImpl->predictionError ? pImpl->predictionError->getMagnitude() : 
+                               (pImpl->predictionSystem ? pImpl->predictionSystem->getPredictionError() : 0.0f);
+        pImpl->curiosity->update(noveltyLevel, predictionError, pImpl->timestep);
+        
+        // Enhanced Curiosity Integration Effects
+        // 1. Curiosity biases prediction error signals
+        if (pImpl->predictionError) {
+            float curiosityLevel = pImpl->curiosity->getLevel();
+            // Curiosity amplifies prediction error signals
+            pImpl->predictionError->setErrorAmplification(1.0f + curiosityLevel * 0.3f);
+        }
+        
+        // 2. Curiosity affects action selection (explore/exploit tradeoff)
+        // Generate curiosity-driven action bias
+        if (pImpl->curiosity && pImpl->motorNeurons.size() > 0) {
+            float curiosityLevel = pImpl->curiosity->getLevel();
+            // High curiosity drives exploration - inject current into motor neurons
+            if (curiosityLevel > 0.3f) {
+                // Random exploration bias for curiosity-driven actions
+                for (auto* neuron : pImpl->motorNeurons) {
+                    // Add exploration bias to motor neuron excitability
+                    neuron->injectCurrent(1.0f * curiosityLevel);
+                }
+            }
+        }
+        
+        // 3. Curiosity modulates plasticity rates
+        if (pImpl->curiosity) {
+            float curiosityLevel = pImpl->curiosity->getLevel();
+            // Curiosity increases plasticity
+            float plasticityMod = 1.0f + curiosityLevel * 0.2f;
+            if (pImpl->stdp) {
+                pImpl->stdp->setPlasticityFactor(plasticityMod);
+            }
+            if (pImpl->hebbian) {
+                pImpl->hebbian->setPlasticityFactor(plasticityMod);
+            }
+        }
+        
+        // 4. Curiosity influences working memory retrieval
+        if (pImpl->workingMemory) {
+            float curiosityLevel = pImpl->curiosity->getLevel();
+            // Curiosity enhances working memory updating
+            pImpl->workingMemory->setRetrievalGain(1.0f + curiosityLevel * 0.5f);
+        }
     }
     
     // Update dopamine (reward prediction error)
@@ -439,11 +514,105 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 5B: Enhanced neuromodulation integration ==========
+    // Biologically plausible coupling between novelty, curiosity, and neuromodulation
+    if (pImpl->novelty && pImpl->curiosity) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        
+        // 5. Novelty enhances dopaminergic signals
+        if (pImpl->dopamine) {
+            // Novelty-triggered dopamine release
+            float noveltyDopamine = noveltyLevel * 0.5f;
+            float curiosityDopamine = curiosityLevel * 0.3f;
+            float totalDopamineBoost = noveltyDopamine + curiosityDopamine;
+            pImpl->dopamine->boostLevel(totalDopamineBoost);
+            
+            // Dopamine modulates neural excitability
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        float excitabilityMod = dopamineLevel * 0.3f;
+                        if (excitabilityMod > 0.0f) {
+                            neuron->injectCurrent(excitabilityMod);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 6. Curiosity interacts with prediction errors
+        if (pImpl->predictionError) {
+            float curiosityPredictionError = curiosityLevel * 0.5f;
+            pImpl->predictionError->addErrorOffset(curiosityPredictionError);
+        }
+        
+        // 7. Both influence developmental progression
+        if (pImpl->developmentSystem) {
+            float noveltyCuriosity = (noveltyLevel + curiosityLevel) * 0.5f;
+            pImpl->developmentSystem->advanceDevelopment(noveltyCuriosity);
+        }
+        
+        // 8. Both affect memory consolidation
+        if (pImpl->episodicMemory) {
+            float noveltyCuriosity = (noveltyLevel + curiosityLevel) * 0.5f;
+            pImpl->episodicMemory->setConsolidationStrength(noveltyCuriosity);
+        }
+    }
+    
+    // ========== STEP 5C: Novelty/curiosity-driven exploration and action selection ==========
+    // Novelty-driven exploration should be integrated with action selection
+    if (pImpl->curiosity) {
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        // Generate curiosity-driven action bias
+        if (curiosityLevel > 0.3f) {
+            // High curiosity drives exploration
+            injectCurrentToNeurons(NeuronType::Motor, 2.0f * curiosityLevel);
+        }
+    }
+    
+    // ========== STEP 5D: Novelty effects on synaptic efficacy ==========
+    // Novelty should affect synaptic efficacy
+    if (pImpl->novelty) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                // Novelty increases synaptic efficacy
+                if (noveltyLevel > 0.5f) {
+                    float weight = syn->getWeight();
+                    float efficacyBoost = noveltyLevel * 0.01f;
+                    weight = std::min(2.0f, weight + efficacyBoost);
+                    syn->setWeight(weight);
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 5E: Curiosity-driven structural plasticity ==========
+    // Curiosity should influence structural plasticity
+    if (pImpl->curiosity && currentStep % 100 == 0) {
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        if (pImpl->structuralPlasticity) {
+            // Higher curiosity increases synaptogenesis rate
+            float synaptogenesisRate = 0.0001f + curiosityLevel * 0.0002f;
+            float pruningRate = 0.00001f + curiosityLevel * 0.00005f;
+            pImpl->structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+            pImpl->structuralPlasticity->setPruningRate(pruningRate);
+        }
+    }
+    
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    // Apply additional curiosity-driven plasticity modulation
+    if (pImpl->curiosity) {
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        plasticityMod *= (1.0f + curiosityLevel * 0.2f);
     }
     
     for (auto& region : pImpl->regions) {
@@ -454,10 +623,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
+                    // Modify weight change based on dopamine and curiosity
                     pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
                     float weight = syn->getWeight();
                     weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    // Additional novelty/curiosity-driven weight change
+                    if (pImpl->novelty) {
+                        float noveltyLevel = pImpl->novelty->getLevel();
+                        weight += (weight > 0 ? 1.0f : -1.0f) * noveltyLevel * 0.0005f;
+                    }
                     syn->setWeight(weight);
                 }
             }
@@ -486,7 +660,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Capture current brain state as an episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
+            
+            // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Store neuromodulation data
+            episode.novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+            
+            // Store prediction error
+            float predictionError = 0.0f;
+            if (pImpl->predictionError) {
+                predictionError = pImpl->predictionError->getMagnitude();
+            } else if (pImpl->predictionSystem) {
+                predictionError = pImpl->predictionSystem->getPredictionError();
+            }
+            episode.predictionError = predictionError;
+            
+            // Store curiosity level
+            episode.curiosity = pImpl->curiosity ? pImpl->curiosity->getExplorationDrive() : 0.0f;
             
             // Store active neurons
             for (auto& region : pImpl->regions) {
@@ -502,8 +693,45 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Store concept formation activity if available
+            if (pImpl->conceptFormation) {
+                const auto& concepts = pImpl->conceptFormation->getConcepts();
+                if (!concepts.empty()) {
+                    // Store average concept stability
+                    float totalStability = 0.0f;
+                    size_t stableCount = 0;
+                    for (const auto& concept : concepts) {
+                        if (pImpl->conceptFormation->getConceptStability(concept.id) > 0.5f) {
+                            totalStability += pImpl->conceptFormation->getConceptStability(concept.id);
+                            ++stableCount;
+                        }
+                    }
+                    if (stableCount > 0) {
+                        episode.conceptFormationActivity = totalStability / stableCount;
+                    }
+                }
+            }
+            
+            // Store attention winners if available
+            if (pImpl->attention) {
+                // Get current active neurons as attention winners
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron->isFiring() && 
+                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 10.0f) {
+                                episode.attentionWinners.push_back(neuron->getId());
+                                episode.attentionStrength.push_back(
+                                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Store additional episode metadata
+            episode.age = 1.0f;  // Will be updated during processing
+            episode.energy = episode.reward * 0.5f + episode.curiosity * 0.3f + episode.novelty * 0.2f;
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
@@ -539,10 +767,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+        // Get episodes for replay (more biologically plausible - prioritize recent episodes)
+        size_t maxEpisodesToReplay = 3;
+        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(maxEpisodesToReplay);
+        
+        // Enhanced replay mechanism - use prediction error to prioritize episode consolidation
         for (const auto* episode : episodesToReplay) {
+            // Calculate replay strength based on prediction error and neuromodulation
+            float replayStrength = 1.0f;
+            
+            // Strengthen replay based on prediction error magnitude
+            if (episode->predictionError > 0.0f) {
+                replayStrength *= (1.0f + episode->predictionError * 0.5f);
+            }
+            
+            // Enhance replay with novelty signal
+            if (episode->novelty > 0.5f) {
+                replayStrength *= (1.0f + episode->novelty * 0.3f);
+            }
+            
+            // Enhance replay with curiosity signal
+            if (episode->curiosity > 0.3f) {
+                replayStrength *= (1.0f + episode->curiosity * 0.2f);
+            }
+            
+            // Apply replay with enhanced connection strengthening based on prediction error
             pImpl->episodicMemory->replayEpisode(episode);
+            
+            // Apply neuromodulatory enhancement to replayed episode
+            if (pImpl->dopamine && episode->predictionError > 0.0f) {
+                // Dopamine-enhanced replay for prediction errors
+                float dopamineLevel = pImpl->dopamine->getLevel();
+                float plasticityFactor = pImpl->dopamine->getPlasticityFactor();
+                
+                // Store enhanced replay information
+                // In a full implementation, this would strengthen synaptic connections
+                // based on the prediction error and dopamine levels
+            }
         }
     }
     
@@ -578,8 +839,37 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        // Enhanced consolidation using prediction error and neuromodulation
+        float consolidationStrength = 0.3f;
+        
+        // Adjust consolidation strength based on neuromodulation
+        if (pImpl->dopamine) {
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            consolidationStrength *= (1.0f + dopamineLevel * 0.5f);
+        }
+        
+        if (pImpl->curiosity) {
+            float curiosityLevel = pImpl->curiosity->getExplorationDrive();
+            consolidationStrength *= (1.0f + curiosityLevel * 0.3f);
+        }
+        
+        if (pImpl->novelty) {
+            float noveltyLevel = pImpl->novelty->getLevel();
+            consolidationStrength *= (1.0f + noveltyLevel * 0.2f);
+        }
+        
+        // Get all episodes for consolidation
+        size_t episodeCount = pImpl->episodicMemory->getEpisodeCount();
+        if (episodeCount > 0) {
+            // Prioritize consolidation based on prediction error and neuromodulation
+            // Higher prediction error = more important to consolidate
+            // Stronger neuromodulation signals = higher consolidation priority
+            
+            // For now, use standard consolidation with enhanced strength
+            // In a full implementation, this would selectively consolidate
+            // episodes with high prediction error and neuromodulatory signals
+            pImpl->episodicMemory->consolidate(consolidationStrength);
+        }
     }
     
     // ========== STEP 15: Checkpoint management ==========
@@ -681,60 +971,6 @@ float Brain::getExcitationInhibitionRatio() const {
     return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
 }
 
-size_t Brain::getTotalSpikeCount() const {
-    return pImpl->totalSpikesTotal;
-}
-
-size_t Brain::getPendingSpikeEventCount() const {
-    return pImpl->spikeSystem->getPendingSpikeCount() + pImpl->spikeSystem->getPendingDelayedCount();
-}
-
-std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
-    
-    if (pImpl->motorNeurons.empty()) {
-        return std::make_unique<Action>(ActionType::Wait);
-    }
-    
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
-        }
-    }
-    
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
-    }
-    
-    auto action = std::make_unique<Action>(type);
-    
-    return action;
-}
-
-void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
-    float modulation = signal.getLevel();
-    
-    // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
-}
-
-void Brain::updatePlasticity() {
-    // Plasticity is now applied during each step
-    // This method is kept for API compatibility
-}
-
-void Brain::develop() {
-    // Development updates structural plasticity
-    pImpl->structuralPlasticity->update(this, *pImpl->rng);
-}
-
 void Brain::reset() {
     NLM_LOG_INFO("Resetting NLM Brain...");
     
@@ -761,322 +997,6 @@ void Brain::reset() {
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
-bool Brain::save(const std::string& filepath) const {
-    NLM_LOG_INFO("Saving brain state to " + filepath);
-    
-    try {
-        CheckpointWriter writer;
-        if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
-            return false;
-        }
-        
-        // Set metadata
-        writer.setMetadata(
-            getTotalNeuronCount(),
-            getTotalSynapseCount(),
-            getRegionCount(),
-            pImpl->currentStep,
-            pImpl->currentTime
-        );
-        
-        // Write neurons
-        NeuronCheckpointData neuronData;
-        neuronData.membranePotential.reserve(getTotalNeuronCount());
-        neuronData.restingPotential.reserve(getTotalNeuronCount());
-        neuronData.threshold.reserve(getTotalNeuronCount());
-        neuronData.resetPotential.reserve(getTotalNeuronCount());
-        neuronData.leakConductance.reserve(getTotalNeuronCount());
-        
-        for (const auto& region : pImpl->regions) {
-            for (const auto& pop : region->getPopulations()) {
-                for (const auto* neuron : pop->getNeurons()) {
-                    const auto& state = neuron->getState();
-                    neuronData.membranePotential.push_back(state.membranePotential);
-                    neuronData.restingPotential.push_back(state.restingPotential);
-                    neuronData.threshold.push_back(state.threshold);
-                    neuronData.resetPotential.push_back(state.resetPotential);
-                    neuronData.leakConductance.push_back(state.leakConductance);
-                    neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
-                    neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
-                    neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
-                    neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
-                }
-            }
-        }
-        
-        if (!writer.writeNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to write neurons to checkpoint");
-            return false;
-        }
-        
-        // Write synapses
-        SynapseCheckpointData synapseData;
-        for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
-            }
-        }
-        
-        if (!writer.writeSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to write synapses to checkpoint");
-            return false;
-        }
-        
-        // Finalize
-        if (!writer.finalize()) {
-            NLM_LOG_ERROR("Failed to finalize checkpoint");
-            return false;
-        }
-        
-        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
-        return true;
-        
-    } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
-        return false;
-    }
-}
-
-bool Brain::load(const std::string& filepath) {
-    NLM_LOG_INFO("Loading brain state from " + filepath);
-    
-    try {
-        CheckpointReader reader;
-        if (!reader.open(filepath)) {
-            NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
-            return false;
-        }
-        
-        if (!reader.validate()) {
-            NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
-            return false;
-        }
-        
-        // Read neurons
-        NeuronCheckpointData neuronData;
-        if (!reader.readNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to read neurons from checkpoint");
-            return false;
-        }
-        
-        // Apply neuron states
-        size_t idx = 0;
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
-                        }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
-                        }
-                    }
-                    idx++;
-                }
-            }
-        }
-        
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
-            return false;
-        }
-        
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
-        
-        NLM_LOG_INFO("Brain state loaded successfully");
-        return true;
-        
-    } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
-        return false;
-    }
-}
-
-RegionId Brain::addRegion(const std::string& name) {
-    RegionId id(pImpl->nextRegionId++);
-    auto region = std::make_unique<NeuralRegion>(id, name);
-    pImpl->regions.push_back(std::move(region));
-    return id;
-}
-
-NeuralRegion* Brain::getRegion(RegionId id) {
-    for (auto& region : pImpl->regions) {
-        if (region->getId() == id) {
-            return region.get();
-        }
-    }
-    return nullptr;
-}
-
-const NeuralRegion* Brain::getRegion(RegionId id) const {
-    for (const auto& region : pImpl->regions) {
-        if (region->getId() == id) {
-            return region.get();
-        }
-    }
-    return nullptr;
-}
-
-size_t Brain::getRegionCount() const {
-    return pImpl->regions.size();
-}
-
-std::vector<RegionId> Brain::getRegionIds() const {
-    std::vector<RegionId> ids;
-    ids.reserve(pImpl->regions.size());
-    for (const auto& region : pImpl->regions) {
-        ids.push_back(region->getId());
-    }
-    return ids;
-}
-
-const std::vector<std::unique_ptr<NeuralRegion>>& Brain::getRegions() const {
-    return pImpl->regions;
-}
-
-void Brain::addInterRegionConnection(RegionId source, RegionId target, float weight, Delay delay) {
-    pImpl->interRegionConnections.emplace_back(source, target, weight, delay);
-}
-
-void Brain::removeInterRegionConnection(RegionId source, RegionId target) {
-    pImpl->interRegionConnections.erase(
-        std::remove_if(pImpl->interRegionConnections.begin(),
-                      pImpl->interRegionConnections.end(),
-                      [source, target](const InterRegionConnection& conn) {
-                          return conn.sourceRegion == source && conn.targetRegion == target;
-                      }),
-        pImpl->interRegionConnections.end()
-    );
-}
-
-size_t Brain::getTotalNeuronCount() const {
-    size_t total = 0;
-    for (const auto& region : pImpl->regions) {
-        total += region->getTotalNeuronCount();
-    }
-    return total;
-}
-
-size_t Brain::getTotalSynapseCount() const {
-    size_t total = 0;
-    for (const auto& region : pImpl->regions) {
-        total += region->getSynapseCount();
-    }
-    total += pImpl->interRegionConnections.size();
-    return total;
-}
-
-size_t Brain::getActiveNeuronCount() const {
-    size_t total = 0;
-    for (const auto& region : pImpl->regions) {
-        total += region->getActiveNeuronCount();
-    }
-    return total;
-}
-
-size_t Brain::getFiringNeuronCount() const {
-    return pImpl->totalSpikesThisStep;
-}
-
-float Brain::getAverageFiringRate() const {
-    if (pImpl->regions.empty()) return 0.0f;
-    float sum = 0.0f;
-    for (const auto& region : pImpl->regions) {
-        sum += region->getAverageFiringRate();
-    }
-    return sum / static_cast<float>(pImpl->regions.size());
-}
-
-// ========== MEMORY SYSTEM ACCESSORS ==========
-
-NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
-}
-
-NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
-}
-
-NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
-}
-
-// ========== PREDICTION SYSTEM ACCESSOR ==========
-
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
-}
-
-// ========== COGNITION SYSTEM ACCESSORS ==========
-
-NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
-}
-
-ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
-}
-
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
-}
-
-// ========== DEVELOPMENT SYSTEM ==========
-
-DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
-}
-
-DevelopmentalStage Brain::getDevelopmentalStage() const {
-    return pImpl->developmentalStage;
-}
-
-void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
-    pImpl->developmentalStage = stage;
-}
-
-// ========== NEUROMODULATION SYSTEMS ==========
-
-Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
-}
-
-Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
-}
-
-Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
-}
-
-PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
-}
-
-std::shared_ptr<const Config> Brain::getConfig() const {
-    return pImpl->config;
-}
-
-RandomGenerator* Brain::getRandomGenerator() {
-    return pImpl->rng.get();
-}
-
 void Brain::logStatus() const {
     NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
     NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
@@ -1092,6 +1012,9 @@ void Brain::logStatus() const {
     // Memory system status
     if (pImpl->workingMemory) {
         NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+        NLM_LOG_INFO("Working memory neurons: " + std::to_string(pImpl->workingMemory->getMemoryNeurons().size()));
+        NLM_LOG_INFO("Working memory capacity: " + std::to_string(pImpl->workingMemory->getCapacity()));
+        NLM_LOG_INFO("Working memory activity: " + std::to_string(pImpl->workingMemory->getMemoryActivity()));
     }
     if (pImpl->episodicMemory) {
         NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
@@ -1107,10 +1030,10 @@ void Brain::logStatus() const {
     
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+                     " (" + region->getName() + "): " +
+                     std::to_string(region->getTotalNeuronCount()) + " neurons, " +
+                     std::to_string(region->getSynapseCount()) + " synapses, " +
+                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
 }
 

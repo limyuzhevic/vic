@@ -41,11 +41,19 @@ struct EpisodicMemoryItem {
     // Time since this episode
     SimulationStep age;
     
+    // Additional metrics for enhanced episodic memory
+    float predictionError;
+    float curiosity;
+    float conceptFormationActivity;
+    std::vector<NeuronId> attentionWinners;
+    std::vector<float> attentionStrength;
+    
     EpisodicMemoryItem()
         : timestamp(0), positionX(0), positionY(0), orientation(0)
         , action(ActionType::Wait)
         , reward(0), energy(0), novelty(0)
-        , resultingReward(0), age(0) {}
+        , resultingReward(0), age(0)
+        , predictionError(0), curiosity(0), conceptFormationActivity(0) {}
 };
 
 // NeuralEpisodicMemory: Stores experiences in a way that interacts with neural substrate
