@@ -124,6 +124,31 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
+    // Store all sensory signals for episodic memory
+    if (brain_->getEpisodicMemory()) {
+        // Convert perceptual signals to episodic memory items
+        EpisodicMemoryItem memoryItem;
+        memoryItem.timestamp = brain_->getCurrentTime();
+        memoryItem.sensoryState = percept.getAllSignals();
+        
+        // Determine action based on current motor activity
+        MotorCommand cmd = decodeMotorCommand();
+        memoryItem.action = static_cast<ActionType>(cmd);
+        memoryItem.reward = 0.0f;  // Will be updated by reward system
+        memoryItem.novelty = getNoveltyLevel();
+        
+        // Store in episodic memory
+        brain_->getEpisodicMemory()->storeEpisode(memoryItem);
+    }
+    
+    // Update working memory with current sensory patterns
+    if (brain_->getWorkingMemory()) {
+        // Convert sensory signals to working memory pattern
+        auto sensoryPattern = percept.getAllSignals();
+        brain_->getWorkingMemory()->storePattern(sensoryPattern);
+        brain_->getWorkingMemory()->update(0.001);  // Update with timestep
+    }
+    
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
         float totalDiff = 0.0f;
