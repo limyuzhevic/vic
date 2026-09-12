@@ -12,6 +12,122 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+## Project Overview
+
+NLM is a computational brain simulation framework that implements:
+
+### Core Components
+- **Phase 6 Integration**: All brain systems connected (memory, neuromodulation, prediction, cognition)
+- **Memory Systems**: Working memory, episodic memory, associative memory
+- **Neuromodulation**: Dopamine, curiosity, prediction error, novelty
+- **Prediction System**: Forward and temporal predictions
+- **Cognition**: Planning, attention, concept formation
+- **Development**: Growth and maturation stages
+- **Learning**: STDP, Hebbian, structural plasticity
+
+### Python API Features
+- **Brain Simulation**: Create and control neural brains
+- **Agent Interface**: Connect brains to simulated worlds
+- **Sensory Processing**: Vision, touch, internal signals
+- **Motor Control**: Action selection and execution
+- **Learning Control**: Enable/disable learning systems
+- **Checkpoint Management**: Save and load brain states
+- **Experiment Framework**: Run comprehensive experiments
+
+## Building and Installation
+
+### Building from Source (Linux/macOS)
+
+```bash
+# Clone the repository
+cd /path/to/nlm
+
+# Create build directory
+mkdir build
+cd build
+
+# Configure with CMake (Release build for best performance)
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build all targets (using all available CPU cores)
+make -j$(nproc)
+
+# Install the Python package (optional)
+pip install -e .
+```
+
+### Building from Source (Windows)
+
+```bash
+# Open Command Prompt in the project root
+mkdir build
+cd build
+cmake .. -G "Visual Studio 16 2019" -A x64
+cmake --build . --config Release
+```
+
+### Python Package Installation
+
+```bash
+# From source (Recommended for development)
+pip install pybind11 scikit-build-core pytest numpy
+cmake .. -DPython_EXECUTABLE=$(which python)
+
+# Install the Python bindings
+pip install .
+
+# Or install in development mode (for editing)
+pip install -e .
+```
+
+## Quick Start (Copy & Paste)
+
+### Example 1: Simplest Brain
+
+```python
+import pynlm
+
+# One line to create a virtual brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# Initialize it
+brain.initialize()
+
+# Make it active
+brain.step(0)
+
+print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+```
+
+### Example 2: Brain in a Simple World
+
+```python
+import pynlm
+
+# Create everything
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run for 50 steps
+for step in range(50):
+    world.update(0.1)  # Update world
+    percept = world.getSensoryPercept()  # What does the agent see?
+    agent.processSensoryInput(percept)  # Brain sees it
+    brain.step(step)  # Brain thinks
+    action = agent.decodeMotorCommand()  # Brain decides action
+    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+
+print("Simulation finished!")
+print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
 ---
 
 ## The 3 Things You Need to Know
