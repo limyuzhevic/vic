@@ -247,8 +247,28 @@ LifetimeExperimentResult Phase5IntegratedExperiment::runDamageRecovery(
         result.phaseResults.push_back(phaseResult);
     }
     
-    // Note: Actual damage application would be done through the brain interface
-    // This is a placeholder for the experiment framework
+    // Simulate damage to neural connections
+    auto& rng = *brain->getRandomGenerator();
+    float threshold = 1.0f - damageFraction;
+    
+    for (uint64_t step = damageStep; step < damageStep + 1000; ++step) {
+        brain->step(step, step * 0.001);
+        
+        // Apply damage: weaken synapses below threshold
+        for (const auto& region : brain->getRegions()) {
+            for (auto* syn : region->getSynapses()) {
+                float currentWeight = syn->getWeight();
+                if (rng.uniformReal(0.0f, 1.0f) < damageFraction && currentWeight > threshold) {
+                    float delta = (currentWeight - threshold) * 0.5f;
+                    syn->addToWeight(-delta);
+                }
+            }
+        }
+        
+        if (step % 1000 == 0) {
+            NLM_LOG_INFO("Damage applied at step " + std::to_string(step));
+        }
+    }
     
     // Post-damage recovery
     {
@@ -258,6 +278,21 @@ LifetimeExperimentResult Phase5IntegratedExperiment::runDamageRecovery(
             [](uint64_t step) {}
         );
         result.phaseResults.push_back(phaseResult);
+    }
+    
+    // Calculate recovery metrics
+    if (!result.phaseResults.empty()) {
+        float preDamagePerf = result.phaseResults[0].totalReward;
+        float postDamagePerf = result.phaseResults[1].totalReward;
+        float recoveryRatio = postDamagePerf > 0 ? (postDamagePerf / preDamagePerf) : 0.0f;
+        
+        // Store recovery metrics
+        for (auto& phase : result.phaseResults) {
+            if (phase.phaseName == "Recovery") {
+                phase.recoverySuccess = recoveryRatio;
+                break;
+            }
+        }
     }
     
     return result;

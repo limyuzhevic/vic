@@ -19,6 +19,26 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , explorationLevel_(0.5f)
+    , curiosityThreshold_(0.5f)
+    , rewardPredictionEnabled_(false)
+    , desiredNoveltyLevel_(0.5f)
+    , memoryConsolidationEnabled_(true)
+    , memoryRetentionTarget_(0.5f)
+    , learningRateModifier_(1.0f)
+    , fatigueEnabled_(false)
+    , energyConservationTarget_(0.5f)
+    , socialLearningEnabled_(false)
+    , imitationThreshold_(0.7f)
+    , rewardPredictionError_(0.0f)
+    , targetPredictionError_(0.0f)
+    , cognitiveLoad_(0.0f)
+    , adaptationProgress_(0.0f)
+    , debugOutputEnabled_(false)
+    , explorationCount_(0)
+    , exploitationCount_(0)
+    , totalRewards_(0)
+    , totalSteps_(0)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -61,7 +81,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::~AgentBrain() {
+    // Cleanup is handled by shared_ptr for brain_
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);

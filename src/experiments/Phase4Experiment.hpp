@@ -190,10 +190,13 @@ public:
     ~ObjectPermanenceExperiment();
     
     // Run object permanence test
-    Phase4Results run(Brain* brain, size_t numTrials = 30);
+    Phase4Results run(Brain* brain, size_t numTrials = 50);
+    
+    // Get success rate over trials
+    std::vector<float> getSuccessHistory() const { return successHistory_; }
     
 private:
-    std::vector<float> searchBehaviorHistory_;
+    std::vector<float> successHistory_;
 };
 
 // Experiment: Social Observation

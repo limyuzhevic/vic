@@ -10,7 +10,9 @@ namespace nlm {
 class ExperimentLogger {
 public:
     ExperimentLogger(const std::string& filename);
-    ~ExperimentLogger();
+    ~ExperimentLogger() {
+        delete pImpl;
+    }
     
     void log(const std::string& message);
     void logEpisodeStart(int episode);
