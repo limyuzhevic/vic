@@ -19,37 +19,96 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Load configuration from JSON file
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    try {
+        // Parse JSON using basic parsing for now (can be replaced with nlohmann/json)
+        std::string line;
+        bool in_object = false;
+        size_t brace_count = 0;
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line.find("#") == 0) {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Basic JSON parsing for { "key": value } format
+            // Remove braces and commas to extract key-value pairs
+            bool is_valid_json_line = false;
+            size_t colon_pos = line.find(':');
+            
+            if (colon_pos != std::string::npos && line.back() == ',') {
+                // Trim whitespace
+                std::string key = trim(line.substr(0, colon_pos));
+                std::string value = trim(line.substr(colon_pos + 1));
+                value = value.substr(0, value.size() - 1); // Remove trailing comma
+                
+                // Remove quotes from key if present
+                if (key.size() >= 2 && ((key.front() == '"' && key.back() == '"') ||
+                                        (key.front() == '\'' && key.back() == '\''))) {
+                    key = key.substr(1, key.size() - 2);
+                }
+                
+                // Try to parse value based on content
+                if (value.size() >= 2 && ((value.front() == '"' && value.back() == '"') ||
+                                          (value.front() == '\'' && value.back() == '\''))) {
+                    // String value
+                    value = value.substr(1, value.size() - 2);
+                    set(key, value, ConfigSource::File);
+                } else if (value == "true" || value == "false") {
+                    // Boolean value
+                    bool bool_val = (value == "true");
+                    set(key, bool_val, ConfigSource::File);
+                } else {
+                    // Try numeric value
+                    bool is_number = true;
+                    for (char c : value) {
+                        if (!std::isdigit(c) && c != '.' && c != '-') {
+                            is_number = false;
+                            break;
+                        }
+                    }
+                    
+                    if (is_number) {
+                        // Try double first (covers integers)
+                        try {
+                            size_t pos;
+                            double double_val = std::stod(value, &pos);
+                            if (pos == value.size()) {
+                                set(key, double_val, ConfigSource::File);
+                                continue;
+                            }
+                        } catch (...) {}
+                        
+                        // Try integer
+                        try {
+                            size_t pos;
+                            int64_t int_val = std::stoll(value, &pos);
+                            if (pos == value.size()) {
+                                set(key, int_val, ConfigSource::File);
+                            }
+                        } catch (...) {}
+                    }
+                }
+                
+                is_valid_json_line = true;
+            }
+            
+            if (!is_valid_json_line) {
+                NLM_LOG_WARNING("Skipping malformed config line: " + line);
+            }
         }
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error loading config file: ") + e.what());
+        return false;
     }
     
     return true;
@@ -81,12 +140,67 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        file << "{" << std::endl;
+        
+        bool first = true;
+        for (const auto& entry : pImpl->entries) {
+            if (!first) {
+                file << "," << std::endl;
+            }
+            
+            file << "  \"" << entry.key << "\": ";
+            
+            // Output value based on type
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << (arg ? "true" : "false");
+                } else if constexpr (std::is_same_v<T, int64_t> || 
+                                     std::is_same_v<T, int> ||
+                                     std::is_same_v<T, double>) {
+                    file << arg;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << arg[i];
+                    }
+                    file << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << arg[i];
+                    }
+                    file << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << "\"" << arg[i] << "\"";
+                    }
+                    file << "]";
+                } else {
+                    file << "null";
+                }
+            }, entry.value);
+            
+            first = false;
+        }
+        
+        file << std::endl << "}" << std::endl;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error saving config file: ") + e.what());
+        return false;
     }
     
     return true;
@@ -134,11 +248,27 @@ void Config::set(const std::string& key, int value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
+void Config::set(const std::string& key, int64_t value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
 void Config::set(const std::string& key, double value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, const std::vector<std::string>& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, const std::vector<int>& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, const std::vector<double>& value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 

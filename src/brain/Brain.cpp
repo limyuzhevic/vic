@@ -214,6 +214,16 @@ bool Brain::initialize() {
                 }
             }
             
+            // Add sensory and motor neurons to working memory during initialization
+            if (pImpl->workingMemory) {
+                for (auto* neuron : pImpl->sensoryNeurons) {
+                    pImpl->workingMemory->storeToNeuron(neuron->getId(), 0.5f);
+                }
+                for (auto* neuron : pImpl->motorNeurons) {
+                    pImpl->workingMemory->storeToNeuron(neuron->getId(), 0.5f);
+                }
+            }
+            
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
                         std::to_string(region->getTotalNeuronCount()) + " neurons");

@@ -61,11 +61,15 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
-        
-        // Process sensory input
-        agent.processSensoryInput(percept);
+        // Get observation - check if brain has regions
+        SensoryPercept percept;
+        if (!agent.getBrain()->getRegions().empty()) {
+            percept = world.observe(agent.getBrain()->getRegions()[0].get());
+            // Process sensory input
+            agent.processSensoryInput(percept);
+        } else {
+            NLM_LOG_WARNING("No brain regions available for sensory observation");
+        }
         
         // Brain step
         brain->step(step, step * 0.001);
