@@ -398,45 +398,44 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
-    
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
+    // ========== STEP 2: Apply neuromodulation ==========
+    if (pImpl->dopamine) {
+        pImpl->dopamine->update(pImpl->timestep);
     }
-    
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
     }
-    
-    // Update curiosity
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
     }
+    if (pImpl->predictionError) {
+        pImpl->predictionError->update(pImpl->timestep);
+    }
     
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
-        
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
-                    }
-                }
-            }
+    // ========== STEP 3: Store sensory input ==========
+    std::vector<float> sensoryData;
+    if (pImpl->sensoryNeurons.size() > 0) {
+        // Simple implementation: use first few neurons as sensory input source
+        // In real usage, this would come from actual sensory processing
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 10; ++i) {
+            sensoryData.push_back(pImpl->sensoryNeurons[i]->getMembranePotential() / 100.0f);
         }
+        
+        // Apply sensory input to brain
+        receiveSensoryInputFromNeurons(sensoryData);
+    }
+    
+    // ========== STEP 4: Update working memory ==========
+    if (pImpl->workingMemory) {
+        // Store sensory input in working memory
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < sensoryData.size(); ++i) {
+            NeuronId neuronId = pImpl->sensoryNeurons[i]->getId();
+            float activation = sensoryData[i] * 10.0f;  // Scale factor
+            pImpl->workingMemory->storeToNeuron(neuronId, activation);
+        }
+        
+        // Update working memory dynamics
+        pImpl->workingMemory->update(pImpl->timestep);
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========

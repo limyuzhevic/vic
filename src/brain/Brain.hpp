@@ -153,6 +153,12 @@ public:
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
     
+    // ========== DEVELOPMENT SYSTEM ==========
+    
+    DevelopmentSystem* getDevelopmentSystem();
+    DevelopmentalStage getDevelopmentalStage() const;
+    void setDevelopmentalStage(DevelopmentalStage stage);
+    
     // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
@@ -163,12 +169,6 @@ public:
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
@@ -184,14 +184,22 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Get serotonin - mood and sleep regulation
+    class Serotonin* getSerotonin();
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Get norepinephrine - arousal and attention
+    class Norepinephrine* getNorepinephrine();
     
-    // Logging
-    void logStatus() const;
+    // Get acetylcholine - learning and memory
+    class Acetylcholine* getAcetylcholine();
+    
+    // ========== BEHAVIORAL SYSTEMS ==========
+    
+    // Social learning and observation
+    class SocialLearning* getSocialLearning();
+    
+    // Sleep/rest cycle management
+    class SleepSystem* getSleepSystem();
     
 private:
     struct Impl;

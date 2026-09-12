@@ -400,26 +400,74 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    m.def("createCustomBrain", [](const std::vector<size_t>& regionSizes, const std::vector<NeuronType>& neuronTypes, float connectionProb) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(std::accumulate(regionSizes.begin(), regionSizes.end(), 0)), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(regionSizes.size()), ConfigSource::Default);
+        config->set("connection_probability", connectionProb, ConfigSource::Default);
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, py::arg("region_sizes"), py::arg("neuron_types"), py::arg("connection_probability") = 0.1f,
+        "Create a custom brain with specified region sizes and neuron types");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("createAdvancedConfig", [](float stdpLTP, float stdpLTD, float noveltyDecay, float curiosityFactor) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("stdp_ltp_weight", stdpLTP, ConfigSource::Default);
+        config->set("stdp_ltd_weight", stdpLTD, ConfigSource::Default);
+        config->set("novelty_decay_rate", noveltyDecay, ConfigSource::Default);
+        config->set("curiosity_factor", curiosityFactor, ConfigSource::Default);
+        return config;
+    }, py::arg("stdp_ltp") = 0.02f, py::arg("stdp_ltd") = 0.015f, py::arg("novelty_decay") = 0.99f, py::arg("curiosity_factor") = 2.0f,
+        "Create an advanced configuration with custom learning parameters");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("runLearningExperiment", [](std::shared_ptr<Brain> brain, size_t steps, float rewardRate) -> std::vector<float> {
+        std::vector<float> rewards;
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(static_cast<SimulationStep>(i), static_cast<Timestamp>(i * 0.001));
+            // Simulate reward based on firing rate
+            float firingRate = brain->getAverageFiringRate() / 100.0f;
+            float reward = firingRate * rewardRate;
+            rewards.push_back(reward);
+            
+            // Apply reward to neuromodulation
+            if (auto* agent = dynamic_cast<AgentBrain*>(brain->getDopamine())) {
+                agent->applyRewardModulation(reward, reward * 0.8f);
+            }
+        }
+        return rewards;
+    }, py::arg("brain"), py::arg("steps"), py::arg("reward_rate") = 1.0f,
+        "Run a learning experiment and return reward history");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("exportBrainState", [](std::shared_ptr<Brain> brain, const std::string& filename) -> bool {
+        return brain->save(filename);
+    }, py::arg("brain"), py::arg("filename"),
+        "Export brain state to file for checkpointing or sharing");
+
+    m.def("importBrainState", [](std::shared_ptr<Brain> brain, const std::string& filename) -> bool {
+        return brain->load(filename);
+    }, py::arg("brain"), py::arg("filename"),
+        "Import brain state from file");
+
+    m.def("analyzeBrainNetwork", [](std::shared_ptr<Brain> brain) {
+        py::dict analysis;
+        analysis["total_neurons"] = brain->getTotalNeuronCount();
+        analysis["total_synapses"] = brain->getTotalSynapseCount();
+        analysis["active_neurons"] = brain->getActiveNeuronCount();
+        analysis["firing_neurons"] = brain->getFiringNeuronCount();
+        analysis["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        analysis["average_firing_rate"] = brain->getAverageFiringRate();
+        analysis["total_spikes"] = brain->getTotalSpikeCount();
+        analysis["pending_spike_events"] = brain->getPendingSpikeEventCount();
+        return analysis;
+    }, py::arg("brain"),
+        "Analyze brain network structure and dynamics");
+
+    m.def("createMultiAgentSystem", [](const std::vector<std::shared_ptr<Config>>& configs) {
+        std::vector<std::shared_ptr<Brain>> brains;
+        for (const auto& config : configs) {
+            brains.push_back(std::make_shared<Brain>(config));
+        }
+        return brains;
+    }, py::arg("configs"),
+        "Create a multi-agent system with shared configuration patterns");
 
 } // namespace nlm
