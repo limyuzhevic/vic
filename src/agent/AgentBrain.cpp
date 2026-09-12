@@ -326,12 +326,130 @@ float AgentBrain::getCuriosityLevel() const {
     return curiosityLevel_;
 }
 
-float AgentBrain::getNoveltyLevel() const {
-    return noveltyLevel_;
+float AgentBrain::getDevelopmentalAge() const {
+    return developmentalAge_;
 }
 
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
+const std::vector<float>& AgentBrain::getPreviousVision() const {
+    return previousVision_;
+}
+
+float AgentBrain::getSensoryNoveltyDecay() const {
+    return sensoryNoveltyDecay_;
+}
+
+void AgentBrain::setNeuromodulationState(float dopamine, float novelty, float curiosity, float predictionError, float expectedReward) {
+    dopamineLevel_ = dopamine;
+    noveltyLevel_ = novelty;
+    curiosityLevel_ = curiosity;
+    predictionError_ = predictionError;
+    expectedReward_ = expectedReward;
+}
+
+void AgentBrain::setDevelopmentState(double age, float plasticity) {
+    developmentalAge_ = age;
+    plasticityModifier_ = plasticity;
+}
+
+const std::vector<Neuron*>& AgentBrain::getMotorForwardNeurons() const {
+    return motorForward_;
+}
+
+const std::vector<Neuron*>& AgentBrain::getMotorBackwardNeurons() const {
+    return motorBackward_;
+}
+
+const std::vector<Neuron*>& AgentBrain::getMotorTurnLeftNeurons() const {
+    return motorTurnLeft_;
+}
+
+const std::vector<Neuron*>& AgentBrain::getMotorTurnRightNeurons() const {
+    return motorTurnRight_;
+}
+
+const std::vector<Neuron*>& AgentBrain::getMotorInteractNeurons() const {
+    return motorInteract_;
+}
+
+const std::vector<Neuron*>& AgentBrain::getMotorWaitNeurons() const {
+    return motorWait_;
+}
+
+const std::vector<Neuron*>& AgentBrain::getSensoryVisionNeurons() const {
+    return sensoryVision_;
+}
+
+const std::vector<Neuron*>& AgentBrain::getSensoryTouchNeurons() const {
+    return sensoryTouch_;
+}
+
+const std::vector<Neuron*>& AgentBrain::getSensoryInternalNeurons() const {
+    return sensoryInternal_;
+}
+
+const std::vector<Neuron*>& AgentBrain::getSensoryProprioceptionNeurons() const {
+    return sensoryProprioception_;
+}
+
+void AgentBrain::batchProcessSensoryInputs(const std::vector<SensoryPercept>& percepts) {
+    for (const auto& percept : percepts) {
+        processSensoryInput(percept);
+    }
+}
+
+std::map<std::string, double> AgentBrain::getStatistics() const {
+    std::map<std::string, double> stats;
+    stats["neuromodulation_level"] = getNeuromodulationLevel();
+    stats["curiosity_level"] = getCuriosityLevel();
+    stats["novelty_level"] = getNoveltyLevel();
+    stats["prediction_error"] = getPredictionError();
+    stats["expected_reward"] = getExpectedReward();
+    stats["plasticity_modifier"] = getPlasticityModifier();
+    stats["developmental_age"] = getDevelopmentalAge();
+    stats["developmental_stage"] = static_cast<int>(getDevelopmentalStage());
+    stats["motor_forward_count"] = motorForward_.size();
+    stats["motor_backward_count"] = motorBackward_.size();
+    stats["motor_turn_left_count"] = motorTurnLeft_.size();
+    stats["motor_turn_right_count"] = motorTurnRight_.size();
+    stats["motor_interact_count"] = motorInteract_.size();
+    stats["motor_wait_count"] = motorWait_.size();
+    stats["sensory_vision_count"] = sensoryVision_.size();
+    stats["sensory_touch_count"] = sensoryTouch_.size();
+    stats["sensory_internal_count"] = sensoryInternal_.size();
+    stats["sensory_proprioception_count"] = sensoryProprioception_.size();
+    stats["previous_vision_size"] = previousVision_.size();
+    return stats;
+}
+
+void AgentBrain::printNeuralArchitecture() const {
+    NLM_LOG_INFO("=== AgentBrain Neural Architecture ===");
+    NLM_LOG_INFO("Motor groups:");
+    NLM_LOG_INFO("  Forward neurons: " + std::to_string(motorForward_.size()));
+    NLM_LOG_INFO("  Backward neurons: " + std::to_string(motorBackward_.size()));
+    NLM_LOG_INFO("  Turn left neurons: " + std::to_string(motorTurnLeft_.size()));
+    NLM_LOG_INFO("  Turn right neurons: " + std::to_string(motorTurnRight_.size()));
+    NLM_LOG_INFO("  Interact neurons: " + std::to_string(motorInteract_.size()));
+    NLM_LOG_INFO("  Wait neurons: " + std::to_string(motorWait_.size()));
+    NLM_LOG_INFO("Sensory groups:");
+    NLM_LOG_INFO("  Vision neurons: " + std::to_string(sensoryVision_.size()));
+    NLM_LOG_INFO("  Touch neurons: " + std::to_string(sensoryTouch_.size()));
+    NLM_LOG_INFO("  Internal neurons: " + std::to_string(sensoryInternal_.size()));
+    NLM_LOG_INFO("  Proprioception neurons: " + std::to_string(sensoryProprioception_.size()));
+    NLM_LOG_INFO("Neuromodulation state:");
+    NLM_LOG_INFO("  Dopamine level: " + std::to_string(dopamineLevel_));
+    NLM_LOG_INFO("  Novelty level: " + std::to_string(noveltyLevel_));
+    NLM_LOG_INFO("  Curiosity level: " + std::to_string(curiosityLevel_));
+    NLM_LOG_INFO("  Prediction error: " + std::to_string(predictionError_));
+    NLM_LOG_INFO("  Expected reward: " + std::to_string(expectedReward_));
+    NLM_LOG_INFO("  Plasticity modifier: " + std::to_string(plasticityModifier_));
+    NLM_LOG_INFO("  Developmental age: " + std::to_string(developmentalAge_));
+    NLM_LOG_INFO("  Developmental stage: " + std::to_string(static_cast<int>(getDevelopmentalStage())));
+    NLM_LOG_INFO("  Reward modulation enabled: " + std::to_string(rewardModulationEnabled_));
+    NLM_LOG_INFO("  Structural plasticity enabled: " + std::to_string(structuralPlasticityEnabled_));
+    NLM_LOG_INFO("  Development enabled: " + std::to_string(developmentEnabled_));
+    NLM_LOG_INFO("  Curiosity enabled: " + std::to_string(curiosityEnabled_));
+    NLM_LOG_INFO("  Previous vision size: " + std::to_string(previousVision_.size()));
+    NLM_LOG_INFO("  Sensory novelty decay: " + std::to_string(sensoryNoveltyDecay_));
 }
 
 void AgentBrain::reset() {

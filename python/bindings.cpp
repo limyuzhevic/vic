@@ -353,73 +353,236 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+    // AgentBrain: Connects NLM brain to the world
+    // Handles sensory transduction and motor decoding
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"),
+             "Create AgentBrain with a brain instance")
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
         .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
+             "Get expected sensory input size. Returns total sensory dimensions (vision + touch + internal + proprioception)")
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
+             "Get expected motor output size. Returns number of motor commands (typically 6: forward, backward, turn left/right, interact, wait)")
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
              py::arg("percept"),
-             "Process sensory percept and inject into brain")
+             "Process sensory percept and inject into brain. percept must contain vision, touch, internal, and proprioception data")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
+             "Decode brain motor activity into motor command based on neural activity patterns")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
+             "Apply reward-based neuromodulation. Updates prediction error and dopamine levels for learning")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
-             "Update development system")
+             "Update development system. Advances developmental age and adjusts plasticity based on time")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
+             "Get current developmental stage (Initial, CriticalPeriod, Maturation, Adult, or Aging)")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
+             "Get current neuromodulation level (dopamine, -1.0 to 1.0)")
         .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
+             "Get curiosity level (0.0 to 1.0, drives exploration behavior)")
         .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
+             "Get novelty level (0.0 to 1.0, based on sensory input changes)")
         .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
+             "Get prediction error (reward - expected reward, drives learning)")
         .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
+             "Reset agent for new episode. Clears neuromodulation state and sensory history")
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+             "Get the underlying Brain instance")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+             py::arg("enable"), "Enable or disable reward modulation system")
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+             py::arg("enable"), "Enable or disable structural plasticity (neuron/synapse changes)")
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+             py::arg("enable"), "Enable or disable developmental processes")
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+             py::arg("enable"), "Enable or disable curiosity-driven exploration")
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+             "Check if reward modulation is enabled")
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is enabled")
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development is enabled")
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity is enabled")
+        
+        // ===== BEGINNER-FRIENDLY HELPER FUNCTIONS =====
+        .def("createSimpleAction", [](const AgentBrain& self, const std::string& actionType, const std::vector<float>& params) {
+            Action act;
+            if (actionType == "move_forward") act = Action(ActionType::MoveForward, params);
+            else if (actionType == "move_backward") act = Action(ActionType::MoveBackward, params);
+            else if (actionType == "turn_left") act = Action(ActionType::TurnLeft, params);
+            else if (actionType == "turn_right") act = Action(ActionType::TurnRight, params);
+            else if (actionType == "interact") act = Action(ActionType::Interact, params);
+            else if (actionType == "wait") act = Action(ActionType::Wait, params);
+            else act = Action(ActionType::Custom, params);
+            return act;
+        }, py::arg("actionType"), py::arg("params") = std::vector<float>(),
+             R"pbdoc(Create a common action type for convenience. Common types: "move_forward", "move_backward", "turn_left", "turn_right", "interact", "wait"")pbdoc")
+        .def("createVisionInput", [](size_t width, size_t height, size_t channels, const std::vector<float>& data) {
+            Vision v(width, height, channels);
+            v.setData(data);
+            return v;
+        }, py::arg("width"), py::arg("height"), py::arg("channels") = 3, py::arg("data") = std::vector<float>(),
+             R"pbdoc(Create vision sensory input. Common defaults: width=16, height=16, channels=3 for grayscale")pbdoc")
+        .def("createAudioInput", [](size_t sampleRate, size_t numSamples, const std::vector<float>& data) {
+            Audio a(sampleRate, numSamples);
+            a.setData(data);
+            return a;
+        }, py::arg("sampleRate"), py::arg("numSamples"), py::arg("data") = std::vector<float>(),
+             R"pbdoc(Create audio sensory input")pbdoc")
+        .def("simulateStep", [](AgentBrain& self, double timestep, const SensoryPercept& percept) {
+            self.processSensoryInput(percept);
+            self.updateDevelopment(timestep);
+            MotorCommand action = self.decodeMotorCommand();
+            return action;
+        }, py::arg("timestep"), py::arg("percept"),
+             "Complete simulation step: process sensory input, update development, and decode action. Convenience method for simple agent control")
+        
+        // ===== ADVANCED POWER USER FEATURES =====
+        .def("getMotorGroups", [](AgentBrain& self) {
+            std::map<std::string, std::vector<Neuron*>> groups;
+            groups["forward"] = self.motorForward_;
+            groups["backward"] = self.motorBackward_;
+            groups["turn_left"] = self.motorTurnLeft_;
+            groups["turn_right"] = self.motorTurnRight_;
+            groups["interact"] = self.motorInteract_;
+            groups["wait"] = self.motorWait_;
+            return groups;
+        }, "Get motor neuron groups as a dictionary. Advanced access to internal neural architecture")
+        .def("getSensoryGroups", [](AgentBrain& self) {
+            std::map<std::string, std::vector<Neuron*>> groups;
+            groups["vision"] = self.sensoryVision_;
+            groups["touch"] = self.sensoryTouch_;
+            groups["internal"] = self.sensoryInternal_;
+            groups["proprioception"] = self.sensoryProprioception_;
+            return groups;
+        }, "Get sensory neuron groups as a dictionary. Advanced access to internal neural architecture")
+        .def("getNeuromodulationState", [](AgentBrain& self) {
+            std::map<std::string, float> state;
+            state["dopamine"] = self.dopamineLevel_;
+            state["novelty"] = self.noveltyLevel_;
+            state["curiosity"] = self.curiosityLevel_;
+            state["prediction_error"] = self.predictionError_;
+            state["expected_reward"] = self.expectedReward_;
+            state["plasticity_modifier"] = self.plasticityModifier_;
+            state["developmental_age"] = static_cast<float>(self.developmentalAge_);
+            return state;
+        }, "Get complete neuromodulation state dictionary. Advanced debugging and analysis")
+        .def("setNeuromodulationState", [](AgentBrain& self, const std::map<std::string, float>& state) {
+            if (state.count("dopamine")) self.dopamineLevel_ = state.at("dopamine");
+            if (state.count("novelty")) self.noveltyLevel_ = state.at("novelty");
+            if (state.count("curiosity")) self.curiosityLevel_ = state.at("curiosity");
+            if (state.count("prediction_error")) self.predictionError_ = state.at("prediction_error");
+            if (state.count("expected_reward")) self.expectedReward_ = state.at("expected_reward");
+            if (state.count("plasticity_modifier")) self.plasticityModifier_ = state.at("plasticity_modifier");
+            if (state.count("developmental_age")) self.developmentalAge_ = state.at("developmental_age");
+        }, py::arg("state"), "Set neuromodulation state from dictionary. Advanced control for power users")
+        .def("batchProcessSensory", [](AgentBrain& self, const std::vector<SensoryPercept>& percepts) {
+            for (const auto& percept : percepts) {
+                self.processSensoryInput(percept);
+            }
+        }, py::arg("percepts"), "Process multiple sensory inputs in batch. More efficient for processing sequences")
+        .def("getStatistics", [](const AgentBrain& self) {
+            std::map<std::string, double> stats;
+            stats["neuromodulation_level"] = self.getNeuromodulationLevel();
+            stats["curiosity_level"] = self.getCuriosityLevel();
+            stats["novelty_level"] = self.getNoveltyLevel();
+            stats["prediction_error"] = self.getPredictionError();
+            stats["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            return stats;
+        }, "Get agent statistics as dictionary. Useful for monitoring and logging")
+        .def("printNeuralArchitecture", [](const AgentBrain& self) {
+            std::cout << "=== AgentBrain Neural Architecture ===\n";
+            std::cout << "Motor groups: " << self.motorForward_.size() << " forward, " 
+                      << self.motorBackward_.size() << " backward, "
+                      << self.motorTurnLeft_.size() << " turn_left, "
+                      << self.motorTurnRight_.size() << " turn_right, "
+                      << self.motorInteract_.size() << " interact, "
+                      << self.motorWait_.size() << " wait\n";
+            std::cout << "Sensory groups: " << self.sensoryVision_.size() << " vision, "
+                      << self.sensoryTouch_.size() << " touch, "
+                      << self.sensoryInternal_.size() << " internal, "
+                      << self.sensoryProprioception_.size() << " proprioception\n";
+            std::cout << "Neuromodulation: dopamine=" << self.dopamineLevel_ 
+                      << ", curiosity=" << self.curiosityLevel_ 
+                      << ", novelty=" << self.noveltyLevel_ << "\n";
+        }, "Print neural architecture to stdout. Debugging and analysis tool")
+        .def("getRandomBehavior", [](AgentBrain& self) {
+            float r = self.brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+            if (r < 0.1f) return MotorCommand::MoveForward;
+            else if (r < 0.2f) return MotorCommand::MoveBackward;
+            else if (r < 0.3f) return MotorCommand::TurnLeft;
+            else if (r < 0.4f) return MotorCommand::TurnRight;
+            else if (r < 0.5f) return MotorCommand::Interact;
+            else if (r < 0.6f) return MotorCommand::LookLeft;
+            else if (r < 0.7f) return MotorCommand::LookRight;
+            else if (r < 0.8f) return MotorCommand::LookUp;
+            else if (r < 0.9f) return MotorCommand::LookDown;
+            else return MotorCommand::Wait;
+        }, "Generate random motor command. Useful for testing and exploration")
+        .def("setExplorationMode", [](AgentBrain& self, bool enable, float curiosityLevel) {
+            self.enableCuriosity(enable);
+            if (enable) self.curiosityLevel_ = curiosityLevel;
+        }, py::arg("enable"), py::arg("curiosityLevel") = 0.5f,
+             "Set exploration mode with specific curiosity level. Convenience for behavior control");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
+    }, "Create a default configuration with sensible defaults for neural simulation")
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, py::arg("config"), "Create a new brain with configuration")
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    }, "Create a new simple world for agent simulation")
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create a new agent brain interface")
+
+    m.def("runSimpleEpisode", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world,
+                               const std::vector<SensoryPercept>& initialPercepts,
+                               size_t steps, double timestep) {
+        agent->initialize(*world);
+        std::vector<MotorCommand> actions;
+        for (size_t i = 0; i < steps; ++i) {
+            agent->processSensoryInput(initialPercepts[i % initialPercepts.size()]);
+            MotorCommand action = agent->decodeMotorCommand();
+            actions.push_back(action);
+            world->applyMotorCommand(action, i * timestep);
+            agent->updateDevelopment(timestep);
+        }
+        return actions;
+    }, py::arg("agent"), py::arg("world"), py::arg("initialPercepts"), py::arg("steps"), py::arg("timestep"),
+        "Run a complete simulation episode. Convenience function for simple agent training/ testing")
+
+    m.def("getAllConstants", []() {
+        std::map<std::string, float> constants;
+        constants["DEFAULT_DOPAMINE_CLAMP_MIN"] = -1.0f;
+        constants["DEFAULT_DOPAMINE_CLAMP_MAX"] = 1.0f;
+        constants["DEFAULT_PLASTICITY_MODIFIER"] = 1.0f;
+        constants["DEFAULT_NOVELTY_DECAY"] = 0.99f;
+        constants["DEFAULT_SENSORY_NOVELTY_DECAY"] = 0.99f;
+        constants["DEFAULT_EXPLORATION_CHANCE"] = 0.3f;
+        constants["DEFAULT_DEVELOPMENT_STAGE_AGE_INITIAL"] = 60.0;
+        constants["DEFAULT_DEVELOPMENT_STAGE_AGE_CRITICAL"] = 300.0;
+        constants["DEFAULT_DEVELOPMENT_STAGE_AGE_MATURE"] = 900.0;
+        return constants;
+    }, "Get all default constants used in the simulation. Useful for configuration and debugging")
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Error types for Python exceptions
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "InvalidArgumentError");
+    py::register_exception<std::out_of_range>(m, "OutOfRangeError");
 }
 
 } // namespace nlm

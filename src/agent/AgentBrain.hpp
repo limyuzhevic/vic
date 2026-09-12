@@ -46,11 +46,49 @@ public:
     // Get curiosity level
     float getCuriosityLevel() const;
     
-    // Get novelty level
-    float getNoveltyLevel() const;
+    // Get expected reward
+    float getExpectedReward() const;
     
-    // Get prediction error
-    float getPredictionError() const;
+    // Get plasticity modifier
+    float getPlasticityModifier() const;
+    
+    // Get developmental age
+    float getDevelopmentalAge() const;
+    
+    // Get previous vision state
+    const std::vector<float>& getPreviousVision() const;
+    
+    // Get sensory novelty decay
+    float getSensoryNoveltyDecay() const;
+    
+    // Set neuromodulation state
+    void setNeuromodulationState(float dopamine, float novelty, float curiosity, float predictionError, float expectedReward);
+    
+    // Set development state
+    void setDevelopmentState(float age, float plasticity);
+    
+    // Get motor neuron groups
+    const std::vector<Neuron*>& getMotorForwardNeurons() const;
+    const std::vector<Neuron*>& getMotorBackwardNeurons() const;
+    const std::vector<Neuron*>& getMotorTurnLeftNeurons() const;
+    const std::vector<Neuron*>& getMotorTurnRightNeurons() const;
+    const std::vector<Neuron*>& getMotorInteractNeurons() const;
+    const std::vector<Neuron*>& getMotorWaitNeurons() const;
+    
+    // Get sensory neuron groups
+    const std::vector<Neuron*>& getSensoryVisionNeurons() const;
+    const std::vector<Neuron*>& getSensoryTouchNeurons() const;
+    const std::vector<Neuron*>& getSensoryInternalNeurons() const;
+    const std::vector<Neuron*>& getSensoryProprioceptionNeurons() const;
+    
+    // Batch process multiple sensory inputs
+    void batchProcessSensoryInputs(const std::vector<SensoryPercept>& percepts);
+    
+    // Get comprehensive statistics
+    std::map<std::string, double> getStatistics() const;
+    
+    // Print neural architecture (for debugging)
+    void printNeuralArchitecture() const;
     
     // Reset agent for new episode
     void reset();
@@ -100,7 +138,7 @@ private:
     float expectedReward_;
     
     // Development state
-    double developmentalAge_;
+    float developmentalAge_;
     float plasticityModifier_;
     
     // Configuration flags
