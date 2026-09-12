@@ -39,7 +39,16 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+        })
+        .def(py::pickle(
+            [](const NeuronId& id) {
+                return py::make_tuple(id.value);
+            },
+            [](py::tuple t) {
+                if (t.size() != 1) throw std::runtime_error("Invalid NeuronId tuple");
+                return NeuronId(t[0].cast<uint64_t>());
+            }
+        ));
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
         .def(py::init<>())
@@ -51,7 +60,16 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const SynapseId& id) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
-        });
+        })
+        .def(py::pickle(
+            [](const SynapseId& id) {
+                return py::make_tuple(id.value);
+            },
+            [](py::tuple t) {
+                if (t.size() != 1) throw std::runtime_error("Invalid SynapseId tuple");
+                return SynapseId(t[0].cast<uint64_t>());
+            }
+        ));
 
     py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
         .def(py::init<>())
@@ -63,7 +81,16 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const RegionId& id) {
             return "<RegionId: " + std::to_string(id.value) + ">";
-        });
+        })
+        .def(py::pickle(
+            [](const RegionId& id) {
+                return py::make_tuple(id.value);
+            },
+            [](py::tuple t) {
+                if (t.size() != 1) throw std::runtime_error("Invalid RegionId tuple");
+                return RegionId(t[0].cast<uint64_t>());
+            }
+        ));
 
     py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
         .def(py::init<>())
@@ -71,7 +98,16 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &PopulationId::value)
         .def("index", &PopulationId::index)
         .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def("__ne__", &PopulationId::operator!=)
+        .def(py::pickle(
+            [](const PopulationId& id) {
+                return py::make_tuple(id.value);
+            },
+            [](py::tuple t) {
+                if (t.size() != 1) throw std::runtime_error("Invalid PopulationId tuple");
+                return PopulationId(t[0].cast<uint64_t>());
+            }
+        ));
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -80,7 +116,8 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Sensory", NeuronType::Sensory)
         .value("Motor", NeuronType::Motor)
         .value("Internal", NeuronType::Internal)
-        .export_values();
+        .export_values()
+        .doc() = "Enumeration of neuron types. Use these values to specify neuron characteristics in configurations.";
 
     py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
         .value("Excitatory", SynapseType::Excitatory)
@@ -88,7 +125,8 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Modulatory", SynapseType::Modulatory)
         .value("Electrical", SynapseType::Electrical)
         .value("GapJunction", SynapseType::GapJunction)
-        .export_values();
+        .export_values()
+        .doc() = "Enumeration of synapse types. Determines how synaptic transmission works (chemical, electrical, or modulatory).";
 
     py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
         .value("Initial", DevelopmentalStage::Initial)
@@ -96,14 +134,16 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Maturation", DevelopmentalStage::Maturation)
         .value("Adult", DevelopmentalStage::Adult)
         .value("Aging", DevelopmentalStage::Aging)
-        .export_values();
+        .export_values()
+        .doc() = "Enumeration of developmental stages. Brain undergoes different plasticity regimes at each stage.";
 
     py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
         .value("Resting", FiringState::Resting)
         .value("Active", FiringState::Active)
         .value("Refractory", FiringState::Refractory)
         .value("Inhibited", FiringState::Inhibited)
-        .export_values();
+        .export_values()
+        .doc() = "Enumeration of neuron firing states during simulation.".c_str();
 
     py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
         .value("MoveForward", ActionType::MoveForward)
@@ -145,19 +185,35 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON file. Returns True on success, False on failure.")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+           "Load configuration from command line arguments. Returns True on success, False on failure.")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a JSON file. Returns True on success, False on failure.")
         .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
+             "Check if a configuration key exists.")
         .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+             "Get all configuration keys.")
         .def("clear", &Config::clear,
-             "Clear all configuration entries")
+             "Clear all configuration entries.")
+        .def("get", [](const Config& self, const std::string& key) {
+            return self.get<std::string>(key);
+        }, py::arg("key"),
+             "Get a configuration value as string. Returns empty string if key not found or type mismatch.")
+        .def("getInt", [](const Config& self, const std::string& key) {
+            return self.get<int64_t>(key);
+        }, py::arg("key"),
+             "Get a configuration value as integer. Returns None if key not found or type mismatch.")
+        .def("getFloat", [](const Config& self, const std::string& key) {
+            return self.get<double>(key);
+        }, py::arg("key"),
+             "Get a configuration value as float. Returns None if key not found or type mismatch.")
+        .def("getBool", [](const Config& self, const std::string& key) {
+            return self.get<bool>(key);
+        }, py::arg("key"),
+             "Get a configuration value as boolean. Returns None if key not found or type mismatch.")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {

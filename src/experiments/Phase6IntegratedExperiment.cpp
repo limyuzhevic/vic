@@ -253,9 +253,12 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
     cfg->set("neuron_count", 100);
     
     auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Brain initialization failed");
+        return false;
+    }
     
-    // Get memory systems
+    // Get memory systems with error checking
     auto* wm = brain->getWorkingMemory();
     auto* em = brain->getEpisodicMemory();
     
@@ -372,7 +375,7 @@ bool Phase6IntegratedExperiment::testReplay() {
     auto brain = std::make_shared<Brain>(cfg);
     brain->initialize();
     
-    auto* em = brain->getEpisodicMemory();
+        auto* em = brain->getEpisodicMemory();
     if (!em) {
         NLM_LOG_ERROR("Episodic memory not available");
         return false;
