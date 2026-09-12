@@ -60,14 +60,39 @@ public:
     const std::vector<DetailedSpikeEvent>& getSpikeHistory() const;
     void clearHistory();
     
-    // Get spike count
-    size_t getSpikeCount() const;
-    size_t getPendingSpikeCount() const;
-    size_t getPendingDelayedCount() const;
+    // Register neuromodulation handlers
+    using DopamineHandler = std::function<void(float)>;
+    void registerDopamineHandler(DopamineHandler handler);
     
-    // Statistics
-    float getAverageSpikeRate() const;
-    std::vector<NeuronId> getMostActiveNeurons(size_t count) const;
+    using CuriosityHandler = std::function<void(float)>;
+    void registerCuriosityHandler(CuriosityHandler handler);
+    
+    using NoveltyHandler = std::function<void(float)>;
+    void registerNoveltyHandler(NoveltyHandler handler);
+    
+    using PredictionErrorHandler = std::function<void(float)>;
+    void registerPredictionErrorHandler(PredictionErrorHandler handler);
+    
+    using IntegratedNeuromodulationHandler = std::function<void(float, float, float, float)>;
+    void registerIntegratedNeuromodulationHandler(IntegratedNeuromodulationHandler handler);
+    
+    // Configure neuromodulation integration
+    void configureDopamineModulation(bool enabled, float scale = 1.0f);
+    void configureCuriosityModulation(bool enabled, float scale = 1.0f);
+    void configureNoveltyModulation(bool enabled, float scale = 1.0f);
+    void configurePredictionErrorModulation(bool enabled, float scale = 1.0f);
+    
+    // Set neuromodulation levels directly
+    void setDopamineLevel(float level);
+    void setCuriosityLevel(float level);
+    void setNoveltyLevel(float level);
+    void setPredictionErrorLevel(float level);
+    
+    // Get current neuromodulation levels
+    float getDopamineLevel() const;
+    float getCuriosityLevel() const;
+    float getNoveltyLevel() const;
+    float getPredictionErrorLevel() const;
     
     // Reset
     void reset();
