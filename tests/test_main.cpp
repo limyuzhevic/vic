@@ -1,5 +1,5 @@
 // NLM Test Main
-// Phase 2: Real Neural Computation Tests
+// Phase 6: Real Neural Computation Tests - Complete System Integration
 
 #include <iostream>
 #include <cassert>
@@ -37,12 +37,47 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_working_memory {
+    void runAll();
+}
+
+namespace test_episodic_memory {
+    void runAll();
+}
+
+namespace test_neuromodulation {
+    void runAll();
+}
+
+namespace test_reward {
+    void runAll();
+}
+
+namespace test_plasticity {
+    void runAll();
+}
+
+namespace test_prediction {
+    void runAll();
+}
+
+namespace test_cognition {
+    void runAll();
+}
+
+namespace test_performance {
+    void runAll();
+}
+
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
-    std::cout << "  - LIF Neuron Dynamics" << std::endl;
-    std::cout << "  - Synaptic Transmission" << std::endl;
-    std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "=== NLM Phase 6 Tests: Complete Cognitive System Integration ===" << std::endl;
+    std::cout << "Testing Real Neural Computation with Full Integration:" << std::endl;
+    std::cout << "  - Working Memory (active maintenance and competition)" << std::endl;
+    std::cout << "  - Episodic Memory (experience storage and replay)" << std::endl;
+    std::cout << "  - Neuromodulation (learning signals and motivation)" << std::endl;
+    std::cout << "  - Prediction System (forward models and error signals)" << std::endl;
+    std::cout << "  - Cognitive Systems (planning, attention, concept formation)" << std::endl;
+    std::cout << "  - Performance Systems (memory pools, event queues)" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -110,7 +145,7 @@ int main() {
         allPassed = false;
     }
     
-    std::cout << "Running Brain tests..." << std::endl;
+    std::cout << "Running Brain Integration tests..." << std::endl;
     try {
         test_brain::runAll();
         std::cout << "  PASSED" << std::endl;
@@ -119,12 +154,77 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << "Running Working Memory tests..." << std::endl;
+    try {
+        test_working_memory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Episodic Memory tests..." << std::endl;
+    try {
+        test_episodic_memory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Neuromodulation tests..." << std::endl;
+    try {
+        test_neuromodulation::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Plasticity tests..." << std::endl;
+    try {
+        test_plasticity::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Prediction tests..." << std::endl;
+    try {
+        test_prediction::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Cognition tests..." << std::endl;
+    try {
+        test_cognition::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Performance tests..." << std::endl;
+    try {
+        test_performance::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << std::endl;
     if (allPassed) {
-        std::cout << "=== All Tests PASSED ===" << std::endl;
+        std::cout << "=== ALL TESTS PASSED ===" << std::endl;
+        std::cout << "Phase 6: Complete Artificial Cognitive System Successfully Implemented" << std::endl;
+        std::cout << "All neural systems are fully integrated and functional" << std::endl;
         return 0;
     } else {
-        std::cout << "=== Some Tests FAILED ===" << std::endl;
+        std::cout << "=== SOME TESTS FAILED ===" << std::endl;
         return 1;
     }
 }

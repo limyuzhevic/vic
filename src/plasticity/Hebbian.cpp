@@ -1,6 +1,7 @@
 #include "Hebbian.hpp"
 #include "../../brain/Synapse.hpp"
 #include <algorithm>
+#include <cmath>
 
 namespace nlm {
 

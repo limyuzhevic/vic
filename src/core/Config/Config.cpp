@@ -92,97 +92,93 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+// Configuration validation
+bool Config::validate() const {
+    bool isValid = true;
     
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
+    // Check for duplicate keys
     std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
+    for (const auto& entry : pImpl->entries) {
+        // Check for numeric range violations
+        if (entry.key == "neuron_count") {
+            if (auto val = get<size_t>(entry.key)) {
+                if (*val == 0 || *val > 100000) {
+                    NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(*val) + ". Must be 1-100000");
+                    isValid = false;
+                }
+            }
+        } else if (entry.key == "region_count") {
+            if (auto val = get<size_t>(entry.key)) {
+                if (*val == 0) {
+                    NLM_LOG_ERROR("Invalid region_count: " + std::to_string(*val) + ". Must be at least 1");
+                    isValid = false;
+                }
+            }
+        } else if (entry.key == "simulation_timestep") {
+            if (auto val = get<double>(entry.key)) {
+                if (*val <= 0.0 || *val > 1.0) {
+                    NLM_LOG_ERROR("Invalid simulation_timestep: " + std::to_string(*val) + ". Must be 0 < value <= 1.0");
+                    isValid = false;
+                }
+            }
+        } else if (entry.key == "connection_probability") {
+            if (auto val = get<float>(entry.key)) {
+                if (*val < 0.0f || *val > 1.0f) {
+                    NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(*val) + ". Must be 0.0-1.0");
+                    isValid = false;
+                }
+            }
+        } else if (entry.key == "random_seed") {
+            if (auto val = get<uint64_t>(entry.key)) {
+                if (*val == 0) {
+                    NLM_LOG_ERROR("Invalid random_seed: " + std::to_string(*val) + ". Must not be 0");
+                    isValid = false;
+                }
+            }
+        }
+        
+        keys.push_back(entry.key);
+    }
+    
+    // Check for duplicate keys
+    std::sort(keys.begin(), keys.end());
+    for (size_t i = 1; i < keys.size(); ++i) {
+        if (keys[i] == keys[i-1]) {
+            NLM_LOG_ERROR("Duplicate configuration key: " + keys[i]);
+            isValid = false;
+        }
+    }
+    
+    return isValid;
+}
+
+std::string Config::getValidationError() const {
+    std::ostringstream oss;
+    
+    // Check required keys
+    std::vector<std::string> requiredKeys = {"neuron_count", "region_count", "simulation_timestep"};
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            oss << "Missing required configuration key: " << key << "\n";
+        }
+    }
+    
+    // Check for duplicate keys
+    std::vector<std::string> keys;
     for (const auto& entry : pImpl->entries) {
         keys.push_back(entry.key);
     }
-    return keys;
-}
-
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+    std::sort(keys.begin(), keys.end());
+    for (size_t i = 1; i < keys.size(); ++i) {
+        if (keys[i] == keys[i-1]) {
+            oss << "Duplicate configuration key: " << keys[i] << "\n";
+        }
     }
+    
+    if (oss.str().empty()) {
+        oss << "Configuration is valid\n";
+    }
+    
     return oss.str();
 }
 
