@@ -96,6 +96,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             sensoryVision_[i]->injectCurrent(current);
         }
     }
+    }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
@@ -104,6 +105,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             float current = touch[i] * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
         }
+    }
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)

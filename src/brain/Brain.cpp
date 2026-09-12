@@ -243,7 +243,11 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    if (predictionSystem) {
+        predictionSystem->initialize(this);
+    } else {
+        NLM_LOG_WARNING("Prediction system not available - will operate without prediction capabilities");
+    }
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);

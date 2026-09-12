@@ -3,16 +3,21 @@
 namespace nlm {
 
 struct PredictionSystem::Impl {
+    Brain* brain;
     float predictionError;
     float confidence;
     std::vector<float> errorHistory;
     
-    Impl() : predictionError(0.0f), confidence(0.5f) {}
+    Impl() : brain(nullptr), predictionError(0.0f), confidence(0.5f) {}
 };
 
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
+
+void PredictionSystem::initialize(Brain* brain) {
+    pImpl->brain = brain;
+}
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
