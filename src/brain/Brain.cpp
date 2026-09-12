@@ -403,7 +403,37 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // Get current neural activity patterns from sensory neurons
+        std::vector<float> currentPattern;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                NeuronType type = pop->getNeuronType();
+                if (type == NeuronType::Sensory || type == NeuronType::Internal) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        // Get activation level (normalized membrane potential)
+                        float activation = std::abs(
+                            neuron->getState().membranePotential - 
+                            neuron->getState().restingPotential
+                        ) / 20.0f;
+                        currentPattern.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        // Store current sensory pattern in working memory
+        if (!currentPattern.empty()) {
+            pImpl->workingMemory->store(currentPattern, 1.0f);
+        }
+        
+        // Update working memory dynamics (maintenance, competition)
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Apply attention from attention system
+        if (pImpl->attention && pImpl->attention->getWinners().size() > 0) {
+            auto winners = pImpl->attention->getWinners();
+            pImpl->workingMemory->strengthenMemory(1.5f);  // Boost winning traces
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -577,10 +607,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
-    }
+        if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+            // Consolidate important memories, remove weak ones
+            pImpl->episodicMemory->consolidate(0.3f);
+        }
+
+    // ========== STEP 17: COLLECT STATISTICS ==========
+    pImpl->totalSpikesTotal += pImpl->totalSpikesThisStep;
+    pImpl->totalSpikesThisStep = 0;
     
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
