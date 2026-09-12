@@ -11,6 +11,12 @@
 
 namespace nlm {
 
+// Semantic memory - gradually acquired knowledge
+class NeuralSemanticMemory;
+
+// Procedural memory - learned skills and habits
+class NeuralProceduralMemory;
+
 // Forward declarations
 class Config;
 class RandomGenerator;
@@ -18,6 +24,8 @@ class SimulationClock;
 class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
+class NeuralSemanticMemory;
+class NeuralProceduralMemory;
 class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
@@ -28,6 +36,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Neuromodulator;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -137,16 +146,22 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
-    
-    // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
-    
-    // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+// ========== MEMORY SYSTEMS ==========
+
+// Working memory - transient active information
+NeuralWorkingMemory* getWorkingMemory();
+
+// Episodic memory - experience storage
+NeuralEpisodicMemory* getEpisodicMemory();
+
+// Semantic memory - gradually acquired knowledge
+NeuralSemanticMemory* getSemanticMemory();
+
+// Procedural memory - learned skills and habits
+NeuralProceduralMemory* getProceduralMemory();
+
+// Associative memory - relationships between representations
+NeuralAssociativeMemory* getAssociativeMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
@@ -170,32 +185,11 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
-    
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
-    
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
-    void logStatus() const;
-    
-private:
-    struct Impl;
-    Impl* pImpl;
-};
+// Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
 
-} // namespace nlm
+    // Acetylcholine - attention and memory
+    Acetylcholine* getAcetylcholine();
+
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
