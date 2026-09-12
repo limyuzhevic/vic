@@ -74,6 +74,29 @@ void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
     } else if (pImpl->stage == DevelopmentalStage::Maturation && pImpl->stageAge > 600.0) {
         advanceStage();
     }
+    
+    // Update sleep/rest cycle - simple version
+    pImpl->stageAge += 0.001;
+    if (pImpl->stage == DevelopmentalStage::Adult) {
+        // Can enter sleep/rest
+        double sleepThreshold = 1200.0;  // After 20 minutes of adult stage
+        if (age_ > sleepThreshold && age_ < sleepThreshold + 10.0) {
+            // Enter rest phase
+            NLM_LOG_INFO("Development: Entering rest/sleep phase for consolidation");
+        }
+        
+        if (age_ > sleepThreshold + 10.0) {
+            // Exit rest phase and consolidate memory
+            NLM_LOG_INFO("Development: Exiting rest phase, consolidating memory");
+            if (brain) {
+                auto* episodicMemory = brain->getEpisodicMemory();
+                if (episodicMemory) {
+                    // Simple consolidation - remove less important memories
+                    episodicMemory->consolidate(0.3f);
+                }
+            }
+        }
+    }
 }
 
 void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDuration dt) {
@@ -89,6 +112,41 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
         advanceStage();
     } else if (pImpl->stage == DevelopmentalStage::Maturation && age_ > 960.0) {
         advanceStage();
+    }
+    
+    // Update sleep/rest cycle with continuous time
+    if (pImpl->stage == DevelopmentalStage::Adult) {
+        // Can enter sleep/rest at specific times
+        double sleepStart = 1200.0;  // After 20 minutes of adult stage
+        double sleepDuration = 300.0;  // 5 minutes sleep
+        
+        if (age_ > sleepStart && age_ < sleepStart + sleepDuration) {
+            // Enter rest phase
+            NLM_LOG_INFO("Development: Entering rest/sleep phase for consolidation");
+            
+            // During rest, replay and consolidate memories
+            if (brain) {
+                auto* episodicMemory = brain->getEpisodicMemory();
+                if (episodicMemory && episodicMemory->isReplayEnabled()) {
+                    // Select episodes for replay based on importance
+                    auto episodesToReplay = episodicMemory->getEpisodesForReplay(3);
+                    for (const auto* episode : episodesToReplay) {
+                        episodicMemory->replayEpisode(episode);
+                    }
+                }
+            }
+        }
+        
+        if (age_ > sleepStart + sleepDuration) {
+            // Memory consolidation after rest
+            if (brain) {
+                auto* episodicMemory = brain->getEpisodicMemory();
+                if (episodicMemory) {
+                    episodicMemory->consolidate(0.5f);  // Higher threshold after sleep
+                }
+            }
+            NLM_LOG_INFO("Development: Memory consolidation complete after rest");
+        }
     }
 }
 

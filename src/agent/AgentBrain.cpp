@@ -334,17 +334,106 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+// Update AgentBrain.cpp - connect to neuromodulation updates
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
-}
-
-} // namespace nlm
+    // Update neuromodulators with brain state
+    void AgentBrain::updateNeuromodulators(const Brain* brain) {
+        if (!brain) return;
+        
+        // Update curiosity based on novelty and prediction error
+        if (curiosityEnabled_ && brain->getCuriosity()) {
+            curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+            curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+        }
+        
+        // Update dopamine from brain
+        if (rewardModulationEnabled_ && brain->getDopamine()) {
+            dopamineLevel_ = brain->getDopamine()->getLevel();
+        }
+        
+        // Update novelty from recent observations
+        if (!previousVision_.empty()) {
+            float totalDiff = 0.0f;
+            const auto& vision = percept.getVision();
+            for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
+                float diff = std::abs(vision[i] - previousVision_[i]);
+                totalDiff += diff;
+            }
+            
+            // Normalize
+            noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+            noveltyLevel_ *= sensoryNoveltyDecay_;
+            previousVision_ = vision;
+        }
+    }
+    
+    // Add decay to neuromodulators
+    void AgentBrain::decayNeuromodulators(TimestepDuration dt) {
+        dopamineLevel_ = std::max(0.0f, dopamineLevel_ - 0.01f * static_cast<float>(dt));
+        noveltyLevel_ = std::max(0.0f, noveltyLevel_ - 0.02f * static_cast<float>(dt));
+        curiosityLevel_ = std::max(0.0f, curiosityLevel_ - 0.01f * static_cast<float>(dt));
+    }
+    
+    // Get neuromodulator summary
+    std::string AgentBrain::getNeuromodulatorSummary() const {
+        std::ostringstream oss;
+        oss << "Neuromodulators: DA=" << dopamineLevel_ 
+            << ", Novelty=" << noveltyLevel_ 
+            << ", Curiosity=" << curiosityLevel_ 
+            << ", Prediction Error=" << predictionError_;
+        return oss.str();
+    }
+    
+    // Add random exploration to AgentBrain
+    MotorCommand AgentBrain::decodeMotorCommandWithRandom() {
+        MotorCommand decoded = decodeFromMotorNeurons();
+        
+        // Apply curiosity-based exploration
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            decoded = selectWithCuriosity(decoded);
+        }
+        
+        // Add occasional random exploration when curiosity is very high
+        if (curiosityEnabled_ && curiosityLevel_ > 0.7f) {
+            float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+            if (r < curiosityLevel_ * 0.2f) {  // Up to 20% chance of random action
+                int choice = brain_->getRandomGenerator()->uniformInt(0, 6);
+                switch (choice) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::MoveBackward;
+                    case 2: return MotorCommand::TurnLeft;
+                    case 3: return MotorCommand::TurnRight;
+                    case 4: return MotorCommand::Interact;
+                    default: return MotorCommand::Wait;
+                }
+            }
+        }
+        
+        return decoded;
+    }
+    
+    // Update development stage effects on AgentBrain
+    void AgentBrain::applyDevelopmentEffects() {
+        if (!brain_) return;
+        
+        DevelopmentalStage stage = brain_->getDevelopmentalStage();
+        
+        // Adjust neuromodulation sensitivity based on development
+        if (stage == DevelopmentalStage::Initial) {
+            // High plasticity, sensitive exploration
+            if (curiosityEnabled_) {
+                curiosityLevel_ = std::min(1.0f, curiosityLevel_ * 1.2f);
+            }
+        } else if (stage == DevelopmentalStage::Adult) {
+            // More stable, less exploration
+            if (curiosityEnabled_) {
+                curiosityLevel_ *= 0.8f;
+            }
+        }
+        
+        // Adjust reward processing based on development
+        if (stage == DevelopmentalStage::CriticalPeriod) {
+            // More sensitive to rewards during critical period
+            dopamineLevel_ = std::min(1.0f, dopamineLevel_ * 1.3f);
+        }
+    }

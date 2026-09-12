@@ -511,8 +511,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // Get sensory state from recent episodes
+        if (!pImpl->episodicMemory->getRecentEpisodes(1).empty()) {
+            const auto* lastEpisode = pImpl->episodicMemory->getRecentEpisodes(1)[0];
+            SensoryInput currentState;
+            
+            // Store predicted vs actual sensory comparison
+            if (!lastEpisode->sensoryState.empty()) {
+                currentState = lastEpisode->sensoryState;
+                // The prediction system would update its predictions
+                // For now, create a placeholder prediction based on last episode
+                pImpl->predictionSystem->train(currentState);
+                
+                // Use prediction error for learning
+                float error = pImpl->predictionSystem->getPredictionError();
+                if (error > 0.1f) {
+                    NLM_LOG_DEBUG("Prediction error: " + std::to_string(error));
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -522,14 +540,55 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Apply attention to working memory winners
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            
+            // Apply novelty-based attention - novel patterns get boost
+            if (pImpl->novelty) {
+                for (const auto& neuronId : competitors) {
+                    // Add bottom-up salience for novel neural patterns
+                    if (pImpl->workingMemory->getNeuronActivation(neuronId) > 0.5f) {
+                        pImpl->attention->applyBottomUpSalience(neuronId, 
+                            pImpl->novelty->getNoveltyLevel() * 0.5f);
+                    }
+                }
+            }
+            
             pImpl->attention->processCompetition(competitors);
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract current neural activity pattern for concept formation
+        std::vector<float> currentPattern;
+        
+        // Get current brain state as pattern for concept learning
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    currentPattern.push_back(
+                        std::abs(state.membranePotential - state.restingPotential) / 50.0f);
+                }
+            }
+        }
+        
+        // Get associated features (last episode's sensory features)
+        std::vector<float> features;
+        if (!pImpl->episodicMemory->getRecentEpisodes(1).empty()) {
+            const auto* lastEpisode = pImpl->episodicMemory->getRecentEpisodes(1)[0];
+            if (!lastEpisode->sensoryState.empty()) {
+                features = lastEpisode->sensoryState;
+            }
+        }
+        
+        // Get reward from dopamine
+        float reward = 0.0f;
+        if (pImpl->dopamine) {
+            reward = pImpl->dopamine->getLevel();
+        }
+        
+        // Present experience to concept formation system
+        pImpl->conceptFormation->presentExperience(currentPattern, features, reward, currentStep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -548,7 +607,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
         // Development affects plasticity rates
         auto* sp = pImpl->structuralPlasticity;
@@ -573,6 +632,74 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            
+            // Development also affects memory system efficiency
+            if (pImpl->workingMemory) {
+                // Working memory capacity grows with development
+                if (stage == DevelopmentalStage::Maturation || stage == DevelopmentalStage::Adult) {
+                    pImpl->workingMemory->setCapacity(pImpl->workingMemory->getCapacity() * 1.5f);
+                }
+            }
+        }
+        
+        // Development affects neuromodulation sensitivity
+        if (pImpl->curiosity) {
+            // Curiosity sensitivity changes with development
+            float curiosityMod = 1.0f;
+            if (stage == DevelopmentalStage::Initial) {
+                curiosityMod = 1.5f;  // More exploration
+            } else if (stage == DevelopmentalStage::Adult) {
+                curiosityMod = 0.5f;  // Less exploration, more exploitation
+            }
+            // Note: Curiosity class would need a method to adjust sensitivity
+        }
+            
+            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            
+            // Development also affects memory system efficiency
+            if (pImpl->workingMemory) {
+                // Working memory capacity grows with development
+                if (stage == DevelopmentalStage::Maturation || stage == DevelopmentalStage::Adult) {
+                    pImpl->workingMemory->setCapacity(pImpl->workingMemory->getCapacity() * 1.5f);
+                }
+            }
+        }
+        
+        // Development affects neuromodulation sensitivity
+        if (pImpl->curiosity) {
+            // Curiosity sensitivity changes with development
+            float curiosityMod = 1.0f;
+            if (stage == DevelopmentalStage::Initial) {
+                curiosityMod = 1.5f;  // More exploration
+            } else if (stage == DevelopmentalStage::Adult) {
+                curiosityMod = 0.5f;  // Less exploration, more exploitation
+            }
+            // Note: Curiosity class would need a method to adjust sensitivity
+        }
+            
+            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            
+            // Development also affects memory system efficiency
+            if (pImpl->workingMemory) {
+                // Working memory capacity grows with development
+                if (stage == DevelopmentalStage::Maturation || stage == DevelopmentalStage::Adult) {
+                    pImpl->workingMemory->setCapacity(pImpl->workingMemory->getCapacity() * 1.5f);
+                }
+            }
+        }
+        
+        // Development affects neuromodulation sensitivity
+        if (pImpl->curiosity) {
+            // Curiosity sensitivity changes with development
+            float curiosityMod = 1.0f;
+            if (stage == DevelopmentalStage::Initial) {
+                curiosityMod = 1.5f;  // More exploration
+            } else if (stage == DevelopmentalStage::Adult) {
+                curiosityMod = 0.5f;  // Less exploration, more exploitation
+            }
+            // Note: Curiosity class would need a method to adjust sensitivity
         }
     }
     
