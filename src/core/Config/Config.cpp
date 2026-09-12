@@ -12,11 +12,9 @@ struct Config::Impl {
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
-Config::~Config() = default;
+Config::Config(Config&& other) noexcept = default;
 
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
@@ -86,7 +84,20 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Use proper value conversion instead of placeholder
+        file << entry.key << " = ";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> || 
+                                 std::is_same_v<T, double> || std::is_same_v<T, bool>) {
+                file << arg;
+            } else {
+                file << "UNKNOWN_TYPE";
+            }
+        }, entry.value);
+        file << "\n";
     }
     
     return true;
@@ -94,6 +105,11 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    // Validate input key
+    if (key.empty()) {
+        return std::nullopt;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -115,13 +131,20 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate input
+    if (key.empty()) {
+        return;  // Silently ignore empty keys
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
+        // Update existing entry
         it->value = value;
         it->source = source;
     } else {
+        // Add new entry
         pImpl->entries.emplace_back(key, value, source);
     }
 }

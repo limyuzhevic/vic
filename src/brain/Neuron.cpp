@@ -189,6 +189,11 @@ void Neuron::setPopulationId(PopulationId population) {
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    // Validate timestep
+    if (dt <= 0.0f) {
+        return false;  // Invalid timestep, return without processing
+    }
+    
     bool fired = false;
     
     // Handle refractory period
@@ -213,11 +218,24 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Validate capacitance to prevent division by zero
+    if (C <= 0.0f) {
+        // Invalid capacitance, skip integration
+        pImpl->synapticInput = 0.0f;
+        return false;
+    }
+    
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
     // Leak contribution
     float leakContribution = (V_rest - V) / tau;
+    
+    // Validate time constant
+    if (tau <= 0.0f) {
+        // Invalid time constant, skip leak calculation
+        leakContribution = 0.0f;
+    }
     
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);

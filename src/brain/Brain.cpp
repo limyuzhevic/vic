@@ -80,7 +80,7 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
+        , rng()  // Properly initialize unique_ptr with default constructor
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -156,8 +156,6 @@ struct Brain::Impl {
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
 };
-
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
 Brain::~Brain() = default;
 
@@ -330,7 +328,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->totalSpikesThisStep = 0;
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
-    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    }
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
     for (auto& region : pImpl->regions) {
@@ -533,7 +533,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
+    if (currentStep % 100 == 0 && pImpl->structuralPlasticity) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
@@ -720,9 +720,11 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     // Apply neuromodulation effects on plasticity
     float modulation = signal.getLevel();
     
-    // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
+    // Scale STDP learning rates with null check
+    if (pImpl->stdp) {
+        pImpl->stdp->setLTPWeight(0.01f * modulation);
+        pImpl->stdp->setLTDWeight(0.012f * modulation);
+    }
 }
 
 void Brain::updatePlasticity() {
