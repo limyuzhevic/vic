@@ -90,7 +90,13 @@ struct LearningExperiment {
             }
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        // Get most active neurons - try prediction system first, then spike system
+        mostActiveNeurons.clear();
+        if (brain->getPredictionSystem()) {
+            mostActiveNeurons = brain->getPredictionSystem()->getMostActiveNeurons(10);
+        } else if (brain->getSpikeSystem()) {
+            mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        }
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
@@ -99,6 +105,7 @@ struct LearningExperiment {
             float mean = sum / finalWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
         }
+    }
     }
     
     void computeStatistics() {
