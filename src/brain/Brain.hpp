@@ -18,12 +18,6 @@ class SimulationClock;
 class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
 class Novelty;
@@ -139,36 +133,40 @@ public:
     
     // ========== MEMORY SYSTEMS ==========
     
-    // Working memory - transient active information
+    // Working memory: temporary storage for active information
     NeuralWorkingMemory* getWorkingMemory();
     
-    // Episodic memory - experience storage
+    // Episodic memory: storage of experiences and events
     NeuralEpisodicMemory* getEpisodicMemory();
     
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    // Attention system for selection and focusing
+    AttentionalSelection* getAttentionSystem();
     
     // ========== PREDICTION SYSTEM ==========
-    
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
-    
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
-    
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
-    
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
-    
-    // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
+    
+    // ========== COGNITION SYSTEMS ==========
+    
+    // Neural planner for predictive action selection
+    NeuralPlanner* getPlanner() { return nullptr; }  // Removed in Phase 6
+    
+    // Concept formation system for pattern discovery
+    ConceptFormation* getConceptFormation() { return nullptr; }  // Removed in Phase 6
+    
+    // Self-model for internal representation
+    SelfModel* getSelfModel() { return nullptr; }  // Removed in Phase 6
+    
+    // Social learning system for observation and imitation
+    SocialLearning* getSocialLearning() { return nullptr; }  // Removed in Phase 6
+    
+    // Spatial representation system
+    SpatialRepresentation* getSpatialRepresentation() { return nullptr; }  // Removed in Phase 6
+    
+    // Temporal relation system
+    TemporalRelation* getTemporalRelation() { return nullptr; }  // Removed in Phase 6
     
     // ========== NEUROMODULATION SYSTEMS ==========
     

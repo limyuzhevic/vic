@@ -27,45 +27,44 @@ NeuralWorkingMemory::NeuralWorkingMemory()
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
-void NeuralWorkingMemory::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
+// ========== INITIALIZATION ==========
+    attentionSystem_ = nullptr;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
-    
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
-        
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
+    // Store the pattern directly for retrieval
+    if (pattern.size() <= memoryNeurons_.size()) {
+        for (size_t i = 0; i < pattern.size(); ++i) {
+            memoryActivations_[i] = pattern[i] * strength;
+            memoryTimestamps_[i] = 0;
         }
+    } else {
+        // Expand memory if needed
+        memoryNeurons_.resize(pattern.size());
+        memoryActivations_.resize(pattern.size());
+        memoryTimestamps_.resize(pattern.size());
         
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
+        for (size_t i = 0; i < pattern.size(); ++i) {
+            memoryNeurons_[i] = NeuronId(i + 1); // Simple neuron IDs for pattern
+            memoryActivations_[i] = pattern[i] * strength;
+            memoryTimestamps_[i] = 0;
+            
+            // Activate the neuron to store the pattern
+            brain_->injectCurrent(memoryNeurons_[i], pattern[i] * strength * 10.0f);
         }
     }
     
     // Create maintenance connections if needed
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
         createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    }
+    
+    // Update attention based on the stored pattern
+    if (brain_ && brain_->getAttentionSystem() && !memoryNeurons_.empty()) {
+        brain_->getAttentionSystem()->processCompetition(memoryNeurons_, 0.5f);
     }
 }
 
@@ -142,6 +141,45 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     
     // Run competition to select winners
     runCompetition();
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
+    
+    // Integrate with neuromodulation for attention modulation
+    if (brain_) {
+        // Check neuromodulation effects on working memory
+        if (brain_->getDopamine()) {
+            float dopamineLevel = brain_->getDopamine()->getLevel();
+            if (dopamineLevel > 0.5f) {
+                // Dopamine enhances memory maintenance
+                strengthenMemory(1.0f + dopamineLevel * 0.5f);
+            }
+        }
+        
+        if (brain_->getCuriosity()) {
+            float curiosityLevel = brain_->getCuriosity()->getLevel();
+            if (curiosityLevel > 0.3f) {
+                // Curiosity enhances pattern exploration
+                // Can be implemented by storing more diverse patterns
+                // For now, just log
+            }
+        }
+    }
+    
+    // Feed relevant memory traces to episodic memory for consolidation
+    if (brain_ && brain_->getEpisodicMemory()) {
+        // Store current working memory state for episodic consolidation
+        auto patterns = retrieve();
+        if (!patterns.empty()) {
+            // Create an episodic memory item from working memory
+            EpisodicMemoryItem episode;
+            episode.timestamp = brain_->getCurrentStep();
+            episode.memoryPattern = patterns;
+            
+            // Store with lower priority (can be consolidated later)
+            brain_->getEpisodicMemory()->storeEpisode(episode);
+        }
+    }
 }
 
 void NeuralWorkingMemory::clear() {

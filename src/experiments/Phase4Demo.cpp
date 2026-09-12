@@ -1,7 +1,3 @@
-#include <iostream>
-#include <memory>
-#include <iomanip>
-#include <sstream>
 #include "core/Config/Config.hpp"
 #include "core/Logger/Logger.hpp"
 #include "brain/Brain.hpp"
@@ -11,9 +7,6 @@
 #include "prediction/NeuralPrediction.hpp"
 #include "memory/NeuralWorkingMemory.hpp"
 #include "memory/NeuralEpisodicMemory.hpp"
-#include "cognition/ConceptFormation.hpp"
-#include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;
 
@@ -212,7 +205,7 @@ int main(int argc, char* argv[]) {
     std::cout << "  - Multi-step planning: Using predictions to select actions\n";
     std::cout << "  - Self-model: Learning body schema and action consequences\n";
     std::cout << "  - Social learning: Observing and imitating others\n";
-    std::cout << "  - Continual learning: Adapting to new tasks\n";
+    std::cout << "  - Continual learning: Adapting to new tasks\n"
     
     std::cout << "\nAll mechanisms emerge from neural dynamics and plasticity.\n";
     std::cout << "No predefined concepts, rules, or symbolic AI were used.\n";

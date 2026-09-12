@@ -58,6 +58,14 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
+    // ========== SYSTEM INITIALIZATION ==========
+    
+    // Initialize all Phase 6 integrated systems
+    void initializeIntegratedSystems();
+    
+    // Reset all Phase 6 integrated systems
+    void resetIntegratedSystems();
+    
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
