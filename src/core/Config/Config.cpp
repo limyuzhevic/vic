@@ -18,9 +18,15 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// TODO PHASE 2: Implement proper JSON/YAML parser with validation
+    // PLACEHOLDER - Phase 1 uses a simple key=value format with basic parsing
+    // Planned improvements:
+    // - Support for nested configuration sections
+    // - Type validation and coercion
+    // - Schema validation
+    // - Environment variable expansion
+    // - Comment preservation
+    // - Multiple format support (JSON, YAML, INI)
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -112,18 +118,6 @@ template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
     return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {

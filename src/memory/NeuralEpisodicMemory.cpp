@@ -574,4 +574,29 @@ float NeuralAssociativeMemory::computeSimilarity(const std::vector<float>& a,
     return dot / (std::sqrt(normA) * std::sqrt(normB));
 }
 
-} // namespace nlm
+    return 0;
+    }
+    
+    size_t NeuralEpisodicMemory::getEpisodeCount() const {
+        return episodes_.size();
+    }
+    
+    void NeuralEpisodicMemory::removeOldestEpisode() {
+        if (!episodes_.empty()) {
+            episodes_.erase(episodes_.begin());
+            if (!pImpl->episodeNeurons.empty()) {
+                pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
+            }
+        }
+    }
+    
+    void NeuralEpisodicMemory::replaySequence(const std::vector<size_t>& episodeIds) {
+        for (size_t id : episodeIds) {
+            if (id < episodes_.size()) {
+                replayEpisode(&episodes_[id]);
+                
+                // Small delay between replays
+                // (In simulation, this would be steps)
+            }
+        }
+    }

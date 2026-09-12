@@ -25,6 +25,9 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Noradrenaline;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
@@ -175,6 +178,15 @@ public:
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
+    // Acetylcholine - attention and memory
+    Acetylcholine* getAcetylcholine();
+    
+    // Noradrenaline - arousal and vigilance
+    Noradrenaline* getNoradrenaline();
+    
+    // Serotonin - mood and social behavior
+    Serotonin* getSerotonin();
+    
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
     
@@ -192,6 +204,56 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // ========== SLEEP/REST SYSTEM ==========
+    
+    // Control sleep/rest mode
+    void setSleepMode(bool enabled);
+    bool isInSleepMode() const;
+    
+    // Sleep timing control
+    void setSleepInterval(size_t steps);
+    size_t getSleepInterval() const;
+    void setSleepReplayInterval(size_t steps);
+    size_t getSleepReplayInterval() const;
+    
+    // Manual memory consolidation and replay
+    void forceConsolidation();
+    void forceReplay();
+    
+    // State export/import for persistence
+    bool exportBrainState(const std::string& filepath) const;
+    bool importBrainState(const std::string& filepath);
+    
+    // Custom configuration presets for experienced users
+    void setConfigPreset(const std::string& presetName);
+    
+    // Performance monitoring and debugging
+    void logPerformanceStats() const;
+    void logPerformanceStatsDetailed() const;
+    
+    // ========== ADVANCED FEATURES ==========
+    
+    // Advanced configuration management
+    bool modifyConfig(const std::string& key, const std::string& value);
+    std::shared_ptr<const Config> getConfig() const;
+    std::string validateConfig() const;
+    bool exportConfig(const std::string& filepath) const;
+    bool importConfig(const std::string& filepath);
+    bool rollbackConfig(size_t steps = 1);
+    
+    // Performance monitoring and debugging
+    void logPerformanceStatsDetailed() const;
+    
+    // Advanced performance monitoring
+    void startPerformanceMonitoring();
+    void stopPerformanceMonitoring();
+    bool isPerformanceMonitoringActive() const;
+    void addPerformanceMetric(const std::string& name, double value);
+    
+    // Advanced experiment control
+    void createAdvancedExperiment(const std::string& name);
+    void runAdvancedExperiment(const std::string& name);
     
 private:
     struct Impl;
