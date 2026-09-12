@@ -22,7 +22,9 @@ NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(new Imp
     pImpl->name = name;
 }
 
-NeuralRegion::~NeuralRegion() = default;
+NeuralRegion::~NeuralRegion() {
+    delete pImpl;
+}
 
 NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;

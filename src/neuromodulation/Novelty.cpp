@@ -18,7 +18,9 @@ struct Novelty::Impl {
 
 Novelty::Novelty() : pImpl(new Impl) {}
 
-Novelty::~Novelty() = default;
+Novelty::~Novelty() {
+    delete pImpl;
+}
 
 void Novelty::initialize(Brain* brain) {
     pImpl->brain = brain;

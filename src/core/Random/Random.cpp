@@ -14,7 +14,9 @@ RandomGenerator::RandomGenerator(uint64_t seed) : pImpl(new Impl(seed)) {}
 
 RandomGenerator::RandomGenerator() : pImpl(new Impl(std::random_device{}())) {}
 
-RandomGenerator::~RandomGenerator() = default;
+RandomGenerator::~RandomGenerator() {
+    delete pImpl;
+}
 
 RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;

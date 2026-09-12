@@ -20,7 +20,9 @@ struct Curiosity::Impl {
 
 Curiosity::Curiosity() : pImpl(new Impl) {}
 
-Curiosity::~Curiosity() = default;
+Curiosity::~Curiosity() {
+    delete pImpl;
+}
 
 void Curiosity::initialize(Brain* brain) {
     pImpl->brain = brain;
