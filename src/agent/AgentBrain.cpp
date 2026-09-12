@@ -5,7 +5,7 @@
 
 namespace nlm {
 
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
+    AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
@@ -19,21 +19,22 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
-{
-    // Initialize motor and sensory neuron groups
+    , previousVision_()
+    {
+    // Consolidate redundant neuron collection: Cache neuron groups during initialization
+    // Single pass through brain regions to populate all neuron groups at once
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
+                const auto& neurons = pop->getNeurons();
                 
                 if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
+                    // Add all motor neurons to the appropriate groups based on distribution
+                    size_t groupIndex = 0;
+                    for (Neuron* n : neurons) {
+                        // Use modular arithmetic to distribute neurons evenly
+                        switch (groupIndex % 6) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
@@ -41,19 +42,20 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                             case 4: motorInteract_.push_back(n); break;
                             case 5: motorWait_.push_back(n); break;
                         }
+                        ++groupIndex;
                     }
                 } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
+                    // Add all sensory neurons to the appropriate groups based on distribution
+                    size_t groupIndex = 0;
+                    for (Neuron* n : neurons) {
+                        // Use modular arithmetic to distribute neurons evenly
+                        switch (groupIndex % 4) {
                             case 0: sensoryVision_.push_back(n); break;
                             case 1: sensoryTouch_.push_back(n); break;
                             case 2: sensoryInternal_.push_back(n); break;
                             case 3: sensoryProprioception_.push_back(n); break;
                         }
+                        ++groupIndex;
                     }
                 }
             }

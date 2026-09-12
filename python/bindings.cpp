@@ -328,6 +328,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
              "Get all regions")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage")
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
              "Get total neuron count across all regions")
         .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
