@@ -40,6 +40,32 @@ struct NeuronState {
         , lastSpikeTime(-1.0f) {}
 };
 
+// Additional neural state for IntegrateAndFireDynamics
+struct IntegrateAndFireState {
+    float adaptationCurrent;       // nS, spike-triggered adaptation current
+    float membraneTimeConstant;    // ms, membrane time constant τ_m
+    float membraneResistance;      // MOhm, membrane resistance R_m
+    
+    IntegrateAndFireState()
+        : adaptationCurrent(0.0f),
+          membraneTimeConstant(20.0f),
+          membraneResistance(10000.0f) {}
+};
+
+// Synaptic state
+struct SynapticState {
+    float activation;             // Current synaptic activation (0-1)
+    float reversalPotential;      // Reversal potential (mV)
+    float maxConductance;         // Maximum conductance (nS)
+    float timeConstant;           // Synaptic time constant (ms)
+    
+    SynapticState()
+        : activation(0.0f),
+          reversalPotential(0.0f),
+          maxConductance(1.0f),
+          timeConstant(5.0f) {}
+};
+
 // Neuron class representing a single neuron
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
 class Neuron {
@@ -93,6 +119,7 @@ public:
     void setRestingPotential(MembranePotential potential);
     MembranePotential getRestingPotential() const;
     void setResetPotential(MembranePotential potential);
+    MembranePotential getResetPotential() const;
     
     // Spike detection
     bool checkThreshold() const;
@@ -143,9 +170,39 @@ public:
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     
+    // Additional methods for IntegrateAndFireDynamics
+    void setRefractoryTime(float time);
+    float getRefractoryTime() const;
+    void clearExternalInput();
+    float getExternalInput() const;
+    void addSynapticInput(float reversalPotential, float conductance, float timeConstant);
+    void setAdaptationCurrent(float current);
+    float getAdaptationCurrent() const;
+    void setMembraneParameters(float tau, float R);
+    float getMembraneTimeConstant() const;
+    float getMembraneResistance() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
 };
+
+// Additional functions for neural integration
+namespace neural {
+    // Apply synaptic inputs to neuron membrane potential
+    void applySynapticInputs(Neuron* neuron, TimestepDuration dt);
+    
+    // Update synaptic conductances
+    void updateSynapticConductances(Neuron* neuron, TimestepDuration dt);
+    
+    // Calculate total membrane current
+    float calculateMembraneCurrent(const Neuron* neuron);
+    
+    // Integrate membrane potential
+    void integrateMembranePotential(Neuron* neuron, TimestepDuration dt);
+    
+    // Handle refractory period
+    void handleRefractoryPeriod(Neuron* neuron, TimestepDuration dt);
+}
 
 } // namespace nlm

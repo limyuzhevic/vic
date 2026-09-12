@@ -1,7 +1,9 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Random/Random.hpp"
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -20,18 +22,29 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Validate input parameters
+    if (!brain) {
+        throw NLMInitializationError("AgentBrain: Null brain pointer provided");
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
+            nlm::ValidationUtils::validatePointerNotNull(region, "AgentBrain constructor: region pointer");
+            
             for (auto& pop : region->getPopulations()) {
+                nlm::ValidationUtils::validatePointerNotNull(pop, "AgentBrain constructor: population pointer");
+                
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
+                        nlm::ValidationUtils::validatePointerNotNull(n, "AgentBrain constructor: neuron pointer");
+                        
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                                     motorTurnLeft_.size() + motorTurnRight_.size() +
+                                     motorInteract_.size() + motorWait_.size();
                         
                         switch (idx % 6) {
                             case 0: motorForward_.push_back(n); break;
@@ -44,9 +57,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
+                        nlm::ValidationUtils::validatePointerNotNull(n, "AgentBrain constructor: sensory neuron pointer");
+                        
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
+                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
                         switch (idx % 4) {
                             case 0: sensoryVision_.push_back(n); break;
@@ -61,13 +76,6 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
-AgentBrain::~AgentBrain() = default;
-
-void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
-    
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
@@ -85,7 +93,29 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    // Validate input parameters
+    nlm::ValidationUtils::validatePointerNotNull(&percept, "AgentBrain::processSensoryInput: percept pointer");
+    nlm::ValidationUtils::validateBrainInitialized(brain_ != nullptr, "AgentBrain::processSensoryInput");
+    
+    const auto& vision = percept.getVision();
+    const auto& touch = percept.getTouch();
+    const auto& internal = percept.getInternal();
+    const auto& proprio = percept.getProprioception();
+    
+    // Validate sensory input sizes
+    nlm::ValidationUtils::validateNotEmpty(vision, "AgentBrain::processSensoryInput: vision data");
+    nlm::ValidationUtils::validateNotEmpty(touch, "AgentBrain::processSensoryInput: touch data");
+    nlm::ValidationUtils::validateNotEmpty(internal, "AgentBrain::processSensoryInput: internal data");
+    nlm::ValidationUtils::validateNotEmpty(proprio, "AgentBrain::processSensoryInput: proprioception data");
+    
+    // Validate neuron arrays
+    nlm::ValidationUtils::validatePointerNotNull(&sensoryVision_, "AgentBrain::processSensoryInput: sensoryVision_ array");
+    nlm::ValidationUtils::validatePointerNotNull(&sensoryTouch_, "AgentBrain::processSensoryInput: sensoryTouch_ array");
+    nlm::ValidationUtils::validatePointerNotNull(&sensoryInternal_, "AgentBrain::processSensoryInput: sensoryInternal_ array");
+    nlm::ValidationUtils::validatePointerNotNull(&sensoryProprioception_, "AgentBrain::processSensoryInput: sensoryProprioception_ array");
+    
+    // Vision input (256 values -> sensoryVision_ neurons)
+    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -150,6 +180,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
+    // Validate brain state
+    nlm::ValidationUtils::validateBrainInitialized(brain_ != nullptr, "AgentBrain::decodeMotorCommand");
+    
     if (!brain_) return MotorCommand::Wait;
     
     MotorCommand decoded = decodeFromMotorNeurons();

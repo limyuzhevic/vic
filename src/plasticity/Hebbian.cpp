@@ -1,86 +1,65 @@
 #include "Hebbian.hpp"
-#include "../../brain/Synapse.hpp"
+#include "PlasticityErrorHandler.hpp"
+#include "../../core/Logger/Logger.hpp"
 #include <algorithm>
+#include <cmath>
+#include <stdexcept>
 
 namespace nlm {
-
-struct Hebbian::Impl {
-    float learningRate;
-    float maxWeight;
-    float minWeight;
-    float covarianceThreshold;  // For covariance rule
-    
-    Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
-             covarianceThreshold(0.0f) {}
-};
-
-Hebbian::Hebbian() : pImpl(new Impl) {}
-
-Hebbian::~Hebbian() = default;
 
 void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& preSpikes,
                       const std::vector<Timestamp>& postSpikes,
                       TimestepDuration dt) {
-    /*
-     * Real Hebbian learning implementation
-     * 
-     * Mathematical formulation (Covariance rule):
-     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
-     * 
-     * Simplified version for spike-based systems:
-     * Δw = η * (coactivity - baseline)
-     * 
-     * Where:
-     *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
-     * 
-     * Biological inspiration:
-     *   - Reflects AMPA receptor trafficking
-     *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
-     *   - Correlation-based learning in visual cortex
-     *   
-     * Limitations:
-     *   - Doesn't account for STDP timing details
-     *   - Single learning rate (no separate potentiation/depression rates)
-     *   - Assumes stationary statistics
-     */
+    // Validate input parameters
+    nlm::ValidationUtils::validatePointerNotNull(synapse, "Hebbian::update: synapse pointer");
+    nlm::ValidationUtils::validateNotEmpty(preSpikes, "Hebbian::update: preSpikes vector");
+    nlm::ValidationUtils::validateNotEmpty(postSpikes, "Hebbian::update: postSpikes vector");
+    nlm::ValidationUtils::validateRange(dt, 0.0, 1000.0, "Hebbian::update: timestep duration");
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
-        return;
-    }
+    // Check if plasticity is enabled
+    nlm::ValidationUtils::validatePlasticityEnabled(true, "Hebbian::update");
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
+    try {
+        // Count correlated spike pairs (simplified covariance)
+        size_t correlationCount = 0;
+        for (Timestamp preTime : preSpikes) {
+            for (Timestamp postTime : postSpikes) {
+                float dt = static_cast<float>(postTime - preTime);
+                // Count spikes within a broad time window as correlated
+                if (std::abs(dt) < 100.0f) {  // 100ms correlation window
+                    ++correlationCount;
+                }
             }
         }
-    }
-    
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
-    
-    // Apply with bounds
-    if (std::abs(delta) > 1e-6f) {
-        applyWeightChange(synapse, delta);
+        
+        // Compute weight change based on correlation
+        float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+        
+        // Apply with bounds
+        if (std::abs(delta) > 1e-6f) {
+            applyWeightChange(synapse, delta);
+        }
+        
+    } catch (const std::exception& e) {
+        nlm::PlasticityErrorHandler::handleHebbianError("Hebbian::update", e.what());
     }
 }
 
-void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+void Hebbian::applyWeightChange(SynapticWeight delta) {
+    // Validate input parameters
+    ValidationUtils::validateRange(delta, pImpl->minWeight, pImpl->maxWeight,
+                                  "Hebbian::applyWeightChange: delta validation");
     
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    try {
+        // Apply weight change
+        float newWeight = pImpl->learningRate + delta;
+        newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
+        pImpl->learningRate = newWeight;
+        
+    } catch (const std::exception& e) {
+        nlm::PlasticityErrorHandler::handleHebbianError("Hebbian::applyWeightChange", e.what());
+    }
 }
 
 const char* Hebbian::getName() const {
@@ -88,7 +67,11 @@ const char* Hebbian::getName() const {
 }
 
 void Hebbian::setLearningRate(float rate) {
-    pImpl->learningRate = std::clamp(rate, 0.0f, 1.0f);
+    // Validate input
+    ValidationUtils::validateRange(rate, 0.0f, 1.0f,
+                                  "Hebbian::setLearningRate: rate validation");
+    
+    pImpl->learningRate = rate;
 }
 
 float Hebbian::getLearningRate() const {
@@ -96,7 +79,11 @@ float Hebbian::getLearningRate() const {
 }
 
 void Hebbian::setMaxWeight(float maxWeight) {
-    pImpl->maxWeight = std::clamp(maxWeight, 0.0f, 10.0f);
+    // Validate input
+    ValidationUtils::validateRange(maxWeight, 0.0f, 10.0f,
+                                  "Hebbian::setMaxWeight: maxWeight validation");
+    
+    pImpl->maxWeight = maxWeight;
 }
 
 float Hebbian::getMaxWeight() const {

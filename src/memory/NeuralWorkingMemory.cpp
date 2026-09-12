@@ -28,6 +28,9 @@ NeuralWorkingMemory::NeuralWorkingMemory()
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
+    // Validate input parameters
+    nlm::ValidationUtils::validatePointerNotNull(brain, "NeuralWorkingMemory::initialize: brain pointer");
+    
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");

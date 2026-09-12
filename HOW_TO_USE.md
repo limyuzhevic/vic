@@ -2,12 +2,14 @@
 
 ## Overview
 
-NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
+NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and basic plasticity mechanisms.
+
+**Reality Check:** This is a **neural simulator**, not a complete AI system. Many high-level systems (memory, advanced cognition, full neuromodulation) exist in the codebase but are not yet integrated into the main brain loop.
 
 This document covers:
 1. Building the C++ project from source
 2. Installing the Python library
-3. Using the NLM Python API
+3. Using the NLM Python API (what's actually functional)
 
 ---
 
@@ -19,6 +21,8 @@ This document covers:
 - **CMake**: Version 3.16 or higher
 - **Python**: 3.8+ (for Python bindings)
 - **pybind11**: Version 2.11.0+ (for Python bindings)
+
+**Note:** Building requires scikit-build-core for Python bindings. The Python bindings are minimal but functional.
 
 ### Build Steps
 
@@ -47,8 +51,8 @@ After successful compilation, you will have:
 | Target | Type | Description |
 |--------|------|-------------|
 | `nlm` | Executable | Main simulation executable |
-| `nlm_core` | Static Library | Core brain components |
-| `nlm_agent` | Static Library | Agent system |
+| `nlm_core` | Static Library | Core brain components (working: LIF neurons, STDP, structural plasticity) |
+| `nlm_agent` | Static Library | Agent system (working: sensory/motor, reward modulation) |
 | `nlm_world` | Static Library | World simulation |
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
@@ -78,11 +82,11 @@ make install
 # Install build dependencies
 pip install pybind11 scikit-build-core pytest numpy
 
-# Build and install
-pip install .
+# Build and install (this may take several minutes)
+pip install -e .
 
 # Or install in development mode
-pip install -e .
+# pip install -e .
 ```
 
 ### Using pyproject.toml (Modern Python Packaging)
@@ -107,11 +111,19 @@ import pynlm
 # Check version
 print(pynlm.__version__)
 
-# Create a simple brain
+# Create a simple brain with default settings
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
-print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
+
+# Initialize brain (required before simulation)
+brain.initialize()
 ```
+
+**Important:** The Python bindings are minimal but functional. Many high-level C++ features are not exposed through the Python API.
+
+---
 
 ---
 
@@ -190,7 +202,11 @@ world.update(timestep=0.1)
 import pynlm
 
 def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+    """Run a complete agent simulation with brain and world.
+    
+    Note: This demonstrates what's actually working. Many high-level features
+    shown in documentation are not yet integrated.
+    """
     
     # 1. Create configuration
     config = pynlm.createDefaultConfig()
@@ -211,11 +227,10 @@ def run_agent_simulation(num_steps=1000):
     # 5. Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
+    # 6. Enable working subsystems
+    agent.enableRewardModulation(True)    # Basic reward modulation
+    agent.enableCuriosity(True)           # Basic novelty detection
+    # Note: Development is minimal, many cognitive systems not integrated
     
     # 7. Run simulation loop
     for step in range(num_steps):
@@ -228,7 +243,7 @@ def run_agent_simulation(num_steps=1000):
         # Process sensory input in brain
         agent.processSensoryInput(percept)
         
-        # Run brain step
+        # Run brain step (neurons fire, STDP updates)
         brain.step(step)
         
         # Decode motor command from brain activity
@@ -237,11 +252,11 @@ def run_agent_simulation(num_steps=1000):
         # Apply motor command to world
         world.applyMotorCommand(motor_cmd, world.getSimulationTime())
         
-        # Apply reward modulation
+        # Apply reward modulation (basic dopamine effects only)
         reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
         agent.applyRewardModulation(reward, 0.0)
         
-        # Update development
+        # Update development (minimal effects)
         agent.updateDevelopment(0.1)
         
         # Print progress
@@ -255,6 +270,9 @@ def run_agent_simulation(num_steps=1000):
 # Run the simulation
 run_agent_simulation(1000)
 ```
+
+**What's Working:** Basic sensory-motor loop, reward modulation, curiosity.
+**What's NOT Working:** Memory systems, prediction, advanced planning, full development.
 
 ### Key Classes and Methods
 
@@ -284,13 +302,15 @@ brain.getAverageFiringRate()      # Average firing rate
 brain.getExcitationInhibitionRatio()  # E/I balance
 
 # State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
+brain.save("checkpoint.bin")       # Save state (STUB - not implemented)
+brain.load("checkpoint.bin")       # Load state (STUB - not implemented)
 
 # Regions
 region_id = brain.addRegion("cortex")
 region = brain.getRegion(region_id)
 ```
+
+**Important:** `save()` and `load()` are STUBS (return false, do nothing). Use C++ CheckpointSystem for persistence.
 
 #### Config Class
 
@@ -334,10 +354,10 @@ agent.updateDevelopment(timestep)
 agent.getDevelopmentalStage()
 
 # Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
+agent.enableRewardModulation(True/False)      # Learn from rewards
+agent.enableStructuralPlasticity(True/False)  # Grow new connections
+agent.enableDevelopment(True/False)           # Brain matures over time
+agent.enableCuriosity(True/False)             # Explore new things
 
 # Statistics
 agent.getCuriosityLevel()
@@ -416,9 +436,9 @@ pynlm.WorldObjectType.Marker
 
 ---
 
-## Part 4: Configuration Options
+## Part 4: Configuration Options (What's Actually Implemented)
 
-### Brain Configuration
+### Brain Configuration (All Implemented)
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -433,24 +453,26 @@ pynlm.WorldObjectType.Marker
 | `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
 | `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
 
-### Plasticity Configuration
+### Plasticity Configuration (All Implemented)
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `plasticity.stdp.enable` | bool | true | Enable STDP |
+| `plasticity.stdp.enable` | bool | true | Enable Spike-Timing-Dependent Plasticity |
 | `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
 | `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (ms) |
 | `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
 | `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
-| `plasticity.structural.enable` | bool | true | Enable structural plasticity |
+| `plasticity.structural.enable` | bool | true | Enable structural plasticity (every 100 steps) |
 
-### Neuromodulation Configuration
+### Neuromodulation Configuration (Partial Implementation)
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
-| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
-| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale (basic STDP scaling only) |
+| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration (basic) |
+| `neuromod.novelty.enable` | bool | true | Enable novelty detection (basic) |
+
+**Note:** Other neuromodulators (serotonin, norepinephrine, ACh) are STUBS.
 
 ---
 
@@ -466,11 +488,14 @@ config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
 
-# Simulate
+# Simulate (basic neural computation)
 for i in range(100):
     brain.step(i)
 
 print("Simulation complete!")
+print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Avg firing rate: {brain.getAverageFiringRate():.2f}")
 ```
 
 ### Environment Interaction
@@ -488,12 +513,19 @@ world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
 world.reset()
 agent.initialize(world)
 
+# Enable working features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
 # Run episode
-for _ in range(500):
+for step in range(500):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
+    brain.step(step)
     world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+
+print("Episode complete!")
+print(f"Total steps: {step + 1}")
 ```
 
 ---
@@ -524,10 +556,15 @@ pip install --force-reinstall .
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
 
+**Brain not working:**
+- Are you calling `brain.initialize()`?
+- Try more simulation steps (needs warmup)
+- Check that sensory input is connected via agent
+
 ---
 
 ## Further Reading
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [PHASE6_FINAL_AUDIT.md](docs/PHASE6_FINAL_AUDIT.md) - Reality check of what's actually implemented
+- [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) - Complete Phase 6 integration examples
