@@ -1,28 +1,40 @@
+// Brain class definition with forward declarations and core interface
+// Includes all system integration points
+
 #pragma once
 
-#include "BrainCore.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/SimulationClock/SimulationClock.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../motor/Action.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../performance/CheckpointSystem.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
-// Forward declarations
-class Config;
+// Forward declarations for all integrated systems
 class RandomGenerator;
-class SimulationClock;
 class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+class NeuralRegion;
 class AttentionalSelection;
 class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -42,7 +54,8 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
-
+// 
+// Phase 6: Final Integration - All systems are coordinated into a unified brain
 class Brain {
 public:
     // Create brain with configuration
