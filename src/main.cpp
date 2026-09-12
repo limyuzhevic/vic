@@ -46,6 +46,7 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+    NLM_LOG_INFO("Banner displayed - Neural Learning Machine Phase 2 starting");
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -163,31 +164,41 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
-    // Inject current into a few neurons and see if spikes propagate
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
-    
-    auto neurons = region->getAllNeurons();
-    if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
-        return;
-    }
-    
     // Get initial spike count
     size_t initialSpikes = brain->getTotalSpikeCount();
     
-    // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+    auto* region = brain->getRegion(RegionId(1));
+    if (!region) {
+        NLM_LOG_ERROR("Failed to get region 1 for connectivity test");
+        return;
+    }
+    
+    auto neurons = region->getAllNeurons();
+    if (neurons.empty()) {
+        NLM_LOG_ERROR("  No neurons found in region!");
+        return;
+    }
+    
+    // Inject current into first 10 neurons with bounds checking
+    size_t testNeurons = std::min(size_t(10), neurons.size());
+    NLM_LOG_INFO("  Injecting current into " + std::to_string(testNeurons) + " neurons...");
+    for (size_t i = 0; i < testNeurons; ++i) {
+        float current = 50.0f;  // Strong excitatory input
+        neurons[i]->injectCurrent(current);
+        NLM_LOG_DEBUG("    Injected " + std::to_string(current) + " to neuron " + std::to_string(i));
     }
     
     // Run a few steps
+    size_t spikes = 0;
     for (SimulationStep step = 0; step < 50; ++step) {
         brain->step(step, step * 0.001);
+        // Log progress every 10 steps for better debugging
+        if (step % 10 == 0) {
+            NLM_LOG_DEBUG("    Step " + std::to_string(step) + ": total spikes = " + std::to_string(brain->getTotalSpikeCount()));
+        }
     }
     
-    size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
+    spikes = brain->getTotalSpikeCount() - initialSpikes;
     NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
     
     if (spikes > 0) {
@@ -195,9 +206,11 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
+            float v = neurons[i]->getMembranePotential();
+            float thresh = neurons[i]->getThreshold();
             NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+                        " V=" + std::to_string(v) +
+                        " thresh=" + std::to_string(thresh));
         }
     }
 }
