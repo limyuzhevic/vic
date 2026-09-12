@@ -65,104 +65,47 @@ PYBIND11_MODULE(pynlm, m) {
             return "<RegionId: " + std::to_string(id.value) + ">";
         });
 
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
+    // Population class for brain structure
+    // Episodic memory for experience storage and replay
+    py::class_<nlm::NeuralEpisodicMemory>(m, "EpisodicMemory", R"pbdoc(Neural episodic memory storing experiences as neural patterns)pbdoc")
         .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
-        .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def("initialize", &nlm::NeuralEpisodicMemory::initialize, py::arg("brain"), "Initialize with brain reference")
+        .def("storeEpisode", &nlm::NeuralEpisodicMemory::storeEpisode, py::arg("episode"), "Store a new experience")
+        .def("retrieveSimilar", &nlm::NeuralEpisodicMemory::retrieveSimilar, py::arg("sensoryPattern"), py::arg("maxResults") = 5, "Retrieve episodes similar to query pattern")
+        .def("retrieveTemporal", &nlm::NeuralEpisodicMemory::retrieveTemporal, py::arg("startTime"), py::arg("endTime"), py::arg("maxResults") = 10, "Retrieve episodes from time window")
+        .def("retrieveByLocation", &nlm::NeuralEpisodicMemory::retrieveByLocation, py::arg("x"), py::arg("y"), py::arg("radius"), py::arg("maxResults") = 5, "Retrieve episodes by location")
+        .def("retrieveAfterAction", &nlm::NeuralEpisodicMemory::retrieveAfterAction, py::arg("action"), py::arg("maxResults") = 5, "Retrieve episodes following specific action")
+        .def("replayEpisode", &nlm::NeuralEpisodicMemory::replayEpisode, py::arg("episode"), "Replay an episode to reactivate neural patterns")
+        .def("updateRelevance", &nlm::NeuralEpisodicMemory::updateRelevance, py::arg("episodeId"), py::arg("relevanceDelta"), "Update episode relevance")
+        .def("getEpisode", &nlm::NeuralEpisodicMemory::getEpisode, py::arg("index"), "Get episode by index")
+        .def("getEpisodeCount", &nlm::NeuralEpisodicMemory::getEpisodeCount, "Get total number of episodes")
+        .def("getRecentEpisodes", &nlm::NeuralEpisodicMemory::getRecentEpisodes, py::arg("count"), "Get recent episodes")
+        .def("getAverageReward", &nlm::NeuralEpisodicMemory::getAverageReward, "Get average reward from episodes")
+        .def("consolidate", &nlm::NeuralEpisodicMemory::consolidate, py::arg("relevanceThreshold"), "Consolidate old episodes")
+        .def("clear", &nlm::NeuralEpisodicMemory::clear, "Clear all episodes")
+        .def("enableReplay", &nlm::NeuralEpisodicMemory::enableReplay, py::arg("enable"), "Enable/disable replay")
+        .def("isReplayEnabled", &nlm::NeuralEpisodicMemory::isReplayEnabled, "Check if replay is enabled")
+        .def("getEpisodesForReplay", &nlm::NeuralEpisodicMemory::getEpisodesForReplay, py::arg("count"), "Get episodes for replay")
+        .def("replaySequence", &nlm::NeuralEpisodicMemory::replaySequence, py::arg("episodeIds"), "Replay multiple episodes")
+        .def("__repr__", [](const nlm::NeuralEpisodicMemory& ep) {
+            return "<EpisodicMemory episodes=" + std::to_string(ep.getEpisodeCount()) + ">";
+        }, "Get string representation of episodic memory");
 
-    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
-        .value("Excitatory", NeuronType::Excitatory)
-        .value("Inhibitory", NeuronType::Inhibitory)
-        .value("Modulatory", NeuronType::Modulatory)
-        .value("Sensory", NeuronType::Sensory)
-        .value("Motor", NeuronType::Motor)
-        .value("Internal", NeuronType::Internal)
-        .export_values();
-
-    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
-        .value("Excitatory", SynapseType::Excitatory)
-        .value("Inhibitory", SynapseType::Inhibitory)
-        .value("Modulatory", SynapseType::Modulatory)
-        .value("Electrical", SynapseType::Electrical)
-        .value("GapJunction", SynapseType::GapJunction)
-        .export_values();
-
-    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
-        .value("Initial", DevelopmentalStage::Initial)
-        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
-        .value("Maturation", DevelopmentalStage::Maturation)
-        .value("Adult", DevelopmentalStage::Adult)
-        .value("Aging", DevelopmentalStage::Aging)
-        .export_values();
-
-    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
-        .value("Resting", FiringState::Resting)
-        .value("Active", FiringState::Active)
-        .value("Refractory", FiringState::Refractory)
-        .value("Inhibited", FiringState::Inhibited)
-        .export_values();
-
-    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
-        .value("MoveForward", ActionType::MoveForward)
-        .value("MoveBackward", ActionType::MoveBackward)
-        .value("MoveLeft", ActionType::MoveLeft)
-        .value("MoveRight", ActionType::MoveRight)
-        .value("TurnLeft", ActionType::TurnLeft)
-        .value("TurnRight", ActionType::TurnRight)
-        .value("Look", ActionType::Look)
-        .value("LookUp", ActionType::LookUp)
-        .value("LookDown", ActionType::LookDown)
-        .value("Interact", ActionType::Interact)
-        .value("Eat", ActionType::Eat)
-        .value("Drink", ActionType::Drink)
-        .value("Rest", ActionType::Rest)
-        .value("Wait", ActionType::Wait)
-        .value("Custom", ActionType::Custom)
-        .export_values();
-
-    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
-        .value("MoveForward", MotorCommand::MoveForward)
-        .value("MoveBackward", MotorCommand::MoveBackward)
-        .value("TurnLeft", MotorCommand::TurnLeft)
-        .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
-        .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
-        .export_values();
-
-    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
-        .value("Empty", WorldObjectType::Empty)
-        .value("Resource", WorldObjectType::Resource)
-        .value("Hazard", WorldObjectType::Hazard)
-        .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
-        .export_values();
-
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    // Associative memory for pattern associations
+    py::class_<nlm::NeuralAssociativeMemory>(m, "AssociativeMemory", R"pbdoc(Neural associative memory creating relationships between experiences)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+        .def("initialize", &nlm::NeuralAssociativeMemory::initialize, py::arg("brain"), "Initialize with brain reference")
+        .def("associate", static_cast<void (nlm::NeuralAssociativeMemory::*)(const std::vector<float>&, const std::vector<float>&, float)>(&nlm::NeuralAssociativeMemory::associate), py::arg("patternA"), py::arg("patternB"), py::arg("strength") = 1.0f, "Create association between two patterns")
+        .def("associateFromExperience", &nlm::NeuralAssociativeMemory::associateFromExperience, py::arg("episode"), "Create association from episode")
+        .def("retrieve", &nlm::NeuralAssociativeMemory::retrieve, py::arg("queryPattern"), py::arg("maxResults") = 5, "Retrieve patterns associated with query")
+        .def("getAssociationStrength", &nlm::NeuralAssociativeMemory::getAssociationStrength, py::arg("patternA"), py::arg("patternB"), "Get association strength")
+        .def("updateAssociation", &nlm::NeuralAssociativeMemory::updateAssociation, py::arg("patternA"), py::arg("patternB"), py::arg("delta"), "Update association based on outcome")
+        .def("spreadActivation", &nlm::NeuralAssociativeMemory::spreadActivation, py::arg("cuePattern"), py::arg("steps") = 2, "Spread activation from cue pattern")
+        .def("clear", &nlm::NeuralAssociativeMemory::clear, "Clear all associations")
+        .def("getAssociationCount", &nlm::NeuralAssociativeMemory::getAssociationCount, "Get number of associations")
+        .def("__repr__", [](const nlm::NeuralAssociativeMemory& am) {
+            return "<AssociativeMemory associations=" + std::to_string(am.getAssociationCount()) + ">";
+        }, "Get string representation of associative memory");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -411,10 +354,6 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

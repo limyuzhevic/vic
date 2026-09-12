@@ -72,7 +72,36 @@ public:
     
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
-    void step(Timestamp currentTime);
+    void step(Timestamp currentTime) {
+        // Real synaptic dynamics:
+        // 1. Decay short-term plasticity state
+        // 2. Decay eligibility trace
+        // 3. Update efficacy based on use
+        
+        TimestepDuration dt = 0.001;  // 1ms timestep
+        
+        // Decay short-term facilitation (Tsodyks-Markram model)
+        if (pImpl->lastPreSpikeTime >= 0.0f) {
+            float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+            pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        }
+        
+        // Decay short-term depression
+        if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
+            float timeSinceActivity = std::max(
+                pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
+                pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
+            );
+            // Recovery from depression toward 1.0
+            pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        }
+        
+        // Decay eligibility trace for reward-modulated learning
+        decayEligibilityTrace(0.001f);  // Fast decay
+        
+        // Clamp weight bounds
+        pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    }
     
     // Reset to initial state
     void reset();

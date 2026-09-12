@@ -3,14 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
-
-namespace nlm {
-
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
-
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+#include <functional>
+#include <nlohmann/json.hpp>
 
 Config::~Config() = default;
 
@@ -20,39 +14,85 @@ Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // For now, implement basic JSON parsing using nlohmann/json
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    try {
+        nlohmann::json jsonData = nlohmann::json::parse(file);
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Recursive function to extract values from JSON
+        std::function<void(const nlohmann::json&, std::string)> extractFromJson = 
+            [&](const nlohmann::json& json, std::string prefix) {
+                for (auto it = json.begin(); it != json.end(); ++it) {
+                    std::string key = prefix.empty() ? it.key() : prefix + "." + it.key();
+                    
+                    if (it->is_object()) {
+                        extractFromJson(*it, key);
+                    } else if (it->is_array()) {
+                        // Store arrays as string representation for now
+                        set(key, it->dump(), ConfigSource::File);
+                    } else {
+                        // Convert JSON value to ConfigValue
+                        ConfigValue configValue;
+                        if (it->is_string()) {
+                            configValue = it->get<std::string>();
+                        } else if (it->is_number_integer()) {
+                            configValue = it->get<int64_t>();
+                        } else if (it->is_number_unsigned()) {
+                            configValue = it->get<uint64_t>();
+                        } else if (it->is_number_float()) {
+                            configValue = it->get<double>();
+                        } else if (it->is_boolean()) {
+                            configValue = it->get<bool>();
+                        } else if (it->is_null()) {
+                            configValue = "null";
+                        } else {
+                            // Fallback to string representation
+                            configValue = it->dump();
+                        }
+                        set(key, configValue, ConfigSource::File);
+                    }
+                }
+            };
+        
+        extractFromJson(jsonData, "");
+        
+        return true;
+    } catch (const std::exception& e) {
+        // Fallback to simple key=value format for backward compatibility
+        file.clear();
+        file.seekg(0, std::ios::beg);
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '\"' && value.back() == '\"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        return true;  // Don't fail on parse error, just fallback
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
