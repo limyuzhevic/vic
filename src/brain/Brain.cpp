@@ -75,6 +75,9 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // Rest state tracking
+    size_t restStartStep;
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -255,9 +258,8 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    // Initialize prediction system (after neuromodulation)
+    pImpl->predictionSystem->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -505,6 +507,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Also store position and action information
+            episode.positionX = 0.0f;  // Would be actual position if world is integrated
+            episode.positionY = 0.0f;
+            episode.orientation = 0.0f;  // Would be actual orientation
+            
+            // Get action from motor neurons
+            ActionType actionType = ActionType::Wait;
+            if (!pImpl->motorNeurons.empty()) {
+                size_t firingMotor = 0;
+                for (auto* neuron : pImpl->motorNeurons) {
+                    if (neuron->isFiring()) {
+                        ++firingMotor;
+                    }
+                }
+                if (firingMotor > 0) {
+                    actionType = ActionType::MoveForward;
+                }
+            }
+            episode.action = actionType;
+            
+            // Store the episode
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
@@ -513,6 +536,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        if (pImpl->predictionError) {
+            // Generate simple prediction based on recent activity
+            float prediction = 0.0f;
+            if (!pImpl->regions.empty() && !pImpl->regions[0]->getPopulations().empty()) {
+                for (const auto& pop : pImpl->regions[0]->getPopulations()) {
+                    float popActivity = pop->getAverageFiringRate();
+                    prediction += popActivity * 0.1f;  // Scale factor
+                }
+            }
+            
+            // Update prediction error
+            float actual = prediction;  // Simplified - would be actual sensory input
+            pImpl->predictionError->computeError(prediction, actual);
+            
+            // Apply prediction error to neuromodulation
+            float errorMagnitude = pImpl->predictionError->getMagnitude();
+            if (errorMagnitude > 0.01f) {  // Only if significant error
+                // Apply neuromodulation
+                Neuromodulator tempSignal;
+                tempSignal.setLevel(errorMagnitude * 2.0f);
+                applyNeuromodulation(tempSignal);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -537,13 +583,48 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+    // ========== STEP 13.5: Implement sleep/rest cycle for memory consolidation ==========
+    
+    // Check if we should enter rest state for consolidation
+    if (pImpl->developmentSystem) {
+        // Get current developmental stage
+        DevelopmentalStage stage = pImpl->developmentalStage;
+        
+        // Check for rest period based on developmental stage
+        // More rest in early development for consolidation
+        size_t restSteps = (stage == DevelopmentalStage::Initial) ? 500 : 
+                          (stage == DevelopmentalStage::CriticalPeriod) ? 200 : 100;
+        
+        if (!pImpl->isResting && currentStep >= pImpl->restStartStep + restSteps) {
+            pImpl->isResting = true;
+            pImpl->restStartStep = currentStep;
+            
+            NLM_LOG_INFO("Brain entering rest state for memory consolidation");
+            
+            // Trigger consolidation of important memories
+            if (pImpl->episodicMemory) {
+                pImpl->episodicMemory->consolidate(0.2f);  // Lower threshold during rest
+            }
+            
+            // Replay important memories during rest
+            if (pImpl->episodicMemory && pImpl->episodicMemory->isReplayEnabled()) {
+                auto importantEpisodes = pImpl->episodicMemory->getEpisodesForReplay(5);
+                for (const auto* episode : importantEpisodes) {
+                    pImpl->episodicMemory->replayEpisode(episode);
+                }
+                NLM_LOG_INFO("Replayed " + std::to_string(importantEpisodes.size()) + 
+                           " important episodes during rest period");
+            }
+        } else if (pImpl->isResting && currentStep >= pImpl->restStartStep + restSteps) {
+            // Exit rest state
+            pImpl->isResting = false;
+            NLM_LOG_INFO("Brain exiting rest state");
         }
+    }
+    
+    // If we just exited rest, update development
+    if (!pImpl->isResting && pImpl->developmentalStage != DevelopmentalStage::Initial) {
+        // Development continues during active processing
     }
     
     // ========== STEP 13: Apply development effects ==========
