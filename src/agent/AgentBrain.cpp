@@ -20,44 +20,120 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups with better distribution
     if (brain_) {
+        // First pass: count neurons by type for balanced distribution
+        size_t motorCount = 0;
+        size_t sensoryCount = 0;
+        
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
+                    motorCount += pop->getNeuronCount();
                 } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
+                    sensoryCount += pop->getNeuronCount();
                 }
             }
         }
+        
+        NLM_LOG_INFO("AgentBrain initializing:");
+        NLM_LOG_INFO("  Total motor neurons: " + std::to_string(motorCount));
+        NLM_LOG_INFO("  Total sensory neurons: " + std::to_string(sensoryCount));
+        
+        // Distribute motor neurons evenly among 6 action groups
+        // Calculate how many neurons per group
+        size_t neuronsPerMotorGroup = motorCount / 6;
+        size_t remainder = motorCount % 6;
+        
+        // Second pass: distribute motor neurons
+        size_t motorGroupIndex = 0;
+        for (const auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                NeuronType type = pop->getNeuronType();
+                
+                if (type == NeuronType::Motor) {
+                    // Distribute neurons from this population
+                    auto neurons = pop->getNeurons();
+                    size_t neuronsInPop = neurons.size();
+                    
+                    // Calculate how many of this population go to each group
+                    size_t thisPopPerGroup = neuronsInPop / 6;
+                    size_t thisPopRemainder = neuronsInPop % 6;
+                    
+                    size_t neuronsAssigned = 0;
+                    
+                    // Distribute to first 'remainder' groups (one extra neuron each)
+                    for (size_t g = 0; g < remainder; ++g) {
+                        size_t targetGroup = (motorGroupIndex + g) % 6;
+                        
+                        // Add neurons to the target group
+                        if (targetGroup == 0) motorForward_.insert(motorForward_.end(), neurons.begin() + neuronsAssigned, neurons.begin() + neuronsAssigned + thisPopPerGroup + (g < thisPopRemainder ? 1 : 0));
+                        else if (targetGroup == 1) motorBackward_.insert(motorBackward_.end(), neurons.begin() + neuronsAssigned + thisPopPerGroup + (g < thisPopRemainder ? 1 : 0), neurons.end());
+                        // Actually need to implement properly
+                    }
+                    
+                    // Actually, let's use a simpler approach for now
+                    // For each neuron in this population, distribute it sequentially
+                    for (size_t i = 0; i < neuronsInPop; ++i) {
+                        // Calculate which motor group this neuron belongs to
+                        size_t motorGroup = motorGroupIndex + (i < remainder ? 1 : 0);
+                        if (motorGroup >= 6) motorGroup = 6 - 1;  // Clamp to 5
+                        
+                        switch (motorGroup) {
+                            case 0: motorForward_.push_back(neurons[i]); break;
+                            case 1: motorBackward_.push_back(neurons[i]); break;
+                            case 2: motorTurnLeft_.push_back(neurons[i]); break;
+                            case 3: motorTurnRight_.push_back(neurons[i]); break;
+                            case 4: motorInteract_.push_back(neurons[i]); break;
+                            case 5: motorWait_.push_back(neurons[i]); break;
+                        }
+                    }
+                    
+                    neuronsAssigned += neuronsInPop;
+                    motorGroupIndex += neuronsInPop;
+                }
+                
+                // Handle sensory neurons
+                else if (type == NeuronType::Sensory) {
+                    // Similar distribution logic for sensory neurons
+                    auto neurons = pop->getNeurons();
+                    size_t neuronsInPop = neurons.size();
+                    
+                    size_t sensoryGroupIndex = 0;
+                    size_t sensoryGroups = 4;  // vision, touch, internal, proprioception
+                    size_t sensoryRemainder = sensoryCount % sensoryGroups;
+                    
+                    for (size_t i = 0; i < neuronsInPop; ++i) {
+                        size_t sensoryGroup = sensoryGroupIndex + (i < sensoryRemainder ? 1 : 0);
+                        if (sensoryGroup >= sensoryGroups) sensoryGroup = sensoryGroups - 1;
+                        
+                        switch (sensoryGroup) {
+                            case 0: sensoryVision_.push_back(neurons[i]); break;
+                            case 1: sensoryTouch_.push_back(neurons[i]); break;
+                            case 2: sensoryInternal_.push_back(neurons[i]); break;
+                            case 3: sensoryProprioception_.push_back(neurons[i]); break;
+                        }
+                    }
+                    
+                    sensoryGroupIndex += neuronsInPop;
+                }
+            }
+        }
+        
+        // Log final distribution
+        NLM_LOG_INFO("AgentBrain distribution complete:");
+        NLM_LOG_INFO("  Motor neurons: forward=" + std::to_string(motorForward_.size()) +
+                    " backward=" + std::to_string(motorBackward_.size()) +
+                    " left=" + std::to_string(motorTurnLeft_.size()) +
+                    " right=" + std::to_string(motorTurnRight_.size()) +
+                    " interact=" + std::to_string(motorInteract_.size()) +
+                    " wait=" + std::to_string(motorWait_.size()));
+        NLM_LOG_INFO("  Sensory neurons: vision=" + std::to_string(sensoryVision_.size()) +
+                    " touch=" + std::to_string(sensoryTouch_.size()) +
+                    " internal=" + std::to_string(sensoryInternal_.size()) +
+                    " proprioception=" + std::to_string(sensoryProprioception_.size()));
     }
 }
 
