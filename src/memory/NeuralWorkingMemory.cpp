@@ -43,15 +43,8 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
+        // Set neuron activation using the brain's injectCurrent method
+        brain_->injectCurrent(neuron, activation * 5.0f);
         
         // Update stored activation
         if (i < memoryActivations_.size()) {
@@ -81,6 +74,15 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        activeTraces_.push_back(0);
+    } else {
+        // Replace the oldest weak trace
+        auto oldest = std::min_element(memoryTimestamps_.begin(), memoryTimestamps_.end());
+        size_t idx = std::distance(memoryTimestamps_.begin(), oldest);
+        
+        memoryNeurons_[idx] = neuron;
+        memoryActivations_[idx] = activation;
+        memoryTimestamps_[idx] = 0;
     }
     
     // Inject current to maintain activation

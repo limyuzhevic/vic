@@ -1,10 +1,13 @@
 #pragma once
 
 #include <string>
-#include <memory>
 #include <vector>
 #include <variant>
+#include <map>
+#include <functional>
 #include <optional>
+#include <memory>
+#include <filesystem>
 
 namespace nlm {
 
@@ -100,6 +103,29 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Template method implementations
+    template<typename T>
+    std::optional<T> get(const std::string& key) const {
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it == pImpl->entries.end()) {
+            return std::nullopt;
+        }
+        
+        try {
+            return std::get<T>(it->value);
+        } catch (const std::bad_variant_access&) {
+            return std::nullopt;
+        }
+    }
+    
+    template<typename T>
+    T getOr(const std::string& key, const T& defaultValue) const {
+        auto val = get<T>(key);
+        return val.has_value() ? val.value() : defaultValue;
+    }
 };
 
 } // namespace nlm

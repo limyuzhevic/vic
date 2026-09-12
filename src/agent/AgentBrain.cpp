@@ -217,15 +217,15 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            // Random motor command - use all available MotorCommand values
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);  // 0-7 inclusive (8 values)
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
                 case 2: return MotorCommand::TurnLeft;
                 case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
+                case 4: return MotorCommand::LookLeft;    // Pan sensor left
+                case 5: return MotorCommand::LookRight;   // Pan sensor right
                 case 6: return MotorCommand::Interact;
                 default: return MotorCommand::Wait;
             }

@@ -215,8 +215,8 @@ bool Brain::initialize() {
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
     
@@ -229,7 +229,7 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
+    // ========== INITIALIZE INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
@@ -290,11 +290,34 @@ bool Brain::initialize() {
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
+    // Initialize episodic memory with default configuration
+    if (pImpl->episodicMemory) {
+        // Set up episodic memory with reasonable defaults
+        pImpl->episodicMemory->setMaxEpisodes(pImpl->config->getOr<size_t>("max_episodes", 10000));
+        pImpl->episodicMemory->enableReplay(pImpl->config->getOr<bool>("enable_replay", true));
+        NLM_LOG_INFO("Episodic memory configured with " + std::to_string(pImpl->episodicMemory->getMaxEpisodes()) + " max episodes");
+    }
+    
+    // Initialize working memory with appropriate capacity
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->setCapacity(pImpl->config->getOr<size_t>("working_memory_capacity", neuronCount / 10));
+        pImpl->workingMemory->setDecayRate(pImpl->config->getOr<float>("working_memory_decay", 0.01f));
+        NLM_LOG_INFO("Working memory configured with capacity " + std::to_string(pImpl->workingMemory->getCapacity()));
+    }
+    
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
     NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    
+    // Memory system status
+    if (pImpl->workingMemory) {
+        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+    }
+    if (pImpl->episodicMemory) {
+        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    }
     
     return true;
 }
