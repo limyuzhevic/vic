@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
 #include <vector>
 #include <memory>
 
@@ -13,6 +14,9 @@ class PredictionSystem {
 public:
     PredictionSystem();
     ~PredictionSystem();
+    
+    // Initialize with brain reference for integration
+    void initialize(Brain* brain);
     
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
@@ -37,6 +41,7 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    Brain* brain_;
 };
 
 } // namespace nlm

@@ -9,11 +9,15 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/Dopamine.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -229,7 +233,7 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
+// ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
@@ -243,7 +247,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -255,9 +259,14 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
+    // Initialize development system
+    pImpl->developmentSystem->initialize(this);
+    
     // Initialize neuromodulation
+    pImpl->dopamine->initialize(this);
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -511,8 +520,62 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory input from the agent's last percept (simplified)
+        // In a real implementation, this would come from the sensory buffer
+        // For now, we'll use the actual sensory state from the brain's sensory neurons
+        std::vector<float> currentSensoryState;
+        
+        // Extract sensory activity from sensory neurons
+        for (Neuron* neuron : pImpl->sensoryNeurons) {
+            const auto& state = neuron->getState();
+            if (neuron->isFiring() || 
+                std::abs(state.membranePotential - state.restingPotential) > 5.0f) {
+                currentSensoryState.push_back(
+                    std::abs(state.membranePotential - state.restingPotential) / 100.0f);
+            }
+        }
+        
+        if (!currentSensoryState.empty()) {
+            // Create a Vision sensory input from the neural activity
+            auto visionInput = std::make_unique<Vision>(16, 16, 1);
+            visionInput->setData(currentSensoryState);
+            
+            // Let prediction system predict next state based on current sensory state
+            std::unique_ptr<SensoryInput> predictedState = 
+                pImpl->predictionSystem->predictNextState(*visionInput);
+            
+            // Update prediction system with predicted vs actual
+            if (predictedState) {
+                // Update predictions
+                pImpl->predictionSystem->updatePredictions(
+                    *predictedState, 
+                    *visionInput);
+                
+                // Compute prediction error
+                float predictionError = pImpl->predictionSystem->getPredictionError();
+                
+                // Feed prediction error to neuromodulators
+                if (pImpl->predictionError) {
+                    pImpl->predictionError->computeError(
+                        predictionError, predictionError);
+                }
+                
+                // Update neuromodulators with prediction error
+                if (pImpl->curiosity) {
+                    pImpl->curiosity->update(predictionError, predictionError, pImpl->timestep);
+                }
+                
+                if (pImpl->dopamine) {
+                    // Dopamine responds to prediction error for learning
+                    pImpl->dopamine->signalRewardPredictionError(predictionError);
+                }
+                
+                if (pImpl->novelty) {
+                    // Novelty detection based on prediction error magnitude
+                    pImpl->novelty->setLevel(std::min(1.0f, predictionError * 2.0f));
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========

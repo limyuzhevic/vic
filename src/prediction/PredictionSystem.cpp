@@ -17,7 +17,17 @@ PredictionSystem::~PredictionSystem() = default;
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
     // PLACEHOLDER: Just return a copy of current state
-    return currentState.clone();
+    // For now, we create a new Vision input with the same data
+    // In Phase 3, this would be a real neural prediction
+    
+    // Create a new Vision object with same dimensions and data
+    auto* vision = static_cast<const Vision*>(&currentState);
+    auto predictedVision = std::make_unique<Vision>(vision->getWidth(), vision->getHeight(), vision->getChannels());
+    
+    // Copy data - this is a simple placeholder prediction
+    predictedVision->setData(vision->getData());
+    
+    return predictedVision;
 }
 
 void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {

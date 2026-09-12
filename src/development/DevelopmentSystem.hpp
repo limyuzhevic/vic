@@ -40,11 +40,27 @@ public:
     bool isCriticalPeriod() const;
     float getCriticalPeriodProgress() const;
     
+    // Update development (simple version)
+    void update(Brain* brain, SimulationStep currentStep);
+    
+    // Update development with full parameters
+    void update(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    
+    // Get plasticity modifier for current stage
+    float getPlasticityModifier() const;
+    
+    // Get critical period info
+    bool isCriticalPeriod() const;
+    float getCriticalPeriodProgress() const;
+    
     // Get developmental age (in simulation time)
     double getDevelopmentalAge() const { return age_; }
     
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
+    
+    // Initialize development system
+    void initialize(Brain* brain);
     
 private:
     struct Impl;
