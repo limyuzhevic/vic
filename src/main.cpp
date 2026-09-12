@@ -1,4 +1,3 @@
-// NLM (熙然) - Neural Learning Machine
 // Phase 2: Real Neural Computation
 //
 // This phase implements real spiking neural computation with:
@@ -357,10 +356,11 @@ int main(int argc, char** argv) {
     }
     
     // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
+    bool configLoaded = config->loadFromFile(configFile);
+    if (configLoaded) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Using default configuration (file not found: " + configFile + ")");
     }
     
     // Override with command line args

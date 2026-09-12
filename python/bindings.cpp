@@ -416,6 +416,77 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Neuromodulators
+    py::class_<Dopamine>(m, "Dopamine", R"pbdoc(Dopamine neuromodulator for reward learning)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Dopamine::getName)
+        .def("getLevel", &Dopamine::getLevel)
+        .def("setLevel", &Dopamine::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor)
+        .def("signalReward", &Dopamine::signalReward, py::arg("reward"))
+        .def("signalRewardPredictionError", &Dopamine::signalRewardPredictionError, py::arg("error"));
+
+    py::class_<Curiosity>(m, "Curiosity", R"pbdoc(Curiosity neuromodulator for exploration)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Curiosity::getName)
+        .def("getLevel", &Curiosity::getLevel)
+        .def("setLevel", &Curiosity::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Curiosity::getPlasticityFactor)
+        .def("driveExploration", &Curiosity::driveExploration, py::arg("sensoryInput"), py::arg("threshold") = 0.5f);
+
+    py::class_<Novelty>(m, "Novelty", R"pbdoc(Novelty neuromodulator for detecting new patterns)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Novelty::getName)
+        .def("getLevel", &Novelty::getLevel)
+        .def("setLevel", &Novelty::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Novelty::getPlasticityFactor)
+        .def("detectNovelty", &Novelty::detectNovelty, py::arg("pattern"));
+
+    py::class_<PredictionError>(m, "PredictionError", R"pbdoc(Prediction error neuromodulator for learning)pbdoc")
+        .def(py::init<>())
+        .def("getName", &PredictionError::getName)
+        .def("getLevel", &PredictionError::getLevel)
+        .def("setLevel", &PredictionError::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &PredictionError::getPlasticityFactor)
+        .def("computePredictionError", &PredictionError::computePredictionError, py::arg("predicted"), py::arg("actual"));
+
+    // Memory systems
+    py::class_<WorkingMemory, std::shared_ptr<WorkingMemory>>(m, "WorkingMemory", R"pbdoc(Working memory system)pbdoc")
+        .def(py::init<>())
+        .def("addPattern", &WorkingMemory::addPattern, py::arg("pattern"))
+        .def("getPattern", &WorkingMemory::getPattern, py::arg("index"))
+        .def("getPatternCount", &WorkingMemory::getPatternCount)
+        .def("clear", &WorkingMemory::clear)
+        .def("getActivePattern", &WorkingMemory::getActivePattern)
+        .def("setActivePattern", &WorkingMemory::setActivePattern, py::arg("pattern"));
+
+    py::class_<EpisodicMemory, std::shared_ptr<EpisodicMemory>>(m, "EpisodicMemory", R"pbdoc(Episodic memory system)pbdoc")
+        .def(py::init<>())
+        .def("recordExperience", &EpisodicMemory::recordExperience, py::arg("percept"), py::arg("action"), py::arg("reward"))
+        .def("getEpisode", &EpisodicMemory::getEpisode, py::arg("index"))
+        .def("getEpisodeCount", &EpisodicMemory::getEpisodeCount)
+        .def("replay", &EpisodicMemory::replay, py::arg("startIndex"), py::arg("count"))
+        .def("clear", &EpisodicMemory::clear)
+        .def("getLastEpisode", &EpisodicMemory::getLastEpisode);
+
+    py::class_<AssociativeMemory, std::shared_ptr<AssociativeMemory>>(m, "AssociativeMemory", R"pbdoc(Associative memory system)pbdoc")
+        .def(py::init<>())
+        .def("associate", &AssociativeMemory::associate, py::arg("pattern1"), py::arg("pattern2"), py::arg("strength"))
+        .def("recall", &AssociativeMemory::recall, py::arg("pattern"))
+        .def("getAssociationStrength", &AssociativeMemory::getAssociationStrength, py::arg("pattern1"), py::arg("pattern2"))
+        .def("clear", &AssociativeMemory::clear)
+        .def("getPatternCount", &AssociativeMemory::getPatternCount);
+
+    // Prediction system
+    py::class_<PredictionSystem, std::shared_ptr<PredictionSystem>>(m, "PredictionSystem", R"pbdoc(Prediction system for anticipation)pbdoc")
+        .def(py::init<>())
+        .def("predict", &PredictionSystem::predict, py::arg("input"))
+        .def("update", &PredictionSystem::update, py::arg("input"), py::arg("outcome"))
+        .def("getPredictionError", &PredictionSystem::getPredictionError, py::arg("input"))
+        .def("getConfidence", &PredictionSystem::getConfidence, py::arg("input"))
+        .def("reset", &PredictionSystem::reset)
+        .def("getPredictionCount", &PredictionSystem::getPredictionCount);
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
