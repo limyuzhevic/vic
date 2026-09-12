@@ -331,7 +331,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
-    
+
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
@@ -340,7 +340,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
-    
+
     // ========== STEP 3: Detect spikes and schedule spike events ==========
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
@@ -397,9 +397,85 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
-    
+
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
+
+    // ========== STEP 4: Update working memory ==========
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->update(pImpl->timestep);
+    }
+
+    // ========== STEP 5: Apply neuromodulation effects ==========
+    // Update novelty detection
+    if (pImpl->novelty) {
+        pImpl->novelty->update(pImpl->timestep);
+    }
+
+    // Update curiosity
+    if (pImpl->curiosity) {
+        pImpl->curiosity->update(pImpl->timestep);
+    }
+
+    // Update dopamine (reward prediction error)
+    if (pImpl->dopamine) {
+        pImpl->dopamine->update(pImpl->timestep);
+        
+        // Apply dopamine effects on neural excitability
+        // Dopamine modulates neural excitability by adjusting effective current injection
+        // Higher dopamine increases excitability (lower effective threshold)
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Dopamine modulates excitability by injecting additional current
+                    // Positive dopamine adds excitatory bias
+                    float excitabilityMod = dopamineLevel * 0.5f;
+                    if (excitabilityMod > 0.0f) {
+                        neuron->injectCurrent(excitabilityMod);
+                    }
+                }
+            }
+        }
+    }
+
+    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+    // Calculate neuromodulation factor for plasticity
+    float plasticityMod = 1.0f;
+    if (pImpl->dopamine) {
+        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+
+    for (auto& region : pImpl->regions) {
+        for (auto& syn : region->getSynapses()) {
+            // Apply STDP with neuromodulation
+            if (syn->getPlasticityFlags().stdp) {
+                const auto& preSpikes = syn->getPreSpikeHistory();
+                const auto& postSpikes = syn->getPostSpikeHistory();
+                
+                if (!preSpikes.empty() && !postSpikes.empty()) {
+                    // Modify weight change based on dopamine
+                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    float weight = syn->getWeight();
+                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    syn->setWeight(weight);
+                }
+            }
+            
+            // Apply Hebbian learning
+            if (syn->getPlasticityFlags().hebbian) {
+                const auto& preSpikes = syn->getPreSpikeHistory();
+                const auto& postSpikes = syn->getPostSpikeHistory();
+                
+                if (!preSpikes.empty() && !postSpikes.empty()) {
+                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                }
+            }
+            
+            // Update synapse state
+            syn->step(currentTime);
+        }
+    }
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
@@ -482,13 +558,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
         
-        if (pImpl->episodicMemory) {
+        if (pImpl->episodicMemory && pImpl->workingMemory) {
             // Capture current brain state as an episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store active neurons and their activations from neural activity
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -505,7 +581,63 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Convert working memory traces to a neural pattern for episodic storage
+            std::vector<float> sensoryState;
+            std::vector<float> resultingSensoryState;
+            
+            // Get working memory content as pattern
+            if (!pImpl->workingMemory->getMemoryNeurons().empty()) {
+                // Create a simplified sensory state representation from working memory
+                sensoryState = std::vector<float>(100, 0.0f);  // Fixed size for compatibility
+                size_t numTraces = std::min(pImpl->workingMemory->getMemoryNeurons().size(), (size_t)100);
+                for (size_t i = 0; i < numTraces; ++i) {
+                    NeuronId neuron = pImpl->workingMemory->getMemoryNeurons()[i];
+                    float activation = pImpl->workingMemory->getNeuronActivation(neuron);
+                    sensoryState[i] = activation;
+                }
+                
+                // Create resulting state - add some variation for action outcome
+                resultingSensoryState = sensoryState;
+                for (float& val : resultingSensoryState) {
+                    val += pImpl->rng->uniformFloat(-0.1f, 0.1f);
+                    val = std::clamp(val, 0.0f, 1.0f);
+                }
+            }
+            
+            episode.sensoryState = sensoryState;
+            episode.resultingSensoryState = resultingSensoryState;
+            
+            // Store position/orientation if available (simplified)
+            episode.positionX = 0.0f;  // Would come from agent's position
+            episode.positionY = 0.0f;
+            episode.orientation = 0.0f;
+            
+            // Record action from motor activity
+            if (!pImpl->motorNeurons.empty()) {
+                // Simple action detection based on motor neuron activity
+                size_t firingMotors = 0;
+                for (auto* neuron : pImpl->motorNeurons) {
+                    if (neuron->isFiring()) firingMotors++;
+                }
+                if (firingMotors > 0) {
+                    episode.action = ActionType::MoveForward;
+                } else {
+                    episode.action = ActionType::Wait;
+                }
+            } else {
+                episode.action = ActionType::Wait;
+            }
+            
+            // Store energy and novelty
+            episode.energy = 1.0f;  // Would come from agent's energy
+            episode.novelty = 0.0f;  // Would be computed by novelty detector
+            
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // Create associations between episodic content and working memory patterns
+            if (pImpl->associativeMemory) {
+                pImpl->associativeMemory->associateFromExperience(episode);
+            }
         }
     }
     
