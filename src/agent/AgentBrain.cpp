@@ -19,6 +19,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , previousVision_()
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -212,27 +213,29 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action when curiosity is high
     if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        float exploreChance = curiosityLevel_ * 0.3f; // Up to 30% random
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
+            // Random motor command (use 6 valid motor groups, not 8)
+            return getRandomMotorCommand();
         }
     }
     
     return defaultCmd;
+}
+
+MotorCommand AgentBrain::getRandomMotorCommand() {
+    int choice = brain_->getRandomGenerator()->uniformInt(0, 6);
+    switch (choice) {
+        case 0: return MotorCommand::MoveForward;
+        case 1: return MotorCommand::MoveBackward;
+        case 2: return MotorCommand::TurnLeft;
+        case 3: return MotorCommand::TurnRight;
+        case 4: return MotorCommand::Interact;
+        case 5: return MotorCommand::Wait;
+        default: return MotorCommand::Wait;
+    }
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {

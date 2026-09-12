@@ -76,6 +76,9 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Helper for random motor command selection
+    MotorCommand getRandomMotorCommand();
+    
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups
@@ -112,6 +115,29 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Constants for neuromodulation and curiosity
+    static constexpr float NOVELTY_THRESHOLD = 0.5f;
+    static constexpr float ACTIVITY_THRESHOLD = 0.5f;
+    static constexpr float EXPLORATION_FACTOR = 0.3f;
+    static constexpr float SENSORY_NOVELTY_DECAY = 0.99f;
+    static constexpr float EXPECTED_REWARD_DECAY = 0.95f;
+    static constexpr float EXPECTED_REWARD_UPDATE = 0.05f;
+    static constexpr float PLASTICITY_FACTOR_BASE = 0.5f;
+    static constexpr float PLASTICITY_FACTOR_MAX = 0.5f;
+    
+    // Development constants
+    static constexpr double DEVELOPMENTAL_STAGE_INITIAL = 60.0;
+    static constexpr double DEVELOPMENTAL_STAGE_CRITICAL = 300.0;
+    static constexpr double DEVELOPMENTAL_STAGE_MATURATION = 900.0;
+    
+    // Structural plasticity constants
+    static constexpr float SYNAPTONGENESIS_RATE_INITIAL = 0.0001f;
+    static constexpr float PRUNING_RATE_INITIAL = 0.00001f;
+    
+    // Motor neuron distribution constants
+    static constexpr size_t MOTOR_GROUP_COUNT = 6;
+    static constexpr size_t SENSORY_GROUP_COUNT = 4;
 };
 
 } // namespace nlm
