@@ -6,28 +6,143 @@
 #include <string>
 #include <vector>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
-
-namespace py = pybind11;
+// Custom exception hierarchy for better error handling
 namespace nlm {
+
+class ConfigError : public std::runtime_error {
+public:
+    explicit ConfigError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ValidationError : public std::runtime_error {
+public:
+    explicit ValidationError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class CreationError : public std::runtime_error {
+public:
+    explicit CreationError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class BrainError : public std::runtime_error {
+public:
+    explicit BrainError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class AgentError : public std::runtime_error {
+public:
+    explicit AgentError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class WorldError : public std::runtime_error {
+public:
+    explicit WorldError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class SensoryError : public std::runtime_error {
+public:
+    explicit SensoryError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class MotorError : public std::runtime_error {
+public:
+    explicit MotorError(const std::string& message) : std::runtime_error(message) {}
+};
+
+// Input validation helpers
+inline void validate_positive(double value, const std::string& name) {
+    if (value < 0) {
+        throw ValidationError(name + " must be non-negative, got " + std::to_string(value));
+    }
+}
+
+inline void validate_range(double value, double min, double max, const std::string& name) {
+    if (value < min || value > max) {
+        throw ValidationError(name + " must be in range [" + std::to_string(min) + ", " + std::to_string(max) + "], got " + std::to_string(value));
+    }
+}
+
+inline void validate_non_empty(const std::string& value, const std::string& name) {
+    if (value.empty()) {
+        throw ValidationError(name + " cannot be empty");
+    }
+}
+
+// Utility functions
+double clamp(double value, double min, double max);
+double lerp(double a, double b, double t);
+double ease_in_out(double t);
+std::shared_ptr<Config> createConfig();
+
+// Convenience functions implementation
+double ease_in_out(double t) {
+    if (t <= 0.0) return 0.0;
+    if (t >= 1.0) return 1.0;
+    return t * t * (3.0 - 2.0 * t);
+}
+
+double lerp(double a, double b, double t) {
+    return a + (b - a) * t;
+}
+
+double clamp(double value, double min, double max) {
+    return std::max(min, std::min(max, value));
+}
+
+std::shared_ptr<Config> createConfig() {
+    return std::make_shared<Config>();
+}
+
+} // namespace nlm
+
+// Forward declarations for binding functions
+void bindTypes(py::module_& m);
+void bindConfig(py::module_& m);
+void bindSensory(py::module_& m);
+void bindMotor(py::module_& m);
+void bindWorld(py::module_& m);
+void bindBrain(py::module_& m);
+void bindAgent(py::module_& m);
+void bindFactoryFunctions(py::module_& m);
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        Provides modular bindings for different components: types, config, sensory, motor, world, brain, and agent.
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Register custom exception types
+    py::register_exception<nlm::ConfigError>(m, "ConfigError", PyExc_RuntimeError);
+    py::register_exception<nlm::ValidationError>(m, "ValidationError", PyExc_ValueError);
+    py::register_exception<nlm::CreationError>(m, "CreationError", PyExc_RuntimeError);
+    py::register_exception<nlm::BrainError>(m, "BrainError", PyExc_RuntimeError);
+    py::register_exception<nlm::AgentError>(m, "AgentError", PyExc_RuntimeError);
+    py::register_exception<nlm::WorldError>(m, "WorldError", PyExc_RuntimeError);
+    py::register_exception<nlm::SensoryError>(m, "SensoryError", PyExc_RuntimeError);
+    py::register_exception<nlm::MotorError>(m, "MotorError", PyExc_RuntimeError);
+
+    // Convenience functions
+    m.def("clamp", &nlm::clamp, "Clamp a value between min and max bounds",
+          py::arg("value"), py::arg("min"), py::arg("max"));
+    m.def("lerp", &nlm::lerp, "Linear interpolation between two values",
+          py::arg("a"), py::arg("b"), py::arg("t"));
+    m.def("ease_in_out", &nlm::ease_in_out, "Ease-in-out interpolation function",
+          py::arg("t"));
+    m.def("create_config", &nlm::createConfig, "Create a default configuration",
+          py::return_value_policy::take_ownership);
+
+    // Load all binding modules
+    bindTypes(m);
+    bindConfig(m);
+    bindSensory(m);
+    bindMotor(m);
+    bindWorld(m);
+    bindBrain(m);
+    bindAgent(m);
+    bindFactoryFunctions(m);
+}
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())

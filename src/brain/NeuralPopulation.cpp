@@ -58,6 +58,11 @@ const Neuron* NeuralPopulation::getNeuron(NeuronIndex index) const {
 }
 
 void NeuralPopulation::addNeuron(Neuron* neuron) {
+    if (!neuron) {
+        NLM_LOG_ERROR("Attempting to add null neuron to population");
+        return;
+    }
+    
     pImpl->neurons.push_back(neuron);
     if (pImpl->size < pImpl->neurons.size()) {
         pImpl->size = pImpl->neurons.size();
