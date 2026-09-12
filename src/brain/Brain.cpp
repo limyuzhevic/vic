@@ -506,6 +506,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // Store in associative memory
+            if (pImpl->associativeMemory) {
+                std::vector<float> sensoryPattern;
+                for (auto* neuron : pImpl->sensoryNeurons) {
+                    sensoryPattern.push_back(neuron->getState().membranePotential);
+                }
+                std::vector<float> actionPattern;
+                for (auto* neuron : pImpl->motorNeurons) {
+                    actionPattern.push_back(neuron->getState().membranePotential);
+                }
+                if (!sensoryPattern.empty()) {
+                    pImpl->associativeMemory->associateFromExperience(episode);
+                }
+            }
         }
     }
     
@@ -513,6 +528,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        if (pImpl->workingMemory) {
+            std::vector<float> memoryPattern = pImpl->workingMemory->retrieve();
+            if (!memoryPattern.empty()) {
+                // Simulate prediction using working memory pattern
+                pImpl->predictionSystem->train(memoryPattern);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========

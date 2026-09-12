@@ -28,9 +28,22 @@ NeuralWorkingMemory::NeuralWorkingMemory()
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
-    pImpl->brain = brain;
     brain_ = brain;
+    pImpl->brain = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
+    
+    // Create initial recurrent connections for each brain region
+    if (brain_) {
+        for (auto& region : brain_->getRegions()) {
+            auto neurons = region->getAllNeurons();
+            if (neurons.size() < 2) continue;
+            
+            // Create a simple chain of recurrent connections for working memory maintenance
+            for (size_t i = 0; i < neurons.size() - 1; ++i) {
+                createRecurrentConnection(neurons[i]->getId(), neurons[i + 1]->getId(), 0.3f);
+            }
+        }
+    }
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
