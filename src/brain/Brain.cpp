@@ -80,7 +80,6 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -98,6 +97,7 @@ struct Brain::Impl {
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
+        // Initialize rng
         rng = std::make_unique<RandomGenerator>(seed);
         
         // Initialize plasticity systems

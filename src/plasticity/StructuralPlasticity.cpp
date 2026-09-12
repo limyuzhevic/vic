@@ -86,9 +86,30 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
     for (auto& region : brain->getRegions()) {
         Synapse* syn = region->getSynapse(synapse);
         if (syn) {
-            // For now, we mark the synapse for removal by zeroing its weight
-            // Actual removal would require modifying the region's synapse storage
-            syn->setWeight(0.0f);
+            // Remove synapse from region's data structures
+            auto& synapses = region->pImpl->synapses;
+            auto& outgoing = region->pImpl->outgoingSynapses;
+            auto& incoming = region->pImpl->incomingSynapses;
+            
+            // Find and remove from synapses vector
+            synapses.erase(std::remove_if(synapses.begin(), synapses.end(),
+                [synapse](const auto& s) { return s->getId() == synapse; }),
+                synapses.end());
+            
+            // Remove from outgoing synapses map
+            for (auto& [source, synIds] : outgoing) {
+                synIds.erase(std::remove_if(synIds.begin(), synIds.end(),
+                    [synapse](SynapseId id) { return id == synapse; }),
+                    synIds.end());
+            }
+            
+            // Remove from incoming synapses map
+            for (auto& [dest, synIds] : incoming) {
+                synIds.erase(std::remove_if(synIds.begin(), synIds.end(),
+                    [synapse](SynapseId id) { return id == synapse; }),
+                    synIds.end());
+            }
+            
             ++pImpl->totalSynapsesPruned;
             return true;
         }

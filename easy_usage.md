@@ -290,8 +290,231 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
+1. Read `HOW_TO_USE.md` for more details about the improved API
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+3. Read `docs/PROGRESSION_TUTORIAL.md` for structured learning paths
+4. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+## New Improved Python API
+
+The NLM Python library has been improved with new factory functions, context managers, and better error handling. Here's what's new:
+
+### New Factory Functions
+
+Instead of creating components separately, use factory functions:
+
+```python
+# Method 1: Simple agent (pre-configured)
+brain, world, agent = pynlm.createSimpleAgent(width=100, height=100)
+
+# Method 2: Default settings
+brain, world, agent = pynlm.createDefaultAgent()
+
+# Method 3: Training agent (with learning enabled)
+brain, world, agent = pynlm.createTrainingAgent(width=200, height=200)
+
+# Method 4: Challenge agent (with obstacles)
+brain, world, agent = pynlm.createChallengeAgent(width=300, height=300)
+
+# Method 5: Custom experiment (from config file)
+brain, world, agent = pynlm.createExperimentAgent(width=400, height=400, config_file="config.json")
+```
+
+### Context Managers
+
+Automatic resource management with context managers:
+
+```python
+# Create agent with automatic cleanup
+with pynlm.createSimpleAgent() as (brain, world, agent):
+    for step in range(100):
+        world.update(0.1)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+
+# Brain context manager
+with pynlm.BrainContextManager(brain) as brain_ctx:
+    for i in range(100):
+        brain_ctx.step(i)
+
+# World context manager  
+with pynlm.SimpleWorldContextManager(world) as world_ctx:
+    for step in range(100):
+        world_ctx.update(0.1)
+```
+
+### Error Handling
+
+Robust simulation with comprehensive error handling:
+
+```python
+def run_simulation_with_error_handling(width=100, height=100, num_steps=1000):
+    brain = world = agent = None
+    
+    try:
+        # Create agent using factory function
+        brain, world, agent = pynlm.createSimpleAgent(width, height)
+        
+        # Run simulation loop
+        for step in range(num_steps):
+            world.update(0.1)
+            agent.processSensoryInput(world.getSensoryPercept())
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Error checking
+            if brain.getFiringNeuronCount() == 0 and step > 100:
+                print("Warning: No neurons firing - possible initialization issue")
+                
+    except pynlm.NLMException as e:
+        print(f"NLM error: {e}")
+        raise
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        raise
+    finally:
+        # Cleanup
+        if agent:
+            agent.reset()
+        if world:
+            world.reset()
+        print("Simulation completed")
+
+# Run robust simulation
+try:
+    run_simulation_with_error_handling()
+except Exception as e:
+    print(f"Simulation failed: {e}")
+```
+
+### Advanced Configuration
+
+Create custom configurations:
+
+```python
+import pynlm
+
+# Create custom configuration
+config = pynlm.createDefaultConfig()
+
+# Customize brain parameters
+config.set("brain.neuron_count", 2000)
+config.set("brain.v_thresh", -45.0)
+config.set("plasticity.stdp.enable", True)
+
+# Customize world
+config.set("world.max_energy", 200.0)
+config.set("world.width", 300.0)
+
+# Save to file
+config.saveToFile("my_config.json")
+
+# Load from file
+new_config = pynlm.Config()
+new_config.loadFromFile("my_config.json")
+
+# Use custom config
+brain = pynlm.createBrain(new_config)
+```
+
+## Quick Reference
+
+### Creating Agents (New API)
+
+| What you want | Old Way | New Way |
+|---------------|---------|----------|
+| Simple agent | `brain = pynlm.createBrain(...); agent = pynlm.createAgentBrain(brain)` | `brain, world, agent = pynlm.createSimpleAgent()` |
+| Training agent | Manual setup with all features enabled | `brain, world, agent = pynlm.createTrainingAgent()` |
+| Challenge agent | Manual setup with obstacles | `brain, world, agent = pynlm.createChallengeAgent()` |
+
+### Context Management
+
+| Need | Old Way | New Way |
+|------|---------|----------|
+| Resource cleanup | Manual reset calls | `with pynlm.createSimpleAgent():` |
+| Batch operations | Multiple function calls | Single context manager |
+
+### Error Handling
+
+| Error type | Old behavior | New behavior |
+|------------|--------------|--------------|
+| NLMException | Generic exception | Specific NLM errors |
+| ValueError | Generic exception | Type checking with clear messages |
+| RuntimeError | Generic exception | Initialization state tracking |
+
+## Upgrading from Old to New API
+
+### Step 1: Replace Manual Creation with Factory Functions
+
+**Old:**
+```python
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(100, 100, 20, 20)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+```
+
+**New:**
+```python
+brain, world, agent = pynlm.createSimpleAgent(width=100, height=100, vision_width=20, vision_height=20)
+```
+
+### Step 2: Add Context Management
+
+**Old:**
+```python
+brain = pynlm.createBrain(...)
+# ... use brain
+brain.reset()  # Manual cleanup
+```
+
+**New:**
+```python
+with pynlm.BrainContextManager(brain) as brain_ctx:
+    # ... use brain
+    # Automatic cleanup on exit
+```
+
+### Step 3: Enable Advanced Features
+
+**Old:**
+```python
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+```
+
+**New:**
+```python
+brain, world, agent = pynlm.createTrainingAgent()  # All features enabled
+# OR with simple agent (features not enabled by default)
+agent = pynlm.createAgentBrain(brain)
+agent.enableRewardModulation(True)  # ... etc
+```
+
+## Summary
+
+The new improved Python API provides:
+
+1. **Factory Functions**: One-line agent creation with sensible defaults
+2. **Context Managers**: Automatic resource management and cleanup
+3. **Better Error Handling**: Specific error types with meaningful messages
+4. **Flexible Configuration**: Custom configuration with file I/O
+5. **Learning Path Tutorial**: Structured progression from beginner to advanced
+
+The documentation has been reorganized into a learning progression system (`docs/PROGRESSION_TUTORIAL.md`) that guides users through:
+- **Level 1**: Foundations (silent brain, agent in world)
+- **Level 2**: Core Patterns (simulation loops, monitoring)
+- **Level 3**: Factory Functions and Context Managers
+- **Level 4**: Advanced Features and Custom Experiments
+
+That's it! You're now ready to use NLM with the improved Python API.

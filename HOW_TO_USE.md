@@ -184,77 +184,401 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Advanced Features
+
+The NLM Python API includes advanced features for complex simulations and experiments:
+
+#### Context Managers
+
+Automatic resource management prevents memory leaks and ensures clean shutdown:
+
+```python
+# Create agent with automatic cleanup
+with pynlm.createSimpleAgent(width=100, height=100) as (brain, world, agent):
+    for step in range(100):
+        world.update(0.1)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+# Agent is automatically reset when exiting the context
+```
+
+Brain context manager for automatic reset:
+
+```python
+# Brain context manager - useful for simulation loops
+with pynlm.BrainContextManager(brain) as brain_ctx:
+    for step in range(100):
+        brain_ctx.step(step)
+```
+
+World context manager:
+
+```python
+# World context manager for world management
+with pynlm.SimpleWorldContextManager(world) as world_ctx:
+    for step in range(100):
+        world_ctx.update(0.1)
+```
+
+#### Factory Functions
+
+One-line agent creation with pre-configured settings:
 
 ```python
 import pynlm
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+# Method 1: Simple agent with custom dimensions
+brain, world, agent = pynlm.createSimpleAgent(
+    width=100, 
+    height=100, 
+    vision_width=20, 
+    vision_height=20
+)
+
+# Method 2: Default settings (pre-configured)
+brain, world, agent = pynlm.createDefaultAgent()
+
+# Method 3: Training agent (advanced features enabled)
+brain, world, agent = pynlm.createTrainingAgent(width=200, height=200)
+
+# Method 4: Challenge agent (obstacles and hazards)
+brain, world, agent = pynlm.createChallengeAgent(width=300, height=300)
+
+# Method 5: Experiment agent (custom configuration)
+brain, world, agent = pynlm.createExperimentAgent(
+    width=400, height=400, 
+    config_file="my_config.json"
+)
+```
+
+#### Error Handling and Validation
+
+Robust simulation with comprehensive error handling:
+
+```python
+import pynlm
+
+def run_agent_simulation(width=100, height=100, num_steps=1000):
+    """Run a simulation with proper error handling."""
+    brain = world = agent = None
     
-    # 1. Create configuration
+    try:
+        # Create agent using factory function
+        brain, world, agent = pynlm.createSimpleAgent(width, height)
+        
+        # Run simulation loop
+        for step in range(num_steps):
+            world.update(0.1)
+            agent.processSensoryInput(world.getSensoryPercept())
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Error checking
+            if brain.getFiringNeuronCount() == 0 and step > 100:
+                print("Warning: No neurons firing - possible initialization issue")
+                
+    except pynlm.NLMException as e:
+        print(f"NLM error: {e}")
+        raise
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        raise
+    finally:
+        # Cleanup
+        if agent:
+            agent.reset()
+        if world:
+            world.reset()
+        print("Simulation completed or terminated")
+
+# Run robust simulation
+try:
+    run_agent_simulation()
+except Exception as e:
+    print(f"Simulation failed: {e}")
+```
+
+#### Advanced Configuration
+
+Create and use complex configuration files:
+
+```python
+import pynlm
+import json
+
+# Create custom configuration
+config = pynlm.createDefaultConfig()
+
+# Customize brain parameters
+config.set("brain.neuron_count", 2000)           # More neurons
+config.set("brain.v_thresh", -45.0)              # Different threshold
+config.set("plasticity.stdp.enable", True)       # Enable STDP
+config.set("plasticity.stdp.learning_rate", 0.001)  # Learning rate
+config.set("neuromodulation.reward_modulation", True)  # Enable reward
+
+# Customize world parameters
+config.set("world.max_energy", 200.0)
+config.set("world.width", 300.0)
+config.set("world.energy_decay_rate", 0.01)
+
+# Save configuration to file
+config.saveToFile("advanced_config.json")
+
+# Load configuration from file
+new_config = pynlm.Config()
+if new_config.loadFromFile("advanced_config.json"):
+    brain = pynlm.createBrain(new_config)
+    brain.initialize()
+else:
+    print("Failed to load configuration")
+```
+
+#### Custom Experiments
+
+Building complex experiment setups:
+
+```python
+import pynlm
+from typing import Tuple
+
+def create_custom_experiment(
+    config_file: str = None,
+    world_width: float = 200,
+    world_height: float = 200,
+    vision_size: int = 30,
+    enable_all_features: bool = True
+) -> Tuple[pynlm.Brain, pynlm.SimpleWorld, pynlm.AgentBrain]:
+    """Create a custom experiment with advanced setup."""
+    
+    # Create configuration
     config = pynlm.createDefaultConfig()
     
-    # 2. Create brain and initialize
+    if config_file:
+        if not config.loadFromFile(config_file):
+            raise ValueError(f"Failed to load config file: {config_file}")
+    
+    if enable_all_features:
+        # Override with advanced settings
+        config.set("brain.neuron_count", 3000)
+        config.set("brain.region_count", 10)
+        config.set("world.max_energy", 200.0)
+        config.set("world.energy_decay_rate", 0.01)
+        config.set("development.enabled", True)
+        config.set("neuromodulation.reward_modulation", True)
+        config.set("neuromodulation.curiosity", True)
+    
+    # Create and initialize brain
     brain = pynlm.createBrain(config)
-    brain.initialize()
+    if not brain.initialize():
+        raise RuntimeError("Failed to initialize brain")
     
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
-    
-    # 4. Create and configure world
+    # Create world with configuration
     world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
+    world.configure(world_width, world_height, vision_size, vision_size)
+    world.setAgentStart(world_width/2, world_height/2)
     
-    # 5. Initialize agent with world
+    # Enable advanced environment features
+    if enable_all_features:
+        world.setMaxEnergy(200.0)
+        world.setEnergyDecayRate(0.01)
+        
+        # Add challenge environment objects
+        world.addObject(pynlm.WorldObject.create_resource(50, 50, 10.0))
+        world.addObject(pynlm.WorldObject.create_resource(150, 150, 5.0))
+        world.addObject(pynlm.WorldObject.create_hazard(100, 100, 3.0))
+        world.addObject(pynlm.WorldObject.create_marker(180, 180))
+    
+    # Create and initialize agent brain
+    agent = pynlm.createAgentBrain(brain)
     agent.initialize(world)
     
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
+    # Enable learning features
+    if enable_all_features:
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(True)
     
-    # 7. Run simulation loop
+    return brain, world, agent
+
+def run_experiment(brain, world, agent, num_steps=1000):
+    """Run a complete experiment with detailed monitoring."""
     for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
+        # Update world state
+        world.update(0.1)
         
-        # Get sensory input from world
+        # Get and process sensory input
         percept = world.getSensoryPercept()
-        
-        # Process sensory input in brain
         agent.processSensoryInput(percept)
         
-        # Run brain step
+        # Run brain simulation
         brain.step(step)
         
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
+        # Get and apply action
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
         
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
+        # Print progress every 100 steps
         if step % 100 == 0:
             print(f"Step {step}:")
             print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
-
-# Run the simulation
-run_agent_simulation(1000)
+            print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty level: {agent.getNoveltyLevel():.3f}")
+            print()
 ```
+
+### Learning Path Integration
+
+The advanced features build on the basic concepts from `easy_usage.md` and provide a progression:
+
+1. **Start with factory functions** (`createSimpleAgent()`) - combines basic patterns
+2. **Add context managers** - ensures proper resource management
+3. **Implement error handling** - robust production code
+4. **Use advanced configuration** - custom experiments
+5. **Create complex experiments** - full research setups
+
+### Quick Reference Guide
+
+| Advanced Feature | When to Use | One-line Method |
+|------------------|-------------|-----------------|
+| Context Manager | Need automatic cleanup | `with pynlm.createSimpleAgent():` |
+| Factory Function | Want pre-configured agent | `pynlm.createSimpleAgent()` |
+| Error Handling | Production code | Wrap in try/except/finally |
+| Config Files | Persistent settings | `config.saveToFile()` |
+| Custom Experiments | Research setups | `create_custom_experiment()` |
+
+### Error Codes
+
+| Exception Type | When Raised | How to Handle |
+|----------------|-------------|---------------|
+| `NLMException` | NLM-specific errors | Check configuration and state |
+| `ValueError` | Invalid parameters | Validate input types/ranges |
+| `KeyError` | Missing config keys | Use `config.has()` to check |
+| `RuntimeError` | Initialization failure | Check system resources |
+
+---
+
+## Part 5: Example Scripts
+
+### Minimal Example (using factory function)
+
+```python
+import pynlm
+
+# Simple one-liner using factory function
+brain, world, agent = pynlm.createDefaultAgent()
+
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+print("Simulation complete!")
+```
+
+### Environment Interaction with Error Handling
+
+```python
+import pynlm
+
+def run_robust_episode(width=10, height=10, num_steps=500):
+    """Run agent in world with error handling."""
+    try:
+        brain, world, agent = pynlm.createSimpleAgent(width, height)
+        
+        for step in range(num_steps):
+            world.update(0.1)
+            agent.processSensoryInput(world.getSensoryPercept())
+            brain.step(step)
+            world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+            
+    except Exception as e:
+        print(f"Episode failed: {e}")
+        raise
+    finally:
+        # Cleanup
+        if 'agent' in locals():
+            agent.reset()
+        if 'world' in locals():
+            world.reset()
+
+# Run robust episodes
+for episode in range(10):
+    print(f"Episode {episode + 1}")
+    run_robust_episode()
+    print("Episode completed")
+    print()
+```
+
+---
+
+## Troubleshooting
+
+### Build Issues
+
+**CMake cannot find Python:**
+```bash
+pip install scikit-build-core pybind11
+cmake .. -DPython_EXECUTABLE=$(which python)
+```
+
+**Compilation errors:**
+- Ensure C++20 compiler support
+- Check CMake version >= 3.16
+- Verify all source files are present
+
+### Runtime Issues
+
+**ImportError: No module named 'pynlm':**
+```bash
+pip install --force-reinstall .
+```
+
+**Segmentation faults:**
+- Check that `initialize()` is called before `step()`
+- Ensure `reset()` is called before re-running simulation
+- Use context managers for automatic cleanup
+
+**Memory leaks:**
+- Always use context managers: `with pynlm.createSimpleAgent():`
+- Or manually call `reset()` on components
+
+**Configuration errors:**
+- Check key names: `config.set("brain.neuron_count", 1000)`
+- Use `config.has("key")` to check existence
+- Save/load config: `config.saveToFile("config.json")`
+
+---
+
+## Further Reading
+
+- [easy_usage.md](easy_usage.md) - Quick start guide with new API
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
+- [docs/SCIENCE.md](docs/SCIENCE.md) - Scientific background
+- [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [docs/PROGRESSION_TUTORIAL.md](docs/PROGRESSION_TUTORIAL.md) - Complete learning path guide
+
+## Quick Start Summary
+
+For beginners:
+1. Use `easy_usage.md` for quick start
+2. Try `pynlm.createSimpleAgent()` factory function
+3. Use context managers: `with pynlm.createSimpleAgent():`
+
+For intermediates:
+1. Use factory functions: `createTrainingAgent()`, `createChallengeAgent()`
+2. Add error handling with try/except/finally
+3. Use advanced configuration files
+
+For advanced users:
+1. Build custom experiments with `create_custom_experiment()`
+2. Implement complex learning loops
+3. Create research-grade simulations
 
 ### Key Classes and Methods
 

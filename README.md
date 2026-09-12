@@ -24,94 +24,75 @@ NLM IS intended to become:
 
 Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
 
-### Phase 6 Integration Achievements
+## Documentation Structure
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+The NLM project has been reorganized with a structured learning progression:
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+### Main Documentation Files
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+| File | Purpose |
+|------|---------|
+| `easy_usage.md` | **Quick start guide** with improved Python API examples |
+| `HOW_TO_USE.md` | **Advanced features** and technical reference |
+| `docs/PROGRESSION_TUTORIAL.md` | **Complete learning path** from beginner to advanced |
+| `docs/ARCHITECTURE.md` | **System architecture** overview |
+| `docs/SCIENCE.md` | **Scientific background** |
+| `docs/EXPERIMENTS.md` | **Experiment descriptions** |
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+### Learning Progression
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+The documentation provides a structured learning path:
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+1. **Level 1: Foundations** - Silent brain, agent in world
+2. **Level 2: Core Patterns** - Simulation loops, monitoring
+3. **Level 3: Factory Functions & Context Managers** - New API
+4. **Level 4: Advanced Features** - Custom experiments
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+### New Improved Python API
 
-## Building
+The NLM Python library includes new factory functions and context managers for easier use:
 
-```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+```python
+# Factory functions for pre-configured agents
+brain, world, agent = pynlm.createSimpleAgent(width=100, height=100)
+brain, world, agent = pynlm.createTrainingAgent()  # with learning enabled
+brain, world, agent = pynlm.createChallengeAgent()  # with obstacles
+
+# Context managers for automatic resource management
+with pynlm.createSimpleAgent() as (brain, world, agent):
+    # Run simulation with automatic cleanup
 ```
 
-## Running
-
-### Phase 6 Demo (Integration Test)
-```bash
-./nlm_phase6_demo
-```
-
-This runs a comprehensive integration test verifying all brain systems are connected.
-
-## Project Structure
+### Project Structure
 
 ```
 NLM/
-├── CMakeLists.txt
-├── README.md
+├── README.md                    # This file - project overview
+├── easy_usage.md                # Quick start guide with new API
+├── HOW_TO_USE.md                # Advanced features and technical reference
 ├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+│   ├── ARCHITECTURE.md         # System architecture overview
+│   ├── SCIENCE.md              # Scientific background
+│   ├── EXPERIMENTS.md          # Experiment descriptions
+│   ├── PROGRESSION_TUTORIAL.md  # Complete learning path (NEW!)
+│   └── ...                    # Other documentation files
 ├── src/
 │   ├── core/           # Core utilities
 │   ├── brain/          # Neural components (integrated)
 │   ├── dynamics/       # Neural dynamics
 │   ├── plasticity/     # Plasticity rules
 │   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
+│   ├── neuromodulation/ # Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── cognition/     # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+│   └── visualization/ # Visualization
+├── tests/                         # Test suite
+└── configs/                      # Configuration files
 ```
 
 ## Phase Summary
@@ -161,6 +142,39 @@ NLM/
 - Checkpoint save/load working
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+
+## Quick Start
+
+### Building
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+### Running the Phase 6 Demo
+
+```bash
+./nlm_phase6_demo
+```
+
+This runs a comprehensive integration test verifying all brain systems are connected.
+
+## Getting Started
+
+For beginners:
+1. Read `easy_usage.md` for quick start with examples
+2. Try the simple examples in the `PROGRESSION_TUTORIAL.md`
+3. Explore factory functions like `createSimpleAgent()`
+4. Use context managers for automatic cleanup
+
+For advanced users:
+1. Read `HOW_TO_USE.md` for advanced features
+2. Build custom experiments
+3. Create custom configurations
+4. Implement complex learning loops
 
 ## Scientific Limitations
 
@@ -220,6 +234,67 @@ CHANGED BRAIN
   ↓
 CHANGED FUTURE BEHAVIOR
 ```
+
+## Key Design Principles
+
+1. **No ML Frameworks**: NLM implements its own neural computation
+2. **No Transformer Architecture**: Uses spiking dynamics and competitive attention
+3. **Biological Inspiration**: Designed to be incrementally more biologically accurate
+4. **Modularity**: Clear interfaces between components
+5. **Determinism**: Reproducible experiments via explicit random seeds
+6. **Performance**: Data-oriented design for large-scale simulation
+7. **Extensibility**: Clear patterns for adding new components
+8. **No Predefined Knowledge**: All learning from experience
+
+## Phase 4 Key Innovations
+
+### Prediction System
+- Learns temporal sequences from experience
+- Predicts action consequences
+- Multi-step prediction capability
+- Error signals modulate learning
+
+### Working Memory
+- Persistent neural activity
+- Recurrent connections for maintenance
+- Competition for selective retention
+- Neural-grounded (not a vector store)
+
+### Episodic Memory
+- Experience encoded as neural patterns
+- Pattern completion retrieval
+- Temporal and spatial indexing
+- Replay during consolidation
+
+### Concept Formation
+- Discovers patterns without labels
+- Prototype formation through averaging
+- Stability measurement
+- Category hints from properties
+
+### Attention
+- Lateral inhibition competition
+- Winner-take-more dynamics
+- Top-down and bottom-up bias
+- NOT Transformer QKV attention
+
+### Planning
+- Uses learned predictions
+- Evaluates potential futures
+- Selects actions leading to goals
+- Adapts based on outcomes
+
+### Self-Model
+- Learns body schema
+- Predicts action consequences
+- Self vs external distinction
+- Capability representation
+
+### Social Learning
+- Observes other agents
+- Learns action effects
+- Imitation capability
+- Simple communication signals
 
 ## License
 

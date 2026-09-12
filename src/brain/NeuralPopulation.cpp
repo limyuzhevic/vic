@@ -44,6 +44,8 @@ bool NeuralPopulation::isEmpty() const {
 }
 
 Neuron* NeuralPopulation::getNeuron(NeuronIndex index) {
+    // Check if pImpl is null before accessing
+    if (!pImpl) return nullptr;
     if (index >= pImpl->neurons.size()) {
         return nullptr;
     }
@@ -51,6 +53,8 @@ Neuron* NeuralPopulation::getNeuron(NeuronIndex index) {
 }
 
 const Neuron* NeuralPopulation::getNeuron(NeuronIndex index) const {
+    // Check if pImpl is null before accessing
+    if (!pImpl) return nullptr;
     if (index >= pImpl->neurons.size()) {
         return nullptr;
     }
