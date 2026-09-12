@@ -1023,29 +1023,49 @@ PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
 
-// ========== COGNITION SYSTEM ACCESSORS ==========
+    // ========== COGNITION SYSTEM ACCESSORS ==========
 
-NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
-}
+    NeuralPlanner* Brain::getPlanner() {
+        return pImpl->planner.get();
+    }
 
-ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
-}
+    ConceptFormation* Brain::getConceptFormation() {
+        return pImpl->conceptFormation.get();
+    }
 
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
-}
+    AttentionalSelection* Brain::getAttention() {
+        return pImpl->attention.get();
+    }
 
-// ========== DEVELOPMENT SYSTEM ==========
+    // ========== MEMORY SYSTEM ACCESSORS ==========
 
-DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
-}
+    NeuralWorkingMemory* Brain::getWorkingMemory() {
+        return pImpl->workingMemory.get();
+    }
 
-DevelopmentalStage Brain::getDevelopmentalStage() const {
-    return pImpl->developmentalStage;
-}
+    NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+        return pImpl->episodicMemory.get();
+    }
+
+    NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+        return pImpl->associativeMemory.get();
+    }
+
+    // ========== PREDICTION SYSTEM ACCESSOR ==========
+
+    PredictionSystem* Brain::getPredictionSystem() {
+        return pImpl->predictionSystem.get();
+    }
+
+    // ========== DEVELOPMENT SYSTEM ==========
+
+    DevelopmentSystem* Brain::getDevelopmentSystem() {
+        return pImpl->developmentSystem.get();
+    }
+
+    DevelopmentalStage Brain::getDevelopmentalStage() const {
+        return pImpl->developmentalStage;
+    }
 
 void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;

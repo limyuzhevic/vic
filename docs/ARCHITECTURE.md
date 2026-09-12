@@ -80,13 +80,6 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **Pruning**: Weak synapse removal
 - **Maturation**: Adult property development
 
-### 6. Neuromodulation Layer
-- **Neuromodulator**: Abstract base for neuromodulators
-- **Dopamine**: Reward and reinforcement
-- **Novelty**: Novelty detection
-- **Curiosity**: Exploration motivation
-- **PredictionError**: Error signals
-
 ### 7. Memory Layer (Phase 4)
 - **NeuralWorkingMemory**: Persistent activity for temporary storage
 - **NeuralEpisodicMemory**: Experience encoding in neural patterns

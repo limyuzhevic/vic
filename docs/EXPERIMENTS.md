@@ -249,7 +249,7 @@ config->set("working_memory_capacity", size_t(100));
 
 ## Analysis Tools
 
-The RepresentationAnalyzer class provides:
+The `RepresentationAnalyzer` class provides:
 - Pattern similarity computation
 - Representational stability
 - Clustering measures

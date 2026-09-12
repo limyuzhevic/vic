@@ -416,10 +416,173 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Convenience function to create a complete brain-world-agent setup
+    m.def("createBrainWithAgent", [](const std::string& config_file) {
+        auto config = std::make_shared<Config>();
+        if (!config_file.empty()) {
+            config->loadFromFile(config_file);
+        }
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        return std::make_tuple(brain, agent);
+    }, py::arg("config_file") = "",
+        "Create a brain and agent brain interface with optional config file");
+
+    // Create brain with agent and world (complete setup)
+    m.def("createBrainWithAgentAndWorld", [](const std::string& config_file, size_t width, size_t height,
+                                             size_t visionWidth, size_t visionHeight) {
+        auto config = std::make_shared<Config>();
+        if (!config_file.empty()) {
+            config->loadFromFile(config_file);
+        }
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        world->reset();
+        agent->initialize(*world);
+        return std::make_tuple(brain, agent, world);
+    }, py::arg("config_file") = "", py::arg("width") = 20, py::arg("height") = 20,
+        py::arg("visionWidth") = 8, py::arg("visionHeight") = 8,
+        "Create a complete brain-agent-world setup with default world configuration");
+
+    // Convenience functions for creating different brain configurations
+    m.def("createMinimalBrain", []() {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a brain with minimal configuration");
+
+    m.def("createDevelopmentBrain", [](float plasticityRate) {
+        auto config = std::make_shared<Config>();
+        config->set("plasticity_rate", plasticityRate);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        brain->setDevelopmentalStage(DevelopmentalStage::Initial);
+        return brain;
+    }, py::arg("plasticity_rate") = 1.0f,
+        "Create a brain optimized for development with specified plasticity rate");
+
+    m.def("createLearningBrain", [](size_t memorySize) {
+        auto config = std::make_shared<Config>();
+        config->set("memory_size", memorySize);
+        config->set("enable_prediction", true);
+        config->set("enable_curiosity", true);
+        config->set("enable_reward_modulation", true);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("memory_size") = 1000,
+        "Create a brain optimized for learning with specified memory size and features enabled");
+
+    // Convenience functions for working with sensory input
+    m.def("applySensoryInputToBrain", [](std::shared_ptr<Brain> brain, const SensoryPercept& percept) {
+        // Convert perceptual sensory data to brain sensory input
+        auto visionInput = std::make_shared<Vision>(percept.getVisionWidth(), percept.getVisionHeight());
+        const auto& vision = percept.getVision();
+        visionInput->setData(vision);
+        
+        auto touchInput = std::make_shared<Audio>(); // Using Audio as generic sensor
+        touchInput->setData(percept.getTouch());
+        
+        auto internalInput = std::make_shared<InternalSignals>();
+        internalInput->setData(percept.getInternal());
+        
+        // Create a combined sensory input (conceptual - actual implementation would depend on API)
+        brain->receiveSensoryInput(*visionInput); // For now, just use vision
+    }, py::arg("brain"), py::arg("percept"),
+        "Apply sensory percept to brain by converting percept data to appropriate sensory input");
+
+    m.def("extractFeaturesFromPercept", [](const SensoryPercept& percept) {
+        std::map<std::string, float> features;
+        
+        const auto& vision = percept.getVision();
+        const auto& touch = percept.getTouch();
+        const auto& internal = percept.getInternal();
+        
+        if (!vision.empty()) {
+            float totalBrightness = 0.0f;
+            float maxBrightness = 0.0f;
+            for (float v : vision) {
+                totalBrightness += v;
+                maxBrightness = std::max(maxBrightness, v);
+            }
+            features["vision_mean_brightness"] = totalBrightness / vision.size();
+            features["vision_max_brightness"] = maxBrightness;
+        }
+        
+        if (!touch.empty()) {
+            float totalTouch = std::accumulate(touch.begin(), touch.end(), 0.0f);
+            features["touch_total"] = totalTouch;
+        }
+        
+        if (!internal.empty()) {
+            float internalSum = std::accumulate(internal.begin(), internal.end(), 0.0f);
+            features["internal_state"] = internalSum / internal.size();
+        }
+        
+        return features;
+    }, py::arg("percept"),
+        "Extract numerical features from a sensory percept for analysis");
+
+    // Convenience functions for brain analysis and statistics
+    m.def("getBrainLearningStats", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, float> stats;
+        
+        stats["total_neurons"] = static_cast<float>(brain->getTotalNeuronCount());
+        stats["total_synapses"] = static_cast<float>(brain->getTotalSynapseCount());
+        stats["active_neurons"] = static_cast<float>(brain->getActiveNeuronCount());
+        stats["firing_neurons"] = static_cast<float>(brain->getFiringNeuronCount());
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spikes"] = static_cast<float>(brain->getTotalSpikeCount());
+        stats["developmental_stage"] = static_cast<float>(brain->getDevelopmentalStage());
+        
+        return stats;
+    }, py::arg("brain"),
+        "Get learning statistics for a brain including neuron counts, firing rates, and developmental stage");
+
+    m.def("getBrainHealthReport", [](std::shared_ptr<Brain> brain) {
+        std::string report;
+        
+        report += "Brain Health Report\n";
+        report += "===================\n\n";
+        
+        report += "Neural Health:\n";
+        report += "  Total Neurons: " + std::to_string(brain->getTotalNeuronCount()) + "\n";
+        report += "  Active Neurons: " + std::to_string(brain->getActiveNeuronCount()) + "\n";
+        report += "  Firing Neurons: " + std::to_string(brain->getFiringNeuronCount()) + "\n";
+        report += "  Average Firing Rate: " + std::to_string(brain->getAverageFiringRate()) + " Hz\n";
+        report += "  Excitation/Inhibition Ratio: " + std::to_string(brain->getExcitationInhibitionRatio()) + "\n\n";
+        
+        report += "Activity Level:\n";
+        float totalActivity = brain->getAverageFiringRate() * brain->getFiringNeuronCount();
+        if (totalActivity < 1.0f) {
+            report += "  Status: Low (quiet)\n";
+        } else if (totalActivity < 10.0f) {
+            report += "  Status: Moderate (active)\n";
+        } else {
+            report += "  Status: High (hyperactive)\n";
+        }
+        
+        report += "  Total Spikes: " + std::to_string(brain->getTotalSpikeCount()) + "\n\n";
+        
+        report += "Development:\n";
+        report += "  Current Stage: " + std::to_string(static_cast<int>(brain->getDevelopmentalStage())) + "\n";
+        
+        return report;
+    }, py::arg("brain"),
+        "Generate a detailed health report for a brain including neural health, activity level, and development status");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
+
+} // namespace nlm
 
 } // namespace nlm
