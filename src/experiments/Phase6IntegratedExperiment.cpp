@@ -61,24 +61,30 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get brain reference for region access
+        Brain* brainPtr = agent.getBrain();
         
-        // Process sensory input
+        // Get current sensory percept from world
+        const SensoryPercept& percept = world.getSensoryPercept();
+        
+        // Process sensory input through agent
         agent.processSensoryInput(percept);
         
-        // Brain step
-        brain->step(step, step * 0.001);
+        // Brain step (real neural computation)
+        brainPtr->step(step, step * 0.001);
         
-        // Get motor command
+        // Get motor command from agent (decodes brain activity)
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
-        
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Apply action to world - this updates agent position, handles collisions,
+        // applies physics, and computes the reward
+        ActionResult actionResult = world.applyAction(brainPtr, cmd);
+        float reward = actionResult.reward;
         totalReward += reward;
+        
+        // Collect metrics
+        totalFiringRate += brainPtr->getAverageFiringRate();
+        if (brainPtr->getFiringNeuronCount() > 0) firingCount++;
         
         // Apply reward modulation
         agent.applyRewardModulation(reward, 0.0f);
@@ -88,17 +94,13 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
             agent.updateDevelopment(0.001);
         }
         
-        // Collect metrics
-        totalFiringRate += brain->getAverageFiringRate();
-        if (brain->getFiringNeuronCount() > 0) firingCount++;
-        
         // Periodic status
         if (step % 1000 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 
                         " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+                        " | Firing: " + std::to_string(brainPtr->getAverageFiringRate()) +
+                        " | WorkingMem: " + std::to_string(brainPtr->getWorkingMemory() ? 
+                            brainPtr->getWorkingMemory()->getActiveTraces() : 0));
         }
     }
     
@@ -110,20 +112,6 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
-    
-    // Verify integration
-    result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
-    result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
-    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
-    result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
-    result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
-    
-    NLM_LOG_INFO("=== Integration Verification ===");
-    NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
     
     // Test checkpointing
     if (config.enableCheckpointing) {
