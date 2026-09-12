@@ -137,50 +137,50 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
-    
-    // Working memory - transient active information
+//========== MEMORY SYSTEMS ==========
+
+    // Neural working memory - transient active information with recurrent dynamics
     NeuralWorkingMemory* getWorkingMemory();
-    
-    // Episodic memory - experience storage
+
+    // Neural episodic memory - experience storage in neural patterns
     NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
+
+    // Neural associative memory - relationships between neural patterns
     NeuralAssociativeMemory* getAssociativeMemory();
-    
-    // ========== PREDICTION SYSTEM ==========
-    
+
+    //========== PREDICTION SYSTEM ==========
+
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
-    
+
+    //========== COGNITION SYSTEMS ==========
+
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
-    
+
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
-    
+
     // Attentional selection for focus
     AttentionalSelection* getAttention();
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    
+
+    //========== DEVELOPMENT SYSTEM ==========
+
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
+
+    //========== NEUROMODULATION SYSTEMS ==========
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
-    
+
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
-    
+
     // Novelty - novelty detection
     Novelty* getNovelty();
-    
+
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
