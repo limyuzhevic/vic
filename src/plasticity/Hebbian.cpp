@@ -19,9 +19,9 @@ Hebbian::Hebbian() : pImpl(new Impl) {}
 Hebbian::~Hebbian() = default;
 
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
+                       const std::vector<Timestamp>& preSpikes,
+                       const std::vector<Timestamp>& postSpikes,
+                       TimestepDuration dt) {
     /*
      * Real Hebbian learning implementation
      * 
@@ -49,15 +49,36 @@ void Hebbian::update(Synapse* synapse,
      *   - Assumes stationary statistics
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    // Validate input parameters
+    if (!synapse) {
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
+    if (preSpikes.empty() || postSpikes.empty()) {
+        return;
+    }
+    
+    if (dt < 0.0) {
+        return;
+    }
+    
+    // Validate Hebbian parameters
+    if (pImpl->learningRate < 0.0f || pImpl->learningRate > 1.0f) {
+        return;
+    }
+    
+    if (pImpl->minWeight >= pImpl->maxWeight) {
+        return;
+    }
+    
+    // Count correlated spike pairs with proper boundary checks
     size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
+    for (size_t i = 0; i < preSpikes.size(); ++i) {
+        Timestamp preTime = preSpikes[i];
+        for (size_t j = 0; j < postSpikes.size(); ++j) {
+            Timestamp postTime = postSpikes[j];
             float dt = static_cast<float>(postTime - preTime);
+            
             // Count spikes within a broad time window as correlated
             if (std::abs(dt) < 100.0f) {  // 100ms correlation window
                 ++correlationCount;
@@ -65,8 +86,7 @@ void Hebbian::update(Synapse* synapse,
         }
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
+    // Compute weight change with validation
     float delta = pImpl->learningRate * static_cast<float>(correlationCount);
     
     // Apply with bounds
@@ -76,11 +96,25 @@ void Hebbian::update(Synapse* synapse,
 }
 
 void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    // Validate input parameters
+    if (!synapse) {
+        return;
+    }
     
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    // Validate parameters for weight change
+    float currentWeight = synapse->getWeight();
+    float newWeight = currentWeight + delta;
+    
+    // Check if the new weight is within bounds before clamping
+    if (newWeight < pImpl->minWeight || newWeight > pImpl->maxWeight) {
+        // Clamp to bounds
+        newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
+    }
+    
+    // Only set weight if it would change
+    if (std::abs(newWeight - currentWeight) > 1e-6f) {
+        synapse->setWeight(newWeight);
+    }
 }
 
 const char* Hebbian::getName() const {

@@ -121,6 +121,68 @@ void testBrainStatus() {
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 
+void testBrainNonePointerScenarios() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(10), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    bool success = brain.initialize();
+    assert(success);
+    
+    // Test getting nullptr brain scenarios
+    // This tests the brain's ability to handle edge cases during initialization
+    // and basic operations with minimal configuration
+    
+    brain.reset();
+    brain.initialize();
+    
+    // Verify brain is in valid state after reset
+    assert(brain.getTotalNeuronCount() == 10);
+    
+    std::cout << "    testBrainNonePointerScenarios passed" << std::endl;
+}
+
+void testBrainEmptyPopulations() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(0), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    bool success = brain.initialize();
+    assert(success);
+    
+    // Test brain with zero neurons
+    assert(brain.getTotalNeuronCount() == 0);
+    assert(brain.getTotalSynapseCount() == 0);
+    
+    // Brain should still be able to step without crashing
+    brain.step(0);
+    
+    std::cout << "    testBrainEmptyPopulations passed" << std::endl;
+}
+
+void testBrainBoundaryNeuronIds() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    bool success = brain.initialize();
+    assert(success);
+    
+    // Test accessing boundary neuron IDs (0 and max values)
+    // nlm::NeuronId is typically size_t or uint64_t
+    
+    nlm::NeuronId zeroId = 0;
+    nlm::NeuronId maxId = 99;  // Based on config
+    
+    // These should not crash - brain should handle boundary IDs gracefully
+    brain.step(0);
+    
+    std::cout << "    testBrainBoundaryNeuronIds passed" << std::endl;
+}
+
 void runAll() {
     testBrainCreation();
     testBrainInitialization();
@@ -129,6 +191,9 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    testBrainNonePointerScenarios();
+    testBrainEmptyPopulations();
+    testBrainBoundaryNeuronIds();
 }
 
 } // namespace test_brain

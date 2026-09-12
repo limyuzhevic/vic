@@ -2,6 +2,8 @@
 #include "../../brain/Synapse.hpp"
 #include <cmath>
 #include <algorithm>
+#include <cassert>
+#include <iostream>
 
 namespace nlm {
 
@@ -52,13 +54,32 @@ void STDP::update(Synapse* synapse,
      *   - Doesn't account for synaptic eligibility traces
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    // Validate input parameters
+    if (!synapse) {
+        return;
+    }
+    
+    if (preSpikes.empty() || postSpikes.empty()) {
+        return;
+    }
+    
+    if (dt < 0.0) {
+        return;
+    }
+    
+    // Validate STDP parameters
+    if (pImpl->timeConstant <= 0.0f) {
+        return;
+    }
+    
+    if (pImpl->ltpWeight < 0.0f || pImpl->ltdWeight < 0.0f) {
         return;
     }
     
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
+    // Compute STDP weight change from spike timing pairs
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
@@ -82,6 +103,9 @@ void STDP::update(Synapse* synapse,
     if (std::abs(totalDelta) > 1e-6f) {
         // Scale by synaptic efficacy if available
         float efficacy = synapse->getEfficacy();
+        if (efficacy <= 0.0f) {
+            return;
+        }
         totalDelta *= efficacy;
         
         // Apply weight change
@@ -89,17 +113,43 @@ void STDP::update(Synapse* synapse,
         
         // Update eligibility trace for reward-modulated learning
         float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
+        float newTrace = currentTrace + totalDelta;
+        if (std::abs(newTrace) < 1e-6f) {
+            newTrace = 0.0f;
+        }
+        synapse->setEligibilityTrace(newTrace);
     }
 }
 
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    // Validate input parameters
+    if (!synapse) {
+        return;
+    }
+    
+    // Validate delta parameter
+    if (std::isnan(delta) || std::isinf(delta)) {
+        return;
+    }
+    
+    // Get current weight before modification
+    float currentWeight = synapse->getWeight();
+    
+    // Calculate new weight
+    float newWeight = currentWeight + delta;
+    
+    // Validate weight is within reasonable bounds before clamping
+    if (std::isnan(newWeight) || std::isinf(newWeight)) {
+        return;
+    }
     
     // Clamp weight to bounds
-    float newWeight = synapse->getWeight() + delta;
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    
+    // Only update if weight actually changed
+    if (std::abs(newWeight - currentWeight) > 1e-6f) {
+        synapse->setWeight(newWeight);
+    }
 }
 
 const char* STDP::getName() const {
