@@ -1,26 +1,5 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
-
-namespace nlm {
+class SemanticMemory;
+class ProceduralMemory;
 
 struct Brain::Impl {
     std::shared_ptr<Config> config;
@@ -32,6 +11,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -129,6 +110,10 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize semantic and procedural memory systems
+        semanticMemory = std::make_unique<SemanticMemory>();
+        proceduralMemory = std::make_unique<ProceduralMemory>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -761,17 +746,25 @@ void Brain::reset() {
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
+// Fix save() to actually save using CheckpointSystem
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
+        // Use the checkpoint manager for proper checkpointing
+        if (!pImpl->checkpointManager) {
+            NLM_LOG_ERROR("Checkpoint manager not initialized");
+            return false;
+        }
+        
+        // Create checkpoint directly
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
             return false;
         }
         
-        // Set metadata
+        // Set metadata using brain statistics
         writer.setMetadata(
             getTotalNeuronCount(),
             getTotalSynapseCount(),
@@ -780,27 +773,50 @@ bool Brain::save(const std::string& filepath) const {
             pImpl->currentTime
         );
         
-        // Write neurons
+        // Write neuron states
         NeuronCheckpointData neuronData;
-        neuronData.membranePotential.reserve(getTotalNeuronCount());
-        neuronData.restingPotential.reserve(getTotalNeuronCount());
-        neuronData.threshold.reserve(getTotalNeuronCount());
-        neuronData.resetPotential.reserve(getTotalNeuronCount());
-        neuronData.leakConductance.reserve(getTotalNeuronCount());
-        
         for (const auto& region : pImpl->regions) {
             for (const auto& pop : region->getPopulations()) {
                 for (const auto* neuron : pop->getNeurons()) {
                     const auto& state = neuron->getState();
-                    neuronData.membranePotential.push_back(state.membranePotential);
-                    neuronData.restingPotential.push_back(state.restingPotential);
-                    neuronData.threshold.push_back(state.threshold);
-                    neuronData.resetPotential.push_back(state.resetPotential);
-                    neuronData.leakConductance.push_back(state.leakConductance);
-                    neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
-                    neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
-                    neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
-                    neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    NeuronCheckpointData nd;
+                    nd.membranePotential.push_back(state.membranePotential);
+                    nd.restingPotential.push_back(state.restingPotential);
+                    nd.threshold.push_back(state.threshold);
+                    nd.resetPotential.push_back(state.resetPotential);
+                    nd.leakConductance.push_back(state.leakConductance);
+                    nd.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                    nd.refractoryRemaining.push_back(state.refractoryRemaining);
+                    nd.refractoryPeriod.push_back(state.refractoryPeriod);
+                    nd.lastSpikeTime.push_back(state.lastSpikeTime);
+                    nd.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                    nd.regionId.push_back(region->getId().index());
+                    nd.populationId.push_back(pop->getId().index());
+                    
+                    neuronData.membranePotential.insert(neuronData.membranePotential.end(), 
+                                                         nd.membranePotential.begin(), nd.membranePotential.end());
+                    neuronData.restingPotential.insert(neuronData.restingPotential.end(), 
+                                                       nd.restingPotential.begin(), nd.restingPotential.end());
+                    neuronData.threshold.insert(neuronData.threshold.end(), 
+                                                 nd.threshold.begin(), nd.threshold.end());
+                    neuronData.resetPotential.insert(neuronData.resetPotential.end(), 
+                                                     nd.resetPotential.begin(), nd.resetPotential.end());
+                    neuronData.leakConductance.insert(neuronData.leakConductance.end(), 
+                                                       nd.leakConductance.begin(), nd.leakConductance.end());
+                    neuronData.firingState.insert(neuronData.firingState.end(), 
+                                                   nd.firingState.begin(), nd.firingState.end());
+                    neuronData.refractoryRemaining.insert(neuronData.refractoryRemaining.end(), 
+                                                          nd.refractoryRemaining.begin(), nd.refractoryRemaining.end());
+                    neuronData.refractoryPeriod.insert(neuronData.refractoryPeriod.end(), 
+                                                       nd.refractoryPeriod.begin(), nd.refractoryPeriod.end());
+                    neuronData.lastSpikeTime.insert(neuronData.lastSpikeTime.end(), 
+                                                     nd.lastSpikeTime.begin(), nd.lastSpikeTime.end());
+                    neuronData.neuronType.insert(neuronData.neuronType.end(), 
+                                                  nd.neuronType.begin(), nd.neuronType.end());
+                    neuronData.regionId.insert(neuronData.regionId.end(), 
+                                                nd.regionId.begin(), nd.regionId.end());
+                    neuronData.populationId.insert(neuronData.populationId.end(), 
+                                                    nd.populationId.begin(), nd.populationId.end());
                 }
             }
         }
@@ -810,16 +826,78 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
-        // Write synapses
+        // Write synapse states
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
             for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                SynapseCheckpointData sd;
+                sd.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                sd.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                sd.weight.push_back(syn->getWeight());
+                sd.delay.push_back(syn->getDelay());
+                sd.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                sd.plasticityFlags.push_back(static_cast<uint8_t>(syn->getPlasticityFlags()));
+                sd.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                sd.efficacy.push_back(syn->getEfficacy());
+                sd.shortTermDepression.push_back(syn->getShortTermDepression());
+                sd.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
+                
+                synapseData.sourceNeuron.insert(synapseData.sourceNeuron.end(), 
+                                                sd.sourceNeuron.begin(), sd.sourceNeuron.end());
+                synapseData.destinationNeuron.insert(synapseData.destinationNeuron.end(), 
+                                                     sd.destinationNeuron.begin(), sd.destinationNeuron.end());
+                synapseData.weight.insert(synapseData.weight.end(), 
+                                          sd.weight.begin(), sd.weight.end());
+                synapseData.delay.insert(synapseData.delay.end(), 
+                                         sd.delay.begin(), sd.delay.end());
+                synapseData.synapseType.insert(synapseData.synapseType.end(), 
+                                               sd.synapseType.begin(), sd.synapseType.end());
+                synapseData.plasticityFlags.insert(synapseData.plasticityFlags.end(), 
+                                                   sd.plasticityFlags.begin(), sd.plasticityFlags.end());
+                synapseData.eligibilityTrace.insert(synapseData.eligibilityTrace.end(), 
+                                                    sd.eligibilityTrace.begin(), sd.eligibilityTrace.end());
+                synapseData.efficacy.insert(synapseData.efficacy.end(), 
+                                            sd.efficacy.begin(), sd.efficacy.end());
+                synapseData.shortTermDepression.insert(synapseData.shortTermDepression.end(), 
+                                                       sd.shortTermDepression.begin(), sd.shortTermDepression.end());
+                synapseData.shortTermFacilitation.insert(synapseData.shortTermFacilitation.end(), 
+                                                         sd.shortTermFacilitation.begin(), sd.shortTermFacilitation.end());
+            }
+            
+            // Also save inter-region connections
+            for (const auto& conn : pImpl->interRegionConnections) {
+                SynapseCheckpointData sd;
+                sd.sourceNeuron.push_back(conn.sourceRegion.index());
+                sd.destinationNeuron.push_back(conn.targetRegion.index());
+                sd.weight.push_back(conn.weight);
+                sd.delay.push_back(conn.delay);
+                sd.synapseType.push_back(static_cast<uint8_t>(SynapseType::LongRange));
+                sd.plasticityFlags = PlasticityFlags();  // Default flags
+                sd.eligibilityTrace = 0.0f;
+                sd.efficacy = 0.0f;
+                sd.shortTermDepression = 0.0f;
+                sd.shortTermFacilitation = 0.0f;
+                
+                synapseData.sourceNeuron.insert(synapseData.sourceNeuron.end(), 
+                                                sd.sourceNeuron.begin(), sd.sourceNeuron.end());
+                synapseData.destinationNeuron.insert(synapseData.destinationNeuron.end(), 
+                                                     sd.destinationNeuron.begin(), sd.destinationNeuron.end());
+                synapseData.weight.insert(synapseData.weight.end(), 
+                                          sd.weight.begin(), sd.weight.end());
+                synapseData.delay.insert(synapseData.delay.end(), 
+                                         sd.delay.begin(), sd.delay.end());
+                synapseData.synapseType.insert(synapseData.synapseType.end(), 
+                                               sd.synapseType.begin(), sd.synapseType.end());
+                synapseData.plasticityFlags.insert(synapseData.plasticityFlags.end(), 
+                                                   sd.plasticityFlags.begin(), sd.plasticityFlags.end());
+                synapseData.eligibilityTrace.insert(synapseData.eligibilityTrace.end(), 
+                                                    sd.eligibilityTrace.begin(), sd.eligibilityTrace.end());
+                synapseData.efficacy.insert(synapseData.efficacy.end(), 
+                                            sd.efficacy.begin(), sd.efficacy.end());
+                synapseData.shortTermDepression.insert(synapseData.shortTermDepression.end(), 
+                                                       sd.shortTermDepression.begin(), sd.shortTermDepression.end());
+                synapseData.shortTermFacilitation.insert(synapseData.shortTermFacilitation.end(), 
+                                                         sd.shortTermFacilitation.begin(), sd.shortTermFacilitation.end());
             }
         }
         
@@ -834,7 +912,7 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
-        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
+        NLM_LOG_INFO("Brain state saved successfully using CheckpointSystem (" + std::to_string(writer.getBytesWritten()) + " bytes)");
         return true;
         
     } catch (const std::exception& e) {
@@ -1011,6 +1089,14 @@ NeuralWorkingMemory* Brain::getWorkingMemory() {
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
+}
+
+SemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+ProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {

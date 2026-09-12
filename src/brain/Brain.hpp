@@ -1,16 +1,3 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 class RandomGenerator;
@@ -23,11 +10,8 @@ class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+class SemanticMemory;
+class ProceduralMemory;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -145,10 +129,11 @@ public:
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
     
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    // Semantic memory - gradually acquired knowledge
+    SemanticMemory* getSemanticMemory();
     
-    // ========== PREDICTION SYSTEM ==========
+    // Procedural memory - learned skills and habits
+    ProceduralMemory* getProceduralMemory();
     
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
