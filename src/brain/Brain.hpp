@@ -28,6 +28,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;  // Attention and memory consolidation
+class Norepinephrine;   // Arousal and vigilance
+class Serotonin;       // Mood and social behavior
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {

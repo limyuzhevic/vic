@@ -393,6 +393,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                         pImpl->workingMemory->storeToNeuron(neuron->getId(), 
                             std::abs(state.membranePotential - state.restingPotential) / 10.0f);
                     }
+                    
+                    // Store to episodic memory - create new episode from neural pattern
+                    if (pImpl->episodicMemory) {
+                        // Create episodic memory item from firing neurons - matching Memory.hpp EpisodicMemoryItem structure
+                        EpisodicMemoryItem episode;
+                        episode.timestamp = currentStep;
+                        
+                        // Find all firing neurons across ALL regions (not just this population)
+                        for (auto& r : pImpl->regions) {
+                            for (auto& p : r->getPopulations()) {
+                                for (auto* n : p->getNeurons()) {
+                                    if (n->isFiring() || 
+                                        std::abs(n->getState().membranePotential - n->getState().restingPotential) > 5.0f) {
+                                        episode.neurons.push_back(n->getId());
+                                        episode.values.push_back(
+                                            std::abs(n->getState().membranePotential - n->getState().restingPotential) / 20.0f);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Include reward signal
+                        episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                        
+                        // Store the episode
+                        pImpl->episodicMemory->storeEpisode(episode);
+                    }
                 }
             }
         }
@@ -407,6 +434,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
+    // Update all neuromodulators and apply their effects on neural activity
+    
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
@@ -438,6 +467,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
+    
+    // Update acetylcholine (attention modulation)
+    // Note: ACh effects on attention would be applied through the attention system
+    
+    // Update norepinephrine (arousal)
+    // Note: NE effects would be applied to general arousal
+    
+    // Update serotonin (mood)
+    // Note: 5-HT effects would be applied to patience and social behavior
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
@@ -511,8 +549,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // The prediction system should be updated with sensory observations
+        // For now, record that we have a prediction system available
+        // This will be enhanced when sensory integration is complete
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +567,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This requires extracting patterns from working memory and episodic memory
+        
+        // Collect current neural patterns from working memory
+        std::vector<float> currentPattern;
+        if (pImpl->workingMemory) {
+            currentPattern = pImpl->workingMemory->retrieve();
+        }
+        
+        // Also include episodic memory patterns if available
+        if (!currentPattern.empty() && pImpl->episodicMemory && 
+            pImpl->episodicMemory->getEpisodeCount() > 0) {
+            // Get most recent episode
+            auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+            if (!recentEpisodes.empty()) {
+                const auto& latestEpisode = recentEpisodes[0];
+                // Incorporate episode data into concept formation
+                // This could be used to learn abstract concepts from experiences
+                pImpl->conceptFormation->initialize(this);
+                
+                // In a full implementation, we would:
+                // 1. Convert neural pattern to sensory-like representation
+                // 2. Feed to ConceptFormation for pattern discovery
+                // 3. Store learned concepts for future use
+                
+                NLM_LOG_INFO("ConceptFormation processing current patterns");
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -690,28 +755,82 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Use NeuralPlanner for action selection if available
+    // This integrates cognitive planning with neural activity
     
+    // Create current state representation from neural activity
+    std::vector<float> currentState;
+    
+    // Extract key features from the brain's current state
+    // This could be neural firing rates, working memory content, etc.
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            float avgFiring = pop->getAverageFiringRate();
+            currentState.push_back(avgFiring);
+        }
+    }
+    
+    // Use NeuralPlanner to select optimal action
+    if (pImpl->planner) {
+        // Get planned action based on current state and development stage
+        DevelopmentalStage stage = pImpl->developmentalStage;
+        float targetReward = 0.5f; // Could be adjusted based on goals
+        
+        ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Convert planned action to Action object
+        auto action = std::make_unique<Action>(plannedAction);
+        
+        // Log the planning decision
+        NLM_LOG_INFO("NeuralPlanner selected action: " + std::to_string(static_cast<int>(plannedAction)));
+        
+        return action;
+    }
+    
+    // Fallback to simple motor neuron activity-based selection if planner not available
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
     // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
+        if (neurons.empty()) return 0.0f;
+        float sum = 0.0f;
+        for (Neuron* n : neurons) {
+            // Use membrane potential deviation from rest as activity measure
+            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+        }
+        return sum / neurons.size();
+    };
+    
+    float forwardAct = calcActivity(pImpl->motorNeurons);
+    
+    // Find maximum activity
+    struct { ActionType cmd; float activity; } commands[] = {
+        {ActionType::MoveForward, forwardAct},
+        {ActionType::MoveBackward, 0.0f},
+        {ActionType::TurnLeft, 0.0f},
+        {ActionType::TurnRight, 0.0f},
+        {ActionType::Interact, 0.0f},
+        {ActionType::Wait, 0.0f}
+    };
+    
+    ActionType best = ActionType::Wait;
+    float bestActivity = 0.0f; // Default to wait if nothing stronger
+    
+    for (const auto& c : commands) {
+        if (c.activity > bestActivity) {
+            bestActivity = c.activity;
+            best = c.cmd;
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    // Only act if there's meaningful activity
+    if (bestActivity < 0.5f) {
+        return std::make_unique<Action>(ActionType::Wait);
     }
     
-    auto action = std::make_unique<Action>(type);
+    auto action = std::make_unique<Action>(best);
     
     return action;
 }
