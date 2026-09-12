@@ -1,3 +1,4 @@
+// Update the Brain header to include all neuromodulator headers
 #pragma once
 
 #include "../core/Types/Types.hpp"
@@ -11,7 +12,7 @@
 
 namespace nlm {
 
-// Forward declarations
+// Forward declarations for all integrated systems
 class Config;
 class RandomGenerator;
 class SimulationClock;
@@ -28,6 +29,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Serotonin;
+class Norepinephrine;
+class Acetylcholine;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -175,8 +179,14 @@ public:
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    // Serotonin - mood, social behavior, impulsivity
+    Serotonin* getSerotonin();
+    
+    // Norepinephrine - arousal, vigilance, novelty detection
+    Norepinephrine* getNorepinephrine();
+    
+    // Acetylcholine - attention, memory consolidation
+    Acetylcholine* getAcetylcholine();
     
     // Novelty - novelty detection
     Novelty* getNovelty();

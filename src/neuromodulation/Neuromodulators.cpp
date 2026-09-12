@@ -1,3 +1,11 @@
+/*
+ * Definition file for neuromodulators (Serotonin, Norepinephrine, Acetylcholine)
+ * Provides the actual implementation classes that integrate with the base Neuromodulator interface
+ */
+
+#ifndef __NEUROMODULATORS_HPP
+#define __NEUROMODULATORS_HPP
+
 #include "Neuromodulator.hpp"
 #include <algorithm>
 #include <cmath>
@@ -231,3 +239,5 @@ void Acetylcholine::signalMemoryConsolidation(float consolidationStrength) {
 }
 
 } // namespace nlm
+
+#endif // __NEUROMODULATORS_HPP
