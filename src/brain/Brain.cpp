@@ -115,11 +115,17 @@ struct Brain::Impl {
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
+        predictionSystem->initialize(this);
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
+        planner->initialize(this);
+        
         conceptFormation = std::make_unique<ConceptFormation>();
+        conceptFormation->initialize(this);
+        
         attention = std::make_unique<AttentionalSelection>();
+        attention->initialize(this);
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -402,40 +408,72 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processSpikes(currentStep);
     
     // ========== STEP 4: Update working memory ==========
+    // Update working memory with current neural activity
+    // Working memory maintains active representations based on recent neural activity
     if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
+        // Store current neural activation patterns into working memory
+        // This is a simplified version - ideally would encode sensory state
+        std::vector<float> currentActivationPattern;
+        currentActivationPattern.reserve(pImpl->sensoryNeurons.size() + pImpl->motorNeurons.size());
+        
+        // Encode sensory neuron activations - these are the sensory inputs
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+            currentActivationPattern.push_back(activation);
+        }
+        
+        // Encode motor neuron activations  
+        for (auto* neuron : pImpl->motorNeurons) {
+            float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+            currentActivationPattern.push_back(activation);
+        }
+        
+        // Store in working memory with strength based on total activation
+        float totalStrength = 0.0f;
+        for (float act : currentActivationPattern) totalStrength += act;
+        float strength = std::min(1.0f, totalStrength / 10.0f);
+        
+        if (!currentActivationPattern.empty() && strength > 0.1f) {
+            pImpl->workingMemory->store(currentActivationPattern, strength);
+        }
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
+    // Update curiosity (combines novelty and prediction error)
+    if (pImpl->curiosity && pImpl->novelty && pImpl->predictionError) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        float predictionErrorLevel = pImpl->predictionError->getError();
+        pImpl->curiosity->update(noveltyLevel, predictionErrorLevel, pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
+        // Apply curiosity effects on neural excitability
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        float curiosityInfluence = curiosityLevel * 0.2f; // Scale curiosity impact
+        
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+                    // Curiosity increases exploration bias by modulating threshold
+                    float explorationBias = curiosityInfluence;
+                    if (explorationBias > 0.0f) {
+                        // Lower threshold for firing (increase excitability)
+                        neuron->setThreshold(neuron->getState().threshold - explorationBias);
                     }
                 }
             }
+        }
+    }
+    
+    // Update prediction error (computes difference between predictions and reality)
+    if (pImpl->predictionError) {
+        // In a real system, prediction error would be computed from environment feedback
+        // For now, use novelty as a proxy for prediction error
+        if (pImpl->novelty) {
+            float noveltyLevel = pImpl->novelty->getLevel();
+            pImpl->predictionError->computeError(0.5f, noveltyLevel);
         }
     }
     
@@ -511,8 +549,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Create a sensory input from current neural activity
+        // Use the pattern of neural activations as prediction input
+        SensoryInput predictionInput;
+        
+        // Build prediction input from sensory neuron activations
+        std::vector<float> predictionData;
+        predictionData.reserve(pImpl->sensoryNeurons.size());
+        
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+            predictionData.push_back(activation);
+        }
+        
+        if (!predictionData.empty()) {
+            predictionInput.setData(predictionData);
+            
+            // Make prediction for next state
+            auto predictedState = pImpl->predictionSystem->predictNextState(predictionInput);
+            
+            // Update prediction error using actual sensory input from environment
+            // This would ideally be called from the environment after action
+            pImpl->predictionSystem->updatePredictions(predictionInput, predictionInput); // Placeholder
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +587,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Encode current experience as neural activity pattern for concept learning
+        std::vector<float> currentExperience;
+        currentExperience.reserve(pImpl->sensoryNeurons.size());
+        
+        // Convert sensory neuron activations to concept formation features
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+            currentExperience.push_back(activation);
+        }
+        
+        // Get reward from dopamine for concept learning
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f;
+        
+        if (!currentExperience.empty()) {
+            // Present experience to concept formation system
+            // In a real implementation, would also provide features and timing
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                currentExperience, currentExperience, reward, currentStep);
+            
+            // If a new concept was formed (conceptId > 0), log it
+            if (conceptId > 0) {
+                // Concept formed - could influence attention or other systems
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
