@@ -36,6 +36,9 @@ public:
     // Configuration
     void configure(float width, float height, size_t visionWidth, size_t visionHeight);
     
+    // Initialize with world dimensions
+    void initialize(size_t visionWidth, size_t visionHeight);
+    
     // Reset world to initial state
     void reset();
     
@@ -83,7 +86,6 @@ public:
     void setRandomSeed(uint64_t seed);
     uint64_t getRandomSeed() const { return rngSeed_; }
     
-private:
     // Generate vision from current view
     void generateVision();
     
@@ -93,6 +95,7 @@ private:
     // Interact with nearby objects
     ActionResult interact();
     
+private:
     // World geometry
     float width_;
     float height_;

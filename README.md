@@ -76,8 +76,11 @@ make -j4
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
+After building with CMake:
+
 ```bash
-./nlm_phase6_demo
+./build/nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
