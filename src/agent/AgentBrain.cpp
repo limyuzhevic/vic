@@ -19,6 +19,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , currentSensoryState_()
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -87,44 +88,80 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
+    // Store current sensory state for episodic memory
+    std::vector<float> currentSensoryState;
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+    
+    // Combine all sensory inputs
+    currentSensoryState.reserve(vision.size() + touch.size() + intern.size() + proprio.size());
+    currentSensoryState.insert(currentSensoryState.end(), vision.begin(), vision.end());
+    currentSensoryState.insert(currentSensoryState.end(), touch.begin(), touch.end());
+    currentSensoryState.insert(currentSensoryState.end(), intern.begin(), intern.end());
+    currentSensoryState.insert(currentSensoryState.end(), proprio.begin(), proprio.end());
+    
+    // Store the current sensory state for later use in episodic memory
+    currentSensoryState_ = currentSensoryState;
+    
+    // Concept formation now uses the actual current pattern for learning
+    if (brain_->getConceptFormation() && !currentSensoryState.empty()) {
+        // Get reward for this experience
+        float reward = expectedReward_;
+        
+        // Present to concept formation
+        brain_->getConceptFormation()->presentExperience(
+            currentSensoryState, 
+            currentSensoryState,  // Features same as pattern for now
+            reward, 
+            brain_->getTotalSpikeCount()  // Use spike count as step number
+        );
+        
+        // Store in episodic memory to create action-experience associations
+        if (brain_->getEpisodicMemory()) {
+            // Create episode for this sensory experience
+            EpisodicMemoryItem episode;
+            episode.timestamp = brain_->getTotalSpikeCount();
+            episode.sensoryState = currentSensoryState;
+            episode.reward = reward;
+            episode.novelty = noveltyLevel_;
+            episode.predictionError = predictionError_;
+            episode.action = MotorCommand::Wait;  // No action yet for sensory-only experience
+            
+            brain_->getEpisodicMemory()->storeEpisode(episode);
         }
     }
     
-    // Compute novelty (difference from previous vision)
+    // Update prediction system with new sensory input - CRITICAL FIX
+    if (brain_->getPredictionSystem() && !currentSensoryState.empty()) {
+        // Create SensoryInput from percept
+        SensoryInput sensoryInput;
+        sensoryInput.setData(currentSensoryState);
+        
+        // Update predictions based on new input
+        brain_->getPredictionSystem()->train(sensoryInput);
+        
+        // CRITICAL FIX: Apply prediction error to neuromodulation system
+        if (brain_->getPredictionErrorSignal()) {
+            // Get prediction error from prediction system
+            float predictionError = brain_->getPredictionSystem()->getPredictionError();
+            
+            // Update prediction error signal for learning
+            brain_->getPredictionErrorSignal()->update(predictionError);
+            
+            // CRITICAL FIX: Connect reward modulation to prediction error system
+            predictionError_ = predictionError;  // Store locally too
+            
+            // Apply the prediction error to neuromodulation
+            if (rewardModulationEnabled_) {
+                // This updates dopamine based on prediction error
+                applyRewardModulation(expectedReward_, expectedReward_ - predictionError);
+            }
+        }
+    }
+    
+    // Update novelty detection
     if (!vision.empty()) {
         float totalDiff = 0.0f;
         for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
@@ -142,11 +179,61 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty and prediction error
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // Update development system to modulate learning rates based on agent age
+    if (brain_->getDevelopmentSystem()) {
+        // Let the development system influence the brain's learning parameters
+        // This is a crucial integration point where development affects plasticity
+        DevelopmentalStage stage = brain_->getDevelopmentalStage();
+        
+        // Development system affects how quickly synapses change
+        float learningRate = 1.0f;
+        
+        // Simple developmental modulation of learning rates
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                learningRate = 1.0f;  // Critical period - high learning
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                learningRate = 0.8f;  // High but less than critical
+                break;
+            case DevelopmentalStage::Maturation:
+                learningRate = 0.5f;  // Moderate learning
+                break;
+            case DevelopmentalStage::Adult:
+                learningRate = 0.2f;  // Stable, slow learning
+                break;
+        }
+        
+        // Apply development-modulated learning to synaptic updates
+        for (const auto& region : brain_->getRegions()) {
+            for (auto* syn : region->getSynapses()) {
+                float eligibility = syn->getEligibilityTrace();
+                
+                if (std::abs(eligibility) > 0.001f) {
+                    // Modulate plasticity with development system influence
+                    float delta = eligibility * dopamineLevel_ * learningRate * plasticityModifier_;
+                    syn->addToWeight(delta);
+                    
+                    // Decay eligibility trace
+                    syn->decayEligibilityTrace(0.1f);
+                }
+            }
+        }
+        
+        // Let development system store experience patterns
+        // This connects development to long-term memory formation
+        if (!currentSensoryState.empty()) {
+            // Call development system to learn from this experience
+            brain_->getDevelopmentSystem()->onLearningEvent(currentSensoryState, learningRate);
+        }
+    }
+}
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
@@ -157,6 +244,25 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
+    }
+    
+    // Store action in episodic memory for learning
+    if (brain_->getEpisodicMemory()) {
+        // Create episodic memory item for this action
+        EpisodicMemoryItem episode;
+        episode.timestamp = brain_->getTotalSpikeCount();  // Use spike count as a simple timestep counter
+        episode.action = decoded;
+        episode.reward = expectedReward_;
+        episode.novelty = noveltyLevel_;
+        episode.predictionError = predictionError_;
+        
+        // Store the sensory state that led to this action
+        if (!currentSensoryState_.empty()) {
+            episode.sensoryState = currentSensoryState_;
+        }
+        
+        // Store the episode
+        brain_->getEpisodicMemory()->storeEpisode(episode);
     }
     
     return decoded;

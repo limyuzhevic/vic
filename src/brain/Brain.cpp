@@ -11,7 +11,7 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
+#include "../prediction/NeuralPrediction.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
@@ -34,7 +34,7 @@ struct Brain::Impl {
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
+    std::unique_ptr<NeuralPrediction> neuralPrediction;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
@@ -113,8 +113,15 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
+        // Initialize neural prediction system
+    neuralPrediction = std::make_unique<NeuralPrediction>();
+    neuralPrediction->initialize(this);
+
+    // Configure prediction
+    neuralPrediction->enableTemporalPrediction(true);
+    neuralPrediction->enableActionConsequencePrediction(true);
+    neuralPrediction->setSequenceMemorySize(100);
+    neuralPrediction->setPredictionHorizon(5);
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
@@ -242,8 +249,15 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // Initialize neural prediction system
+    neuralPrediction = std::make_unique<NeuralPrediction>();
+    neuralPrediction->initialize(this);
+
+    // Configure prediction
+    neuralPrediction->enableTemporalPrediction(true);
+    neuralPrediction->enableActionConsequencePrediction(true);
+    neuralPrediction->setSequenceMemorySize(100);
+    neuralPrediction->setPredictionHorizon(5);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -390,10 +404,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     
                     // Store to working memory - neurons that fire become part of working memory
                     if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                        float activation = std::abs(state.membranePotential - state.restingPotential) / 10.0f;
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), activation);
                     }
-                }
+                    }
             }
         }
     }
@@ -404,6 +418,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Apply attention to working memory winners
+        if (pImpl->attention && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+            
+            // Apply attention modulation to neurons in working memory
+            for (const NeuronId& neuronId : competitors) {
+                float inhibition = pImpl->attention->getInhibitionFor(neuronId);
+                float excitation = pImpl->attention->getExcitationFor(neuronId);
+                
+                if (excitation > inhibition) {
+                    // Apply attentional excitation
+                    for (auto& region : pImpl->regions) {
+                        for (auto& pop : region->getPopulations()) {
+                            for (auto* neuron : pop->getNeurons()) {
+                                if (neuron->getId() == neuronId) {
+                                    neuron->injectCurrent(excitation * 2.0f);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -414,7 +454,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        // Get prediction error for curiosity calculation
+        float predictionError = 0.0f;
+        if (pImpl->predictionSystem) {
+            predictionError = pImpl->predictionSystem->getPredictionError();
+        }
+        
+        // Get novelty for curiosity calculation
+        float novelty = 0.0f;
+        if (pImpl->novelty) {
+            novelty = pImpl->novelty->getLevel();
+        }
+        
+        pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -436,44 +488,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                 }
             }
-        }
-    }
-    
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
-    float plasticityMod = 1.0f;
-    if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
-    }
-    
-    for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
-            // Apply STDP with neuromodulation
-            if (syn->getPlasticityFlags().stdp) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                    float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
-                }
-            }
-            
-            // Apply Hebbian learning
-            if (syn->getPlasticityFlags().hebbian) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                }
-            }
-            
-            // Update synapse state
-            syn->step(currentTime);
         }
     }
     
@@ -510,9 +524,91 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    // Use NeuralPrediction for sophisticated forward modeling and error-driven learning
+    if (pImpl->neuralPrediction) {
+        // Extract sensory state from recent input
+        std::vector<float> sensoryState;
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            if (neuron) {
+                const auto& state = neuron->getState();
+                float activation = std::abs(state.membranePotential - state.restingPotential) / 10.0f;
+                sensoryState.push_back(activation);
+            }
+        }
+        
+        // Record current state for sequence learning
+        if (!sensoryState.empty()) {
+            pImpl->neuralPrediction->recordSensoryState(sensoryState, currentStep);
+        }
+        
+        // Generate prediction for next timestep
+        std::vector<float> predictedState = pImpl->neuralPrediction->generatePrediction(currentStep);
+        
+        // If we have a prediction, compute error and update learning
+        if (!predictedState.empty()) {
+            // Use NeuralPrediction's error-driven learning
+            float predictionError = pImpl->neuralPrediction->updateWithObservation(sensoryState, currentStep);
+            
+            // Get prediction confidence and error metrics
+            float confidence = pImpl->neuralPrediction->getPredictionError();
+            
+            // Connect prediction error to neuromodulation for learning
+            if (pImpl->predictionError) {
+                // Update prediction error signal for neuromodulation
+                pImpl->predictionError->update(predictionError);
+            }
+            
+            // Update novelty detection based on prediction error
+            if (pImpl->novelty) {
+                pImpl->novelty->updateFromPredictionError(predictionError);
+            }
+            
+            // Update concept formation with prediction errors
+            if (pImpl->conceptFormation) {
+                pImpl->conceptFormation->updateWithPredictionError(predictionError);
+            }
+            
+            // Store prediction context in episodic memory
+            if (pImpl->episodicMemory) {
+                EpisodicMemoryItem predictionContext;
+                predictionContext.timestamp = currentStep;
+                predictionContext.sensoryState = sensoryState;
+                predictionContext.predictedState = predictedState;
+                predictionContext.action = ActionType::Wait;
+                predictionContext.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                predictionContext.predictionError = predictionError;
+                
+                pImpl->episodicMemory->storeEpisode(predictionContext);
+            }
+        }
+        
+        // Action-consequence prediction for planning
+        if (pImpl->planner) {
+            // Get current state and use action-consequence prediction for planning
+            if (!sensoryState.empty()) {
+                // Get available motor neurons for action generation
+                std::vector<NeuronId> motorActions;
+                for (const auto& actionNeuron : pImpl->motorNeurons) {
+                    if (actionNeuron) {
+                        motorActions.push_back(actionNeuron->getId());
+                    }
+                }
+                
+                // For each potential action, predict its consequences
+                for (const auto& actionId : motorActions) {
+                    // In a real implementation, this would map neuron IDs to ActionType
+                    // For now, we'll use a placeholder action
+                    ActionType actionType = ActionType::Wait;
+                    std::vector<float> consequence = pImpl->neuralPrediction->predictActionConsequence(actionType, sensoryState);
+                    
+                    if (!consequence.empty()) {
+                        pImpl->neuralPrediction->recordAction(actionType, currentStep);
+                        pImpl->planner->addActionConsequence(actionType, consequence);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +620,63 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Apply top-down attention from episodic memory
+        if (pImpl->episodicMemory) {
+            auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(3);
+            for (const auto* episode : recentEpisodes) {
+                // Apply attention based on episodic relevance
+                // Recent episodes with high reward or novelty get attention boost
+                float relevance = episode->reward * 0.5f + episode->novelty * 0.3f;
+                if (relevance > 0.5f) {
+                    for (const NeuronId& neuronId : episode->activeNeurons) {
+                        pImpl->attention->applyTopDownBias(neuronId, relevance * 0.5f);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract current neural activity pattern from working memory
+        std::vector<float> currentPattern = pImpl->workingMemory ? pImpl->workingMemory->retrieve() : std::vector<float>();
+        
+        // Extract sensory features from recent activity
+        std::vector<float> sensoryFeatures;
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            if (neuron) {
+                const auto& state = neuron->getState();
+                float activation = std::abs(state.membranePotential - state.restingPotential) / 10.0f;
+                sensoryFeatures.push_back(activation);
+            }
+        }
+        
+        // Get reward from neuromodulation
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Present to concept formation
+        pImpl->conceptFormation->presentExperience(currentPattern, sensoryFeatures, reward, currentStep);
+        
+        // Find best matching concept for current sensory state
+        size_t matchingConcept = pImpl->conceptFormation->getMatchingConcept(currentPattern);
+        if (matchingConcept > 0) {
+            // Apply top-down bias from concept to attentional selection
+            float conceptStability = pImpl->conceptFormation->getConceptStability(matchingConcept);
+            if (conceptStability > 0.5f) {
+                // Boost relevant neurons based on concept prototype
+                const std::vector<float>& prototype = pImpl->conceptFormation->getConceptPrototype(matchingConcept);
+                for (size_t i = 0; i < std::min(prototype.size(), currentPattern.size()); ++i) {
+                    if (prototype[i] > 0.5f) {
+                        // Find corresponding neuron
+                        if (!pImpl->sensoryNeurons.empty() && i < pImpl->sensoryNeurons.size()) {
+                            pImpl->attention->applyTopDownBias(pImpl->sensoryNeurons[i]->getId(), prototype[i] * 2.0f);
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1005,22 +1152,8 @@ float Brain::getAverageFiringRate() const {
 
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
-NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
-}
-
-NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
-}
-
-NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
-}
-
-// ========== PREDICTION SYSTEM ACCESSOR ==========
-
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
+NeuralPrediction* Brain::getNeuralPrediction() {
+    return pImpl->neuralPrediction.get();
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========

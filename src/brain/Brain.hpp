@@ -11,6 +11,8 @@
 
 namespace nlm {
 
+class NeuralPrediction;
+
 // Forward declarations
 class Config;
 class RandomGenerator;

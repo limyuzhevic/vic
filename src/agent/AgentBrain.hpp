@@ -112,6 +112,9 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Current sensory state buffer for episodic memory
+    std::vector<float> currentSensoryState_;
 };
 
 } // namespace nlm
