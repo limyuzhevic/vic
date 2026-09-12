@@ -511,8 +511,50 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Extract current sensory state from neurons for prediction
+        std::vector<float> currentSensoryState;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                NeuronType type = pop->getNeuronType();
+                if (type == NeuronType::Sensory) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        // Encode sensory activity into prediction system
+                        currentSensoryState.push_back(
+                            std::max(0.0f, (state.membranePotential - state.restingPotential) / 50.0f));
+                    }
+                }
+            }
+        }
+        
+        // Generate prediction for next state based on current neural activity
+        if (!currentSensoryState.empty()) {
+            std::vector<float> predictedState = 
+                pImpl->predictionSystem->predictNextState(currentSensoryState);
+            
+            // Update prediction with actual state (neural activity represents observation)
+            float predictionError = pImpl->predictionSystem->updateWithObservation(
+                currentSensoryState, predictedState);
+            
+            // Use prediction error to modulate plasticity
+            if (predictionError > 0.01f) {
+                // High prediction error indicates surprise, enhancing learning
+                float errorMultiplier = predictionError * 10.0f;
+                for (auto& region : pImpl->regions) {
+                    for (auto& syn : region->getSynapses()) {
+                        if (syn->getPlasticityFlags().stdp) {
+                            // Scale STDP weight changes based on prediction error
+                            float currentWeight = syn->getWeight();
+                            float scaledWeight = currentWeight * (1.0f + errorMultiplier);
+                            syn->setWeight(std::clamp(scaledWeight, -1.0f, 1.0f));
+                        }
+                    }
+                }
+            }
+            
+            // Store prediction error for neuromodulation
+            pImpl->predictionError = predictionError;
+        }
     }
     
     // ========== STEP 9: Update attention system ==========

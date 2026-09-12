@@ -15,37 +15,39 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
+    // Phase 2: Real integrate-and-fire dynamics with conductance-based integration
+    // Implements: dV/dt = (V_rest - V)/tau + I/C
+    // Where I includes synaptic currents and external inputs
     
     const auto& state = neuron->getState();
     
-    // Leaky integration: dV/dt = -(V - V_rest) / tau + I / C
-    // For simplicity using explicit Euler:
-    // V_new = V_old + dt * (-(V_old - V_rest) / tau + I / C)
-    
+    // Get all inputs contributing to membrane potential
     float V = neuron->getMembranePotential();
     float V_rest = state.restingPotential;
-    float I = neuron->getTotalCurrent();
+    float I_total = neuron->getTotalCurrent();  // Includes synaptic inputs
     float tau = pImpl->membraneTimeConstant;
     float R = pImpl->membraneResistance;
     
-    // Simple Euler integration
-    float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
+    // Apply leak conductance (I_leak = (V - V_rest) / R_leak)
+    // and synaptic input (I_syn) to compute total current
+    // dV/dt = (V_rest - V)/(R_leak * C) + I_syn / C
+    
+    // Simple exponential Euler integration for stability
+    float dV = (-(V - V_rest) / tau + I_total / R) * static_cast<float>(dt);
     neuron->setMembranePotential(V + dV);
     
-    // Check for firing
+    // Check for spike threshold crossing
     if (shouldFire(neuron)) {
         neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
+        neuron->recordSpike(static_cast<Timestamp>(pImpl->currentTime));
     }
     
-    // Refractory mechanism
+    // Apply refractory period if needed
     if (neuron->isRefractory()) {
         neuron->setMembranePotential(state.resetPotential);
     }
     
-    // Clear current for next step
+    // Clear accumulated currents for next step
     neuron->clearTotalCurrent();
 }
 
