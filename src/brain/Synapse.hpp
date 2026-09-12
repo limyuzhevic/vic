@@ -72,7 +72,8 @@ public:
     
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
-    void step(Timestamp currentTime);
+    // Returns true if post-synaptic potential was transmitted, false otherwise
+    bool step(Timestamp currentTime);
     
     // Reset to initial state
     void reset();

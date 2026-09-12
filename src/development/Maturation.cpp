@@ -30,6 +30,14 @@ void Maturation::setProgress(float progress) {
 void Maturation::update(Brain* brain, SimulationStep currentStep) {
     // TODO PHASE 2: Implement real maturation
     // PLACEHOLDER: Progress increases over simulation time
+    // Real implementation would incorporate:
+    // - Experience-driven synaptic strengthening
+    // - Age-dependent changes in neural properties
+    // - Activity-dependent maturation rates
+    // - Developmental window constraints
+    
+    // TEMPORARY: Simple linear progress increase
+    setProgress(static_cast<float>(currentStep) / 10000.0f);
 }
 
 MembranePotential Maturation::getMatureThreshold() const {

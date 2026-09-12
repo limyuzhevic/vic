@@ -135,7 +135,8 @@ public:
     
     // Update neuron for one simulation step
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
+    // Returns true if neuron fired, false otherwise
+    bool step(Timestamp currentTime) final;
     
     // Reset to initial state
     void reset();

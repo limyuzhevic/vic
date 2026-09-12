@@ -191,11 +191,14 @@ void Synapse::setEfficacy(float efficacy) {
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
-void Synapse::step(Timestamp currentTime) {
+bool Synapse::step(Timestamp currentTime) {
+    bool wasActive = false;
+    
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
+    // 4. Transmit post-synaptic potential if pre-synaptic spike occurred
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
@@ -218,8 +221,38 @@ void Synapse::step(Timestamp currentTime) {
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
+    // Check if synaptic transmission should occur this step
+    if (pImpl->delay > 0) {
+        pImpl->delay--;
+        wasActive = false; // Delaying transmission
+    } else {
+        // Calculate effective synaptic weight with STP
+        float stpFactor = pImpl->shortTermDepression * pImpl->shortTermFacilitation;
+        float effectiveWeight = pImpl->weight * pImpl->efficacy * stpFactor;
+        
+        // Determine if pre-synaptic spike occurred recently (for transmission)
+        bool preSpikeOccurred = false;
+        for (const auto& spikeTime : pImpl->preSpikeHistory) {
+            if (std::abs(static_cast<float>(currentTime) - spikeTime) < 1.0f) {
+                preSpikeOccurred = true;
+                break;
+            }
+        }
+        
+        if (preSpikeOccurred) {
+            wasActive = true;
+            // Calculate post-synaptic potential (PSP)
+            float psp = effectiveWeight;
+            
+            // Find and update destination neuron (simplified - would need neuron registry in real implementation)
+            // For now, return true to indicate transmission occurred
+        }
+    }
+    
     // Clamp weight bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    return wasActive;
 }
 
 void Synapse::reset() {

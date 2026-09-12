@@ -32,7 +32,16 @@ void Dopamine::setLevel(float level) {
 float Dopamine::getPlasticityFactor() const {
     // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
     // PLACEHOLDER: Higher dopamine increases plasticity
-    return 0.5f + 0.5f * pImpl->level;
+    // IMPROVEMENT: More realistic dopamine effect on synaptic modification
+    
+    // Real implementation would consider:
+    // - Time course of dopamine signals
+    // - Receptor dynamics (D1 vs D2 receptors)
+    // - Nonlinear response curves
+    // - Context-dependent modulation
+    
+    // Simplified model: dopamine level linearly scales plasticity range
+    return 0.3f + 0.7f * pImpl->level;  // Range: 0.3 to 1.0
 }
 
 void Dopamine::update(TimestepDuration dt) {

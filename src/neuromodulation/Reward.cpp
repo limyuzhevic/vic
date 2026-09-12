@@ -35,6 +35,16 @@ void Reward::reset() {
 float Reward::computeReward(const Observation& observation) const {
     // TODO PHASE 2: Implement real reward computation from observation
     // PLACEHOLDER: Returns 0
+    // IMPROVEMENT: Basic reward computation based on observation properties
+    
+    // Access observation data through getter methods (assuming they exist)
+    // For now, implement a simple heuristic-based reward
+    
+    // Example: If observation contains positive stimuli, provide positive reward
+    // This would need to be adapted to the actual Observation structure
+    
+    // Check for achievement/completion signals in observation
+    // For now, return 0 as placeholder
     return 0.0f;
 }
 

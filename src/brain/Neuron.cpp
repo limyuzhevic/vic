@@ -259,10 +259,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     return fired;
 }
 
-void Neuron::step(Timestamp currentTime) {
+bool Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
     TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    bool fired = stepLIF(currentTime, dt);
+    return fired;
 }
 
 void Neuron::reset() {
@@ -272,29 +273,36 @@ void Neuron::reset() {
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
+    // Enhanced random initialization with biologically realistic parameters
+    // Membrane potential starts near resting potential with small biological variation
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
-    // Threshold is typically -55mV with small variation
+    // Threshold typically -55mV with biological variation for spike initiation
     pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
     
-    // Resting potential typically -70mV
+    // Resting potential typically -70mV with small physiological variation
     pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
     
-    // Reset potential is usually close to resting
+    // Reset potential is usually close to resting potential, slightly depolarized
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
     
-    // Refractory period: 2-10ms typical
+    // Refractory period: 2-10ms typical for cortical neurons
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
     
-    // Initial state
+    // Initial state variables
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
     
-    // Clear any residual state
+    // Set additional biologically realistic parameters
+    pImpl->state.leakConductance = 10.0f + rng.uniformReal(-2.0f, 2.0f); // nS
+    pImpl->state.synapseConductance = 0.0f; // Starts at zero, builds up through synaptic activity
+    
+    // Initialize firing rate to zero
+    pImpl->state.firingRate = 0.0f;
+    
+    // Clear any residual state from previous operations
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
 }

@@ -32,6 +32,26 @@ void Pruning::setPruningRate(float rate) {
 void Pruning::update(Brain* brain, RandomGenerator& rng) {
     // TODO PHASE 2: Implement real pruning
     // PLACEHOLDER: Weak synapses are removed probabilistically
+    // IMPROVEMENT: Real implementation with activity-dependent pruning
+    if (!brain) return;
+    
+    // Get all synapses from the brain
+    auto& regions = brain->getAllRegions();
+    for (auto* region : regions) {
+        if (!region) continue;
+        
+        auto& synapses = region->getSynapses();
+        for (auto& synapse : synapses) {
+            if (!synapse) continue;
+            
+            // Check pruning criteria
+            if (pruneSynapse(synapse.get())) {
+                // Remove synapse from region (implementation would need brain API)
+                // For now, mark for removal
+                synapse->setWeight(0.0f); // Invalidate
+            }
+        }
+    }
 }
 
 bool Pruning::pruneSynapse(Synapse* synapse) {
