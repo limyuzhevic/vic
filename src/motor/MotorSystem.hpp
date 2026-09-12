@@ -25,7 +25,7 @@ public:
     void setActionPreference(ActionType action, float preference);
     
     // Get action history
-    const std::vector<const Action*>& getActionHistory() const;
+    const std::vector<std::unique_ptr<const Action>>& getActionHistory() const;
     void clearHistory();
     
 private:

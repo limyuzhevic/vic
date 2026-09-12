@@ -4,7 +4,7 @@ namespace nlm {
 
 struct MotorSystem::Impl {
     std::vector<ActionType> availableActions;
-    std::vector<const Action*> actionHistory;
+    std::vector<std::unique_ptr<const Action>> actionHistory;
     
     Impl() {
         availableActions = {
@@ -42,14 +42,11 @@ void MotorSystem::setActionPreference(ActionType action, float preference) {
     // TODO PHASE 2: Implement action preferences
 }
 
-const std::vector<const Action*>& MotorSystem::getActionHistory() const {
+const std::vector<std::unique_ptr<const Action>>& MotorSystem::getActionHistory() const {
     return pImpl->actionHistory;
 }
 
 void MotorSystem::clearHistory() {
-    for (auto* action : pImpl->actionHistory) {
-        delete action;
-    }
     pImpl->actionHistory.clear();
 }
 
