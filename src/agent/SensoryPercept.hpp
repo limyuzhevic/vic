@@ -21,6 +21,10 @@ public:
     size_t getVisionWidth() const { return visionWidth_; }
     size_t getVisionHeight() const { return visionHeight_; }
     
+    // Vision width and height (convenience methods for AgentBrain)
+    size_t getVisionWidth_Expanded() const { return visionWidth_; }
+    size_t getVisionHeight_Expanded() const { return visionHeight_; }
+    
     // Touch/proximity sensors (binary collision signals)
     const std::vector<float>& getTouch() const { return touch_; }
     void setTouch(const std::vector<float>& t) { touch_ = t; }

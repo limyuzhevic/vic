@@ -25,6 +25,10 @@ public:
     // Get motor output size expected
     size_t getMotorOutputSize() const;
     
+    // Get vision width and height (convenience methods)
+    size_t getVisionWidth() const;
+    size_t getVisionHeight() const;
+    
     // Process sensory percept and inject into brain
     void processSensoryInput(const SensoryPercept& percept);
     
