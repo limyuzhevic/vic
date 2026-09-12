@@ -25,6 +25,9 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
@@ -171,9 +174,18 @@ public:
     void setDevelopmentalStage(DevelopmentalStage stage);
     
     // ========== NEUROMODULATION SYSTEMS ==========
-    
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and social behavior
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
@@ -190,12 +202,24 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
-    void logStatus() const;
+        // Integrate neural planner with action selection for goal-directed behavior
+    void integrateWithActionSelection();
     
+    // Get current sensory vector from neural activity
+    std::vector<float> getCurrentSensoryVector() const;
+    
+    // Get current predictions for action planning
+    const std::vector<float>& getCurrentPredictions() const { return currentPredictions_; }
+    
+    // Set current predictions for action planning
+    void setCurrentPredictions(const std::vector<float>& predictions) { currentPredictions_ = predictions; }
+
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Current predictions for action planning (from prediction system)
+    std::vector<float> currentPredictions_;
 };
 
 } // namespace nlm
