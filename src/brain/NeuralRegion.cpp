@@ -236,62 +236,89 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
                                                float connectionProbability,
                                                float meanWeight,
                                                float weightVariance) {
-    // Efficient random connectivity initialization
-    // Creates synapses based on neuron types:
-    // - Excitatory neurons -> all neurons (excitatory synapses)
-    // - Inhibitory neurons -> all neurons (inhibitory synapses)
+    NLM_LOG_DEBUG("NeuralRegion " + std::to_string(pImpl->id) + " initializing random connectivity");
     
-    // Get all neurons
-    auto neurons = getAllNeurons();
-    size_t neuronCount = neurons.size();
-    
-    // Create random connections
-    for (size_t i = 0; i < neuronCount; ++i) {
-        Neuron* preNeuron = neurons[i];
-        NeuronType preType = preNeuron->getType();
+    try {
+        // Validate input parameters
+        NLM_VALIDATE_PARAM(connectionProbability >= 0.0f && connectionProbability <= 1.0f, 
+                          "Connection probability must be between 0 and 1");
+        NLM_VALIDATE_PARAM(weightVariance >= 0.0f, "Weight variance must be non-negative");
         
-        // Skip if not a proper source neuron
-        if (preType == NeuronType::Modulatory) continue;
+        // Get all neurons
+        auto neurons = getAllNeurons();
+        size_t neuronCount = neurons.size();
         
-        for (size_t j = 0; j < neuronCount; ++j) {
-            if (i == j) continue;  // No self-connections
+        NLM_VALIDATE_PARAM(neuronCount > 0, "Region must contain at least one neuron for connectivity initialization");
+        
+        // Create random connections
+        for (size_t i = 0; i < neuronCount; ++i) {
+            NLM_CHECK_BOUNDS(i, neuronCount, "Neuron index out of bounds in connectivity initialization");
             
-            Neuron* postNeuron = neurons[j];
+            Neuron* preNeuron = neurons[i];
+            NLM_CHECK_NULL(preNeuron, "Pre-synaptic neuron is null in connectivity initialization");
             
-            // Probabilistic connection
-            if (!rng.bernoulli(connectionProbability)) continue;
+            NeuronType preType = preNeuron->getType();
             
-            // Determine synapse type based on pre-synaptic neuron type
-            SynapseType synType;
-            float weight;
+            // Skip if not a proper source neuron
+            if (preType == NeuronType::Modulatory) continue;
             
-            if (preType == NeuronType::Excitatory || 
-                preType == NeuronType::Sensory ||
-                preType == NeuronType::Motor ||
-                preType == NeuronType::Internal) {
-                // excitatory synapse
-                synType = SynapseType::Excitatory;
-                weight = meanWeight + rng.normal(0.0f, weightVariance);
-                weight = std::max(0.01f, weight);  // Ensure positive
-            } else if (preType == NeuronType::Inhibitory) {
-                // inhibitory synapse
-                synType = SynapseType::Inhibitory;
-                weight = -(meanWeight + rng.normal(0.0f, weightVariance));
-                weight = std::min(-0.01f, weight);  // Ensure negative
-            } else {
-                synType = SynapseType::Excitatory;
-                weight = meanWeight + rng.normal(0.0f, weightVariance);
-            }
-            
-            // Add synapse
-            SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);
-            
-            // Initialize random properties
-            if (Synapse* syn = getSynapse(synId)) {
-                syn->setType(synType);
-                syn->initializeRandom(rng);
+            for (size_t j = 0; j < neuronCount; ++j) {
+                NLM_CHECK_BOUNDS(j, neuronCount, "Neuron index out of bounds in connectivity initialization");
+                
+                if (i == j) continue;  // No self-connections
+                
+                Neuron* postNeuron = neurons[j];
+                NLM_CHECK_NULL(postNeuron, "Post-synaptic neuron is null in connectivity initialization");
+                
+                // Probabilistic connection
+                if (!rng.bernoulli(connectionProbability)) continue;
+                
+                // Determine synapse type based on pre-synaptic neuron type
+                SynapseType synType;
+                float weight;
+                
+                if (preType == NeuronType::Excitatory || 
+                    preType == NeuronType::Sensory ||
+                    preType == NeuronType::Motor ||
+                    preType == NeuronType::Internal) {
+                    // excitatory synapse
+                    synType = SynapseType::Excitatory;
+                    weight = meanWeight + rng.normal(0.0f, weightVariance);
+                    weight = std::max(0.01f, weight);  // Ensure positive
+                } else if (preType == NeuronType::Inhibitory) {
+                    // inhibitory synapse
+                    synType = SynapseType::Inhibitory;
+                    weight = -(meanWeight + rng.normal(0.0f, weightVariance));
+                    weight = std::min(-0.01f, weight);  // Ensure negative
+                } else {
+                    synType = SynapseType::Excitatory;
+                    weight = meanWeight + rng.normal(0.0f, weightVariance);
+                }
+                
+                // Validate weight
+                if (weight < -1.0f || weight > 1.0f) {
+                    NLM_LOG_WARNING("Weight " + std::to_string(weight) + " out of expected bounds, clamping");
+                    weight = std::max(-1.0f, std::min(1.0f, weight));
+                }
+                
+                // Add synapse
+                SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);
+                
+                // Initialize random properties
+                if (Synapse* syn = getSynapse(synId)) {
+                    syn->setType(synType);
+                    syn->initializeRandom(rng);
+                }
             }
         }
+        
+        NLM_LOG_DEBUG("NeuralRegion " + std::to_string(pImpl->id) + " connectivity initialization completed");
+    } catch (const NLMError& e) {
+        NLM_LOG_ERROR(std::string("NLM NeuralRegion initializeRandomConnectivity error (code: ") + std::to_string(static_cast<int>(e.getCode())) + "): " + e.what() + " (Region: " + std::to_string(pImpl->id) + ")");
+        throw;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Unexpected error during NeuralRegion initializeRandomConnectivity: ") + e.what() + " (Region: " + std::to_string(pImpl->id) + ")");
+        throw;
     }
 }
 

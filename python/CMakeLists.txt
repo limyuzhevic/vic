@@ -53,7 +53,6 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/prediction/NeuralPrediction.cpp
     ${NLM_SOURCE_DIR}/motor/MotorSystem.cpp
     ${NLM_SOURCE_DIR}/environment/Environment.cpp
-    ${NLM_SOURCE_DIR}/environment/Observation.cpp
     ${NLM_SOURCE_DIR}/experiments/Experiment.cpp
     ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
     ${NLM_SOURCE_DIR}/experiments/Metrics.cpp

@@ -1,5 +1,6 @@
 #include "Synapse.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/ErrorHandling.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -192,34 +193,59 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    NLM_LOG_DEBUG("Synapse stepping (ID: " + std::to_string(pImpl->id) + ")");
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
-    
-    // Decay short-term facilitation (Tsodyks-Markram model)
-    if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+    try {
+        // Real synaptic dynamics:
+        // 1. Decay short-term plasticity state
+        // 2. Decay eligibility trace
+        // 3. Update efficacy based on use
+        
+        TimestepDuration dt = 0.001;  // 1ms timestep
+        
+        // Validate input parameters
+        NLM_VALIDATE_PARAM(dt > 0.0f, "Invalid timestep duration in synapse step");
+        NLM_VALIDATE_PARAM(currentTime >= 0.0f, "Invalid current time in synapse step");
+        
+        // Decay short-term facilitation (Tsodyks-Markram model)
+        if (pImpl->lastPreSpikeTime >= 0.0f) {
+            float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+            NLM_VALIDATE_PARAM(timeSincePre >= 0.0f, "Invalid time since pre spike");
+            pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        }
+        
+        // Decay short-term depression
+        if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
+            float timeSinceActivity = std::max(
+                pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
+                pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
+            );
+            NLM_VALIDATE_PARAM(timeSinceActivity >= 0.0f, "Invalid time since activity");
+            // Recovery from depression toward 1.0
+            pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        }
+        
+        // Decay eligibility trace for reward-modulated learning
+        decayEligibilityTrace(0.001f);  // Fast decay
+        
+        // Clamp weight bounds
+        pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+        
+        // Validate synapse state after step
+        NLM_VALIDATE_PARAM(pImpl->shortTermDepression >= 0.0f && pImpl->shortTermDepression <= 1.0f, 
+                          "Short-term depression out of valid range");
+        NLM_VALIDATE_PARAM(pImpl->shortTermFacilitation >= 0.0f && pImpl->shortTermFacilitation <= 1.0f, 
+                          "Short-term facilitation out of valid range");
+        NLM_VALIDATE_PARAM(std::abs(pImpl->eligibilityTrace) < 10.0f, "Eligibility trace out of valid range");
+        
+        NLM_LOG_DEBUG("Synapse step completed successfully (ID: " + std::to_string(pImpl->id) + ")");
+    } catch (const NLMError& e) {
+        NLM_LOG_ERROR(std::string("NLM Synapse step error (code: ") + std::to_string(static_cast<int>(e.getCode())) + "): " + e.what() + " (ID: " + std::to_string(pImpl->id) + ")");
+        throw;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Unexpected error during synapse step: ") + e.what() + " (ID: " + std::to_string(pImpl->id) + ")");
+        throw;
     }
-    
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
-    }
-    
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
-    
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::reset() {
@@ -231,35 +257,58 @@ void Synapse::reset() {
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
-    // Proper random initialization based on synapse type
-    if (pImpl->type == SynapseType::Excitatory) {
-        // Excitatory synapses: small positive weights
-        pImpl->weight = rng.uniformReal(0.1f, 0.4f);
-        // Excitatory synapses have moderate initial efficacy
-        pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
-    } else if (pImpl->type == SynapseType::Inhibitory) {
-        // Inhibitory synapses: negative weights
-        pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
-        pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
-    } else {
-        // Other types: small random weights
-        pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
-        pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
+    NLM_LOG_DEBUG("Initializing synapse with random parameters");
+    
+    try {
+        // Validate parameters before use
+        NLM_VALIDATE_PARAM(pImpl->type != SynapseType::Electrical || pImpl->delay > 0, 
+                          "Electrical synapses must have positive delay");
+        
+        // Proper random initialization based on synapse type
+        if (pImpl->type == SynapseType::Excitatory) {
+            // Excitatory synapses: small positive weights
+            pImpl->weight = rng.uniformReal(0.1f, 0.4f);
+            // Excitatory synapses have moderate initial efficacy
+            pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        } else if (pImpl->type == SynapseType::Inhibitory) {
+            // Inhibitory synapses: negative weights
+            pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
+            pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        } else {
+            // Other types: small random weights
+            pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
+            pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
+        }
+        
+        // Validate weight initialization
+        NLM_VALIDATE_PARAM(pImpl->weight >= Impl::MIN_WEIGHT && pImpl->weight <= Impl::MAX_WEIGHT, 
+                          "Initialized weight out of valid bounds");
+        
+        // Random delay: 1-5 steps (1-5ms at 1ms timestep)
+        pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
+        
+        // Validate delay
+        NLM_VALIDATE_PARAM(pImpl->delay > 0, "Initialized delay must be positive");
+        
+        // Initialize short-term plasticity state
+        pImpl->shortTermDepression = 1.0f;  // Fully recovered
+        pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
+        
+        // Initialize eligibility trace to 0
+        pImpl->eligibilityTrace = 0.0f;
+        
+        // Initialize last spike times
+        pImpl->lastPreSpikeTime = -1.0f;
+        pImpl->lastPostSpikeTime = -1.0f;
+        
+        NLM_LOG_DEBUG("Synapse initialization completed successfully");
+    } catch (const NLMError& e) {
+        NLM_LOG_ERROR(std::string("NLM Synapse initializationRandom error (code: ") + std::to_string(static_cast<int>(e.getCode())) + "): " + e.what());
+        throw;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Unexpected error during synapse initializationRandom: ") + e.what());
+        throw;
     }
-    
-    // Random delay: 1-5 steps (1-5ms at 1ms timestep)
-    pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
-    
-    // Initialize short-term plasticity state
-    pImpl->shortTermDepression = 1.0f;  // Fully recovered
-    pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
-    
-    // Initialize eligibility trace to 0
-    pImpl->eligibilityTrace = 0.0f;
-    
-    // Initialize last spike times
-    pImpl->lastPreSpikeTime = -1.0f;
-    pImpl->lastPostSpikeTime = -1.0f;
 }
 
 } // namespace nlm

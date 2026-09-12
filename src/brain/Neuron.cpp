@@ -1,5 +1,6 @@
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/ErrorHandling.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -189,74 +190,116 @@ void Neuron::setPopulationId(PopulationId population) {
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
-    bool fired = false;
+    NLM_LOG_DEBUG("Neuron stepping LIF dynamics");
     
-    // Handle refractory period
-    if (pImpl->state.refractoryRemaining > 0) {
-        --pImpl->state.refractoryRemaining;
-        // During refractory period, clear synaptic input but don't integrate
-        pImpl->synapticInput = 0.0f;
-        if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
+    try {
+        bool fired = false;
+        
+        // Validate input parameters
+        NLM_VALIDATE_PARAM(dt > 0.0f, "Invalid timestep duration");
+        NLM_VALIDATE_PARAM(currentTime >= 0.0f, "Invalid current time");
+        
+        // Handle refractory period
+        if (pImpl->state.refractoryRemaining > 0) {
+            --pImpl->state.refractoryRemaining;
+            // During refractory period, clear synaptic input but don't integrate
+            pImpl->synapticInput = 0.0f;
+            if (pImpl->state.refractoryRemaining == 0) {
+                pImpl->state.firingState = FiringState::Resting;
+            }
+            NLM_LOG_DEBUG("Neuron in refractory period, remaining: " + std::to_string(pImpl->state.refractoryRemaining));
+            return false;
         }
-        return false;
+        
+        // Validate neuron state values
+        NLM_VALIDATE_PARAM(pImpl->state.restingPotential >= -100.0f && pImpl->state.restingPotential <= 100.0f, 
+                          "Invalid resting potential");
+        NLM_VALIDATE_PARAM(pImpl->state.threshold >= -100.0f && pImpl->state.threshold <= 100.0f, 
+                          "Invalid threshold");
+        NLM_VALIDATE_PARAM(pImpl->state.resetPotential >= -100.0f && pImpl->state.resetPotential <= 100.0f, 
+                          "Invalid reset potential");
+        
+        // LIF dynamics: Leaky Integrate-and-Fire
+        // dV/dt = (V_rest - V)/tau + I/C
+        // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+        
+        MembranePotential& V = pImpl->state.membranePotential;
+        MembranePotential V_rest = pImpl->state.restingPotential;
+        MembranePotential V_reset = pImpl->state.resetPotential;
+        MembranePotential threshold = pImpl->state.threshold;
+        float tau = Impl::TIME_CONSTANT;  // ms
+        float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+        
+        // Validate constants
+        NLM_VALIDATE_PARAM(C > 0.0f, "Invalid membrane capacitance");
+        NLM_VALIDATE_PARAM(tau > 0.0f, "Invalid time constant");
+        
+        // Synaptic input contributes to membrane potential change
+        float synapticContribution = pImpl->synapticInput / C;
+        
+        // Check for division by zero
+        NLM_CHECK_DIVISION(C, "Division by zero in synaptic contribution calculation");
+        
+        // Leak contribution
+        float leakContribution = (V_rest - V) / tau;
+        
+        // Check for division by zero
+        NLM_CHECK_DIVISION(tau, "Division by zero in leak contribution calculation");
+        
+        // Update membrane potential using exponential Euler integration
+        V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+        
+        // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+        if (pImpl->state.adaptationVariable > 0.0f) {
+            V -= pImpl->state.adaptationVariable * 0.01f;
+            pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        }
+        
+        // Clamp membrane potential to prevent instability
+        V = std::clamp(V, -100.0f, 50.0f);
+        
+        // Check for spike
+        if (V >= threshold) {
+            fired = true;
+            pImpl->state.firingState = FiringState::Active;
+            pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+            
+            // Record spike
+            recordSpike(currentTime);
+            
+            // Reset membrane potential
+            V = V_reset;
+            
+            // Enter refractory period
+            pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+            pImpl->state.firingState = FiringState::Refractory;
+            
+            // Validate refractory period
+            NLM_VALIDATE_PARAM(pImpl->state.refractoryRemaining > 0, "Invalid refractory period after spike");
+            
+            // Update adaptation for spike-frequency adaptation
+            pImpl->state.adaptationVariable += 1.0f;
+            
+            NLM_LOG_DEBUG("Neuron fired at time " + std::to_string(currentTime));
+        } else {
+            pImpl->state.firingState = FiringState::Active;
+        }
+        
+        // Clear synaptic input for next step
+        pImpl->synapticInput = 0.0f;
+        
+        // Validate post-step state
+        NLM_VALIDATE_PARAM(V >= -100.0f && V <= 50.0f, "Membrane potential out of valid range");
+        
+        NLM_LOG_DEBUG("Neuron step completed, fired: " + std::to_string(fired));
+        return fired;
+    } catch (const NLMError& e) {
+        NLM_LOG_ERROR(std::string("NLM Neuron stepLIF error (code: ") + std::to_string(static_cast<int>(e.getCode())) + "): " + e.what());
+        throw;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Unexpected error during neuron stepLIF: ") + e.what());
+        throw;
     }
-    
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
-    
-    MembranePotential& V = pImpl->state.membranePotential;
-    MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
-    
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
-    
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
-    
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
-    
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
-    }
-    
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
-    
-    // Check for spike
-    if (V >= threshold) {
-        fired = true;
-        pImpl->state.firingState = FiringState::Active;
-        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
-        
-        // Record spike
-        recordSpike(currentTime);
-        
-        // Reset membrane potential
-        V = V_reset;
-        
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
-        pImpl->state.firingState = FiringState::Refractory;
-        
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
-    } else {
-        pImpl->state.firingState = FiringState::Active;
-    }
-    
-    // Clear synaptic input for next step
-    pImpl->synapticInput = 0.0f;
-    
-    return fired;
 }
 
 void Neuron::step(Timestamp currentTime) {
@@ -266,37 +309,70 @@ void Neuron::step(Timestamp currentTime) {
 }
 
 void Neuron::reset() {
-    pImpl->state = NeuronState();
-    pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+    NLM_LOG_DEBUG("Resetting neuron state");
+    
+    try {
+        // Reset to initial state
+        pImpl->state = NeuronState();
+        pImpl->synapticInput = 0.0f;
+        pImpl->spikeHistory.clear();
+        
+        // Validate reset state
+        NLM_VALIDATE_PARAM(pImpl->state.refractoryRemaining == 0, "Neuron reset failed - refractory not reset");
+        NLM_VALIDATE_PARAM(pImpl->state.membranePotential == pImpl->state.restingPotential, "Neuron reset failed - membrane potential not reset");
+        
+        NLM_LOG_DEBUG("Neuron reset completed successfully");
+    } catch (const NLMError& e) {
+        NLM_LOG_ERROR(std::string("NLM Neuron reset error (code: ") + std::to_string(static_cast<int>(e.getCode())) + "): " + e.what());
+        throw;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Unexpected error during neuron reset: ") + e.what());
+        throw;
+    }
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    NLM_LOG_DEBUG("Initializing neuron with random parameters");
     
-    // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
-    
-    // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
-    
-    // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
-    
-    // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
-    
-    // Initial state
-    pImpl->state.firingState = FiringState::Resting;
-    pImpl->state.refractoryRemaining = 0;
-    pImpl->state.adaptationVariable = 0.0f;
-    pImpl->state.lastSpikeTime = -1.0f;
-    
-    // Clear any residual state
-    pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+    try {
+        // Validate parameters before use
+        NLM_VALIDATE_PARAM(pImpl->state.restingPotential >= -100.0f && pImpl->state.restingPotential <= 100.0f, 
+                          "Invalid resting potential in neuron state");
+        
+        // Real random initialization with biological constraints
+        // Membrane potential starts near resting potential
+        pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+        
+        // Threshold is typically -55mV with small variation
+        pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+        
+        // Resting potential typically -70mV
+        pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+        
+        // Reset potential is usually close to resting
+        pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+        
+        // Refractory period: 2-10ms typical
+        pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+        
+        // Initial state
+        pImpl->state.firingState = FiringState::Resting;
+        pImpl->state.refractoryRemaining = 0;
+        pImpl->state.adaptationVariable = 0.0f;
+        pImpl->state.lastSpikeTime = -1.0f;
+        
+        // Validate initialization results
+        NLM_VALIDATE_PARAM(pImpl->state.refractoryPeriod > 0, "Invalid refractory period");
+        NLM_VALIDATE_PARAM(pImpl->state.threshold > pImpl->state.resetPotential, "Invalid threshold configuration");
+        
+        NLM_LOG_DEBUG("Neuron initialization completed successfully");
+    } catch (const NLMError& e) {
+        NLM_LOG_ERROR(std::string("NLM Neuron initialization error (code: ") + std::to_string(static_cast<int>(e.getCode())) + "): " + e.what());
+        throw;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Unexpected error during neuron initialization: ") + e.what());
+        throw;
+    }
 }
 
 } // namespace nlm
