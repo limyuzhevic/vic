@@ -26,6 +26,10 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
 
 void NeuralEpisodicMemory::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize NeuralEpisodicMemory with null brain pointer");
+        return;
+    }
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralEpisodicMemory initialized");
@@ -194,6 +198,8 @@ const EpisodicMemoryItem* NeuralEpisodicMemory::getEpisode(size_t index) const {
     if (index < episodes_.size()) {
         return &episodes_[index];
     }
+    NLM_LOG_WARNING("Attempted to get episode at invalid index: " + std::to_string(index) + 
+                   " (valid range: 0-" + std::to_string(episodes_.size() - 1) + ")");
     return nullptr;
 }
 

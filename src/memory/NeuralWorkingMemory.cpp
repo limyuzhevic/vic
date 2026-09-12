@@ -40,20 +40,25 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
+        // Safe indexing with modulo to prevent out-of-bounds
+        NeuronId neuron = memoryNeurons_[i % std::max<size_t>(1, memoryNeurons_.size())];
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+        auto* region = brain_->getRegion(neuron.getId() / 1000);
+        if (region) {
+            auto neurons = region->getAllNeurons();
+            if (neurons) {
+                for (auto* nn : *neurons) {
+                    if (nn && nn->getId() == neuron) {
+                        nn->injectCurrent(activation * 5.0f);
+                        break;
+                    }
                 }
             }
         }
         
-        // Update stored activation
+        // Update stored activation with bounds checking
         if (i < memoryActivations_.size()) {
             memoryActivations_[i] = activation;
         } else {
@@ -117,7 +122,13 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
     
     // Update maintenance - reinforce active memory neurons
+    // Use size() instead of hardcoded limit for safety
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        // Safe indexing with bounds check
+        if (i >= memoryNeurons_.size() || i >= memoryActivations_.size() || i >= memoryTimestamps_.size()) {
+            break;  // Skip if arrays are out of sync
+        }
+        
         NeuronId neuron = memoryNeurons_[i];
         float activation = memoryActivations_[i];
         

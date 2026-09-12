@@ -205,12 +205,12 @@ bool Brain::initialize() {
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
                 for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
+                    if (neuron) pImpl->sensoryNeurons.push_back(neuron);
                 }
             }
             if (motorPop) {
                 for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
+                    if (neuron) pImpl->motorNeurons.push_back(neuron);
                 }
             }
             
@@ -232,63 +232,85 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+    }
     
     // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+    }
+    if (pImpl->curiosity) {
+        pImpl->curiosity->initialize(this);
+    }
     
     // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
-    
-    // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+            // Count spikes
+            ++pImpl->totalSpikesThisStep;
+            ++pImpl->totalSpikesTotal;
+        });
+        
+        // Register delayed spike handler to deliver synaptic input
+        pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+            // Find destination neuron and deliver synaptic input
+            for (auto& region : pImpl->regions) {
+                auto neurons = region->getAllNeurons();
+                if (neurons) {
+                    for (auto* neuron : *neurons) {
+                        if (neuron && neuron->getId() == event.destination_neuron) {
+                            // Apply synaptic weight as current
+                            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                            if (event.is_excitatory) {
+                                neuron->receiveExcitatoryInput(synapticCurrent);
+                            } else {
+                                neuron->receiveInhibitoryInput(-synapticCurrent);
+                            }
+                            return;
+                        }
                     }
-                    return;
                 }
             }
-        }
-    });
+        });
+    }
     
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    }
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));

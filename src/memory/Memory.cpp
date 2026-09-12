@@ -15,17 +15,23 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 
 WorkingMemory::~WorkingMemory() = default;
 
-void WorkingMemory::store(NeuronId neuron, float value) {
+bool WorkingMemory::store(NeuronId neuron, float value) {
     // TODO PHASE 2: Implement real storage with capacity limits
+    if (!neuron.isValid()) {
+        return false;  // Invalid neuron ID
+    }
+    
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
-            return;
+            return true;
         }
     }
     if (pImpl->items.size() < pImpl->capacity) {
         pImpl->items.emplace_back(neuron, value);
+        return true;
     }
+    return false;  // At capacity
 }
 
 float WorkingMemory::retrieve(NeuronId neuron) const {
