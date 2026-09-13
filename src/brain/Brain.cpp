@@ -177,10 +177,26 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
+    // Validate configuration parameters
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
-    size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    double simulationTimestep = pImpl->config->getOr<double>("simulation_timestep", 0.001);
+    
+    // Validate critical parameters
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Configuration validation failed: neuron_count must be > 0");
+        return false;
+    }
+    
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Configuration validation failed: connection_probability must be in [0, 1]");
+        return false;
+    }
+    
+    if (simulationTimestep <= 0.0) {
+        NLM_LOG_ERROR("Configuration validation failed: simulation_timestep must be > 0");
+        return false;
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
@@ -333,9 +349,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+    // Cache regions and populations for performance
+    const auto& regions = pImpl->regions;
+    for (auto& region : regions) {
+        const auto& populations = region->getPopulations();
+        for (auto& pop : populations) {
+            const auto& neurons = pop->getNeurons();
+            for (auto* neuron : neurons) {
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }
@@ -425,13 +445,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
+        if (dopamineLevel > 0.0f) {
+            // Cache regions and populations for performance
+            const auto& regions = pImpl->regions;
+            float excitabilityMod = dopamineLevel * 0.5f;
+            for (auto& region : regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
                         neuron->injectCurrent(excitabilityMod);
                     }
                 }
@@ -446,8 +466,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
-    for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
+    // Cache regions and synapses for performance
+    const auto& regions = pImpl->regions;
+    for (auto& region : regions) {
+        const auto& synapses = region->getSynapses();
+        for (auto& syn : synapses) {
             // Apply STDP with neuromodulation
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
@@ -488,10 +511,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
-            for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
+            // Cache regions and populations for performance
+            const auto& regions = pImpl->regions;
+            for (auto& region : regions) {
+                const auto& populations = region->getPopulations();
+                for (auto& pop : populations) {
+                    const auto& neurons = pop->getNeurons();
+                    for (auto* neuron : neurons) {
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());

@@ -219,8 +219,18 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Leak contribution
     float leakContribution = (V_rest - V) / tau;
     
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Update membrane potential using proper exponential Euler integration
+    // dV/dt = (V_rest - V)/tau + I/C
+    // Solution: V_new = V_rest + (V - V_rest) * exp(-dt/tau) + I/C * (1 - exp(-dt/tau))
+    
+    float tau = Impl::TIME_CONSTANT;  // ms
+    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    
+    float synapticContribution = pImpl->synapticInput / C;
+    float leakContribution = (V_rest - V) / tau;
+    
+    float exp_factor = std::exp(-static_cast<float>(dt) * 1000.0f / tau);  // Convert dt from seconds to ms
+    V = V_rest + (V - V_rest) * exp_factor + synapticContribution * (1.0f - exp_factor);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
