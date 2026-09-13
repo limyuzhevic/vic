@@ -18,10 +18,15 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
+    // LIF parameters - constants extracted from magic numbers
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr float ADAPTATION_DECAY = 0.95f;  // Spike-frequency adaptation decay
+    static constexpr float ADAPTATION_COEFF = 0.01f;  // Spike-frequency adaptation coefficient
+    static constexpr float VOLTAGE_CLAMP_MIN = -100.0f;  // mV
+    static constexpr float VOLTAGE_CLAMP_MAX = 50.0f;  // mV
+    static constexpr float SPIKE_THRESHOLD_MULTIPLIER = 1.0f;  // For threshold testing
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
@@ -224,12 +229,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        V -= pImpl->state.adaptationVariable * Impl::ADAPTATION_COEFF;
+        pImpl->state.adaptationVariable *= Impl::ADAPTATION_DECAY;  // Decay adaptation
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    V = std::clamp(V, Impl::VOLTAGE_CLAMP_MIN, Impl::VOLTAGE_CLAMP_MAX);
     
     // Check for spike
     if (V >= threshold) {

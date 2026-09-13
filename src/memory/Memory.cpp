@@ -1,6 +1,3 @@
-#include "Memory.hpp"
-#include <algorithm>
-
 namespace nlm {
 
 // Working Memory Implementation
@@ -16,13 +13,14 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // Check for existing item and update if found
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
             return;
         }
     }
+    // Add new item if capacity permits
     if (pImpl->items.size() < pImpl->capacity) {
         pImpl->items.emplace_back(neuron, value);
     }
@@ -108,7 +106,15 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // TODO: Implement real consolidation with relevance-based pruning
+    // This could involve:
+    // 1. Scoring episodes based on neuron activation patterns
+    // 2. Identifying redundant or less relevant episodes
+    // 3. Moving important episodes to long-term storage
+    // 4. Freeing memory space for new episodes
+    
+    // Placeholder: Currently does nothing
+    // For Phase 3+: Implement actual consolidation logic
 }
 
 // Semantic Memory Implementation
@@ -166,12 +172,14 @@ ProceduralMemory::ProceduralMemory() : pImpl(new Impl) {}
 ProceduralMemory::~ProceduralMemory() = default;
 
 void ProceduralMemory::learnSkill(const std::string& name, const std::vector<NeuronId>& pattern) {
+    // Check if skill already exists
     for (auto& skill : pImpl->skills) {
         if (skill.name == name) {
             skill.neuralPattern = pattern;
             return;
         }
     }
+    // Create and add new skill
     Skill skill;
     skill.name = name;
     skill.neuralPattern = pattern;

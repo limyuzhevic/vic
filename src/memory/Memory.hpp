@@ -7,7 +7,8 @@
 namespace nlm {
 
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Currently implemented as an associative array mapping NeuronIds to float values
+// For Phase 3+: Integrate with neural activity patterns
 
 class WorkingMemory {
 public:
@@ -40,7 +41,8 @@ private:
 };
 
 // Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
+// Currently implemented as a circular buffer of episodes with neuron IDs and values
+// For Phase 3+: Add replay mechanisms and temporal pattern detection
 
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
@@ -80,7 +82,8 @@ private:
 };
 
 // Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
+// Currently implemented as a key-value store for facts
+// For Phase 3+: Connect to neural representations and pattern completion
 
 class SemanticMemory {
 public:
@@ -108,7 +111,8 @@ private:
 };
 
 // Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
+// Currently implemented as a skill repository with neural patterns
+// For Phase 3+: Integrate with motor system and reinforcement learning
 
 struct Skill {
     std::string name;
@@ -144,7 +148,8 @@ private:
 };
 
 // Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
+// Currently implemented as a weighted graph of neuron associations
+// For Phase 3+: Add Hebbian learning and pattern completion
 
 class AssociativeMemory {
 public:
