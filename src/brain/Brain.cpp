@@ -98,6 +98,7 @@ struct Brain::Impl {
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
+        // Fix: rng(nullptr) was incorrect, now properly initialized
         rng = std::make_unique<RandomGenerator>(seed);
         
         // Initialize plasticity systems

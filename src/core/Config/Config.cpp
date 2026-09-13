@@ -168,11 +168,37 @@ void Config::clear() {
     pImpl->entries.clear();
 }
 
+// Configuration summary with advanced details
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    
+    // Show key statistics
+    int fileEntries = 0, commandLineEntries = 0, runtimeEntries = 0;
     for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
+        switch (entry.source) {
+            case ConfigSource::File: fileEntries++; break;
+            case ConfigSource::CommandLine: commandLineEntries++; break;
+            case ConfigSource::Runtime: runtimeEntries++; break;
+            default: break;
+        }
+    }
+    
+    oss << "  File entries: " << fileEntries << "\n";
+    oss << "  Command line entries: " << commandLineEntries << "\n";
+    oss << "  Runtime entries: " << runtimeEntries << "\n";
+    
+    // Group entries by source for better organization
+    oss << "\nEntries by source:\n";
+    for (const auto& entry : pImpl->entries) {
+        std::string sourceName;
+        switch (entry.source) {
+            case ConfigSource::File: sourceName = "FILE"; break;
+            case ConfigSource::CommandLine: sourceName = "CMD"; break;
+            case ConfigSource::Runtime: sourceName = "RUNTIME"; break;
+            default: sourceName = "DEFAULT"; break;
+        }
+        oss << "  [" << sourceName << "] " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
@@ -181,8 +207,13 @@ std::string Config::summary() const {
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << "]";
+        if (!entry.description.empty()) {
+            oss << "  // " << entry.description;
+        }
+        oss << "\n";
     }
+    
     return oss.str();
 }
 

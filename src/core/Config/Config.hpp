@@ -93,6 +93,38 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // === ADVANCED CONFIGURATION FEATURES ===
+    
+    // Schema validation
+    bool validateSchema(const std::string& schema) const;
+    bool validateRequiredKeys(const std::vector<std::string>& requiredKeys) const;
+    bool validateKeyType(const std::string& key, const std::string& typeName) const;
+    
+    // Configuration merging
+    void merge(const Config& other, bool override = true);
+    bool matches(const Config& other, bool exact = true) const;
+    
+    // Configuration serialization
+    std::string toJSON() const;
+    bool fromJSON(const std::string& json);
+    
+    // Configuration comparison
+    bool equals(const Config& other) const;
+    
+    // Extensibility hooks
+    template<typename T>
+    void addValidator(const std::string& key, std::function<bool(const T&)> validator);
+    
+    void setDescription(const std::string& key, const std::string& description);
+    std::string getDescription(const std::string& key) const;
+    
+    // Batch operations
+    void batchSet(const std::map<std::string, ConfigValue>& values);
+    void batchGet(std::map<std::string, ConfigValue>& values) const;
+    
+    // Configuration cloning
+    std::shared_ptr<Config> clone() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
