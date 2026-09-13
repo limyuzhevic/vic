@@ -176,71 +176,71 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     bool success = true;
     
     // Test 1: Memory systems exist and are connected
-    if (brain->getWorkingMemory() != nullptr) {
-        NLM_LOG_INFO("[PASS] Working memory is integrated");
-    } else {
+    if (brain->getWorkingMemory() == nullptr) {
         NLM_LOG_ERROR("[FAIL] Working memory is NOT integrated");
         success = false;
+    } else {
+        NLM_LOG_INFO("[PASS] Working memory is integrated");
     }
     
-    if (brain->getEpisodicMemory() != nullptr) {
-        NLM_LOG_INFO("[PASS] Episodic memory is integrated");
-    } else {
+    if (brain->getEpisodicMemory() == nullptr) {
         NLM_LOG_ERROR("[FAIL] Episodic memory is NOT integrated");
         success = false;
+    } else {
+        NLM_LOG_INFO("[PASS] Episodic memory is integrated");
     }
     
     // Test 2: Neuromodulation systems exist
-    if (brain->getDopamine() != nullptr) {
-        NLM_LOG_INFO("[PASS] Dopamine system is integrated");
-    } else {
+    if (brain->getDopamine() == nullptr) {
         NLM_LOG_ERROR("[FAIL] Dopamine system is NOT integrated");
         success = false;
+    } else {
+        NLM_LOG_INFO("[PASS] Dopamine system is integrated");
     }
     
-    if (brain->getCuriosity() != nullptr) {
-        NLM_LOG_INFO("[PASS] Curiosity system is integrated");
-    } else {
+    if (brain->getCuriosity() == nullptr) {
         NLM_LOG_ERROR("[FAIL] Curiosity system is NOT integrated");
         success = false;
+    } else {
+        NLM_LOG_INFO("[PASS] Curiosity system is integrated");
     }
     
     // Test 3: Prediction system exists
-    if (brain->getPredictionSystem() != nullptr) {
-        NLM_LOG_INFO("[PASS] Prediction system is integrated");
-    } else {
+    if (brain->getPredictionSystem() == nullptr) {
         NLM_LOG_ERROR("[FAIL] Prediction system is NOT integrated");
         success = false;
+    } else {
+        NLM_LOG_INFO("[PASS] Prediction system is integrated");
     }
     
     // Test 4: Cognition systems exist
-    if (brain->getPlanner() != nullptr) {
-        NLM_LOG_INFO("[PASS] Planner is integrated");
-    } else {
+    if (brain->getPlanner() == nullptr) {
         NLM_LOG_ERROR("[FAIL] Planner is NOT integrated");
         success = false;
+    } else {
+        NLM_LOG_INFO("[PASS] Planner is integrated");
     }
     
-    if (brain->getConceptFormation() != nullptr) {
-        NLM_LOG_INFO("[PASS] Concept formation is integrated");
-    } else {
+    if (brain->getConceptFormation() == nullptr) {
         NLM_LOG_ERROR("[FAIL] Concept formation is NOT integrated");
         success = false;
+    } else {
+        NLM_LOG_INFO("[PASS] Concept formation is integrated");
     }
     
-    if (brain->getAttention() != nullptr) {
-        NLM_LOG_INFO("[PASS] Attention is integrated");
-    } else {
+    if (brain->getAttention() == nullptr) {
         NLM_LOG_ERROR("[FAIL] Attention is NOT integrated");
         success = false;
+    } else {
+        NLM_LOG_INFO("[PASS] Attention is integrated");
     }
     
     // Test 5: Development system exists
-    if (brain->getDevelopmentSystem() != nullptr) {
-        NLM_LOG_INFO("[PASS] Development system is integrated");
-    } else {
+    if (brain->getDevelopmentSystem() == nullptr) {
         NLM_LOG_ERROR("[FAIL] Development system is NOT integrated");
         success = false;
+    } else {
+        NLM_LOG_INFO("[PASS] Development system is integrated");
     }
     
     return success;

@@ -333,78 +333,50 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
-            }
-        }
-    }
+    updateAllNeurons(currentTime);
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                // Check if neuron just fired this step
-                const auto& state = neuron->getState();
-                bool justFired = (state.firingState == FiringState::Refractory &&
-                                 state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
-
-                if (justFired) {
-                    // Neuron fired this step - queue the spike
-                    SpikeEvent event(neuron->getId(), currentTime, currentStep);
-                    pImpl->spikeSystem->queueSpike(event);
-
-                    // Record post-synaptic spike for incoming synapses (plasticity)
-                    auto incomingSynapses = region->getSynapsesTo(neuron->getId());
-                    for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
-                    }
-
-                    // Get outgoing synapses and schedule delayed spike events
-                    auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
-                    for (Synapse* syn : outgoingSynapses) {
-                        // Create delayed spike event
-                        Delay delay = syn->getDelay();
-                        SimulationStep deliveryStep = currentStep + delay;
-                        Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
-
-                        DelayedSpikeEvent delayedEvent(
-                            neuron->getId(),
-                            syn->getDestinationNeuron(),
-                            syn->getId(),
-                            syn->getWeight(),
-                            syn->getType(),
-                            currentTime,
-                            deliveryTime,
-                            currentStep,
-                            deliveryStep
-                        );
-
-                        pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
-
-                        // Record pre-synaptic spike for plasticity
-                        syn->recordPreSpike(currentTime);
-                    }
-                    
-                    // Store to working memory - neurons that fire become part of working memory
-                    if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
-                    }
-                }
-            }
-        }
-    }
+    detectAndProcessSpikes(currentStep, currentTime);
     
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
     // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
-    }
+    updateWorkingMemory();
+    
+    // ========== STEP 5: Apply neuromodulation effects ==========
+    applyNeuromodulationEffects(currentTime);
+    
+    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+    applyPlasticityRules(currentTime);
+    
+    // ========== STEP 7: Update episodic memory ==========
+    updateEpisodicMemory();
+    
+    // ========== STEP 8: Update prediction system ==========
+    updatePredictionSystem();
+    
+    // ========== STEP 9: Update attention system ==========
+    updateAttentionSystem();
+    
+    // ========== STEP 10: Update concept formation ==========
+    updateConceptFormation();
+    
+    // ========== STEP 11: Apply structural plasticity periodically ==========
+    applyStructuralPlasticity(currentStep);
+    
+    // ========== STEP 12: Replay important memories ==========
+    replayMemories(currentStep);
+    
+    // ========== STEP 13: Apply development effects ==========
+    applyDevelopmentEffects(currentStep);
+    
+    // ========== STEP 14: Periodic memory consolidation ==========
+    consolidateMemories(currentStep);
+    
+    // ========== STEP 15: Checkpoint management ==========
+    updateCheckpointManager(currentStep, currentTime);
+}
     
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
@@ -1112,6 +1084,186 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
-}
+        for (const auto& region : pImpl->regions) {
+            region->reset();
+        }
+    
+        pImpl->spikeSystem->reset();
+        pImpl->developmentalStage = DevelopmentalStage::Initial;
+        
+        // Reset memory systems
+        if (pImpl->workingMemory) pImpl->workingMemory->clear();
+        if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
+        if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+        if (pImpl->attention) pImpl->attention->reset();
+        
+        NLM_LOG_INFO("NLM Brain reset complete");
+    }
 
-} // namespace nlm
+    bool Brain::save(const std::string& filepath) const {
+        NLM_LOG_INFO("Saving brain state to " + filepath);
+        
+        try {
+            CheckpointWriter writer;
+            if (!writer.create(filepath, CompressionLevel::Balanced)) {
+                NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+                return false;
+            }
+            
+            // Set metadata
+            writer.setMetadata(
+                getTotalNeuronCount(),
+                getTotalSynapseCount(),
+                getRegionCount(),
+                pImpl->currentStep,
+                pImpl->currentTime
+            );
+            
+            // Write neurons
+            NeuronCheckpointData neuronData;
+            neuronData.membranePotential.reserve(getTotalNeuronCount());
+            neuronData.restingPotential.reserve(getTotalNeuronCount());
+            neuronData.threshold.reserve(getTotalNeuronCount());
+            neuronData.resetPotential.reserve(getTotalNeuronCount());
+            neuronData.leakConductance.reserve(getTotalNeuronCount());
+            
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        neuronData.membranePotential.push_back(state.membranePotential);
+                        neuronData.restingPotential.push_back(state.restingPotential);
+                        neuronData.threshold.push_back(state.threshold);
+                        neuronData.resetPotential.push_back(state.resetPotential);
+                        neuronData.leakConductance.push_back(state.leakConductance);
+                        neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                        neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
+                        neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
+                        neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    }
+                }
+            }
+            
+            if (!writer.writeNeurons(neuronData)) {
+                NLM_LOG_ERROR("Failed to write neurons to checkpoint");
+                return false;
+            }
+            
+            // Write synapses
+            SynapseCheckpointData synapseData;
+            for (const auto& region : pImpl->regions) {
+                for (const auto* syn : region->getSynapses()) {
+                    synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                    synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                    synapseData.weight.push_back(syn->getWeight());
+                    synapseData.delay.push_back(syn->getDelay());
+                    synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                    synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                }
+            }
+            
+            if (!writer.writeSynapses(synapseData)) {
+                NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+                return false;
+            }
+            
+            // Finalize
+            if (!writer.finalize()) {
+                NLM_LOG_ERROR("Failed to finalize checkpoint");
+                return false;
+            }
+            
+            NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
+            return true;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+            return false;
+        }
+    }
+
+    bool Brain::load(const std::string& filepath) {
+        NLM_LOG_INFO("Loading brain state from " + filepath);
+        
+        try {
+            CheckpointReader reader;
+            if (!reader.open(filepath)) {
+                NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
+                return false;
+            }
+            
+            if (!reader.validate()) {
+                NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
+                return false;
+            }
+            
+            // Read neurons
+            NeuronCheckpointData neuronData;
+            if (!reader.readNeurons(neuronData)) {
+                NLM_LOG_ERROR("Failed to read neurons from checkpoint");
+                return false;
+            }
+            
+            // Apply neuron states
+            size_t idx = 0;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (idx < neuronData.membranePotential.size()) {
+                            neuron->setMembranePotential(neuronData.membranePotential[idx]);
+                            neuron->setRestingPotential(neuronData.restingPotential[idx]);
+                            neuron->setThreshold(neuronData.threshold[idx]);
+                            neuron->setResetPotential(neuronData.resetPotential[idx]);
+                            neuron->setLeakConductance(neuronData.leakConductance[idx]);
+                            if (idx < neuronData.firingState.size()) {
+                                neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
+                            }
+                            if (idx < neuronData.refractoryRemaining.size()) {
+                                neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                            }
+                        }
+                        idx++;
+                    }
+                }
+            }
+            
+            // Read synapses
+            SynapseCheckpointData synapseData;
+            if (!reader.readSynapses(synapseData)) {
+                NLM_LOG_ERROR("Failed to read synapses from checkpoint");
+                return false;
+            }
+            
+            // Apply synapse states - need to find matching synapses
+            if (!synapseData.weight.empty() && !pImpl->regions.empty()) {
+                // Simple approach: apply to first few synapses
+                size_t synapseIdx = 0;
+                for (auto& region : pImpl->regions) {
+                    auto& synapses = region->getSynapses();
+                    for (auto* syn : synapses) {
+                        if (synapseIdx < synapseData.weight.size()) {
+                            syn->setWeight(synapseData.weight[synapseIdx]);
+                            if (synapseIdx < synapseData.delay.size()) {
+                                // Note: setDelay doesn't exist in Synapse interface
+                                // Delay is set during initialization
+                            }
+                            if (synapseIdx < synapseData.synapseType.size()) {
+                                // Note: setType doesn't exist in Synapse interface
+                                // Type is set during initialization
+                            }
+                        }
+                        synapseIdx++;
+                    }
+                }
+            }
+            
+            NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+            
+            NLM_LOG_INFO("Brain state loaded successfully");
+            return true;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
+            return false;
+        }
+    }
