@@ -366,12 +366,78 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
+    // Parse additional advanced command-line options
+    int experimentMode = 0;
+    std::string outputFile;
+    double progressInterval = 100.0;
+    bool saveBrain = false;
+    bool loadBrain = false;
+    bool enableAllSystems = false;
+    bool enableDevelopment = false;
+    bool enableCuriosity = false;
+    bool enableMemory = false;
+    
+    // Parse advanced command line options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg.substr(0, 5) == "--mode") {
+            if (i + 1 < argc) experimentMode = std::atoi(argv[++i]);
+        } else if (arg.substr(0, 10) == "--progress") {
+            if (i + 1 < argc) progressInterval = std::atof(argv[++i]);
+        } else if (arg.substr(0, 7) == "--output") {
+            if (arg.find('=') != std::string::npos) {
+                outputFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                outputFile = argv[++i];
+            }
+        } else if (arg == "--save") {
+            saveBrain = true;
+        } else if (arg == "--load") {
+            loadBrain = true;
+        } else if (arg == "--all-systems") {
+            enableAllSystems = true;
+        } else if (arg == "--development") {
+            enableDevelopment = true;
+        } else if (arg == "--curiosity") {
+            enableCuriosity = true;
+        } else if (arg == "--memory") {
+            enableMemory = true;
+        }
+    }
+    
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // Apply advanced options
+    if (enableAllSystems) {
+        config->set("enable_working_memory", true, ConfigSource::Default);
+        config->set("enable_episodic_memory", true, ConfigSource::Default);
+        config->set("enable_semantic_memory", true, ConfigSource::Default);
+        config->set("enable_prediction", true, ConfigSource::Default);
+        config->set("enable_planning", true, ConfigSource::Default);
+        config->set("enable_attention", true, ConfigSource::Default);
+        config->set("enable_development", true, ConfigSource::Default);
+    }
+    
+    if (enableDevelopment) {
+        config->set("enable_development", true, ConfigSource::Default);
+        config->set("developmental_stage", 1, ConfigSource::Default);
+    }
+    
+    if (enableCuriosity) {
+        config->set("enable_curiosity", true, ConfigSource::Default);
+        config->set("curiosity_level", 0.5f, ConfigSource::Default);
+    }
+    
+    if (enableMemory) {
+        config->set("enable_working_memory", true, ConfigSource::Default);
+        config->set("enable_episodic_memory", true, ConfigSource::Default);
+    }
     
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);

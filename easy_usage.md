@@ -221,37 +221,43 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 4: Complete Agent with Learning
 
 ```python
 import pynlm
 
-# Setup
-config = pynlm.createDefaultConfig()
+# Setup with advanced configuration
+config = pynlm.createAdvancedConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
+
 world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
 world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
+# Enable all learning systems
 agent.enableRewardModulation(True)
+agent.enableDevelopment(True)
 agent.enableCuriosity(True)
 
-# Run agent
-for step in range(100):
+# Run agent learning simulation
+for step in range(500):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
     brain.step(step)
     action = agent.decodeMotorCommand()
     world.applyMotorCommand(action, world.getSimulationTime())
     
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+    if step % 100 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing, "
+              f"reward: {agent.getNeuromodulationLevel():.3f}")
 
-print("Agent simulation complete!")
+print("Complete agent simulation finished!")
+print(f"Final curiosity: {agent.getCuriosityLevel():.3f}")
+print(f"Final novelty: {agent.getNoveltyLevel():.3f}")
+```
 ```
 
 ---

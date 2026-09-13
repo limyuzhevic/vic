@@ -134,6 +134,21 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Wait", MotorCommand::Wait)
         .export_values();
 
+    // Advanced configuration options for expert users
+    m.def("createAdvancedConfig", []() {
+        auto config = std::make_shared<Config>();
+        // Set advanced defaults for performance
+        config->set("neuron_count", 1000, ConfigSource::Default);
+        config->set("region_count", 4, ConfigSource::Default);
+        config->set("connection_probability", 0.2f, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+        return config;
+    }, "Create an advanced configuration with optimized settings");
+
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
         .value("Empty", WorldObjectType::Empty)
         .value("Resource", WorldObjectType::Resource)
@@ -289,6 +304,38 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // Factory functions for advanced configuration
+    m.def("createAdvancedConfig", []() {
+        auto config = std::make_shared<Config>();
+        // Set advanced defaults for performance
+        config->set("neuron_count", 1000, ConfigSource::Default);
+        config->set("region_count", 4, ConfigSource::Default);
+        config->set("connection_probability", 0.2f, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+        return config;
+    }, "Create an advanced configuration with optimized settings");
+
+    m.def("createHighPerformanceConfig", []() {
+        auto config = std::make_shared<Config>();
+        // Set high-performance defaults for large networks
+        config->set("neuron_count", 5000, ConfigSource::Default);
+        config->set("region_count", 8, ConfigSource::Default);
+        config->set("connection_probability", 0.05f, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.008f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.009f, ConfigSource::Default);
+        config->set("stdp_tau", 30.0f, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.00005f, ConfigSource::Default);
+        config->set("pruning_rate", 0.000005f, ConfigSource::Default);
+        config->set("enable_memory_systems", true, ConfigSource::Default);
+        config->set("enable_prediction", true, ConfigSource::Default);
+        return config;
+    }, "Create a high-performance configuration for large networks");
+
+    // Advanced brain operations
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -351,7 +398,33 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        .def("enableAllSystems", [](Brain& brain) {
+            brain.getConfig()->set("enable_working_memory", true, ConfigSource::Default);
+            brain.getConfig()->set("enable_episodic_memory", true, ConfigSource::Default);
+            brain.getConfig()->set("enable_semantic_memory", true, ConfigSource::Default);
+            brain.getConfig()->set("enable_prediction", true, ConfigSource::Default);
+            brain.getConfig()->set("enable_planning", true, ConfigSource::Default);
+            brain.getConfig()->set("enable_attention", true, ConfigSource::Default);
+            brain.getConfig()->set("enable_development", true, ConfigSource::Default);
+        }, "Enable all brain systems for maximum functionality")
+        .def("disableAllSystems", [](Brain& brain) {
+            brain.getConfig()->set("enable_working_memory", false, ConfigSource::Default);
+            brain.getConfig()->set("enable_episodic_memory", false, ConfigSource::Default);
+            brain.getConfig()->set("enable_semantic_memory", false, ConfigSource::Default);
+            brain.getConfig()->set("enable_prediction", false, ConfigSource::Default);
+            brain.getConfig()->set("enable_planning", false, ConfigSource::Default);
+            brain.getConfig()->set("enable_attention", false, ConfigSource::Default);
+            brain.getConfig()->set("enable_development", false, ConfigSource::Default);
+        }, "Disable all brain systems for minimal footprint")
+        .def("simulateStep", [](Brain& brain, float timestep = 0.001f, bool injectInput = false) {
+            static uint64_t step = 0;
+            if (injectInput) {
+                brain.injectCurrentToNeurons(NeuronType::Sensory, 20.0f);
+            }
+            brain.step(step++, timestep);
+        }, py::arg("timestep") = 0.001f, py::arg("injectInput") = false,
+            "Simple step simulation with optional sensory input injection");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
