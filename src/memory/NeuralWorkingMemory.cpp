@@ -77,15 +77,22 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
+        
+        // Inject current to maintain activation
+        if (brain_) {
+            brain_->injectCurrent(neuron, activation * 5.0f);
+        }
     } else if (memoryNeurons_.size() < capacity_) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
-    }
-    
-    // Inject current to maintain activation
-    if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
+        
+        // Inject current to maintain activation
+        if (brain_) {
+            brain_->injectCurrent(neuron, activation * 5.0f);
+        }
+    } else {
+        NLM_LOG_WARNING("Cannot store neuron - memory at capacity: " + std::to_string(memoryNeurons_.size()));
     }
 }
 

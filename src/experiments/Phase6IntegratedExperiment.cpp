@@ -28,10 +28,39 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
     cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    
+    // Validate configuration parameters
+    if (config.neuronCount <= 0) {
+        NLM_LOG_ERROR("Invalid neuron count: must be positive");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    if (config.maxSteps <= 0) {
+        NLM_LOG_ERROR("Invalid max steps: must be positive");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
+    // Set default STDP weights with validation
+    float ltpWeight = 0.01f;
+    float ltdWeight = 0.012f;
+    if (ltpWeight < 0.0f || ltpWeight > 1.0f) {
+        NLM_LOG_WARNING("Clamping STDP LTP weight to valid range [0.0, 1.0]");
+        ltpWeight = std::clamp(ltpWeight, 0.0f, 1.0f);
+    }
+    if (ltdWeight < 0.0f || ltdWeight > 1.0f) {
+        NLM_LOG_WARNING("Clamping STDP LTD weight to valid range [0.0, 1.0]");
+        ltdWeight = std::clamp(ltdWeight, 0.0f, 1.0f);
+    }
+    
+    cfg->set("stdp_ltp_weight", ltpWeight);
+    cfg->set("stdp_ltd_weight", ltdWeight);
+    
+    // Set additional optional parameters with validation
+    if (config.enableDevelopment) {
+        cfg->set("synaptogenesis_rate", 0.0001f);
+        cfg->set("pruning_rate", 0.00001f);
+    }
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);

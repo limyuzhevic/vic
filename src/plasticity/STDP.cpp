@@ -78,18 +78,23 @@ void STDP::update(Synapse* synapse,
         }
     }
     
-    // Apply weight change with bounds
     if (std::abs(totalDelta) > 1e-6f) {
         // Scale by synaptic efficacy if available
-        float efficacy = synapse->getEfficacy();
-        totalDelta *= efficacy;
+        if (synapse) {
+            float efficacy = synapse->getEfficacy();
+            totalDelta *= efficacy;
+        }
         
         // Apply weight change
-        synapse->addToWeight(totalDelta);
+        if (synapse) {
+            synapse->addToWeight(totalDelta);
+        }
         
         // Update eligibility trace for reward-modulated learning
-        float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
+        if (synapse) {
+            float currentTrace = synapse->getEligibilityTrace();
+            synapse->setEligibilityTrace(currentTrace + totalDelta);
+        }
     }
 }
 
