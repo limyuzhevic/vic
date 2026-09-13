@@ -194,6 +194,19 @@ public:
     void logStatus() const;
     
 private:
+    // Integrated brain systems
+    class NeuralWorkingMemory* workingMemory;
+    class NeuralEpisodicMemory* episodicMemory;
+    class NeuralAssociativeMemory* associativeMemory;
+    class PredictionSystem* predictionSystem;
+    class NeuralPlanner* planner;
+    class ConceptFormation* conceptFormation;
+    class AttentionalSelection* attention;
+    class DevelopmentSystem* developmentSystem;
+    class Dopamine* dopamine;
+    class Curiosity* curiosity;
+    class Novelty* novelty;
+    class PredictionError* predictionError;
     struct Impl;
     Impl* pImpl;
 };

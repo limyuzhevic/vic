@@ -28,6 +28,9 @@ struct Brain::Impl {
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
+    // Thread synchronization
+    mutable std::mutex mutex;
+    
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
@@ -78,6 +81,9 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    DevelopmentalStage developmentalStage;
+    RegionId nextRegionId;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -93,69 +99,104 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
-        
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
-        
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+    // Initialize random generator with seed from config
+    uint64_t seed = 42;  // Default seed
+    if (auto seedOpt = config->get<uint64_t>("random_seed")) {
+        seed = *seedOpt;
+    }
+    rng = std::make_unique<RandomGenerator>(seed);
+    if (!rng) {
+        NLM_LOG_ERROR("Failed to initialize random generator");
+        return false;
     }
     
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
-};
+    // Initialize plasticity systems
+    spikeSystem = std::make_unique<SpikeSystem>();
+    stdp = std::make_unique<STDP>();
+    hebbian = std::make_unique<Hebbian>();
+    structuralPlasticity = std::make_unique<StructuralPlasticity>();
+    
+    // Check if plasticity systems were created successfully
+    if (!spikeSystem || !stdp || !hebbian || !structuralPlasticity) {
+        NLM_LOG_ERROR("Failed to initialize one or more plasticity systems");
+        return false;
+    }
+    
+    // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+    
+    // Initialize memory systems
+    workingMemory = std::make_unique<NeuralWorkingMemory>();
+    episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+    associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+    
+    // Check if memory systems were created successfully
+    if (!workingMemory || !episodicMemory || !associativeMemory) {
+        NLM_LOG_ERROR("Failed to initialize one or more memory systems");
+        return false;
+    }
+    
+    // Initialize prediction system
+    predictionSystem = std::make_unique<PredictionSystem>();
+    
+    // Initialize cognition systems
+    planner = std::make_unique<NeuralPlanner>();
+    conceptFormation = std::make_unique<ConceptFormation>();
+    attention = std::make_unique<AttentionalSelection>();
+    
+    // Check if cognition systems were created successfully
+    if (!planner || !conceptFormation || !attention) {
+        NLM_LOG_ERROR("Failed to initialize one or more cognition systems");
+        return false;
+    }
+    
+    // Initialize development system
+    developmentSystem = std::make_unique<DevelopmentSystem>();
+    
+    // Initialize neuromodulation systems
+    dopamine = std::make_unique<Dopamine>();
+    curiosity = std::make_unique<Curiosity>();
+    predictionError = std::make_unique<PredictionError>();
+    novelty = std::make_unique<Novelty>();
+    
+    // Check if neuromodulation systems were created successfully
+    if (!dopamine || !curiosity || !predictionError || !novelty) {
+        NLM_LOG_ERROR("Failed to initialize one or more neuromodulation systems");
+        return false;
+    }
+        
+            // Configure STDP parameters
+    float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+    float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+    float tau = config->getOr<float>("stdp_tau", 20.0f);
+    stdp->configure(ltpWeight, ltdWeight, tau);
+    
+    // Configure structural plasticity
+    float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+    structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+    structuralPlasticity->setPruningRate(pruningRate);
+    
+    // Get timestep
+    timestep = config->getOr<double>("simulation_timestep", 0.001);
+    
+    // Get integration intervals from config
+    replayInterval = config->getOr<size_t>("replay_interval", 100);
+    consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+    
+    // Initialize checkpoint manager
+    checkpointManager = std::make_unique<CheckpointManager>();
+    
+    // Validate that all critical components are initialized
+    if (!spikeSystem || !stdp || !hebbian || !structuralPlasticity ||
+        !workingMemory || !episodicMemory || !associativeMemory ||
+        !planner || !conceptFormation || !attention ||
+        !developmentSystem || !dopamine || !curiosity ||
+        !predictionError || !novelty) {
+        NLM_LOG_ERROR("Brain initialization failed: One or more critical components failed to initialize");
+        return;
+    }
+    
+    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
@@ -174,9 +215,6 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
-bool Brain::initialize() {
-    NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
-    
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
@@ -185,39 +223,66 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
-    // Create regions
+    // Validate configuration parameters
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid configuration: neuron_count must be greater than 0");
+        return false;
+    }
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Invalid configuration: region_count must be greater than 0");
+        return false;
+    }
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR(std::string("Invalid configuration: connection_probability must be between 0.0 and 1.0, got ") + std::to_string(connectionProbability));
+        return false;
+    }
+    
+    // Create regions with error handling
     for (size_t i = 0; i < regionCount; ++i) {
         addRegion("Region_" + std::to_string(i + 1));
     }
     
-    // Create neurons across regions
+    if (getRegionCount() != regionCount) {
+        NLM_LOG_ERROR("Failed to create all specified regions");
+        return false;
+    }
+    
+    // Create neurons across regions with memory allocation error handling
     size_t neuronsPerRegion = neuronCount / regionCount;
+    if (neuronsPerRegion == 0) {
+        NLM_LOG_ERROR("Failed to distribute neurons across regions");
+        return false;
+    }
+    
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
-            
-            // Collect sensory and motor neurons for I/O
-            auto* sensoryPop = region->getPopulation(sensoryPopId);
-            auto* motorPop = region->getPopulation(motorPopId);
-            if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
-                }
-            }
-            if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
-                }
-            }
-            
-            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+        if (!region) {
+            NLM_LOG_ERROR(std::string("Failed to access region ") + std::to_string(i + 1));
+            return false;
         }
+        
+        // Add populations
+        auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
+        auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
+        auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+        
+        // Collect sensory and motor neurons for I/O
+        auto* sensoryPop = region->getPopulation(sensoryPopId);
+        auto* motorPop = region->getPopulation(motorPopId);
+        if (sensoryPop) {
+            for (auto* neuron : sensoryPop->getNeurons()) {
+                pImpl->sensoryNeurons.push_back(neuron);
+            }
+        }
+        if (motorPop) {
+            for (auto* neuron : motorPop->getNeurons()) {
+                pImpl->motorNeurons.push_back(neuron);
+            }
+        }
+        
+        NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
+                     ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                     std::to_string(region->getTotalNeuronCount()) + " neurons");
     }
     
     // Initialize connectivity with random weights
@@ -232,63 +297,90 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+    }
     
     // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    if (pImpl->dopamine) pImpl->dopamine->initialize(this);
+    if (pImpl->curiosity) pImpl->curiosity->initialize(this);
+    if (pImpl->predictionError) pImpl->predictionError->initialize(this);
+    if (pImpl->novelty) pImpl->novelty->initialize(this);
+    
+    // Set dopamine to initial level
+    if (pImpl->dopamine) {
+        pImpl->dopamine->setLevel(0.5f);
+        pImpl->dopamine->initialize(this);
+        pImpl->dopamine->setLevel(0.5f);  // Set initial dopamine level
+    }
     
     // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+            // Count spikes
+            ++pImpl->totalSpikesThisStep;
+            ++pImpl->totalSpikesTotal;
+        });
+    }
     
     // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+            // Find destination neuron and deliver synaptic input
+            for (auto& region : pImpl->regions) {
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron->getId() == event.destination_neuron) {
+                        // Apply synaptic weight as current
+                        MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                        if (event.is_excitatory) {
+                            neuron->receiveExcitatoryInput(synapticCurrent);
+                        } else {
+                            neuron->receiveInhibitoryInput(-synapticCurrent);
+                        }
+                        return;
                     }
-                    return;
                 }
             }
-        }
-    });
+        });
+    }
     
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    }
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
@@ -398,41 +490,47 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
+    // Process immediate spikes with thread safety
+    {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        pImpl->spikeSystem->processSpikes(currentStep);
+    }
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
-    
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
+    // Apply neuromodulation effects with thread safety
+    {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        // Update novelty detection
+        if (pImpl->novelty) {
+            pImpl->novelty->update(pImpl->timestep);
+        }
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+        // Update curiosity
+        if (pImpl->curiosity) {
+            pImpl->curiosity->update(pImpl->timestep);
+        }
+        
+        // Update dopamine (reward prediction error)
+        if (pImpl->dopamine) {
+            pImpl->dopamine->update(pImpl->timestep);
+            
+            // Apply dopamine effects on neural excitability
+            // Dopamine modulates neural excitability by adjusting effective current injection
+            // Higher dopamine increases excitability (lower effective threshold)
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Dopamine modulates excitability by injecting additional current
+                        // Positive dopamine adds excitatory bias
+                        float excitabilityMod = dopamineLevel * 0.5f;
+                        if (excitabilityMod > 0.0f) {
+                            neuron->injectCurrent(excitabilityMod);
+                        }
                     }
                 }
             }

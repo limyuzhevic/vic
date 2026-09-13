@@ -4,6 +4,8 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <filesystem>
+#include <system_error>
 
 namespace nlm {
 
@@ -71,12 +73,35 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Close existing file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    // Open new file with error handling
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        // Try to create the file if it doesn't exist
+        std::error_code ec;
+        std::filesystem::create_directories(std::filesystem::path(filepath).parent_path(), ec);
+        pImpl->fileOut.open(filepath, std::ios::app);
+        if (!pImpl->fileOut.is_open()) {
+            NLM_LOG_ERROR(std::string("Failed to open log file: ") + filepath);
+            return;
+        }
+    }
+    
+    NLM_LOG_INFO(std::string("Log file set: ") + filepath);
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
+        NLM_LOG_INFO("Log file closed");
     }
 }
 

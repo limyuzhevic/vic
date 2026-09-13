@@ -24,11 +24,16 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR(std::string("Failed to open configuration file: ") + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    bool fileHadErrors = false;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +46,13 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key is not empty
+            if (key.empty()) {
+                NLM_LOG_WARNING(std::string("Empty key found in configuration file: ") + filepath + std::string(" at line ") + std::to_string(lineNumber));
+                fileHadErrors = true;
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -49,7 +61,16 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING(std::string("Malformed line in configuration file: ") + filepath + ": " + line + std::string(" at line ") + std::to_string(lineNumber));
+            fileHadErrors = true;
         }
+    }
+    
+    if (fileHadErrors) {
+        NLM_LOG_WARNING(std::string("Configuration file ") + filepath + " had parsing errors, but was partially loaded");
+    } else {
+        NLM_LOG_INFO(std::string("Configuration file ") + filepath + " loaded successfully");
     }
     
     return true;
@@ -81,15 +102,60 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR(std::string("Failed to save configuration to file: ") + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        for (const auto& entry : pImpl->entries) {
+            // Write description as comment if present
+            if (!entry.description.empty()) {
+                file << "# " << entry.description << "\n";
+            }
+            
+            // Write key=value pair with value formatted according to type
+            file << entry.key << " = ";
+            
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << arg[i];
+                    }
+                    file << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << arg[i];
+                    }
+                    file << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << "\"" << arg[i] << "\"";
+                    }
+                    file << "]";
+                } else {
+                    file << arg;  // For int, int64_t, double, bool
+                }
+            }, entry.value);
+            
+            file << "\n\n";
+        }
+        
+        NLM_LOG_INFO(std::string("Configuration saved successfully to: ") + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error saving configuration to file ") + filepath + ": " + e.what());
+        return false;
     }
-    
-    return true;
 }
 
 template<typename T>

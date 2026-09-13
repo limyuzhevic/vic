@@ -48,6 +48,11 @@ struct Synapse::Impl {
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     : pImpl(new Impl) {
+    if (!pImpl) {
+        NLM_LOG_CRITICAL("Failed to allocate memory for Synapse object");
+        return;
+    }
+    
     pImpl->id = id;
     pImpl->sourceNeuron = source;
     pImpl->destinationNeuron = destination;
