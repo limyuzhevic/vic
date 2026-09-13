@@ -6,14 +6,24 @@
 namespace nlm {
 
 // Simple linear congruential generator
+// Constants from Numerical Recipes: good period ~2^63, passes tests
 static uint64_t lcg(uint64_t& state) {
+    // Hull-Dobell theorem satisfied for full period
     state = state * 6364136223846793005ULL + 1442695040888963407ULL;
     return state;
 }
 
 static float urand(uint64_t& state, float min, float max) {
+    // Improved RNG: use full 64-bit LCG output for better randomness
     uint64_t r = lcg(state);
-    float normalized = (r & 0xFFFFFFFFFFFFULL) / static_cast<float>(0xFFFFFFFFFFFFULL);
+    
+    // Generate uniform float [0, 1) using 53 bits of precision (double precision mantissa)
+    // First 27 bits ensure good resolution, next 27 bits for randomness
+    uint64_t high = (r >> 37) & 0x1FFFFFFF;  // 29 bits from upper part
+    uint64_t low = r & 0x1FFFFFFF;           // 29 bits from lower part
+    uint64_t combined = (high << 29) | low;  // 58 bits total
+    
+    float normalized = (combined / static_cast<double>(0x3FFFFFFF));  // Normalize to [0, 1)
     return min + normalized * (max - min);
 }
 

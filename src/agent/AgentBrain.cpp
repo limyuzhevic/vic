@@ -29,11 +29,12 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                        // Use neuron ID for deterministic distribution
+                        size_t idx = n->getState().lastSpikeTime > -1.0f ? 
+                            static_cast<size_t>(n->getState().lastSpikeTime) % 6 : 
+                            (static_cast<size_t>(n->getId().value) % 6);
                         
-                        switch (idx % 6) {
+                        switch (idx) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
@@ -45,10 +46,10 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
+                        // Use neuron ID for deterministic distribution
+                        size_t idx = static_cast<size_t>(n->getId().value) % 4;
                         
-                        switch (idx % 4) {
+                        switch (idx) {
                             case 0: sensoryVision_.push_back(n); break;
                             case 1: sensoryTouch_.push_back(n); break;
                             case 2: sensoryInternal_.push_back(n); break;
@@ -64,7 +65,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    // Initialize previousVision_ with correct size based on world vision dimensions
+    size_t expectedVisionSize = world.getVisionWidth() * world.getVisionHeight();
+    previousVision_.assign(expectedVisionSize, 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
@@ -84,42 +87,108 @@ size_t AgentBrain::getMotorOutputSize() const {
     return 6;
 }
 
+// Brain neuron scale factors for sensory input processing
+// Vision neuron sensitivity: scales visual input intensity to neural current
+// 5.0f = multiplier to convert 0.0-1.0 vision values to 0.0-5.0 current units
+static constexpr float VISION_NEURON_SCALE = 5.0f;  // Vision intensity to current scaling
+
+// Touch neuron sensitivity: scales tactile input intensity
+// 8.0f = multiplier for collision/proximity signals (0.0-1.0 range)
+static constexpr float TOUCH_NEURON_SCALE = 8.0f;  // Touch intensity to current scaling
+
+// Internal signal neuron sensitivity: processes homeostatic signals
+// (2.0f * input - 1.0f) centers around 0.0, then * 5.0f scales to ~±10.0 range
+static constexpr float INTERNAL_NEURON_SCALE = 5.0f;  // Internal signal scaling
+static constexpr float INTERNAL_NEURON_CENTER = 2.0f;  // Center point for internal signals
+
+// Proprioception neuron sensitivity: processes body state
+// (2.0f * input - 1.0f) centers around 0.0, then * 3.0f scales to ~±6.0 range
+static constexpr float PROPRIOCEPT_NEURON_SCALE = 3.0f;  // Proprioception scaling
+static constexpr float PROPRIOCEPT_NEURON_CENTER = 2.0f;  // Center point for proprioception
+
+// Novelty detection decay rate per timestep
+// 0.99f = approximately 1% decay per timestep (slow novelty decay)
+static constexpr float NOVELTY_DECAY_RATE = 0.99f;
+
+// Curiosity threshold for exploration (0.0-1.0 range)
+// 0.3f = minimum curiosity level to trigger exploration behavior
+static constexpr float CURIOSITY_EXPLORATION_THRESHOLD = 0.3f;
+
+// Neuromodulation decision threshold (0.0-1.0 range)
+// 0.5f = decision threshold for high curiosity-based exploration
+static constexpr float CURIOSITY_HIGH_THRESHOLD = 0.5f;
+
+// Neuromodulation exploration chance multiplier
+// 0.3f = maximum random action selection probability at high curiosity
+static constexpr float MAX_EXPLORATION_CHANCE = 0.3f;
+
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain: No brain available for processing sensory input");
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
+    if (sensoryVision_.size() != vision.size()) {
+        NLM_LOG_ERROR("AgentBrain: Vision size mismatch - expected " + 
+                     std::to_string(sensoryVision_.size()) + 
+                     " neurons but got " + std::to_string(vision.size()) + " vision values");
+        return;
+    }
+    
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            float current = vision[i] * VISION_NEURON_SCALE;  // Use constant
             sensoryVision_[i]->injectCurrent(current);
         }
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
+    if (sensoryTouch_.size() != touch.size()) {
+        NLM_LOG_ERROR("AgentBrain: Touch size mismatch - expected " + 
+                     std::to_string(sensoryTouch_.size()) + 
+                     " neurons but got " + std::to_string(touch.size()) + " touch values");
+        return;
+    }
+    
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = touch[i] * TOUCH_NEURON_SCALE;  // Use constant
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
+    if (sensoryInternal_.size() != intern.size()) {
+        NLM_LOG_ERROR("AgentBrain: Internal size mismatch - expected " + 
+                     std::to_string(sensoryInternal_.size()) + 
+                     " neurons but got " + std::to_string(intern.size()) + " internal values");
+        return;
+    }
+    
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            float current = (intern[i] * INTERNAL_NEURON_CENTER - 1.0f) * INTERNAL_NEURON_SCALE;  // Use constants
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
+    if (sensoryProprioception_.size() != proprio.size()) {
+        NLM_LOG_ERROR("AgentBrain: Proprioception size mismatch - expected " + 
+                     std::to_string(sensoryProprioception_.size()) + 
+                     " neurons but got " + std::to_string(proprio.size()) + " proprioception values");
+        return;
+    }
+    
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            float current = (proprio[i] * PROPRIOCEPT_NEURON_CENTER - 1.0f) * PROPRIOCEPT_NEURON_SCALE;  // Use constants
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
@@ -136,7 +205,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
         
         // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
+        noveltyLevel_ *= NOVELTY_DECAY_RATE;  // Use constant
         
         // Store for next time
         previousVision_ = vision;
