@@ -30,6 +30,9 @@ public:
     // Decay novelty over time
     void update(TimestepDuration dt);
     
+    // Update novelty with simplified signature for brain integration
+    void update(float dt);
+    
     // Get novelty history
     const std::vector<float>& getHistory() const;
     void clearHistory();

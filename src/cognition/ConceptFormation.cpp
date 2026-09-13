@@ -137,6 +137,29 @@ void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>&
     
     // Update instance stability
     concept->instances.back().stability = newStability;
+    
+    // Derive category hint from features and reward patterns
+    std::string derivedCategory;
+    if (reward > 0.5f) {
+        derivedCategory = "rewarding";
+    } else if (reward < -0.3f) {
+        derivedCategory = "harmful";
+    } else {
+        derivedCategory = "neutral";
+    }
+    
+    // Adjust category based on feature analysis
+    if (!features.empty()) {
+        float featureSum = 0.0f;
+        for (float f : features) featureSum += f;
+        if (featureSum > 2.0f) {
+            derivedCategory = derivedCategory + "_high";
+        } else if (featureSum < -2.0f) {
+            derivedCategory = derivedCategory + "_low";
+        }
+    }
+    
+    concept->categoryHint = derivedCategory;
 }
 
 void ConceptFormation::updatePrototype(size_t conceptId, const std::vector<float>& newInstance) {
