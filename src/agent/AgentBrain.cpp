@@ -22,40 +22,47 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
+        // First, collect all neurons by type from the brain
+        std::vector<Neuron*> allMotorNeurons;
+        std::vector<Neuron*> allSensoryNeurons;
+        
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
+                        allMotorNeurons.push_back(n);
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
+                        allSensoryNeurons.push_back(n);
                     }
                 }
+            }
+        }
+        
+        // Distribute motor neurons into groups
+        for (size_t i = 0; i < allMotorNeurons.size(); ++i) {
+            size_t group = i % 6;  // 6 motor groups: forward, backward, left, right, interact, wait
+            switch (group) {
+                case 0: motorForward_.push_back(std::shared_ptr<Neuron>(allMotorNeurons[i], [](Neuron*) {})); break;
+                case 1: motorBackward_.push_back(std::shared_ptr<Neuron>(allMotorNeurons[i], [](Neuron*) {})); break;
+                case 2: motorTurnLeft_.push_back(std::shared_ptr<Neuron>(allMotorNeurons[i], [](Neuron*) {})); break;
+                case 3: motorTurnRight_.push_back(std::shared_ptr<Neuron>(allMotorNeurons[i], [](Neuron*) {})); break;
+                case 4: motorInteract_.push_back(std::shared_ptr<Neuron>(allMotorNeurons[i], [](Neuron*) {})); break;
+                case 5: motorWait_.push_back(std::shared_ptr<Neuron>(allMotorNeurons[i], [](Neuron*) {})); break;
+            }
+        }
+        
+        // Distribute sensory neurons into groups
+        for (size_t i = 0; i < allSensoryNeurons.size(); ++i) {
+            size_t group = i % 4;  // 4 sensory groups: vision, touch, internal, proprioception
+            switch (group) {
+                case 0: sensoryVision_.push_back(std::shared_ptr<Neuron>(allSensoryNeurons[i], [](Neuron*) {})); break;
+                case 1: sensoryTouch_.push_back(std::shared_ptr<Neuron>(allSensoryNeurons[i], [](Neuron*) {})); break;
+                case 2: sensoryInternal_.push_back(std::shared_ptr<Neuron>(allSensoryNeurons[i], [](Neuron*) {})); break;
+                case 3: sensoryProprioception_.push_back(std::shared_ptr<Neuron>(allSensoryNeurons[i], [](Neuron*) {})); break;
             }
         }
     }
@@ -90,37 +97,41 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
+        const auto& neuron = sensoryVision_[i];
+        if (neuron) {
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+            neuron->injectCurrent(current);
         }
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
+        const auto& neuron = sensoryTouch_[i];
+        if (neuron) {
             float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+            neuron->injectCurrent(current);
         }
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
+        const auto& neuron = sensoryInternal_[i];
+        if (neuron) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+            neuron->injectCurrent(current);
         }
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
+        const auto& neuron = sensoryProprioception_[i];
+        if (neuron) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+            neuron->injectCurrent(current);
         }
     }
     
@@ -147,6 +158,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // Integrate with brain's memory and prediction systems
+    integrateSensoryInput(vision);
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
@@ -164,10 +178,10 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
     // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
+    auto calcActivity = [](const std::vector<std::shared_ptr<Neuron>>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
-        for (Neuron* n : neurons) {
+        for (const auto& n : neurons) {
             // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
         }
@@ -345,6 +359,277 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+void AgentBrain::integrateSensoryInput(const std::vector<float>& sensoryPattern) {
+    if (!brain_) return;
+    
+    // Access integrated systems
+    auto* workingMemory = getWorkingMemory();
+    auto* episodicMemory = getEpisodicMemory();
+    auto* associativeMemory = getAssociativeMemory();
+    auto* predictionSystem = getPredictionSystem();
+    auto* attention = getAttention();
+    auto* curiosity = getCuriosity();
+    auto* novelty = getNovelty();
+    auto* predictionError = getPredictionError();
+    
+    // Update working memory with sensory input
+    if (workingMemory) {
+        workingMemory->store(sensoryPattern, 1.0f);
+    }
+    
+    // Update novelty detection
+    if (novelty) {
+        novelty->detectNovelty(sensoryPattern, previousVision_);
+    }
+    
+    // Update prediction system with sensory input
+    if (predictionSystem) {
+        // The prediction system would process the sensory input
+        // For now, we'll store it for future reference
+        predictionSystem->storeSensoryObservation(sensoryPattern[0], 0);
+    }
+    
+    // Apply attentional selection
+    if (attention) {
+        // Simple attentional modulation based on stimulus strength
+        if (!sensoryPattern.empty() && sensoryPattern[0] > 0.5f) {
+            attention->applyTopDownBias(sensoryVision_.empty() ? 0 : sensoryVision_[0]->getId(), sensoryPattern[0]);
+        }
+    }
+    
+    // Update curiosity system with novelty
+    if (curiosity && novelty) {
+        curiosity->update(novelty->getLevel(), predictionError_->getError(), 1.0f);
+    }
+    
+    // Update episodic memory
+    if (episodicMemory) {
+        // Store current sensory state as an episode
+        EpisodicMemoryItem episode;
+        episode.timestamp = 0;  // Simplified
+        episode.sensoryState = sensoryPattern;
+        episode.reward = 0.0f;  // Will be updated by reward modulation
+        episodicMemory->storeEpisode(episode);
+    }
+    
+    // Update prediction error
+    if (predictionError) {
+        predictionError->computeError(predictionError_, predictionError_);
+    }
+}
+
+void AgentBrain::integrateCuriosityDrivenLearning() {
+    if (!brain_) return;
+    
+    auto* curiosity = getCuriosity();
+    auto* novelty = getNovelty();
+    auto* episodicMemory = getEpisodicMemory();
+    
+    if (curiosity && curiosityLevel_ > 0.3f) {
+        // Apply curiosity-based exploration modulation
+        // Get random generator from brain
+        auto* rng = brain_->getRandomGenerator();
+        if (rng) {
+            // Higher curiosity increases exploration
+            float exploreChance = curiosityLevel_ * 0.3f;
+            float r = rng->uniformReal(0.0f, 1.0f);
+            
+            if (r < exploreChance) {
+                // Trigger exploration behavior
+                if (episodicMemory) {
+                    // Rehearse or retrieve similar episodes to encourage novel behavior
+                    auto recentEpisodes = episodicMemory->getRecentEpisodes(3);
+                    if (!recentEpisodes.empty()) {
+                        episodicMemory->replayEpisode(recentEpisodes[0]);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void AgentBrain::integrateMemoryReplay() {
+    if (!brain_) return;
+    
+    auto* episodicMemory = getEpisodicMemory();
+    if (episodicMemory && episodicMemory->isReplayEnabled()) {
+        // Select episodes for replay based on relevance
+        auto replayEpisodes = episodicMemory->getEpisodesForReplay(3);
+        
+        // Replay the selected episodes to consolidate memory
+        for (const auto* episode : replayEpisodes) {
+            episodicMemory->replayEpisode(episode);
+        }
+    }
+}
+
+} // namespace nlm
+
+// Advanced Curiosity and Memory Features Implementation
+
+namespace nlm {
+
+// Forward declarations for helper functions
+float AgentBrain::calculatePatternStrength(const EpisodicMemoryItem& episode) const {
+    if (episode.sensoryState.empty()) return 0.0f;
+    
+    // Calculate pattern strength based on coherence and reward
+    float coherence = 1.0f;
+    if (episode.sensoryState.size() > 1) {
+        float avgVal = 0.0f;
+        for (float val : episode.sensoryState) avgVal += val;
+        avgVal /= episode.sensoryState.size();
+        
+        float variance = 0.0f;
+        for (float val : episode.sensoryState) {
+            variance += (val - avgVal) * (val - avgVal);
+        }
+        variance /= episode.sensoryState.size();
+        
+        // Lower variance = higher coherence
+        coherence = std::max(0.0f, 1.0f - variance);
+    }
+    
+    return coherence * (episode.reward + 0.1f);
+}
+
+std::vector<EpisodicMemoryItem> AgentBrain::getAllEpisodes() const {
+    std::vector<EpisodicMemoryItem> allEpisodes;
+    
+    auto* episodicMemory = getEpisodicMemory();
+    if (!episodicMemory) return allEpisodes;
+    
+    // Get episodes from all sources
+    allEpisodes = episodicMemory->getRecentEpisodes(100); // Get up to 100 recent episodes
+    
+    return allEpisodes;
+}
+
+std::vector<EpisodicMemoryItem> AgentBrain::findSimilarEpisodes(const std::vector<float>& pattern, size_t maxCount) const {
+    std::vector<EpisodicMemoryItem> similarEpisodes;
+    auto allEpisodes = getAllEpisodes();
+    
+    if (allEpisodes.empty()) return similarEpisodes;
+    
+    std::vector<std::pair<float, EpisodicMemoryItem>> episodeSimilarities;
+    for (const auto& episode : allEpisodes) {
+        float similarity = 0.0f;
+        size_t compareLen = std::min(pattern.size(), episode.sensoryState.size());
+        
+        for (size_t i = 0; i < compareLen; ++i) {
+            similarity += 1.0f - std::abs(pattern[i] - episode.sensoryState[i]);
+        }
+        similarity /= std::max<size_t>(compareLen, 1);
+        
+        episodeSimilarities.push_back({similarity, episode});
+    }
+    
+    std::sort(episodeSimilarities.begin(), episodeSimilarities.end(),
+              [](const std::pair<float, EpisodicMemoryItem>& a,
+                 const std::pair<float, EpisodicMemoryItem>& b) {
+                  return a.first > b.first;
+              });
+    
+    size_t count = std::min(maxCount, episodeSimilarities.size());
+    for (size_t i = 0; i < count; ++i) {
+        similarEpisodes.push_back(episodeSimilarities[i].second);
+    }
+    
+    return similarEpisodes;
+}
+
+float AgentBrain::calculateReplayPriority(const EpisodicMemoryItem& episode) const {
+    float priority = 0.0f;
+    
+    // Based on reward
+    priority += episode.reward * 0.4f;
+    
+    // Based on novelty
+    if (!episode.sensoryState.empty()) {
+        float novelty = 0.0f;
+        for (float val : episode.sensoryState) {
+            novelty += val;
+        }
+        novelty /= episode.sensoryState.size();
+        priority += novelty * 0.3f;
+    }
+    
+    // Based on prediction error (if available)
+    priority += std::abs(episode.reward - expectedReward_) * 0.3f;
+    
+    return priority;
+}
+
+float AgentBrain::calculateEpisodeStrength(const EpisodicMemoryItem& episode) const {
+    float strength = 0.0f;
+    
+    // Based on reward
+    strength += episode.reward * 0.5f;
+    
+    // Based on coherence (lower variance = higher strength)
+    if (!episode.sensoryState.empty()) {
+        float avg = 0.0f;
+        for (float val : episode.sensoryState) avg += val;
+        avg /= episode.sensoryState.size();
+        
+        float variance = 0.0f;
+        for (float val : episode.sensoryState) {
+            variance += (val - avg) * (val - avg);
+        }
+        variance /= episode.sensoryState.size();
+        
+        // Lower variance = higher coherence = higher strength
+        strength += (1.0f - variance) * 0.5f;
+    }
+    
+    return std::clamp(strength, 0.0f, 1.0f);
+}
+
+void AgentBrain::replayEpisode(const EpisodicMemoryItem* episode) {
+    if (!brain_ || !episode) return;
+    
+    // Replay an episode to strengthen learning and consolidate memory
+    for (size_t i = 0; i < episode->sensoryState.size() && i < 10; ++i) {
+        float current = episode->sensoryState[i] * 5.0f;
+        injectCurrent(static_cast<NeuronId>(i), current);
+    }
+    
+    // Apply episode reward to neuromodulation
+    applyRewardModulation(episode->reward, expectedReward_);
+    
+    // Update learning success for meta-learning
+    float learningSuccess = calculateLearningSuccess(episode);
+    updateMetaLearningPlastictyModulation(learningSuccess);
+}
+
+float AgentBrain::calculateLearningSuccess(const EpisodicMemoryItem* episode) const {
+    if (!episode) return 0.0f;
+    
+    float success = episode->reward;
+    
+    // If reward is high but prediction error is low, learning was successful
+    if (episode->reward > expectedReward_ && std::abs(predictionError_) < 0.1f) {
+        success *= 1.5f;
+    }
+    
+    return std::clamp(success, 0.0f, 1.0f);
+}
+
+void AgentBrain::completePattern(const EpisodicMemoryItem& episode, NeuralWorkingMemory* workingMemory) {
+    if (!workingMemory) return;
+    
+    for (size_t i = 0; i < episode.sensoryState.size() && i < 10; ++i) {
+        float patternValue = episode.sensoryState[i];
+        workingMemory->store(static_cast<NeuronId>(i), patternValue);
+    }
+}
+
+void AgentBrain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    if (brain_) {
+        brain_->injectCurrent(neuron, current);
+    }
 }
 
 } // namespace nlm

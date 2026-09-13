@@ -20,7 +20,7 @@ void EnvironmentState::set_terminal(bool terminal) {
     pImpl->terminal = terminal;
 }
 
-Environment::Environment() : state_(nullptr), lastReward_(0.0f), done_(false) {}
+Environment::Environment() : state_(std::make_unique<EnvironmentState>()), lastReward_(0.0f), done_(false) {}
 
 struct GridWorldEnvironment::Impl {
     int width;
