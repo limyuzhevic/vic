@@ -21,6 +21,9 @@ public:
     // Update curiosity based on novelty and prediction error
     void update(float novelty, float predictionError, TimestepDuration dt);
     
+    // Update curiosity with separate factors (more granular control)
+    void updateWithFactors(float noveltyFactor, float errorFactor);
+    
     // Get exploration drive (same as level)
     float getExplorationDrive() const;
     

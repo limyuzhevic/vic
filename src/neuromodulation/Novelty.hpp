@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <vector>
 
 namespace nlm {
 
@@ -18,6 +19,10 @@ public:
     // Get novelty level
     float getLevel() const;
     void setLevel(float level);
+    
+    // Get last pattern for comparison
+    const std::vector<float>& getLastPattern() const;
+    void setLastPattern(const std::vector<float>& pattern);
     
     // Detect novelty from observation
     void detectNovelty(const class Observation& observation, 
