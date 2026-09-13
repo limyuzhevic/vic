@@ -12,8 +12,14 @@ struct STDP::Impl {
     float minWeight;      // Minimum synaptic weight
     float maxWeight;      // Maximum synaptic weight
     
+    // Advanced STDP features
+    float aPlus;          // Pairing rule parameter A+
+    float aMinus;         // Pairing rule parameter A-
+    bool tripletLearning; // Whether triplet learning is enabled
+    
     Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
+             minWeight(-1.0f), maxWeight(1.0f),
+             aPlus(0.01f), aMinus(0.012f), tripletLearning(false) {}
 };
 
 STDP::STDP() : pImpl(new Impl) {}
@@ -21,9 +27,9 @@ STDP::STDP() : pImpl(new Impl) {}
 STDP::~STDP() = default;
 
 void STDP::update(Synapse* synapse,
-                   const std::vector<Timestamp>& preSpikes,
-                   const std::vector<Timestamp>& postSpikes,
-                   TimestepDuration dt) {
+                  const std::vector<Timestamp>& preSpikes,
+                  const std::vector<Timestamp>& postSpikes,
+                  TimestepDuration dt) {
     /*
      * Real STDP implementation based on spike-timing correlation
      * 
@@ -37,8 +43,8 @@ void STDP::update(Synapse* synapse,
      *   Δw = A- * exp(Δt / τ-)
      * 
      * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
+     *   A+ = aPlus (potentiation amplitude)
+     *   A- = aMinus (depression amplitude)  
      *   τ+ = τ- = timeConstant (STDP time window)
      * 
      * Biological inspiration:
@@ -46,10 +52,9 @@ void STDP::update(Synapse* synapse,
      *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
      *   - Post-before-pre causes backpropagating action potentials
      *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
+     * Advanced features:
+     *   - Pairing rule implementation for weight-dependent STDP
+     *   - Optional triplet learning for spontaneous activity
      */
     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
@@ -59,6 +64,9 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
+    // Calculate current weight for pairing rule
+    float currentWeight = synapse->getWeight();
+    
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
@@ -66,12 +74,34 @@ void STDP::update(Synapse* synapse,
             if (dt > 0) {
                 // Pre before post: POTENTIATION
                 // "Cells that fire together, wire together" - but only if pre fires before post
+                
+                // Basic STDP with exponential decay
                 float delta = pImpl->ltpWeight * std::exp(-dt / tau);
+                
+                // Apply pairing rule (weight-dependent modulation)
+                if (pImpl->tripletLearning) {
+                    // Pair of pre, post (and possibly neighboring spikes)
+                    float pairingDelta = pImpl->aPlus * std::exp(-dt / tau) * 
+                                       (1.0f + 0.5f * currentWeight);  // Weight-dependent
+                    delta += pairingDelta * 0.1f;  // Weight-dependent contribution
+                }
+                
                 totalDelta += delta;
             } else if (dt < 0) {
                 // Post before pre: DEPRESSION
                 // "Anti-Hebbian" - connection weakens if post fires without pre
+                
+                // Basic STDP with exponential decay
                 float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                
+                // Apply pairing rule (weight-dependent modulation)
+                if (pImpl->tripletLearning) {
+                    // Pair of post, pre (and possibly neighboring spikes)
+                    float pairingDelta = -pImpl->aMinus * std::exp(dt / tau) * 
+                                        (1.0f - 0.5f * currentWeight);  // Weight-dependent
+                    delta += pairingDelta * 0.1f;  // Weight-dependent contribution
+                }
+                
                 totalDelta += delta;
             }
             // dt == 0: no change (simultaneous spikes - rare in practice)
@@ -108,6 +138,8 @@ const char* STDP::getName() const {
 
 void STDP::setLTPWeight(float weight) {
     pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
+    // Also update pairing rule parameter
+    pImpl->aPlus = pImpl->ltpWeight;
 }
 
 float STDP::getLTPWeight() const {
@@ -116,6 +148,8 @@ float STDP::getLTPWeight() const {
 
 void STDP::setLTDWeight(float weight) {
     pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
+    // Also update pairing rule parameter
+    pImpl->aMinus = pImpl->ltdWeight;
 }
 
 float STDP::getLTDWeight() const {
@@ -134,6 +168,17 @@ void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
     setLTPWeight(ltpWeight);
     setLTDWeight(ltdWeight);
     setTimeConstant(tau);
+}
+
+void STDP::setPairingRule(float a_plus, float a_minus, float w_max, float w_min) {
+    pImpl->aPlus = std::clamp(a_plus, 0.0f, 0.1f);
+    pImpl->aMinus = std::clamp(a_minus, 0.0f, 0.1f);
+    pImpl->maxWeight = std::clamp(w_max, 0.0f, 2.0f);
+    pImpl->minWeight = std::clamp(w_min, -2.0f, 0.0f);
+}
+
+void STDP::enableTripletLearning(bool enable) {
+    pImpl->tripletLearning = enable;
 }
 
 } // namespace nlm

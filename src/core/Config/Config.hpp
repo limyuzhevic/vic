@@ -1,46 +1,60 @@
+// NLM Configuration management system
+// Handles loading and saving of brain configuration parameters
+
 #pragma once
 
 #include <string>
-#include <memory>
+#include <map>
 #include <vector>
-#include <variant>
-#include <optional>
+#include <memory>
+#include "core/Types/Types.hpp"
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-
 // Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+enum class ConfigType {
+    Integer,
+    Float,
+    String,
+    Boolean,
+    Unknown
 };
 
-// Configuration entry
+// Configuration sources for value precedence
+enum class ConfigSource {
+    Default,    // Default/hardcoded values
+    Runtime,    // Set at runtime
+    File,       // Loaded from file
+    CommandLine // Set via command line
+};
+
+// Individual configuration entry
 struct ConfigEntry {
     std::string key;
-    ConfigValue value;
+    ConfigType type;
     ConfigSource source;
-    std::string description;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    // Union for different value types
+    union {
+        int64_t intValue;
+        float floatValue;
+        std::string stringValue;
+        bool boolValue;
+    };
+    
+    ConfigEntry() : type(ConfigType::Unknown), source(ConfigSource::Default) {}
+    
+    // Helper methods for type checking
+    bool isInteger() const { return type == ConfigType::Integer; }
+    bool isFloat() const { return type == ConfigType::Float; }
+    bool isString() const { return type == ConfigType::String; }
+    bool isBoolean() const { return type == ConfigType::Boolean; }
+    
+    // Get value as specific type with defaults
+    int64_t getAsInt(int64_t defaultValue = 0) const;
+    float getAsFloat(float defaultValue = 0.0f) const;
+    const std::string& getAsString(const std::string& defaultValue = "") const;
+    bool getAsBoolean(bool defaultValue = false) const;
 };
 
 // Main configuration class
@@ -55,51 +69,58 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Set a configuration value
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, float value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Get a configuration value with default
+    int64_t getOr(const std::string& key, int64_t defaultValue = 0) const;
+    float getOr(const std::string& key, float defaultValue = 0.0f) const;
+    const std::string& getOr(const std::string& key, const std::string& defaultValue = "") const;
+    bool getOr(const std::string& key, bool defaultValue = false) const;
+    
+    // Get value by type (template-based)
+    template<typename T>
+    T get(const std::string& key) const;
+    
+    // Check if a key exists
+    bool has(const std::string& key) const;
+    
+    // Get all keys
+    std::vector<std::string> getKeys() const;
+    
+    // Load configuration from file
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save configuration to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    // Get source of a configuration value
+    ConfigSource getSource(const std::string& key) const;
     
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+    // Reset configuration to defaults
+    void reset();
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Merge another config into this one
+    void merge(const Config& other, bool overwrite = true);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Get configuration size
+    size_t size() const { return entries.size(); }
     
-    // Remove key
-    void remove(const std::string& key);
+    // Check if empty
+    bool empty() const { return entries.empty(); }
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
+    // Clear all entries
+    void clear() { entries.clear(); }
     
 private:
     struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    Impl* pImpl;
 };
 
 } // namespace nlm

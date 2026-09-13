@@ -54,6 +54,8 @@ add_library(nlm_core STATIC
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
+    src/neuromodulation/RewardModulatedSTDP.cpp
+    src/neuromodulation/TripletSTDP.cpp
     # Memory
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
@@ -79,6 +81,13 @@ add_library(nlm_core STATIC
     src/environment/Environment.cpp
     src/environment/Observation.cpp
     src/environment/Action.cpp
+    # Agent
+    src/agent/AgentBrain.cpp
+    src/agent/SensoryPercept.cpp
+    # World
+    src/world/SimpleWorld.cpp
+    src/world/Observation.cpp
+    src/world/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp

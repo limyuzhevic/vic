@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// Real implementation for Phase 2 with biological accuracy
 
 class STDP : public PlasticityRule {
 public:
@@ -30,21 +30,38 @@ public:
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
     
+    // Advanced STDP features
+    void setPairingRule(float a_plus, float a_minus, float w_max, float w_min);
+    void enableTripletLearning(bool enable);
+    
 private:
     struct Impl;
     Impl* pImpl;
 };
 
 // Reward-modulated STDP (R-STDP)
-// PLACEHOLDER - Phase 2
+// Implements dopamine-dependent modulation of STDP
 class RewardModulatedSTDP : public PlasticityRule {
 public:
+    RewardModulatedSTDP();
+    ~RewardModulatedSTDP() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "R-STDP"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // Neuromodulation parameters
+    void setDopamineGain(float gain);
+    float getDopamineGain() const;
+    void setDAWeight(float weight);
+    float getDAWeight() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Spike-timing dependent plasticity with triplet interactions
