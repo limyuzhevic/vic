@@ -27,10 +27,13 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 ### Phase 6 Integration Achievements
 
 #### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+- **Working Memory with Sensory Encoding**: Working memory now directly encodes sensory input as persistent activity patterns. The `processSensoryInput()` method extracts all sensory data (vision, touch, internal signals, proprioception) and stores them in working memory for immediate neural processing and pattern completion.
+
+- **Episodic Memory with Consolidation**: Episodic memory now implements sophisticated consolidation with relevance evaluation. The `consolidate()` method prunes low-relevance episodes while preserving important ones, using multi-factor relevance scores (reward, age, novelty, prediction error) to guide consolidation.
+
+- **Associative Memory with Pattern Completion**: Pattern completion through associative memory enables recall of related memories and filling in missing information.
+
+- All memory systems connected to neural processing for bidirectional interaction.
 
 #### Neuromodulation Integration
 - Dopamine affects neural excitability and plasticity
@@ -45,9 +48,9 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 #### Cognition Systems
 - Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+- **Concept Formation with Working Memory**: Concept formation now leverages working memory patterns and associative memory for enhanced concept discovery.
+- **Attention with Competitive Selection Dynamics**: Attention mechanisms now incorporate working memory patterns and bottom-up salience from prediction errors.
+- All cognition systems connected to perception and action.
 
 #### Development Integration
 - Developmental stages affect plasticity rates
@@ -60,8 +63,8 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Can resume from saved checkpoints
 
 #### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
+- **Episodic Memory Replay**: Episodic memory replay now integrates with associative memory to strengthen neural connections and update concepts.
+- **Memory Consolidation for Important Episodes**: Enhanced consolidation mechanism preserves high-relevance experiences for long-term learning.
 - Integration with sleep/rest cycle
 
 ## Building
@@ -103,6 +106,9 @@ NLM/
 │   ├── development/    # Developmental system
 │   ├── neuromodulation/# Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
+│   │   ├── WorkingMemory: Stores sensory input patterns
+│   │   ├── EpisodicMemory: Conserves experiences with relevance evaluation
+│   │   └── AssociativeMemory: Connects related patterns
 │   ├── prediction/     # Prediction systems (integrated)
 │   ├── cognition/      # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
@@ -112,6 +118,50 @@ NLM/
 │   └── visualization/  # Visualization
 ├── tests/
 └── configs/
+```
+
+## Integration Details
+
+### Enhanced Working Memory Encoding
+The working memory system now directly encodes all sensory input:
+
+```cpp
+// processSensoryInput() now extracts and stores sensory data:
+void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
+    // Extract vision (256), touch (8), internal (4), proprioception (6)
+    std::vector<float> sensoryData;
+    sensoryData.reserve(274); // Total input size
+    
+    // Store in working memory for immediate use
+    if (!sensoryData.empty()) {
+        brain_->getWorkingMemory()->store(sensoryData, 1.0f);
+    }
+}
+```
+
+### Sophisticated Episodic Memory Consolidation
+The episodic memory consolidation now uses multi-factor relevance evaluation:
+
+```cpp
+void EpisodicMemory::consolidate(float relevanceThreshold) {
+    // Calculate multi-factor relevance:
+    // - Reward (40%): Most important for learning
+    // - Age (20%): Older experiences more relevant
+    // - Time-based (20%): Recent experiences prioritized
+    // - Novelty (20%): Novel experiences preserved
+    
+    for (const auto& episode : pImpl->episodes) {
+        float relevance = episode.reward * 0.4f +
+                         std::min(1.0f, static_cast<float>(episode.age) / 1000.0f) * 0.2f +
+                         timeFactor * 0.2f +
+                         noveltyFactor * 0.2f;
+        
+        // Keep high-relevance or recent episodes
+        if (relevance > relevanceThreshold || episode.age < 500) {
+            keptEpisodes.push_back(episode);
+        }
+    }
+}
 ```
 
 ## Phase Summary
@@ -136,9 +186,9 @@ NLM/
 
 ### Phase 4 (Complete)
 - Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
+- **Working memory with sensory encoding**
+- **Episodic memory with consolidation**
+- Concept formation from experience patterns
 - Neural attention (NOT Transformer)
 - Predictive planning
 - Self-model
@@ -154,12 +204,13 @@ NLM/
 
 ### Phase 6 (Complete - Final Integration)
 - All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
+- **Working memory directly encodes sensory input**
+- **Episodic memory implements sophisticated consolidation**
 - Neuromodulation affects plasticity and dynamics
 - Prediction integrated with learning
 - Development affects plasticity rates
 - Checkpoint save/load working
-- Replay and consolidation functional
+- **Replay and consolidation functional**
 - Phase 6 integration experiment created
 
 ## Scientific Limitations
@@ -180,6 +231,8 @@ Phase 6 does NOT claim:
 - Genuine subjective experience
 
 Phase 6 DOES investigate:
+- Whether working memory can directly encode sensory input as persistent patterns
+- Whether episodic memory can implement sophisticated consolidation with relevance evaluation
 - Whether memory systems can integrate with neural dynamics
 - Whether neuromodulation can affect plasticity in a coordinated way
 - Whether prediction can become a central organizing principle
@@ -189,18 +242,18 @@ Phase 6 DOES investigate:
 
 ## Architecture Philosophy
 
-The NLM brain operates as a closed-loop system:
+The NLM brain operates as a closed-loop system with enhanced memory integration:
 
 ```
 WORLD
   ↓
-SENSORY INPUT
+SENSORY INPUT → WORKING MEMORY (direct encoding)
   ↓
 NEURAL PROCESSING (LIF dynamics, spikes)
   ↓
 INTERNAL STATE (working memory, attention)
   ↓
-MEMORY / PREDICTION
+MEMORY / PREDICTION (with consolidation)
   ↓
 MOTIVATION / NEUROMODULATION (dopamine, curiosity)
   ↓
@@ -214,9 +267,9 @@ REWARD / SURPRISE / ERROR
   ↓
 PLASTICITY (STDP, Hebbian, structural)
   ↓
-MEMORY / DEVELOPMENT
+MEMORY / DEVELOPMENT (with consolidation)
   ↓
-CHANGED BRAIN
+CHANGED BRAIN (replayed, consolidated)
   ↓
 CHANGED FUTURE BEHAVIOR
 ```

@@ -87,8 +87,40 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
+    // Extract all sensory data into a single vector for working memory
+    std::vector<float> sensoryData;
+    
+    // Vision input (256 values)
     const auto& vision = percept.getVision();
+    for (size_t i = 0; i < vision.size(); ++i) {
+        sensoryData.push_back(vision[i]);
+    }
+    
+    // Touch input (8 values)
+    const auto& touch = percept.getTouch();
+    for (size_t i = 0; i < touch.size(); ++i) {
+        sensoryData.push_back(touch[i]);
+    }
+    
+    // Internal signals (4 values)
+    const auto& intern = percept.getInternal();
+    for (size_t i = 0; i < intern.size(); ++i) {
+        sensoryData.push_back(intern[i]);
+    }
+    
+    // Proprioception (6 values)
+    const auto& proprio = percept.getProprioception();
+    for (size_t i = 0; i < proprio.size(); ++i) {
+        sensoryData.push_back(proprio[i]);
+    }
+    
+    // Store sensory data in working memory for encoding
+    if (!sensoryData.empty()) {
+        // Scale and store in working memory
+        brain_->getWorkingMemory()->store(sensoryData, 1.0f);
+    }
+    
+    // Original neural injection for direct sensory processing
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
@@ -98,7 +130,6 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
@@ -107,7 +138,6 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
@@ -116,7 +146,6 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
