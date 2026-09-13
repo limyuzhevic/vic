@@ -15,6 +15,7 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../performance/CheckpointManager.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -865,7 +866,7 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply neuron states
+        // Apply neuron states to existing neurons
         size_t idx = 0;
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
@@ -882,6 +883,11 @@ bool Brain::load(const std::string& filepath) {
                         if (idx < neuronData.refractoryRemaining.size()) {
                             neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
                         }
+                        if (idx < neuronData.lastSpikeTime.size()) {
+                            neuron->setLastSpikeTime(neuronData.lastSpikeTime[idx]);
+                        }
+                        // Note: neuronType, regionId, populationId are not typically restored
+                        // as they define the static structure
                     }
                     idx++;
                 }
@@ -895,11 +901,101 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - match by source/destination neurons
+        NLM_LOG_INFO("Applying " + std::to_string(synapseData.weight.size()) + " synapses from checkpoint");
         
-        NLM_LOG_INFO("Brain state loaded successfully");
+        // Clear existing synapses first for a clean load
+        // This is important because the checkpoint contains the complete state
+        for (auto& region : pImpl->regions) {
+            region->clearSynapses();
+        }
+        
+        // Rebuild all regions and neurons from checkpoint synapse data
+        // We need to create a mapping from neuron index to NeuronId
+        std::vector<std::vector<Neuron*>> neuronsByRegion;
+        neuronsByRegion.reserve(pImpl->regions.size());
+        
+        for (auto& region : pImpl->regions) {
+            std::vector<Neuron*> regionNeurons;
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    regionNeurons.push_back(neuron);
+                }
+            }
+            neuronsByRegion.push_back(regionNeurons);
+        }
+        
+        // Create synapses based on checkpoint data
+        for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+            uint64_t srcIdx = synapseData.sourceNeuron[i];
+            uint64_t dstIdx = synapseData.destinationNeuron[i];
+            
+            // Find the source neuron
+            Neuron* srcNeuron = nullptr;
+            NeuronId srcId(INVALID_NEURON_ID.value);
+            size_t regionIdx = 0;
+            
+            // Search for source neuron
+            for (size_t r = 0; r < neuronsByRegion.size(); ++r) {
+                for (Neuron* n : neuronsByRegion[r]) {
+                    if (srcIdx == 0) {  // First neuron gets index 0
+                        srcNeuron = n;
+                        srcId = n->getId();
+                        break;
+                    }
+                    srcIdx--;
+                }
+                if (srcNeuron) break;
+            }
+            
+            if (!srcNeuron) continue;
+            
+            // Search for destination neuron
+            Neuron* dstNeuron = nullptr;
+            NeuronId dstId(INVALID_NEURON_ID.value);
+            srcIdx = synapseData.sourceNeuron[i]; // Reset
+            
+            for (size_t r = 0; r < neuronsByRegion.size(); ++r) {
+                for (Neuron* n : neuronsByRegion[r]) {
+                    if (dstIdx == 0) {
+                        dstNeuron = n;
+                        dstId = n->getId();
+                        break;
+                    }
+                    dstIdx--;
+                }
+                if (dstNeuron) break;
+            }
+            
+            if (!dstNeuron) continue;
+            
+            // Create synapse
+            Synapse* syn = new Synapse(srcId, dstId, synapseData.weight[i],
+                                     synapseData.delay[i], 
+                                     static_cast<SynapseType>(synapseData.synapseType[i]),
+                                     synapseData.eligibilityTrace[i],
+                                     synapseData.efficacy[i],
+                                     synapseData.shortTermDepression[i],
+                                     synapseData.shortTermFacilitation[i]);
+            
+            // Add to the appropriate region
+            auto* region = getRegion(srcId);  // Find region containing source neuron
+            if (region) {
+                region->addSynapse(std::unique_ptr<Synapse>(syn));
+                
+                // Apply additional synapse properties
+                syn->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                syn->setShortTermDepression(synapseData.shortTermDepression[i]);
+                syn->setShortTermFacilitation(synapseData.shortTermFacilitation[i]);
+            }
+        }
+        
+        // Restore other systems state from checkpoint
+        // Note: CheckpointSystem doesn't currently store spike system,
+        // random generator, or neuromodulation state
+        
+        NLM_LOG_INFO("Brain state loaded successfully with " + 
+                    std::to_string(synapseData.weight.size()) + " synapses restored");
         return true;
         
     } catch (const std::exception& e) {
