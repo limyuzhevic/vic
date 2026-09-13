@@ -65,10 +65,12 @@ public:
     bool initialize();
     
     // Main simulation step
-    void step(SimulationStep currentStep);
+    void step(SimulationStep currentStep, Timestamp currentTime = 0.0);
     
-    // Simulation time step
-    void step(SimulationStep currentStep, Timestamp currentTime);
+    // Convenience overload - calculates timestamp from step number if not provided
+    void step(SimulationStep currentStep) {
+        step(currentStep, static_cast<Timestamp>(currentStep));
+    }
     
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern

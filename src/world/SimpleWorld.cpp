@@ -58,16 +58,90 @@ void SimpleWorld::reset() {
     
     // Place some resource objects (positive reward when touched)
     for (int i = 0; i < 5; ++i) {
-        float ox = urand(rngState_, 1.0f, width_ - 1.0f);
-        float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
+        bool placed = false;
+        float attempts = 0;
+        
+        while (!placed && attempts < 100) {
+            float ox = urand(rngState_, 1.0f, width_ - 1.0f);
+            float oy = urand(rngState_, 1.0f, height_ - 1.0f);
+            
+            // Check agent start position (keep agent away from objects)
+            if (std::abs(ox - agent_.x) < 3.0f && std::abs(oy - agent_.y) < 3.0f) {
+                attempts++;
+                continue;
+            }
+            
+            // Check for overlap with existing objects
+            bool overlap = false;
+            for (const auto& obj : objects_) {
+                if (!obj.active) continue;
+                float dx = ox - obj.x;
+                float dy = oy - obj.y;
+                float dist = std::sqrt(dx * dx + dy * dy);
+                if (dist < (obj.radius + 0.4f)) {
+                    overlap = true;
+                    break;
+                }
+            }
+            
+            if (!overlap) {
+                objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
+                placed = true;
+            }
+            
+            attempts++;
+        }
+        
+        if (!placed) {
+            // Fallback: place at fixed positions if random placement fails
+            float ox = 5.0f + i * 3.0f;
+            float oy = 5.0f + (i % 2) * 4.0f;
+            objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
+        }
     }
     
     // Place some hazard objects (negative reward when touched)
     for (int i = 0; i < 3; ++i) {
-        float ox = urand(rngState_, 1.0f, width_ - 1.0f);
-        float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
+        bool placed = false;
+        float attempts = 0;
+        
+        while (!placed && attempts < 100) {
+            float ox = urand(rngState_, 1.0f, width_ - 1.0f);
+            float oy = urand(rngState_, 1.0f, height_ - 1.0f);
+            
+            // Check agent start position (keep agent away from objects)
+            if (std::abs(ox - agent_.x) < 3.0f && std::abs(oy - agent_.y) < 3.0f) {
+                attempts++;
+                continue;
+            }
+            
+            // Check for overlap with existing objects
+            bool overlap = false;
+            for (const auto& obj : objects_) {
+                if (!obj.active) continue;
+                float dx = ox - obj.x;
+                float dy = oy - obj.y;
+                float dist = std::sqrt(dx * dx + dy * dy);
+                if (dist < (obj.radius + 0.3f)) {
+                    overlap = true;
+                    break;
+                }
+            }
+            
+            if (!overlap) {
+                objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
+                placed = true;
+            }
+            
+            attempts++;
+        }
+        
+        if (!placed) {
+            // Fallback: place at fixed positions if random placement fails
+            float ox = 15.0f + i * 3.0f;
+            float oy = 10.0f + i * 3.0f;
+            objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
+        }
     }
     
     generateVision();

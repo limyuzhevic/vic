@@ -84,9 +84,67 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write header comment
+    file << "# NLM Configuration File (Generated)" << std::endl;
+    file << "# Format: key = value (value type depends on key)" << std::endl;
+    file << "# Comments start with #" << std::endl;
+    file << std::endl;
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << "# Source: ";
+        switch (entry.source) {
+            case ConfigSource::Default: file << "Default"; break;
+            case ConfigSource::File: file << "File"; break;
+            case ConfigSource::CommandLine: file << "Command Line"; break;
+            case ConfigSource::Runtime: file << "Runtime"; break;
+        }
+        file << "\n";
+        
+        // Write key=value pair
+        file << entry.key << " = ";
+        
+        // Handle different value types
+        std::visit([&file](auto&& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, int>) {
+                file << value;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << value;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format double to avoid scientific notation
+                file << std::fixed << std::setprecision(6) << value;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (value ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << value << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << std::fixed << std::setprecision(6) << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << value[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << "[UNKNOWN_TYPE]";
+            }
+        }, entry.value);
+        
+        file << "\n" << std::endl;
     }
     
     return true;
