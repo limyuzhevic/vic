@@ -45,6 +45,15 @@ float PredictionSystem::getConfidence() const {
     return pImpl->confidence;
 }
 
+void PredictionSystem::setConfidence(float confidence) {
+    pImpl->confidence = confidence;
+}
+
+void PredictionSystem::updatePredictionError(float error) {
+    pImpl->predictionError = error;
+    pImpl->errorHistory.push_back(error);
+}
+
 const std::vector<float>& PredictionSystem::getErrorHistory() const {
     return pImpl->errorHistory;
 }
@@ -55,6 +64,15 @@ void PredictionSystem::clearHistory() {
 
 void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
+}
+
+void PredictionSystem::update(TimestepDuration dt) {
+    // Decay prediction error over time
+    pImpl->predictionError *= (1.0f - dt * 0.1f);
+    pImpl->confidence *= (1.0f - dt * 0.05f);
+    
+    // Keep confidence in reasonable range
+    pImpl->confidence = std::clamp(pImpl->confidence, 0.1f, 1.0f);
 }
 
 } // namespace nlm

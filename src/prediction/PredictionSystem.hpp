@@ -27,12 +27,21 @@ public:
     // Get prediction confidence
     float getConfidence() const;
     
+    // Set prediction confidence
+    void setConfidence(float confidence);
+    
+    // Update prediction error from neuromodulation
+    void updatePredictionError(float error);
+    
     // Get prediction history
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Update prediction system
+    void update(TimestepDuration dt);
     
 private:
     struct Impl;

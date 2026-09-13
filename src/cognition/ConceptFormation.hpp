@@ -137,6 +137,18 @@ public:
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+    
+    // Apply attention from attentional selection
+    void applyAttendedRegion(RegionId region);
+    
+    // Apply bottom-up salience from attentional selection
+    void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
+    
+    // Process episodic memory for concept formation
+    void processEpisode(const EpisodicMemoryItem* episode);
+    
+    // Update concept formation
+    void update(TimestepDuration dt);
 
 private:
     // Create new concept from pattern
@@ -161,6 +173,12 @@ private:
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable
     size_t stabilityWindow_;    // How many observations to consider for stability
+    
+    // Attention integration
+    std::vector<RegionId> attendedRegions_;
+    std::vector<NeuronId> neuronSalience_;
+    std::unordered_map<uint64_t, float> topDownBias_;
+    std::unordered_map<uint64_t, float> bottomUpSalience_;
 };
 
 // SpatialRepresentation: Learns spatial relationships from experience
@@ -266,6 +284,6 @@ private:
 
     Brain* brain_;
     std::vector<SequenceLink> sequences_;
-};
+}
 
 } // namespace nlm

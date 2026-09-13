@@ -511,8 +511,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural activity
+        // For now, track prediction error history
+        
+        // Get prediction error from neuromodulation system
+        if (pImpl->predictionError) {
+            float predictionError = pImpl->predictionError->getError();
+            pImpl->predictionSystem->updatePredictionError(predictionError);
+        }
+        
+        // Apply neuromodulation effects on prediction confidence
+        if (pImpl->dopamine) {
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            float confidenceMod = 0.5f + 0.5f * std::clamp(dopamineLevel, 0.0f, 1.0f);
+            pImpl->predictionSystem->setConfidence(pImpl->predictionSystem->getConfidence() * confidenceMod);
+        }
+        
+        pImpl->predictionSystem->update(pImpl->timestep);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -523,13 +538,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Apply top-down bias from attended regions to concept formation
+            for (RegionId region : pImpl->attention->getAttendedRegions()) {
+                if (pImpl->conceptFormation) {
+                    pImpl->conceptFormation->applyAttendedRegion(region);
+                }
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Integrate with episodic memory for pattern discovery
+        if (pImpl->episodicMemory && !pImpl->episodicMemory->getRecentEpisodes(1).empty()) {
+            const auto* latestEpisode = pImpl->episodicMemory->getRecentEpisodes(1)[0];
+            pImpl->conceptFormation->processEpisode(latestEpisode);
+        }
+        
+        // Apply bottom-up salience from attentional selection
+        for (const auto& winner : pImpl->attention ? pImpl->attention->getWinners() : std::vector<NeuronId>()) {
+            if (pImpl->conceptFormation) {
+                pImpl->conceptFormation->applyBottomUpSalience(winner, 1.0f);
+            }
+        }
+        
+        pImpl->conceptFormation->update(pImpl->timestep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1011,6 +1046,10 @@ NeuralWorkingMemory* Brain::getWorkingMemory() {
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
+}
+
+NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    return pImpl->associativeMemory.get();
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
