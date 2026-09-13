@@ -192,13 +192,20 @@ bool Brain::initialize() {
     
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
+    
+    // Ensure minimum neurons per region (at least 1)
+    if (neuronsPerRegion < 1) neuronsPerRegion = 1;
+    
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
-            // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+            // Add populations with minimum neurons
+            size_t sensoryCount = std::max(neuronsPerRegion / 4, size_t(1));
+            size_t internalCount = std::max(neuronsPerRegion / 2, size_t(1));
+            size_t motorCount = std::max(neuronsPerRegion / 4, size_t(1));
+            auto sensoryPopId = region->addPopulation(sensoryCount, NeuronType::Sensory);
+            auto internalPopId = region->addPopulation(internalCount, NeuronType::Internal);
+            auto motorPopId = region->addPopulation(motorCount, NeuronType::Motor);
             
             // Collect sensory and motor neurons for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);

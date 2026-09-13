@@ -43,6 +43,7 @@ int main(int argc, char* argv[]) {
     experiment.testNeuromodulationIntegration();
     std::cout << std::endl;
     
+    // Test individual systems
     std::cout << "--- Checkpoint Test ---" << std::endl;
     experiment.testCheckpointing();
     std::cout << std::endl;

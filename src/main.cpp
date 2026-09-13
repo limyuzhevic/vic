@@ -48,6 +48,28 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printHelp() {
+    std::cout << "=== NLM Phase 2 Help ===" << std::endl;
+    std::cout << "Usage: nlm [--config <file>] [--seed <number>] [--neurons <count>] [--timestep <seconds>] [--plasticity <rate>] [--help]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config <file>        Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --seed <number>       Random seed for reproducible experiments" << std::endl;
+    std::cout << "  --neurons <count>      Number of neurons in the brain (default: 500)" << std::endl;
+    std::cout << "  --timestep <seconds>   Simulation timestep in seconds (default: 0.001)" << std::endl;
+    std::cout << "  --plasticity <rate>    Synaptogenesis rate (default: 0.0001)" << std::endl;
+    std::cout << "  --help, -h             Show this help message and exit" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm --neurons 1000 --seed 12345" << std::endl;
+    std::cout << "  nlm --config my_config.cfg --timestep 0.0001" << std::endl;
+    std::cout << std::endl;
+    std::cout << "The program runs three tests:" << std::endl;
+    std::cout << "  1. Basic neural connectivity" << std::endl;
+    std::cout << "  2. Plasticity learning experiment" << std::endl;
+    std::cout << "  3. STDP verification (pre-before-post potentiation)" << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -353,6 +375,41 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg.substr(0, 5) == "--seed") {
+            if (arg.find('=') != std::string::npos) {
+                uint64_t seed = std::stoull(arg.substr(arg.find('=') + 1));
+                config->set("random_seed", static_cast<int64_t>(seed), ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                uint64_t seed = std::stoull(argv[++i]);
+                config->set("random_seed", static_cast<int64_t>(seed), ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 8) == "--neurons") {
+            if (arg.find('=') != std::string::npos) {
+                size_t neurons = std::stoull(arg.substr(arg.find('=') + 1));
+                config->set("neuron_count", static_cast<int64_t>(neurons), ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                size_t neurons = std::stoull(argv[++i]);
+                config->set("neuron_count", static_cast<int64_t>(neurons), ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 12) == "--timestep") {
+            if (arg.find('=') != std::string::npos) {
+                double timestep = std::stod(arg.substr(arg.find('=') + 1));
+                config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                double timestep = std::stod(argv[++i]);
+                config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 12) == "--plasticity") {
+            if (arg.find('=') != std::string::npos) {
+                float rate = std::stof(arg.substr(arg.find('=') + 1));
+                config->set("synaptogenesis_rate", rate, ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                float rate = std::stof(argv[++i]);
+                config->set("synaptogenesis_rate", rate, ConfigSource::CommandLine);
+            }
+        } else if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
         }
     }
     
