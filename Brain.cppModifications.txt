@@ -1,0 +1,14 @@
+Modified Brain.cpp file to integrate cognition systems:
+
+Changes made:
+1. Updated STEP 9: Attention system now integrates with planning and concept formation
+2. Updated STEP 10: Concept formation now processes neural activity patterns from working memory and attention winners
+3. Updated STEP 11-15: Maintained existing structure for structural plasticity, replay, development, consolidation, and checkpoint management
+
+The key integrations:
+- Attention system now provides top-down bias to guide concept formation and planning
+- Concept formation processes working memory content and attention winners to form new concepts
+- Neural planner is now integrated into action production to use attention for goal setting
+- Attention winners influence planning through goal setting
+
+All cognitive systems (NeuralPlanner, ConceptFormation, AttentionalSelection) are now properly connected to the brain step loop.

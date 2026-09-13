@@ -142,7 +142,7 @@ public:
      * Schedule a spike for delivery at a future step
      */
     void schedule(uint64_t sourceNeuron, uint64_t destNeuron, uint64_t synapseId,
-                  float weight, bool isExcitatory, uint64_t deliveryStep);
+                   float weight, bool isExcitatory, uint64_t deliveryStep);
     
     /**
      * Get all spikes scheduled for delivery at current step
@@ -280,6 +280,145 @@ public:
 
 private:
     std::vector<PriorityEvent> events_;
+};
+
+// EventQueue - Main event queue for spike processing
+class EventQueue {
+public:
+    using SpikeHandler = std::function<void(const DetailedSpikeEvent&)>;
+    using DelayedSpikeHandler = std::function<void(const DelayedSpikeEvent&)>;
+    
+    EventQueue(size_t immediateCapacity = SPIKE_QUEUE_CAPACITY,
+              size_t numBuckets = DELAYED_SPIKE_BUCKETS,
+              size_t maxDelaySteps = MAX_DELAY_STEPS);
+    ~EventQueue();
+    
+    // Disable copying
+    EventQueue(const EventQueue&) = delete;
+    EventQueue& operator=(const EventQueue&) = delete;
+    
+    /**
+     * Queue an immediate spike event
+     */
+    bool queueImmediateSpike(uint64_t sourceNeuron, uint64_t destNeuron,
+                           uint64_t synapseId, float weight, bool isExcitatory);
+    
+    /**
+     * Queue a delayed spike event
+     */
+    bool queueDelayedSpike(uint64_t sourceNeuron, uint64_t destNeuron,
+                         uint64_t synapseId, float weight, bool isExcitatory,
+                         uint64_t deliveryStep);
+    
+    /**
+     * Get all due delayed spikes for current step
+     */
+    std::vector<QueuedSpikeEvent> getDueDelayedSpikes(uint64_t currentStep);
+    
+    /**
+     * Process all due spikes (calls handlers)
+     */
+    void processDueSpikes(uint64_t currentStep, Timestamp currentTime);
+    
+    /**
+     * Reset all queues
+     */
+    void reset();
+    
+    /**
+     * Get immediate queue
+     */
+    const SpikeRingBuffer& getImmediateQueue() const { return immediateQueue_; }
+    
+    /**
+     * Get delayed queue
+     */
+    const DelayedSpikeQueue& getDelayedQueue() const { return delayedQueue_; }
+    
+    /**
+     * Get priority queue
+     */
+    const PriorityEventQueue& getPriorityQueue() const { return priorityQueue_; }
+    
+    /**
+     * Get total pending spike count
+     */
+    size_t getTotalPendingCount() const;
+    
+    /**
+     * Get pending delayed spike count
+     */
+    size_t getPendingDelayedCount() const { return delayedQueue_.pendingCount(); }
+    
+    /**
+     * Get pending immediate spike count
+     */
+    size_t getPendingImmediateCount() const { return immediateQueue_.size(); }
+    
+    /**
+     * Advance time for delayed queue (should be called at end of each step)
+     */
+    void advanceTime(uint64_t currentStep) { delayedQueue_.advanceTime(currentStep); }
+    
+    /**
+     * Push handler for spike events
+     */
+    void registerHandler(SpikeHandler handler) {
+        spikeHandler_ = std::move(handler);
+    }
+    
+    /**
+     * Push handler for delayed spike events
+     */
+    void registerDelayedHandler(DelayedSpikeHandler handler) {
+        delayedSpikeHandler_ = std::move(handler);
+    }
+    
+    /**
+     * Get spike history
+     */
+    const std::vector<DetailedSpikeEvent>& getSpikeHistory() const;
+    
+    /**
+     * Clear history
+     */
+    void clearHistory();
+    
+    /**
+     * Get spike count
+     */
+    size_t getSpikeCount() const;
+    
+    /**
+     * Get pending spike count
+     */
+    size_t getPendingSpikeCount() const;
+    
+    /**
+     * Get pending delayed count
+     */
+    size_t getPendingDelayedCount() const;
+    
+    /**
+     * Statistics
+     */
+    float getAverageSpikeRate() const;
+    std::vector<NeuronId> getMostActiveNeurons(size_t count) const;
+    
+    /**
+     * Reset
+     */
+    void reset();
+    
+private:
+    // Event queue components
+    SpikeRingBuffer immediateQueue_;
+    DelayedSpikeQueue delayedQueue_;
+    PriorityEventQueue priorityQueue_;
+    
+    // Handler callbacks
+    SpikeHandler spikeHandler_;
+    DelayedSpikeHandler delayedSpikeHandler_;
 };
 
 // Inline implementations for performance

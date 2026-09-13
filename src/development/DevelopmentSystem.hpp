@@ -13,11 +13,6 @@ class RandomGenerator;
 // Implements developmental stages, plasticity modulation, and structural changes
 
 class DevelopmentSystem {
-public:
-    DevelopmentSystem();
-    ~DevelopmentSystem();
-    
-    // Get current developmental stage
     DevelopmentalStage getStage() const;
     void setStage(DevelopmentalStage stage);
     
@@ -33,6 +28,9 @@ public:
     // Update development with full parameters
     void update(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
     
+    // Comprehensive update method that applies all developmental effects
+    void updateComprehensive(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    
     // Get plasticity modifier for current stage
     float getPlasticityModifier() const;
     
@@ -45,6 +43,24 @@ public:
     
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
+    
+    // Affect neural excitability (changes in firing thresholds)
+    void affectNeuralExcitability(Brain* brain);
+    
+    // Affect attention mechanisms (changes in focus/selectivity)
+    void affectAttentionSystem(Brain* brain);
+    
+    // Affect memory consolidation (changes in memory strength)
+    void affectMemoryConsolidation(Brain* brain);
+    
+    // Affect prediction system behavior
+    void affectPredictionSystem(Brain* brain);
+    
+    // Affect working memory properties
+    void affectWorkingMemory(Brain* brain);
+    
+    // Connect to neuromodulation (ACh, NE, 5-HT) for developmental effects
+    void affectNeuromodulation(Brain* brain);
     
 private:
     struct Impl;

@@ -1,8 +1,11 @@
 #include "Config.hpp"
+#include "../Exceptions.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cerrno>
+#include <system_error>
 
 namespace nlm {
 
@@ -24,11 +27,14 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -43,12 +49,15 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
             set(key, value, ConfigSource::File);
+            NLM_LOG_INFO("Config parsed: " + key + " = " + value);
+        } else {
+            NLM_LOG_WARN("Skipping malformed config line " + std::to_string(lineNumber) + ": " + line);
         }
     }
     
@@ -56,6 +65,11 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc <= 1) {
+        NLM_LOG_INFO("No command line arguments provided for configuration");
+        return true;
+    }
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,14 +79,20 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                NLM_LOG_INFO("Setting config from command line: " + key + " = " + value);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_WARN("Malformed command line argument: " + arg);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            NLM_LOG_INFO("Setting config from command line: " + key + " = " + value);
             set(key, value, ConfigSource::CommandLine);
+        } else {
+            NLM_LOG_WARN("Unhandled command line argument: " + arg);
         }
     }
     return true;
@@ -81,6 +101,7 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     

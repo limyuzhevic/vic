@@ -1,4 +1,5 @@
 #include "SimpleWorld.hpp"
+#include "../core/Exceptions.hpp"
 #include <cmath>
 #include <algorithm>
 #include <iostream>
@@ -35,10 +36,22 @@ SimpleWorld::SimpleWorld()
 SimpleWorld::~SimpleWorld() = default;
 
 void SimpleWorld::configure(float width, float height, size_t visionWidth, size_t visionHeight) {
+    if (width <= 0.0f || height <= 0.0f) {
+        NLM_LOG_ERROR("SimpleWorld::configure: invalid dimensions (width=" + std::to_string(width) + ", height=" + std::to_string(height) + ")");
+        return;
+    }
+    if (visionWidth == 0 || visionHeight == 0) {
+        NLM_LOG_ERROR("SimpleWorld::configure: invalid vision dimensions (width=" + std::to_string(visionWidth) + ", height=" + std::to_string(visionHeight) + ")");
+        return;
+    }
+    
     width_ = width;
     height_ = height;
     visionWidth_ = visionWidth;
     visionHeight_ = visionHeight;
+    
+    NLM_LOG_INFO("SimpleWorld configured: " + std::to_string(width_) + "x" + std::to_string(height_) + 
+                 " vision " + std::to_string(visionWidth_) + "x" + std::to_string(visionHeight_));
 }
 
 void SimpleWorld::setRandomSeed(uint64_t seed) {
@@ -47,35 +60,47 @@ void SimpleWorld::setRandomSeed(uint64_t seed) {
 }
 
 void SimpleWorld::reset() {
-    simTime_ = 0.0;
-    agent_.reset();
-    agent_.x = urand(rngState_, 2.0f, width_ - 2.0f);
-    agent_.y = urand(rngState_, 2.0f, height_ - 2.0f);
-    agent_.energy = maxEnergy_;
-    rngState_ = rngSeed_;  // Reset RNG for reproducible object placement
-    
-    objects_.clear();
-    
-    // Place some resource objects (positive reward when touched)
-    for (int i = 0; i < 5; ++i) {
-        float ox = urand(rngState_, 1.0f, width_ - 1.0f);
-        float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
+    try {
+        simTime_ = 0.0;
+        agent_.reset();
+        agent_.x = urand(rngState_, 2.0f, width_ - 2.0f);
+        agent_.y = urand(rngState_, 2.0f, height_ - 2.0f);
+        agent_.energy = maxEnergy_;
+        rngState_ = rngSeed_;  // Reset RNG for reproducible object placement
+        
+        objects_.clear();
+        
+        // Place some resource objects (positive reward when touched)
+        for (int i = 0; i < 5; ++i) {
+            float ox = urand(rngState_, 1.0f, width_ - 1.0f);
+            float oy = urand(rngState_, 1.0f, height_ - 1.0f);
+            objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
+        }
+        
+        // Place some hazard objects (negative reward when touched)
+        for (int i = 0; i < 3; ++i) {
+            float ox = urand(rngState_, 1.0f, width_ - 1.0f);
+            float oy = urand(rngState_, 1.0f, height_ - 1.0f);
+            objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
+        }
+        
+        generateVision();
+        
+        NLM_LOG_INFO("SimpleWorld reset: agent at (" + std::to_string(agent_.x) + ", " + std::to_string(agent_.y) + ")");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error resetting SimpleWorld: ") + e.what());
+        throw;
     }
-    
-    // Place some hazard objects (negative reward when touched)
-    for (int i = 0; i < 3; ++i) {
-        float ox = urand(rngState_, 1.0f, width_ - 1.0f);
-        float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
-    }
-    
-    generateVision();
 }
 
 void SimpleWorld::setAgentStart(float x, float y) {
+    if (!isValidPosition(x, y)) {
+        NLM_LOG_ERROR("SimpleWorld::setAgentStart: invalid position (" + std::to_string(x) + ", " + std::to_string(y) + ")");
+        return;
+    }
     agent_.x = x;
     agent_.y = y;
+    NLM_LOG_INFO("Agent positioned at (" + std::to_string(x) + ", " + std::to_string(y) + ")");
 }
 
 void SimpleWorld::update(double timestep) {
@@ -121,94 +146,124 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
     const float moveSpeed = 3.0f;
     const float turnSpeed = 2.0f;
     
-    // Only allow one action per step
-    if (currentTime - agent_.lastActionTime < 0.1) {
-        return ActionResult(0.0f, false, "too soon");
+    // Check for valid command
+    if (cmd == MotorCommand::Wait) {
+        // Decay velocities
+        agent_.velocityX *= 0.9f;
+        agent_.velocityY *= 0.9f;
+        agent_.angularVelocity *= 0.9f;
+        agent_.isMoving = false;
+        agent_.isTurning = false;
+        result.reward = 0.0f;
+        result.success = true;
+        result.message = "wait_command";
+        return result;
     }
     
-    agent_.lastActionTime = currentTime;
+    // Only allow one action per step
+    if (currentTime - agent_.lastActionTime < 0.1) {
+        result.reward = -0.05f;  // Small penalty for trying to act too soon
+        result.success = false;
+        result.message = "too_soon";
+        return result;
+    }
     
-    switch (cmd) {
-        case MotorCommand::MoveForward: {
-            float dx = std::cos(agent_.orientation) * moveSpeed;
-            float dy = std::sin(agent_.orientation) * moveSpeed;
-            
-            float newX = agent_.x + dx * 0.1f;
-            float newY = agent_.y + dy * 0.1f;
-            
-            if (isValidPosition(newX, newY)) {
-                agent_.x = newX;
-                agent_.y = newY;
-                agent_.isMoving = true;
-                result.reward = -0.01f;  // Small cost for movement
-                result.success = true;
-            } else {
-                result.reward = -0.05f;  // Cost for hitting wall
-                result.success = false;
-            }
-            break;
-        }
+    try {
+        agent_.lastActionTime = currentTime;
         
-        case MotorCommand::MoveBackward: {
-            float dx = -std::cos(agent_.orientation) * moveSpeed * 0.5f;
-            float dy = -std::sin(agent_.orientation) * moveSpeed * 0.5f;
-            
-            float newX = agent_.x + dx * 0.1f;
-            float newY = agent_.y + dy * 0.1f;
-            
-            if (isValidPosition(newX, newY)) {
-                agent_.x = newX;
-                agent_.y = newY;
-                agent_.isMoving = true;
-                result.reward = -0.02f;
-                result.success = true;
-            } else {
-                result.reward = -0.05f;
-                result.success = false;
+        switch (cmd) {
+            case MotorCommand::MoveForward: {
+                float dx = std::cos(agent_.orientation) * moveSpeed;
+                float dy = std::sin(agent_.orientation) * moveSpeed;
+                
+                float newX = agent_.x + dx * 0.1f;
+                float newY = agent_.y + dy * 0.1f;
+                
+                if (isValidPosition(newX, newY)) {
+                    agent_.x = newX;
+                    agent_.y = newY;
+                    agent_.velocityX = dx;
+                    agent_.velocityY = dy;
+                    agent_.isMoving = true;
+                    result.reward = -0.01f;  // Small cost for movement
+                    result.success = true;
+                    result.message = "move_forward";
+                } else {
+                    result.reward = -0.05f;  // Cost for hitting wall
+                    result.success = false;
+                    result.message = "wall_collision";
+                }
+                break;
             }
-            break;
+            
+            case MotorCommand::MoveBackward: {
+                float dx = -std::cos(agent_.orientation) * moveSpeed * 0.5f;
+                float dy = -std::sin(agent_.orientation) * moveSpeed * 0.5f;
+                
+                float newX = agent_.x + dx * 0.1f;
+                float newY = agent_.y + dy * 0.1f;
+                
+                if (isValidPosition(newX, newY)) {
+                    agent_.x = newX;
+                    agent_.y = newY;
+                    agent_.velocityX = dx;
+                    agent_.velocityY = dy;
+                    agent_.isMoving = true;
+                    result.reward = -0.02f;
+                    result.success = true;
+                    result.message = "move_backward";
+                } else {
+                    result.reward = -0.05f;
+                    result.success = false;
+                    result.message = "wall_collision";
+                }
+                break;
+            }
+            
+            case MotorCommand::TurnLeft:
+                agent_.angularVelocity = -turnSpeed;
+                agent_.isTurning = true;
+                result.reward = -0.005f;
+                result.success = true;
+                result.message = "turn_left";
+                break;
+                
+            case MotorCommand::TurnRight:
+                agent_.angularVelocity = turnSpeed;
+                agent_.isTurning = true;
+                result.reward = -0.005f;
+                result.success = true;
+                result.message = "turn_right";
+                break;
+                
+            case MotorCommand::LookLeft:
+                // Pan sensor (no movement)
+                result.reward = 0.0f;
+                result.success = true;
+                result.message = "look_left";
+                break;
+                
+            case MotorCommand::LookRight:
+                result.reward = 0.0f;
+                result.success = true;
+                result.message = "look_right";
+                break;
+                
+            case MotorCommand::Interact:
+                result = interact();
+                break;
+                
+            default:
+                result.reward = 0.0f;
+                result.success = false;
+                result.message = "unknown_command";
+                break;
         }
-        
-        case MotorCommand::TurnLeft:
-            agent_.angularVelocity = -turnSpeed;
-            agent_.isTurning = true;
-            result.reward = -0.005f;
-            result.success = true;
-            break;
-            
-        case MotorCommand::TurnRight:
-            agent_.angularVelocity = turnSpeed;
-            agent_.isTurning = true;
-            result.reward = -0.005f;
-            result.success = true;
-            break;
-            
-        case MotorCommand::LookLeft:
-            // Pan sensor (no movement)
-            result.reward = 0.0f;
-            result.success = true;
-            break;
-            
-        case MotorCommand::LookRight:
-            result.reward = 0.0f;
-            result.success = true;
-            break;
-            
-        case MotorCommand::Interact:
-            result = interact();
-            break;
-            
-        case MotorCommand::Wait:
-        default:
-            // Decay velocities
-            agent_.velocityX *= 0.9f;
-            agent_.velocityY *= 0.9f;
-            agent_.angularVelocity *= 0.9f;
-            agent_.isMoving = false;
-            agent_.isTurning = false;
-            result.reward = 0.0f;
-            result.success = true;
-            break;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error applying motor command: ") + e.what());
+        result.reward = -0.1f;  // Penalty for command failure
+        result.success = false;
+        result.message = "command_error";
     }
     
     return result;
@@ -218,49 +273,71 @@ ActionResult SimpleWorld::interact() {
     ActionResult result;
     result.reward = 0.0f;
     result.success = false;
+    result.message = "no_interaction";
     
-    // Check for objects in interaction range
-    const float interactRange = 1.0f;
-    
-    for (auto& obj : objects_) {
-        if (!obj.active) continue;
+    try {
+        // Check for objects in interaction range
+        const float interactRange = 1.0f;
         
-        float dx = obj.x - agent_.x;
-        float dy = obj.y - agent_.y;
-        float dist = std::sqrt(dx * dx + dy * dy);
-        
-        if (dist < interactRange + obj.radius) {
-            obj.active = false;  // Consume the object
+        for (auto& obj : objects_) {
+            if (!obj.active) continue;
             
-            if (obj.type == WorldObjectType::Resource) {
-                agent_.energy = std::min(maxEnergy_, agent_.energy + resourceEnergyGain_);
-                result.reward = obj.value;  // Positive reward
-                result.success = true;
-                result.message = "consumed_resource";
-            } else if (obj.type == WorldObjectType::Hazard) {
-                agent_.health -= 0.2f;
-                result.reward = obj.value;  // Negative reward
-                result.success = true;
-                result.message = "hit_hazard";
+            float dx = obj.x - agent_.x;
+            float dy = obj.y - agent_.y;
+            float dist = std::sqrt(dx * dx + dy * dy);
+            
+            if (dist < interactRange + obj.radius) {
+                obj.active = false;  // Consume the object
+                
+                if (obj.type == WorldObjectType::Resource) {
+                    agent_.energy = std::min(maxEnergy_, agent_.energy + resourceEnergyGain_);
+                    result.reward = obj.value;  // Positive reward
+                    result.success = true;
+                    result.message = "consumed_resource";
+                    
+                    NLM_LOG_INFO("Agent collected resource: +" + std::to_string(obj.value) + " energy");
+                } else if (obj.type == WorldObjectType::Hazard) {
+                    agent_.health -= 0.2f;
+                    result.reward = obj.value;  // Negative reward
+                    result.success = true;
+                    result.message = "hit_hazard";
+                    
+                    NLM_LOG_WARNING("Agent hit hazard: -" + std::to_string(std::abs(obj.value)) + " health");
+                }
+                
+                // Only interact with one object at a time
+                break;
             }
-            
-            // Only interact with one object at a time
-            break;
         }
-    }
-    
-    if (!result.success) {
-        result.message = "no_object";
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error in interact(): ") + e.what());
+        result.reward = -0.1f;
+        result.success = false;
+        result.message = "interact_error";
     }
     
     return result;
 }
 
 bool SimpleWorld::isValidPosition(float x, float y) const {
-    // Check world boundaries
-    if (x < 0.0f || x >= width_ || y < 0.0f || y >= height_) {
+    // Check world boundaries with some tolerance for floating point precision
+    if (x < -1.0f || x > width_ + 1.0f || y < -1.0f || y > height_ + 1.0f) {
         return false;
     }
+    
+    // Check for objects that occupy the space
+    for (const auto& obj : objects_) {
+        if (!obj.active) continue;
+        
+        float dx = obj.x - x;
+        float dy = obj.y - y;
+        float dist = std::sqrt(dx * dx + dy * dy);
+        
+        if (dist < obj.radius) {
+            return false;
+        }
+    }
+    
     return true;
 }
 
