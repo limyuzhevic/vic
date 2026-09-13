@@ -164,7 +164,7 @@ private:
 
     Brain* brain_;
     float capabilityLevel_;
-    
+
     // Action -> (beforeState -> afterState) mappings
     struct ActionEffect {
         std::vector<float> beforeState;
@@ -172,7 +172,7 @@ private:
         float confidence;
         size_t observationCount;
     };
-    
+
     std::vector<std::vector<ActionEffect>> actionEffects_;  // Indexed by ActionType
 };
 
