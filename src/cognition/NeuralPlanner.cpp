@@ -6,9 +6,8 @@
 namespace nlm {
 
 struct NeuralPlanner::Impl {
-    Brain* brain;
-    
-    Impl() : brain(nullptr) {}
+    // pImpl::brain is now handled through brain_ member
+    Impl() {}
 };
 
 NeuralPlanner::NeuralPlanner()

@@ -511,8 +511,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory input from active sensory neurons
+        std::vector<float> currentSensory;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            if (neuron->isActive() || neuron->getState().membranePotential > neuron->getState().threshold) {
+                currentSensory.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+            }
+        }
+        
+        if (!currentSensory.empty()) {
+            // Update prediction system with sensory observation
+            pImpl->predictionSystem->updateSensoryPrediction(currentSensory);
+            
+            // Compute prediction error
+            if (pImpl->dopamine) {
+                // Update dopamine based on prediction error
+                pImpl->dopamine->setPredictionError(
+                    pImpl->predictionSystem->getPredictionError(currentSensory)
+                );
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +546,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Get current neural activity patterns for concept formation
+        std::vector<float> currentActivity;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    float activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                    currentActivity.push_back(activity);
+                }
+            }
+        }
+        
+        if (!currentActivity.empty()) {
+            pImpl->conceptFormation->updateConcepts(currentActivity);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -896,8 +927,71 @@ bool Brain::load(const std::string& filepath) {
         }
         
         // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // We need to match checkpoint synapses to existing brain synapses by source/destination neuron IDs
+        
+        // Create a mapping from neuron ID to neuron pointer for quick lookup
+        std::unordered_map<NeuronId, Neuron*> neuronMap;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    neuronMap[neuron->getId()] = neuron;
+                }
+            }
+        }
+        
+        // Count how many synapses we successfully applied
+        size_t appliedCount = 0;
+        size_t skippedCount = 0;
+        
+        // For each checkpoint synapse, find the source neuron and apply the state
+        for (size_t i = 0; i < synapseData.sourceNeuron.size(); ++i) {
+            NeuronId sourceId(synapseData.sourceNeuron[i]);
+            NeuronId destId(synapseData.destinationNeuron[i]);
+            
+            // Find source neuron in our brain
+            auto* sourceNeuron = neuronMap.find(sourceId);
+            if (!sourceNeuron) {
+                skippedCount++;
+                continue;  // Skip if source neuron doesn't exist
+            }
+            
+            // Get all synapses from this source neuron
+            auto synapses = (*sourceNeuron)->outgoingSynapses;
+            bool found = false;
+            
+            // Look for a synapse with matching destination neuron
+            for (SynapseId synId : synapses) {
+                auto* synapse = region->getSynapse(synId);
+                if (synapse && synapse->getDestinationNeuron() == destId) {
+                    // Found matching synapse - apply checkpoint state
+                    synapse->setWeight(synapseData.weight[i]);
+                    synapse->setDelay(synapseData.delay[i]);
+                    synapse->setType(static_cast<SynapseType>(synapseData.synapseType[i]));
+                    synapse->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                    
+                    // Restore plasticity state
+                    auto& flags = synapse->getPlasticityFlags();
+                    flags.hebbian = (synapseData.plasticityFlags[i] & 1) != 0;
+                    flags.stdp = (synapseData.plasticityFlags[i] & 2) != 0;
+                    flags.reward_modulated = (synapseData.plasticityFlags[i] & 4) != 0;
+                    
+                    synapse->setEfficacy(synapseData.efficacy[i]);
+                    synapse->setDepression(synapseData.shortTermDepression[i]);
+                    synapse->setFacilitation(synapseData.shortTermFacilitation[i]);
+                    
+                    appliedCount++;
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                skippedCount++;
+            }
+        }
+        
+        NLM_LOG_INFO("Applied " + std::to_string(appliedCount) + " synapses, skipped " + 
+                     std::to_string(skippedCount) + " synapses (neurons not found)");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -1005,35 +1099,35 @@ float Brain::getAverageFiringRate() const {
 
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
-NeuralWorkingMemory* Brain::getWorkingMemory() {
+NeuralWorkingMemory* Brain::getWorkingMemory() const {
     return pImpl->workingMemory.get();
 }
 
-NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+NeuralEpisodicMemory* Brain::getEpisodicMemory() const {
     return pImpl->episodicMemory.get();
 }
 
-NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+NeuralAssociativeMemory* Brain::getAssociativeMemory() const {
     return pImpl->associativeMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
-PredictionSystem* Brain::getPredictionSystem() {
+PredictionSystem* Brain::getPredictionSystem() const {
     return pImpl->predictionSystem.get();
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
-NeuralPlanner* Brain::getPlanner() {
+NeuralPlanner* Brain::getPlanner() const {
     return pImpl->planner.get();
 }
 
-ConceptFormation* Brain::getConceptFormation() {
+ConceptFormation* Brain::getConceptFormation() const {
     return pImpl->conceptFormation.get();
 }
 
-AttentionalSelection* Brain::getAttention() {
+AttentionalSelection* Brain::getAttention() const {
     return pImpl->attention.get();
 }
 
