@@ -1,87 +1,312 @@
-#include "AgentBrain.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
-
-namespace nlm {
-
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
-    : brain_(brain)
-    , dopamineLevel_(0.0f)
-    , noveltyLevel_(0.0f)
-    , curiosityLevel_(0.0f)
-    , predictionError_(0.0f)
-    , expectedReward_(0.0f)
-    , developmentalAge_(0.0)
-    , plasticityModifier_(1.0f)
-    , rewardModulationEnabled_(true)
-    , structuralPlasticityEnabled_(true)
-    , developmentEnabled_(true)
-    , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
-{
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
-        }
+// Initialize behaviors
+    behaviorList_.reserve(8);
+    
+    // Create and enable behaviors based on configuration
+    if (memoryGuidedEnabled_) {
+        auto memoryBehavior = std::make_unique<MemoryGuidedBehavior>();
+        memoryBehavior->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+        behaviorList_.push_back(std::move(memoryBehavior));
     }
+    
+    if (socialLearningEnabled_) {
+        auto socialBehavior = std::make_unique<SocialLearningBehavior>();
+        socialBehavior->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+        behaviorList_.push_back(std::move(socialBehavior));
+    }
+    
+    if (metaCognitionEnabled_) {
+        auto metaBehavior = std::make_unique<MetaCognitionBehavior>();
+        metaBehavior->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+        behaviorList_.push_back(std::move(metaBehavior));
+    }
+    
+    if (curiosityDrivenEnabled_) {
+        auto curiosityBehavior = std::make_unique<CuriosityDrivenBehavior>();
+        curiosityBehavior->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+        behaviorList_.push_back(std::move(curiosityBehavior));
+    }
+    
+    if (rewardShapingEnabled_) {
+        auto rewardBehavior = std::make_unique<RewardShapingBehavior>();
+        rewardBehavior->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+        behaviorList_.push_back(std::move(rewardBehavior));
+    }
+    
+    if (transferLearningEnabled_) {
+        auto transferBehavior = std::make_unique<TransferLearningBehavior>();
+        transferBehavior->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+        behaviorList_.push_back(std::move(transferBehavior));
+    }
+    
+    if (hierarchicalPlanningEnabled_) {
+        auto hierarchicalBehavior = std::make_unique<HierarchicalPlanningBehavior>();
+        hierarchicalBehavior->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+        behaviorList_.push_back(std::move(hierarchicalBehavior));
+    }
+    
+    NLM_LOG_INFO("AgentBrain constructed with " + std::to_string(behaviorList_.size()) + " behaviors");
 }
 
 AgentBrain::~AgentBrain() = default;
 
-void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+void AgentBrain::setBrain(std::shared_ptr<Brain> brain) {
+    brain_ = brain;
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    // Reinitialize behaviors with new brain
+    for (auto& behavior : behaviorList_) {
+        if (behavior) {
+            behavior->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+        }
+    }
 }
 
-size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
+void AgentBrain::enableMemoryGuided(bool enable) {
+    memoryGuidedEnabled_ = enable;
+    if (enable) {
+        auto memoryBehavior = std::make_unique<MemoryGuidedBehavior>();
+        memoryBehavior->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+        // Add or replace in behavior list
+        addOrReplaceBehavior(std::move(memoryBehavior), "MemoryGuided");
+    }
 }
 
-size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
+void AgentBrain::enableSocialLearning(bool enable) {
+    socialLearningEnabled_ = enable;
+    if (enable) {
+        auto socialBehavior = std::make_unique<SocialLearningBehavior>();
+        socialBehavior->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+        addOrReplaceBehavior(std::move(socialBehavior), "SocialLearning");
+    }
+}
+
+void AgentBrain::enableMetaCognition(bool enable) {
+    metaCognitionEnabled_ = enable;
+    if (enable) {
+        auto metaBehavior = std::make_unique<MetaCognitionBehavior>();
+        metaBehavior->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+        addOrReplaceBehavior(std::move(metaBehavior), "MetaCognition");
+    }
+}
+
+void AgentBrain::enableCuriosityDriven(bool enable) {
+    curiosityDrivenEnabled_ = enable;
+    if (enable) {
+        auto curiosityBehavior = std::make_unique<CuriosityDrivenBehavior>();
+        curiosityBehavior->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+        addOrReplaceBehavior(std::move(curiosityBehavior), "CuriosityDriven");
+    }
+}
+
+void AgentBrain::enableRewardShaping(bool enable) {
+    rewardShapingEnabled_ = enable;
+    if (enable) {
+        auto rewardBehavior = std::make_unique<RewardShapingBehavior>();
+        rewardBehavior->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+        addOrReplaceBehavior(std::move(rewardBehavior), "RewardShaping");
+    }
+}
+
+void AgentBrain::enableTransferLearning(bool enable) {
+    transferLearningEnabled_ = enable;
+    if (enable) {
+        auto transferBehavior = std::make_unique<TransferLearningBehavior>();
+        transferBehavior->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+        addOrReplaceBehavior(std::move(transferBehavior), "TransferLearning");
+    }
+}
+
+void AgentBrain::enableHierarchicalPlanning(bool enable) {
+    hierarchicalPlanningEnabled_ = enable;
+    if (enable) {
+        auto hierarchicalBehavior = std::make_unique<HierarchicalPlanningBehavior>();
+        hierarchicalBehavior->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+        addOrReplaceBehavior(std::move(hierarchicalBehavior), "HierarchicalPlanning");
+    }
+}
+
+void AgentBrain::addOrReplaceBehavior(std::unique_ptr<Behavior> newBehavior, const std::string& name) {
+    // Check if behavior with same name already exists
+    for (auto it = behaviorList_.begin(); it != behaviorList_.end(); ++it) {
+        if ((*it) && (*it)->getName() == name) {
+            *it = std::move(newBehavior);
+            if (*it) {
+                (*it)->initialize(this, episodicMemory_.get(), nullptr, brain_.get());
+            }
+            return;
+        }
+    }
+    // If not found, add to list
+    behaviorList_.push_back(std::move(newBehavior));
+}
+
+void AgentBrain::disableAllBehaviors() {
+    for (auto& behavior : behaviorList_) {
+        if (behavior) {
+            behavior->setEnabled(false);
+        }
+    }
+    // Clear the list
+    behaviorList_.clear();
+}
+
+const std::vector<std::unique_ptr<Behavior>>& AgentBrain::getBehaviors() const {
+    return behaviorList_;
+}
+
+MotorCommand AgentBrain::decodeMotorCommand() {
+    if (!brain_) return MotorCommand::Wait;
+    
+    MotorCommand baseCommand = decodeFromMotorNeurons();
+    
+    // Apply all enabled behaviors
+    MotorCommand behaviorCommand = MotorCommand::Wait;
+    for (auto& behavior : behaviorList_) {
+        if (behavior && behavior->shouldActivate()) {
+            MotorCommand cmd = behavior->update(1.0); // Use timestep 1.0 for now
+            if (cmd != MotorCommand::Wait) {
+                behaviorCommand = cmd;
+            }
+        }
+    }
+    
+    // If no behavior produced a command, use base command
+    if (behaviorCommand == MotorCommand::Wait) {
+        return baseCommand;
+    }
+    
+    return behaviorCommand;
+}
+
+float AgentBrain::getMetaCognitiveConfidence() const {
+    float totalConfidence = 0.0f;
+    int count = 0;
+    
+    for (const auto& behavior : behaviorList_) {
+        if (behavior) {
+            totalConfidence += behavior->getConfidence();
+            count++;
+        }
+    }
+    
+    return count > 0 ? totalConfidence / count : 0.5f;
+}
+
+std::vector<float> AgentBrain::getWorkingMemoryState() const {
+    if (workingMemory_) {
+        return workingMemory_->retrieve();
+    }
+    return std::vector<float>();
+}
+
+void AgentBrain::setWorkingMemory(std::shared_ptr<NeuralWorkingMemory> memory) {
+    workingMemory_ = memory;
+}
+
+void AgentBrain::setEpisodicMemory(std::shared_ptr<NeuralEpisodicMemory> memory) {
+    episodicMemory_ = memory;
+}
+
+void AgentBrain::setNeuralPlanner(std::shared_ptr<NeuralPlanner> planner) {
+    neuralPlanner_ = planner;
+}
+
+bool AgentBrain::hasMemoryGuided() const {
+    return memoryGuidedEnabled_;
+}
+
+bool AgentBrain::hasSocialLearning() const {
+    return socialLearningEnabled_;
+}
+
+bool AgentBrain::hasMetaCognition() const {
+    return metaCognitionEnabled_;
+}
+
+bool AgentBrain::hasCuriosityDriven() const {
+    return curiosityDrivenEnabled_;
+}
+
+bool AgentBrain::hasRewardShaping() const {
+    return rewardShapingEnabled_;
+}
+
+bool AgentBrain::hasTransferLearning() const {
+    return transferLearningEnabled_;
+}
+
+bool AgentBrain::hasHierarchicalPlanning() const {
+    return hierarchicalPlanningEnabled_;
+}
+
+float AgentBrain::getAverageBehaviorConfidence() const {
+    float totalConfidence = 0.0f;
+    int count = 0;
+    
+    for (const auto& behavior : behaviorList_) {
+        if (behavior) {
+            totalConfidence += behavior->getConfidence();
+            count++;
+        }
+    }
+    
+    return count > 0 ? totalConfidence / count : 0.0f;
+}
+
+void AgentBrain::updateBehaviorConfidence(const std::string& behaviorName, float delta) {
+    for (auto& behavior : behaviorList_) {
+        if (behavior && behavior->getName() == behaviorName) {
+            behavior->updateConfidence(delta);
+            break;
+        }
+    }
+}
+
+void AgentBrain::recordSocialObservation(ActionType observedAction,
+                                        const std::vector<float>& observerState,
+                                        const std::vector<float>& resultingState,
+                                        float reward) {
+    // Record observation in social learning memory
+    if (socialLearningEnabled_) {
+        // In a full implementation, this would update social learning behavior
+        // For now, just log
+        NLM_LOG_INFO("Recorded social observation: " + std::to_string(static_cast<int>(observedAction)));
+    }
+}
+
+void AgentBrain::updateMetaCognition(double timestep) {
+    // Update meta-cognitive awareness based on performance
+    if (metaCognitionEnabled_) {
+        // In a full implementation, this would track prediction accuracy,
+        // confidence calibration, and metacognitive monitoring
+    }
+}
+
+void AgentBrain::updateCuriosityDriven(double timestep) {
+    // Update curiosity-based exploration
+    if (curiosityDrivenEnabled_) {
+        // In a full implementation, this would adjust exploration based on uncertainty
+    }
+}
+
+void AgentBrain::updateRewardShaping(double timestep) {
+    // Apply reward shaping modifications
+    if (rewardShapingEnabled_) {
+        // In a full implementation, this would apply shaped rewards
+    }
+}
+
+void AgentBrain::updateTransferLearning(double timestep) {
+    // Update transfer learning capabilities
+    if (transferLearningEnabled_) {
+        // In a full implementation, this would update skill representations
+    }
+}
+
+void AgentBrain::updateHierarchicalPlanning(double timestep) {
+    // Update hierarchical planning
+    if (hierarchicalPlanningEnabled_) {
+        // In a full implementation, this would update high-level plans
+    }
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
@@ -311,27 +536,6 @@ void AgentBrain::updateDevelopment(double timestep) {
             sp->setPruningRate(pruneRate);
         }
     }
-}
-
-DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
-    if (!brain_) return DevelopmentalStage::Initial;
-    return brain_->getDevelopmentalStage();
-}
-
-float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
-}
-
-float AgentBrain::getCuriosityLevel() const {
-    return curiosityLevel_;
-}
-
-float AgentBrain::getNoveltyLevel() const {
-    return noveltyLevel_;
-}
-
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
 }
 
 void AgentBrain::reset() {

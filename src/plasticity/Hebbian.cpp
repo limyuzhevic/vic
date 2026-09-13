@@ -71,6 +71,11 @@ void Hebbian::update(Synapse* synapse,
     
     // Apply with bounds
     if (std::abs(delta) > 1e-6f) {
+        // Apply with stability constraint to prevent runaway learning
+        if (std::abs(delta) > pImpl->maxWeight) {
+            float sign = delta > 0 ? 1.0f : -1.0f;
+            delta = sign * pImpl->maxWeight;
+        }
         applyWeightChange(synapse, delta);
     }
 }

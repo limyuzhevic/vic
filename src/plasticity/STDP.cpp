@@ -96,10 +96,18 @@ void STDP::update(Synapse* synapse,
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
-    // Clamp weight to bounds
-    float newWeight = synapse->getWeight() + delta;
+    // Prevent weight drift by applying bounded updates
+    float currentWeight = synapse->getWeight();
+    float newWeight = currentWeight + delta;
+    
+    // Clamp to stable bounds to prevent drift
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    
+    // Apply weight change with hysteresis to prevent oscillation
+    float weightDiff = std::abs(newWeight - currentWeight);
+    if (weightDiff > 1e-6f) {
+        synapse->setWeight(newWeight);
+    }
 }
 
 const char* STDP::getName() const {
