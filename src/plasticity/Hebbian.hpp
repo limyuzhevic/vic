@@ -5,10 +5,10 @@
 namespace nlm {
 
 // Hebbian learning implementation
-class Hebbian : public PlasticityRule {
+class HebbianRule : public PlasticityRule {
 public:
-    Hebbian();
-    ~Hebbian() override;
+    HebbianRule();
+    ~HebbianRule() override;
     
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,

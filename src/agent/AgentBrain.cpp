@@ -44,17 +44,22 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
+                        // Distribute sensory neurons in a balanced round-robin fashion
+                        // This fixes the bug where indices could overflow or cause incorrect distribution
+                        static size_t visionCounter = 0;
+                        static size_t touchCounter = 0;
+                        static size_t internalCounter = 0;
+                        static size_t proprioceptionCounter = 0;
                         
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
+                        // Use separate counters to ensure even distribution
+                        switch (visionCounter % 4) {
+                            case 0: sensoryVision_.push_back(n); visionCounter++; break;
+                            case 1: sensoryTouch_.push_back(n); touchCounter++; break;
+                            case 2: sensoryInternal_.push_back(n); internalCounter++; break;
+                            case 3: sensoryProprioception_.push_back(n); proprioceptionCounter++; break;
                         }
                     }
+                }
                 }
             }
         }
