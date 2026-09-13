@@ -266,6 +266,12 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
+    // Store prediction error in brain for prediction system
+    auto* predictionError = brain_->getPredictionErrorSignal();
+    if (predictionError) {
+        predictionError->setLevel(std::abs(predictionError_));
+    }
+    
     // Modulate plasticity based on dopamine
     // Positive dopamine increases plasticity, negative decreases
     float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
@@ -276,6 +282,12 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (stdp) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
+    }
+    
+    // Update neuromodulation system
+    auto* neuromod = brain_->getDopamine();
+    if (neuromod) {
+        neuromod->setLevel(std::abs(dopamineLevel_));
     }
 }
 
@@ -311,6 +323,27 @@ void AgentBrain::updateDevelopment(double timestep) {
             sp->setPruningRate(pruneRate);
         }
     }
+    
+    // Update development system with current state
+    auto* devSys = brain_->getDevelopmentSystem();
+    if (devSys) {
+        devSys->updateDevelopmentStage(developmentalAge_);
+    }
+    
+    // Store development history for tracking
+    developmentHistory_.push_back({
+        .age = developmentalAge_,
+        .stage = brain_->getDevelopmentalStage(),
+        .plasticity = plasticityModifier_,
+        .reward = dopamineLevel_,
+        .curiosity = curiosityLevel_,
+        .novelty = noveltyLevel_
+    });
+    
+    // Limit history size
+    if (developmentHistory_.size() > 100) {
+        developmentHistory_.erase(developmentHistory_.begin());
+    }
 }
 
 DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
@@ -345,6 +378,9 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Clear development history
+    developmentHistory_.clear();
 }
 
 } // namespace nlm

@@ -99,19 +99,17 @@ private:
     float predictionError_;
     float expectedReward_;
     
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
+    // Development history tracking
+    struct DevelopmentEvent {
+        double age;
+        DevelopmentalStage stage;
+        float plasticity;
+        float reward;
+        float curiosity;
+        float novelty;
+    };
     
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
-    
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    std::vector<DevelopmentEvent> developmentHistory_;
 };
 
 } // namespace nlm

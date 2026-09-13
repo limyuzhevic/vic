@@ -75,8 +75,8 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    // Planning state
+    ActionType plannedAction;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -243,7 +243,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->train(*pImpl->sensoryInput);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -511,11 +511,75 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction based on current sensory input
+        if (pImpl->sensoryInput) {
+            // Use sensory input to update prediction system
+            pImpl->predictionSystem->updatePredictions(*pImpl->sensoryInput, *pImpl->sensoryInput);
+            
+            // Get prediction error to update neuromodulation
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (pImpl->predictionError) {
+                // Scale prediction error by confidence and time
+                float scaledError = predictionError * pImpl->predictionSystem->getConfidence() * 0.1f;
+                pImpl->predictionError->signalPredictionError(scaledError);
+            }
+            
+            // Store prediction for use by other systems
+            pImpl->lastPrediction = *pImpl->sensoryInput;
+            
+            // Update concept formation with prediction error
+            if (pImpl->conceptFormation && predictionError > 0.1f) {
+                // Novel predictions can trigger concept formation
+                // Convert prediction error to concept features
+                std::vector<float> features(predictionError * 10.0f);
+                pImpl->conceptFormation->presentExperience(features, features, predictionError, currentStep);
+            }
+        }
+    }
+    
+    // ========== STEP 9: Neural planning ==========
+    // Use neural planner to select actions based on current state and goals
+    if (pImpl->planner && pImpl->workingMemory) {
+        // Get current state from working memory
+        std::vector<float> currentState = pImpl->workingMemory->retrieve();
+        
+        // If we have a goal, use it; otherwise use reward maximization
+        float targetReward = 0.5f;  // Default target
+        
+        // If concept formation has learned goals, use them
+        if (pImpl->conceptFormation && pImpl->conceptFormation->getConceptCount() > 0) {
+            // Use the most stable concept as target
+            size_t bestConcept = 0;
+            float bestStability = 0.0f;
+            
+            for (size_t i = 0; i < pImpl->conceptFormation->getConceptCount(); ++i) {
+                float stability = pImpl->conceptFormation->getConceptStability(i);
+                if (stability > bestStability) {
+                    bestStability = stability;
+                    bestConcept = i;
+                }
+            }
+            
+            if (bestStability > 0.7f) {
+                // Use concept prototype as current goal
+                std::vector<float> goal = pImpl->conceptFormation->getConceptPrototype(bestConcept);
+                pImpl->planner->setCurrentGoal(goal);
+                targetReward = 0.8f;  // Higher target for learned goals
+            }
+        }
+        
+        // Plan next action
+        ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Store planned action for action selection
+        if (pImpl->planningAction) {
+            pImpl->planningAction->plannedAction = plannedAction;
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
+    
+    // ========== STEP 10: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -526,18 +590,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
+    // ========== STEP 11: Neural concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Use prediction errors and sensory input to trigger concept formation
+        if (pImpl->predictionError && pImpl->predictionError->getError() > 0.2f) {
+            // High prediction error indicates something novel
+            std::vector<float> pattern(10, pImpl->predictionError->getError());
+            std::vector<float> features(pattern.size(), pImpl->predictionError->getError());
+            pImpl->conceptFormation->presentExperience(pattern, features, 
+                                                    pImpl->predictionError->getError(), currentStep);
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 12: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
+    // ========== STEP 13: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
@@ -546,7 +617,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // ========== STEP 14: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -574,12 +645,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
+        
+        // Update neuromodulation levels based on development
+        if (pImpl->dopamine) {
+            // Dopamine levels decrease with age (adaptive learning)
+            float ageFactor = 1.0f - (currentStep / (currentStep + 10000.0f));
+            float currentDopamine = pImpl->dopamine->getLevel();
+            pImpl->dopamine->setLevel(currentDopamine * ageFactor);
+        }
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
+        
+        // Also consolidate working memory to long-term if confidence is high
+        if (pImpl->workingMemory) {
+            float memoryActivity = pImpl->workingMemory->getMemoryActivity();
+            if (memoryActivity > 0.5f) {
+                // Store important working memory to episodic
+                std::vector<float> pattern = pImpl->workingMemory->retrieve();
+                if (!pattern.empty()) {
+                    EpisodicMemoryItem episode;
+                    episode.timestamp = currentStep;
+                    episode.activeNeurons = pImpl->workingMemory->getMemoryNeurons();
+                    episode.neuronActivations = pattern;
+                    episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                    
+                    pImpl->episodicMemory->storeEpisode(episode);
+                }
+            }
+        }
     }
     
     // ========== STEP 15: Checkpoint management ==========
