@@ -1,7 +1,6 @@
-#include "AgentBrain.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
+// Include necessary headers for error handling
+#include <cassert>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -29,17 +28,23 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
+                        // Map all 8 motor commands: MoveForward(0), MoveBackward(1), 
+                        // TurnLeft(2), TurnRight(3), LookLeft(4), LookRight(5), 
+                        // Interact(6), Wait(7)
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
+                                    motorLookLeft_.size() + motorLookRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
                         
-                        switch (idx % 6) {
+                        switch (idx % 8) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
                             case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                            case 4: motorLookLeft_.push_back(n); break;
+                            case 5: motorLookRight_.push_back(n); break;
+                            case 6: motorInteract_.push_back(n); break;
+                            case 7: motorWait_.push_back(n); break;
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
@@ -64,10 +69,26 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    // Validate inputs
+    if (world.getVisionWidth() == 0 || world.getVisionHeight() == 0) {
+        NLM_LOG_ERROR("Invalid world dimensions: visionWidth=" + 
+                      std::to_string(world.getVisionWidth()) + 
+                      ", visionHeight=" + std::to_string(world.getVisionHeight()));
+        throw std::invalid_argument("World dimensions must be positive");
+    }
+    
+    // Resize previous vision buffer with validation
+    size_t visionSize = world.getVisionWidth() * world.getVisionHeight();
+    previousVision_.resize(visionSize, 0.0f);
+    
+    // Validate sensory neuron groups
+    validateSensoryGroups();
+    validateMotorGroups();
+    
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Log initialization summary
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
@@ -80,12 +101,27 @@ size_t AgentBrain::getSensoryInputSize() const {
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
+    // One motor neuron per action: MoveForward, MoveBackward, TurnLeft, TurnRight,
+    // LookLeft, LookRight, Interact, Wait (8 total commands)
+    return 8;
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    // Validate brain exists
+    if (!brain_) {
+        NLM_LOG_WARNING("Cannot process sensory input: brain is not initialized");
+        return;
+    }
+    
+    // Validate percept data
+    if (percept.getVision().empty() && percept.getTouch().empty() && 
+        percept.getInternal().empty() && percept.getProprioception().empty()) {
+        NLM_LOG_WARNING("Empty sensory percept provided");
+        return;
+    }
+    
+    // Validate sensory neuron groups
+    validateSensoryGroups();
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -169,43 +205,48 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         float sum = 0.0f;
         for (Neuron* n : neurons) {
             // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            // Use getter methods for proper encapsulation
+            sum += std::abs(n->getMembranePotential() - n->getRestingPotential());
         }
         return sum / neurons.size();
     };
-    
+
     float forwardAct = calcActivity(motorForward_);
     float backwardAct = calcActivity(motorBackward_);
     float leftAct = calcActivity(motorTurnLeft_);
     float rightAct = calcActivity(motorTurnRight_);
+    float lookLeftAct = calcActivity(motorLookLeft_);
+    float lookRightAct = calcActivity(motorLookRight_);
     float interactAct = calcActivity(motorInteract_);
     float waitAct = calcActivity(motorWait_);
-    
+
     // Find maximum activity
     struct { MotorCommand cmd; float activity; } commands[] = {
         {MotorCommand::MoveForward, forwardAct},
         {MotorCommand::MoveBackward, backwardAct},
         {MotorCommand::TurnLeft, leftAct},
         {MotorCommand::TurnRight, rightAct},
+        {MotorCommand::LookLeft, lookLeftAct},
+        {MotorCommand::LookRight, lookRightAct},
         {MotorCommand::Interact, interactAct},
         {MotorCommand::Wait, waitAct}
     };
-    
+
     MotorCommand best = MotorCommand::Wait;
     float bestActivity = waitAct;  // Default to wait if nothing stronger
-    
+
     for (const auto& c : commands) {
         if (c.activity > bestActivity) {
             bestActivity = c.activity;
             best = c.cmd;
         }
     }
-    
+
     // Only act if there's meaningful activity
     if (bestActivity < 0.5f) {
         return MotorCommand::Wait;
     }
-    
+
     return best;
 }
 
@@ -217,7 +258,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
+            // Random motor command from full 8-command set
             int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
@@ -233,6 +274,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     }
     
     return defaultCmd;
+}
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
@@ -334,6 +376,84 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+void AgentBrain::validateSensoryGroups() const {
+    // Validate all sensory neuron groups exist and are not null
+    NLM_LOG_DEBUG("Validating sensory neuron groups...");
+    
+    // Validate vision sensory neurons
+    if (sensoryVision_.empty()) {
+        NLM_LOG_WARNING("No vision sensory neurons found");
+    } else {
+        NLM_LOG_DEBUG(std::to_string(sensoryVision_.size()) + " vision sensory neurons validated");
+    }
+    
+    // Validate touch sensory neurons
+    if (sensoryTouch_.empty()) {
+        NLM_LOG_WARNING("No touch sensory neurons found");
+    } else {
+        NLM_LOG_DEBUG(std::to_string(sensoryTouch_.size()) + " touch sensory neurons validated");
+    }
+    
+    // Validate internal sensory neurons
+    if (sensoryInternal_.empty()) {
+        NLM_LOG_WARNING("No internal sensory neurons found");
+    } else {
+        NLM_LOG_DEBUG(std::to_string(sensoryInternal_.size()) + " internal sensory neurons validated");
+    }
+    
+    // Validate proprioception sensory neurons
+    if (sensoryProprioception_.empty()) {
+        NLM_LOG_WARNING("No proprioception sensory neurons found");
+    } else {
+        NLM_LOG_DEBUG(std::to_string(sensoryProprioception_.size()) + " proprioception sensory neurons validated");
+    }
+}
+
+void AgentBrain::validateMotorGroups() const {
+    // Validate all motor neuron groups exist and are not null
+    NLM_LOG_DEBUG("Validating motor neuron groups...");
+    
+    // Validate motor forward neurons
+    if (motorForward_.empty()) {
+        NLM_LOG_WARNING("No motorForward neurons found");
+    }
+    
+    // Validate motor backward neurons
+    if (motorBackward_.empty()) {
+        NLM_LOG_WARNING("No motorBackward neurons found");
+    }
+    
+    // Validate motor turn left neurons
+    if (motorTurnLeft_.empty()) {
+        NLM_LOG_WARNING("No motorTurnLeft neurons found");
+    }
+    
+    // Validate motor turn right neurons
+    if (motorTurnRight_.empty()) {
+        NLM_LOG_WARNING("No motorTurnRight neurons found");
+    }
+    
+    // Validate motor look left neurons
+    if (motorLookLeft_.empty()) {
+        NLM_LOG_WARNING("No motorLookLeft neurons found");
+    }
+    
+    // Validate motor look right neurons
+    if (motorLookRight_.empty()) {
+        NLM_LOG_WARNING("No motorLookRight neurons found");
+    }
+    
+    // Validate motor interact neurons
+    if (motorInteract_.empty()) {
+        NLM_LOG_WARNING("No motorInteract neurons found");
+    }
+    
+    // Validate motor wait neurons
+    if (motorWait_.empty()) {
+        NLM_LOG_WARNING("No motorWait neurons found");
+    }
+    
+    NLM_LOG_DEBUG("Motor neuron group validation complete");
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
@@ -344,7 +464,7 @@ void AgentBrain::reset() {
     plasticityModifier_ = 1.0f;
     
     // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    if (!previousVision_.empty()) {
+        std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    }
 }
-
-} // namespace nlm
