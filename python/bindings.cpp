@@ -7,6 +7,10 @@
 #include <vector>
 
 #include "../src/brain/Brain.hpp"
+#include "../src/brain/Neuron.hpp"
+#include "../src/brain/NeuralPopulation.hpp"
+#include "../src/brain/NeuralRegion.hpp"
+#include "../src/brain/Synapse.hpp"
 #include "../src/core/Config/Config.hpp"
 #include "../src/core/Types/Types.hpp"
 #include "../src/agent/AgentBrain.hpp"
@@ -29,6 +33,7 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
+    // Unique identifiers
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -73,6 +78,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
 
+    // Enumerations
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
         .value("Inhibitory", NeuronType::Inhibitory)
@@ -142,6 +148,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Core classes
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -176,9 +183,17 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
              py::arg("channels") = 3)
+        .def("getType", &Vision::getType)
+        .def("getData", &Vision::getData)
+        .def("getDimensions", &Vision::getDimensions)
+        .def("getTimestamp", &Vision::getTimestamp)
+        .def("setTimestamp", &Vision::setTimestamp, py::arg("timestamp"))
         .def("setData", [](Vision& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
+        .def("setData", [](Vision& self, float* data, size_t size) {
+            self.setData(data, size);
+        }, py::arg("data"), py::arg("size"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
         .def("getChannels", &Vision::getChannels);
@@ -186,6 +201,11 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
+        .def("getType", &Audio::getType)
+        .def("getData", &Audio::getData)
+        .def("getDimensions", &Audio::getDimensions)
+        .def("getTimestamp", &Audio::getTimestamp)
+        .def("setTimestamp", &Audio::setTimestamp, py::arg("timestamp"))
         .def("setData", [](Audio& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
@@ -195,6 +215,11 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
+        .def("getType", &InternalSignals::getType)
+        .def("getData", &InternalSignals::getData)
+        .def("getDimensions", &InternalSignals::getDimensions)
+        .def("getTimestamp", &InternalSignals::getTimestamp)
+        .def("setTimestamp", &InternalSignals::setTimestamp, py::arg("timestamp"))
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
@@ -289,69 +314,73 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
-        .def("reset", &Brain::reset,
-             "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
-        .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+    // Neural brain region
+    py::class_<NeuralRegion>(m, "NeuralRegion", R"pbdoc(Neural brain region)pbdoc")
+        .def(py::init<RegionId>(), py::arg("id"))
+        .def(py::init<RegionId, std::string>(), py::arg("id"), py::arg("name"))
+        .def("getId", &NeuralRegion::getId)
+        .def("getName", &NeuralRegion::getName)
+        .def("setName", &NeuralRegion::setName, py::arg("name"))
+        .def("addPopulation", &NeuralRegion::addPopulation, py::arg("size"), py::arg("type") = NeuronType::Internal)
+        .def("getPopulation", &NeuralRegion::getPopulation, py::arg("id"))
+        .def("getPopulationCount", &NeuralRegion::getPopulationCount)
+        .def("getTotalNeuronCount", &NeuralRegion::getTotalNeuronCount)
+        .def("addSynapse", &NeuralRegion::addSynapse, py::arg("source"), py::arg("destination"), py::arg("weight") = 0.0f, py::arg("delay") = 1)
+        .def("getSynapse", &NeuralRegion::getSynapse, py::arg("id"))
+        .def("getSynapseCount", &NeuralRegion::getSynapseCount)
+        .def("step", &NeuralRegion::step, py::arg("currentTime"))
+        .def("reset", &NeuralRegion::reset);
+
+    // Neuron class representing a single neuron
+    py::class_<Neuron>(m, "Neuron", R"pbdoc(Leaky Integrate-and-Fire neuron)pbdoc")
+        .def(py::init<NeuronId>(), py::arg("id"))
+        .def("getId", &Neuron::getId)
+        .def("getType", &Neuron::getType)
+        .def("setType", &Neuron::setType, py::arg("type"))
+        .def("getState", &Neuron::getState)
+        .def("getMembranePotential", &Neuron::getMembranePotential)
+        .def("setMembranePotential", &Neuron::setMembranePotential, py::arg("potential"))
+        .def("addToMembranePotential", &Neuron::addToMembranePotential, py::arg("delta"))
+        .def("getThreshold", &Neuron::getThreshold)
+        .def("setThreshold", &Neuron::setThreshold, py::arg("threshold"))
+        .def("isFiring", &Neuron::isFiring)
+        .def("isRefractory", &Neuron::isRefractory)
+        .def("setFiringState", &Neuron::setFiringState, py::arg("state"))
+        .def("setRefractoryPeriod", &Neuron::setRefractoryPeriod, py::arg("steps"))
+        .def("decrementRefractory", &Neuron::decrementRefractory)
+        .def("getFiringRate", &Neuron::getFiringRate)
+        .def("setFiringRate", &Neuron::setFiringRate, py::arg("rate"))
+        .def("setLeakConductance", &Neuron::setLeakConductance, py::arg("conductance"))
+        .def("getLeakConductance", &Neuron::getLeakConductance)
+        .def("getRefractoryPeriod", &Neuron::getRefractoryPeriod)
+        .def("setRestingPotential", &Neuron::setRestingPotential, py::arg("potential"))
+        .def("getRestingPotential", &Neuron::getRestingPotential)
+        .def("setResetPotential", &Neuron::setResetPotential, py::arg("potential"))
+        .def("checkThreshold", &Neuron::checkThreshold)
+        .def("getLastSpikeTime", &Neuron::getLastSpikeTime)
+        .def("stepLIF", &Neuron::stepLIF, py::arg("currentTime"), py::arg("dt"))
+        .def("receiveExcitatoryInput", &Neuron::receiveExcitatoryInput, py::arg("amplitude"))
+        .def("receiveInhibitoryInput", &Neuron::receiveInhibitoryInput, py::arg("amplitude"))
+        .def("receiveModulatoryInput", &Neuron::receiveModulatoryInput, py::arg("amplitude"))
+        .def("injectCurrent", &Neuron::injectCurrent, py::arg("current"))
+        .def("getTotalCurrent", &Neuron::getTotalCurrent)
+        .def("clearTotalCurrent", &Neuron::clearTotalCurrent)
+        .def("recordSpike", &Neuron::recordSpike, py::arg("timestamp"))
+        .def("getSpikeHistory", &Neuron::getSpikeHistory)
+        .def("clearSpikeHistory", &Neuron::clearSpikeHistory)
+        .def("addIncomingSynapse", &Neuron::addIncomingSynapse, py::arg("handle"))
+        .def("addOutgoingSynapse", &Neuron::addOutgoingSynapse, py::arg("handle"))
+        .def("getIncomingSynapses", &Neuron::getIncomingSynapses)
+        .def("getOutgoingSynapses", &Neuron::getOutgoingSynapses)
+        .def("getPlasticityFlags", &Neuron::getPlasticityFlags)
+        .def("enablePlasticity", &Neuron::enablePlasticity, py::arg("hebbian"), py::arg("stdp"), py::arg("rewardModulated"))
+        .def("setRegionId", &Neuron::setRegionId)
+        .def("getRegionId", &Neuron::getRegionId)
+        .def("setPopulationId", &Neuron::setPopulationId)
+        .def("getPopulationId", &Neuron::getPopulationId)
+        .def("step", &Neuron::step, py::arg("currentTime"))
+        .def("reset", &Neuron::reset)
+        .def("initializeRandom", &Neuron::initializeRandom, py::arg("rng"));
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
