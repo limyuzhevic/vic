@@ -190,8 +190,31 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
+    // Get current developmental stage
+    DevelopmentalStage getDevelopmentalStage() const;
+    
+    // Set developmental stage
+    void setDevelopmentalStage(DevelopmentalStage stage);
+    
+    // Get random generator
+    RandomGenerator* getRandomGenerator();
+    
     // Logging
     void logStatus() const;
+    
+    // Phase 6: Integration helper methods
+    void logConfiguration(const Config& cfg) const;
+    void initializePlasticity();
+    void initializeIntegratedSystems();
+    void updateMemorySystems(SimulationStep step, Timestamp time);
+    void updatePredictionSystem();
+    void updateCognitionSystems();
+    void updateDevelopment();
+    void updateNeuromodulation(float dopamineLevel);
+    void updateMemoryConsolidation();
+    void updateCheckpointManagement(SimulationStep step, Timestamp time);
+    void updateStructuralPlasticity(SimulationStep step);
+    void updateReplayMemories(SimulationStep step);
     
 private:
     struct Impl;

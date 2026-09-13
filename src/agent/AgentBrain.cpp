@@ -84,66 +84,79 @@ size_t AgentBrain::getMotorOutputSize() const {
     return 6;
 }
 
-void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
-    
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+    
+    // Process each vision value and inject into corresponding sensory neuron
+    // This creates a precise mapping between vision data and neural activity
+    for (size_t i = 0; i < vision.size() && i < sensoryVision_.size(); ++i) {
+        Neuron* neuron = sensoryVision_[i];
+        if (neuron && vision[i] > 0.0f) {
+            // Only inject if we have a valid neuron and there's visual input
+            // Vision value range [0,1] is scaled to neural current range
+            float current = vision[i] * 5.0f;  // Scale to ~0-5 mV
+            neuron->injectCurrent(current);
         }
     }
     
-    // Touch input (8 values -> sensoryTouch_ neurons)
+    // Process touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+    for (size_t i = 0; i < touch.size() && i < sensoryTouch_.size(); ++i) {
+        Neuron* neuron = sensoryTouch_[i];
+        if (neuron && touch[i] > 0.0f) {
+            // Touch values indicate collision detection
+            // Stronger touches produce more neural excitation
+            float current = touch[i] * 8.0f;  // Scale to ~0-8 mV
+            neuron->injectCurrent(current);
         }
     }
     
-    // Internal signals (4 values -> sensoryInternal_ neurons)
+    // Process internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+    for (size_t i = 0; i < intern.size() && i < sensoryInternal_.size(); ++i) {
+        Neuron* neuron = sensoryInternal_[i];
+        if (neuron) {
+            // Internal signals need normalization: convert from [-1,1] to [-5,5] mV
+            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;
+            neuron->injectCurrent(current);
         }
     }
     
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
+    // Process proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+    for (size_t i = 0; i < proprio.size() && i < sensoryProprioception_.size(); ++i) {
+        Neuron* neuron = sensoryProprioception_[i];
+        if (neuron) {
+            // Proprioception also needs normalization: convert from [-1,1] to [-3,3] mV
+            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;
+            neuron->injectCurrent(current);
         }
     }
     
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
+    // Compute novelty (difference from previous vision) - simplified and more efficient
+    if (!vision.empty() && !previousVision_.empty()) {
         float totalDiff = 0.0f;
+        
+        // Calculate total absolute difference between current and previous vision
         for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
             float diff = std::abs(vision[i] - previousVision_[i]);
             totalDiff += diff;
         }
         
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        // Normalize by the maximum possible difference (vision.size() * 1.0)
+        noveltyLevel_ = totalDiff / static_cast<float>(std::max<size_t>(vision.size(), 1));
         
-        // Decay and update
+        // Apply decay factor to novelty level for temporal smoothing
         noveltyLevel_ *= sensoryNoveltyDecay_;
         
-        // Store for next time
+        // Update previous vision for next comparison
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty - more stable calculation
     if (curiosityEnabled_) {
+        // Curiosity = 2 * novelty + 0.5 * prediction error
+        // Ensures curiosity is always in [0, 1] range
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
