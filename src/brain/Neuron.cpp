@@ -188,7 +188,7 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+void Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
     // Handle refractory period
@@ -199,7 +199,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         if (pImpl->state.refractoryRemaining == 0) {
             pImpl->state.firingState = FiringState::Resting;
         }
-        return false;
+        return false;  // Early return when in refractory period
     }
     
     // LIF dynamics: Leaky Integrate-and-Fire
@@ -247,15 +247,15 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
-    } else {
-        pImpl->state.firingState = FiringState::Active;
-    }
-    
+    // Update adaptation for spike-frequency adaptation
+    pImpl->state.adaptationVariable += 1.0f;
+} else {
+    pImpl->state.firingState = FiringState::Active;
+}
+
     // Clear synaptic input for next step
     pImpl->synapticInput = 0.0f;
-    
+
     return fired;
 }
 
