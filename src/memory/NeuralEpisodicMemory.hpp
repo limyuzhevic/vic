@@ -98,9 +98,9 @@ public:
 
     // Get episode by index
     const EpisodicMemoryItem* getEpisode(size_t index) const;
-
-    // Get total number of episodes
-    size_t getEpisodeCount() const { return episodes_.size(); }
+    
+    // Get all episodes
+    const std::vector<EpisodicMemoryItem>& getAllEpisodes() const;
 
     // Get recent episodes
     std::vector<const EpisodicMemoryItem*> getRecentEpisodes(size_t count) const;
@@ -108,15 +108,10 @@ public:
     // Get average reward from episodes
     float getAverageReward() const;
 
-    // Clear old episodes
-    void consolidate(float relevanceThreshold);
-
-    // Clear all episodes
-    void clear();
-
-    // Enable/disable replay
-    void enableReplay(bool enable) { replayEnabled_ = enable; }
-    bool isReplayEnabled() const { return replayEnabled_; }
+    // Store an action experience (simplified episode)
+    void storeActionMemory(const EpisodicMemoryItem& actionItem) {
+        storeEpisode(actionItem);
+    }
 
     // Get episodes for replay (selection based on relevance and recency)
     std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;

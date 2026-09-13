@@ -22,54 +22,73 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , memoryNeurons_()
+    , memoryActivations_()
+    , memoryTimestamps_()
+    , activeTraces_()
+    , recurrentConnections_()
+    , winners_()
 {
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
+    if (!brain) return;
+    
     pImpl->brain = brain;
     brain_ = brain;
+    
+    // Initialize memory structures - we'll populate them with actual neurons later
+    // when store/storeToNeuron are called with real neuron IDs
+    memoryNeurons_.clear();
+    memoryActivations_.clear();
+    memoryTimestamps_.clear();
+    
+    // Initialize with placeholder neurons for memory trace slots
+    // This provides the structure for memory traces
+    size_t initialCapacity = capacity_ > 0 ? capacity_ : 100;
+    memoryNeurons_.reserve(initialCapacity);
+    memoryActivations_.reserve(initialCapacity);
+    memoryTimestamps_.reserve(initialCapacity);
+    
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    // Clear any existing data and initialize properly
+    memoryNeurons_.clear();
+    memoryActivations_.clear();
+    memoryTimestamps_.clear();
     
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
+    // Create new memory slots for pattern - use pattern indices as deterministic neuron IDs
+    for (size_t i = 0; i < std::min(pattern.size(), capacity_); ++i) {
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
+        // Create a deterministic neuron ID for this memory slot
+        // Using a fixed offset to avoid ID conflicts with real brain neurons
+        NeuronId neuron(static_cast<uint64_t>(i + 1000000));
         
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
-        }
+        // Store activation and timestamp
+        memoryNeurons_.push_back(neuron);
+        memoryActivations_.push_back(activation);
+        memoryTimestamps_.push_back(0);
+        
+        // Inject current into the neuron for maintenance
+        brain_->injectCurrent(neuron, activation * 5.0f);
     }
     
-    // Create maintenance connections if needed
+    // Create maintenance connections between consecutive memory neurons
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
         createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
     }
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
+    if (!brain_) return;
+    
     // Find or add this neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     
@@ -83,10 +102,8 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryTimestamps_.push_back(0);
     }
     
-    // Inject current to maintain activation
-    if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
-    }
+    // Inject current to maintain activation - use brain's method
+    brain_->injectCurrent(neuron, activation * 5.0f);
 }
 
 std::vector<float> NeuralWorkingMemory::retrieve() const {

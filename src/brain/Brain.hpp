@@ -28,6 +28,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -139,13 +142,13 @@ public:
     
     // ========== MEMORY SYSTEMS ==========
     
-    // Working memory - transient active information
+    // Get working memory system (existing implementation)
     NeuralWorkingMemory* getWorkingMemory();
     
-    // Episodic memory - experience storage
+    // Get episodic memory system (existing implementation)
     NeuralEpisodicMemory* getEpisodicMemory();
     
-    // Associative memory - pattern associations
+    // Get associative memory system (existing implementation)
     NeuralAssociativeMemory* getAssociativeMemory();
     
     // ========== PREDICTION SYSTEM ==========
@@ -170,9 +173,9 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
+// ========== NEUROMODULATION SYSTEMS ==========
+
+// Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
     // Curiosity - exploration motivation
@@ -183,6 +186,15 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Acetylcholine - attention and memory
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and behavior
+    Serotonin* getSerotonin();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

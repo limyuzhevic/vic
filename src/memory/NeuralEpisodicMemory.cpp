@@ -38,13 +38,41 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     
     episodes_.push_back(stored);
     
-    // Create episode neuron for pattern completion
+    // Create episode neuron for pattern completion with proper encoding
     if (brain_ && !episode.sensoryState.empty()) {
         NeuronId epNeuron(episodes_.size() + 20000);
         pImpl->episodeNeurons.push_back(epNeuron);
         
-        // Store episode index in the neuron
-        // (This is a simplified approach - real implementation would use more distributed encoding)
+        // Encode the sensory pattern into the episode neuron
+        // Distribute sensory input across a sparse pattern
+        float maxSensory = 0.0f;
+        for (float val : episode.sensoryState) {
+            if (std::abs(val) > maxSensory) maxSensory = std::abs(val);
+        }
+        
+        if (maxSensory > 0.0f) {
+            // Create a distributed representation based on the sensory pattern
+            // For each significant sensory input, create a connection to the episode neuron
+            for (size_t i = 0; i < episode.sensoryState.size(); ++i) {
+                if (std::abs(episode.sensoryState[i]) > 0.1f) {
+                    // Find or create a pattern neuron that represents this sensory dimension
+                    // For now, we just mark the episode neuron as connected to the sensory system
+                    // In a real implementation, this would create actual synapses
+                    brain_->injectCurrent(epNeuron, episode.sensoryState[i] * 0.5f);
+                }
+            }
+            
+            // Also connect to working memory neurons that were active during this episode
+            if (brain_->getWorkingMemory()) {
+                std::vector<NeuronId> memoryNeurons = brain_->getWorkingMemory()->getMemoryNeurons();
+                for (NeuronId memNeuron : memoryNeurons) {
+                    if (brain_->getWorkingMemory()->getNeuronActivation(memNeuron) > 0.3f) {
+                        brain_->injectCurrent(epNeuron, 0.2f);
+                        break;
+                    }
+                }
+            }
+        }
     }
     
     // Remove old episodes if over capacity
@@ -290,6 +318,54 @@ float NeuralEpisodicMemory::computeSimilarity(const std::vector<float>& query,
     if (normQ < 0.0001f || normE < 0.0001f) return 0.0f;
     
     return dot / (std::sqrt(normQ) * std::sqrt(normE));
+}
+
+void NeuralEpisodicMemory::updateWithWorkingMemory() {
+    // Integrate with working memory to strengthen episode-neuron connections
+    if (!brain_ || !brain_->getWorkingMemory()) return;
+    
+    std::vector<NeuronId> memoryNeurons = brain_->getWorkingMemory()->getMemoryNeurons();
+    
+    // Find and strengthen episode neurons based on working memory patterns
+    for (NeuronId memNeuron : memoryNeurons) {
+        // Check if this working memory neuron is associated with any stored episode
+        for (const auto& episodeNeuron : pImpl->episodeNeurons) {
+            // Look for connections between the working memory neuron and episode neuron
+            // In a full implementation, this would search through the brain's synapse network
+            // For now, we simulate this by injecting current to strengthen the connection
+            brain_->injectCurrent(episodeNeuron, 0.1f);
+        }
+    }
+}
+
+const std::vector<EpisodicMemoryItem>& NeuralEpisodicMemory::getAllEpisodes() const {
+    return episodes_;
+}
+
+bool NeuralEpisodicMemory::matchesCriteria(
+    const EpisodicMemoryItem& episode,
+    const std::vector<float>* sensoryQuery,
+    SimulationStep* startTime,
+    SimulationStep* endTime,
+    ActionType* actionQuery) const {
+    
+    if (sensoryQuery) {
+        if (computeSimilarity(*sensoryQuery, episode) < 0.3f) {
+            return false;
+        }
+    }
+    
+    if (startTime && endTime) {
+        if (episode.timestamp < *startTime || episode.timestamp > *endTime) {
+            return false;
+        }
+    }
+    
+    if (actionQuery && episode.action != *actionQuery) {
+        return false;
+    }
+    
+    return true;
 }
 
 bool NeuralEpisodicMemory::matchesCriteria(

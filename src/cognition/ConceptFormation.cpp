@@ -291,6 +291,36 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
     return 1.0f - (totalVariance / concept->instances.size());
 }
 
+// Get preferred action based on concept matching
+ActionType ConceptFormation::getPreferredAction(const std::vector<float>& state) {
+    ActionType best = ActionType::Wait;
+    float bestValue = -1000.0f;
+    
+    for (size_t i = 0; i < concepts_.size(); ++i) {
+        const auto& concept = concepts_[i];
+        
+        // Check how well this concept matches current state
+        float similarity = computeSimilarity(state, concept.prototype);
+        if (similarity > 0.6f) {
+            // Value based on stability and similarity
+            float value = concept.avgStability * similarity;
+            if (value > bestValue) {
+                bestValue = value;
+                // Determine action from category hint
+                if (concept.categoryHint == "rewarding") {
+                    best = ActionType::Interact;
+                } else if (concept.categoryHint == "harmful") {
+                    best = ActionType::Wait;
+                } else {
+                    best = ActionType::MoveForward;
+                }
+            }
+        }
+    }
+    
+    return best;
+}
+
 void ConceptFormation::clear() {
     concepts_.clear();
     nextConceptId_ = 1;

@@ -110,6 +110,9 @@ public:
     // Get number of concepts discovered
     size_t getConceptCount() const { return concepts_.size(); }
 
+    // Get preferred action for given state
+    ActionType getPreferredAction(const std::vector<float>& state);
+
     // Merge two concepts (when discovered they are actually the same)
     void mergeConcepts(size_t conceptA, size_t conceptB);
 

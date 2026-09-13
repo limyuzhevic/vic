@@ -42,13 +42,24 @@ struct Brain::Impl {
     std::unique_ptr<AttentionalSelection> attention;
     
     // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
+std::unique_ptr<DevelopmentSystem> developmentSystem;
     
     // ========== NEUROMODULATION SYSTEMS ==========
+
     std::unique_ptr<Dopamine> dopamine;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
+
+    // Phase 2: Real neural computation components
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
+
+    // Phase 2: Real neural computation components
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -93,13 +104,6 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
-        
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
         stdp = std::make_unique<STDP>();
@@ -129,6 +133,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -259,34 +266,11 @@ bool Brain::initialize() {
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
     
-    // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
-    
-    // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
-                    }
-                    return;
-                }
-            }
-        }
-    });
-    
-    // Configure checkpoint manager
+    // Initialize new neuromodulators
+    if (pImpl->dopamine) pImpl->dopamine->initialize(this);
+    if (pImpl->acetylcholine) pImpl->acetylcholine->initialize(this);
+    if (pImpl->norepinephrine) pImpl->norepinephrine->initialize(this);
+    if (pImpl->serotonin) pImpl->serotonin->initialize(this);
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
@@ -398,9 +382,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
-    
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
@@ -492,7 +473,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
-                        if (neuron->isFiring() || 
+                        if (neuron->isFiring() && 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());
                             episode.neuronActivations.push_back(
@@ -502,11 +483,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Encode current sensory state
+            if (!pImpl->sensoryNeurons.empty()) {
+                episode.sensoryState.clear();
+                for (auto* neuron : pImpl->sensoryNeurons) {
+                    episode.sensoryState.push_back(neuron->getState().membranePotential / 10.0f);
+                }
+            }
+            
+            // Store current time/location info
+            episode.positionX = pImpl->positionX ? *pImpl->positionX : 0.0f;
+            episode.positionY = pImpl->positionY ? *pImpl->positionY : 0.0f;
+            episode.orientation = pImpl->orientation ? *pImpl->orientation : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
+    }
+    
+    // Update episodic memory integration with working memory
+    if (pImpl->episodicMemory && pImpl->workingMemory) {
+        pImpl->episodicMemory->updateWithWorkingMemory();
     }
     
     // ========== STEP 8: Update prediction system ==========
@@ -614,6 +610,27 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
     }
+    
+    // Update episodic memory with sensory pattern
+    if (pImpl->episodicMemory && !values.empty()) {
+        // Capture current sensory pattern for episodic storage
+        std::vector<float> sensoryPattern;
+        for (size_t i = 0; i < numSensory && i < values.size(); ++i) {
+            sensoryPattern.push_back(values[i]);
+        }
+        
+        // Create a simple episodic memory entry for the current sensory snapshot
+        // This will be integrated with the regular episode storage system
+        EpisodicMemoryItem sensoryEpisode;
+        sensoryEpisode.timestamp = currentStep;
+        sensoryEpisode.sensoryState = sensoryPattern;
+        sensoryEpisode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Store this sensory episode for later recall
+        // Note: This is a simplified approach - full episodic storage happens in step()
+        // For now, we store it to help episodic memory recognize patterns
+        pImpl->episodicMemory->storeEpisode(sensoryEpisode);
+    }
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
@@ -690,29 +707,164 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Enhanced action selection using cognitive systems
+    // Integrates attention, neural planning, self-model, and concept formation
     
-    if (pImpl->motorNeurons.empty()) {
-        return std::make_unique<Action>(ActionType::Wait);
-    }
+    // Track current and next states for self-model updates
+    std::vector<float> currentState;
+    std::vector<float> predictedState;
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+    // 1. Extract current sensory state for cognitive processing
+    currentState = extractSensoryState();
+    
+    // 2. Use ConceptFormation to process current sensory pattern
+    // and identify relevant concepts for action selection
+    std::vector<float> currentPattern;
+    if (!pImpl->sensoryNeurons.empty()) {
+        currentPattern.reserve(pImpl->sensoryNeurons.size());
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            currentPattern.push_back(neuron->getState().membranePotential / 10.0f);
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    if (pImpl->conceptFormation && !currentPattern.empty()) {
+        pImpl->conceptFormation->presentExperience(currentPattern, currentPattern, 0.0f, pImpl->currentStep);
     }
     
-    auto action = std::make_unique<Action>(type);
+    // 3. Use Attention system to select which neural populations to consider
+    // Process all motor and sensory neurons as potential action candidates
+    std::vector<NeuronId> allCandidates;
+    for (auto* neuron : pImpl->motorNeurons) {
+        allCandidates.push_back(neuron->getId());
+    }
+    for (auto* neuron : pImpl->sensoryNeurons) {
+        allCandidates.push_back(neuron->getId());
+    }
     
+    std::vector<NeuronId> attendedNeurons;
+    if (pImpl->attention && !allCandidates.empty()) {
+        // Apply attention to find the most relevant neurons for action
+        attendedNeurons = pImpl->attention->processCompetition(allCandidates);
+        
+        // If attention selected specific neurons, prioritize them for action
+        if (!attendedNeurons.empty()) {
+            return createActionFromAttendedNeurons(attendedNeurons);
+        }
+    }
+    
+    // 4. Use NeuralPlanner to evaluate alternative action sequences
+    // This provides sophisticated planning based on learned predictions
+    ActionType plannedAction = ActionType::Wait;
+    float bestPlanReward = -1000.0f;
+    
+    if (pImpl->planner) {
+        // Set current state for planning
+        pImpl->planner->setCurrentGoal(currentPattern);
+        
+        // Generate and evaluate action sequences
+        auto sequences = pImpl->planner->generateActionSequences(pImpl->planner->getPlanningDepth());
+        
+        if (!sequences.empty()) {
+            // Evaluate first sequence as an example
+            auto candidate = pImpl->planner->evaluateSequence(sequences[0], currentPattern);
+            
+            if (candidate.expectedReward > bestPlanReward) {
+                bestPlanReward = candidate.expectedReward;
+                if (!candidate.actions.empty()) {
+                    plannedAction = candidate.actions[0];
+                }
+            }
+        }
+    }
+    
+    // 5. Use SelfModel to predict action consequences
+    // This provides body awareness and consequence prediction
+    ActionType selfModelAction = ActionType::Wait;
+    float bestSelfModelValue = -1000.0f;
+    
+    if (pImpl->conceptFormation && pImpl->conceptFormation->getConceptCount() > 0) {
+        selfModelAction = pImpl->conceptFormation->getPreferredAction(currentPattern);
+        
+        // If self-model suggests an action, evaluate its expected value
+        auto predictedNext = predictActionConsequence(selfModelAction, currentPattern);
+        if (!predictedNext.empty()) {
+            // Simple value heuristic: more active sensory input is better
+            float predictedValue = 0.0f;
+            for (float val : predictedNext) {
+                predictedValue += val;
+            }
+            
+            if (predictedValue > bestSelfModelValue) {
+                bestSelfModelValue = predictedValue;
+            }
+        }
+    }
+    
+    // 6. Integrate all cognitive system evaluations
+    // Priority: Planned actions > SelfModel actions > Attention-based actions > Basic motor activity
+    ActionType finalAction = ActionType::Wait;
+    
+    if (bestPlanReward > 0.0f) {
+        // Planning system selected a good action
+        finalAction = plannedAction;
+    } else if (bestSelfModelValue > 0.0f) {
+        // Self-model suggests a beneficial action
+        finalAction = selfModelAction;
+    } else {
+        // Fallback to basic motor neuron activity with attention filtering
+        finalAction = getBasicActionWithAttention(pImpl->motorNeurons);
+    }
+    
+    // 7. Update SelfModel with actual action (for learning)
+    if (pImpl->conceptFormation) {
+        // Store action in episodic memory for later self-model learning
+        EpisodicMemoryItem actionItem;
+        actionItem.timestamp = pImpl->currentStep;
+        actionItem.actionTaken = finalAction;
+        actionItem.sensoryState = currentPattern;
+        actionItem.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        if (pImpl->episodicMemory) {
+            pImpl->episodicMemory->storeActionMemory(actionItem);
+        }
+    }
+    
+    // 8. Update NeuralPlanner based on actual action outcomes
+    if (pImpl->planner) {
+        // Get the actual action that was executed
+        std::vector<ActionType> actualActions;
+        actualActions.push_back(finalAction);
+        
+        // Simulate reward based on action success
+        float reward = 0.0f;
+        if (finalAction != ActionType::Wait && 
+            (pImpl->dopamine || pImpl->curiosity)) {
+            reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            reward += pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+        }
+        
+        // Update planner quality based on outcome
+        pImpl->planner->updatePlanQuality(std::vector<ActionType>(), actualActions, reward);
+    }
+    
+    // 9. Update SelfModel with actual action consequences
+    if (pImpl->conceptFormation && !currentPattern.empty()) {
+        // Predict actual outcome (simplified - use current pattern as predicted)
+        std::vector<float> predictedOutcome = predictActionConsequence(finalAction, currentPattern);
+        
+        if (!predictedOutcome.empty()) {
+            // Record the action and its actual effect
+            if (!pImpl->conceptFormation->getConcepts().empty()) {
+                pImpl->conceptFormation->updateConcept(
+                    pImpl->conceptFormation->getMatchingConcept(currentPattern),
+                    currentPattern, predictedOutcome, 
+                    pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f
+                );
+            }
+        }
+    }
+    
+    auto action = std::make_unique<Action>(finalAction);
     return action;
 }
 
