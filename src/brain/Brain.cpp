@@ -14,13 +14,14 @@
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
+#include "../cognition/SpatialRepresentation.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
-
-namespace nlm {
 
 struct Brain::Impl {
     std::shared_ptr<Config> config;
@@ -35,11 +36,18 @@ struct Brain::Impl {
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
+// ========== INTEGRATED COGNITION SYSTEMS ==========
     
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    
+    // ========== STANDALONE COGNITIVE SYSTEMS ==========
+    
+    // These remain as separate experimental modules
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
+    std::unique_ptr<SpatialRepresentation> spatialRepresentation;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -120,6 +128,11 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        
+        // Initialize standalone cognitive systems (not integrated into main brain loop)
+        selfModel = std::make_unique<SelfModel>();
+        socialLearning = std::make_unique<SocialLearning>();
+        spatialRepresentation = std::make_unique<SpatialRepresentation>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();

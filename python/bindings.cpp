@@ -15,6 +15,14 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+// Include all the necessary headers
+#include "../src/cognition/SelfModel.hpp"
+#include "../src/cognition/SocialLearning.hpp"
+#include "../src/cognition/SpatialRepresentation.hpp"
+#include "../src/neuromodulation/Acetylcholine.cpp"
+#include "../src/neuromodulation/Norepinephrine.cpp"
+#include "../src/neuromodulation/Serotonin.cpp"
+#include "../src/neuromodulation/Neuromodulator.cpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -24,11 +32,19 @@ PYBIND11_MODULE(pynlm, m) {
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        Provides comprehensive access to all brain systems including:
+        - Core neural computation (LIF neurons, STDP, structural plasticity)
+        - Integrated memory systems (working, episodic, associative)
+        - Neuromodulation (dopamine, acetylcholine, norepinephrine, serotonin)
+        - Cognitive systems (planning, concept formation, attention)
+        - Prediction system for forward models
+        - Development and plasticity control
+        - Phase 6 integration experiment
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
+    // Core identifier classes
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -73,6 +89,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
 
+    // Neuron and synapse types
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
         .value("Inhibitory", NeuronType::Inhibitory)
@@ -142,6 +159,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Core Configuration
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -164,6 +182,7 @@ PYBIND11_MODULE(pynlm, m) {
             return "<Config: " + cfg.summary() + ">";
         });
 
+    // Sensory processing
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
@@ -198,6 +217,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
+    // Actions and world objects
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
         .def(py::init<ActionType>(), py::arg("type"))
@@ -221,6 +241,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &WorldObject::value)
         .def_readwrite("active", &WorldObject::active);
 
+    // Agent representation
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
         .def_readwrite("x", &AgentBody::x)
@@ -263,6 +284,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
+    // Environment
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
@@ -289,6 +311,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // Core Brain system
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -353,6 +376,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // Agent brain interface
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -400,6 +424,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Factory functions
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,10 +441,129 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Neuromodulation system (Phase 2 complete)
+    py::class_<Acetylcholine>(m, "Acetylcholine", R"pbdoc(Acetylcholine neuromodulator for attention and memory consolidation)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Acetylcholine::getName)
+        .def("getLevel", &Acetylcholine::getLevel)
+        .def("setLevel", &Acetylcholine::setLevel)
+        .def("getPlasticityFactor", &Acetylcholine::getPlasticityFactor)
+        .def("update", &Acetylcholine::update)
+        .def("signalAttention", &Acetylcholine::signalAttention)
+        .def("signalMemoryLoad", &Acetylcholine::signalMemoryLoad)
+        .def("signalThetaOscillation", &Acetylcholine::signalThetaOscillation);
+
+    py::class_<Norepinephrine>(m, "Norepinephrine", R"pbdoc(Norepinephrine neuromodulator for arousal and vigilance)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Norepinephrine::getName)
+        .def("getLevel", &Norepinephrine::getLevel)
+        .def("setLevel", &Norepinephrine::setLevel)
+        .def("getPlasticityFactor", &Norepinephrine::getPlasticityFactor)
+        .def("update", &Norepinephrine::update)
+        .def("signalStress", &Norepinephrine::signalStress)
+        .def("signalLocusCoeruleActivation", &Norepinephrine::signalLocusCoeruleActivation)
+        .def("signalArousal", &Norepinephrine::signalArousal);
+
+    py::class_<Serotonin>(m, "Serotonin", R"pbdoc(Serotonin neuromodulator for mood, social behavior, and inhibition)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Serotonin::getName)
+        .def("getLevel", &Serotonin::getLevel)
+        .def("setLevel", &Serotonin::setLevel)
+        .def("getPlasticityFactor", &Serotonin::getPlasticityFactor)
+        .def("update", &Serotonin::update)
+        .def("signalSatiety", &Serotonin::signalSatiety)
+        .def("signalSocialReward", &Serotonin::signalSocialReward)
+        .def("signalMood", &Serotonin::signalMood);
+
+    // Cognitive systems (Phase 6 complete)
+    py::class_<SelfModel>(m, "SelfModel", R"pbdoc(Self-model system for body schema, agency, and action-effect prediction)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SelfModel::initialize)
+        .def("recordSelfAction", &SelfModel::recordSelfAction)
+        .def("predictActionConsequence", &SelfModel::predictActionConsequence)
+        .def("getSelfModelConfidence", &SelfModel::getSelfModelConfidence)
+        .def("computeSelfGeneratedLikeness", &SelfModel::computeSelfGeneratedLikeness)
+        .def("getPreferredAction", &SelfModel::getPreferredAction)
+        .def("updateSelfModel", &SelfModel::updateSelfModel)
+        .def("getCapabilityLevel", &SelfModel::getCapabilityLevel)
+        .def("getBodyAwareness", &SelfModel::getBodyAwareness)
+        .def("clear", &SelfModel::clear)
+        .def("hasSelfModel", &SelfModel::hasSelfModel);
+
+    py::class_<SocialLearning>(m, "SocialLearning", R"pbdoc(Social learning system for observation, imitation, and signal detection)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SocialLearning::initialize)
+        .def("observeAgentAction", &SocialLearning::observeAgentAction)
+        .def("canImitate", &SocialLearning::canImitate)
+        .def("getImitationAction", &SocialLearning::getImitationAction)
+        .def("learnCommunicationSignal", &SocialLearning::learnCommunicationSignal)
+        .def("detectSignal", &SocialLearning::detectSignal)
+        .def("getSignalPattern", &SocialLearning::getSignalPattern)
+        .def("getSignalMeaning", &SocialLearning::getSignalMeaning)
+        .def("updateSocialKnowledge", &SocialLearning::updateSocialKnowledge)
+        .def("clear", &SocialLearning::clear)
+        .def("hasSocialKnowledge", &SocialLearning::hasSocialKnowledge)
+        .def("getObservationCount", &SocialLearning::getObservationCount);
+
+    py::class_<SpatialRepresentation>(m, "SpatialRepresentation", R"pbdoc(Spatial representation system for place cells, path integration, and navigation)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SpatialRepresentation::initialize)
+        .def("recordPosition", &SpatialRepresentation::recordPosition)
+        .def("getPredictedPosition", &SpatialRepresentation::getPredictedPosition)
+        .def("integrateMovement", &SpatialRepresentation::integrateMovement)
+        .def("getPositionActivation", &SpatialRepresentation::getPositionActivation)
+        .def("getPlaceNeuronsNear", &SpatialRepresentation::getPlaceNeuronsNear)
+        .def("getGridSpacing", &SpatialRepresentation::getGridSpacing)
+        .def("clear", &SpatialRepresentation::clear)
+        .def("hasPlaceCells", &SpatialRepresentation::hasPlaceCells);
+
+    // Prediction system (Phase 2 complete)
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(Prediction system for forward models, error computation, and learning)pbdoc")
+        .def(py::init<>())
+        .def("predictNextState", &PredictionSystem::predictNextState)
+        .def("updatePredictions", &PredictionSystem::updatePredictions)
+        .def("getPredictionError", &PredictionSystem::getPredictionError)
+        .def("getConfidence", &PredictionSystem::getConfidence)
+        .def("getErrorHistory", &PredictionSystem::getErrorHistory)
+        .def("clearHistory", &PredictionSystem::clearHistory)
+        .def("train", &PredictionSystem::train);
+
+    // Phase 6 Integration Experiment
+    py::class_<Phase6Config>(m, "Phase6Config", R"pbdoc(Configuration for Phase 6 integration experiment)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("neuronCount", &Phase6Config::neuronCount)
+        .def_readwrite("maxSteps", &Phase6Config::maxSteps)
+        .def_readwrite("enableCheckpointing", &Phase6Config::enableCheckpointing)
+        .def_readwrite("enableReplay", &Phase6Config::enableReplay)
+        .def_readwrite("enableDevelopment", &Phase6Config::enableDevelopment);
+
+    py::class_<Phase6Result>(m, "Phase6Result", R"pbdoc(Results from Phase 6 integration experiment)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("totalReward", &Phase6Result::totalReward)
+        .def_readwrite("avgFiringRate", &Phase6Result::avgFiringRate)
+        .def_readwrite("memoryEpisodesStored", &Phase6Result::memoryEpisodesStored)
+        .def_readwrite("dopamineLevel", &Phase6Result::dopamineLevel)
+        .def_readwrite("memoryWorkingMemoryIntegrated", &Phase6Result::memoryWorkingMemoryIntegrated)
+        .def_readwrite("memoryEpisodicMemoryIntegrated", &Phase6Result::memoryEpisodicMemoryIntegrated)
+        .def_readwrite("neuromodulationIntegrated", &Phase6Result::neuromodulationIntegrated)
+        .def_readwrite("predictionIntegrated", &Phase6Result::predictionIntegrated)
+        .def_readwrite("developmentIntegrated", &Phase6Result::developmentIntegrated)
+        .def_readwrite("checkpointingWorks", &Phase6Result::checkpointingWorks)
+        .def_readwrite("totalWallClockTime", &Phase6Result::totalWallClockTime);
+
+    py::class_<Phase6IntegratedExperiment>(m, "Phase6IntegratedExperiment", R"pbdoc(Complete integration experiment for all brain systems)pbdoc")
+        .def(py::init<>())
+        .def("verifyIntegration", &Phase6IntegratedExperiment::verifyIntegration)
+        .def("testMemoryIntegration", &Phase6IntegratedExperiment::testMemoryIntegration)
+        .def("testNeuromodulationIntegration", &Phase6IntegratedExperiment::testNeuromodulationIntegration)
+        .def("testCheckpointing", &Phase6IntegratedExperiment::testCheckpointing)
+        .def("testReplay", &Phase6IntegratedExperiment::testReplay)
+        .def("run", &Phase6IntegratedExperiment::run);
+
+    // Legacy identifiers (for backward compatibility)
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
 
 } // namespace nlm

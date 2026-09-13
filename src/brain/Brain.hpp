@@ -28,6 +28,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
