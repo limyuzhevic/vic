@@ -61,8 +61,8 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Save to file (JSON format by default)
+    bool saveToFile(const std::string& filepath, bool jsonFormat = true) const;
     
     // Get values
     template<typename T>
@@ -100,6 +100,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Parse JSON content from string
+    static bool parseJsonContent(const std::string& content, Config& config);
 };
 
 } // namespace nlm
