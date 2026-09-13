@@ -177,10 +177,30 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
+    // Validate configuration
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Brain configuration is null");
+        return false;
+    }
+    
+    // Get configuration values with validation
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid neuron count: 0");
+        return false;
+    }
+    
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Invalid region count: 0");
+        return false;
+    }
+    
+    float connectionProbability = pImpl->config->getOr<float>("connection_probability", nlm::SimulationConstants::DEFAULT_CONNECTION_PROBABILITY);
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection probability: " + std::to_string(connectionProbability));
+        return false;
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");

@@ -18,16 +18,24 @@ struct NeuralWorkingMemory::Impl {
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    if (!pImpl) {
+        throw std::runtime_error("Failed to allocate NeuralWorkingMemory::Impl");
+    }
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_WARNING("Cannot initialize NeuralWorkingMemory with null brain pointer");
+        return;
+    }
+    
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
@@ -36,6 +44,12 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
+    // Validate strength parameter
+    if (std::isnan(strength)) {
+        NLM_LOG_ERROR("Invalid strength value (NaN)");
+        return;
+    }
+    
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
@@ -43,12 +57,23 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
+        // Validate neuron ID
+        if (neuron.getId() == 0) {
+            NLM_LOG_WARNING("Invalid neuron ID (0)");
+            continue;
+        }
+        
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+        if (auto* region = brain_->getRegion(neuron.getId() / 1000)) {
+            auto neurons = region->getAllNeurons();
+            if (neurons) {
+                for (auto* nn : *neurons) {
+                    if (nn) {
+                        if (nn->getId() == neuron) {
+                            nn->injectCurrent(activation * 5.0f);
+                            break;
+                        }
+                    }
                 }
             }
         }

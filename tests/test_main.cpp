@@ -37,12 +37,47 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_agentbrain {
+    void runAll();
+}
+
+namespace test_simpleworld {
+    void runAll();
+}
+
+namespace test_memory {
+    void runAll();
+}
+
+namespace test_neuromodulation {
+    void runAll();
+}
+
+namespace test_cognition {
+    void runAll();
+}
+
+namespace test_development {
+    void runAll();
+}
+
+namespace test_experiments {
+    void runAll();
+}
+
+namespace test_python_bindings {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "  - AgentBrain Integration" << std::endl;
+    std::cout << "  - SimpleWorld" << std::endl;
+    std::cout << "  - Memory Systems" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -113,6 +148,69 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running AgentBrain tests..." << std::endl;
+    try {
+        test_agentbrain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running SimpleWorld tests..." << std::endl;
+    try {
+        test_simpleworld::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Neuromodulation tests..." << std::endl;
+    try {
+        test_neuromodulation::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Cognition system tests..." << std::endl;
+    try {
+        test_cognition::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Development system tests..." << std::endl;
+    try {
+        test_development::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Phase 3, 4, 6 experiment tests..." << std::endl;
+    try {
+        test_experiments::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Python bindings tests..." << std::endl;
+    try {
+        test_python_bindings::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

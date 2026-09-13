@@ -14,20 +14,32 @@ struct PredictionError::Impl {
     Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
 };
 
-PredictionError::PredictionError() : pImpl(new Impl) {}
+PredictionError::PredictionError() : pImpl(new Impl) {
+    if (!pImpl) {
+        throw std::runtime_error("Failed to allocate PredictionError::Impl");
+    }
+}
 
 PredictionError::~PredictionError() = default;
 
 void PredictionError::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_WARNING("Cannot initialize PredictionError with null brain pointer");
+        return;
+    }
     pImpl->brain = brain;
     NLM_LOG_INFO("PredictionError system initialized");
 }
 
 float PredictionError::getError() const {
-    return pImpl->error;
+    return pImpl->brain ? pImpl->error : 0.0f;
 }
 
 void PredictionError::computeError(float predicted, float actual) {
+    if (!pImpl->brain) {
+        return;
+    }
+    
     pImpl->predictedValue = predicted;
     pImpl->actualValue = actual;
     pImpl->error = actual - predicted;
@@ -39,15 +51,18 @@ void PredictionError::updatePrediction(float newPrediction) {
 }
 
 const std::vector<float>& PredictionError::getHistory() const {
-    return pImpl->history;
+    static const std::vector<float> empty;
+    return pImpl->brain ? pImpl->history : empty;
 }
 
 void PredictionError::clearHistory() {
-    pImpl->history.clear();
+    if (pImpl->brain) {
+        pImpl->history.clear();
+    }
 }
 
 float PredictionError::getMagnitude() const {
-    return std::abs(pImpl->error);
+    return std::abs(getError());
 }
 
 } // namespace nlm

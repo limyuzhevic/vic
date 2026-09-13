@@ -1,0 +1,158 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [created ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        build_type: [Release, Debug]
+        include:
+          - os: ubuntu-latest
+            ctest_args: --output-on-failure
+          - os: macos-latest
+            ctest_args: --output-on-failure
+          - os: windows-latest
+            ctest_args: --output-on-failure
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Set up CMake
+      uses: actions/cache@v3
+      id: cmake-cache
+      with:
+        path: ~/.cache/cmake
+        key: ${{ runner.os }}-cmake-${{ hashFiles('CMakeLists.txt') }}
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake python3-dev python3-pip
+        pip install scikit-build-core pybind11 pytest numpy
+    
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DBUILD_TESTS=ON \
+          -DBUILD_PYTHON_BINDINGS=ON \
+          -DBUILD_SHARED_LIBS=OFF
+      if: runner.os != 'windows-latest'
+    
+    - name: Configure CMake (Windows)
+      run: |
+        mkdir build
+        cd build
+        cmake .. -G "Visual Studio 16 2019" -A x64 \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DBUILD_TESTS=ON \
+          -DBUILD_PYTHON_BINDINGS=ON
+      if: runner.os == 'windows-latest'
+    
+    - name: Build
+      run: |
+        cd build
+        cmake --build . --config ${{ matrix.build_type }} --parallel 4
+      if: runner.os != 'windows-latest'
+    
+    - name: Build (Windows)
+      run: |
+        cd build
+        cmake --build . --config ${{ matrix.build_type }} --parallel 4
+      if: runner.os == 'windows-latest'
+    
+    - name: Run C++ Tests
+      run: |
+        cd build
+        ctest ${{ matrix.ctest_args }} --config ${{ matrix.build_type }}
+      if: matrix.build_type == 'Debug'
+    
+    - name: Run Python Tests
+      run: |
+        python -m pytest tests/ -v
+      if: always()
+
+  python-package:
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install scikit-build-core pybind11 pytest numpy build
+    
+    - name: Build Python package
+      run: |
+        python -m build
+    
+    - name: Test Python package
+      run: |
+        python -m pytest tests/ -v
+    
+    - name: Upload package artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: python-package
+        path: dist/
+
+  coverage:
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install scikit-build-core pybind11 pytest numpy coverage
+    
+    - name: Configure and build with coverage
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Coverage -DNLM_COVERAGE=ON
+        cmake --build . --parallel 4
+    
+    - name: Run coverage
+      run: |
+        cd build
+        ctest --output-on-failure
+        coverage report
+    
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: coverage-report
+        path: coverage.xml

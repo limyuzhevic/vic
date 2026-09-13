@@ -45,20 +45,61 @@ struct InterRegionConnection {
 };
 
 // Brain: The central coordinator of the neural system
+//
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
-
+//
+// Architecture:
+// - Phase 6: Full integration of all brain systems
+// - Spiking neural dynamics with LIF neurons
+// - Working memory, episodic memory, and associative memory systems
+// - Prediction system for sensory expectation and error
+// - Neural planner for action planning
+// - Concept formation for pattern abstraction
+// - Attentional selection for information prioritization
+// - Neuromodulation (dopamine, curiosity, novelty, prediction error)
+// - Developmental stages with structural plasticity
+//
+// Features:
+// - Event-driven spike processing
+// - Real-time plasticity rules (STDP, Hebbian)
+// - Synaptogenesis and pruning
+// - Memory consolidation and replay
+// - Checkpoint persistence
+//
 class Brain {
 public:
-    // Create brain with configuration
+    /**
+     * @brief Construct a new Brain object with configuration
+     * 
+     * @param config Configuration for brain parameters and settings
+     *              Must be a valid shared pointer, cannot be null
+     */
     explicit Brain(std::shared_ptr<Config> config);
     
+    /**
+     * @brief Destroy the Brain object
+     */
     ~Brain();
     
-    // Disable copying, enable moving
+    /**
+     * @brief Copy constructor (deleted - brain is move-only)
+     */
     Brain(const Brain&) = delete;
+    
+    /**
+     * @brief Copy assignment operator (deleted - brain is move-only)
+     */
     Brain& operator=(const Brain&) = delete;
+    
+    /**
+     * @brief Move constructor
+     */
     Brain(Brain&&) noexcept;
+    
+    /**
+     * @brief Move assignment operator
+     */
     Brain& operator=(Brain&&) noexcept;
     
     // Initialize brain with configuration

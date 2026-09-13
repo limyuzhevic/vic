@@ -18,20 +18,32 @@ struct Curiosity::Impl {
         , decayRate(0.05f) {}
 };
 
-Curiosity::Curiosity() : pImpl(new Impl) {}
+Curiosity::Curiosity() : pImpl(new Impl) {
+    if (!pImpl) {
+        throw std::runtime_error("Failed to allocate Curiosity::Impl");
+    }
+}
 
 Curiosity::~Curiosity() = default;
 
 void Curiosity::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_WARNING("Cannot initialize Curiosity with null brain pointer");
+        return;
+    }
     pImpl->brain = brain;
     NLM_LOG_INFO("Curiosity system initialized");
 }
 
 float Curiosity::getLevel() const {
-    return pImpl->level;
+    return pImpl->brain ? pImpl->level : 0.0f;
 }
 
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
+    if (!pImpl->brain) {
+        return;
+    }
+    
     // Curiosity increases with novelty and prediction error
     float target = pImpl->noveltyWeight * novelty + 
                    pImpl->predictionErrorWeight * predictionError;
@@ -44,7 +56,7 @@ void Curiosity::update(float novelty, float predictionError, TimestepDuration dt
 }
 
 float Curiosity::getExplorationDrive() const {
-    return pImpl->level;
+    return getLevel();
 }
 
 void Curiosity::setNoveltyWeight(float weight) {

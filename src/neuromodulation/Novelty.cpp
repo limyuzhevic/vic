@@ -16,17 +16,25 @@ struct Novelty::Impl {
     Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
 };
 
-Novelty::Novelty() : pImpl(new Impl) {}
+Novelty::Novelty() : pImpl(new Impl) {
+    if (!pImpl) {
+        throw std::runtime_error("Failed to allocate Novelty::Impl");
+    }
+}
 
 Novelty::~Novelty() = default;
 
 void Novelty::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_WARNING("Cannot initialize Novelty with null brain pointer");
+        return;
+    }
     pImpl->brain = brain;
     NLM_LOG_INFO("Novelty detection initialized");
 }
 
 float Novelty::getLevel() const {
-    return pImpl->level;
+    return pImpl->brain ? pImpl->level : 0.0f;
 }
 
 void Novelty::setLevel(float level) {
@@ -35,6 +43,10 @@ void Novelty::setLevel(float level) {
 
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
+    if (!pImpl->brain) {
+        return;
+    }
+    
     // Extract features from observations and compare
     // Simple implementation: just set to a placeholder
     pImpl->level = 1.0f;
@@ -43,6 +55,10 @@ void Novelty::detectNovelty(const Observation& observation,
 
 void Novelty::detectNovelty(const std::vector<float>& currentPattern,
                             const std::vector<float>& previousPattern) {
+    if (!pImpl->brain) {
+        return;
+    }
+    
     if (currentPattern.empty() || previousPattern.empty()) {
         pImpl->level = 0.0f;
         return;
