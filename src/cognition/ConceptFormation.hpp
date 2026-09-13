@@ -4,8 +4,8 @@
 #include "../brain/Brain.hpp"
 #include <vector>
 #include <memory>
-#include <functional>
 #include <string>
+#include <algorithm>
 
 namespace nlm {
 
@@ -84,9 +84,9 @@ public:
     // Returns concept ID if this experience belongs to an existing concept,
     // or 0 if it's too early to tell, or new concept ID if novel
     size_t presentExperience(const std::vector<float>& pattern,
-                            const std::vector<float>& features,
-                            float reward,
-                            SimulationStep currentTime);
+                             const std::vector<float>& features,
+                             float reward,
+                             SimulationStep currentTime);
 
     // Get the concept that best matches a pattern
     size_t getMatchingConcept(const std::vector<float>& pattern,
@@ -138,6 +138,9 @@ public:
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
 
+    // Access concept observation counts for stability tracking
+    const std::vector<size_t>& getConceptObservationCounts() const { return conceptObservationCounts_; }
+
 private:
     // Create new concept from pattern
     size_t createConcept(const std::vector<float>& pattern,
@@ -155,117 +158,13 @@ private:
 
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
+    std::vector<size_t> conceptObservationCounts_;  // Track observations per concept
     size_t nextConceptId_;
     
     // Parameters
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable
     size_t stabilityWindow_;    // How many observations to consider for stability
-};
-
-// SpatialRepresentation: Learns spatial relationships from experience
-// NOT a map with coordinates - encodes spatial relationships in neural patterns
-//
-// Key mechanisms:
-// - Place neurons form through spatial exploration
-// - Spatial relationships encoded in synaptic connectivity
-// - Path integration through dead reckoning
-// - Landmark associations
-
-class SpatialRepresentation {
-public:
-    SpatialRepresentation();
-    ~SpatialRepresentation();
-
-    void initialize(Brain* brain);
-
-    // Record current position experience
-    void recordPosition(float x, float y, const std::vector<float>& sensoryCues);
-
-    // Get predicted position based on path integration
-    std::pair<float, float> getPredictedPosition() const;
-
-    // Update position estimate based on movement
-    void integrateMovement(float dx, float dy);
-
-    // Get position neuron activation for a given position
-    float getPositionActivation(float x, float y) const;
-
-    // Find place neurons near a position
-    std::vector<NeuronId> getPlaceNeuronsNear(float x, float y, float radius) const;
-
-    // Get grid spacing (if grid cells have formed)
-    float getGridSpacing() const { return gridSpacing_; }
-
-    // Clear spatial representations
-    void clear();
-
-    // Have place cells formed?
-    bool hasPlaceCells() const { return !placeCells_.empty(); }
-
-private:
-    struct PlaceCell {
-        NeuronId neuron;
-        float x;
-        float y;
-        float fieldRadius;
-        float activation;
-    };
-
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    std::vector<PlaceCell> placeCells_;
-    float currentX_;
-    float currentY_;
-    float gridSpacing_;
-    std::vector<float> lastSensoryCue_;
-};
-
-// TemporalRelation: Learns temporal relationships (before, after, sequence)
-// NOT symbolic timestamps - encodes temporal order in neural activity
-
-class TemporalRelation {
-public:
-    TemporalRelation();
-    ~TemporalRelation();
-
-    void initialize(Brain* brain);
-
-    // Record that event A was followed by event B
-    void recordSequence(const std::vector<float>& eventA,
-                      const std::vector<float>& eventB,
-                      float reward);
-
-    // Given event A, predict what comes next
-    std::vector<float> predictNext(const std::vector<float>& eventA) const;
-
-    // Given event B, predict what came before
-    std::vector<float> predictPrevious(const std::vector<float>& eventB) const;
-
-    // Get confidence in prediction
-    float getPredictionConfidence(const std::vector<float>& event) const;
-
-    // Get sequence length
-    size_t getSequenceLength() const { return sequences_.size(); }
-
-    // Clear sequences
-    void clear();
-
-private:
-    struct SequenceLink {
-        std::vector<float> fromEvent;
-        std::vector<float> toEvent;
-        float strength;
-        size_t observationCount;
-    };
-
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    std::vector<SequenceLink> sequences_;
 };
 
 } // namespace nlm

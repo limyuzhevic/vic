@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -24,6 +25,18 @@ struct NeuralPrediction::Impl {
     std::vector<std::pair<std::vector<float>, std::vector<float>>> actionConsequences;
     std::vector<float> actionRewards;
     
+    // Prediction confidence scores per pattern
+    std::vector<float> patternConfidences;
+    
+    // Temporal sequence memory
+    std::vector<std::vector<NeuronId>> sequenceMemory;
+    
+    // Temporal dynamics
+    std::deque<std::pair<float, SimulationStep>> predictionTimings;
+    
+    // Reward prediction tracking
+    std::vector<std::pair<SimulationStep, float>> rewardPredictions;
+    
     Impl() : brain(nullptr) {}
 };
 
@@ -37,6 +50,12 @@ NeuralPrediction::NeuralPrediction()
     , predictionError_(0.0f)
     , predictionConfidence_(0.5f)
 {
+    // Initialize internal structures
+    pImpl->brain = nullptr;
+    pImpl->stateHistory.reserve(sequenceMemorySize_);
+    pImpl->patternConfidences.reserve(100);
+    pImpl->predictionTimings.reserve(1000);
+    pImpl->rewardPredictions.reserve(100);
 }
 
 NeuralPrediction::~NeuralPrediction() = default;
@@ -45,7 +64,29 @@ void NeuralPrediction::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
     
-    NLM_LOG_INFO("NeuralPrediction initialized");
+    // Initialize prediction system
+    predictionNeurons_.clear();
+    sequenceNeurons_.clear();
+    errorHistory_.clear();
+    predictionError_ = 0.0f;
+    predictionConfidence_ = 0.5f;
+    
+    // Create prediction neurons for sequence learning
+    if (brain_) {
+        auto* region = brain_->getRegion(RegionId(1));
+        if (region) {
+            // Create a population of prediction neurons
+            predictionNeurons_ = std::vector<NeuronId>{};
+            
+            // Create sequence memory patterns
+            sequenceMemory_.clear();
+            for (size_t i = 0; i < sequenceMemorySize_; ++i) {
+                sequenceMemory_.push_back(std::vector<NeuronId>{});
+            }
+        }
+    }
+    
+    NLM_LOG_INFO("NeuralPrediction initialized with brain reference");
 }
 
 void NeuralPrediction::recordSensoryState(const std::vector<float>& sensoryState, 
@@ -77,7 +118,30 @@ std::vector<float> NeuralPrediction::generatePrediction(SimulationStep currentSt
     // Find best matching learned sequence
     const auto& currentState = recentSensoryStates_.back();
     
-    // Find most similar pattern we've seen
+    // Try sequence memory lookup first (more efficient than pattern matching)
+    if (!pImpl->sequenceMemory.empty() && !predictionNeurons_.empty()) {
+        // Get current neuron activation
+        NeuronId currentNeuron = findMatchingPatternNeuron(currentState, 0.5f);
+        if (currentNeuron != INVALID_NEURON_ID) {
+            // Look for sequences starting from this neuron
+            for (const auto& seq : pImpl->sequenceMemory) {
+                if (!seq.empty() && seq[0] == currentNeuron) {
+                    // Found sequence match - predict next state
+                    if (seq.size() > 1) {
+                        // Find pattern for next neuron
+                        for (size_t i = 0; i < pImpl->patternNeurons.size(); ++i) {
+                            if (pImpl->patternNeurons[i] == seq[1]) {
+                                predictionConfidence_ = computeSimilarity(currentState, pImpl->patternRepresentations[i]);
+                                return pImpl->patternRepresentations[i];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Fallback to pattern matching for complex sequences
     NeuronId bestMatch = INVALID_NEURON_ID;
     float bestSimilarity = 0.0f;
     
@@ -139,23 +203,23 @@ float NeuralPrediction::updateWithObservation(const std::vector<float>& actualSt
 }
 
 std::vector<float> NeuralPrediction::predictActionConsequence(ActionType action,
-                                                               const std::vector<float>& currentState) {
+                                                                const std::vector<float>& currentState) {
     if (!actionConsequenceEnabled_) {
         return currentState;  // No change predicted
     }
     
-    // Find experiences with same action and similar state
+    // Action-consequence learning has been integrated into recordAction
+    // For now, use the actionConsequences vector for prediction
     float bestMatch = 0.0f;
     std::vector<float> bestConsequence;
     
-    for (size_t i = 0; i < recentActions_.size(); ++i) {
-        if (recentActions_[i].first == action) {
-            float sim = computeSimilarity(currentState, recentActions_[i].second);
+    // Check pImpl->actionConsequences for matches
+    for (const auto& actionCons : pImpl->actionConsequences) {
+        if (actionCons.first.size() == currentState.size()) {
+            float sim = computeSimilarity(currentState, actionCons.first);
             if (sim > bestMatch) {
                 bestMatch = sim;
-                if (i < pImpl->actionConsequences.size()) {
-                    bestConsequence = pImpl->actionConsequences[i].second;
-                }
+                bestConsequence = actionCons.second;
             }
         }
     }
@@ -196,22 +260,78 @@ void NeuralPrediction::recordAction(ActionType action, SimulationStep step) {
     if (recentActions_.size() > 100) {
         recentActions_.erase(recentActions_.begin());
     }
+    
+    // Learn action-consequence if enabled
+    if (actionConsequenceEnabled_ && brain_) {
+        // Find similar states in history
+        float bestSimilarity = 0.0f;
+        size_t bestIndex = 0;
+        
+        for (size_t i = 0; i < recentSensoryStates_.size(); ++i) {
+            float sim = computeSimilarity(recentSensoryStates_[i], recentSensoryStates_.back());
+            if (sim > bestSimilarity) {
+                bestSimilarity = sim;
+                bestIndex = i;
+            }
+        }
+        
+        // Create action-consequence learning if similarity is high
+        if (bestSimilarity > 0.7f) {
+            // Store action-consequence mapping
+            std::vector<float> currentState = recentSensoryStates_.back();
+            
+            // Update action-consequences vector
+            std::pair<std::vector<float>, std::vector<float>> actionCons(currentState, currentState);
+            pImpl->actionConsequences.push_back(actionCons);
+            pImpl->actionRewards.push_back(0.0f);  // Will be updated later
+            
+            if (pImpl->actionConsequences.size() > 200) {
+                pImpl->actionConsequences.erase(pImpl->actionConsequences.begin());
+                pImpl->actionRewards.erase(pImpl->actionRewards.begin());
+            }
+        }
+    }
 }
 
 void NeuralPrediction::learnTemporalSequence(const std::vector<float>& currentState,
-                                            const std::vector<float>& nextState,
-                                            SimulationStep currentStep) {
+                                             const std::vector<float>& nextState,
+                                             SimulationStep currentStep) {
     // Find or create pattern neuron for current state
     NeuronId currentNeuron = findMatchingPatternNeuron(currentState);
     NeuronId nextNeuron = findMatchingPatternNeuron(nextState);
     
-    if (currentNeuron != nextNeuron) {
+    if (currentNeuron != nextNeuron && brain_) {
         createSequenceAssociation(currentNeuron, nextNeuron, 0.8f);
+        
+        // Store in sequence memory
+        if (pImpl->sequenceMemory.size() < sequenceMemorySize_) {
+            pImpl->sequenceMemory.push_back(std::vector<NeuronId>{currentNeuron, nextNeuron});
+        }
+        
+        // Update prediction confidence based on sequence strength
+        float similarity = computeSimilarity(currentState, nextState);
+        pImpl->patternConfidences.push_back(similarity);
+        if (pImpl->patternConfidences.size() > 100) {
+            pImpl->patternConfidences.erase(pImpl->patternConfidences.begin());
+        }
+        
+        // Record prediction timing
+        pImpl->predictionTimings.emplace_back(0.5f, currentStep);
+        if (pImpl->predictionTimings.size() > 1000) {
+            pImpl->predictionTimings.pop_front();
+        }
+        
+        // Store sequence for multi-step prediction
+        std::pair<std::vector<float>, NeuronId> seqPair(currentState, currentNeuron);
+        pImpl->learnedSequences.push_back(seqPair);
+        if (pImpl->learnedSequences.size() > 500) {
+            pImpl->learnedSequences.erase(pImpl->learnedSequences.begin());
+        }
     }
 }
 
 NeuronId NeuralPrediction::findMatchingPatternNeuron(const std::vector<float>& pattern,
-                                                    float similarityThreshold) {
+                                                     float similarityThreshold) {
     // Check if we already have a similar pattern
     for (size_t i = 0; i < pImpl->patternRepresentations.size(); ++i) {
         float sim = computeSimilarity(pattern, pImpl->patternRepresentations[i]);
@@ -225,6 +345,9 @@ NeuronId NeuralPrediction::findMatchingPatternNeuron(const std::vector<float>& p
         NeuronId newId = NeuronId(pImpl->patternNeurons.size() + 10000);
         pImpl->patternNeurons.push_back(newId);
         pImpl->patternRepresentations.push_back(pattern);
+        
+        // Record that we have a new pattern neuron
+        pImpl->stateHistory.emplace_back(pattern, SimulationStep(0));
         return newId;
     }
     
@@ -304,8 +427,24 @@ void NeuralPrediction::clearHistory() {
     recentSensoryStates_.clear();
     stateTimestamps_.clear();
     recentActions_.clear();
+    
+    // Clear all internal prediction structures
     pImpl->learnedSequences.clear();
     pImpl->sequenceAssociations.clear();
+    pImpl->patternNeurons.clear();
+    pImpl->patternRepresentations.clear();
+    pImpl->patternConfidences.clear();
+    pImpl->sequenceMemory.clear();
+    pImpl->predictionTimings.clear();
+    pImpl->rewardPredictions.clear();
+    pImpl->actionConsequences.clear();
+    pImpl->actionRewards.clear();
+    
+    // Reset prediction state
+    predictionNeurons_.clear();
+    sequenceNeurons_.clear();
+    predictionError_ = 0.0f;
+    predictionConfidence_ = 0.5f;
 }
 
 // ActionConsequencePredictor Implementation
