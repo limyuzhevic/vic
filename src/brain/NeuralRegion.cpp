@@ -245,7 +245,10 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
     auto neurons = getAllNeurons();
     size_t neuronCount = neurons.size();
     
-    // Create random connections
+    // O(N²) optimization: For large networks, use sparse connectivity
+    // Current implementation creates all possible connections, which is inefficient
+    // TODO: Implement sparse connectivity using adjacency lists or similar
+    
     for (size_t i = 0; i < neuronCount; ++i) {
         Neuron* preNeuron = neurons[i];
         NeuronType preType = preNeuron->getType();
@@ -258,7 +261,7 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
             
             Neuron* postNeuron = neurons[j];
             
-            // Probabilistic connection
+            // Probabilistic connection - inefficient O(N²) implementation
             if (!rng.bernoulli(connectionProbability)) continue;
             
             // Determine synapse type based on pre-synaptic neuron type

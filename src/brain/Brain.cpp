@@ -677,8 +677,11 @@ float Brain::getExcitationInhibitionRatio() const {
     
     if (totalInhibitory > 0.0f) {
         return totalExcitatory / totalInhibitory;
+    } else if (totalExcitatory > 0.0f) {
+        return std::numeric_limits<float>::infinity();
+    } else {
+        return 0.0f;
     }
-    return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
 }
 
 size_t Brain::getTotalSpikeCount() const {
