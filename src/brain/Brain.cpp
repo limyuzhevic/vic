@@ -404,6 +404,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Update working memory with sensory patterns
+        if (pImpl->predictionSystem) {
+            auto& sensoryPattern = pImpl->predictionSystem->getSensoryPattern();
+            if (!sensoryPattern.empty()) {
+                pImpl->workingMemory->store(sensoryPattern, 0.8f);
+            }
+        }
+        
+        // Integrate with attention system - process memory neurons through attention
+        if (pImpl->attention && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            // Apply attentional focus to working memory neurons
+            for (NeuronId neuron : memoryNeurons) {
+                // Apply attention to memory neurons for selective retention
+                pImpl->attention->applyBottomUpSalience(neuron, 0.5f);
+                if (pImpl->workingMemory->isWinning(neuron)) {
+                    pImpl->attention->applyTopDownBias(neuron, 0.3f);
+                }
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -502,8 +523,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
+            // Store reward in episode (duplicate line removed)
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Update associative memory from this episode
+            if (pImpl->associativeMemory && !episode.activeNeurons.empty()) {
+                // Create pattern from active neurons for associative learning
+                std::vector<float> activePattern;
+                for (size_t i = 0; i < episode.activeNeurons.size(); ++i) {
+                    activePattern.push_back(episode.neuronActivations[i]);
+                }
+                
+                // Associate with reward level
+                std::vector<float> rewardPattern(episode.activeNeurons.size(), episode.reward);
+                pImpl->associativeMemory->associateFromExperience(episode);
+            }
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
