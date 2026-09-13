@@ -206,18 +206,29 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // dV/dt = (V_rest - V)/tau + I/C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
     
+    // Define LIF parameters
+    float tau = Impl::TIME_CONSTANT;  // ms
+    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    
+    // Prevent division by zero - tau must be > 0 for LIF stability
+    if (tau <= 0.0f) {
+        NLM_LOG_ERROR("Invalid time constant tau=" + std::to_string(tau) + ". Must be > 0 for LIF stability.");
+        return false;
+    }
+    
+    // Also check membrane capacitance
+    if (C <= 0.0f) {
+        NLM_LOG_ERROR("Invalid membrane capacitance C=" + std::to_string(C) + ". Must be > 0.");
+        return false;
+    }
+    
+    // Include leak conductance in time constant for biological realism
+    float effective_tau = tau * (1.0f + pImpl->state.leakConductance / 10.0f);
+    
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
-    
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
-    
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);

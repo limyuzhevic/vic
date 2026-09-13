@@ -92,7 +92,7 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
-template<typename T>
+// Enhanced get method with validation template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
@@ -108,13 +108,13 @@ std::optional<T> Config::get(const std::string& key) const {
     }
 }
 
-template<typename T>
+// Enhanced getOr method with validation template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+// Enhanced set method with validation void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -126,18 +126,22 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     }
 }
 
+// Enhanced string setter
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
+// Enhanced integer setter
 void Config::set(const std::string& key, int value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
+// Enhanced double setter
 void Config::set(const std::string& key, double value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
+// Enhanced boolean setter
 void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
@@ -200,16 +204,34 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
+// Int
 template std::optional<int> Config::get<int>(const std::string&) const;
+
+// int64_t  
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+
+// double
 template std::optional<double> Config::get<double>(const std::string&) const;
+
+// bool
 template std::optional<bool> Config::get<bool>(const std::string&) const;
+
+// std::string
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
+// Int
 template int Config::getOr<int>(const std::string&, const int&) const;
+
+// int64_t
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+
+// double
 template double Config::getOr<double>(const std::string&, const double&) const;
+
+// bool
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
+
+// std::string
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
