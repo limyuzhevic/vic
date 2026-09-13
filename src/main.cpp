@@ -17,7 +17,7 @@
 #include "sensory/SensoryInput.hpp"
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
+#include "experiments/LearningExperiment.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,6 +25,9 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <stdexcept>
+#include <cassert>
+#include <algorithm>
 
 using namespace nlm;
 

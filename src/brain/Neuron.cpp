@@ -1,7 +1,11 @@
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/Config/Config.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
+#include <cassert>
 
 namespace nlm {
 
@@ -220,6 +224,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
+    // Convert timestep from seconds to milliseconds for consistency with tau units
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)

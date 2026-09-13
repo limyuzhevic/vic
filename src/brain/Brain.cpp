@@ -22,6 +22,33 @@
 
 namespace nlm {
 
+#include "Brain.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/SimulationClock/SimulationClock.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../motor/Action.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../performance/CheckpointSystem.hpp"
+#include <fstream>
+#include <algorithm>
+#include <cmath>
+#include <sstream>
+#include <stdexcept>
+#include <cassert>
+#include <iostream>
+
+namespace nlm {
+
 struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;

@@ -1,7 +1,12 @@
 #include "Synapse.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/Config/Config.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
+#include <cassert>
+#include <iostream>
 
 namespace nlm {
 
