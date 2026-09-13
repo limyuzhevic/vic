@@ -1,3 +1,23 @@
+// ============================================================================
+// NLM Python Bindings Documentation
+// ============================================================================
+// 
+// This file contains the pybind11 bindings that expose the NLM C++ brain simulation
+// framework to Python. It provides a comprehensive API for creating and simulating
+// artificial brains with biologically-inspired neural dynamics.
+// 
+// The bindings expose:
+// 1. Core data types (NeuronId, SynapseId, etc.)
+// 2. Enumerations (NeuronType, SynapseType, DevelopmentalStage, etc.)
+// 3. Main classes (Brain, Config, AgentBrain, SimpleWorld)
+// 4. Sensory input classes (Vision, Audio, SensoryInput)
+// 5. Motor output classes (Action, MotorCommand, WorldObject)
+// 6. State classes (AgentBody, SensoryPercept, ActionResult)
+// 7. Factory functions for creating brain components
+// 
+// The API is designed to mirror the C++ interface while providing Python-friendly
+// interfaces with automatic memory management via shared_ptr.
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
@@ -5,16 +25,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -27,6 +37,7 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
+    // Register exception types for Python
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")

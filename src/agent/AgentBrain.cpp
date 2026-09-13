@@ -28,6 +28,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
+                        if (!n) continue; // Safety check for null pointer
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
@@ -44,6 +45,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
+                        if (!n) continue; // Safety check for null pointer
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
@@ -64,18 +66,34 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    // Validate world parameter
+    if (world.getVisionWidth() == 0 || world.getVisionHeight() == 0) {
+        NLM_LOG_ERROR("Invalid world dimensions: visionWidth = " + 
+                     std::to_string(world.getVisionWidth()) + 
+                     ", visionHeight = " + std::to_string(world.getVisionHeight()));
+        return;
+    }
+    
+    // Initialize with memory-safe allocation
+    size_t visionSize = world.getVisionWidth() * world.getVisionHeight();
+    previousVision_.resize(visionSize, 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Add validation for sensory neuron groups
+    size_t totalSensoryNeurons = sensoryVision_.size() + sensoryTouch_.size() +
+                                sensoryInternal_.size() + sensoryProprioception_.size();
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons, " +
+                 std::to_string(sensoryProprioception_.size()) + " proprioception sensory neurons");
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
     // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
+    // Use size_t for consistency
     return 256 + 8 + 4 + 6;
 }
 
@@ -236,7 +254,12 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
+    // Validate inputs - reward and prediction should be reasonable values
     if (!brain_ || !rewardModulationEnabled_) return;
+    
+    // Clamp reward and prediction to reasonable ranges
+    reward = std::clamp(reward, -10.0f, 10.0f);
+    predictedReward = std::clamp(predictedReward, -10.0f, 10.0f);
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -244,20 +267,33 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
+    // Clamp expected reward
+    expectedReward_ = std::clamp(expectedReward_, -5.0f, 5.0f);
+    
     // Dopamine-like signal (based on prediction error)
     dopamineLevel_ = predictionError_;
     
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
+    // Validate plasticity modifier
+    if (plasticityModifier_ < 0.1f) plasticityModifier_ = 0.1f;
+    if (plasticityModifier_ > 2.0f) plasticityModifier_ = 2.0f;
+    
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
+            if (!syn) continue;  // Safety check
+            
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
                 // Apply reward-modulated weight change
                 float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                
+                // Clamp delta to prevent excessive changes
+                delta = std::clamp(delta, -0.1f, 0.1f);
+                
                 syn->addToWeight(delta);
                 
                 // Decay eligibility trace

@@ -16,6 +16,7 @@ SensoryPercept::SensoryPercept()
 
 std::vector<float> SensoryPercept::getAllSignals() const {
     std::vector<float> all;
+    all.reserve(vision_.size() + touch_.size() + internal_.size() + proprioception_.size() + audio_.size());
     
     // Vision (flattened)
     all.insert(all.end(), vision_.begin(), vision_.end());
