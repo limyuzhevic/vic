@@ -19,6 +19,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , plannedAction_(MotorCommand::Wait)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -79,13 +80,10 @@ size_t AgentBrain::getSensoryInputSize() const {
     return 256 + 8 + 4 + 6;
 }
 
-size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
-}
-
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
+    
+    // ===== SENSORY INPUT TO NEURAL INJECTION =====
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -147,10 +145,124 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // ========= INTEGRATE WITH COGNITIVE SYSTEMS =========
+    
+    // Extract percept data for brain systems
+    std::vector<float> perceptData;
+    
+    // Combine all sensory modalities
+    const auto& visionData = percept.getVision();
+    const auto& touchData = percept.getTouch();
+    const auto& internalData = percept.getInternal();
+    const auto& proprioceptionData = percept.getProprioception();
+    
+    // Vision (256 values)
+    perceptData.insert(perceptData.end(), visionData.begin(), visionData.end());
+    
+    // Touch (8 values) 
+    perceptData.insert(perceptData.end(), touchData.begin(), touchData.end());
+    
+    // Internal (4 values)
+    perceptData.insert(perceptData.end(), internalData.begin(), internalData.end());
+    
+    // Proprioception (6 values)
+    perceptData.insert(perceptData.end(), proprioceptionData.begin(), proprioceptionData.end());
+    
+    // ===== INTEGRATION: CONCEPT FORMATION =====
+    if (brain_ && brain_->getConceptFormation()) {
+        brain_->getConceptFormation()->presentExperience(perceptData, {}, 0.0f, 0);
+    }
+    
+    // ===== INTEGRATION: PREDICTION SYSTEM =====
+    if (brain_ && brain_->getPredictionSystem()) {
+        brain_->getPredictionSystem()->updatePrediction(perceptData);
+    }
+    
+    // ===== INTEGRATION: ATTENTION SYSTEM =====
+    if (brain_ && brain_->getAttention()) {
+        // Get current working memory content
+        std::vector<float> memoryPattern;
+        if (brain_->getWorkingMemory()) {
+            memoryPattern = brain_->getWorkingMemory()->retrieve();
+        }
+        
+        // Use working memory and perception as attention competitors
+        std::vector<NeuronId> competitors;
+        
+        // Add neurons from working memory that have significant activity
+        if (!memoryPattern.empty()) {
+            for (size_t i = 0; i < std::min(memoryPattern.size(), 100u); ++i) {
+                if (memoryPattern[i] > 0.1f) {
+                    // Create a neuron ID for working memory slot
+                    competitors.push_back(NeuronId(i + 10000));  // Offset to distinguish from real neurons
+                }
+            }
+        }
+        
+        // Add sensory neurons that were strongly activated
+        for (size_t i = 0; i < std::min(vision.size(), 256u); ++i) {
+            if (vision[i] > 0.5f) {
+                competitors.push_back(NeuronId(i));  // Use actual neuron ID from vision mapping
+            }
+        }
+        
+        // Process competition to select attention winners
+        std::vector<NeuronId> winners = brain_->getAttention()->processCompetition(competitors, 0.5f);
+        
+        // Apply attention to winners (focus processing on them)
+        for (const NeuronId& winner : winners) {
+            brain_->getAttention()->applyTopDownBias(winner, 1.0f);
+        }
+    }
+    
+    // ===== INTEGRATION: NEURAL PLANNER =====
+    if (brain_ && brain_->getPlanner()) {
+        // Get current state from brain
+        std::vector<float> currentState;
+        
+        // Get motor neuron activity as state representation
+        float totalActivity = 0.0f;
+        for (Neuron* n : motorForward_) {
+            totalActivity += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+        }
+        for (Neuron* n : motorBackward_) {
+            totalActivity += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+        }
+        
+        // Convert to normalized state vector
+        currentState.push_back(totalActivity / 10.0f);
+        
+        // Plan next action based on current state and goal
+        ActionType plannedAction = brain_->getPlanner()->planAction(currentState);
+        
+        // Store planned action for action selection
+        plannedAction_ = plannedAction;
+    }
+    
+    // ===== INTEGRATION: SELF MODEL =====
+    if (brain_ && brain_->getSelfModel()) {
+        // Update self model based on perceptual input
+        // SelfModel would need processPercept method or similar
+        // brain_->getSelfModel()->processPercept(perceptData);
+    }
+    
+    // ===== INTEGRATION: SOCIAL LEARNING =====
+    if (brain_ && brain_->getSocialLearning()) {
+        // Update social learning based on perceptual input
+        // SocialLearning would need processPercept method or similar
+        // brain_->getSocialLearning()->processPercept(perceptData);
+    }
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
+    
+    // First try planned action if available
+    if (plannedAction_ != MotorCommand::Wait) {
+        plannedAction_ = MotorCommand::Wait;
+        return plannedAction_;
+    }
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
@@ -247,10 +359,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Dopamine-like signal (based on prediction error)
     dopamineLevel_ = predictionError_;
     
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
-    
-    // Apply to all synapses with eligibility traces
+    // Apply reward-modulated plasticity to synapses
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
             float eligibility = syn->getEligibilityTrace();
@@ -342,6 +451,7 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    plannedAction_ = MotorCommand::Wait;
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
