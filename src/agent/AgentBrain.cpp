@@ -1,11 +1,12 @@
 #include "AgentBrain.hpp"
+#include "Action.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
 
 namespace nlm {
 
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
+    AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
@@ -19,6 +20,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , conceptFormation_(nullptr)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -72,6 +74,10 @@ void AgentBrain::initialize(const SimpleWorld& world) {
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    
+    // Initialize concept formation
+    conceptFormation_ = std::make_unique<ConceptFormation>();
+    conceptFormation_->initialize(brain_.get());
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -147,16 +153,87 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // Concept formation - convert sensory percept to pattern/features
+    if (conceptFormation_) {
+        // Convert to pattern for concept formation
+        std::vector<float> pattern = percept.getAllSignals();
+        
+        // Features could be derived from the percept (e.g., just pass the pattern as features for now)
+        std::vector<float> features = pattern;
+        
+        // For now, use a simple reward signal (could come from environment later)
+        float reward = 0.0f;
+        
+        // Present experience to ConceptFormation system
+        SimulationStep currentTime = brain_->getTotalSpikeCount();
+        size_t conceptId = conceptFormation_->presentExperience(pattern, features, reward, currentTime);
+        
+        if (conceptId > 0) {
+            NLM_LOG_INFO("AgentBrain: ConceptFormation formed new concept " + std::to_string(conceptId));
+        }
+    }
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // Try to integrate NeuralPlanner for action selection
     MotorCommand decoded = decodeFromMotorNeurons();
     
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+    // Get NeuralPlanner from brain
+    auto* planner = brain_->getPlanner();
+    if (planner) {
+        // Convert current neural activity to state vector for planning
+        std::vector<float> currentState;
+        
+        // Get working memory content as state
+        if (brain_->getWorkingMemory()) {
+            auto memoryNeurons = brain_->getWorkingMemory()->getMemoryNeurons();
+            currentState.reserve(memoryNeurons.size());
+            for (NeuronId neuronId : memoryNeurons) {
+                float activation = brain_->getWorkingMemory()->getNeuronActivation(neuronId);
+                currentState.push_back(activation);
+            }
+        }
+        
+        // Add neuromodulation levels to state for richer planning context
+        float stateWithMod = predictionError_ + (dopamineLevel_ * 0.1f) + (curiosityLevel_ * 0.1f) + 
+                           (noveltyLevel_ * 0.05f) + (expectedReward_ * 0.2f);
+        currentState.push_back(stateWithMod);
+        
+        // Include developmental stage as part of state (0=initial, 1=critical, 2=maturation, 3=adult)
+        DevelopmentalStage stage = brain_->getDevelopmentalStage();
+        currentState.push_back(static_cast<float>(stage) / 3.0f);
+        
+        // Add current motor activity to state
+        float motorActivity = (std::max({getFromActivity(motorForward_), getFromActivity(motorBackward_),
+                                       getFromActivity(motorTurnLeft_), getFromActivity(motorTurnRight_),
+                                       getFromActivity(motorInteract_), getFromActivity(motorWait_)}));
+        currentState.push_back(motorActivity);
+        
+        // If working memory is empty, use a simple state
+        if (currentState.empty()) {
+            currentState.resize(10, 0.5f);  // Default neutral state
+        }
+        
+        // Use NeuralPlanner to suggest an action based on state and prediction error
+        ActionType plannedAction = planner->planAction(currentState, expectedReward_);
+        
+        // Convert ActionType to MotorCommand
+        MotorCommand plannedMotorCmd = ActionTypeToMotorCommand(plannedAction);
+        
+        // Apply curiosity-based exploration (still active)
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            decoded = selectWithCuriosity(plannedMotorCmd);
+        } else {
+            decoded = plannedMotorCmd;
+        }
+    } else {
+        // Apply curiosity-based exploration if no planner
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            decoded = selectWithCuriosity(decoded);
+        }
     }
     
     return decoded;
@@ -330,11 +407,18 @@ float AgentBrain::getNoveltyLevel() const {
     return noveltyLevel_;
 }
 
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
-}
-
 void AgentBrain::reset() {
+    // Clear concept formation
+    if (conceptFormation_) {
+        conceptFormation_->clear();
+    }
+    
+    // Reset brain state
+    if (brain_) {
+        brain_->reset();
+    }
+    
+    // Reset sensory state
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
@@ -343,8 +427,5 @@ void AgentBrain::reset() {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    NLM_LOG_INFO("AgentBrain reset complete");
 }
-
-} // namespace nlm

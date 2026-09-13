@@ -9,6 +9,8 @@
 
 namespace nlm {
 
+class ConceptFormation;
+
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
@@ -57,6 +59,11 @@ public:
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    
+    // Convert ActionType to MotorCommand
+    static MotorCommand ActionTypeToMotorCommand(ActionType action);
+    
+    ConceptFormation* getConceptFormation() { return conceptFormation_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -112,6 +119,9 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Concept formation
+    std::unique_ptr<ConceptFormation> conceptFormation_;
 };
 
 } // namespace nlm
