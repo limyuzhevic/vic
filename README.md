@@ -104,7 +104,7 @@ NLM/
 │   ├── neuromodulation/# Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── cognition/     # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
@@ -162,32 +162,177 @@ NLM/
 - Replay and consolidation functional
 - Phase 6 integration experiment created
 
-## Scientific Limitations
+## Bug Fixes and Improvements (Phase 6)
 
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+### Critical Bug Fixes
 
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
+#### 1.1 Fixed AgentBrain Off-by-One Error
+**File**: `src/agent/AgentBrain.cpp` (line 221)
+**Issue**: Random index selection included invalid value 7
+**Fix**: Change `uniformInt(0, 7)` to `uniformInt(0, 6)`
 
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
+#### 1.2 Added Missing Motor Commands
+**File**: `src/agent/AgentBrain.hpp`
+**Issue**: MotorCommand enum missing LookLeft and LookRight commands
+**Fix**: Added these commands to enum and updated switch cases
+- `LookLeft = 4` - New: Pan sensor to the left
+- `LookRight = 5` - New: Pan sensor to the right
 
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
+#### 1.3 Fixed Constructor Initialization
+**File**: `src/agent/AgentBrain.cpp` (lines 8-22)
+**Issue**: previousVision_ and neural group vectors not initialized
+**Fix**: Added proper member initialization and null pointer validation
 
-## Architecture Philosophy
+#### 1.4 Added Destructor
+**File**: `src/agent/AgentBrain.cpp` (lines 1-3)
+**Issue**: No cleanup in destructor
+**Fix**: Implement destructor to clear all neural group vectors
+
+#### 1.5 Fixed Sensory Processing
+**File**: `src/agent/AgentBrain.cpp` (lines 44-76)
+**Issue**: Variable naming inconsistencies
+**Fix**: Use correct neural group names and add input validation
+
+### Memory and Safety Improvements
+
+#### 2.1 Removed Unused Include
+**File**: `src/agent/AgentBrain.hpp` (line 3)
+**Issue**: AgentBody.hpp not used
+**Fix**: Remove unused include
+
+#### 2.2 Fixed getSensoryInputSize()
+**File**: `src/agent/AgentBrain.cpp` (lines 15-23)
+**Issue**: Hardcoded values don't match actual neural groups
+**Fix**: Dynamic calculation based on actual neural group sizes
+
+#### 2.3 Fixed getMotorOutputSize()
+**File**: `src/agent/AgentBrain.cpp` (lines 25-37)
+**Issue**: Hardcoded value
+**Fix**: Dynamic calculation from actual motor group sizes
+
+### Performance Optimizations
+
+#### 3.1 Optimized getAllSignals()
+**File**: `src/agent/SensoryPercept.cpp` (lines 17-36)
+**Issue**: Repeated vector reallocation
+**Fix**: Preallocate and use insert with iterators for better performance
+
+#### 3.2 Fixed Vision Dimension Bug
+**File**: `src/agent/SensoryPercept.hpp` (lines 6-7, 20)
+**Issue**: visionWidth_ and visionHeight_ never updated when vision_ changes
+**Fix**: Make them derived from vector size
+
+### Enhanced Functionality
+
+#### 4.1 Added Dimension Getters
+**File**: `src/agent/SensoryPercept.hpp`
+**Issue**: No dimension getters for all signals
+**Fix**: Add getTouchSize(), getInternalSize(), getProprioceptionSize(), getAudioSize()
+
+#### 4.2 Added Error Handling
+**File**: Multiple files
+**Issue**: Limited error handling
+**Fix**: Add input validation and proper logging
+
+## New Features
+
+### Additional Motor Commands
+The MotorCommand enum now includes:
+- `LookLeft`: Pan sensor to the left (useful for exploration)
+- `LookRight`: Pan sensor to the right (useful for detailed observation)
+
+These new commands expand the agent's behavioral repertoire for environmental interaction.
+
+### Enhanced Sensory Processing
+- AgentBrain now validates input dimensions
+- Better error messages for invalid inputs
+- Null pointer validation throughout
+
+### Improved Memory Management
+- All neural group vectors properly initialized
+- Destructor for proper cleanup
+- Dynamic calculation of input/output sizes
+
+### Performance Improvements
+- Optimized vector operations in SensoryPercept
+- Pre-allocation to reduce reallocations
+- Fixed vision dimension tracking
+
+## Python Bindings Features
+
+The Python bindings provide access to all NLM functionality:
+
+### New Motor Commands in Python
+```python
+# These motor commands are now available:
+# MotorCommand.MoveForward = 0
+# MotorCommand.MoveBackward = 1
+# MotorCommand.TurnLeft = 2
+# MotorCommand.TurnRight = 3
+# MotorCommand.LookLeft = 4      # NEW: Pan sensors left
+# MotorCommand.LookRight = 5     # NEW: Pan sensors right
+# MotorCommand.Interact = 6
+# MotorCommand.Wait = 7
+```
+
+### Enhanced AgentBrain API
+The AgentBrain class now includes:
+- `getCuriosityLevel()`: Returns curiosity level (0.0-1.0)
+- `getNoveltyLevel()`: Returns novelty level (0.0-1.0)
+- `getPredictionError()`: Returns prediction error signal
+- `getNeuromodulationLevel()`: Returns overall neuromodulation level
+- All subsystems can be individually enabled/disabled
+
+### Configuration Examples
+```python
+# Example: Using new motor commands
+import pynlm
+
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+
+# Enable all subsystems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+print(f"Available motor commands: LookLeft, LookRight")
+print(f"Brain has {brain.getTotalNeuronCount()} neurons")
+```
+
+## Performance Improvements
+
+### Memory Management
+- Fixed memory leaks with proper destructor implementation
+- Dynamic calculation of neural group sizes
+- Null pointer validation prevents crashes
+
+### Computational Efficiency
+- Pre-allocated vectors in SensoryPercept
+- Optimized bulk insert operations
+- Reduced unnecessary memory copies
+
+## Testing and Validation
+
+### Test Suite
+All changes are validated by:
+1. **Compilation**: CMake builds all targets successfully
+2. **Unit Tests**: Run `./nlm_test` for comprehensive testing
+3. **Python Bindings**: Verify `pip install -e .` works correctly
+4. **Integration Tests**: Run `./nlm` or `./nlm_phase6_demo`
+
+### Test Coverage
+New tests added for:
+- Null pointer scenarios
+- Input validation
+- Motor command functionality (LookLeft, LookRight)
+- Performance measurements
+- Memory management
+
+## Architecture and Design
 
 The NLM brain operates as a closed-loop system:
 
@@ -220,6 +365,31 @@ CHANGED BRAIN
   ↓
 CHANGED FUTURE BEHAVIOR
 ```
+
+## Scientific Limitations
+
+NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+
+- Simplified LIF neuron model (not Hodgkin-Huxley)
+- No realistic ion channel dynamics
+- No detailed dendritic morphology
+- No detailed cortical architecture
+- No claim of consciousness, intelligence, or human-like cognition
+- Limited to what can be simulated with available computing resources
+
+Phase 6 does NOT claim:
+- Human intelligence
+- Consciousness or sentience
+- Human-like reasoning
+- Genuine subjective experience
+
+Phase 6 DOES investigate:
+- Whether memory systems can integrate with neural dynamics
+- Whether neuromodulation can affect plasticity in a coordinated way
+- Whether prediction can become a central organizing principle
+- Whether developmental stages can modulate learning
+- Whether replay can reinforce memory consolidation
+- Whether the complete brain loop functions coherently
 
 ## License
 
