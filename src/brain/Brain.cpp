@@ -406,7 +406,63 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
+    // ========== STEP 5: Update attention system ==========
+    if (pImpl->attention) {
+        pImpl->attention->update(pImpl->timestep);
+        
+        // Apply attention to working memory winners
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+        }
+    }
+    
+    // ========== STEP 6: Update concept formation ==========
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Process current neural activity patterns to form concepts
+        // Get the current neural state and pass to concept formation
+        std::vector<float> neuralPatterns;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        neuralPatterns.push_back(
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+        }
+        
+        if (!neuralPatterns.empty()) {
+            pImpl->conceptFormation->update(neuralPatterns);
+        }
+    }
+    
+    // ========== STEP 7: Update prediction system ==========
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // The prediction system would be updated with sensory observations
+        // Use working memory traces to guide prediction
+        std::vector<float> memoryTraces;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (pImpl->workingMemory) {
+                        float trace = pImpl->workingMemory->getMemoryTrace(neuron->getId());
+                        if (trace > 0.0f) {
+                            memoryTraces.push_back(trace);
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (!memoryTraces.empty()) {
+            pImpl->predictionSystem->update(memoryTraces);
+        }
+    }
+    
+    // ========== STEP 8: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
@@ -482,13 +538,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
         
-        if (pImpl->episodicMemory) {
+        if (pImpl->episodicMemory && pImpl->workingMemory) {
             // Capture current brain state as an episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store active neurons and their working memory traces
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -497,13 +553,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                             episode.activeNeurons.push_back(neuron->getId());
                             episode.neuronActivations.push_back(
                                 std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                            
+                            // Store working memory traces for this neuron
+                            if (pImpl->workingMemory) {
+                                float memoryValue = pImpl->workingMemory->getMemoryTrace(neuron->getId());
+                                if (memoryValue > 0.0f) {
+                                    episode.memoryTraces.push_back({neuron->getId(), memoryValue});
+                                }
+                            }
                         }
                     }
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Store reward prediction error in episode
+            if (pImpl->predictionError) {
+                float predError = pImpl->predictionError->getPredictionError();
+                episode.predictionError = predError;
+            }
+            
+            // Store attention focus
+            if (pImpl->attention) {
+                auto attentionFocus = pImpl->attention->getFocusNeurons();
+                episode.attentionFocus.assign(attentionFocus.begin(), attentionFocus.end());
+            }
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
