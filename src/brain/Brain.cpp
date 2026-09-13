@@ -681,15 +681,119 @@ float Brain::getExcitationInhibitionRatio() const {
     return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
 }
 
-size_t Brain::getTotalSpikeCount() const {
-    return pImpl->totalSpikesTotal;
+// Working memory integration
+NeuralWorkingMemory* Brain::getWorkingMemory() {
+    return pImpl->workingMemory.get();
 }
 
-size_t Brain::getPendingSpikeEventCount() const {
-    return pImpl->spikeSystem->getPendingSpikeCount() + pImpl->spikeSystem->getPendingDelayedCount();
+const NeuralWorkingMemory* Brain::getWorkingMemory() const {
+    return pImpl->workingMemory.get();
 }
 
-std::unique_ptr<class Action> Brain::produceAction() {
+// Episodic memory integration
+NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    return pImpl->episodicMemory.get();
+}
+
+const NeuralEpisodicMemory* Brain::getEpisodicMemory() const {
+    return pImpl->episodicMemory.get();
+}
+
+// Associative memory integration
+NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    return pImpl->associativeMemory.get();
+}
+
+const NeuralAssociativeMemory* Brain::getAssociativeMemory() const {
+    return pImpl->associativeMemory.get();
+}
+
+// Prediction system integration
+PredictionSystem* Brain::getPredictionSystem() {
+    return pImpl->predictionSystem.get();
+}
+
+const PredictionSystem* Brain::getPredictionSystem() const {
+    return pImpl->predictionSystem.get();
+}
+
+// Neural planner integration
+NeuralPlanner* Brain::getPlanner() {
+    return pImpl->planner.get();
+}
+
+const NeuralPlanner* Brain::getPlanner() const {
+    return pImpl->planner.get();
+}
+
+// Concept formation integration
+ConceptFormation* Brain::getConceptFormation() {
+    return pImpl->conceptFormation.get();
+}
+
+const ConceptFormation* Brain::getConceptFormation() const {
+    return pImpl->conceptFormation.get();
+}
+
+// Attention system integration
+AttentionalSelection* Brain::getAttention() {
+    return pImpl->attention.get();
+}
+
+const AttentionalSelection* Brain::getAttention() const {
+    return pImpl->attention.get();
+}
+
+// Development system integration
+DevelopmentSystem* Brain::getDevelopmentSystem() {
+    return pImpl->developmentSystem.get();
+}
+
+const DevelopmentSystem* Brain::getDevelopmentSystem() const {
+    return pImpl->developmentSystem.get();
+}
+
+// Neuromodulation systems
+Dopamine* Brain::getDopamine() {
+    return pImpl->dopamine.get();
+}
+
+const Dopamine* Brain::getDopamine() const {
+    return pImpl->dopamine.get();
+}
+
+Curiosity* Brain::getCuriosity() {
+    return pImpl->curiosity.get();
+}
+
+const Curiosity* Brain::getCuriosity() const {
+    return pImpl->curiosity.get();
+}
+
+Novelty* Brain::getNovelty() {
+    return pImpl->novelty.get();
+}
+
+const Novelty* Brain::getNovelty() const {
+    return pImpl->novelty.get();
+}
+
+PredictionError* Brain::getPredictionErrorSignal() {
+    return pImpl->predictionError.get();
+}
+
+const PredictionError* Brain::getPredictionErrorSignal() const {
+    return pImpl->predictionError.get();
+}
+
+// Development stage
+DevelopmentalStage Brain::getDevelopmentalStage() const {
+    return pImpl->developmentalStage;
+}
+
+void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
+    pImpl->developmentalStage = stage;
+}
     // Simple action selection based on motor neuron activity
     // The motor neuron population with highest average activity determines action
     
@@ -749,10 +853,6 @@ void Brain::reset() {
         region->reset();
     }
     
-    pImpl->spikeSystem->reset();
-    pImpl->developmentalStage = DevelopmentalStage::Initial;
-    
-    // Reset memory systems
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();

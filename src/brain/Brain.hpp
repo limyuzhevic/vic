@@ -137,52 +137,50 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
-    
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
+    const NeuralWorkingMemory* getWorkingMemory() const;
     
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
+    const NeuralEpisodicMemory* getEpisodicMemory() const;
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
-    
-    // ========== PREDICTION SYSTEM ==========
+    const NeuralAssociativeMemory* getAssociativeMemory() const;
     
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
+    const PredictionSystem* getPredictionSystem() const;
     
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
+    const NeuralPlanner* getPlanner() const;
     
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
+    const ConceptFormation* getConceptFormation() const;
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+    const AttentionalSelection* getAttention() const;
     
-    // ========== DEVELOPMENT SYSTEM ==========
-    
+    // Development system
     DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
+    const DevelopmentSystem* getDevelopmentSystem() const;
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
+    // Neuromodulation systems
     Dopamine* getDopamine();
+    const Dopamine* getDopamine() const;
     
-    // Curiosity - exploration motivation
     Curiosity* getCuriosity();
+    const Curiosity* getCuriosity() const;
     
-    // Novelty - novelty detection
     Novelty* getNovelty();
+    const Novelty* getNovelty() const;
     
-    // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    const PredictionError* getPredictionErrorSignal() const;
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

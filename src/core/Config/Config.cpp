@@ -114,7 +114,7 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -124,6 +124,18 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     } else {
         pImpl->entries.emplace_back(key, value, source);
     }
+}
+
+void Config::set(const std::string& key, int value, ConfigSource source) {
+    set(key, std::to_string(value), source);
+}
+
+void Config::set(const std::string& key, double value, ConfigSource source) {
+    set(key, std::to_string(value), source);
+}
+
+void Config::set(const std::string& key, bool value, ConfigSource source) {
+    set(key, value ? "true" : "false", source);
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {

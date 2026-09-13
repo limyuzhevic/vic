@@ -400,6 +400,159 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Memory system bindings
+    py::class_<NeuralWorkingMemory>(m, "NeuralWorkingMemory", R"pbdoc(Working memory system for transient active information)pbdoc")
+        .def("storeToNeuron", &NeuralWorkingMemory::storeToNeuron,
+             py::arg("neuronId"), py::arg("activation"),
+             "Store neural activation in working memory")
+        .def("update", &NeuralWorkingMemory::update,
+             py::arg("timestep"),
+             "Update working memory dynamics")
+        .def("clear", &NeuralWorkingMemory::clear,
+             "Clear all working memory content")
+        .def("getNeuronActivations", &NeuralWorkingMemory::getNeuronActivations,
+             "Get current neuron activations")
+        .def("getActiveNeurons", &NeuralWorkingMemory::getActiveNeurons,
+             "Get list of active neurons")
+        .def("getMaxCapacity", &NeuralWorkingMemory::getMaxCapacity,
+             "Get maximum working memory capacity")
+        .def("setCapacity", &NeuralWorkingMemory::setCapacity,
+             py::arg("capacity"),
+             "Set working memory capacity");
+
+    py::class_<NeuralEpisodicMemory>(m, "NeuralEpisodicMemory", R"pbdoc(Episodic memory system for storing experiences)pbdoc")
+        .def("storeExperience", [](NeuralEpisodicMemory& self, uint64_t timestamp, const std::vector<float>& percept) {
+            self.storeExperience(timestamp, percept);
+        }, py::arg("timestamp"), py::arg("percept"),
+             "Store an experience with timestamp and percept")
+        .def("replayExperience", [](NeuralEpisodicMemory& self, size_t episodeIndex, std::vector<float>& output) {
+            self.replayExperience(episodeIndex, output);
+        }, py::arg("episodeIndex"), py::arg("output"),
+             "Replay a stored experience")
+        .def("getRecentExperiences", &NeuralEpisodicMemory::getRecentExperiences,
+             "Get recent experiences")
+        .def("getMaxEpisodes", &NeuralEpisodicMemory::getMaxEpisodes,
+             "Get maximum number of episodes");
+
+    // Prediction system bindings
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(Prediction system for sensory prediction and error computation)pbdoc")
+        .def("update", &PredictionSystem::update,
+             py::arg("timestep"),
+             "Update prediction system")
+        .def("getPredictionError", &PredictionSystem::getPredictionError,
+             "Get current prediction error")
+        .def("getConfidence", &PredictionSystem::getConfidence,
+             "Get prediction confidence")
+        .def("getPredictions", &PredictionSystem::getPredictions,
+             "Get current predictions");
+
+    // Cognition system bindings
+    py::class_<NeuralPlanner>(m, "NeuralPlanner", R"pbdoc(Neural planner for action planning)pbdoc")
+        .def("planAction", &NeuralPlanner::planAction,
+             py::arg("context"), py::arg("maxSteps"),
+             "Plan an action sequence")
+        .def("update", &NeuralPlanner::update,
+             py::arg("timestep"),
+             "Update planner")
+        .def("setPlanningDepth", &NeuralPlanner::setPlanningDepth,
+             py::arg("depth"),
+             "Set planning depth")
+        .def("getPlannedActions", &NeuralPlanner::getPlannedActions,
+             "Get planned action sequence");
+
+    py::class_<ConceptFormation>(m, "ConceptFormation", R"pbdoc(Concept formation for pattern discovery)pbdoc")
+        .def("processPattern", [](ConceptFormation& self, const std::vector<float>& pattern) {
+            self.processPattern(pattern);
+        }, py::arg("pattern"),
+             "Process a pattern for concept formation")
+        .def("update", &ConceptFormation::update,
+             py::arg("timestep"),
+             "Update concept formation")
+        .def("getConcepts", &ConceptFormation::getConcepts,
+             "Get discovered concepts");
+
+    // Attention system bindings
+    py::class_<AttentionalSelection>(m, "AttentionalSelection", R"pbdoc(Attention system for focus and selection)pbdoc")
+        .def("allocateAttention", [](AttentionalSelection& self, const std::vector<float>& priorities, size_t maxFocus) {
+            self.allocateAttention(priorities, maxFocus);
+        }, py::arg("priorities"), py::arg("maxFocus"),
+             "Allocate attention based on priorities")
+        .def("update", &AttentionalSelection::update,
+             py::arg("timestep"),
+             "Update attentional selection")
+        .def("getFocusedItems", &AttentionalSelection::getFocusedItems,
+             "Get currently focused items")
+        .def("getAttentionLevel", &AttentionalSelection::getAttentionLevel,
+             "Get current attention level");
+
+    // Development system bindings
+    py::class_<DevelopmentSystem>(m, "DevelopmentSystem", R"pbdoc(Development system for maturation and learning)pbdoc")
+        .def("update", &DevelopmentSystem::update,
+             py::arg("timestep"),
+             "Update development system")
+        .def("getDevelopmentalStage", &DevelopmentSystem::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("getPlasticityRate", &DevelopmentSystem::getPlasticityRate,
+             "Get current plasticity rate");
+
+    // Neuromodulation system bindings
+    py::class_<Dopamine>(m, "Dopamine", R"pbdoc(Dopamine neuromodulator for reward and reinforcement)pbdoc")
+        .def("update", &Dopamine::update,
+             py::arg("timestep"),
+             "Update dopamine levels")
+        .def("getLevel", &Dopamine::getLevel,
+             "Get current dopamine level")
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor,
+             "Get plasticity modulation factor");
+
+    py::class_<Curiosity>(m, "Curiosity", R"pbdoc(Curiosity neuromodulator for exploration motivation)pbdoc")
+        .def("update", &Curiosity::update,
+             py::arg("timestep"),
+             "Update curiosity levels")
+        .def("getLevel", &Curiosity::getLevel,
+             "Get current curiosity level")
+        .def("getExplorationBias", &Curiosity::getExplorationBias,
+             "Get exploration bias");
+
+    py::class_<Novelty>(m, "Novelty", R"pbdoc(Novelty detection system)pbdoc")
+        .def("update", &Novelty::update,
+             py::arg("timestep"),
+             "Update novelty detection")
+        .def("getLevel", &Novelty::getLevel,
+             "Get current novelty level")
+        .def("getNoveltyThreshold", &Novelty::getNoveltyThreshold,
+             "Get novelty detection threshold");
+
+    py::class_<PredictionError>(m, "PredictionError", R"pbdoc(Prediction error signal)pbdoc")
+        .def("update", &PredictionError::update,
+             py::arg("predicted"), py::arg("actual"),
+             "Update prediction error")
+        .def("getLevel", &PredictionError::getLevel,
+             "Get current prediction error level");
+
+    // Config extension for memory integration
+    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+        .def(py::init<>())
+        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+             "Load configuration from a JSON file")
+        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
+            return self.loadFromArgs(argc, argv);
+        }, py::arg("argc"), py::arg("argv"),
+           "Load configuration from command line arguments")
+        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+             "Save configuration to a JSON file")
+        .def("has", &Config::has, py::arg("key"),
+             "Check if a configuration key exists")
+        .def("getKeys", &Config::getKeys,
+             "Get all configuration keys")
+        .def("clear", &Config::clear,
+             "Clear all configuration entries")
+        .def("summary", &Config::summary,
+             "Get a summary string of the configuration")
+        .def("__repr__", [](const Config& cfg) {
+            return "<Config: " + cfg.summary() + ">";
+        });
+
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
