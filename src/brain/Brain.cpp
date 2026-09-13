@@ -407,14 +407,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
-    
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+    // Update dopamine (reward prediction error)
+    if (pImpl->dopamine) {
+        pImpl->dopamine->update(pImpl->timestep);
+        
+        // Apply dopamine effects on neural excitability
+        // Dopamine modulates neural excitability by adjusting effective current injection
+        // Higher dopamine increases excitability (lower effective threshold)
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Dopamine modulates excitability by injecting additional current
+                    // Positive dopamine adds excitatory bias
+                    float excitabilityMod = dopamineLevel * 0.5f;
+                    if (excitabilityMod > 0.0f) {
+                        neuron->injectCurrent(excitabilityMod);
+                    }
+                }
+            }
+        }
     }
     
     // Update dopamine (reward prediction error)
@@ -511,25 +523,39 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory input for prediction
+        const std::vector<float> sensoryData = GetSensoryInputFromWorld();
+        pImpl->predictionSystem->update(currentStep, currentTime, sensoryData);
     }
     
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
+        // Gather neural activity to process
+        std::vector<NeuronId> allNeurons;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isActive() || neuron->isFiring()) {
+                        allNeurons.push_back(neuron->getId());
+                    }
+                }
+            }
+        }
+        
+        // Update attention based on neural activity
         pImpl->attention->update(pImpl->timestep);
         
-        // Apply attention to working memory winners
+        // Process working memory for attentional competition
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+            pImpl->attention->processCompetition(pImpl->workingMemory->getMemoryNeurons());
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation processes neural patterns to discover abstract concepts
+        // Would integrate with working memory and attention
+        // For now, placeholder for concept formation integration
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -573,6 +599,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+        
+        // Development affects neuromodulation sensitivity
+        if (pImpl->dopamine) {
+            // Dopamine sensitivity decreases with development
+            float dopamineMod = 1.0f;
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    dopamineMod = 1.0f;  // High sensitivity
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    dopamineMod = 0.8f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    dopamineMod = 0.5f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    dopamineMod = 0.3f;  // Lower sensitivity
+                    break;
+            }
+            // Could modify dopamine levels or response here
+        }
+        
+        // Development affects working memory capacity
+        if (pImpl->workingMemory) {
+            size_t baseCapacity = 100;
+            float capacityMod = 1.0f;
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    capacityMod = 1.5f;  // Rapid learning phase
+                    break;
+                case DevelopmentalStage::Adult:
+                    capacityMod = 0.8f;  // Optimized capacity
+                    break;
+            }
+            pImpl->workingMemory->setCapacity(baseCapacity * capacityMod);
         }
     }
     

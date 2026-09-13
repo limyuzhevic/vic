@@ -387,22 +387,42 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+    .def("enableDevelopment", &AgentBrain::enableDevelopment, py::arg("enable"))
+        .def("enableCuriosity", &AgentBrain::enableCuriosity, py::arg("enable"))
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("setDevelopmentalStage", &AgentBrain::setDevelopmentalStage,
+             py::arg("stage"), "Set developmental stage of the brain")
+        .def("setPlanningDepth", &AgentBrain::setPlanningDepth,
+             py::arg("depth"), "Set planning depth for neural planner")
+        .def("setAttentionStrength", &AgentBrain::setAttentionStrength,
+             py::arg("inhibitionStrength"), py::arg("excitationStrength"),
+             "Set attention system parameters");
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Advanced agent brain functionality - NEW METHODS ADDED
+    .def("setCurrentGoal", &AgentBrain::setCurrentGoal,
+         py::arg("goal"), "Set current goal for the agent")
+        .def("getCurrentGoal", &AgentBrain::getCurrentGoal,
+             "Get current goal of the agent")
+        .def("setActionQuality", &AgentBrain::setActionQuality,
+             py::arg("action"), py::arg("quality"), "Set quality of an action")
+        .def("getActionQuality", &AgentBrain::getActionQuality,
+             py::arg("action"), "Get quality of an action")
+        .def("trainPlanner", &AgentBrain::trainPlanner,
+             py::arg("reward"), "Train planner based on reward feedback")
+        .def("updateSelfModel", &AgentBrain::updateSelfModel,
+             py::arg("stateChanges"), py::arg("action"), "Update self model")
+        .def("createSocialLearningConnection", &AgentBrain::createSocialLearningConnection,
+             py::arg("otherBrain"), "Create social learning connection with another brain")
+        .def("getDevelopmentalMetrics", &AgentBrain::getDevelopmentalMetrics,
+             "Get developmental metrics for the brain");
+
+    // Simulation control methods - NEW METHODS ADDED
+    .def("runEpisode", &AgentBrain::runEpisode,
+         py::arg("steps"), py::arg("world"), "Run an episode in a world")
+        .def("resetEpisode", &AgentBrain::resetEpisode, "Reset for new episode")
+        .def("getEpisodeStatistics", &AgentBrain::getEpisodeStatistics,
+             "Get statistics from completed episode");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
