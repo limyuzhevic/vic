@@ -37,6 +37,11 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
     }
 }
 
+void PredictionSystem::updateConfidence(float error) {
+    // Confidence decreases with higher prediction error
+    pImpl->confidence = std::max(0.1f, 1.0f - error);
+}
+
 float PredictionSystem::getPredictionError() const {
     return pImpl->predictionError;
 }

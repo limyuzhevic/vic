@@ -1,40 +1,22 @@
 #pragma once
 
-/**
- * CheckpointSystem - Brain state serialization and checkpointing
- * 
- * Provides robust checkpointing for large-scale neural simulations.
- * Supports incremental saves, version compatibility, and validation.
- * 
- * Features:
- * - Complete brain state serialization
- * - Incremental checkpointing
- * - Version compatibility checks
- * - Integrity validation
- * - Streaming for large checkpoints
- * 
- * Stored state:
- * - Neuron states (membrane potential, firing state, etc.)
- * - Synapse states (weights, plasticity, etc.)
- * - Spike history (recent)
- * - Plasticity state (eligibility traces, etc.)
- * - Developmental state
- * - Random generator state
- * - Simulation clock
- * - Environment state (optional)
- */
-
-#include <cstddef>
-#include <cstdint>
 #include <string>
 #include <vector>
-#include <memory>
+#include <functional>
 #include <optional>
 #include <fstream>
-#include <functional>
-#include <variant>
+#include <filesystem>
+#include <chrono>
+#include <cstring>
+#include <cmath>
+#include <unordered_map>
+#include <memory>
 
 namespace nlm {
+
+// Forward declarations
+class CheckpointWriter;
+class CheckpointReader;
 
 // Checkpoint version for compatibility
 constexpr uint32_t CHECKPOINT_VERSION_MAJOR = 1;
@@ -126,21 +108,6 @@ struct SectionHeader {
 };
 
 /**
- * Checksum calculator
- */
-class ChecksumCalculator {
-public:
-    using uint128_t = unsigned __int128;
-    
-    static uint64_t crc64(const void* data, size_t size);
-    static uint32_t crc32(const void* data, size_t size);
-    static uint64_t fletcher64(const uint64_t* data, size_t count);
-    
-    // Combine checksums
-    static uint64_t combine(uint64_t a, uint64_t b);
-};
-
-/**
  * Neuron state for checkpointing
  */
 struct NeuronCheckpointData {
@@ -172,6 +139,21 @@ struct SynapseCheckpointData {
     std::vector<float> efficacy;
     std::vector<float> shortTermDepression;
     std::vector<float> shortTermFacilitation;
+};
+
+/**
+ * Checksum calculator
+ */
+class ChecksumCalculator {
+public:
+    using uint128_t = unsigned __int128;
+    
+    static uint64_t crc64(const void* data, size_t size);
+    static uint32_t crc32(const void* data, size_t size);
+    static uint64_t fletcher64(const uint64_t* data, size_t count);
+    
+    // Combine checksums
+    static uint64_t combine(uint64_t a, uint64_t b);
 };
 
 /**
@@ -232,7 +214,7 @@ public:
      * Get reader progress (0.0 - 1.0)
      */
     double getProgress() const;
-
+    
 private:
     std::ifstream stream_;
     CheckpointHeader header_;
@@ -275,7 +257,7 @@ public:
      * Set checkpoint metadata
      */
     void setMetadata(uint64_t neuronCount, uint64_t synapseCount, 
-                   uint64_t regionCount, uint64_t step, double simTime);
+                    uint64_t regionCount, uint64_t step, double simTime);
     
     /**
      * Write checkpoint data
@@ -303,7 +285,7 @@ public:
      * Get total bytes written
      */
     uint64_t getBytesWritten() const { return bytesWritten_; }
-
+    
 private:
     bool writeHeader();
     bool writeSectionHeader(const SectionHeader& header);

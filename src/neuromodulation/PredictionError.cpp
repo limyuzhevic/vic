@@ -10,6 +10,7 @@ struct PredictionError::Impl {
     float predictedValue;
     float actualValue;
     std::vector<float> history;
+    std::vector<PredictionErrorItem> errorItems;
     
     Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
 };
@@ -44,10 +45,20 @@ const std::vector<float>& PredictionError::getHistory() const {
 
 void PredictionError::clearHistory() {
     pImpl->history.clear();
+    pImpl->errorItems.clear();
 }
 
 float PredictionError::getMagnitude() const {
     return std::abs(pImpl->error);
+}
+
+void PredictionError::storePredictionError(const PredictionErrorItem& item) {
+    pImpl->errorItems.push_back(item);
+    NLM_LOG_INFO("PredictionError stored: " + std::to_string(item.errorValue) + " at step " + std::to_string(item.timestamp));
+}
+
+const std::vector<PredictionErrorItem>& PredictionError::getPredictionErrors() const {
+    return pImpl->errorItems;
 }
 
 } // namespace nlm

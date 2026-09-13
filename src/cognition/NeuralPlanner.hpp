@@ -47,6 +47,11 @@ public:
     PlanningCandidate evaluateSequence(const std::vector<ActionType>& actions,
                                       const std::vector<float>& startState);
 
+    // Evaluate a potential action sequence
+    // Returns expected total reward and confidence
+    PlanningCandidate evaluateSequence(const std::vector<ActionType>& actions,
+                                      const std::vector<float>& startState);
+
     // Get number of steps to look ahead
     size_t getPlanningDepth() const { return planningDepth_; }
     void setPlanningDepth(size_t depth) { planningDepth_ = depth; }
@@ -70,6 +75,32 @@ public:
     // Get current goal
     std::vector<float> getCurrentGoal() const { return currentGoal_; }
     void setCurrentGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
+
+    // Get current concept similarity for action filtering
+    float getConceptSimilarityForAction(const std::vector<float>& currentState) const;
+
+    // Get planning confidence
+    float getPlanningConfidence() const { return planningConfidence_; }
+
+    // Update plans based on actual outcome
+    void updatePlanQuality(const std::vector<ActionType>& plannedActions,
+                          const std::vector<ActionType>& actualActions,
+                          float actualReward);
+
+    // Clear planning cache
+    void clearCache();
+
+    // Set action quality function (from experience)
+    void setActionQuality(ActionType action, float quality) {
+        actionQuality_[static_cast<size_t>(action)] = quality;
+    }
+
+    // Get current goal
+    std::vector<float> getCurrentGoal() const { return currentGoal_; }
+    void setCurrentGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
+
+    // Get current concept similarity for action filtering
+    float getConceptSimilarityForAction(const std::vector<float>& currentState) const;
 
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;

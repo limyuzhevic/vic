@@ -1,38 +1,28 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <string>
+#include <vector>
 
 namespace nlm {
 
-// Novelty detection signal
-// Computes novelty from comparison with previous observations
-
-class Novelty {
+// Novelty: Detects novel sensory patterns and drives exploration
+class Novelty : public Neuromodulator {
 public:
     Novelty();
-    ~Novelty();
+    ~Novelty() override;
     
-    // Initialize with brain reference
-    void initialize(class Brain* brain);
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
     
-    // Get novelty level
-    float getLevel() const;
-    void setLevel(float level);
+    // Novelty detection for exploration
+    void detectNovelty(float activation, float noveltyThreshold);
     
-    // Detect novelty from observation
-    void detectNovelty(const class Observation& observation, 
-                       const class Observation& previousObservation);
-    
-    // Detect novelty from sensory input pattern
-    void detectNovelty(const std::vector<float>& currentPattern,
-                       const std::vector<float>& previousPattern);
-    
-    // Decay novelty over time
-    void update(TimestepDuration dt);
-    
-    // Get novelty history
-    const std::vector<float>& getHistory() const;
-    void clearHistory();
+    // Integration with other systems
+    void integrateWithCuriosity(float curiosityLevel);
     
 private:
     struct Impl;

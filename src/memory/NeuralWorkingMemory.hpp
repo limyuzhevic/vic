@@ -154,17 +154,23 @@ public:
     // Is this neuron currently attended?
     bool isAttended(NeuronId neuron) const;
 
-    // Get attention winners
-    const std::vector<NeuronId>& getWinners() const { return winners_; }
+    // Integrate with episodic memory - use episode content to guide attention
+    void integrateEpisodicMemory(const NeuralEpisodicMemory& episodicMemory);
 
-    // Top-down attention (goal-directed)
-    void applyTopDownBias(NeuronId neuron, float biasStrength);
+    // Influence concept formation - use attended features for pattern discovery
+    void influenceConceptFormation(ConceptFormation& conceptFormation);
 
-    // Bottom-up attention (stimulus-driven)
-    void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
+    // Connect to working memory - use memory traces to set attention priorities
+    void connectToWorkingMemory(NeuralWorkingMemory& workingMemory);
 
-    // Reset attention
-    void reset();
+    // Connect to prediction system - use prediction confidence to guide attention
+    void connectToPredictionSystem(PredictionSystem& predictionSystem);
+
+    // Influence planning - use attention focus to bias action planning
+    void influencePlanning(NeuralPlanner& planner);
+
+    // Bias action selection - use attention to amplify motor neurons
+    void biasActionSelection();
 
 private:
     struct Impl;

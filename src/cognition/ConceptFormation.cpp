@@ -47,10 +47,7 @@ size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
     
     // Check if this is novel enough to form a new concept
     if (isNovel(pattern, formationThreshold_)) {
-        // But wait - we need a few observations before committing to a concept
-        // This prevents forming concepts from noise
-        
-        // For now, create concept if sufficiently different from all others
+        // Create concept from the pattern
         return createConcept(pattern, features, reward);
     }
     

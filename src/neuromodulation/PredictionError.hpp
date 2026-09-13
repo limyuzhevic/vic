@@ -31,6 +31,12 @@ public:
     // Get error magnitude for neuromodulation
     float getMagnitude() const;
     
+    // Store prediction error items for episodic memory
+    void storePredictionError(const PredictionErrorItem& item);
+    
+    // Get stored prediction errors
+    const std::vector<PredictionErrorItem>& getPredictionErrors() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

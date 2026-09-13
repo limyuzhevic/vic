@@ -28,6 +28,10 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
+class TemporalRelation;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -164,35 +168,44 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
-    // ========== DEVELOPMENT SYSTEM ==========
+    // Spatial representation for spatial reasoning
+    SpatialRepresentation* getSpatialRepresentation();
     
+    // Temporal relation for sequence learning
+    TemporalRelation* getTemporalRelation();
+
+    // ========== DEVELOPMENT SYSTEM ==========
+
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
-    
+
     // ========== NEUROMODULATION SYSTEMS ==========
-    
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
-    
+
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
-    
+
     // Novelty - novelty detection
     Novelty* getNovelty();
-    
+
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
-    
+
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
-    
+
     // Get random generator
     RandomGenerator* getRandomGenerator();
-    
+
+    // Get current simulation step
+    SimulationStep getCurrentStep() const;
+
     // Logging
     void logStatus() const;
-    
+
 private:
     struct Impl;
     Impl* pImpl;

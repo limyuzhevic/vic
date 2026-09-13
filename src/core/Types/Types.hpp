@@ -179,6 +179,15 @@ enum class FiringState : uint8_t {
     Inhibited
 };
 
+// Prediction error item for episodic memory
+struct PredictionErrorItem {
+    SimulationStep timestamp;
+    float errorValue;
+    SensoryInput predictedState;
+    SensoryInput actualState;
+    float impact;
+};
+
 // Generic handle types for efficiency
 using NeuronHandle = uint64_t;
 using SynapseHandle = uint64_t;
