@@ -186,7 +186,7 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
+    std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
     size_t end = str.find_last_not_of(" \t\r\n");
@@ -199,7 +199,95 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
+// Configuration validation rules
+struct ValidationRule {
+    std::string key;
+    std::string type;
+    std::string min;
+    std::string max;
+    std::string description;
+};
+
+std::vector<ValidationRule> getValidationRules() {
+    return {
+        {"neuron_count", "int", "100", "100000", "Total number of neurons in the brain"},
+        {"region_count", "int", "1", "100", "Number of brain regions"},
+        {"connection_probability", "float", "0.0", "1.0", "Connection probability for random connectivity"},
+        {"plasticity_learning_rate", "float", "0.0", "1.0", "General plasticity learning rate"},
+        {"stdp_ltp_weight", "float", "0.0", "1.0", "STDP long-term potentiation weight"},
+        {"stdp_ltd_weight", "float", "0.0", "1.0", "STDP long-term depression weight"},
+        {"stdp_time_constant", "float", "1.0", "1000.0", "STDP time constant in ms"},
+        {"development_synaptogenesis_rate", "float", "0.0", "1.0", "Synaptogenesis rate"},
+        {"development_pruning_rate", "float", "0.0", "1.0", "Pruning rate"},
+        {"dopamine_baseline", "float", "-1.0", "1.0", "Dopamine baseline level"},
+        {"dopamine_scale", "float", "0.1", "10.0", "Dopamine modulation scale"},
+        {"simulation_timestep", "float", "0.0001", "0.1", "Simulation timestep in seconds"},
+        {"max_simulation_steps", "int", "10", "1000000", "Maximum simulation steps"},
+        {"checkpoint_interval", "int", "0", "1000000", "Checkpoint saving interval"},
+        {"vision_width", "int", "8", "256", "Vision sensor width"},
+        {"vision_height", "int", "8", "256", "Vision sensor height"},
+        {"working_memory_capacity", "int", "1", "10000", "Working memory capacity"},
+        {"episodic_memory_max_episodes", "int", "1", "100000", "Maximum episodic memory episodes"}
+    };
+}
+
+class ValidationError {
+public:
+    std::string message;
+    std::string key;
+    std::string rule;
+    
+    ValidationError(const std::string& msg, const std::string& k, const std::string& r)
+        : message(msg), key(k), rule(r) {}
+};
+
+class ConfigValidator {
+public:
+    std::vector<ValidationError> validate(const Config& config) {
+        std::vector<ValidationError> errors;
+        auto rules = getValidationRules();
+        
+        for (const auto& rule : rules) {
+            if (config.has(rule.key)) {
+                std::optional<ConfigValue> val = config.get(rule.key);
+                if (val.has_value()) {
+                    std::string error = validateValue(rule, *val);
+                    if (!error.empty()) {
+                        errors.emplace_back(error, rule.key, rule.type);
+                    }
+                }
+            }
+        }
+        
+        return errors;
+    }
+    
+private:
+    std::string validateValue(const ValidationRule& rule, const ConfigValue& value) {
+        try {
+            if (rule.type == "int") {
+                int val = std::get<int>(value);
+                if (rule.min != "" && val < std::stoi(rule.min)) {
+                    return "Value " + std::to_string(val) + " is less than minimum " + rule.min;
+                }
+                if (rule.max != "" && val > std::stoi(rule.max)) {
+                    return "Value " + std::to_string(val) + " is greater than maximum " + rule.max;
+                }
+            } else if (rule.type == "float") {
+                double val = std::get<double>(value);
+                if (rule.min != "" && val < std::stod(rule.min)) {
+                    return "Value " + std::to_string(val) + " is less than minimum " + rule.min;
+                }
+                if (rule.max != "" && val > std::stod(rule.max)) {
+                    return "Value " + std::to_string(val) + " is greater than maximum " + rule.max;
+                }
+            }
+        } catch (const std::bad_variant_access&) {
+            return "Value has wrong type for key " + rule.key;
+        }
+        return "";
+    }
+};
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
