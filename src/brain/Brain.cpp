@@ -32,6 +32,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -46,6 +48,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -106,12 +111,12 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        semanticMemory = std::make_unique<SemanticMemory>();
+        proceduralMemory = std::make_unique<ProceduralMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -126,6 +131,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -242,22 +250,27 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // Initialize semantic memory
+    if (pImpl->semanticMemory) {
+        pImpl->semanticMemory->initialize(this);
+        pImpl->semanticMemory->setStorageCapacity(neuronCount / 20);
+    }
     
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    // Initialize procedural memory
+    if (pImpl->proceduralMemory) {
+        pImpl->proceduralMemory->initialize(this);
+        pImpl->proceduralMemory->setSkillCapacity(neuronCount / 15);
+    }
     
-    pImpl->conceptFormation->initialize(this);
-    
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
-    
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+        // Initialize neuromodulation
+        pImpl->novelty->initialize(this);
+        pImpl->curiosity->initialize(this);
+        
+        // Initialize other neuromodulators
+        if (pImpl->dopamine) pImpl->dopamine->initialize(this);
+        if (pImpl->acetylcholine) pImpl->acetylcholine->initialize(this);
+        if (pImpl->norepinephrine) pImpl->norepinephrine->initialize(this);
+        if (pImpl->serotonin) pImpl->serotonin->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -582,7 +595,54 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 15: Sleep/rest cycle for memory consolidation ==========
+    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory && !pImpl->isResting) {
+        // Begin sleep/rest cycle for memory consolidation
+        pImpl->isResting = true;
+        pImpl->stepsSinceLastEpisode = 0;
+        
+        // Store current experience in episodic memory
+        if (pImpl->workingMemory) {
+            std::vector<float> workingPattern = pImpl->workingMemory->retrieve();
+            
+            // Create episodic memory item from working memory
+            EpisodicMemoryItem episode;
+            episode.timestamp = currentStep;
+            episode.sensoryState = workingPattern;  // Simplified: use working memory as sensory state
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            episode.action = ActionType::Rest;
+            episode.age = 0;
+            
+            pImpl->episodicMemory->storeEpisode(episode);
+            NLM_LOG_INFO("Brain: Stored experience in episodic memory during sleep/rest cycle");
+        }
+    }
+    
+    // ========== STEP 16: Experience replay for consolidation ==========
+    if (pImpl->isResting && currentStep >= pImpl->stepsSinceLastEpisode + 10) {
+        // End of sleep/rest - replay important memories
+        if (pImpl->episodicMemory) {
+            auto replayEpisodes = pImpl->episodicMemory->getEpisodesForReplay(5);
+            if (!replayEpisodes.empty()) {
+                NLM_LOG_INFO("Brain: Replaying " + std::to_string(replayEpisodes.size()) + 
+                           " episodes for consolidation");
+            }
+            
+            // Replay episodes to strengthen connections
+            for (const auto* episode : replayEpisodes) {
+                if (episode) {
+                    // Replay would strengthen neural connections
+                    // In full implementation, this would reactivate the neural patterns
+                    NLM_LOG_INFO("Brain: Replaying episode from step " + std::to_string(episode->timestamp));
+                }
+            }
+        }
+        
+        pImpl->isResting = false;
+        pImpl->stepsSinceLastEpisode = 0;
+    }
+    
+    // ========== STEP 17: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
