@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef NLM_NEURAL_POPULATION_HPP
+#define NLM_NEURAL_POPULATION_HPP
+
 #include "../core/Types/Types.hpp"
 #include "Neuron.hpp"
 #include <vector>
@@ -8,7 +11,8 @@
 namespace nlm {
 
 // NeuralPopulation: A group of neurons with shared properties
-// PLACEHOLDER - Phase 2 will implement population-level dynamics
+// Placeholder - Phase 2 will implement population-level dynamics with specialized functions
+// for batch operations, population statistics, and coordinated activity patterns
 
 class NeuralPopulation {
 public:

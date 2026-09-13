@@ -17,6 +17,7 @@
 #include "sensory/SensoryInput.hpp"
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
+#include "environment/Observation.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
 #include <iostream>

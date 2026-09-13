@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef NLM_AGENT_BRAIN_HPP
+#define NLM_AGENT_BRAIN_HPP
+
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
@@ -10,7 +13,8 @@
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding with neuromodulation and development support
+// Manages neural activity flow between brain and environment, including action selection and reward processing
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -115,3 +119,5 @@ private:
 };
 
 } // namespace nlm
+
+#endif // NLM_AGENT_BRAIN_HPP

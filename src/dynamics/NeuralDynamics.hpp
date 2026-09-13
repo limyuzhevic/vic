@@ -1,13 +1,17 @@
 #pragma once
 
+#ifndef NLM_NEURAL_DYNAMICS_HPP
+#define NLM_NEURAL_DYNAMICS_HPP
+
 #include "../core/Types/Types.hpp"
 #include "../brain/Neuron.hpp"
 #include "../brain/Synapse.hpp"
 
 namespace nlm {
 
-// Abstract base class for neural dynamics
-// PLACEHOLDER - Phase 2 will implement various dynamics models
+// Abstract base class for neural dynamics models
+// Provides a unified interface for different neural dynamics implementations
+// Currently serves as a placeholder for Phase 2 implementation
 
 class NeuralDynamics {
 public:
@@ -52,11 +56,12 @@ private:
     Impl* pImpl;
 };
 
-// Hodgkin-Huxley dynamics (detailed model)
-// TODO PHASE 2: Implement Hodgkin-Huxley
+// Hodgkin-Huxley dynamics (detailed biophysical model)
+// TODO PHASE 2: Implement Hodgkin-Huxley dynamics with 4 differential equations
+// for membrane voltage, sodium activation/inactivation, and potassium activation
 class HodgkinHuxleyDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement HH dynamics
+    // PLACEHOLDER - Phase 2 will implement HH dynamics with proper differential equation integration
     void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
     void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
     void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
@@ -64,11 +69,11 @@ public:
     void reset() override {}
 };
 
-// FitzHugh-Nagumo dynamics (simplified兴奋性模型)
-// TODO PHASE 2: Implement FHN dynamics
+// FitzHugh-Nagumo dynamics (simplified excitation model)
+// TODO PHASE 2: Implement FHN dynamics with 2-dimensional reduction of HH
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement FHN dynamics
+    // PLACEHOLDER - Phase 2 will implement FHN dynamics as a model of excitable systems
     void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
     void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
     void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}

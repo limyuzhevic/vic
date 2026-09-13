@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef NLM_SPIKE_SYSTEM_HPP
+#define NLM_SPIKE_SYSTEM_HPP
+
 #include "../core/Types/Types.hpp"
 #include "../brain/Neuron.hpp"
 #include <vector>
@@ -23,7 +26,8 @@ struct DetailedSpikeEvent {
 };
 
 // Event-driven neural computation system
-// Handles spike event processing and delayed synaptic transmission
+// Handles spike event processing and delayed synaptic transmission with efficient queue management
+// Provides high-performance spike delivery for large-scale neural simulations
 class SpikeSystem {
 public:
     SpikeSystem();
@@ -35,17 +39,20 @@ public:
     SpikeSystem(SpikeSystem&&) noexcept;
     SpikeSystem& operator=(SpikeSystem&&) noexcept;
     
-    // Queue a spike event
+    // Queue a spike event for immediate processing
     void queueSpike(const SpikeEvent& event);
     void queueSpike(NeuronId neuron, Timestamp timestamp, SimulationStep step);
     
-    // Queue a delayed spike event (for synaptic transmission)
+    // Queue a delayed spike event for synaptic transmission
+    // Handles transmission delays in neural connections
     void queueDelayedSpike(const DelayedSpikeEvent& event);
     
-    // Process all queued spikes for current step
+    // Process all queued spikes for current simulation step
+    // Delivers spikes to their targets and updates neural state
     void processSpikes(SimulationStep currentStep);
     
     // Process pending delayed spikes that should be delivered now
+    // Synchronizes delayed spike delivery with current simulation time
     void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
     
     // Register spike handler callback (called when spikes are generated)
@@ -69,7 +76,7 @@ public:
     float getAverageSpikeRate() const;
     std::vector<NeuronId> getMostActiveNeurons(size_t count) const;
     
-    // Reset
+    // Reset system state
     void reset();
     
 private:

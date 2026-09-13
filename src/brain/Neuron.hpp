@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef NLM_NEURON_HPP
+#define NLM_NEURON_HPP
+
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
@@ -11,6 +14,7 @@ class Synapse;
 class RandomGenerator;
 
 // Neuron state structure for efficient storage
+// Contains all state variables for a single neuron
 struct NeuronState {
     MembranePotential membranePotential;    // Current membrane potential (mV)
     MembranePotential restingPotential;    // Resting potential (mV)
@@ -25,6 +29,7 @@ struct NeuronState {
     float adaptationVariable;              // For spike-frequency adaptation
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
+    // Default constructor with biologically plausible initial values
     NeuronState()
         : membranePotential(-70.0f)
         , restingPotential(-70.0f)
@@ -134,7 +139,7 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Implements real Leaky Integrate-and-Fire (LIF) dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state

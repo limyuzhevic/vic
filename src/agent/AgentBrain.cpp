@@ -1,5 +1,10 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../world/SimpleWorld.hpp"
+#include "../agent/SensoryPercept.hpp"
+#include "../agent/MotorCommand.hpp"
+#include "../brain/Brain.hpp"
+#include "../core/Types/Types.hpp"
 #include <algorithm>
 #include <cmath>
 

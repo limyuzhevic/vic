@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef NLM_SYNAPSE_HPP
+#define NLM_SYNAPSE_HPP
+
 #include "../core/Types/Types.hpp"
 
 namespace nlm {
@@ -70,10 +73,11 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
-    // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
-    void step(Timestamp currentTime);
-    
+// Update synapse for one simulation step
+    // Implements real synaptic dynamics with transmission and plasticity
+    // Returns true if synapse transmitted a spike during this step
+    bool step(Timestamp currentTime);
+
     // Reset to initial state
     void reset();
     

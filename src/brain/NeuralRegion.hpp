@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef NLM_NEURAL_REGION_HPP
+#define NLM_NEURAL_REGION_HPP
+
 #include "../core/Types/Types.hpp"
 #include "NeuralPopulation.hpp"
 #include "Synapse.hpp"
@@ -10,7 +13,8 @@
 namespace nlm {
 
 // NeuralRegion: A brain region containing multiple populations and local connectivity
-// PLACEHOLDER - Phase 2 will implement region-level dynamics
+// Placeholder - Phase 2 will implement region-level dynamics with specialized functions
+// for regional connectivity, intra-regional communication, and region-specific processing
 
 class NeuralRegion {
 public:

@@ -12,9 +12,41 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+
+// Neuromodulation systems
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+
+// Memory systems
+#include "../src/memory/WorkingMemory.hpp"
+#include "../src/memory/EpisodicMemory.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+
+// Development system
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/development/Maturation.hpp"
+#include "../src/development/Synaptogenesis.hpp"
+#include "../src/development/Pruning.hpp"
+
+// Plasticity systems
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/plasticity/StructuralPlasticity.hpp"
+
+// Environment and Observation
+#include "../src/environment/Environment.hpp"
+#include "../src/environment/Observation.hpp"
+#include "../src/environment/Action.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -400,26 +432,106 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    m.def("createNeuromodulator", []() -> std::shared_ptr<Neuromodulator> {
+        return std::make_shared<Neuromodulator>();
+    }, "Create a default neuromodulator");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("createCuriosity", []() -> std::shared_ptr<Curiosity> {
+        return std::make_shared<Curiosity>();
+    }, "Create a new curiosity system");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("createNovelty", []() -> std::shared_ptr<Novelty> {
+        return std::make_shared<Novelty>();
+    }, "Create a new novelty detection system");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("createReward", []() -> std::shared_ptr<Reward> {
+        return std::make_shared<Reward>();
+    }, "Create a new reward system");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    m.def("createPredictionError", []() -> std::shared_ptr<PredictionError> {
+        return std::make_shared<PredictionError>();
+    }, "Create a new prediction error system");
+
+    m.def("createMemorySystem", []() -> std::shared_ptr<WorkingMemory> {
+        return std::make_shared<WorkingMemory>();
+    }, "Create a working memory system");
+
+    m.def("createEpisodicMemory", []() -> std::shared_ptr<EpisodicMemory> {
+        return std::make_shared<EpisodicMemory>();
+    }, "Create an episodic memory system");
+
+    m.def("createDevelopmentSystem", []() -> std::shared_ptr<DevelopmentSystem> {
+        return std::make_shared<DevelopmentSystem>();
+    }, "Create a development system");
+
+    m.def("createSTDP", []() -> std::shared_ptr<STDP> {
+        return std::make_shared<STDP>();
+    }, "Create an STDP plasticity rule");
+
+    m.def("createHebbian", []() -> std::shared_ptr<Hebbian> {
+        return std::make_shared<Hebbian>();
+    }, "Create a Hebbian plasticity rule");
+
+    m.def("createStructuralPlasticity", []() -> std::shared_ptr<StructuralPlasticity> {
+        return std::make_shared<StructuralPlasticity>();
+    }, "Create a structural plasticity system");
+
+    m.def("createEnvironment", []() -> std::shared_ptr<Environment> {
+        return std::make_shared<Environment>();
+    }, "Create an environment system");
+
+    m.def("createObservation", []() -> std::shared_ptr<Observation> {
+        return std::make_shared<Observation>();
+    }, "Create an observation");
+
+    // Type conversion helpers
+    m.def("as_neuron_id", [](uint64_t value) {
+        return NeuronId(value);
+    }, py::arg("value"), "Convert uint64 to NeuronId");
+
+    m.def("as_synapse_id", [](uint64_t value) {
+        return SynapseId(value);
+    }, py::arg("value"), "Convert uint64 to SynapseId");
+
+    m.def("as_region_id", [](uint64_t value) {
+        return RegionId(value);
+    }, py::arg("value"), "Convert uint64 to RegionId");
+
+    m.def("as_population_id", [](uint64_t value) {
+        return PopulationId(value);
+    }, py::arg("value"), "Convert uint64 to PopulationId");
+
+    m.def("as_vector", [](std::vector<float> vec) {
+        return vec;
+    }, py::arg("vec"), "Convert vector<float> to Python list");
+
+    // Convenience factory functions
+    m.def("make_action", [](ActionType type, const std::vector<float>& parameters) {
+        return Action(type, parameters);
+    }, py::arg("type"), py::arg("parameters"), "Create an Action from type and parameters");
+
+    m.def("make_action_from_name", [](const std::string& name) {
+        ActionType type = ActionType::Custom;
+        if (name == "move_forward") type = ActionType::MoveForward;
+        else if (name == "move_backward") type = ActionType::MoveBackward;
+        else if (name == "turn_left") type = ActionType::TurnLeft;
+        else if (name == "turn_right") type = ActionType::TurnRight;
+        return Action(type);
+    }, py::arg("name"), "Create an Action from string name");
+
+    // Error handling
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "InvalidArgument");
+    py::register_exception<std::out_of_range>(m, "OutOfRange");
+
+    // Constants
+    m.attr("DEFAULT_WORLD_WIDTH") = 100.0f;
+    m.attr("DEFAULT_WORLD_HEIGHT") = 100.0f;
+    m.attr("DEFAULT_VISION_WIDTH") = 84;
+    m.attr("DEFAULT_VISION_HEIGHT") = 84;
+    m.attr("DEFAULT_VISION_CHANNELS") = 3;
+    m.attr("DEFAULT_SAMPLE_RATE") = 16000;
+    m.attr("DEFAULT_NUM_SAMPLES") = 8000;
 }
 
 } // namespace nlm
