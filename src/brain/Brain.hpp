@@ -6,6 +6,8 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/NeuromodulationManager.hpp"
 #include <memory>
 #include <string>
 
@@ -183,6 +185,13 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Neuromodulation manager
+    void setupNeuromodulation();
+    NeuromodulationManager* getNeuromodulationManager();
+    void processWithNeuromodulation(const Observation& observation,
+                                     const Observation& previousObservation,
+                                     float predictedValue);
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
