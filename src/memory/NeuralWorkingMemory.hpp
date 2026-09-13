@@ -57,10 +57,11 @@ public:
 
     // Decay rate for memory traces
     float getDecayRate() const { return decayRate_; }
-    void setDecayRate(float rate) { decayRate_ = rate; }
-
     // Get neurons currently in working memory
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
+    
+    // Get activation weights for memory neurons
+    const std::vector<float>& getMemoryWeights() const { return memoryActivations_; }
 
     // Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);

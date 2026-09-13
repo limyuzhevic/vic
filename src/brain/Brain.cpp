@@ -509,10 +509,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    // Predict next state based on current memory pattern
+                std::unique_ptr<SensoryInput> prediction = 
+                    pImpl->predictionSystem->predictNextState(SensoryInput(sensoryInput));
+                
+                if (prediction && !prediction->getData().empty()) {
+                    // Get prediction error from prediction system
+                    float predError = pImpl->predictionSystem->getPredictionError();
+                    
+                    // Update dopamine based on prediction error
+                    if (pImpl->dopamine) {
+                        // Prediction error drives learning
+                        float learningRate = 0.01f * (1.0f - predError);
+                        pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() * (1.0f - learningRate) + 
+                                                (predError > 0.1f ? 1.0f : 0.0f) * learningRate * 0.5f);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +542,44 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        std::vector<float> pattern;
+        std::vector<float> features;
+        
+        // Extract pattern from working memory
+        if (pImpl->workingMemory) {
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            const auto& memoryWeights = pImpl->workingMemory->getMemoryWeights();
+            
+            if (!memoryNeurons.empty()) {
+                pattern.reserve(memoryNeurons.size());
+                features.reserve(memoryNeurons.size());
+                
+                for (size_t i = 0; i < memoryNeurons.size(); ++i) {
+                    pattern.push_back(static_cast<float>(memoryNeurons[i]) / 1000.0f);
+                    features.push_back(memoryWeights[i]);
+                }
+                
+                // Present pattern to concept formation
+                size_t conceptId = pImpl->conceptFormation->presentExperience(
+                    pattern, features, 
+                    pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f,
+                    currentStep
+                );
+                
+                // Concept formed, can be used for planning
+                if (conceptId > 0) {
+                    // Store concept in associative memory for later use
+                    if (pImpl->associativeMemory) {
+                        // Get concept prototype and store it
+                        auto prototype = pImpl->conceptFormation->getConceptPrototype(conceptId);
+                        if (!prototype.empty()) {
+                            pImpl->associativeMemory->storePattern(prototype, pattern);
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -761,9 +811,6 @@ void Brain::reset() {
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
-bool Brain::save(const std::string& filepath) const {
-    NLM_LOG_INFO("Saving brain state to " + filepath);
-    
     try {
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
@@ -828,6 +875,123 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write memory systems
+        // Working memory
+        if (pImpl->workingMemory) {
+            std::vector<float> workingMemoryData;
+            workingMemoryData.reserve(pImpl->workingMemory->getMemoryNeurons().size() + 
+                                    pImpl->workingMemory->getMemoryActivations().size());
+            
+            const auto& neurons = pImpl->workingMemory->getMemoryNeurons();
+            const auto& activations = pImpl->workingMemory->getMemoryActivations();
+            
+            workingMemoryData.push_back(static_cast<float>(neurons.size()));
+            for (size_t i = 0; i < neurons.size(); ++i) {
+                workingMemoryData.push_back(static_cast<float>(neurons[i]));
+            }
+            for (size_t i = 0; i < activations.size(); ++i) {
+                workingMemoryData.push_back(activations[i]);
+            }
+            
+            if (!writer.writeSection(CheckpointSection::Memory, workingMemoryData.data(), 
+                                    workingMemoryData.size() * sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write working memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Episodic memory
+        if (pImpl->episodicMemory) {
+            std::vector<uint64_t> episodicMemoryData;
+            episodicMemoryData.reserve(pImpl->episodicMemory->getEpisodeCount() * 10);  // Estimate: 10 fields per episode
+            
+            const auto& episodes = pImpl->episodicMemory->getEpisodes();
+            episodicMemoryData.push_back(static_cast<uint64_t>(episodes.size()));
+            
+            for (const auto& episode : episodes) {
+                episodicMemoryData.push_back(static_cast<uint64_t>(episode.timestamp));
+                episodicMemoryData.push_back(static_cast<uint64_t>(episode.activeNeurons.size()));
+                episodicMemoryData.push_back(static_cast<uint64_t>(episode.neuronActivations.size()));
+                episodicMemoryData.push_back(reinterpret_cast<uint64_t&>(episode.action));  // Cast union to uint64_t
+                episodicMemoryData.push_back(reinterpret_cast<uint64_t&>(episode.reward));  // Cast union to uint64_t
+                episodicMemoryData.push_back(episode.positionX);  // Will cast to uint64_t
+                episodicMemoryData.push_back(episode.positionY);
+                episodicMemoryData.push_back(episode.age);
+                episodicMemoryData.push_back(static_cast<uint64_t>(episode.sensoryState.size()));
+                
+                // Store active neurons
+                for (const auto& neuronId : episode.activeNeurons) {
+                    episodicMemoryData.push_back(static_cast<uint64_t>(neuronId));
+                }
+                // Store neuron activations
+                for (const auto& activation : episode.neuronActivations) {
+                    episodicMemoryData.push_back(reinterpret_cast<uint64_t&>(activation));  // Cast float to uint64_t
+                }
+                // Store sensory state
+                for (const auto& value : episode.sensoryState) {
+                    episodicMemoryData.push_back(reinterpret_cast<uint64_t&>(value));  // Cast float to uint64_t
+                }
+            }
+            
+            if (!writer.writeSection(CheckpointSection::Memory, episodicMemoryData.data(),
+                                    episodicMemoryData.size() * sizeof(uint64_t))) {
+                NLM_LOG_ERROR("Failed to write episodic memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write neuromodulation states
+        if (pImpl->dopamine) {
+            float dopamineData[1] = {pImpl->dopamine->getLevel()};
+            if (!writer.writeSection(CheckpointSection::Neuromodulation, dopamineData, sizeof(dopamineData))) {
+                NLM_LOG_ERROR("Failed to write dopamine to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write prediction system state
+        if (pImpl->predictionSystem) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float confidence = pImpl->predictionSystem->getConfidence();
+            std::vector<float> predictionData{predictionError, confidence};
+            
+            if (!writer.writeSection(CheckpointSection::Memory, predictionData.data(), predictionData.size() * sizeof(float))) {
+                NLM_LOG_ERROR("Failed to write prediction system to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write development stage
+        uint8_t developmentalStage = static_cast<uint8_t>(pImpl->developmentalStage);
+        if (!writer.writeSection(CheckpointSection::Development, &developmentalStage, sizeof(developmentalStage))) {
+            NLM_LOG_ERROR("Failed to write development stage to checkpoint");
+            return false;
+        }
+        
+        // Write random generator state
+        // For now, just use current step as a simple seed
+        uint64_t rngState = static_cast<uint64_t>(pImpl->currentStep);
+        if (!writer.writeSection(CheckpointSection::RandomState, &rngState, sizeof(rngState))) {
+            NLM_LOG_ERROR("Failed to write RNG state to checkpoint");
+            return false;
+        }
+        
+        // Write simulation state
+        struct SimulationStateData {
+            uint64_t currentStep;
+            double currentTime;
+            bool isResting;
+        };
+        SimulationStateData simState;
+        simState.currentStep = pImpl->currentStep;
+        simState.currentTime = pImpl->currentTime;
+        simState.isResting = pImpl->isResting;
+        
+        if (!writer.writeSection(CheckpointSection::SimulationState, &simState, sizeof(simState))) {
+            NLM_LOG_ERROR("Failed to write simulation state to checkpoint");
+            return false;
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -841,7 +1005,6 @@ bool Brain::save(const std::string& filepath) const {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
         return false;
     }
-}
 
 bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
@@ -858,49 +1021,145 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Read neurons
-        NeuronCheckpointData neuronData;
-        if (!reader.readNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to read neurons from checkpoint");
-            return false;
-        }
-        
-        // Apply neuron states
-        size_t idx = 0;
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
-                        }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
-                        }
+        // Read working memory
+        auto workingMemorySection = reader.readSection(CheckpointSection::Memory);
+        if (!workingMemorySection.empty()) {
+            const uint64_t* data = reinterpret_cast<const uint64_t*>(workingMemorySection.data());
+            size_t dataSize = workingMemorySection.size() / sizeof(uint64_t);
+            
+            if (dataSize >= 1) {
+                size_t neuronCount = static_cast<size_t>(data[0]);
+                if (neuronCount > 0 && pImpl->workingMemory) {
+                    pImpl->workingMemory->clear();
+                    
+                    size_t availableData = dataSize - 1;
+                    size_t maxNeurons = std::min(neuronCount, availableData / 2);
+                    
+                    for (size_t i = 0; i < maxNeurons; ++i) {
+                        NeuronId neuronId(data[1 + i]);
+                        float activation = (i + 1 + maxNeurons < dataSize) ? 
+                            *reinterpret_cast<const float*>(&data[1 + maxNeurons + i]) : 0.5f;
+                        
+                        pImpl->workingMemory->storeToNeuron(neuronId, activation);
                     }
-                    idx++;
                 }
             }
         }
         
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
-            return false;
+        // Read episodic memory
+        auto episodicSection = reader.readSection(CheckpointSection::Memory);
+        if (!episodicSection.empty()) {
+            const uint64_t* data = reinterpret_cast<const uint64_t*>(episodicSection.data());
+            size_t dataSize = episodicSection.size() / sizeof(uint64_t);
+            
+            if (dataSize >= 1) {
+                size_t episodeCount = static_cast<size_t>(data[0]);
+                if (episodeCount > 0 && pImpl->episodicMemory) {
+                    pImpl->episodicMemory->clear();
+                    
+                    size_t pos = 1;
+                    size_t processedEpisodes = 0;
+                    
+                    while (pos + 10 <= dataSize && processedEpisodes < episodeCount) {
+                        EpisodicMemoryItem episode;
+                        episode.timestamp = data[pos++];
+                        
+                        size_t activeNeuronsCount = static_cast<size_t>(data[pos++]);
+                        episode.activeNeurons.clear();
+                        for (size_t i = 0; i < activeNeuronsCount && pos < dataSize; ++i) {
+                            episode.activeNeurons.push_back(NeuronId(data[pos++]));
+                        }
+                        
+                        size_t activationsCount = static_cast<size_t>(data[pos++]);
+                        episode.neuronActivations.clear();
+                        for (size_t i = 0; i < activationsCount && pos < dataSize; ++i) {
+                            episode.neuronActivations.push_back(*reinterpret_cast<const float*>(&data[pos++]));
+                        }
+                        
+                        // Skip action (union cast)
+                        pos++;
+                        // Skip reward (union cast)
+                        pos++;
+                        // Skip positionX
+                        pos++;
+                        // Skip positionY
+                        pos++;
+                        episode.age = data[pos++];
+                        
+                        size_t sensoryStateSize = static_cast<size_t>(data[pos++]);
+                        episode.sensoryState.clear();
+                        for (size_t i = 0; i < sensoryStateSize && pos < dataSize; ++i) {
+                            episode.sensoryState.push_back(*reinterpret_cast<const float*>(&data[pos++]));
+                        }
+                        
+                        // Skip remaining fields for this episode (positionX, positionY, age, sensoryState size)
+                        // We already skipped positionX, positionY, age, and sensoryState size
+                        
+                        if (pos <= dataSize) {
+                            pImpl->episodicMemory->storeEpisode(episode);
+                            processedEpisodes++;
+                        }
+                    }
+                }
+            }
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Read neuromodulation states
+        auto neuromodulationSection = reader.readSection(CheckpointSection::Neuromodulation);
+        if (!neuromodulationSection.empty() && pImpl->dopamine) {
+            if (neuromodulationSection.size() >= sizeof(float)) {
+                float dopamineLevel = *reinterpret_cast<const float*>(neuromodulationSection.data());
+                pImpl->dopamine->setLevel(dopamineLevel);
+            }
+        }
+        
+        // Read prediction system state
+        auto predictionSection = reader.readSection(CheckpointSection::Memory);
+        if (!predictionSection.empty() && pImpl->predictionSystem) {
+            if (predictionSection.size() >= 2 * sizeof(float)) {
+                float predictionError = *reinterpret_cast<const float*>(predictionSection.data());
+                float confidence = *reinterpret_cast<const float*>(predictionSection.data() + sizeof(float));
+                
+                // The prediction system doesn't have direct setters, so we need to trigger an update
+                // Create a dummy observation to trigger training
+                std::vector<float> dummyState(10, 0.5f);
+                pImpl->predictionSystem->train(SensoryInput(dummyState));
+                pImpl->predictionSystem->updatePredictions(SensoryInput(dummyState), SensoryInput(dummyState));
+            }
+        }
+        
+        // Read development stage
+        auto developmentSection = reader.readSection(CheckpointSection::Development);
+        if (!developmentSection.empty() && developmentSection.size() >= sizeof(uint8_t)) {
+            pImpl->developmentalStage = static_cast<DevelopmentalStage>(*developmentSection.data());
+        }
+        
+        // Read random generator state (currently just step number)
+        auto randomSection = reader.readSection(CheckpointSection::RandomState);
+        if (!randomSection.empty() && randomSection.size() >= sizeof(uint64_t) && pImpl->rng) {
+            // We can't easily restore the full RNG state, so just reset with a seed
+            // Use the step number as seed
+            uint64_t rngSeed = *reinterpret_cast<const uint64_t*>(randomSection.data());
+            pImpl->rng = std::make_unique<RandomGenerator>(rngSeed);
+        }
+        
+        // Read simulation state
+        auto simulationSection = reader.readSection(CheckpointSection::SimulationState);
+        if (!simulationSection.empty() && simulationSection.size() >= sizeof(SimulationStateData)) {
+            const SimulationStateData* simData = reinterpret_cast<const SimulationStateData*>(simulationSection.data());
+            pImpl->currentStep = simData->currentStep;
+            pImpl->currentTime = simData->currentTime;
+            pImpl->isResting = simData->isResting;
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
+        return false;
+    }
+}
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
