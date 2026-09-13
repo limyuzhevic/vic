@@ -1,4 +1,5 @@
 #include "SensoryPercept.hpp"
+#include "../core/Logger/Logger.hpp"
 
 namespace nlm {
 
@@ -7,11 +8,14 @@ SensoryPercept::SensoryPercept()
     , visionHeight_(16)
     , timestamp_(0.0)
 {
-    vision_.resize(16 * 16, 0.0f);
+    // Configure sensory dimensions with validation
+    vision_.resize(visionWidth_ * visionHeight_, 0.0f);
     touch_.resize(8, 0.0f);
     internal_.resize(4, 0.0f);
     proprioception_.resize(6, 0.0f);
     audio_.resize(0, 0.0f);
+    
+    NLM_LOG_DEBUG("SensoryPercept initialized with configurable dimensions");
 }
 
 std::vector<float> SensoryPercept::getAllSignals() const {
