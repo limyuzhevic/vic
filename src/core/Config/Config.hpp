@@ -55,13 +55,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or simple format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON, YAML, or simple format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -71,7 +71,7 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
@@ -93,13 +93,29 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Internal helpers
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // File format loaders/savers
+    bool loadFromSimpleFormat(const std::string& filepath);
+    bool saveToSimpleFormat(const std::string& filepath) const;
+    bool loadFromJSON(const std::string& filepath);
+    bool saveToJSON(const std::string& filepath) const;
+    bool loadFromYAML(const std::string& filepath);
+    bool saveToYAML(const std::string& filepath) const;
+    
+    // Utility functions
+    bool setFromString(const std::string& key, const std::string& valueStr, ConfigSource source);
+    std::string valueToString(const ConfigValue& value) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    void validateAll();
+    void printHelp();
+    void printVersion();
 };
 
 } // namespace nlm
