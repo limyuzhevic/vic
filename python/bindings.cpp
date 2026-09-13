@@ -351,7 +351,74 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+
+    // Add bindings for memory systems
+    .def("getWorkingMemory", &Brain::getWorkingMemory,
+         py::return_value_policy::reference_internal,
+         "Get the working memory system")
+    .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+         py::return_value_policy::reference_internal,
+         "Get the episodic memory system")
+    .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+         py::return_value_policy::reference_internal,
+         "Get the associative memory system")
+
+    // Add bindings for prediction system
+    .def("getPredictionSystem", &Brain::getPredictionSystem,
+         py::return_value_policy::reference_internal,
+         "Get the prediction system")
+
+    // Add bindings for cognition systems
+    .def("getPlanner", &Brain::getPlanner,
+         py::return_value_policy::reference_internal,
+         "Get the neural planner")
+    .def("getConceptFormation", &Brain::getConceptFormation,
+         py::return_value_policy::reference_internal,
+         "Get the concept formation system")
+    .def("getAttention", &Brain::getAttention,
+         py::return_value_policy::reference_internal,
+         "Get the attentional selection system")
+
+    // Add bindings for development system
+    .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+         py::return_value_policy::reference_internal,
+         "Get the development system")
+
+    // Add bindings for neuromodulation systems
+    .def("getDopamine", &Brain::getDopamine,
+         py::return_value_policy::reference_internal,
+         "Get the dopamine neuromodulator")
+    .def("getCuriosity", &Brain::getCuriosity,
+         py::return_value_policy::reference_internal,
+         "Get the curiosity neuromodulator")
+    .def("getNovelty", &Brain::getNovelty,
+         py::return_value_policy::reference_internal,
+         "Get the novelty neuromodulator")
+    .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+         py::return_value_policy::reference_internal,
+         "Get the prediction error signal");
+
+    // Add bindings for plasticity systems
+    .def("getSpikeSystem", &Brain::getSpikeSystem,
+         py::return_value_policy::reference_internal,
+         "Get the spike system")
+    .def("getSTDP", &Brain::getSTDP,
+         py::return_value_policy::reference_internal,
+         "Get the STDP plasticity system")
+    .def("getHebbian", &Brain::getHebbian,
+         py::return_value_policy::reference_internal,
+         "Get the Hebbian plasticity system")
+    .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+         py::return_value_policy::reference_internal,
+         "Get the structural plasticity system")
+    .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+         py::arg("signal"),
+         "Apply neuromodulatory signals")
+    .def("updatePlasticity", &Brain::updatePlasticity,
+         "Update plasticity rules")
+    .def("develop", &Brain::develop,
+         "Apply developmental changes");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
