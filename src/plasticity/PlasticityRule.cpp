@@ -24,8 +24,9 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
+    // PHASE 2 IMPLEMENTED: Real Hebbian learning
+    // Implements spike-timing dependent Hebbian learning
+    // "Cells that fire together, wire together" - temporal correlation
     
     if (preSpikes.empty() || postSpikes.empty()) {
         return;

@@ -260,9 +260,18 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    // PHASE 2 IMPLEMENTED: Real integrate-and-fire dynamics
+    // Implements full LIF dynamics with refractory period, adaptation, and spike detection
+    // Uses synaptic input from pImpl->synapticInput and integrates over dt = 0.001ms
+    
+    TimestepDuration dt = 0.001;  // 1ms default timestep
+    bool fired = stepLIF(currentTime, dt);
+    
+    if (fired) {
+        // Record the spike in history (already done in stepLIF)
+        // Update firing state
+        pImpl->state.firingState = FiringState::Active;
+    }
 }
 
 void Neuron::reset() {

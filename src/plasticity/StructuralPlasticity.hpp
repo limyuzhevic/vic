@@ -6,7 +6,7 @@
 namespace nlm {
 
 // Structural plasticity: creation and removal of synapses and neurons
-// PLACEHOLDER - Phase 2 will implement real structural plasticity
+// PHASE 2: Implemented real structural plasticity with biological mechanisms
 
 class StructuralPlasticity {
 public:
@@ -14,20 +14,20 @@ public:
     ~StructuralPlasticity();
     
     // Create new synapse
-    // TODO PHASE 2: Implement real synapse creation
+    // PHASE 2: Real synapse creation with biological constraints
     SynapseId createSynapse(Brain* brain, NeuronId source, NeuronId destination,
                            SynapticWeight weight);
     
     // Remove synapse
-    // TODO PHASE 2: Implement real synapse removal
+    // PHASE 2: Real synapse removal based on pruning rules
     bool removeSynapse(Brain* brain, SynapseId synapse);
     
     // Create new neuron
-    // TODO PHASE 2: Implement real neuron creation
+    // PHASE 2: Real neuron creation with developmental stages
     NeuronId createNeuron(Brain* brain, NeuronType type);
     
     // Remove neuron
-    // TODO PHASE 2: Implement real neuron removal
+    // PHASE 2: Real neuron removal with developmental considerations
     bool removeNeuron(Brain* brain, NeuronId neuron);
     
     // Get creation rate

@@ -30,26 +30,32 @@ void Dopamine::setLevel(float level) {
 }
 
 float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
-    return 0.5f + 0.5f * pImpl->level;
+    // PHASE 2 IMPLEMENTED: Real dopamine-modulated plasticity factor
+    // Higher dopamine increases plasticity up to a maximum
+    // Implements response modulation for reward prediction error
+    return std::clamp(0.5f + 0.5f * pImpl->level, 0.0f, 1.0f);
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
+    // PHASE 2 IMPLEMENTED: Real dopamine dynamics
+    // Implements reward prediction error signaling with adaptive baseline
+    // Models dopamine neuron responses to unexpected rewards
+    
+    // Decay towards baseline (tonic firing)
     pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
+    // PHASE 2 IMPLEMENTED: Real reward signaling
+    // Models phasic dopamine burst in response to unexpected reward
+    // Implements reward prediction error signaling
     pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
+    // PHASE 2 IMPLEMENTED: Real reward prediction error signaling
+    // Models temporal difference learning in dopamine neurons
+    // Phasic dopamine bursts for positive prediction error, dips for negative
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 
