@@ -1,11 +1,18 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Final Integration with Command-Line Interface
 //
 // This phase implements real spiking neural computation with:
 // - Leaky Integrate-and-Fire (LIF) neurons
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+// - Integrated memory systems (working, episodic, associative)
+// - Prediction system and neural planning
+// - Neuromodulation (dopamine, curiosity, novelty)
+// - Development and structural plasticity
+// - Comprehensive checkpointing and persistence
+// - Advanced configuration with runtime options
+// - Command-line interface for brain manipulation
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -18,15 +25,250 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
-
+#include "agent/AgentBrain.hpp"
 #include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <fstream>
+#include <sstream>
 
 using namespace nlm;
+
+// Command-line interface for brain manipulation
+namespace cli {
+
+    // Print configuration help
+    void printConfigHelp() {
+        std::cout << "=== Configuration Options ===" << std::endl;
+        std::cout << "--config=file.cfg              Load configuration from file" << std::endl;
+        std::cout << "--key=value                   Set configuration key" << std::endl;
+        std::cout << "--neuron-count=N              Set number of neurons" << std::endl;
+        std::cout << "--region-count=N              Set number of brain regions" << std::endl;
+        std::cout << "--simulation-timestep=DT       Set simulation timestep" << std::endl;
+        std::cout << "--random-seed=N               Set random seed for reproducibility" << std::endl;
+        std::cout << "--checkpoint-dir=DIR           Set checkpoint directory" << std::endl;
+        std::cout << "--replay-interval=N           Set memory replay interval" << std::endl;
+        std::cout << "--consolidation-interval=N    Set memory consolidation interval" << std::endl;
+        std::cout << "--stdp-ltp-weight=VAL         Set STDP LTP weight" << std::endl;
+        std::cout << "--stdp-ltd-weight=VAL         Set STDP LTD weight" << std::endl;
+        std::cout << "--stdp-tau=VAL                Set STDP tau parameter" << std::endl;
+        std::cout << "--synaptogenesis-rate=VAL     Set synaptogenesis rate" << std::endl;
+        std::cout << "--pruning-rate=VAL            Set pruning rate" << std::endl;
+        std::cout << "--help                        Show this help message" << std::endl;
+    }
+    
+    // Print brain status
+    void printBrainStatus(std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            std::cout << "ERROR: No brain available" << std::endl;
+            return;
+        }
+        
+        std::cout << "=== Brain Status ===" << std::endl;
+        brain->logStatus();
+    }
+    
+    // Save brain to checkpoint
+    bool saveBrain(std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain) {
+            std::cout << "ERROR: No brain to save" << std::endl;
+            return false;
+        }
+        
+        std::cout << "Saving brain to: " << filepath << std::endl;
+        return brain->save(filepath);
+    }
+    
+    // Load brain from checkpoint
+    bool loadBrain(std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain) {
+            std::cout << "ERROR: No brain to load into" << std::endl;
+            return false;
+        }
+        
+        std::cout << "Loading brain from: " << filepath << std::endl;
+        return brain->load(filepath);
+    }
+    
+    // Reset brain
+    void resetBrain(std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            std::cout << "ERROR: No brain to reset" << std::endl;
+            return;
+        }
+        
+        std::cout << "Resetting brain..." << std::endl;
+        brain->reset();
+    }
+    
+    // Run simulation steps
+    void runSimulation(std::shared_ptr<Brain> brain, size_t steps, bool verbose = false) {
+        if (!brain) {
+            std::cout << "ERROR: No brain to run" << std::endl;
+            return;
+        }
+        
+        std::cout << "Running " << steps << " simulation steps..." << std::endl;
+        
+        if (verbose) {
+            std::cout << "Step | Spikes | Firing | Total Spikes | E/I Ratio" << std::endl;
+            std::cout << "-----|--------|--------|--------------|----------" << std::endl;
+        }
+        
+        for (SimulationStep step = 0; step < steps; ++step) {
+            // Inject sensory input if brain has sensory neurons
+            brain->injectCurrentToNeurons(NeuronType::Sensory, 10.0f);
+            
+            brain->step(step);
+            
+            if (verbose && step % 100 == 0) {
+                std::cout << std::setw(4) << step << " | "
+                          << std::setw(6) << brain->getFiringNeuronCount() << " | "
+                          << std::setw(6) << (brain->getActiveNeuronCount()) << " | "
+                          << std::setw(12) << brain->getTotalSpikeCount() << " | "
+                          << std::setw(9) << brain->getExcitationInhibitionRatio() << std::endl;
+            }
+        }
+        
+        std::cout << "Completed " << steps << " simulation steps." << std::endl;
+    }
+    
+    // Print configuration
+    void printConfiguration(std::shared_ptr<Config> config) {
+        if (!config) {
+            std::cout << "ERROR: No configuration available" << std::endl;
+            return;
+        }
+        
+        std::cout << "=== Current Configuration ===" << std::endl;
+        std::cout << config->summary() << std::endl;
+    }
+    
+    // Set configuration value
+    void setConfigValue(std::shared_ptr<Config> config, const std::string& key, const std::string& value) {
+        if (!config) {
+            std::cout << "ERROR: No configuration available" << std::endl;
+            return;
+        }
+        
+        config->set(key, value, ConfigSource::CommandLine);
+        std::cout << "Set " << key << " = " << value << std::endl;
+    }
+}
+
+// Command-line tool for brain manipulation
+void brainToolMain(int argc, char** argv) {
+    // Initialize logger
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    std::cout << "=== NLM Brain Manipulation Tool ===" << std::endl;
+    
+    // Load configuration
+    auto config = std::make_shared<Config>();
+    
+    // Parse command line arguments
+    std::string configFile;
+    std::string action;
+    std::string inputFile;
+    std::string outputFile;
+    size_t steps = 100;
+    bool verbose = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help") {
+            std::cout << "Usage: brain-tool [options]" << std::endl;
+            std::cout << "Options:" << std::endl;
+            std::cout << "  --help                    Show this help message" << std::endl;
+            std::cout << "  --version                 Show version information" << std::endl;
+            std::cout << "  --config=file.cfg         Load configuration from file" << std::endl;
+            std::cout << "  --action=ACTION           Set action: status|save|load|reset|run" << std::endl;
+            std::cout << "  --input=file              Input file for load/save actions" << std::endl;
+            std::cout << "  --output=file             Output file for save actions" << std::endl;
+            std::cout << "  --steps=N                 Number of simulation steps to run" << std::endl;
+            std::cout << "  --verbose                 Verbose output" << std::endl;
+            std::cout << "  --set=key=value           Set configuration key-value pair" << std::endl;
+            return;
+        } else if (arg == "--version") {
+            std::cout << "NLM Brain Manipulation Tool v0.1.0" << std::endl;
+            return;
+        } else if (startsWith(arg, "--config=")) {
+            configFile = arg.substr(9);
+        } else if (startsWith(arg, "--action=")) {
+            action = arg.substr(8);
+        } else if (startsWith(arg, "--input=")) {
+            inputFile = arg.substr(7);
+        } else if (startsWith(arg, "--output=")) {
+            outputFile = arg.substr(8);
+        } else if (startsWith(arg, "--steps=")) {
+            steps = std::stoul(arg.substr(7));
+        } else if (arg == "--verbose") {
+            verbose = true;
+        } else if (startsWith(arg, "--set=")) {
+            std::string kv = arg.substr(6);
+            size_t pos = kv.find('=');
+            if (pos != std::string::npos) {
+                std::string key = kv.substr(0, pos);
+                std::string value = kv.substr(pos + 1);
+                config->set(key, value, ConfigSource::CommandLine);
+            }
+        }
+    }
+    
+    // Load config file if specified
+    if (!configFile.empty()) {
+        if (config->loadFromFile(configFile)) {
+            std::cout << "Loaded configuration from: " << configFile << std::endl;
+        } else {
+            std::cout << "WARNING: Failed to load configuration from: " << configFile << std::endl;
+        }
+    }
+    
+    // Create default configuration if needed
+    if (!config->has("neuron_count")) {
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    }
+    if (!config->has("region_count")) {
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    }
+    if (!config->has("simulation_timestep")) {
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    }
+    
+    // Initialize brain
+    auto brain = std::make_shared<Brain>(config);
+    std::cout << "Initializing brain..." << std::endl;
+    
+    if (!brain->initialize()) {
+        std::cout << "ERROR: Failed to initialize brain" << std::endl;
+        return;
+    }
+    
+    // Execute action
+    if (action == "status") {
+        cli::printBrainStatus(brain);
+    } else if (action == "save" && !outputFile.empty()) {
+        cli::saveBrain(brain, outputFile);
+    } else if (action == "load" && !inputFile.empty()) {
+        cli::loadBrain(brain, inputFile);
+    } else if (action == "reset") {
+        cli::resetBrain(brain);
+    } else if (action == "run") {
+        cli::runSimulation(brain, steps, verbose);
+    } else {
+        // Default action: show status
+        cli::printBrainStatus(brain);
+    }
+    
+    std::cout << "=== Brain tool completed ===" << std::endl;
+}
 
 void printBanner() {
     std::cout << R"(

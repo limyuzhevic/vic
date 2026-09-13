@@ -87,3 +87,9 @@ void runAll() {
 }
 
 } // namespace test_config
+
+int main() {
+    std::cout << "=== Config Tests ===" << std::endl;
+    test_config::runAll();
+    return 0;
+}

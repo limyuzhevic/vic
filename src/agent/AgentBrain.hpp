@@ -6,8 +6,18 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <algorithm>
+#include <random>
 
 namespace nlm {
+
+// Motor distribution strategies
+enum class DistributionStrategy {
+    Random,        // Pure random distribution
+    Balanced,      // Equal emphasis on important actions
+    Learned,       // Based on experience and learned patterns
+    Adaptive       // Dynamic based on current state
+};
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
@@ -69,12 +79,48 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Motor distribution configuration
+    void setMotorDistributionStrategy(DistributionStrategy strategy) { 
+        motorDistributionStrategy_ = strategy; 
+    }
+    void setSensoryDistributionStrategy(DistributionStrategy strategy) { 
+        sensoryDistributionStrategy_ = strategy; 
+    }
+    DistributionStrategy getMotorDistributionStrategy() const { return motorDistributionStrategy_; }
+    DistributionStrategy getSensoryDistributionStrategy() const { return sensoryDistributionStrategy_; }
+    
+    // Re-distribute neurons (useful when brain is reconfigured)
+    void redistributeNeurons() {
+        distributeNeurons();
+    }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Neuron distribution methods
+    void distributeNeurons();
+    void distributeMotorNeurons(size_t totalMotorNeurons);
+    void distributeMotorRandom(size_t totalMotorNeurons);
+    void distributeMotorBalanced(size_t totalMotorNeurons);
+    void distributeMotorLearned(size_t totalMotorNeurons);
+    void distributeMotorAdaptive(size_t totalMotorNeurons);
+    void distributeMotorWeighted(size_t totalMotorNeurons, 
+                                 double forwardWeight, double backwardWeight,
+                                 double leftWeight, double rightWeight,
+                                 double interactWeight, double waitWeight);
+    
+    void distributeSensoryNeurons(size_t totalSensoryNeurons);
+    void distributeSensoryRandom(size_t totalSensoryNeurons);
+    void distributeSensoryOrganized(size_t totalSensoryNeurons);
+    void distributeSensoryExperienceBased(size_t totalSensoryNeurons);
+    void distributeSensoryAdaptive(size_t totalSensoryNeurons);
+    void distributeSensoryWeighted(size_t totalSensoryNeurons,
+                                 double visionWeight, double touchWeight,
+                                 double internalWeight, double proprioceptionWeight);
     
     std::shared_ptr<Brain> brain_;
     
@@ -112,6 +158,13 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Distribution strategies
+    DistributionStrategy motorDistributionStrategy_;
+    DistributionStrategy sensoryDistributionStrategy_;
+    
+    // Random number generator for distribution
+    std::mt19937 rng_;
 };
 
 } // namespace nlm

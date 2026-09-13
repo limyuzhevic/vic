@@ -127,6 +127,12 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
+# Brain manipulation tool
+add_executable(brain_tool
+    src/main.cpp
+)
+target_link_libraries(brain_tool PUBLIC nlm_core)
+
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
