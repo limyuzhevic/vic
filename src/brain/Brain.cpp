@@ -124,11 +124,12 @@ struct Brain::Impl {
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+    // Initialize neuromodulation systems
+    dopamine = std::make_unique<Dopamine>();
+    curiosity = std::make_unique<Curiosity>();
+    enhancedCuriosity = std::make_unique<EnhancedCuriosity>();
+    predictionError = std::make_unique<PredictionError>();
+    novelty = std::make_unique<Novelty>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);

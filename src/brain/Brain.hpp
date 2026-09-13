@@ -26,6 +26,7 @@ class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
+class EnhancedCuriosity;
 class Novelty;
 class PredictionError;
 
