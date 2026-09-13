@@ -105,15 +105,15 @@ public:
                 metrics.totalReward += result.reward;
                 metrics.totalSpikes += brain->getFiringNeuronCount();
                 
-                // Count actions
-                switch (cmd) {
-                    case MotorCommand::MoveForward: metrics.forwardCount++; break;
-                    case MotorCommand::MoveBackward: metrics.backwardCount++; break;
-                    case MotorCommand::TurnLeft: metrics.turnLeftCount++; break;
-                    case MotorCommand::TurnRight: metrics.turnRightCount++; break;
-                    case MotorCommand::Interact: metrics.interactCount++; break;
-                    default: metrics.waitCount++; break;
-                }
+            // Count actions
+            switch (cmd) {
+                case MotorCommand::MoveForward: metrics.forwardCount++; break;
+                case MotorCommand::MoveBackward: metrics.backwardCount++; break;
+                case MotorCommand::TurnLeft: metrics.turnLeftCount++; break;
+                case MotorCommand::TurnRight: metrics.turnRightCount++; break;
+                case MotorCommand::Interact: metrics.interactCount++; break;
+                default: metrics.waitCount++; break;
+            }
                 
                 // Print periodic updates
                 if (step % 50 == 0) {
@@ -220,11 +220,8 @@ private:
             case MotorCommand::MoveBackward: return "MoveBackward";
             case MotorCommand::TurnLeft: return "TurnLeft";
             case MotorCommand::TurnRight: return "TurnRight";
-            case MotorCommand::LookLeft: return "LookLeft";
-            case MotorCommand::LookRight: return "LookRight";
             case MotorCommand::Interact: return "Interact";
-            case MotorCommand::Wait: return "Wait";
-            default: return "Unknown";
+            default: return "Wait";
         }
     }
     
