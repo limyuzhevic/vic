@@ -1,0 +1,52 @@
+# Test configuration file template
+# This template is used by CMake to generate test configuration files
+# @VARIABLE@ placeholders will be replaced during CMake configuration
+
+# Test random seed for reproducible experiments
+random_seed = @TEST_RANDOM_SEED@
+
+# Simulation timestep for tests
+simulation_timestep = @TEST_TIMESTEP@
+
+# Number of neurons for basic tests
+neuron_count = @TEST_NEURON_COUNT@
+
+# Number of regions for basic tests
+region_count = @TEST_REGION_COUNT@
+
+# Connection probability
+connection_probability = @TEST_CONNECTION_PROBABILITY@
+
+# Plasticity parameters
+plasticity_learning_rate = @TEST_PLASTICITY_LEARNING_RATE@
+stdp_ltp_weight = @TEST_STDP_LTP_WEIGHT@
+stdp_ltd_weight = @TEST_STDP_LTD_WEIGHT@
+stdp_tau = @TEST_STDP_TAU@
+
+# Development parameters
+synaptogenesis_rate = @TEST_SYNAPTOGENESIS_RATE@
+pruning_rate = @TEST_PRUNING_RATE@
+
+# Neuromodulation parameters
+dopamine_baseline = @TEST_DOPAMINE_BASELINE@
+
+# Reward parameters
+reward_discount_factor = @TEST_REWARD_DISCOUNT_FACTOR@
+
+# Environment settings
+environment_name = @TEST_ENVIRONMENT_NAME@
+environment_width = @TEST_ENVIRONMENT_WIDTH@
+environment_height = @TEST_ENVIRONMENT_HEIGHT@
+
+# Logging settings
+log_level = @TEST_LOG_LEVEL@
+log_to_file = @TEST_LOG_TO_FILE@
+log_filename = @TEST_LOG_FILENAME@
+
+# Simulation settings
+max_simulation_steps = @TEST_MAX_STEPS@
+simulation_time_limit = @TEST_TIME_LIMIT@
+
+# Visualization settings
+visualization_enabled = @TEST_VISUALIZATION_ENABLED@
+visualization_update_rate = @TEST_VISUALIZATION_UPDATE_RATE@

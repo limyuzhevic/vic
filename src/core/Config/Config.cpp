@@ -20,7 +20,9 @@ Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Current implementation: Phase 1 uses a simple key=value format
+    // This format is used for .cfg files (e.g., configs/default.cfg)
+    // Phase 2 and beyond will switch to JSON/YAML format
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -92,8 +94,8 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
+// Get value as generic ConfigValue
+std::optional<ConfigValue> Config::getAny(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -101,17 +103,7 @@ std::optional<T> Config::get(const std::string& key) const {
         return std::nullopt;
     }
     
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    return it->value;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {

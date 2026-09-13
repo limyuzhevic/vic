@@ -5,11 +5,14 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+class ConfigValidator;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -64,9 +67,12 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get value
     template<typename T>
     std::optional<T> get(const std::string& key) const;
+    
+    // Get value as generic ConfigValue
+    std::optional<ConfigValue> getAny(const std::string& key) const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
@@ -100,6 +106,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    friend class ConfigValidator;
 };
 
 } // namespace nlm
