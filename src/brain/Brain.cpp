@@ -11,6 +11,8 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
+#include "../brain/AttentionalSelection.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
@@ -477,9 +479,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 6.5: Add neural associative memory to working-episodic memory dynamics ==========
+    if (pImpl->workingMemory && pImpl->associativeMemory) {
+        // Integrate working memory with episodic memory via associative memory
+        std::vector<float> wmContent = pImpl->workingMemory->retrieve();
+        if (!wmContent.empty() && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Create bidirectional associations between working memory and episodic memory
+            auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+            
+            for (const auto* episode : recentEpisodes) {
+                if (episode) {
+                    // Create association between working memory pattern and episodic content
+                    pImpl->associativeMemory->associate(wmContent, episode->sensoryState, 0.3f);
+                    
+                    // Create association between active neurons and episodic activation pattern
+                    std::vector<float> neuronPattern;
+                    for (size_t i = 0; i < std::min(episode->activeNeurons.size(), episode->neuronActivations.size()); ++i) {
+                        float activation = episode->neuronActivations[i];
+                        neuronPattern.push_back(activation);
+                    }
+                    
+                    // Associate working memory with neuron activation patterns
+                    for (size_t i = 0; i < std::min(pImpl->workingMemory->getMemoryNeurons().size(), 3u); ++i) {
+                        NeuronId neuron = pImpl->workingMemory->getMemoryNeurons()[i];
+                        float neuronValue = static_cast<float>(neuron.value) / 100000.0f;
+                        pImpl->associativeMemory->associate(neuronPattern, std::vector<float>(1, neuronValue), 0.2f);
+                    }
+                }
+            }
+        }
+    }
+    
     // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+    if (pImpl->stepsSinceLastEpisode >= 20) {  // Store episode every 20 steps (requirement 1)
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
@@ -505,7 +538,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Transfer working memory traces to episodic memory (requirement 1)
+            if (pImpl->workingMemory) {
+                // Get current working memory content
+                std::vector<float> wmContent = pImpl->workingMemory->retrieve();
+                // Encode working memory content as sensory state
+                if (!wmContent.empty()) {
+                    episode.sensoryState = wmContent;
+                }
+                
+                // Transfer associative memory between working and episodic traces (requirement 4)
+                if (pImpl->associativeMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                    for (const auto& neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                        // Convert neuron ID to float pattern for associative memory
+                        float pattern = static_cast<float>(neuronId.value) / 100000.0f;
+                        std::vector<float> patternVec(1, pattern);
+                        
+                        // Create association between working memory and episodic content (requirement 4)
+                        if (!wmContent.empty()) {
+                            pImpl->associativeMemory->associate(patternVec, wmContent, 0.5f);
+                        }
+                    }
+                }
+            }
+            
             pImpl->episodicMemory->storeEpisode(episode);
+        }
+    }
+    
+    // Continuous episodic memory relevance updates (requirement 2)
+    if (pImpl->episodicMemory) {
+        // Update relevance based on working memory activation
+        if (pImpl->workingMemory) {
+            float wmActivity = pImpl->workingMemory->getMemoryActivity();
+            // Higher working memory activity increases relevance of recent episodes
+            if (wmActivity > 0.5f) {
+                // Update relevance of most recent episodes
+                auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+                for (const auto* episode : recentEpisodes) {
+                    if (episode && episode->age < 100) {  // Recent episodes
+                        pImpl->episodicMemory->updateRelevance(episode->timestamp, wmActivity * 0.01f);
+                    }
+                }
+            }
+        }
+        
+        // Update episodic memory states (age, etc.)
+        for (size_t i = 0; i < pImpl->episodicMemory->getEpisodeCount(); ++i) {
+            if (const EpisodicMemoryItem* episode = pImpl->episodicMemory->getEpisode(i)) {
+                // Age episodes (just increment age for now)
+                const_cast<EpisodicMemoryItem*>(episode)->age++;
+            }
         }
     }
     
@@ -519,6 +602,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
+        // Integrate attentional selection with episodic memory states
+        if (pImpl->episodicMemory) {
+            // Get highly relevant episodes from episodic memory
+            auto relevantEpisodes = pImpl->episodicMemory->getEpisodesForReplay(3);
+            
+            // Extract patterns from relevant episodes for attentional focus
+            for (const auto* episode : relevantEpisodes) {
+                if (episode) {
+                    // Apply top-down attentional bias based on episodic content
+                    for (size_t i = 0; i < episode->activeNeurons.size() && i < episode->neuronActivations.size(); ++i) {
+                        float salience = episode->neuronActivations[i] * 2.0f;  // Amplify salience
+                        pImpl->attention->applyBottomUpSalience(episode->activeNeurons[i], salience);
+                    }
+                }
+            }
+        }
+        
         // Apply attention to working memory winners
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
@@ -530,6 +630,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
+        
+        // Integrate episodic memory with concept formation
+        if (pImpl->episodicMemory && pImpl->workingMemory) {
+            // Get recent episodic patterns
+            auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(10);
+            
+            // Use working memory content to form concepts from episodic patterns
+            std::vector<float> wmContent = pImpl->workingMemory->retrieve();
+            
+            // Concept formation would analyze these patterns and create
+            // abstract representations
+            // (simplified placeholder for now)
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
