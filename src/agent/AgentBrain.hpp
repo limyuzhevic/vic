@@ -69,6 +69,81 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced agent configuration options
+    void setSensoryWeight(float weight) { sensoryWeight_ = weight; }
+    void setMotorThreshold(float threshold) { motorThreshold_ = threshold; }
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = threshold; }
+    void setNoveltyDecay(float decay) { noveltyDecay_ = decay; }
+    void setDevelopmentRate(double rate) { developmentRate_ = rate; }
+    void setPlasticityModifier(float modifier) { plasticityModifier_ = modifier; }
+    
+    float getSensoryWeight() const { return sensoryWeight_; }
+    float getMotorThreshold() const { return motorThreshold_; }
+    float getCuriosityThreshold() const { return curiosityThreshold_; }
+    float getNoveltyDecay() const { return noveltyDecay_; }
+    double getDevelopmentRate() const { return developmentRate_; }
+    float getPlasticityModifier() const { return plasticityModifier_; }
+    
+    // Performance and monitoring options
+    void setMaxSteps(int maxSteps) { maxSteps_ = maxSteps; }
+    void setEnableMetrics(bool enable) { enableMetrics_ = enable; }
+    void setEnableProfiling(bool enable) { enableProfiling_ = enable; }
+    
+    int getMaxSteps() const { return maxSteps_; }
+    bool isMetricsEnabled() const { return enableMetrics_; }
+    bool isProfilingEnabled() const { return enableProfiling_; }
+    
+    // Advanced behavior options
+    void setExplorationMode(bool exploration) { explorationMode_ = exploration; }
+    void setExploitationMode(bool exploitation) { exploitationMode_ = exploitation; }
+    void setAdaptiveLearning(bool adaptive) { adaptiveLearning_ = adaptive; }
+    
+    bool isExplorationMode() const { return explorationMode_; }
+    bool isExploitationMode() const { return exploitationMode_; }
+    bool isAdaptiveLearning() const { return adaptiveLearning_; }
+    
+    // Output formatting options
+    void setVerboseOutput(bool verbose) { verboseOutput_ = verbose; }
+    void setJsonOutput(bool json) { jsonOutput_ = json; }
+    
+    bool isVerboseOutput() const { return verboseOutput_; }
+    bool isJsonOutput() const { return jsonOutput_; }
+    
+    // Configuration serialization
+    std::map<std::string, std::string> getConfig() const;
+    void setConfig(const std::map<std::string, std::string>& config);
+    
+    // Batch processing and scripting capabilities
+    void enableBatchMode(bool enable) { batchMode_ = enable; }
+    bool isBatchMode() const { return batchMode_; }
+    
+    // Advanced feature toggles
+    void setMemoryReplayEnabled(bool enable) { memoryReplayEnabled_ = enable; }
+    void setCheckpointEnabled(bool enable) { checkpointEnabled_ = enable; }
+    void setVisualizationEnabled(bool enable) { visualizationEnabled_ = enable; }
+    
+    bool isMemoryReplayEnabled() const { return memoryReplayEnabled_; }
+    bool isCheckpointEnabled() const { return checkpointEnabled_; }
+    bool isVisualizationEnabled() const { return visualizationEnabled_; }
+    
+    // Get comprehensive agent status
+    std::map<std::string, py::object> getStatus() const;
+    
+    // Command processing and scripting
+    void executeCommand(const std::string& command);
+    bool commandExists(const std::string& command) const;
+    std::vector<std::string> getAvailableCommands() const;
+    
+    // Advanced commands for research and development
+    void runResearchSuite(const std::vector<std::string>& config_names, const SimpleWorld& world, int steps);
+    void run_batch(int steps);
+    void exportResults(const std::string& filename);
+    void importConfiguration(const std::string& filename);
+    void profilePerformance();
+    void visualizeActivity(const std::string& output_format = "plot");
+    void analyzeLearningCurves();
+    void generateReport(const std::string& report_type = "comprehensive");
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -108,6 +183,35 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    
+    // Advanced configuration options
+    float sensoryWeight_;
+    float motorThreshold_;
+    float curiosityThreshold_;
+    float noveltyDecay_;
+    double developmentRate_;
+    
+    // Performance monitoring
+    int maxSteps_;
+    bool enableMetrics_;
+    bool enableProfiling_;
+    
+    // Advanced behavior modes
+    bool explorationMode_;
+    bool exploitationMode_;
+    bool adaptiveLearning_;
+    
+    // Output formatting
+    bool verboseOutput_;
+    bool jsonOutput_;
+    
+    // Batch processing
+    bool batchMode_;
+    
+    // Feature toggles
+    bool memoryReplayEnabled_;
+    bool checkpointEnabled_;
+    bool visualizationEnabled_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
