@@ -1,13 +1,9 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
 
 namespace nlm {
 
@@ -142,18 +138,17 @@ public:
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
     
-    // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    // Semantic memory - facts and knowledge
+    SemanticMemory* getSemanticMemory();
     
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    // Procedural memory - skills and habits
+    ProceduralMemory* getProceduralMemory();
     
-    // ========== PREDICTION SYSTEM ==========
+    // Epigenetic memory - learned behaviors
+    EpigeneticMemory* getEpigeneticMemory();
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
+    // Neuroendocrine memory - hormonal states
+    NeuroendocrineMemory* getNeuroendocrineMemory();
     
     // Neural planner for action planning
     NeuralPlanner* getPlanner();

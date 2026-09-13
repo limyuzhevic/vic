@@ -12,6 +12,7 @@
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
@@ -125,10 +126,15 @@ struct Brain::Impl {
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
         // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
+        novelty = std::make_unique<Novelty>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+        dopamine = std::make_unique<Dopamine>();
+        
+        // Configure neuromodulation parameters
+        dopamine->setLevel(0.5f);  // Start with moderate dopamine level
+        
+        NLM_LOG_INFO("Dopamine initialized with level: 0.5");
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -215,8 +221,8 @@ bool Brain::initialize() {
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
     
