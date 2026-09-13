@@ -28,7 +28,9 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,6 +51,9 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            // Log warning for malformed line
+            std::cerr << "Warning: Malformed config line " << lineNumber << ": '" << line << "'" << std::endl;
         }
     }
     
@@ -60,20 +65,25 @@ bool Config::loadFromArgs(int argc, char** argv) {
         std::string arg(argv[i]);
         
         // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
+        if (arg.size() >= 2 && arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                std::cerr << "Warning: Command line argument '" << arg << "' should be in --key=value format" << std::endl;
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+// Handle -key value format
+        else if (arg.size() >= 2 && arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+        } else if (arg.size() >= 2 && arg[0] == '-') {
+            std::cerr << "Warning: Command line argument '" << arg << "' should have a value" << std::endl;
         }
+    }
     }
     return true;
 }
