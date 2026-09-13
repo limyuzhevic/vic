@@ -2,7 +2,6 @@
 
 #include "../core/Types/Types.hpp"
 #include <vector>
-#include <array>
 
 namespace nlm {
 
@@ -40,11 +39,61 @@ struct NeuronState {
         , lastSpikeTime(-1.0f) {}
 };
 
-// Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+/**
+ * @class Neuron
+ * @brief Represents a single artificial neuron implementing Leaky Integrate-and-Fire (LIF) dynamics
+ * @details This class models a biologically-inspired neuron that integrates synaptic inputs over time
+ *          and emits spikes when the membrane potential crosses a threshold. The neuron implements
+ *          the classic LIF model used in computational neuroscience to balance biological plausibility
+ *          with computational efficiency.
+ *          
+ *          The neuron follows the differential equation:
+ *          τ dV/dt = -(V - V_rest) + R·I_syn + I_ext
+ *          where τ = membrane time constant, V = membrane potential, R = membrane resistance
+ *          
+ *          Biological inspiration comes from real cortical neurons with:
+ *          - Membrane potential dynamics with exponential decay
+ *          - Spike threshold and reset mechanism
+ *          - Refractory period preventing excessive firing
+ *          - Synaptic integration of excitatory and inhibitory inputs
+ *          - Short-term plasticity and adaptation mechanisms
+ *          
+ *          Parameters typically range:
+ *          - Resting potential: -70 mV
+ *          - Threshold: -55 mV  
+ *          - Refractory period: 1-5 ms
+ *          - Membrane time constant: 10-20 ms
+ *          
+ * @note This class uses the PImpl idiom for performance and forward compatibility
+ * @see Synapse, NeuralPopulation, NeuralRegion, PlasticityRule, Neuromodulator
+ * @example
+ * @code
+ * Neuron neuron(1);  // Create neuron with ID 1
+ * neuron.setThreshold(-50.0f);
+ * neuron.setLeakConductance(20.0f);
+ * float input = 100.0f;
+ * neuron.injectCurrent(input);
+ * bool fired = neuron.stepLIF(currentTime, dt);
+ * if (fired) {
+ *     // Handle spike: update connected synapses
+ * }
+ * @endcode
+ */
 class Neuron {
 public:
-    // Create neuron with ID
+    /**
+     * @brief Construct a new Neuron object with the given ID
+     * @param id Unique identifier for this neuron (typically 0 to neuron_count-1)
+     * 
+     * Neuron IDs are used for:
+     * - References in synaptic connections
+     * - Identifying neurons in population management
+     * - Spike event tracking
+     * - Memory of neuron identity across simulation steps
+     * 
+     * @note IDs must be unique within the brain simulation
+     * @see NeuronId, Synapse
+     */
     explicit Neuron(NeuronId id);
     
     ~Neuron();
@@ -98,43 +147,7 @@ public:
     bool checkThreshold() const;
     float getLastSpikeTime() const;
     
-    // LIF step function - returns true if neuron fired
-    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
-    
-    // Incoming signals (post-synaptic potentials)
-    void receiveExcitatoryInput(MembranePotential amplitude);
-    void receiveInhibitoryInput(MembranePotential amplitude);
-    void receiveModulatoryInput(MembranePotential amplitude);
-    
-    // Current injection (from external sources)
-    void injectCurrent(MembranePotential current);
-    MembranePotential getTotalCurrent() const;
-    void clearTotalCurrent();
-    
-    // Spike history (recent spikes for STDP)
-    void recordSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getSpikeHistory() const;
-    void clearSpikeHistory();
-    
-    // Synapse management (incoming and outgoing)
-    void addIncomingSynapse(SynapseHandle handle);
-    void addOutgoingSynapse(SynapseHandle handle);
-    const std::vector<SynapseHandle>& getIncomingSynapses() const;
-    const std::vector<SynapseHandle>& getOutgoingSynapses() const;
-    
-    // Plasticity state
-    const PlasticityFlags& getPlasticityFlags() const;
-    PlasticityFlags& getPlasticityFlags();
-    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
-    
-    // Region/population membership
-    void setRegionId(RegionId region);
-    RegionId getRegionId() const;
-    void setPopulationId(PopulationId population);
-    PopulationId getPopulationId() const;
-    
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -142,6 +155,9 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
+    
+    // Step LIF simulation (kept for backward compatibility)
+    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
     
 private:
     struct Impl;

@@ -37,6 +37,50 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_hebbian {
+    void runAll();
+}
+
+namespace test_structural_plasticity {
+    void runAll();
+}
+
+namespace test_dopamine {
+    void runAll();
+}
+
+namespace test_reward {
+    void runAll();
+}
+
+namespace test_curiosity {
+    void runAll();
+}
+
+namespace test_novelty {
+    void runAll();
+}
+
+namespace test_prediction_error {
+    void runAll();
+}
+
+namespace test_working_memory {
+    void runAll();
+}
+
+namespace test_episodic_memory {
+    void runAll();
+}
+
+namespace test_development {
+    void runAll();
+}
+
+namespace test_stdp_comprehensive {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -113,6 +157,105 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Hebbian tests..." << std::endl;
+    try {
+        test_hebbian::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Structural Plasticity tests..." << std::endl;
+    try {
+        test_structural_plasticity::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Dopamine tests..." << std::endl;
+    try {
+        test_dopamine::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Reward tests..." << std::endl;
+    try {
+        test_reward::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Curiosity tests..." << std::endl;
+    try {
+        test_curiosity::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Novelty tests..." << std::endl;
+    try {
+        test_novelty::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Prediction Error tests..." << std::endl;
+    try {
+        test_prediction_error::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Working Memory tests..." << std::endl;
+    try {
+        test_working_memory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Episodic Memory tests..." << std::endl;
+    try {
+        test_episodic_memory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Development tests..." << std::endl;
+    try {
+        test_development::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running STDP Comprehensive tests..." << std::endl;
+    try {
+        test_stdp_comprehensive::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
