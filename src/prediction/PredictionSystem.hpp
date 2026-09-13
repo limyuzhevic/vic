@@ -34,6 +34,10 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // New methods for Phase 6 integration
+    void updatePredictionError(float noveltyLevel);
+    void trainPrediction(const Brain& brain);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

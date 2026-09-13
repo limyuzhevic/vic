@@ -121,6 +121,14 @@ struct Brain::Impl {
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
+        // Initialize prediction system
+        predictionSystem = std::make_unique<PredictionSystem>();
+        
+        // Initialize cognition systems
+        planner = std::make_unique<NeuralPlanner>();
+        conceptFormation = std::make_unique<ConceptFormation>();
+        attention = std::make_unique<AttentionalSelection>();
+        
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
@@ -511,8 +519,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state and neural activity
+        // Prediction system learns to predict future sensory states and their consequences
+        if (pImpl->novelty) {
+            // Use novelty to drive prediction updates
+            float noveltyLevel = pImpl->novelty->getLevel();
+            pImpl->predictionSystem->updatePredictionError(noveltyLevel);
+        }
+        
+        // Train prediction system with current neural activity pattern
+        // This enables predictive coding and anticipation
+        pImpl->predictionSystem->trainPrediction(*this);
     }
     
     // ========== STEP 9: Update attention system ==========

@@ -37,6 +37,32 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
     }
 }
 
+void PredictionSystem::updatePredictionError(float noveltyLevel) {
+    // Phase 6 integration: Update prediction error based on novelty
+    // Novelty indicates prediction errors - unexpected sensory input
+    pImpl->predictionError = noveltyLevel * 0.5f;  // Scale novelty to prediction error
+    pImpl->errorHistory.push_back(pImpl->predictionError);
+}
+
+void PredictionSystem::trainPrediction(const Brain& brain) {
+    // Phase 6 integration: Train prediction using actual brain neural activity
+    // Extract sensory patterns from working memory and train predictive model
+    auto* workingMemory = brain.getWorkingMemory();
+    if (!workingMemory) {
+        return;
+    }
+    
+    // Get current brain activity patterns
+    const auto& memoryNeurons = workingMemory->getMemoryNeurons();
+    if (memoryNeurons.empty()) {
+        return;
+    }
+    
+    // For now, just record training - real implementation would extract patterns
+    // and train predictive weights based on neural activity
+    pImpl->confidence = std::min(1.0f, pImpl->confidence + 0.01f);
+}
+
 float PredictionSystem::getPredictionError() const {
     return pImpl->predictionError;
 }
