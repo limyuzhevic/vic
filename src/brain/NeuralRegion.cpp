@@ -59,6 +59,7 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+        NLM_LOG_ERROR("Invalid population ID: " + std::to_string(id.index()));
         return nullptr;
     }
     return pImpl->populations[id.index() - 1].get();
@@ -66,6 +67,7 @@ NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+        NLM_LOG_ERROR("Invalid population ID: " + std::to_string(id.index()));
         return nullptr;
     }
     return pImpl->populations[id.index() - 1].get();
@@ -103,21 +105,19 @@ SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
 }
 
 Synapse* NeuralRegion::getSynapse(SynapseId id) {
-    for (auto& syn : pImpl->synapses) {
-        if (syn->getId() == id) {
-            return syn.get();
-        }
+    if (id.index() == 0 || id.index() > pImpl->synapses.size()) {
+        NLM_LOG_ERROR("Invalid synapse ID: " + std::to_string(id.index()));
+        return nullptr;
     }
-    return nullptr;
+    return pImpl->synapses[id.index() - 1].get();
 }
 
 const Synapse* NeuralRegion::getSynapse(SynapseId id) const {
-    for (auto& syn : pImpl->synapses) {
-        if (syn->getId() == id) {
-            return syn.get();
-        }
+    if (id.index() == 0 || id.index() > pImpl->synapses.size()) {
+        NLM_LOG_ERROR("Invalid synapse ID: " + std::to_string(id.index()));
+        return nullptr;
     }
-    return nullptr;
+    return pImpl->synapses[id.index() - 1].get();
 }
 
 size_t NeuralRegion::getSynapseCount() const {
@@ -314,3 +314,53 @@ std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
 }
 
 } // namespace nlm
+
+// Ensure proper copy semantics for pImpl pattern
+void NeuralRegion::copyFrom(const NeuralRegion& other) {
+    if (!pImpl || !other.pImpl) return;
+    
+    // Copy all fields from other.pImpl
+    pImpl->name = other.pImpl->name;
+    
+    // Note: populations and synapses are unique_ptr, we need to deep copy them
+    pImpl->populations.clear();
+    pImpl->synapses.clear();
+    pImpl->outgoingSynapses.clear();
+    pImpl->incomingSynapses.clear();
+    pImpl->nextSynapseId = other.pImpl->nextSynapseId;
+    
+    // Deep copy populations
+    for (const auto& pop : other.pImpl->populations) {
+        if (pop) {
+            auto newPop = std::make_unique<NeuralPopulation>(*pop);
+            pImpl->populations.push_back(std::move(newPop));
+        }
+    }
+    
+    // Deep copy synapses
+    for (const auto& syn : other.pImpl->synapses) {
+        if (syn) {
+            auto newSyn = std::make_unique<Synapse>(*syn);
+            pImpl->synapses.push_back(std::move(newSyn));
+        }
+    }
+    
+    // Rebuild connection maps
+    for (const auto& syn : pImpl->synapses) {
+        if (syn) {
+            pImpl->outgoingSynapses[syn->getSourceNeuron()].push_back(syn->getId());
+            pImpl->incomingSynapses[syn->getDestinationNeuron()].push_back(syn->getId());
+        }
+    }
+}
+
+void NeuralRegion::deepCopy(const NeuralRegion& other) {
+    if (this == &other) return;
+    
+    delete pImpl;
+    pImpl = new Impl(*other.pImpl);
+    
+    // Need to copy the actual population and synapse objects
+    // This is complex due to nested unique_ptr, so we'll implement a proper copy constructor
+    copyFrom(other);
+}

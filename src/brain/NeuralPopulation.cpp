@@ -111,10 +111,11 @@ float NeuralPopulation::getAverageFiringRate() const {
 }
 
 float NeuralPopulation::getActivityLevel() const {
-    if (pImpl->neurons.empty()) {
+    size_t neuronCount = pImpl->neurons.size();
+    if (neuronCount == 0) {
         return 0.0f;
     }
-    return static_cast<float>(getActiveCount()) / static_cast<float>(pImpl->neurons.size());
+    return static_cast<float>(getActiveCount()) / static_cast<float>(neuronCount);
 }
 
 void NeuralPopulation::initializeRandom(RandomGenerator& rng) {

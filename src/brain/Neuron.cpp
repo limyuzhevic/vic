@@ -300,3 +300,28 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
 }
 
 } // namespace nlm
+
+// Ensure proper copy semantics for pImpl pattern
+void Neuron::copyFrom(const Neuron& other) {
+    if (!pImpl || !other.pImpl) return;
+    
+    // Copy all fields from other.pImpl
+    pImpl->id = other.pImpl->id;
+    pImpl->type = other.pImpl->type;
+    pImpl->state = other.pImpl->state;
+    pImpl->regionId = other.pImpl->regionId;
+    pImpl->populationId = other.pImpl->populationId;
+    pImpl->totalCurrent = other.pImpl->totalCurrent;
+    pImpl->synapticInput = other.pImpl->synapticInput;
+    pImpl->spikeHistory = other.pImpl->spikeHistory;
+    pImpl->incomingSynapses = other.pImpl->incomingSynapses;
+    pImpl->outgoingSynapses = other.pImpl->outgoingSynapses;
+    pImpl->plasticityFlags = other.pImpl->plasticityFlags;
+}
+
+void Neuron::deepCopy(const Neuron& other) {
+    if (this == &other) return;
+    
+    delete pImpl;
+    pImpl = new Impl(*other.pImpl);
+}

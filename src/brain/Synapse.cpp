@@ -263,3 +263,32 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
 }
 
 } // namespace nlm
+
+// Ensure proper copy semantics for pImpl pattern
+void Synapse::copyFrom(const Synapse& other) {
+    if (!pImpl || !other.pImpl) return;
+    
+    // Copy all fields from other.pImpl
+    pImpl->id = other.pImpl->id;
+    pImpl->sourceNeuron = other.pImpl->sourceNeuron;
+    pImpl->destinationNeuron = other.pImpl->destinationNeuron;
+    pImpl->weight = other.pImpl->weight;
+    pImpl->delay = other.pImpl->delay;
+    pImpl->type = other.pImpl->type;
+    pImpl->preSpikeHistory = other.pImpl->preSpikeHistory;
+    pImpl->postSpikeHistory = other.pImpl->postSpikeHistory;
+    pImpl->plasticityFlags = other.pImpl->plasticityFlags;
+    pImpl->shortTermDepression = other.pImpl->shortTermDepression;
+    pImpl->shortTermFacilitation = other.pImpl->shortTermFacilitation;
+    pImpl->lastPreSpikeTime = other.pImpl->lastPreSpikeTime;
+    pImpl->lastPostSpikeTime = other.pImpl->lastPostSpikeTime;
+    pImpl->eligibilityTrace = other.pImpl->eligibilityTrace;
+    pImpl->efficacy = other.pImpl->efficacy;
+}
+
+void Synapse::deepCopy(const Synapse& other) {
+    if (this == &other) return;
+    
+    delete pImpl;
+    pImpl = new Impl(*other.pImpl);
+}
