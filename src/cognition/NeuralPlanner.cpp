@@ -26,6 +26,14 @@ void NeuralPlanner::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralPlanner initialized");
+    
+    // Initialize self-model for planning
+    selfModel_ = std::make_unique<SelfModel>();
+    selfModel_->initialize(brain);
+    
+    // Initialize social learning system
+    socialLearning_ = std::make_unique<SocialLearning>();
+    socialLearning_->initialize(brain);
 }
 
 ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
@@ -237,8 +245,42 @@ void NeuralPlanner::updatePlanQuality(const std::vector<ActionType>& plannedActi
     }
 }
 
-void NeuralPlanner::clearCache() {
-    // Clear any planning cache
+void NeuralPlanner::recordSelfAction(ActionType action,
+                                   const std::vector<float>& beforeState,
+                                   const std::vector<float>& afterState) {
+    if (selfModel_) {
+        selfModel_->recordSelfAction(action, beforeState, afterState);
+    }
+}
+
+std::vector<float> NeuralPlanner::predictActionConsequence(ActionType action,
+                                                         const std::vector<float>& currentState) {
+    if (selfModel_) {
+        return selfModel_->predictActionConsequence(action, currentState);
+    }
+    return currentState;
+}
+
+float NeuralPlanner::getSelfModelConfidence(ActionType action) const {
+    if (selfModel_) {
+        return selfModel_->getSelfModelConfidence(action);
+    }
+    return 0.0f;
+}
+
+void NeuralPlanner::observeAgentAction(ActionType observedAction,
+                                      const std::vector<float>& observerState,
+                                      const std::vector<float>& resultingState) {
+    if (socialLearning_) {
+        socialLearning_->observeAgentAction(observedAction, observerState, resultingState);
+    }
+}
+
+ActionType NeuralPlanner::getImitationAction(const std::vector<float>& currentState) {
+    if (socialLearning_) {
+        return socialLearning_->getImitationAction(currentState);
+    }
+    return ActionType::Wait;
 }
 
 bool NeuralPlanner::wasRecentPlanSuccessful() const {

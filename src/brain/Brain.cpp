@@ -6,9 +6,9 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -49,6 +49,10 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -407,34 +411,151 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
     
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
+    // Update acetylcholine (attention and memory consolidation)
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
+        // ACh enhances synaptic plasticity and attention
+        float achLevel = pImpl->acetylcholine->getLevel();
+        
+        // Boost STDP plasticity
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                if (syn->getPlasticityFlags().stdp) {
+                    // ACh significantly boosts STDP learning rate
+                    float stdpBoost = 1.0f + achLevel * (pImpl->acetylcholine->getPlasticityFactor() - 1.0f);
+                    float weightChange = syn->getWeight() * 0.001f * (stdpBoost - 1.0f);
+                    syn->addToWeight(weightChange);
+                }
+            }
+        }
+        
+        // Apply attention modulation to working memory
+        if (pImpl->workingMemory && achLevel > 0.3f) {
+            // Stronger ACh enhances working memory consolidation
+            pImpl->workingMemory->strengthenMemory(1.0f + achLevel * 0.5f);
+        }
+    }
+    
+    // Update noradrenaline (arousal and vigilance)
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+        
+        // NE increases overall neural excitability (arousal)
+        float neLevel = pImpl->norepinephrine->getLevel();
+        float arousalMod = 1.0f + neLevel * (pImpl->norepinephrine->getPlasticityFactor() - 1.0f);
+        
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+                    // NE increases response gain and reduces threshold
+                    float current = neuron->getInjectedCurrent();
+                    neuron->injectCurrent(current * arousalMod);
+                    
+                    // Also affects inhibitory neurons
+                    if (neuron->getNeuronType() == NeuronType::Inhibitory) {
+                        neuron->injectCurrent(-neuron->getInjectedCurrent() * 0.5f * (1.0f - neLevel));
                     }
                 }
+            }
+        }
+    }
+    
+    // Update serotonin (mood, behavioral inhibition, social behavior)
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        
+        // 5-HT modulates behavioral inhibition and mood
+        float serotoninLevel = pImpl->serotonin->getLevel();
+        float inhibitionStrength = pImpl->serotonin->getPlasticityFactor();
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Serotonin increases inhibitory control
+                    float inhibition = 1.0f - inhibitionStrength * 0.5f;
+                    if (inhibition > 0.1f) {
+                        // Stronger inhibition reduces firing
+                        neuron->injectCurrent(-inhibition * 0.3f);
+                    }
+                    
+                    // Serotonin also affects burst firing patterns
+                    if (serotoninLevel > 0.5f) {
+                        // Reduce overall excitability for stable mood
+                        neuron->injectCurrent(-0.1f);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update dopamine (reward, motivation, motor control)
+    if (pImpl->dopamine) {
+        pImpl->dopamine->update(pImpl->timestep);
+        
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Dopamine modulates motor neuron activity
+        for (auto* neuron : pImpl->motorNeurons) {
+            // D1-like receptor: facilitates movement
+            if (dopamineLevel > 0.5f) {
+                neuron->injectCurrent(dopamineLevel * 2.0f);
+            }
+            
+            // D2-like receptor: suppresses competing movements
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* otherNeuron : pop->getNeurons()) {
+                        if (otherNeuron != neuron && otherNeuron->getNeuronType() == NeuronType::Motor) {
+                            // Dopamine can suppress competing motor units
+                            if (dopamineLevel > 0.7f) {
+                                otherNeuron->injectCurrent(-dopamineLevel * 0.5f);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Apply dopamine effects on plasticity
+        float plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                if (syn->getPlasticityFlags().stdp) {
+                    // Dopaminergic modulation of STDP
+                    float weight = syn->getWeight();
+                    if (dopamineLevel > 0.3f) {
+                        // Positive prediction error (reward): strengthen synapses
+                        float change = weight * 0.0005f * (plasticityMod - 0.5f);
+                        syn->addToWeight(change);
+                    } else {
+                        // Negative prediction error (prediction error): weaken synapses
+                        float change = weight * -0.0003f * (1.0f - plasticityMod);
+                        syn->addToWeight(change);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update prediction error neuromodulation
+    if (pImpl->predictionError) {
+        pImpl->predictionError->update(pImpl->timestep);
+        
+        // Prediction error directly modulates learning rate (like dopamine)
+        float predictionError = pImpl->predictionError->getLevel();
+        
+        // Apply to all synapses
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                // Stronger prediction error = more learning
+                float learningMod = 1.0f + predictionError * 3.0f;
+                
+                // Update synapse weight with prediction error modulation
+                float currentWeight = syn->getWeight();
+                float change = currentWeight * (learningMod - 1.0f) * 0.001f;
+                syn->addToWeight(change);
             }
         }
     }
@@ -486,9 +607,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Capture current brain state as an episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store sensory pattern if available
+            episode.sensoryState.reserve(pImpl->sensoryNeurons.size());
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                episode.sensoryState.push_back(
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+            }
+            
+            // Store active neurons - enhanced integration with concept formation
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,17 +629,65 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Store reward from neuromodulators
+            float reward = 0.0f;
+            if (pImpl->dopamine) {
+                reward = pImpl->dopamine->getLevel();
+            }
+            episode.reward = reward;
             
+            // Store position and orientation (would come from proprioception)
+            episode.positionX = 0.0f;  // Would get from proprioception
+            episode.positionY = 0.0f;
+            episode.orientation = 0.0f;
+            
+            // Store resulting sensory state (what action produces)
+            episode.resultingSensoryState = episode.sensoryState;
+            episode.resultingReward = episode.reward;
+            
+            // Integrate with episodic memory system
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // Also update associative memory with this experience
+            if (pImpl->associativeMemory) {
+                pImpl->associativeMemory->associateFromExperience(episode);
+            }
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->sensoryNeurons.size() > 0) {
+        // Create sensory state from current sensory neuron activities
+        std::vector<float> sensoryState;
+        sensoryState.reserve(pImpl->sensoryNeurons.size());
+        
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            sensoryState.push_back(
+                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+        }
+        
+        // Update prediction system with current sensory state
+        if (!sensoryState.empty()) {
+            pImpl->predictionSystem->train(sensoryState);
+            
+            // Get prediction error
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // Use prediction error as attention signal
+            if (pImpl->attention) {
+                // Higher prediction error = more attention to this state
+                float attentionBoost = std::min(1.0f, predictionError * 2.0f);
+                pImpl->attention->applyBottomUpSalience(pImpl->sensoryNeurons[0]->getId(), attentionBoost);
+            }
+            
+            // Store prediction error for neuromodulation
+            if (pImpl->predictionError) {
+                // Normalize error to 0-1 range
+                float normalizedError = std::clamp(predictionError * 10.0f, 0.0f, 1.0f);
+                // Prediction error modulates learning (like dopamine)
+                pImpl->predictionError->signalPredictionError(normalizedError);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +703,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Create sensory state from current sensory neuron activities
+        std::vector<float> sensoryState;
+        sensoryState.reserve(pImpl->sensoryNeurons.size());
+        
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            sensoryState.push_back(
+                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+        }
+        
+        // Create features for concept formation
+        std::vector<float> features = sensoryState;
+        
+        // Get current reward from dopamine
+        float reward = 0.0f;
+        if (pImpl->dopamine) {
+            reward = pImpl->dopamine->getLevel();
+        }
+        
+        // Update concept formation with current experience
+        if (!sensoryState.empty()) {
+            pImpl->conceptFormation->presentExperience(
+                sensoryState,
+                features,
+                reward,
+                currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
