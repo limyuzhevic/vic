@@ -8,8 +8,6 @@
 namespace nlm {
 
 // NeuralPopulation: A group of neurons with shared properties
-// PLACEHOLDER - Phase 2 will implement population-level dynamics
-
 class NeuralPopulation {
 public:
     // Create population with ID and size
@@ -66,10 +64,5 @@ public:
     void recordActivity();  // Record current state for statistics
     float getMeanMembranePotential() const;
     float getVarianceMembranePotential() const;
-    
-private:
-    struct Impl;
-    Impl* pImpl;
-};
 
 } // namespace nlm

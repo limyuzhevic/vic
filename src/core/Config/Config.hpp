@@ -5,6 +5,10 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <filesystem>
+#include <map>
+#include <unordered_map>
+#include <algorithm>
 
 namespace nlm {
 
@@ -43,6 +47,21 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// JSON/YAML parser interface
+class JSONParser {
+public:
+    static bool parse(const std::string& content, std::vector<ConfigEntry>& entries);
+    static std::string serialize(const std::vector<ConfigEntry>& entries);
+    static bool has_support();
+};
+
+class YAMLParser {
+public:
+    static bool parse(const std::string& content, std::vector<ConfigEntry>& entries);
+    static std::string serialize(const std::vector<ConfigEntry>& entries);
+    static bool has_support();
+};
+
 // Main configuration class
 class Config {
 public:
@@ -55,7 +74,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (auto-detects JSON/YAML/key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,6 +112,10 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Get available parser support
+    bool hasJSONSupport() const;
+    bool hasYAMLSupport() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +123,13 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Parser helper functions
+    static bool tryParseJSON(const std::string& content, std::vector<ConfigEntry>& entries);
+    static bool tryParseYAML(const std::string& content, std::vector<ConfigEntry>& entries);
+    static std::string entriesToJSON(const std::vector<ConfigEntry>& entries);
+    static std::string entriesToYAML(const std::vector<ConfigEntry>& entries);
+    static std::string entriesToKeyValue(const std::vector<ConfigEntry>& entries);
 };
 
 } // namespace nlm
