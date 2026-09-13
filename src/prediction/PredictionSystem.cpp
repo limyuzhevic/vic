@@ -21,19 +21,31 @@ std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryIn
 }
 
 void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
-    // TODO PHASE 2: Implement real prediction error computation
-    // PLACEHOLDER: Calculate simple error
+    // Implement real prediction error computation
     const auto& predData = predicted.getData();
     const auto& actualData = actual.getData();
     
     if (predData.size() == actualData.size() && !predData.empty()) {
         float sumError = 0.0f;
+        float maxDiff = 0.0f;
         for (size_t i = 0; i < predData.size(); ++i) {
             float diff = predData[i] - actualData[i];
             sumError += diff * diff;
+            maxDiff = std::max(maxDiff, std::abs(diff));
         }
         pImpl->predictionError = sumError / predData.size();
         pImpl->errorHistory.push_back(pImpl->predictionError);
+        
+        // Clamp error history to reasonable size
+        if (pImpl->errorHistory.size() > 1000) {
+            pImpl->errorHistory.erase(pImpl->errorHistory.begin());
+        }
+        
+        // Update confidence based on prediction error (lower error = higher confidence)
+        pImpl->confidence = std::clamp(1.0f - pImpl->predictionError, 0.0f, 1.0f);
+    } else {
+        pImpl->predictionError = 1.0f;  // Large error for mismatched data
+        pImpl->confidence = 0.0f;
     }
 }
 

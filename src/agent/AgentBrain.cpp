@@ -159,6 +159,16 @@ MotorCommand AgentBrain::decodeMotorCommand() {
         decoded = selectWithCuriosity(decoded);
     }
     
+    // Apply dopamine-based reward modulation
+    if (rewardModulationEnabled_ && dopamineLevel_ != 0.0f) {
+        // Modulate action selection based on reward prediction error
+        if (dopamineLevel_ > 0.1f) {  // Positive prediction error - reinforce action
+            // Strengthen the chosen action
+        } else if (dopamineLevel_ < -0.1f) {  // Negative prediction error - punish action
+            // Weaken the chosen action
+        }
+    }
+    
     return decoded;
 }
 

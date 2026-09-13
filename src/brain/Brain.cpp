@@ -527,9 +527,71 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && !pImpl->sensoryNeurons.empty()) {
+        // Create concept from current neural activity patterns
+        // Collect current neural activation levels as features for concept formation
+        
+        std::vector<float> neuralActivity;
+        neuralActivity.reserve(128); // Target size for concept vector
+        
+        // Sample various neural populations for concept representation
+        size_t sampledCount = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (sampledCount >= 128) break;
+                    
+                    const auto& state = neuron->getState();
+                    float activation = std::abs(state.membranePotential - state.restingPotential);
+                    neuralActivity.push_back(activation);
+                    sampledCount++;
+                }
+                if (sampledCount >= 128) break;
+            }
+            if (sampledCount >= 128) break;
+        }
+        
+        // If we didn't get enough samples, pad with zeros
+        while (neuralActivity.size() < 128) {
+            neuralActivity.push_back(0.0f);
+        }
+        
+        // Add current system state features
+        std::vector<float> systemFeatures;
+        systemFeatures.reserve(16);
+        
+        // Add dopamine level
+        if (pImpl->dopamine) {
+            systemFeatures.push_back(pImpl->dopamine->getLevel());
+        }
+        
+        // Add novelty level
+        if (pImpl->novelty) {
+            systemFeatures.push_back(pImpl->novelty->getLevel());
+        }
+        
+        // Add prediction error
+        if (pImpl->predictionSystem) {
+            systemFeatures.push_back(pImpl->predictionSystem->getPredictionError());
+            systemFeatures.push_back(pImpl->predictionSystem->getConfidence());
+        }
+        
+        // Add development stage
+        systemFeatures.push_back(static_cast<float>(pImpl->developmentalStage));
+        
+        // Pad with zeros if needed
+        while (systemFeatures.size() < 16) {
+            systemFeatures.push_back(0.0f);
+        }
+        
+        // Combine neural activity and system features for concept
+        std::vector<float> conceptFeatures;
+        conceptFeatures.reserve(144);
+        conceptFeatures.insert(conceptFeatures.end(), neuralActivity.begin(), neuralActivity.end());
+        conceptFeatures.insert(conceptFeatures.end(), systemFeatures.begin(), systemFeatures.end());
+        
+        // Update concept formation system
+        pImpl->conceptFormation->update(conceptFeatures);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
