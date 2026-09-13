@@ -157,19 +157,32 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+Brain::Brain(std::shared_ptr<Config> config) : pImpl(std::make_unique<Impl>(config)) {}
 
-Brain::~Brain() = default;
+Brain::Brain(const Brain& other) : pImpl(std::make_unique<Impl>(*other.pImpl)) {}
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Brain& Brain::operator=(const Brain& other) {
+    if (this != &other) {
+        pImpl = std::make_unique<Impl>(*other.pImpl);
+    }
+    return *this;
 }
+
+Brain::Brain(Brain&& other) noexcept : pImpl(std::exchange(other.pImpl, nullptr)) {}
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
         delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::exchange(other.pImpl, nullptr);
+    }
+    return *this;
+}
+
+Brain::Brain(const Brain& other) : pImpl(std::make_unique<Impl>(*other.pImpl)) {}
+
+Brain& Brain::operator=(const Brain& other) {
+    if (this != &other) {
+        pImpl = std::make_unique<Impl>(*other.pImpl);
     }
     return *this;
 }
@@ -177,10 +190,30 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
+    // Input validation
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Invalid configuration: nullptr");
+        return false;
+    }
+    
+    // Get configuration values with validation
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    
+    // Validate configuration values
+    if (neuronCount == 0 || neuronCount > 1000000) {
+        NLM_LOG_ERROR("Invalid neuron count: " + std::to_string(neuronCount));
+        return false;
+    }
+    if (regionCount == 0 || regionCount > 1000) {
+        NLM_LOG_ERROR("Invalid region count: " + std::to_string(regionCount));
+        return false;
+    }
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection probability: " + std::to_string(connectionProbability));
+        return false;
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");

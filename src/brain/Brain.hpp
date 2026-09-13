@@ -56,10 +56,10 @@ public:
     ~Brain();
     
     // Disable copying, enable moving
-    Brain(const Brain&) = delete;
-    Brain& operator=(const Brain&) = delete;
-    Brain(Brain&&) noexcept;
-    Brain& operator=(Brain&&) noexcept;
+    Brain(const Brain& other);
+    Brain& operator=(const Brain& other);
+    Brain(Brain&& other) noexcept;
+    Brain& operator=(Brain&& other) noexcept;
     
     // Initialize brain with configuration
     bool initialize();

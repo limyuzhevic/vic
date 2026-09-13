@@ -343,6 +343,12 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
+    // Input validation
+    if (!config) {
+        std::cerr << "ERROR: Failed to create configuration!" << std::endl;
+        return 1;
+    }
+    
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
@@ -364,7 +370,10 @@ int main(int argc, char** argv) {
     }
     
     // Override with command line args
-    config->loadFromArgs(argc, argv);
+    if (!config->loadFromArgs(argc, argv)) {
+        NLM_LOG_ERROR("Failed to load configuration from command line args!");
+        return 1;
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
