@@ -3,6 +3,8 @@
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
+#include "../brain/NeuralWorkingMemory.hpp"
+#include "../brain/NeuralEpisodicMemory.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
@@ -77,6 +79,8 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    NeuralWorkingMemory* workingMemory_;
+    NeuralEpisodicMemory* episodicMemory_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;

@@ -44,6 +44,8 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
+class SemanticMemory;
+
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
@@ -140,29 +142,32 @@ public:
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    NeuralWorkingMemory* getWorkingMemory() { return pImpl->workingMemory.get(); }
     
     // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    NeuralEpisodicMemory* getEpisodicMemory() { return pImpl->episodicMemory.get(); }
     
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    NeuralAssociativeMemory* getAssociativeMemory() { return pImpl->associativeMemory.get(); }
+    
+    // Semantic memory - conceptual knowledge
+    SemanticMemory* getSemanticMemory() { return pImpl->semanticMemory.get(); }
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    PredictionSystem* getPredictionSystem() { return pImpl->predictionSystem.get(); }
     
     // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    NeuralPlanner* getPlanner() { return pImpl->planner.get(); }
     
     // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    ConceptFormation* getConceptFormation() { return pImpl->conceptFormation.get(); }
     
     // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    AttentionalSelection* getAttention() { return pImpl->attention.get(); }
     
     // ========== DEVELOPMENT SYSTEM ==========
     

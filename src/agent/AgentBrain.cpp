@@ -7,6 +7,8 @@ namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
+    , workingMemory_(nullptr)
+    , episodicMemory_(nullptr)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -20,6 +22,12 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Get references to memory systems
+    if (brain_) {
+        workingMemory_ = brain_->getWorkingMemory();
+        episodicMemory_ = brain_->getEpisodicMemory();
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -64,6 +72,12 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
+    if (!brain_) return;
+    
+    // Initialize working memory and episodic memory pointers
+    workingMemory_ = brain_->getWorkingMemory();
+    episodicMemory_ = brain_->getEpisodicMemory();
+    
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
@@ -72,6 +86,10 @@ void AgentBrain::initialize(const SimpleWorld& world) {
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    
+    NLM_LOG_INFO("Memory systems initialized: Working Memory " + 
+                 std::to_string(workingMemory_ ? 1 : 0) + ", Episodic Memory " + 
+                 std::to_string(episodicMemory_ ? 1 : 0));
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -140,6 +158,75 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         
         // Store for next time
         previousVision_ = vision;
+    }
+    
+    // Store experience in working memory
+    if (workingMemory_) {
+        // Get all sensory signals concatenated (as defined in SensoryPercept)
+        std::vector<float> pattern = percept.getAllSignals();
+        
+        // Calculate strength based on overall sensory intensity and novelty
+        float totalIntensity = 0.0f;
+        totalIntensity += std::accumulate(vision.begin(), vision.end(), 0.0f);
+        totalIntensity += std::accumulate(touch.begin(), touch.end(), 0.0f);
+        totalIntensity += std::accumulate(intern.begin(), intern.end(), 0.0f);
+        totalIntensity += std::accumulate(proprio.begin(), proprio.end(), 0.0f);
+        
+        // Normalize intensity (assuming ranges: vision ~256, touch ~8, internal ~4, proprio ~6)
+        float maxPossibleIntensity = (vision.size() * 1.0f) + (touch.size() * 1.0f) + 
+                                     (intern.size() * 1.0f) + (proprio.size() * 1.0f);
+        float normalizedIntensity = (maxPossibleIntensity > 0.0f) ? 
+            std::min(1.0f, totalIntensity / maxPossibleIntensity) : 0.0f;
+        
+        // Combine intensity with novelty to get experience strength
+        float strength = (normalizedIntensity * 0.7f) + (noveltyLevel_ * 0.3f);
+        strength = std::clamp(strength, 0.0f, 1.0f);
+        
+        // Store in working memory using the brain's working memory system
+        workingMemory_->store(pattern, strength);
+        
+        // Log the experience storage
+        NLM_LOG_DEBUG("Stored sensory experience in working memory: pattern size " + 
+                      std::to_string(pattern.size()) + ", strength " + 
+                      std::to_string(strength));
+    }
+    
+    // Store experience in episodic memory (for long-term storage)
+    if (episodicMemory_) {
+        // Create an episodic memory item representing this sensory experience
+        EpisodicMemoryItem episode;
+        
+        // Set the timestamp
+        episode.timestamp = 0; // Will be set properly by episodic memory
+        
+        // Store all sensory data in the sensoryState field (as per EpisodicMemoryItem definition)
+        episode.sensoryState = percept.getAllSignals();
+        
+        // Set position and orientation from world or default
+        episode.positionX = 0.0f;
+        episode.positionY = 0.0f;
+        episode.orientation = 0.0f;
+        
+        // No action taken yet (just sensory input)
+        episode.action = ActionType::Wait;
+        
+        // Set internal state
+        episode.reward = dopamineLevel_;
+        episode.energy = 1.0f; // Default energy level
+        episode.novelty = noveltyLevel_;
+        
+        // No resulting sensory state yet (this is input, not consequence)
+        episode.resultingSensoryState = std::vector<float>();
+        episode.resultingReward = 0.0f;
+        
+        // Store neural activity pattern (from the brain's current state)
+        // This would typically capture which neurons were active
+        // For now, we store the sensory pattern as the neural activity representation
+        
+        // Store the episode in episodic memory
+        episodicMemory_->storeEpisode(episode);
+        
+        NLM_LOG_DEBUG("Stored sensory experience in episodic memory");
     }
     
     // Update curiosity based on novelty
