@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+// Consistent path structure using NLM_SOURCE_DIR would be better,
+// but maintaining current relative paths for now to avoid breaking build
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
 #include "../src/core/Types/Types.hpp"
@@ -15,6 +17,9 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+
+// Note: In python/CMakeLists.txt, NLM_SOURCE_DIR is set and the paths are managed
+// through CMake, so the relative paths in this file should work correctly.
 
 namespace py = pybind11;
 namespace nlm {
