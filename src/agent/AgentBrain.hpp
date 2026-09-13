@@ -6,8 +6,12 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <string>
 
 namespace nlm {
+
+// Forward declarations
+class Neuron;
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
@@ -69,12 +73,73 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Debug and diagnostics
+    size_t getSensoryVisionCount() const { return sensoryVision_.size(); }
+    size_t getSensoryTouchCount() const { return sensoryTouch_.size(); }
+    size_t getSensoryInternalCount() const { return sensoryInternal_.size(); }
+    size_t getSensoryProprioceptionCount() const { return sensoryProprioception_.size(); }
+    size_t getMotorForwardCount() const { return motorForward_.size(); }
+    size_t getMotorBackwardCount() const { return motorBackward_.size(); }
+    size_t getMotorTurnLeftCount() const { return motorTurnLeft_.size(); }
+    size_t getMotorTurnRightCount() const { return motorTurnRight_.size(); }
+    size_t getMotorInteractCount() const { return motorInteract_.size(); }
+    size_t getMotorWaitCount() const { return motorWait_.size(); }
+    
+    // Configuration setters for advanced users
+    void setConstants(const struct Constants& c) { constants_ = c; }
+    
+    // Status information
+    std::string getDebugInfo() const;
+    
 private:
+    // Constants for agent behavior
+    struct Constants {
+        // Sensory scaling factors
+        float visionScale = 5.0f;
+        float touchScale = 8.0f;
+        float internalScale = 5.0f;
+        float proprioceptionScale = 3.0f;
+        
+        // Activity and exploration thresholds
+        float minActivityThreshold = 0.5f;
+        float curiosityExplorationThreshold = 0.3f;
+        float highCuriosityThreshold = 0.5f;
+        float explorationChanceMultiplier = 0.3f;
+        
+        // Neuromodulation ranges
+        float dopamineClampMin = -1.0f;
+        float dopamineClampMax = 1.0f;
+        float noveltyDecayFactor = 0.99f;
+        
+        // Development timing
+        double initialStageTime = 60.0;
+        double criticalPeriodTime = 300.0;
+        double maturationTime = 900.0;
+        float adultPlasticityModifier = 0.2f;
+        
+        // Memory and plasticity
+        float eligibilityTraceThreshold = 0.001f;
+        float eligibilityTraceDecay = 0.1f;
+        float plasticityBaseFactor = 0.5f;
+        float plasticityMinFactor = 0.1f;
+        float plasticityMaxFactor = 2.0f;
+        
+        // STDP parameters
+        float stdpLTPWeight = 0.01f;
+        float stdpLTDWeight = 0.012f;
+        float structuralSynaptogenesisRate = 0.0001f;
+        float structuralPruningRate = 0.00001f;
+    };
+
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Helper function to calculate distribution index safely
+    static size_t calculateDistributionIndex(const std::vector<Neuron*>& neurons, 
+                                           size_t accumulatedSize);
     
     std::shared_ptr<Brain> brain_;
     
@@ -112,6 +177,9 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Configuration constants
+    Constants constants_;
 };
 
 } // namespace nlm

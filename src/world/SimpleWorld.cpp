@@ -2,6 +2,7 @@
 #include <cmath>
 #include <algorithm>
 #include <iostream>
+#include <limits>
 
 namespace nlm {
 
@@ -30,11 +31,25 @@ SimpleWorld::SimpleWorld()
     , rngState_(42)
 {
     agent_.reset();
+    
+    // Initialize health bounds
+    agent_.health = 1.0f;
 }
 
 SimpleWorld::~SimpleWorld() = default;
 
 void SimpleWorld::configure(float width, float height, size_t visionWidth, size_t visionHeight) {
+    // Validate configuration parameters
+    if (width <= 0.0f || height <= 0.0f) {
+        std::cerr << "Warning: World dimensions must be positive. Using defaults." << std::endl;
+        return;
+    }
+    
+    if (visionWidth == 0 || visionHeight == 0) {
+        std::cerr << "Warning: Vision dimensions must be positive. Using defaults." << std::endl;
+        return;
+    }
+    
     width_ = width;
     height_ = height;
     visionWidth_ = visionWidth;
@@ -52,7 +67,10 @@ void SimpleWorld::reset() {
     agent_.x = urand(rngState_, 2.0f, width_ - 2.0f);
     agent_.y = urand(rngState_, 2.0f, height_ - 2.0f);
     agent_.energy = maxEnergy_;
-    rngState_ = rngSeed_;  // Reset RNG for reproducible object placement
+    agent_.health = 1.0f;  // Ensure health is initialized
+    
+    // Reset RNG for reproducible object placement
+    rngState_ = rngSeed_;
     
     objects_.clear();
     
@@ -227,9 +245,10 @@ ActionResult SimpleWorld::interact() {
         
         float dx = obj.x - agent_.x;
         float dy = obj.y - agent_.y;
-        float dist = std::sqrt(dx * dx + dy * dy);
+        float distSq = dx*dx + dy*dy;  // Use squared distance
+        float radiusSum = interactRange + obj.radius;
         
-        if (dist < interactRange + obj.radius) {
+        if (distSq < radiusSum * radiusSum) {
             obj.active = false;  // Consume the object
             
             if (obj.type == WorldObjectType::Resource) {
@@ -238,7 +257,7 @@ ActionResult SimpleWorld::interact() {
                 result.success = true;
                 result.message = "consumed_resource";
             } else if (obj.type == WorldObjectType::Hazard) {
-                agent_.health -= 0.2f;
+                agent_.health = std::max(0.0f, agent_.health - 0.2f);  // Clamp to non-negative
                 result.reward = obj.value;  // Negative reward
                 result.success = true;
                 result.message = "hit_hazard";
@@ -257,7 +276,7 @@ ActionResult SimpleWorld::interact() {
 }
 
 bool SimpleWorld::isValidPosition(float x, float y) const {
-    // Check world boundaries
+    // Check world boundaries - ensure consistent with collision handling
     if (x < 0.0f || x >= width_ || y < 0.0f || y >= height_) {
         return false;
     }
@@ -265,16 +284,19 @@ bool SimpleWorld::isValidPosition(float x, float y) const {
 }
 
 WorldObject* SimpleWorld::getObjectAt(float x, float y) {
-    for (auto& obj : objects_) {
+    for (WorldObject& obj : objects_) {
         if (!obj.active) continue;
         
         float dx = obj.x - x;
         float dy = obj.y - y;
-        float dist = std::sqrt(dx * dx + dy * dy);
+        float distSq = dx*dx + dy*dy;  // Use squared distance for efficiency
         
-        if (dist < obj.radius) {
-            return &obj;
+        if (distSq < obj.radius * obj.radius) {
+            return &obj;  // Pointer to member, not local variable
         }
+    }
+    return nullptr;
+}
     }
     return nullptr;
 }
@@ -284,14 +306,14 @@ void SimpleWorld::addObject(const WorldObject& obj) {
 }
 
 void SimpleWorld::removeObject(float x, float y) {
-    for (auto& obj : objects_) {
+    for (WorldObject& obj : objects_) {
         if (!obj.active) continue;
         
         float dx = obj.x - x;
         float dy = obj.y - y;
-        float dist = std::sqrt(dx * dx + dy * dy);
+        float distSq = dx*dx + dy*dy;  // Use squared distance for efficiency
         
-        if (dist < obj.radius) {
+        if (distSq < obj.radius * obj.radius) {
             obj.active = false;
             return;
         }
@@ -396,7 +418,7 @@ void SimpleWorld::checkCollisions() {
     // Passive collision check (for damage when moving into objects)
     WorldObject* obj = getObjectAt(agent_.x, agent_.y);
     if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
-        agent_.health -= 0.01f;  // Passive damage
+        agent_.health = std::max(0.0f, agent_.health - 0.01f);  // Clamp to non-negative
     }
 }
 

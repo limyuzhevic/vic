@@ -17,8 +17,6 @@
 #include "../src/agent/SensoryPercept.hpp"
 
 namespace py = pybind11;
-namespace nlm {
-
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
@@ -28,6 +26,43 @@ PYBIND11_MODULE(pynlm, m) {
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+
+    // Basic enums first
+    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
+        .value("Excitatory", NeuronType::Excitatory)
+        .value("Inhibitory", NeuronType::Inhibitory)
+        .value("Modulatory", NeuronType::Modulatory)
+        .value("Sensory", NeuronType::Sensory)
+        .value("Motor", NeuronType::Motor)
+        .value("Internal", NeuronType::Internal)
+        .export_values();
+
+    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
+        .value("Empty", WorldObjectType::Empty)
+        .value("Resource", WorldObjectType::Resource)
+        .value("Hazard", WorldObjectType::Hazard)
+        .value("Wall", WorldObjectType::Wall)
+        .value("Marker", WorldObjectType::Marker)
+        .export_values();
+
+    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
+        .value("Initial", DevelopmentalStage::Initial)
+        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
+        .value("Maturation", DevelopmentalStage::Maturation)
+        .value("Adult", DevelopmentalStage::Adult)
+        .value("Aging", DevelopmentalStage::Aging)
+        .export_values();
+
+    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
+        .value("MoveForward", MotorCommand::MoveForward)
+        .value("MoveBackward", MotorCommand::MoveBackward)
+        .value("TurnLeft", MotorCommand::TurnLeft)
+        .value("TurnRight", MotorCommand::TurnRight)
+        .value("LookLeft", MotorCommand::LookLeft)
+        .value("LookRight", MotorCommand::LookRight)
+        .value("Interact", MotorCommand::Interact)
+        .value("Wait", MotorCommand::Wait)
+        .export_values();
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -263,6 +298,106 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
+    // AgentBrain constants structure
+    py::class_<AgentBrain::Constants>(m, "AgentBrainConstants", R"pbdoc(Constants for AgentBrain configuration)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("vision_scale", &AgentBrain::Constants::visionScale)
+        .def_readwrite("touch_scale", &AgentBrain::Constants::touchScale)
+        .def_readwrite("internal_scale", &AgentBrain::Constants::internalScale)
+        .def_readwrite("proprioception_scale", &AgentBrain::Constants::proprioceptionScale)
+        .def_readwrite("min_activity_threshold", &AgentBrain::Constants::minActivityThreshold)
+        .def_readwrite("curiosity_exploration_threshold", &AgentBrain::Constants::curiosityExplorationThreshold)
+        .def_readwrite("high_curiosity_threshold", &AgentBrain::Constants::highCuriosityThreshold)
+        .def_readwrite("exploration_chance_multiplier", &AgentBrain::Constants::explorationChanceMultiplier)
+        .def_readwrite("dopamine_clamp_min", &AgentBrain::Constants::dopamineClampMin)
+        .def_readwrite("dopamine_clamp_max", &AgentBrain::Constants::dopamineClampMax)
+        .def_readwrite("novelty_decay_factor", &AgentBrain::Constants::noveltyDecayFactor)
+        .def_readwrite("initial_stage_time", &AgentBrain::Constants::initialStageTime)
+        .def_readwrite("critical_period_time", &AgentBrain::Constants::criticalPeriodTime)
+        .def_readwrite("maturation_time", &AgentBrain::Constants::maturationTime)
+        .def_readwrite("adult_plasticity_modifier", &AgentBrain::Constants::adultPlasticityModifier)
+        .def_readwrite("eligibility_trace_threshold", &AgentBrain::Constants::eligibilityTraceThreshold)
+        .def_readwrite("eligibility_trace_decay", &AgentBrain::Constants::eligibilityTraceDecay)
+        .def_readwrite("plasticity_base_factor", &AgentBrain::Constants::plasticityBaseFactor)
+        .def_readwrite("plasticity_min_factor", &AgentBrain::Constants::plasticityMinFactor)
+        .def_readwrite("plasticity_max_factor", &AgentBrain::Constants::plasticityMaxFactor)
+        .def_readwrite("stdp_ltp_weight", &AgentBrain::Constants::stdpLTPWeight)
+        .def_readwrite("stdp_ltd_weight", &AgentBrain::Constants::stdpLTDWeight)
+        .def_readwrite("structural_synaptogenesis_rate", &AgentBrain::Constants::structuralSynaptogenesisRate)
+        .def_readwrite("structural_pruning_rate", &AgentBrain::Constants::structuralPruningRate);
+
+    // Config class
+    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+        .def(py::init<>())
+        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+             "Load configuration from a JSON file")
+        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
+            return self.loadFromArgs(argc, argv);
+        }, py::arg("argc"), py::arg("argv"),
+           "Load configuration from command line arguments")
+        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+             "Save configuration to a JSON file")
+        .def("has", &Config::has, py::arg("key"),
+             "Check if a configuration key exists")
+        .def("getKeys", &Config::getKeys,
+             "Get all configuration keys")
+        .def("clear", &Config::clear,
+             "Clear all configuration entries")
+        .def("summary", &Config::summary,
+             "Get a summary string of the configuration")
+        .def("__repr__", [](const Config& cfg) {
+            return "<Config: " + cfg.summary() + ">";
+        });
+
+    // Action class
+    py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
+        .def(py::init<>())
+        .def(py::init<ActionType>(), py::arg("type"))
+        .def("getType", &Action::getType)
+        .def("setType", &Action::setType, py::arg("type"))
+        .def("getName", &Action::getName)
+        .def("clone", &Action::clone);
+
+    // WorldObject class
+    py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
+        .def(py::init<>())
+        .def(py::init<float, float, WorldObjectType, float, float>(),
+             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
+             py::arg("radius") = 0.5f)
+        .def_readwrite("x", &WorldObject::x)
+        .def_readwrite("y", &WorldObject::y)
+        .def_readwrite("radius", &WorldObject::radius)
+        .def_readwrite("type", &WorldObject::type)
+        .def_readwrite("value", &WorldObject::value)
+        .def_readwrite("active", &WorldObject::active);
+
+    // AgentBody class
+    py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("x", &AgentBody::x)
+        .def_readwrite("y", &AgentBody::y)
+        .def_readwrite("orientation", &AgentBody::orientation)
+        .def_readwrite("velocityX", &AgentBody::velocityX)
+        .def_readwrite("velocityY", &AgentBody::velocityY)
+        .def_readwrite("angularVelocity", &AgentBody::angularVelocity)
+        .def_readwrite("energy", &AgentBody::energy)
+        .def_readwrite("health", &AgentBody::health)
+        .def_readwrite("age", &AgentBody::age)
+        .def_readwrite("isMoving", &AgentBody::isMoving)
+        .def_readwrite("isTurning", &AgentBody::isTurning)
+        .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
+        .def("reset", &AgentBody::reset);
+
+    // ActionResult class
+    py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
+        .def(py::init<>())
+        .def(py::init<float, bool, std::string>(),
+             py::arg("reward"), py::arg("success"), py::arg("message") = "")
+        .def_readwrite("reward", &ActionResult::reward)
+        .def_readwrite("success", &ActionResult::success)
+        .def_readwrite("message", &ActionResult::message);
+
+    // SimpleWorld class
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
@@ -287,7 +422,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        .def("getObjectAt", &SimpleWorld::getObjectAt, py::arg("x"), py::arg("y"),
+             py::return_value_policy::reference_internal);
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
