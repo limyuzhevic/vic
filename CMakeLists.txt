@@ -34,7 +34,17 @@ add_library(nlm_core STATIC
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
+    # Split Brain.cpp into focused components
+    src/brain/BrainCore.cpp
+    src/brain/BrainNeuralOperations.cpp
+    src/brain/BrainPlasticity.cpp
+    src/brain/BrainDevelopment.cpp
+    src/brain/BrainMemorySystems.cpp
+    src/brain/BrainPrediction.cpp
+    src/brain/BrainCognition.cpp
+    src/brain/BrainNeuromodulation.cpp
+    src/brain/BrainCheckpoint.cpp
+    src/brain/BrainStatistics.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
@@ -142,6 +152,14 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 # Testing
 enable_testing()
 add_subdirectory(tests)
+
+# CLI Application
+add_executable(nlm_cli
+    src/cli/NLMCLI.cpp
+)
+
+target_link_libraries(nlm_cli PUBLIC nlm_core)
+set_target_properties(nlm_cli PROPERTIES OUTPUT_NAME "nlm")
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
