@@ -54,36 +54,91 @@ private:
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
+// TODO PHASE 2: Implement real acetylcholine effects
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Memory modulation
+    void modulateAttention(float strength);
+    void enhanceMemoryConsolidation(float strength);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
+// TODO PHASE 2: Implement real norepinephrine effects
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Arousal and attention modulation
+    void increaseVigilance(float strength);
+    void modulateArousal(float strength);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
+// TODO PHASE 2: Implement real serotonin effects
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Behavioral modulation
+    void modulateMood(float strength);
+    void controlImpulsivity(float strength);
+    void influenceSocialBehavior(float strength);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Serotonin 2A receptor: Neural gain and plasticity
+// TODO PHASE 2: Implement real 5-HT2A effects
+class Serotonin2A : public Neuromodulator {
+public:
+    const char* getName() const override { return "5-HT2A"; }
     float getLevel() const override { return 0.0f; }
     void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    float getPlasticityFactor() const override { return 0.5f + 0.5f * pImpl->level; }
+    void update(TimestepDuration dt) override {
+        pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    }
+    
+    // Neural gain and plasticity enhancement
+    void increaseNeuralGain(float strength);
+    void modulateMetaplasticity(float strength);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

@@ -528,11 +528,86 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Update concept formation system with current neural activity
+        pImpl->conceptFormation->update(pImpl->timestep);
+        
+        // Present experience to concept formation (this is called from agent brain)
+        // ConceptFormation needs actual experience data from sensory processing
+        // For now, we just update the system each step
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Update planning and cognitive systems ==========
+    if (pImpl->planner) {
+        // Update neural planner for action planning
+        // The planner should analyze current state and predict action consequences
+        pImpl->planner->update(pImpl->timestep);
+        
+        // Generate action plans based on current goals
+        auto* planningSystem = pImpl->planner.get();
+        if (planningSystem) {
+            auto plans = planningSystem->generatePlans();
+            if (!plans.empty()) {
+                // Store plans in working memory for execution
+                if (pImpl->workingMemory) {
+                    for (const auto& plan : plans) {
+                        pImpl->workingMemory->storeToNeuron(
+                            plan->actionSequence.front(),
+                            plan->confidence
+                        );
+                    }
+                }
+            }
+        }
+    }
+    
+    if (pImpl->conceptFormation) {
+        // Process current neural activity for concept formation
+        std::vector<float> currentActivity;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isActive() || neuron->isFiring()) {
+                        float activation = std::abs(
+                            neuron->getState().membranePotential - 
+                            neuron->getState().restingPotential
+                        ) / 10.0f;
+                        currentActivity.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        if (!currentActivity.empty()) {
+            pImpl->conceptFormation->addExperience(currentActivity);
+        }
+    }
+    
+    if (pImpl->attention) {
+        // Update attention system with current neural competition
+        // Attention should select and amplify relevant neural activity
+        std::vector<NeuronId> competitors;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isActive() || neuron->isFiring()) {
+                        competitors.push_back(neuron->getId());
+                    }
+                }
+            }
+        }
+        
+        if (!competitors.empty()) {
+            pImpl->attention->update(pImpl->timestep);
+            pImpl->attention->processCompetition(competitors);
+        }
+    }
+    
+    if (pImpl->conceptFormation && !pImpl->conceptFormation->getConcepts().empty()) {
+        // Form new concepts from processed experience
+        pImpl->conceptFormation->processCurrentActivity(std::vector<float>());
+    }
+    
+    // ========== STEP 12: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }

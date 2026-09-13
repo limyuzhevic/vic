@@ -268,7 +268,34 @@ float ConceptFormation::computeSimilarity(const std::vector<float>& a,
     return dot / (std::sqrt(normA) * std::sqrt(normB));
 }
 
+void ConceptFormation::update(TimestepDuration dt) {
+    // TODO PHASE 2: Implement real concept updating
+    // Currently just updates place representations
+    for (auto& place : placeCells_) {
+        place.stability = std::min(1.0f, place.stability * 0.95f + 0.01f);
+    }
+}
+
+void ConceptFormation::reset() {
+    concepts_.clear();
+    placeCells_.clear();
+    formedConcepts_.clear();
+    conceptStability_.clear();
+}
+
+void ConceptFormation::addExperience(const std::vector<float>& pattern) {
+    // TODO PHASE 2: Implement concept learning from experience
+    // For now, just record the pattern
+    conceptPatterns_.push_back(pattern);
+}
+
 bool ConceptFormation::isConceptStable(size_t conceptId) const {
+    auto it = conceptStability_.find(conceptId);
+    if (it != conceptStability_.end()) {
+        return it->second > 0.5f;  // Stable if confidence > 0.5
+    }
+    return false;
+}
     const DiscoveredConcept* concept = getConcept(conceptId);
     if (!concept) return false;
     
