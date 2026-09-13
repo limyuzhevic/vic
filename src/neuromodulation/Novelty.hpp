@@ -27,7 +27,7 @@ public:
     void detectNovelty(const std::vector<float>& currentPattern,
                        const std::vector<float>& previousPattern);
     
-    // Decay novelty over time
+    // Update novelty system
     void update(TimestepDuration dt);
     
     // Get novelty history
