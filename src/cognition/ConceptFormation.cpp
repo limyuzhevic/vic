@@ -268,11 +268,33 @@ float ConceptFormation::computeSimilarity(const std::vector<float>& a,
     return dot / (std::sqrt(normA) * std::sqrt(normB));
 }
 
-bool ConceptFormation::isConceptStable(size_t conceptId) const {
-    const DiscoveredConcept* concept = getConcept(conceptId);
-    if (!concept) return false;
+float ConceptFormation::getConceptConfidence() const {
+    float totalConfidence = 0.0f;
+    size_t conceptCount = concepts_.size();
     
-    return concept->avgStability >= stabilityThreshold_;
+    for (const auto& concept : concepts_) {
+        float conceptConfidence = concept.avgStability;
+        
+        // Factor in number of observations
+        float obsFactor = std::min(1.0f, static_cast<float>(concept.totalObservations) / 10.0f);
+        
+        // Factor in instance consistency
+        float consistency = 0.0f;
+        if (!concept.instances.empty()) {
+            size_t stableCount = 0;
+            for (const auto& instance : concept.instances) {
+                if (instance.stability > 0.7f) {
+                    stableCount++;
+                }
+            }
+            consistency = static_cast<float>(stableCount) / concept.instances.size();
+        }
+        
+        float conceptTotalConfidence = conceptConfidence * 0.5f + obsFactor * 0.3f + consistency * 0.2f;
+        totalConfidence += conceptTotalConfidence;
+    }
+    
+    return conceptCount > 0 ? totalConfidence / conceptCount : 0.0f;
 }
 
 float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {

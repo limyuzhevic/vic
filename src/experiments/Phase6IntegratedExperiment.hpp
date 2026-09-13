@@ -47,6 +47,11 @@ struct Phase6IntegrationResult {
     float curiosityLevel;
     float dopamineLevel;
     
+    // Visualization metrics
+    bool visualizationEnabled;
+    uint64_t totalFramesRendered;
+    double averageFPS;
+    
     // Timestamps
     time_t startTime;
     time_t endTime;
@@ -67,6 +72,9 @@ struct Phase6IntegrationResult {
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
         , dopamineLevel(0.0f)
+        , visualizationEnabled(false)
+        , totalFramesRendered(0)
+        , averageFPS(0.0)
         , startTime(0)
         , endTime(0)
         , totalWallClockTime(0.0) {}

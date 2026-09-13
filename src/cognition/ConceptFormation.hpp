@@ -77,10 +77,7 @@ public:
     ConceptFormation();
     ~ConceptFormation();
 
-    // Initialize with brain reference
-    void initialize(Brain* brain);
-
-    // Present a new experience to the concept formation system
+        // Present a new experience to the concept formation system
     // Returns concept ID if this experience belongs to an existing concept,
     // or 0 if it's too early to tell, or new concept ID if novel
     size_t presentExperience(const std::vector<float>& pattern,
@@ -117,26 +114,16 @@ public:
     void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
                       const std::vector<float>& features, float reward);
 
-    // Compute similarity between two patterns
-    float computeSimilarity(const std::vector<float>& a,
-                          const std::vector<float>& b) const;
+    // Update concept formation with current neural activity pattern
+    void updateConcept(const std::vector<float>& currentPattern);
 
-    // Check if pattern is novel (doesn't belong to any existing concept)
-    bool isNovel(const std::vector<float>& pattern,
-                 float similarityThreshold = 0.7f) const;
-
-    // Get concept for a given pattern
-    size_t findConceptForPattern(const std::vector<float>& pattern) const;
-
-    // Clear all concepts
-    void clear();
-
-    // Get generalization ability (can concept handle variations?)
-    float getGeneralizationAbility(size_t conceptId) const;
+    // Get concept confidence (overall level of formed concepts)
+    float getConceptConfidence() const;
 
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+    void setStabilityThreshold(float s) { stabilityThreshold_ = s; }
 
 private:
     // Create new concept from pattern

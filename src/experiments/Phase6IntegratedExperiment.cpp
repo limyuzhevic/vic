@@ -4,6 +4,7 @@
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../agent/AgentBrain.hpp"
+#include "../visualization/VisualizationInterface.hpp"
 #include <chrono>
 #include <cmath>
 
@@ -16,6 +17,7 @@ Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
 Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
     Phase6IntegrationResult result;
     result.startTime = time(nullptr);
+    result.visualizationEnabled = false; // Will be set if visualization is used
     
     auto startWall = std::chrono::high_resolution_clock::now();
     
@@ -40,6 +42,12 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         result.endTime = time(nullptr);
         return result;
     }
+    
+    // Initialize visualization if development is enabled (which includes visualization support)
+    nlm::VisualizationInterface viz;
+    bool useVisualization = config.enableDevelopment;
+    
+    NLM_LOG_INFO("Visualization " + std::string(useVisualization ? "enabled" : "disabled") + " for experiment");
     
     // Create simple world
     SimpleWorld world;
@@ -69,6 +77,17 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         
         // Brain step
         brain->step(step, step * 0.001);
+        
+        // Feed brain state to visualization
+        if (useVisualization) {
+            // Get spike system for visualization
+            auto* spikeSys = brain->getSpikeSystem();
+            if (spikeSys) {
+                // TODO PHASE 2: Retrieve and feed spike events to visualization
+                // For now, just update visualization with basic brain state
+                // viz.feedNeuralData(*brain, step, step * 0.001);
+            }
+        }
         
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
