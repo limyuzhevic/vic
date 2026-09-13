@@ -65,7 +65,7 @@ ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
     return ActionType::Wait;
 }
 
-PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>& actions,
+void NeuralPlanner::evaluateSequence(const std::vector<ActionType>& actions,
                                                  const std::vector<float>& startState) {
     PlanningCandidate candidate;
     candidate.actions = actions;
@@ -78,10 +78,10 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
     for (size_t i = 0; i < actions.size(); ++i) {
         ActionType action = actions[i];
         
-        // Evaluate this action
+        // Evaluate this action using predictive forward model
         float actionValue = evaluateAction(action, currentState);
         
-        // Predict next state
+        // Use SelfModel to predict next state (forward model)
         auto predictedNext = predictNextState(action, currentState);
         
         if (!predictedNext.empty()) {
@@ -89,7 +89,7 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
             currentState = predictedNext;
         }
         
-        // Get action quality from experience
+        // Get action quality from experience (reinforcement learning)
         size_t actionIdx = static_cast<size_t>(action);
         if (actionIdx < actionQuality_.size()) {
             actionValue = actionQuality_[actionIdx] * 0.7f + actionValue * 0.3f;
@@ -97,7 +97,7 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
         
         totalReward += actionValue;
         
-        // Reduce confidence if we're uncertain
+        // Reduce confidence based on self-model uncertainty
         confidence *= getSelfModelConfidence(action);
     }
     

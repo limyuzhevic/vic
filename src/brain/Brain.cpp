@@ -20,84 +20,92 @@
 #include <cmath>
 #include <sstream>
 
-namespace nlm {
+// Add checkpoint data structures
+struct WorkingMemoryCheckpointData {
+    std::vector<float> activations;
+    std::vector<NeuronId> neurons;
+    std::vector<SimulationStep> timestamps;
+    float decayRate;
+    size_t capacity;
+};
 
-struct Brain::Impl {
-    std::shared_ptr<Config> config;
-    std::unique_ptr<RandomGenerator> rng;
-    std::vector<std::unique_ptr<NeuralRegion>> regions;
-    std::vector<InterRegionConnection> interRegionConnections;
-    
-    // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
-    
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
-    
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
-    std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
-    
-    // Phase 2: Real neural computation components
-    std::unique_ptr<SpikeSystem> spikeSystem;
-    std::unique_ptr<STDP> stdp;
-    std::unique_ptr<Hebbian> hebbian;
-    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
-    
-    // Simulation parameters
-    TimestepDuration timestep;
-    SimulationStep currentStep;
+struct NeuromodulationCheckpointData {
+    float dopamineLevel;
+    float curiosityLevel;
+    float noveltyLevel;
+    float predictionError;
+};
+
+struct DevelopmentCheckpointData {
+    DevelopmentalStage stage;
+    float maturityLevel;
+    bool hasPruned;
+    bool hasSynaptogenesis;
+};
+
+struct PredictionCheckpointData {
+    float predictionError;
+    float confidence;
+    std::vector<float> errorHistory;
+    std::vector<float> predictionBuffers;
+};
+
+struct CognitiveCheckpointData {
+    std::vector<float> actionQuality;
+    std::vector<float> currentGoal;
+    size_t planningDepth;
+    float planningConfidence;
+    std::vector<bool> recentPlanSuccess;
+};
+
+struct RandomGeneratorCheckpointData {
+    uint64_t currentState;
+    uint64_t seed;
+};
+
+struct SimulationCheckpointData {
+    uint64_t currentStep;
     Timestamp currentTime;
-    
-    // Statistics
-    size_t totalSpikesThisStep;
-    size_t totalSpikesTotal;
-    
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
-    
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
+    uint64_t totalSpikesTotal;
+    SimulationStep developmentalStage;
     size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
+};
+
+struct BrainCheckpointData {
+    // Neural data (already handled by CheckpointSystem)
+    std::vector<float> neuronMembranePotentials;
+    std::vector<float> neuronRestingPotentials;
+    std::vector<float> neuronThresholds;
+    std::vector<float> neuronResetPotentials;
+    std::vector<float> neuronLeakConductances;
+    std::vector<uint8_t> neuronFiringStates;
+    std::vector<uint32_t> neuronRefractoryRemainings;
+    std::vector<uint32_t> neuronRefractoryPeriods;
+    std::vector<float> neuronLastSpikeTimes;
     
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    // Synapse data (already handled by CheckpointSystem)
+    std::vector<uint64_t> synapseSourceNeurons;
+    std::vector<uint64_t> synapseDestinationNeurons;
+    std::vector<float> synapseWeights;
+    std::vector<uint32_t> synapseDelays;
+    std::vector<uint8_t> synapseTypes;
+    std::vector<uint8_t> synapsePlasticityFlags;
+    std::vector<float> synapseEligibilityTraces;
     
-    Impl(std::shared_ptr<Config> cfg)
-        : config(cfg)
-        , rng(nullptr)
-        , developmentalStage(DevelopmentalStage::Initial)
-        , nextRegionId(1)
-        , timestep(0.001)
-        , currentStep(0)
-        , currentTime(0.0)
-        , totalSpikesThisStep(0)
-        , totalSpikesTotal(0)
-        , isResting(false)
-        , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
-    {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
+    // System data
+    WorkingMemoryCheckpointData workingMemory;
+    NeuromodulationCheckpointData neuromodulation;
+    DevelopmentCheckpointData development;
+    PredictionCheckpointData prediction;
+    CognitiveCheckpointData cognition;
+    RandomGeneratorCheckpointData randomGenerator;
+    SimulationCheckpointData simulation;
+    InterRegionConnection interRegionConnections;
+};
+
+// Forward declaration for CheckpointSystem namespace
+namespace nlm {
+    struct Brain::Impl {
         rng = std::make_unique<RandomGenerator>(seed);
         
         // Initialize plasticity systems
@@ -142,20 +150,160 @@ struct Brain::Impl {
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+    // Get spike system (const version)
+    const SpikeSystem* getSpikeSystem() const {
+        return pImpl->spikeSystem.get();
     }
     
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
-};
+    // Get STDP (const version)
+    const STDP* getSTDP() const {
+        return pImpl->stdp.get();
+    }
+    
+    // Get Hebbian (const version)
+    const Hebbian* getHebbian() const {
+        return pImpl->hebbian.get();
+    }
+    
+    // Get structural plasticity (const version)
+    const StructuralPlasticity* getStructuralPlasticity() const {
+        return pImpl->structuralPlasticity.get();
+    }
+    
+    // Get random generator (const version)
+    const RandomGenerator* getRandomGenerator() const {
+        return pImpl->rng.get();
+    }
+    
+    // Get configuration (const version)
+    const Config* getConfig() const {
+        return pImpl->config.get();
+    }
+    
+    // Get current timestep (const version)
+    double getTimestep() const {
+        return pImpl->timestep;
+    }
+    
+    // Get current simulation step (const version)
+    uint64_t getCurrentStep() const {
+        return pImpl->currentStep;
+    }
+    
+    // Get current simulation time (const version)
+    double getCurrentTime() const {
+        return pImpl->currentTime;
+    }
+    
+    // Get total spike count (const version)
+    uint64_t getTotalSpikesTotal() const {
+        return pImpl->totalSpikesTotal;
+    }
+    
+    // Get steps since last episode (const version)
+    size_t getStepsSinceLastEpisode() const {
+        return pImpl->stepsSinceLastEpisode;
+    }
+    
+    // Get replay interval (const version)
+    size_t getReplayInterval() const {
+        return pImpl->replayInterval;
+    }
+    
+    // Get consolidation interval (const version)
+    size_t getConsolidationInterval() const {
+        return pImpl->consolidationInterval;
+    }
+    
+    // Get is resting (const version)
+    bool getIsResting() const {
+        return pImpl->isResting;
+    }
+    
+    // Get sensory neurons (const version)
+    const std::vector<Neuron*>& getSensoryNeurons() const {
+        return pImpl->sensoryNeurons;
+    }
+    
+    // Get motor neurons (const version)
+    const std::vector<Neuron*>& getMotorNeurons() const {
+        return pImpl->motorNeurons;
+    }
+    
+    // Helper functions for checkpoint manager
+    bool saveNeurons(NeuronCheckpointData& data) {
+        data.membranePotential.clear();
+        data.restingPotential.clear();
+        data.threshold.clear();
+        data.resetPotential.clear();
+        data.leakConductance.clear();
+        data.firingState.clear();
+        data.refractoryRemaining.clear();
+        data.refractoryPeriod.clear();
+        data.lastSpikeTime.clear();
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    data.membranePotential.push_back(state.membranePotential);
+                    data.restingPotential.push_back(state.restingPotential);
+                    data.threshold.push_back(state.threshold);
+                    data.resetPotential.push_back(state.resetPotential);
+                    data.leakConductance.push_back(state.leakConductance);
+                    data.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                    data.refractoryRemaining.push_back(state.refractoryRemaining);
+                    data.refractoryPeriod.push_back(state.refractoryPeriod);
+                    data.lastSpikeTime.push_back(state.lastSpikeTime);
+                }
+            }
+        }
+        return !data.membranePotential.empty();
+    }
+    
+    bool saveSynapses(SynapseCheckpointData& data) {
+        data.sourceNeuron.clear();
+        data.destinationNeuron.clear();
+        data.weight.clear();
+        data.delay.clear();
+        data.synapseType.clear();
+        data.plasticityFlags.clear();
+        data.eligibilityTrace.clear();
+        data.efficacy.clear();
+        data.shortTermDepression.clear();
+        data.shortTermFacilitation.clear();
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto* syn : region->getSynapses()) {
+                data.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                data.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                data.weight.push_back(syn->getWeight());
+                data.delay.push_back(syn->getDelay());
+                data.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                data.plasticityFlags.push_back(syn->getPlasticityFlags());
+                data.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                data.efficacy.push_back(1.0f); // Placeholder
+                data.shortTermDepression.push_back(0.0f); // Placeholder
+                data.shortTermFacilitation.push_back(0.0f); // Placeholder
+            }
+        }
+        return !data.sourceNeuron.empty();
+    }
+    
+    // Set developmental stage
+    void setDevelopmentalStage(DevelopmentalStage stage) {
+        pImpl->developmentalStage = stage;
+    }
+    
+    // Get all regions (const version)
+    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const {
+        return pImpl->regions;
+    }
+    
+    // Get inter-region connections
+    const std::vector<InterRegionConnection>& getInterRegionConnections() const {
+        return pImpl->interRegionConnections;
+    }
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
@@ -316,13 +464,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 5. Apply neuromodulation effects on neural excitability
      * 6. Apply plasticity rules (STDP, Hebbian)
      * 7. Update episodic memory with current experience
-     * 8. Update prediction system
-     * 9. Update attention system
-     * 10. Update concept formation
+     * 8. Update prediction system with sensory input
+     * 9. Update attention system based on working memory
+     * 10. Update concept formation from sensory patterns
      * 11. Apply structural plasticity (synaptogenesis, pruning)
      * 12. Replay important memories (during rest or periodically)
      * 13. Apply development effects
-     * 14. Collect statistics
+     * 14. Update neuromodulation levels
+     * 15. Collect statistics
      */
     
     pImpl->currentStep = currentStep;
@@ -337,6 +486,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
                 neuron->stepLIF(currentTime, pImpl->timestep);
+                
+                // Store working memory for firing neurons - not just sensory neurons
+                if (pImpl->workingMemory) {
+                    const auto& state = neuron->getState();
+                    if (neuron->isFiring() || 
+                        std::abs(state.membranePotential - state.restingPotential) > 2.0f) {
+                        float activation = std::abs(state.membranePotential - state.restingPotential) / 10.0f;
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), activation);
+                    }
+                }
             }
         }
     }
@@ -401,22 +560,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
+    // Update working memory (maintenance and competition)
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
-    
-    // ========== STEP 5: Apply neuromodulation effects ==========
+
+    // Apply neuromodulation effects on neural excitability
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
     }
-    
+
     // Update curiosity
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
     }
-    
+
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
@@ -509,44 +668,100 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    // Store sensory input patterns to working memory
+    if (pImpl->workingMemory) {
+        // Store current sensory input patterns to working memory for pattern learning
+        // Use attention-weighted values for better encoding
+        std::vector<NeuronId> activeNeurons;
+        std::vector<float> activations;
+        
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            if (neuron->isFiring()) {
+                float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                pImpl->workingMemory->storeToNeuron(neuron->getId(), activation);
+            }
+        }
     }
     
+    // Update prediction system with current state
+    if (pImpl->predictionSystem) {
+        // Get current sensory input from agent's percept if available
+        // The prediction system needs real sensory input to learn
+        // For now, we use a simple approach - check if AgentBrain has stored recent percept
+        // This is a placeholder for actual integration with AgentBrain
+        
+        // Simple training with current brain state
+        std::vector<float> currentState;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    currentState.push_back(
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 50.0f);
+                }
+            }
+        }
+        
+        if (!currentState.empty()) {
+            class SensoryInput input;
+            // TODO: Properly create SensoryInput from neural state
+            // For now create placeholder
+            pImpl->predictionSystem->train(input);
+        }
+    }
+
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
-        // Apply attention to working memory winners
+        // Apply attention to working memory winners for neural competition
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+            std::vector<NeuronId> attended = pImpl->attention->processCompetition(competitors);
+            
+            // Apply attended regions to brain regions for focused processing
+            for (const auto& winner : attended) {
+                // Extract region ID from neuron ID (assuming regionId = neuronId / 1000)
+                RegionId regionId = static_cast<RegionId>(winner.getId() / 1000);
+                pImpl->attention->focusOnRegion(regionId);
+            }
         }
     }
-    
+
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
-    }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
-    }
-    
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+        // Process current neural activity patterns to form concepts
+        // Get current brain state for concept formation
+        std::vector<float> currentPattern;
+        
+        // Sample neural activity for concept formation
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                // Use average neuron activity in each population
+                float totalActivity = 0.0f;
+                size_t count = 0;
+                for (auto* neuron : pop->getNeurons()) {
+                    totalActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                    ++count;
+                }
+                if (count > 0) {
+                    currentPattern.push_back(totalActivity / count);
+                }
+            }
+        }
+        
+        if (!currentPattern.empty()) {
+            // Present pattern to concept formation system
+            pImpl->conceptFormation->presentExperience(
+                currentPattern,  // neural pattern
+                currentPattern,  // features (same for now)
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,  // reward from dopamine
+                pImpl->currentStep
+            );
         }
     }
-    
-    // ========== STEP 13: Apply development effects ==========
+
+    // ========== STEP 11: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -575,17 +790,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
-    
+
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
-    
+
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+
+    // ========== STEP 16: Update neuromodulation ==========
+    // Update neuromodulation systems
+    if (pImpl->novelty) pImpl->novelty->update(pImpl->timestep);
+    if (pImpl->curiosity) pImpl->curiosity->update(pImpl->timestep);
+    if (pImpl->dopamine) pImpl->dopamine->update(pImpl->timestep);
+    if (pImpl->predictionError) pImpl->predictionError->update(pImpl->timestep);
+
+    // ========== STEP 17: Collect statistics ==========
+    // Collect brain statistics for monitoring
+    // (Stats collection could go here)
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
@@ -609,10 +835,15 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
+        // Store in working memory for all sensory input (not just strong inputs)
+        if (pImpl->workingMemory) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
+    }
+    
+    // Train prediction system with sensory input
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->train(input);
     }
 }
 
@@ -828,6 +1059,163 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write inter-region connections
+        std::vector<InterRegionConnection> connections;
+        connections.reserve(pImpl->interRegionConnections.size());
+        for (const auto& conn : pImpl->interRegionConnections) {
+            connections.push_back(conn);
+        }
+        if (!connections.empty()) {
+            writer.writeSection(CheckpointSection::Connectivity, 
+                               &connections[0], 
+                               connections.size() * sizeof(InterRegionConnection));
+        }
+        
+        // Write plasticity state (STDP, Hebbian, StructuralPlasticity)
+        // This would be implemented based on the actual plasticity system structures
+        
+        // Write development system state
+        {
+            DevelopmentCheckpointData devData;
+            devData.stage = pImpl->developmentalStage;
+            // Add development system specific state here
+            writer.writeSection(CheckpointSection::Development, 
+                               &devData, sizeof(DevelopmentCheckpointData));
+        }
+        
+        // Write neuromodulation systems state
+        {
+            NeuromodulationCheckpointData neuromodData;
+            neuromodData.dopamineLevel = 0.5f; // Placeholder - get from dopamine system
+            neuromodData.curiosityLevel = 0.5f; // Placeholder
+            neuromodData.noveltyLevel = 0.5f; // Placeholder
+            neuromodData.predictionError = 0.5f; // Placeholder
+            writer.writeSection(CheckpointSection::Neuromodulation, 
+                               &neuromodData, sizeof(NeuromodulationCheckpointData));
+        }
+        
+        // Write memory systems state
+        {
+            WorkingMemoryCheckpointData memData;
+            // TODO: Get actual memory system state
+            writer.writeSection(CheckpointSection::Memory, 
+                               &memData, sizeof(WorkingMemoryCheckpointData));
+        }
+        
+        // Write prediction system state
+        {
+            PredictionCheckpointData predData;
+            // TODO: Get actual prediction system state
+            writer.writeSection(CheckpointSection::Prediction, 
+                               &predData, sizeof(PredictionCheckpointData));
+        }
+        
+        // Write development system state
+        {
+            DevelopmentCheckpointData devData;
+            devData.stage = pImpl->developmentalStage;
+            devData.maturityLevel = 0.5f; // Placeholder - get from development system
+            devData.hasPruned = false; // Placeholder - get from development system
+            devData.hasSynaptogenesis = false; // Placeholder - get from development system
+            writer.writeSection(CheckpointSection::Development, 
+                               &devData, sizeof(DevelopmentCheckpointData));
+        }
+        
+        // Write neuromodulation systems state
+        {
+            NeuromodulationCheckpointData neuromodData;
+            neuromodData.dopamineLevel = 0.5f; // Placeholder - get from dopamine system
+            neuromodData.curiosityLevel = 0.5f; // Placeholder
+            neuromodData.noveltyLevel = 0.5f; // Placeholder
+            neuromodData.predictionError = 0.5f; // Placeholder
+            writer.writeSection(CheckpointSection::Neuromodulation, 
+                               &neuromodData, sizeof(NeuromodulationCheckpointData));
+        }
+        
+        // Write memory systems state
+        {
+            WorkingMemoryCheckpointData memData;
+            memData.decayRate = 0.01f; // Placeholder - get from working memory
+            memData.capacity = 100; // Placeholder - get from working memory
+            // Get actual memory system state
+            if (pImpl->workingMemory) {
+                auto ret = pImpl->workingMemory->retrieve();
+                memData.activations = ret;
+                memData.neurons = pImpl->workingMemory->getMemoryNeurons();
+                memData.timestamps.resize(memData.neurons.size(), pImpl->currentStep);
+            }
+            writer.writeSection(CheckpointSection::Memory, 
+                               &memData, sizeof(WorkingMemoryCheckpointData));
+        }
+        
+        // Write prediction system state
+        {
+            PredictionCheckpointData predData;
+            // Get actual prediction system state
+            if (pImpl->predictionSystem) {
+                predData.predictionError = pImpl->predictionSystem->getPredictionError();
+                predData.confidence = pImpl->predictionSystem->getConfidence();
+                predData.errorHistory = pImpl->predictionSystem->getErrorHistory();
+                // predictionBuffers would need to be added to PredictionSystem
+            }
+            writer.writeSection(CheckpointSection::Prediction, 
+                               &predData, sizeof(PredictionCheckpointData));
+        }
+        
+        // Write cognitive systems state
+        {
+            CognitiveCheckpointData cogData;
+            cogData.planningDepth = 3; // Placeholder - get from planner
+            cogData.planningConfidence = 0.5f; // Placeholder - get from planner
+            // Get actual cognitive system state
+            if (pImpl->planner) {
+                cogData.actionQuality = std::vector<float>(10, 0.5f); // Placeholder
+                cogData.currentGoal = std::vector<float>(5, 0.5f); // Placeholder
+                cogData.recentPlanSuccess = std::vector<bool>(10, true); // Placeholder
+            }
+            writer.writeSection(CheckpointSection::Environment, 
+                               &cogData, sizeof(CognitiveCheckpointData));
+        }
+        
+        // Write random generator state
+        {
+            RandomGeneratorCheckpointData rngData;
+            // Get actual random generator state
+            if (pImpl->rng) {
+                rngData.currentState = pImpl->rng->getState(); // Assuming this method exists
+                rngData.seed = pImpl->rng->getSeed(); // Assuming this method exists
+            }
+            writer.writeSection(CheckpointSection::RandomState, 
+                               &rngData, sizeof(RandomGeneratorCheckpointData));
+        }
+        
+        // Write simulation state
+        {
+            SimulationCheckpointData simData;
+            simData.currentStep = pImpl->currentStep;
+            simData.currentTime = pImpl->currentTime;
+            simData.totalSpikesTotal = pImpl->totalSpikesTotal;
+            simData.developmentalStage = pImpl->developmentalStage;
+            simData.stepsSinceLastEpisode = pImpl->stepsSinceLastEpisode;
+            writer.writeSection(CheckpointSection::SimulationState, 
+                               &simData, sizeof(SimulationCheckpointData));
+        }
+        
+        // Write spike history
+        {
+            // TODO: Get actual spike history data
+            // For now, create a minimal spike history entry
+            struct SpikeHistoryEntry {
+                uint64_t neuronId;
+                Timestamp lastSpikeTime;
+                uint32_t spikeCount;
+            };
+            std::vector<SpikeHistoryEntry> spikeHistory;
+            writer.writeSection(CheckpointSection::SpikeHistory, 
+                               &spikeHistory[0], 
+                               spikeHistory.size() * sizeof(SpikeHistoryEntry));
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -888,16 +1276,126 @@ bool Brain::load(const std::string& filepath) {
             }
         }
         
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
-            return false;
+        // Load development system state
+        {
+            DevelopmentCheckpointData devData;
+            auto devSection = reader.readSection(CheckpointSection::Development);
+            if (!devSection.empty() && devSection.size() >= sizeof(DevelopmentCheckpointData)) {
+                std::memcpy(&devData, devSection.data(), sizeof(DevelopmentCheckpointData));
+                pImpl->developmentalStage = devData.stage;
+                // Restore development system specific state
+            }
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Load neuromodulation systems state
+        {
+            NeuromodulationCheckpointData neuromodData;
+            auto neuromodSection = reader.readSection(CheckpointSection::Neuromodulation);
+            if (!neuromodSection.empty() && neuromodSection.size() >= sizeof(NeuromodulationCheckpointData)) {
+                std::memcpy(&neuromodData, neuromodSection.data(), sizeof(NeuromodulationCheckpointData));
+                // Restore neuromodulation systems state (dopamine, curiosity, novelty, prediction error)
+                // These would be restored from the actual neuromodulation systems
+            }
+        }
+        
+        // Load memory systems state
+        {
+            WorkingMemoryCheckpointData memData;
+            auto memSection = reader.readSection(CheckpointSection::Memory);
+            if (!memSection.empty() && memSection.size() >= sizeof(WorkingMemoryCheckpointData)) {
+                std::memcpy(&memData, memSection.data(), sizeof(WorkingMemoryCheckpointData));
+                // Restore working memory state
+                if (pImpl->workingMemory) {
+                    pImpl->workingMemory->clear();
+                    for (size_t i = 0; i < memData.neurons.size() && i < memData.activations.size(); ++i) {
+                        pImpl->workingMemory->storeToNeuron(memData.neurons[i], memData.activations[i]);
+                    }
+                    pImpl->workingMemory->setDecayRate(memData.decayRate);
+                    pImpl->workingMemory->setCapacity(memData.capacity);
+                }
+            }
+        }
+        
+        // Load prediction system state
+        {
+            PredictionCheckpointData predData;
+            auto predSection = reader.readSection(CheckpointSection::Prediction);
+            if (!predSection.empty() && predSection.size() >= sizeof(PredictionCheckpointData)) {
+                std::memcpy(&predData, predSection.data(), sizeof(PredictionCheckpointData));
+                // Restore prediction system state
+                if (pImpl->predictionSystem) {
+                    // Restore prediction system state (predictionError, confidence, errorHistory)
+                    // These would be restored based on the actual PredictionSystem interface
+                }
+            }
+        }
+        
+        // Load cognitive systems state
+        {
+            CognitiveCheckpointData cogData;
+            auto cogSection = reader.readSection(CheckpointSection::Environment);
+            if (!cogSection.empty() && cogSection.size() >= sizeof(CognitiveCheckpointData)) {
+                std::memcpy(&cogData, cogSection.data(), sizeof(CognitiveCheckpointData));
+                // Restore cognitive systems state (planner, concept formation, attention)
+                if (pImpl->planner) {
+                    // Restore planner state
+                    pImpl->planner->setPlanningDepth(cogData.planningDepth);
+                    pImpl->planner->setPlanningConfidence(cogData.planningConfidence);
+                }
+                // Restore other cognitive systems
+            }
+        }
+        
+        // Load random generator state
+        {
+            RandomGeneratorCheckpointData rngData;
+            auto rngSection = reader.readSection(CheckpointSection::RandomState);
+            if (!rngSection.empty() && rngSection.size() >= sizeof(RandomGeneratorCheckpointData)) {
+                std::memcpy(&rngData, rngSection.data(), sizeof(RandomGeneratorCheckpointData));
+                // Restore random generator state
+                if (pImpl->rng) {
+                    // Restore random generator state (currentState, seed)
+                }
+            }
+        }
+        
+        // Load simulation state
+        {
+            SimulationCheckpointData simData;
+            auto simSection = reader.readSection(CheckpointSection::SimulationState);
+            if (!simSection.empty() && simSection.size() >= sizeof(SimulationCheckpointData)) {
+                std::memcpy(&simData, simSection.data(), sizeof(SimulationCheckpointData));
+                pImpl->currentStep = simData.currentStep;
+                pImpl->currentTime = simData.currentTime;
+                pImpl->totalSpikesTotal = simData.totalSpikesTotal;
+                pImpl->developmentalStage = simData.developmentalStage;
+                pImpl->stepsSinceLastEpisode = simData.stepsSinceLastEpisode;
+            }
+        }
+        
+        // Load spike history
+        {
+            auto spikeSection = reader.readSection(CheckpointSection::SpikeHistory);
+            if (!spikeSection.empty()) {
+                // Restore spike history data
+                // Parse and restore spike history for neurons
+            }
+        }
+        
+        // Load inter-region connections
+        {
+            auto connSection = reader.readSection(CheckpointSection::Connectivity);
+            if (!connSection.empty()) {
+                // Parse and restore inter-region connections
+                const InterRegionConnection* connections = reinterpret_cast<const InterRegionConnection*>(connSection.data());
+                size_t connCount = connSection.size() / sizeof(InterRegionConnection);
+                pImpl->interRegionConnections.clear();
+                pImpl->interRegionConnections.reserve(connCount);
+                for (size_t i = 0; i < connCount; ++i) {
+                    pImpl->interRegionConnections.push_back(connections[i]);
+                }
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

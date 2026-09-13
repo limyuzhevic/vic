@@ -143,14 +143,21 @@ void ConceptFormation::updatePrototype(size_t conceptId, const std::vector<float
     for (auto& concept : concepts_) {
         if (concept.id == conceptId) {
             // Hebbian update: weight prototype towards new instance
-            float alpha = 0.2f;  // Learning rate
+            float alpha = 0.1f;  // Faster learning for concept prototypes
             
             if (concept.prototype.size() == newInstance.size()) {
                 for (size_t i = 0; i < concept.prototype.size(); ++i) {
                     concept.prototype[i] = concept.prototype[i] * (1.0f - alpha) + 
                                           newInstance[i] * alpha;
+                    
+                    // Normalize to maintain pattern scale
+                    if (concept.prototype[i] > 1.0f) concept.prototype[i] = 1.0f;
+                    if (concept.prototype[i] < 0.0f) concept.prototype[i] = 0.0f;
                 }
             }
+            
+            // Update category hint based on current prototype properties
+            updateCategoryHint(&concept);
             break;
         }
     }

@@ -1,34 +1,5 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
-
-namespace nlm {
-
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
-
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -42,6 +13,89 @@ struct InterRegionConnection {
     
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+};
+
+// Checkpoint data structures
+struct WorkingMemoryCheckpointData {
+    std::vector<float> activations;
+    std::vector<NeuronId> neurons;
+    std::vector<SimulationStep> timestamps;
+    float decayRate;
+    size_t capacity;
+};
+
+struct NeuromodulationCheckpointData {
+    float dopamineLevel;
+    float curiosityLevel;
+    float noveltyLevel;
+    float predictionError;
+};
+
+struct DevelopmentCheckpointData {
+    DevelopmentalStage stage;
+    float maturityLevel;
+    bool hasPruned;
+    bool hasSynaptogenesis;
+};
+
+struct PredictionCheckpointData {
+    float predictionError;
+    float confidence;
+    std::vector<float> errorHistory;
+    std::vector<float> predictionBuffers;
+};
+
+struct CognitiveCheckpointData {
+    std::vector<float> actionQuality;
+    std::vector<float> currentGoal;
+    size_t planningDepth;
+    float planningConfidence;
+    std::vector<bool> recentPlanSuccess;
+};
+
+struct RandomGeneratorCheckpointData {
+    uint64_t currentState;
+    uint64_t seed;
+};
+
+struct SimulationCheckpointData {
+    uint64_t currentStep;
+    Timestamp currentTime;
+    uint64_t totalSpikesTotal;
+    DevelopmentalStage developmentalStage;
+    size_t stepsSinceLastEpisode;
+};
+
+struct BrainCheckpointData {
+    // Neural data (already handled by CheckpointSystem)
+    std::vector<float> neuronMembranePotentials;
+    std::vector<float> neuronRestingPotentials;
+    std::vector<float> neuronThresholds;
+    std::vector<float> neuronResetPotentials;
+    std::vector<float> neuronLeakConductances;
+    std::vector<uint8_t> neuronFiringStates;
+    std::vector<uint32_t> neuronRefractoryRemainings;
+    std::vector<uint32_t> neuronRefractoryPeriods;
+    std::vector<float> neuronLastSpikeTimes;
+    
+    // Synapse data (already handled by CheckpointSystem)
+    std::vector<uint64_t> synapseSourceNeurons;
+    std::vector<uint64_t> synapseDestinationNeurons;
+    std::vector<float> synapseWeights;
+    std::vector<uint32_t> synapseDelays;
+    std::vector<uint8_t> synapseTypes;
+    std::vector<uint8_t> synapsePlasticityFlags;
+    std::vector<float> synapseEligibilityTraces;
+    
+    // System data
+    WorkingMemoryCheckpointData workingMemory;
+    NeuromodulationCheckpointData neuromodulation;
+    DevelopmentCheckpointData development;
+    PredictionCheckpointData prediction;
+    CognitiveCheckpointData cognition;
+    RandomGeneratorCheckpointData randomGenerator;
+    SimulationCheckpointData simulation;
+    std::vector<InterRegionConnection> interRegionConnections;
 };
 
 // Brain: The central coordinator of the neural system
@@ -197,5 +251,11 @@ private:
     struct Impl;
     Impl* pImpl;
 };
+
+// Checkpoint system for brain state serialization
+class CheckpointSystem;
+class CheckpointWriter;
+class CheckpointReader;
+class CheckpointManager;
 
 } // namespace nlm
