@@ -18,10 +18,10 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    // LIF parameters - these should be configured from config file
+    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF - TODO: make configurable
+    static constexpr float TIME_CONSTANT = 20.0f;  // ms - TODO: make configurable
+    static constexpr size_t MAX_SPIKE_HISTORY = 100;  // TODO: make configurable
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
@@ -188,7 +188,7 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+void Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
     // Handle refractory period
@@ -199,7 +199,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         if (pImpl->state.refractoryRemaining == 0) {
             pImpl->state.firingState = FiringState::Resting;
         }
-        return false;
+        return;
     }
     
     // LIF dynamics: Leaky Integrate-and-Fire
@@ -256,7 +256,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Clear synaptic input for next step
     pImpl->synapticInput = 0.0f;
     
-    return fired;
+    return;
 }
 
 void Neuron::step(Timestamp currentTime) {

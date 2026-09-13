@@ -1,6 +1,8 @@
 #include "NeuralPopulation.hpp"
 #include <algorithm>
 #include <numeric>
+#include <stdexcept>
+#include <cassert>
 
 namespace nlm {
 
@@ -55,6 +57,15 @@ const Neuron* NeuralPopulation::getNeuron(NeuronIndex index) const {
         return nullptr;
     }
     return pImpl->neurons[index];
+}
+
+// Assert on debug builds and throw exception on release
+void NeuralPopulation::validateNeuronIndex(NeuronIndex index) const {
+#ifdef NDEBUG
+    throw std::out_of_range("Neuron index out of bounds");
+#else
+    assert(index < pImpl->neurons.size() && "Neuron index out of bounds");
+#endif
 }
 
 void NeuralPopulation::addNeuron(Neuron* neuron) {
