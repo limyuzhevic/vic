@@ -6,6 +6,13 @@
 
 namespace nlm {
 
+// Need to add RandomGenerator to NeuralEpisodicMemory
+// Include the header
+#include "../core/Random/Random.hpp"
+
+// Forward declaration since it's already included in other files
+// Let's check if RandomGenerator is already accessible
+
 struct NeuralEpisodicMemory::Impl {
     Brain* brain;
     
@@ -38,22 +45,128 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     
     episodes_.push_back(stored);
     
-    // Create episode neuron for pattern completion
+    // Create better distributed neural pattern for episodic encoding
     if (brain_ && !episode.sensoryState.empty()) {
-        NeuronId epNeuron(episodes_.size() + 20000);
-        pImpl->episodeNeurons.push_back(epNeuron);
+        // Enhanced distributed encoding using multiple neurons
+        // The encoding should capture multiple aspects of the episode
+        int numPatternNeurons = std::max(3, static_cast<int>(episode.sensoryState.size() / 10));
+        numPatternNeurons = std::min(numPatternNeurons, 20);  // Cap for stability
         
-        // Store episode index in the neuron
-        // (This is a simplified approach - real implementation would use more distributed encoding)
+        std::vector<NeuronId> patternNeurons;
+        
+        // Create features from the episode for distributed representation
+        std::vector<float> episodeFeatures;
+        
+        // Feature 1: Raw sensory state (distribute across first half)
+        if (episode.sensoryState.size() > 0) {
+            size_t featureCount = numPatternNeurons / 2;
+            for (size_t i = 0; i < featureCount && i < episode.sensoryState.size(); ++i) {
+                // Normalize sensory values to activation range
+                float normValue = std::max(0.0f, std::min(1.0f, episode.sensoryState[i] * 10.0f));
+                episodeFeatures.push_back(normValue);
+            }
+        }
+        
+        // Feature 2: Reward and energy (high importance)
+        if (numPatternNeurons > 1) {
+            float rewardFeature = std::min(1.0f, std::abs(episode.reward));
+            float energyFeature = std::min(1.0f, episode.energy);
+            episodeFeatures.push_back(rewardFeature);
+            episodeFeatures.push_back(energyFeature);
+        }
+        
+        // Feature 3: Location information
+        if (numPatternNeurons > 2) {
+            float xFeature = std::min(1.0f, std::abs(episode.positionX) / 10.0f);
+            float yFeature = std::min(1.0f, std::abs(episode.positionY) / 10.0f);
+            episodeFeatures.push_back(xFeature);
+            episodeFeatures.push_back(yFeature);
+        }
+        
+        // Feature 4: Action encoding
+        if (numPatternNeurons > 3) {
+            float actionFeature = 0.0f;
+            switch (episode.action) {
+                case ActionType::MoveForward: actionFeature = 0.2f; break;
+                case ActionType::MoveBackward: actionFeature = 0.4f; break;
+                case ActionType::MoveLeft: actionFeature = 0.6f; break;
+                case ActionType::MoveRight: actionFeature = 0.8f; break;
+                case ActionType::Look: actionFeature = 1.0f; break;
+                default: actionFeature = 0.1f; break;
+            }
+            episodeFeatures.push_back(actionFeature);
+        }
+        
+        // Feature 5: Temporal pattern (based on age)
+        if (numPatternNeurons > 4) {
+            float temporalFeature = std::min(1.0f, episode.age / 100.0f);
+            episodeFeatures.push_back(temporalFeature);
+        }
+        
+        // Feature 6: Result state (if available)
+        if (!episode.resultingSensoryState.empty() && numPatternNeurons > 5) {
+            float resultFeature = 0.0f;
+            for (size_t i = 0; i < episode.resultingSensoryState.size() && i < 3; ++i) {
+                resultFeature += std::abs(episode.resultingSensoryState[i]);
+            }
+            resultFeature = std::min(1.0f, resultFeature / 3.0f);
+            episodeFeatures.push_back(resultFeature);
+        }
+        
+        // Create pattern neurons with enhanced distributed encoding
+        for (int i = 0; i < numPatternNeurons && i < episodeFeatures.size(); ++i) {
+            // Use a more sophisticated encoding - each neuron represents a different feature
+            // with some temporal modulation for pattern completion
+            float featureValue = episodeFeatures[i];
+            
+            // Remove RandomGenerator references from the implementation
+        
+        // Temporal modulation - creates memory trace with time-varying dynamics
+        float temporalMod = 1.0f + 0.5f * std::sin(i * 0.3f + episode.age * 0.01f);
+        float activation = featureValue * temporalMod * 3.0f;
+        
+        // Use distributed neuron IDs that capture feature relationships
+        NeuronId patternNeuron(episode.timestamp + 10000 + i * 1000);
+        patternNeurons.push_back(patternNeuron);
+        
+        // Inject current to establish the distributed pattern
+        // Higher activation for more salient features
+        brain_->injectCurrent(patternNeuron, activation);
+        
+        // Add some randomness for robustness (biological realism)
+        // Simple pseudo-random noise using deterministic function of neuron index and episode
+        float noise = ((i * 13 + episode.age * 7) % 100) / 100.0f * 0.2f - 0.1f;
+        activation += noise;
+        brain_->injectCurrent(patternNeuron, activation);
+    }
+        }
+        
+        // Store the enhanced pattern neuron indices
+        if (!patternNeurons.empty()) {
+            pImpl->episodeNeurons.push_back(patternNeurons[0]);  // First neuron as anchor
+            
+            // Store additional pattern neurons for better pattern completion
+            if (patternNeurons.size() > 3) {
+                // Select key neurons for pattern completion
+                for (size_t i = 1; i < std::min(size_t(4), patternNeurons.size()); ++i) {
+                    pImpl->episodeNeurons.push_back(patternNeurons[i]);
+                }
+            }
+        }
+        
+        // Also store the full feature vector in the episode itself for retrieval
+        // This allows for better similarity matching later
+        stored.patternNeurons = patternNeurons;
+        
+        // Create a more sophisticated feature vector for later retrieval
+        stored.featureVector = episodeFeatures;
     }
     
-    // Remove old episodes if over capacity
-    while (episodes_.size() > maxEpisodes_) {
-        episodes_.erase(episodes_.begin());
-        if (!pImpl->episodeNeurons.empty()) {
-            pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
-        }
-    }
+    // Store the episode in the deque with enhanced features
+    // The stored copy (with patternNeurons and featureVector if we added it) will be used
+    // Replace the last push_back with a proper assignment
+    auto& lastEpisode = episodes_.back();
+    lastEpisode = stored;
     
     // Age all episodes
     for (auto& ep : episodes_) {

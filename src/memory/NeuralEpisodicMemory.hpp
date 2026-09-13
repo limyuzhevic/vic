@@ -38,6 +38,13 @@ struct EpisodicMemoryItem {
     std::vector<NeuronId> activeNeurons;
     std::vector<float> neuronActivations;
     
+    // Distributed pattern representation for better episodic encoding
+    // Multiple neurons representing different aspects of the episode
+    std::vector<NeuronId> patternNeurons;
+    
+    // Enhanced feature vector for distributed encoding
+    std::vector<float> featureVector;
+    
     // Time since this episode
     SimulationStep age;
     

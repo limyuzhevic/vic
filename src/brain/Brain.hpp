@@ -191,7 +191,19 @@ public:
     RandomGenerator* getRandomGenerator();
     
     // Logging
-    void logStatus() const;
+    float getAverageMemoryActivity() const;
+    
+    // Memory system management
+    void updateMemorySystems();
+    void replayImportantMemories();
+    
+    // Synaptic scaling controls
+    void enableSynapticScaling(bool enable);
+    void setSynapticScalingTarget(float targetWeight);
+    void setSynapticScalingBounds(float minWeight, float maxWeight);
+    
+    // Memory system status
+    void logMemorySystemStatus() const;
     
 private:
     struct Impl;

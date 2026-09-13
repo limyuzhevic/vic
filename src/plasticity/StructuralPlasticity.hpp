@@ -38,8 +38,38 @@ public:
     float getPruningRate() const;
     void setPruningRate(float rate);
     
+    // Synaptic scaling configuration
+    void enableSynapticScaling(bool enable);
+    bool isSynapticScalingEnabled() const;
+    
+    void setTargetAverageWeight(float weight);
+    float getTargetAverageWeight() const;
+    
+    void setScalingRate(float rate);
+    float getScalingRate() const;
+    
+    void setMaxWeight(float maxWeight);
+    float getMaxWeight() const;
+    
+    void setMinWeight(float minWeight);
+    float getMinWeight() const;
+    
     // Update structural plasticity
     void update(Brain* brain, class RandomGenerator& rng);
+    
+    // Get statistics
+    size_t getTotalSynapsesCreated() const;
+    size_t getTotalSynapsesPruned() const;
+    size_t getTotalScalingOperations() const;
+    
+    // Get synaptic scaling info
+    struct SynapticScalingInfo {
+        bool enabled;
+        float targetAverageWeight;
+        float scalingOperations;
+    };
+    
+    SynapticScalingInfo getSynapticScalingInfo() const;
     
 private:
     struct Impl;

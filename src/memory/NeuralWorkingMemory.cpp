@@ -116,7 +116,7 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
     
-    // Update maintenance - reinforce active memory neurons
+    // Update maintenance - reinforce active memory neurons through recurrent connections
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         NeuronId neuron = memoryNeurons_[i];
         float activation = memoryActivations_[i];
@@ -128,14 +128,48 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             // Age the trace
             memoryTimestamps_[i]++;
             
-            // Check if trace is too old
+            // Apply comprehensive synaptic scaling to prevent runaway excitation
+            // Scale activation based on current trace age, magnitude, and network activity
+            float ageFactor = std::min(1.0f, 1000.0f / memoryTimestamps_[i]);  // Older traces decay less
+            float magnitudeFactor = std::min(1.0f, activation / 0.5f);  // Prevent excessive scaling
+            
+            // Network activity factor - consider competition with other traces
+            float competitionFactor = 1.0f;
+            if (memoryNeurons_.size() > 1) {
+                float totalActivity = 0.0f;
+                for (float act : memoryActivations_) {
+                    totalActivity += act;
+                }
+                float avgActivity = totalActivity / memoryActivations_.size();
+                competitionFactor = std::min(2.0f, 1.0f + (activation / (avgActivity + 0.01f)));
+            }
+            
+            float scalingFactor = ageFactor * magnitudeFactor / competitionFactor;
+            activation *= scalingFactor;
+            
+            // Check if trace is too old (decay if older than 1000 steps)
             if (memoryTimestamps_[i] > 1000) {
                 activation *= (1.0f - decayRate_);
+            }
+            
+            // Apply homeostatic scaling based on network load
+            // This ensures working memory doesn't saturate
+            float networkLoad = getMemoryActivity();
+            if (networkLoad > 0.8f) {
+                // High network load - scale down all traces
+                activation *= 0.9f;
             }
             
             memoryActivations_[i] = activation;
         }
     }
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
+    
+    // Apply global synaptic scaling across the entire network
+    // This is the homeostatic mechanism for preventing runaway excitation
+    applyGlobalSynapticScaling();
     
     // Decay weak traces
     decayWeakTraces();
@@ -197,13 +231,60 @@ float NeuralWorkingMemory::getMemoryActivity() const {
     return total / memoryActivations_.size();
 }
 
-void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
-    // Check if connection already exists
-    for (const auto& conn : pImpl->maintenanceSynapses) {
-        if (conn.first == from && conn.second == to) return;
+void NeuralWorkingMemory::applyGlobalSynapticScaling() {
+    if (!brain_) return;
+    
+    // Global homeostatic synaptic scaling to prevent runaway excitation
+    // This is called from working memory update to regulate overall network activity
+    
+    float totalExcitation = 0.0f;
+    float totalInhibition = 0.0f;
+    size_t totalSynapses = 0;
+    
+    // Collect statistics from all regions
+    for (auto& region : brain_->getRegions()) {
+        for (auto* syn : region->getSynapses()) {
+            float weight = syn->getWeight();
+            if (weight > 0) {
+                totalExcitation += weight;
+            } else {
+                totalInhibition += std::abs(weight);
+            }
+            totalSynapses++;
+        }
     }
     
-    pImpl->maintenanceSynapses.emplace_back(from, to);
+    if (totalSynapses == 0) return;
+    
+    float currentRatio = totalExcitation / (totalInhibition + 0.01f);
+    float targetRatio = 1.0f;  // Balanced excitation/inhibition
+    
+    // Apply scaling if ratio is too high (excess excitation)
+    if (currentRatio > targetRatio * 1.2f) {
+        // Too much excitation - scale down all weights
+        float scaleFactor = targetRatio / currentRatio;
+        
+        for (auto& region : brain_->getRegions()) {
+            for (auto* syn : region->getSynapses()) {
+                float newWeight = syn->getWeight() * scaleFactor;
+                syn->setWeight(newWeight);
+            }
+        }
+        
+        NLM_LOG_INFO("Applied global synaptic scaling down by factor " + std::to_string(scaleFactor));
+    } else if (currentRatio < targetRatio * 0.8f) {
+        // Too much inhibition - scale up all weights
+        float scaleFactor = targetRatio / currentRatio;
+        
+        for (auto& region : brain_->getRegions()) {
+            for (auto* syn : region->getSynapses()) {
+                float newWeight = syn->getWeight() * scaleFactor;
+                syn->setWeight(newWeight);
+            }
+        }
+        
+        NLM_LOG_INFO("Applied global synaptic scaling up by factor " + std::to_string(scaleFactor));
+    }
 }
 
 void NeuralWorkingMemory::updateRecurrentConnections() {
@@ -219,8 +300,52 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
         }
         
         if (fromActivation > 0.1f && brain_) {
-            // Send maintenance signal
-            brain_->injectCurrent(conn.second, fromActivation * 2.0f);
+            // Find destination neuron and apply recurrent reinforcement
+            for (auto& region : brain_->getRegions()) {
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron->getId() == conn.second) {
+                        // Apply Hebbian-style reinforcement
+                        float reinforcementStrength = fromActivation * 1.5f;
+                        
+                        // Find or create a synapse to provide recurrent input
+                        auto incomingSynapses = region->getSynapsesTo(conn.second);
+                        bool foundConnection = false;
+                        
+                        for (Synapse* syn : incomingSynapses) {
+                            if (syn->getSourceNeuron() == conn.first) {
+                                // Update existing synapse weight with Hebbian learning
+                                float currentWeight = syn->getWeight();
+                                float newWeight = std::min(currentWeight + reinforcementStrength * 0.05f, 1.0f);
+                                syn->setWeight(newWeight);
+                                foundConnection = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!foundConnection) {
+                            // Create new recurrent connection
+                            region->addSynapse(conn.first, conn.second, reinforcementStrength * 0.1f, 5);
+                        }
+                        
+                        // Inject current to reinforce memory trace (dual mechanism)
+                        neuron->injectCurrent(fromActivation * 3.0f);
+                        
+                        // Also check for synaptic scaling of this specific connection
+                        float scaleFactor = std::min(1.0f, 1.0f / (fromActivation + 0.01f));
+                        
+                        for (Synapse* syn : incomingSynapses) {
+                            if (syn->getSourceNeuron() == conn.first) {
+                                float weight = syn->getWeight();
+                                float scaledWeight = weight * scaleFactor;
+                                syn->setWeight(scaledWeight);
+                            }
+                        }
+                        
+                        break;
+                    }
+                }
+            }
         }
     }
 }

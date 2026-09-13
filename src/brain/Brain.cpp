@@ -994,33 +994,102 @@ size_t Brain::getFiringNeuronCount() const {
     return pImpl->totalSpikesThisStep;
 }
 
-float Brain::getAverageFiringRate() const {
-    if (pImpl->regions.empty()) return 0.0f;
-    float sum = 0.0f;
-    for (const auto& region : pImpl->regions) {
-        sum += region->getAverageFiringRate();
+float Brain::getAverageMemoryActivity() const {
+    float totalActivity = 0.0f;
+    int count = 0;
+    
+    if (pImpl->workingMemory) {
+        totalActivity += pImpl->workingMemory->getMemoryActivity();
+        ++count;
     }
-    return sum / static_cast<float>(pImpl->regions.size());
+    
+    if (pImpl->episodicMemory) {
+        totalActivity += static_cast<float>(pImpl->episodicMemory->getEpisodeCount());
+        ++count;
+    }
+    
+    if (pImpl->structuralPlasticity) {
+        auto info = pImpl->structuralPlasticity->getSynapticScalingInfo();
+        totalActivity += info.totalScalingOperations;
+        ++count;
+    }
+    
+    return count > 0 ? totalActivity / count : 0.0f;
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
-
-NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
+void Brain::logMemorySystemStatus() const {
+    NLM_LOG_INFO("=== Memory System Status ===");
+    
+    if (pImpl->workingMemory) {
+        NLM_LOG_INFO("Working memory: " + std::to_string(pImpl->workingMemory->getMemoryNeurons().size()) + 
+                     " neurons, activity: " + std::to_string(pImpl->workingMemory->getMemoryActivity()));
+    }
+    
+    if (pImpl->episodicMemory) {
+        NLM_LOG_INFO("Episodic memory: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()) + 
+                     " episodes, replay enabled: " + std::to_string(pImpl->episodicMemory->isReplayEnabled()));
+    }
+    
+    if (pImpl->structuralPlasticity) {
+        auto info = pImpl->structuralPlasticity->getSynapticScalingInfo();
+        NLM_LOG_INFO("Synaptic scaling: enabled=" + std::to_string(info.enabled) + 
+                     ", avg target weight=" + std::to_string(info.targetAverageWeight) + 
+                     ", scaling operations=" + std::to_string(info.totalScalingOperations));
+    }
+    
+    NLM_LOG_INFO("Overall memory system effectiveness: " + std::to_string(getAverageMemoryActivity()));
 }
 
-NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
+// ========== MEMORY SYSTEM MANAGEMENT ==========
+
+void Brain::updateMemorySystems() {
+    // Update working memory maintenance
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->update(pImpl->timestep);
+    }
+    
+    // Update episodic memory consolidation
+    if (pImpl->episodicMemory) {
+        // Periodically consolidate memories based on relevance
+        if (pImpl->currentStep % pImpl->consolidationInterval == 0) {
+            pImpl->episodicMemory->consolidate(0.3f);
+        }
+    }
+    
+    // Update structural plasticity including synaptic scaling
+    if (pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    }
 }
 
-NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
+void Brain::replayImportantMemories() {
+    // Replay important memories for consolidation
+    if (pImpl->episodicMemory && pImpl->episodicMemory->isReplayEnabled()) {
+        // Get episodes for replay based on relevance and recency
+        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+        for (const auto* episode : episodesToReplay) {
+            pImpl->episodicMemory->replayEpisode(episode);
+        }
+    }
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
+void Brain::enableSynapticScaling(bool enable) {
+    if (pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->enableSynapticScaling(enable);
+    }
+}
 
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
+void Brain::setSynapticScalingTarget(float targetWeight) {
+    if (pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->setTargetAverageWeight(targetWeight);
+    }
+}
+
+void Brain::setSynapticScalingBounds(float minWeight, float maxWeight) {
+    if (pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->setMinWeight(minWeight);
+        pImpl->structuralPlasticity->setMaxWeight(maxWeight);
+    }
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
