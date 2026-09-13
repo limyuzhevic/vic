@@ -7,24 +7,14 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
-#include "brain/Brain.hpp"
-#include "brain/Neuron.hpp"
-#include "brain/Synapse.hpp"
-#include "sensory/SensoryInput.hpp"
-#include "motor/Action.hpp"
-#include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
-
 #include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <fstream>
+#include <sstream>
 
 using namespace nlm;
 
@@ -343,28 +333,49 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Try to load from file if provided - with validation
     std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+    bool configFileExists = false;
+    
+    // Check if config file exists and is accessible
+    if (!configFile.empty()) {
+        std::ifstream configFileCheck(configFile);
+        configFileExists = configFileCheck.good();
+        configFileCheck.close();
+        
+        if (configFileExists) {
+            NLM_LOG_INFO("Config file validated: " + configFile);
+        } else {
+            NLM_LOG_WARNING("Config file not found or inaccessible: " + configFile + ". Using defaults.");
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    // Load config from file (only if exists)
+    if (configFileExists) {
+        if (config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        } else {
+            NLM_LOG_ERROR("Failed to load configuration from: " + configFile + ". Using defaults.");
+        }
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
+    
+    // Additional validation for critical parameters
+    int64_t neuronCount = config->getOr<int64_t>("neuron_count", 500);
+    if (neuronCount <= 0) {
+        NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount) + ". Must be positive.");
+        neuronCount = 500; // Default
+    }
+    
+    size_t regionCount = static_cast<size_t>(config->getOr<int64_t>("region_count", 1));
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Invalid region_count: " + std::to_string(regionCount) + ". Must be at least 1.");
+        regionCount = 1; // Default
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);

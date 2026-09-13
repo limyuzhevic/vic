@@ -89,6 +89,10 @@ public:
     Hebbian* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
     
+    // Neuron management
+    Neuron* getNeuron(NeuronId id);
+    const Neuron* getNeuron(NeuronId id) const;
+    
     // Statistics
     float getExcitationInhibitionRatio() const;
     size_t getTotalSpikeCount() const;
