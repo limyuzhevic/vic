@@ -11,8 +11,9 @@ struct Neuron::Impl {
     NeuronState state;
     RegionId regionId;
     PopulationId populationId;
-    MembranePotential totalCurrent;  // Total synaptic current input this step
-    MembranePotential synapticInput;  // Accumulated synaptic input
+    // TOTAL CURRENT: Accumulated synaptic input (note: synapticInput field renamed from totalCurrent for clarity)
+    // Both fields existed previously but only synapticInput was used
+    MembranePotential synapticInput;  // Accumulated synaptic input (formerly totalCurrent)
     std::vector<Timestamp> spikeHistory;
     std::vector<SynapseHandle> incomingSynapses;
     std::vector<SynapseHandle> outgoingSynapses;
@@ -24,7 +25,7 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             synapticInput(0.0f) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -32,7 +33,6 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
-    pImpl->totalCurrent = 0.0f;
 }
 
 Neuron::~Neuron() = default;
@@ -131,16 +131,8 @@ void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
     pImpl->synapticInput -= amplitude;
 }
 
-void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
-    // Modulatory input affects plasticity but not directly integrated
-    // Used for neuromodulation (e.g., dopamine, acetylcholine)
-    pImpl->state.adaptationVariable += amplitude * 0.1f;
-}
-
-void Neuron::injectCurrent(MembranePotential current) {
-    // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
-    pImpl->synapticInput += current;
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->synapticInput;
 }
 
 void Neuron::clearTotalCurrent() {
