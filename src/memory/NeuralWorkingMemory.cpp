@@ -2,6 +2,7 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -28,8 +29,11 @@ NeuralWorkingMemory::NeuralWorkingMemory()
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize NeuralWorkingMemory with null brain");
+        return;
+    }
+    pImpl->brain = brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
