@@ -27,6 +27,12 @@ public:
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
+    // Get neuromodulation effect on neural excitability
+    virtual float getExcitabilityModifier() const { return 1.0f; }
+
+    // Get neuromodulation effect on memory consolidation
+    virtual float getConsolidationFactor() const { return 1.0f; }
+
 protected:
     Neuromodulator() = default;
 };
