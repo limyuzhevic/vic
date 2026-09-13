@@ -2,7 +2,7 @@
 
 /**
  * Phase6IntegratedExperiment - Phase 6 final integration test
- * 
+ *
  * This experiment demonstrates that the integrated brain systems work together:
  * - Memory systems are connected to neural processing
  * - Neuromodulation affects plasticity and neural dynamics
@@ -10,7 +10,7 @@
  * - Prediction system is integrated
  * - Replay and consolidation are functional
  * - Checkpoint save/load works
- * 
+ *
  * The experiment runs a complete lifetime simulation and verifies
  * that all systems interact properly.
  */
@@ -24,6 +24,16 @@
 #include <unordered_map>
 
 namespace nlm {
+
+/**
+ * Test result enumeration
+ */
+enum class TestResult {
+    MemoryTest,
+    NeuromodulationTest,
+    CheckpointTest,
+    ReplayTest
+};
 
 /**
  * Phase 6 integration test result
@@ -133,6 +143,31 @@ public:
      * Test replay system
      */
     bool testReplay();
+    
+    /**
+     * Set test result for a specific test
+     */
+    void setTestResult(TestResult test, bool passed);
+    
+    /**
+     * Get test result for a specific test
+     */
+    bool getTestResult(TestResult test) const;
+    
+    /**
+     * Test specific memory systems integration
+     */
+    bool testWorkingMemoryIntegration();
+    bool testEpisodicMemoryIntegration();
+    bool testAssociativeMemoryIntegration();
+    
+    /**
+     * Test specific neuromodulation systems integration
+     */
+    bool testDopamineIntegration();
+    bool testCuriosityIntegration();
+    bool testNoveltyIntegration();
+    bool testPredictionErrorIntegration();
 };
 
 } // namespace nlm

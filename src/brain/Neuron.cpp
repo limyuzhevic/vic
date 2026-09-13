@@ -265,6 +265,11 @@ void Neuron::step(Timestamp currentTime) {
     stepLIF(currentTime, dt);
 }
 
+// Enhanced Neuron step with configurable timestep
+void Neuron::step(Timestamp currentTime, TimestepDuration dt) {
+    stepLIF(currentTime, dt);
+}
+
 void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
