@@ -428,7 +428,13 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
-    
+
+    // Run Phase 6 Integration Test to verify complete system
+    brain->reset();
+    brain->initialize();
+    runPhase6IntegrationTest(brain);
+
+    // Final completion summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Phase 2 Complete ===");
     NLM_LOG_INFO("");
@@ -444,6 +450,8 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
-    
+    NLM_LOG_INFO("Note: Phase 6 integration test demonstrates the complete");
+    NLM_LOG_INFO("functional integration of all major brain systems (memory,");
+    NLM_LOG_INFO("prediction, neuromodulation, cognition, and development).
     return 0;
 }

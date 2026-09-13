@@ -254,6 +254,118 @@ for step in range(100):
 print("Agent simulation complete!")
 ```
 
+### Project 4: Advanced Agent with Reward-Based Learning
+
+```python
+import pynlm
+
+def run_advanced_agent(config_path=None):
+    """Advanced agent that learns through reward and curiosity."""
+    
+    # Create brain with custom configuration
+    config = pynlm.createDefaultConfig()
+    if config_path:
+        try:
+            config.loadFromFile(config_path)
+        except:
+            print(f"Warning: Could not load config from {config_path}, using defaults")
+    
+    # Configure for better learning
+    config.set("brain.neuron_count", 2000)  # More neurons for complex behavior
+    config.set("plasticity.stdp.enable", True)
+    config.set("plasticity.hebbian.enable", True)
+    config.set("plasticity.structural.enable", True)
+    config.set("neuromod.dopamine.scale", 2.0)
+    config.set("neuromod.curiosity.enable", True)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=30, height=30, visionWidth=12, visionHeight=12)
+    world.reset()
+    world.setAgentStart(15.0, 15.0)
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable all learning systems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # Add some resources to the world
+    import random
+    for _ in range(10):
+        x = random.uniform(5.0, 25.0)
+        y = random.uniform(5.0, 25.0)
+        world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=10.0))
+    
+    # Run the simulation
+    episode_reward = 0.0
+    for step in range(1000):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process in agent and brain
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        
+        # Get action from brain
+        action = agent.decodeMotorCommand()
+        
+        # Execute in world
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply reward modulation
+        current_reward = 0.0
+        if world.getAgentBody().energy <= 0.1:
+            current_reward -= 5.0  # Penalty for low energy
+        
+        agent.applyRewardModulation(current_reward, 0.0)
+        
+        # Update development occasionally
+        if step % 10 == 0:
+            agent.updateDevelopment(0.1)
+        
+        # Log statistics periodically
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+            print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty level: {agent.getNoveltyLevel():.3f}")
+            print(f"  Reward modulation: {agent.getNeuromodulationLevel():.3f}")
+            print(f"  Development stage: {brain.getDevelopmentalStage()}")
+            print(f"  Agent energy: {world.getAgentBody().energy:.2f}")
+        
+        episode_reward += current_reward
+        
+        # Early termination if energy is critically low
+        if world.getAgentBody().energy <= 0.0:
+            print("Agent died of starvation!")
+            break
+    
+    print(f"\nEpisode completed!")
+    print(f"Total reward: {episode_reward:.2f}")
+    print(f"Final brain stats:")
+    print(f"  Neurons: {brain.getTotalNeuronCount()}")
+    print(f"  Synapses: {brain.getTotalSynapseCount()}")
+    print(f"  Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+    print(f"  Development stage: {brain.getDevelopmentalStage()}")
+    
+    return brain, world, agent, episode_reward
+
+# Run the advanced agent example
+if __name__ == "__main__":
+    print("=== Advanced NLM Agent Example ===\n")
+    run_advanced_agent()
+```
+
 ---
 
 ## Quick Reference
