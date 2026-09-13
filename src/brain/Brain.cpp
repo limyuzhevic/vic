@@ -145,12 +145,58 @@ struct Brain::Impl {
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
         
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+    // Get integration intervals from config
+    replayInterval = config->getOr<size_t>("replay_interval", 100);
+    consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+
+    // Initialize checkpoint manager
+    checkpointManager = std::make_unique<CheckpointManager>();
+    
+    // Connect integrated systems to brain (Phase 6 integration)
+    // Set brain reference for all integrated systems so they can be activated
+    if (workingMemory) {
+        // Working memory receives input from sensory neurons during processing
+        workingMemory->initialize(this);
+    }
+    if (episodicMemory) {
+        // Episodic memory stores episodes based on brain activity patterns
+        episodicMemory->initialize(this);
+    }
+    if (associativeMemory) {
+        // Associative memory forms pattern associations
+        associativeMemory->initialize(this);
+    }
+    if (predictionSystem) {
+        // Prediction system predicts next sensory states
+        // (predictionSystem doesn't have initialize method currently)
+    }
+    if (planner) {
+        // Neural planner plans action sequences
+        planner->initialize(this);
+    }
+    if (conceptFormation) {
+        // Concept formation discovers patterns from experience
+        conceptFormation->initialize(this);
+    }
+    if (attention) {
+        // Attention selects relevant information
+        attention->initialize(this);
+    }
+    if (novelty) {
+        // Novelty detection identifies new patterns
+        novelty->initialize(this);
+    }
+    if (curiosity) {
+        // Curiosity drives exploration
+        curiosity->initialize(this);
+    }
+    if (dopamine) {
+        // Dopamine mediates reward prediction error
+        // Dopamine is already initialized in Brain.cpp constructor
+    }
+    if (predictionError) {
+        // Prediction error signals mismatch between expected and actual
+        predictionError->initialize(this);
     }
     
     DevelopmentalStage developmentalStage;
