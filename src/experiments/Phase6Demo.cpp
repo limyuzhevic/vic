@@ -1,22 +1,9 @@
-/**
- * Phase 6 Demo - Integration Test
- * 
- * This demo runs the Phase 6 integration experiment to verify
- * that all brain systems are properly connected.
- */
-
-#include "experiments/Phase6IntegratedExperiment.hpp"
-#include "core/Logger/Logger.hpp"
+#include "Phase6Demo.hpp"
 #include <iostream>
 
-using namespace nlm;
-
-int main(int argc, char* argv[]) {
+int main() {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
-    
-    // Initialize logging
-    Logger::getInstance().setLevel(Logger::Level::Info);
     
     // Create experiment
     Phase6IntegratedExperiment experiment;

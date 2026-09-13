@@ -43,18 +43,6 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
-class Config {
-public:
-    Config();
-    ~Config();
-    
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
-    
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
@@ -71,12 +59,20 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
+    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
+    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
+    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
+    
+    // Parameter validation
+    bool validateParameter(const ConfigEntry& entry) const;
+    bool validateParameterRange(const ConfigEntry& entry, const std::string& key, double min = 0.0, double max = 0.0) const;
+    bool validateParameterEnum(const ConfigEntry& entry, const std::string& key, const std::vector<std::string>& validValues) const;
+    
+    // Validation report generation
+    std::string generateValidationReport() const;
     
     // Check existence
     bool has(const std::string& key) const;
@@ -94,12 +90,13 @@ public:
     std::string summary() const;
     
 private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
-};
+    
+    // File format detection and parsing
+    bool tryParseJSON(const std::string& content);
+    bool loadFromString(const std::string& content);
+
 
 } // namespace nlm

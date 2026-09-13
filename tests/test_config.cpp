@@ -78,12 +78,57 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testParameterValidation() {
+    nlm::Config config;
+    
+    // Valid parameters
+    config.set("width", 100, nlm::ConfigSource::Runtime);
+    assert(config.has("width"));
+    
+    config.set("height", 200, nlm::ConfigSource::Runtime);
+    assert(config.has("height"));
+    
+    config.set("opacity", 0.5, nlm::ConfigSource::Runtime);
+    assert(config.has("opacity"));
+    
+    // Valid enum
+    config.set("format", "PNG", nlm::ConfigSource::Runtime);
+    assert(config.has("format"));
+    
+    // Valid string with description
+    config.set("description", "Test parameter", nlm::ConfigSource::Runtime, "Test description");
+    assert(config.has("description"));
+    
+    std::cout << "    testParameterValidation passed" << std::endl;
+}
+
+void testValidationReport() {
+    nlm::Config config;
+    
+    // Add various valid parameters
+    config.set("valid_int", 42, nlm::ConfigSource::Runtime);
+    config.set("valid_string", "test", nlm::ConfigSource::Runtime);
+    
+    // Generate validation report
+    std::string report = config.generateValidationReport();
+    assert(!report.empty());
+    
+    // Report should contain summary
+    assert(report.find("Summary:") != std::string::npos);
+    
+    std::cout << "    testValidationReport passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testParameterValidation();
+    testValidationReport();
+    
+    std::cout << "\nAll config tests passed!" << std::endl;
 }
 
 } // namespace test_config
