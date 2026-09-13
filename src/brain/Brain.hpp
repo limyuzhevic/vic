@@ -28,6 +28,8 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;
+class SocialLearning;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -197,5 +199,9 @@ private:
     struct Impl;
     Impl* pImpl;
 };
+
+// Cognitive systems (added for full integration)
+class SelfModel;
+class SocialLearning;
 
 } // namespace nlm

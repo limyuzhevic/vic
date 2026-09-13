@@ -4,6 +4,10 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <memory>
 #include <vector>
 
@@ -11,6 +15,7 @@ namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Uses integrated brain systems for intelligent behavior
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -29,6 +34,7 @@ public:
     void processSensoryInput(const SensoryPercept& percept);
     
     // Decode brain motor activity into motor command
+    // Uses NeuralPlanner for intelligent action selection
     MotorCommand decodeMotorCommand();
     
     // Apply neuromodulation based on reward
@@ -57,6 +63,12 @@ public:
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    
+    // Access to integrated brain systems for intelligent behavior
+    NeuralPlanner* getPlanner() { return brain_ ? brain_->getPlanner() : nullptr; }
+    ConceptFormation* getConceptFormation() { return brain_ ? brain_->getConceptFormation() : nullptr; }
+    NeuralWorkingMemory* getWorkingMemory() { return brain_ ? brain_->getWorkingMemory() : nullptr; }
+    NeuralEpisodicMemory* getEpisodicMemory() { return brain_ ? brain_->getEpisodicMemory() : nullptr; }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }

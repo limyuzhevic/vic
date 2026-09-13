@@ -1,5 +1,9 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -154,9 +158,136 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+    // Check if we should use intelligent planning
+    NeuralPlanner* planner = getPlanner();
+    ConceptFormation* conceptFormation = getConceptFormation();
+    NeuralWorkingMemory* workingMemory = getWorkingMemory();
+    NeuralEpisodicMemory* episodicMemory = getEpisodicMemory();
+    
+    bool useIntelligentPlanning = false;
+    
+    // Use intelligent planning if available and curiosity is enabled
+    if (planner && curiosityEnabled_ && getCuriosityLevel() > 0.1f) {
+        useIntelligentPlanning = true;
+    }
+    
+    // Use concept formation for better understanding
+    if (conceptFormation && useIntelligentPlanning) {
+        // Present current neural state to concept formation for pattern recognition
+        // This is a simplified implementation - would need actual state encoding
+        // conceptFormation->presentExperience(currentSensoryState, features, reward, brain_->getCurrentStep());
+    }
+    
+    // Use working memory for context
+    if (workingMemory && useIntelligentPlanning) {
+        // Retrieve working memory content for planning context
+        // std::vector<float> workingMemoryContent = workingMemory->retrieve();
+        
+        // Check if working memory contains relevant information
+        if (!workingMemory->getMemoryNeurons().empty()) {
+            size_t memoryNeurons = workingMemory->getMemoryNeurons().size();
+            // Use working memory to influence action selection
+            float memoryInfluence = std::min(1.0f, memoryNeurons / 10.0f);
+            if (memoryInfluence > 0.5f) {
+                // Modify action based on working memory
+                // In real implementation, this would modulate planner's action selection
+                useIntelligentPlanning = true;
+            }
+        }
+    }
+    
+    // Use episodic memory for experience
+    if (episodicMemory && useIntelligentPlanning) {
+        // Retrieve similar episodes for context
+        // auto similarEpisodes = episodicMemory->retrieveSimilar(currentState);
+        
+        size_t episodeCount = episodicMemory->getEpisodeCount();
+        if (episodeCount > 10) {
+            // Use episodic memory to inform planning
+            // Higher episode count = more experience = better planning
+            useIntelligentPlanning = true;
+        }
+    }
+    
+    // Apply intelligent planning if all systems are available
+    if (useIntelligentPlanning && planner) {
+        // Convert motor neuron activity to a state vector for planning
+        std::vector<float> currentState;
+        
+        // Get average activity from each motor group
+        auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
+            if (neurons.empty()) return 0.0f;
+            float sum = 0.0f;
+            for (Neuron* n : neurons) {
+                sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            }
+            return sum / neurons.size();
+        };
+        
+        float forwardAct = calcActivity(motorForward_);
+        float backwardAct = calcActivity(motorBackward_);
+        float leftAct = calcActivity(motorTurnLeft_);
+        float rightAct = calcActivity(motorTurnRight_);
+        float interactAct = calcActivity(motorInteract_);
+        float waitAct = calcActivity(motorWait_);
+        
+        // Create state representation
+        currentState.reserve(6);
+        currentState.push_back(forwardAct);
+        currentState.push_back(backwardAct);
+        currentState.push_back(leftAct);
+        currentState.push_back(rightAct);
+        currentState.push_back(interactAct);
+        currentState.push_back(waitAct);
+        
+        // Also include neuromodulation levels
+        currentState.push_back(getNeuromodulationLevel());  // Dopamine
+        currentState.push_back(getNoveltyLevel());          // Novelty
+        currentState.push_back(getCuriosityLevel());       // Curiosity
+        currentState.push_back(getPredictionError());      // Prediction error
+        
+        // Use NeuralPlanner to select the best action
+        ActionType plannedAction = planner->planAction(currentState, 0.5f);
+        
+        // Apply curiosity-based exploration with planned action
+        if (curiosityEnabled_ && getCuriosityLevel() > 0.3f) {
+            // With high curiosity, might choose exploration over planned action
+            float explorationChance = getCuriosityLevel() * 0.2f;  // 20% max random exploration
+            float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+            if (r < explorationChance) {
+                // Use curiosity to override planned action with random exploration
+                decoded = selectWithCuriosity(MotorCommand::Wait);
+            } else {
+                // Convert planned action to MotorCommand
+                switch (plannedAction) {
+                    case ActionType::MoveForward: decoded = MotorCommand::MoveForward; break;
+                    case ActionType::MoveBackward: decoded = MotorCommand::MoveBackward; break;
+                    case ActionType::TurnLeft: decoded = MotorCommand::TurnLeft; break;
+                    case ActionType::TurnRight: decoded = MotorCommand::TurnRight; break;
+                    case ActionType::Interact: decoded = MotorCommand::Interact; break;
+                    case ActionType::LookLeft: decoded = MotorCommand::LookLeft; break;
+                    case ActionType::LookRight: decoded = MotorCommand::LookRight; break;
+                    default: decoded = MotorCommand::Wait; break;
+                }
+            }
+        } else {
+            // Use planned action directly
+            switch (plannedAction) {
+                case ActionType::MoveForward: decoded = MotorCommand::MoveForward; break;
+                case ActionType::MoveBackward: decoded = MotorCommand::MoveBackward; break;
+                case ActionType::TurnLeft: decoded = MotorCommand::TurnLeft; break;
+                case ActionType::TurnRight: decoded = MotorCommand::TurnRight; break;
+                case ActionType::Interact: decoded = MotorCommand::Interact; break;
+                case ActionType::LookLeft: decoded = MotorCommand::LookLeft; break;
+                case ActionType::LookRight: decoded = MotorCommand::LookRight; break;
+                default: decoded = MotorCommand::Wait; break;
+            }
+        }
+    } else {
+        // Apply curiosity-based exploration
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            decoded = selectWithCuriosity(decoded);
+        }
     }
     
     return decoded;

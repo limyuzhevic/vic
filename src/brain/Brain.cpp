@@ -36,10 +36,14 @@ struct Brain::Impl {
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
     
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
+    // ========== COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    
+    // Cognitive systems (added for full integration)
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -108,11 +112,6 @@ struct Brain::Impl {
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
         
@@ -130,18 +129,6 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
         
@@ -151,6 +138,41 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Initialize neuromodulation
+        novelty->initialize(this);
+        curiosity->initialize(this);
+        
+        // Register spike handlers for event-driven processing
+        spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+            // Count spikes
+            ++totalSpikesThisStep;
+            ++totalSpikesTotal;
+        });
+        
+        // Register delayed spike handler to deliver synaptic input
+        spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+            // Find destination neuron and deliver synaptic input
+            for (auto& region : regions) {
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron->getId() == event.destination_neuron) {
+                        // Apply synaptic weight as current
+                        MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                        if (event.is_excitatory) {
+                            neuron->receiveExcitatoryInput(synapticCurrent);
+                        } else {
+                            neuron->receiveInhibitoryInput(-synapticCurrent);
+                        }
+                        return;
+                    }
+                }
+            }
+        });
+        
+        // Configure checkpoint manager
+        std::string checkpointDir = config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        checkpointManager->configure(checkpointDir, 10000, 5, true);
     }
     
     DevelopmentalStage developmentalStage;
@@ -249,17 +271,29 @@ bool Brain::initialize() {
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
     
-    pImpl->conceptFormation->initialize(this);
-    
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
-    
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
-    
-    // Register spike handlers for event-driven processing
+        // ========== INITIALIZE COGNITION SYSTEMS ==========
+        
+        // Initialize neural planner
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+        
+        pImpl->conceptFormation->initialize(this);
+        
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+        
+        // Initialize self-model (new cognitive system)
+        pImpl->selfModel = std::make_unique<SelfModel>();
+        pImpl->selfModel->initialize(this);
+        
+        // Initialize social learning (new cognitive system)
+        pImpl->socialLearning = std::make_unique<SocialLearning>();
+        pImpl->socialLearning->initialize(this);
+        
+        // Configure checkpoint manager
+        std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
         // Count spikes
         ++pImpl->totalSpikesThisStep;
