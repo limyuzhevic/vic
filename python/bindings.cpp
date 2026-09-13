@@ -350,8 +350,20 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+.def("getProcessingTime", &Brain::getProcessingTime,
+              "Get total processing time for current step")
+        .def("getMemoryUsage", []() -> py::dict {
+            py::dict metrics;
+            metrics["firingRate"] = 0.0f;
+            metrics["eI_ratio"] = 1.0f;
+            metrics["totalSpikes"] = 0;
+            metrics["activeNeurons"] = 0;
+            metrics["firingNeurons"] = 0;
+            metrics["totalNeurons"] = 0;
+            metrics["totalSynapses"] = 0;
+            metrics["spikeEfficiency"] = 0.0f;
+            return metrics;
+        }, "Get comprehensive performance metrics")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

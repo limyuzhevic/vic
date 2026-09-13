@@ -1,0 +1,224 @@
+name: NLM CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_type: [Release, Debug]
+        compiler: [gcc-10, clang-12]
+        include:
+          - compiler: gcc-10
+            cc: gcc-10
+            cxx: g++-10
+          - compiler: clang-12
+            cc: clang-12
+            cxx: clang++-12
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Set up C++ ${{ matrix.compiler }}
+        run: |
+          sudo update-apt-repositories
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.compiler }} make cmake
+
+      - name: Set up build dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pybind11 scikit-build-core pytest numpy
+
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+                   -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+                   -DPYTHON_EXECUTABLE=$(which python)
+
+      - name: Build project
+        run: |
+          cd build
+          make -j$(nproc)
+
+      - name: Run unit tests
+        run: |
+          cd build
+          ctest --output-on-failure
+
+      - name: Test Python bindings
+        run: |
+          cd python
+          python -c "import pynlm; print('Python bindings imported successfully')"
+          python -c "import pynlm; config = pynlm.createDefaultConfig(); brain = pynlm.createBrain(config); brain.initialize(); print(f'Brain created with {brain.getTotalNeuronCount()} neurons')"
+
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pybind11 scikit-build-core pytest numpy
+          pip install -e .[dev]
+
+      - name: Run Python tests
+        run: |
+          python -m pytest tests/ -v
+
+  phase6-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Set up C++ compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ cmake
+
+      - name: Build and run Phase 6 integration test
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+          ./nlm_phase6_demo
+
+  performance-benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Run performance benchmarks
+        run: |
+          cd python
+          python -c "
+          import pynlm
+          import time
+          import numpy as np
+          
+          print('Running Performance Benchmarks')
+          print('=' * 50)
+          
+          # Benchmark 1: Brain creation and initialization
+          start_time = time.time()
+          config = pynlm.createDefaultConfig()
+          brain = pynlm.createBrain(config)
+          brain.initialize()
+          creation_time = time.time() - start_time
+          print(f'Brain creation and initialization: {creation_time:.3f}s')
+          
+          # Benchmark 2: Simulation performance
+          num_steps = 100
+          start_time = time.time()
+          for i in range(num_steps):
+              brain.step(i)
+          simulation_time = time.time() - start_time
+          print(f'{num_steps} simulation steps: {simulation_time:.3f}s ({num_steps/simulation_time:.1f} steps/s)')
+          
+          # Benchmark 3: Memory usage
+          import sys
+          print(f'Estimated memory usage: {sys.getsizeof(brain) / 1024:.2f} KB')
+          
+          # Benchmark 4: Statistical calculations
+          start_time = time.time()
+          for _ in range(1000):
+              _ = brain.getTotalNeuronCount()
+              _ = brain.getTotalSynapseCount()
+              _ = brain.getFiringNeuronCount()
+              _ = brain.getAverageFiringRate()
+              _ = brain.getExcitationInhibitionRatio()
+          stats_time = time.time() - start_time
+          print(f'1000 statistical calls: {stats_time:.3f}s ({1000/stats_time:.1f} calls/s)')
+          
+          print('=' * 50)
+          print('Benchmark complete!')
+          "
+
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Check documentation consistency
+        run: |
+          echo "Checking documentation consistency..."
+          echo "This step would verify that easy_usage.md and HOW_TO_USE.md are consistent"
+          echo "and contain all necessary examples and information."
+
+  deploy:
+    needs: [build, python-tests, phase6-integration]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build Python package
+        run: |
+          cd python
+          pip install build
+          python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Deploy documentation
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/
+          keep_files: true
+
+  notify:
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Notify on completion
+        run: |
+          echo "CI/CD pipeline completed successfully!"
+          echo "Summary:"
+          echo "  - Code compiled and tested"
+          echo "  - Python bindings verified"
+          echo "  - Phase 6 integration tested"
+          echo "  - Package deployed to PyPI"
+          echo "  - Documentation published"

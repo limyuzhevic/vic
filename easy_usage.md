@@ -71,6 +71,150 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### Example 3: Advanced Brain with Learning
+
+```python
+import pynlm
+
+# Setup with enhanced configuration
+config = pynlm.createDefaultConfig()
+
+# Enable advanced features
+config.set("development.enable", True)
+config.set("neuromod.dopamine.scale", 2.0)
+config.set("neuromod.curiosity.enable", True)
+config.set("neuromod.novelty.enable", True)
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.hebbian.enable", True)
+config.set("plasticity.structural.enable", True)
+
+# Create and initialize brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create world and agent
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all learning subsystems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run enhanced learning simulation
+for step in range(500):
+    # Update world
+    world.update(0.1)
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    
+    # Brain thinks and learns
+    brain.step(step)
+    
+    # Get action and execute
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply reward modulation
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    
+    # Update development stage
+    agent.updateDevelopment(0.1)
+    
+    # Print progress and stats every 50 steps
+    if step % 50 == 0:
+        print(f"Step {step}:")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Development stage: {brain.getDevelopmentalStage()}")
+        print(f"  Prediction error: {agent.getPredictionError():.3f}")
+        print()
+
+print("Enhanced learning simulation complete!")
+print(f"Final firing rate: {brain.getAverageFiringRate():.3f}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+```
+
+### Example 4: Memory and Prediction System
+
+```python
+import pynlm
+
+# Create brain with memory systems
+config = pynlm.createDefaultConfig()
+config.set("memory.enable", True)
+config.set("prediction.enable", True)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation focusing on memory and prediction
+print("Testing Memory and Prediction Systems:")
+print("=" * 50)
+
+for step in range(200):
+    # Brain processes and stores experiences
+    brain.step(step)
+    
+    # Get brain state information
+    spike_count = brain.getTotalSpikeCount()
+    firing_rate = brain.getAverageFiringRate()
+    
+    # Check memory systems (if accessible via Python API)
+    # This would depend on what Python bindings provide
+    
+    # Print memory-related stats every 50 steps
+    if step % 50 == 0 and step > 0:
+        print(f"Step {step}: {spike_count} total spikes, {firing_rate:.3f} firing rate")
+        
+        # Get prediction confidence if available
+        # prediction_confidence = brain.getPredictionConfidence()
+        # print(f"  Prediction confidence: {prediction_confidence:.3f}")
+
+print("Memory and prediction test complete!")
+```
+
+### Example 5: Checkpoint and Resume
+
+```python
+import pynlm
+import os
+
+# Create and run brain
+simulation_name = "demo_brain"
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run for a while
+for step in range(300):
+    brain.step(step)
+    
+    # Save checkpoint periodically
+    if step % 100 == 0:
+        checkpoint_file = f"{simulation_name}_checkpoint_{step}.bin"
+        brain.save(checkpoint_file)
+        print(f"Saved checkpoint at step {step} to {checkpoint_file}")
+
+print("Simulation with checkpointing complete!")
+
+# Example of loading a saved checkpoint (if implemented)
+# saved_file = "demo_brain_checkpoint_100.bin"
+# if os.path.exists(saved_file):
+#     print(f"Loading checkpoint from {saved_file}")
+#     brain.load(saved_file)
+#     print("Checkpoint loaded successfully!")
+```
+
 ---
 
 ## Simple Analogy
@@ -141,6 +285,7 @@ print("Neurons firing:", brain.getFiringNeuronCount())
 print("Total spikes:", brain.getTotalSpikeCount())
 print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
+print("E/I ratio:", brain.getExcitationInhibitionRatio())
 ```
 
 ### Pattern 3: Enable Brain Features
@@ -151,6 +296,10 @@ agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
+
+# Enable neuromodulation systems
+agent.enableDopamineModulation(True)    # Reward-based learning
+agent.enableNoveltyDetection(True)      # Detect new experiences
 ```
 
 ---
@@ -221,7 +370,7 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent with Learning
 
 ```python
 import pynlm
@@ -285,13 +434,18 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"Brain crashes with segmentation fault"**
+- Check that `initialize()` is called before `step()`
+- Ensure `reset()` is called before re-running simulation
+- Check that all required configurations are set
+
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
+1. Read `HOW_TO_USE.md` for more details on advanced features
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM at beginner, intermediate, and advanced levels.
