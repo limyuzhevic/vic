@@ -115,6 +115,10 @@ struct Brain::Impl {
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
+        predictionSystem->initialize(this);
+        
+        // Initialize neural prediction components
+        // These are initialized within PredictionSystem constructor
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
@@ -510,9 +514,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Store current sensory state in prediction system for prediction
+        auto memoryPatterns = pImpl->workingMemory->getActivePatterns();
+        if (!memoryPatterns.empty()) {
+            // Create SensoryInput from working memory patterns
+            std::unique_ptr<SensoryInput> currentInput = std::make_unique<SensoryInput>();
+            currentInput->setData(memoryPatterns);
+            
+            // Generate prediction for next state
+            auto predictedInput = pImpl->predictionSystem->predictNextState(*currentInput);
+            
+            // Update prediction system with actual sensory input if available
+            // This would be called from sensory processing pipeline
+            if (predictedInput) {
+                pImpl->predictionSystem->train(*currentInput);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========

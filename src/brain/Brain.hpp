@@ -29,6 +29,11 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Additional neural components for prediction
+class NeuralPrediction;
+class ActionConsequencePredictor;
+class PredictionErrorSignal;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
