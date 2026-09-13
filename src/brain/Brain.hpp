@@ -145,6 +145,12 @@ public:
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
     
+    // Semantic memory - pattern associations
+    NeuralSemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - skills and habits
+    NeuralProceduralMemory* getProceduralMemory();
+    
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
@@ -197,5 +203,9 @@ private:
     struct Impl;
     Impl* pImpl;
 };
+
+// Forward declarations for memory classes (defined in Memory.hpp)
+class NeuralSemanticMemory;
+class NeuralProceduralMemory;
 
 } // namespace nlm

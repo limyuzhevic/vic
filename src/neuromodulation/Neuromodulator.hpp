@@ -48,6 +48,22 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Configuration methods
+    void setDecayRate(float rate);
+    float getDecayRate() const;
+    
+    void setReleaseRate(float rate);
+    float getReleaseRate() const;
+    
+    void setPeak(float peak);
+    float getPeak() const;
+    
+    void setBaseline(float baseline);
+    float getBaseline() const;
+    
+    // Reset method
+    void reset();
+    
 private:
     struct Impl;
     Impl* pImpl;
