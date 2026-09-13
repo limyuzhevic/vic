@@ -1,0 +1,31 @@
+# NLM package configuration template for CMake package config
+
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Include targets file
+include("${CMAKE_CURRENT_LIST_DIR}/nlm-targets.cmake")
+
+# Check for dependencies and provide hints if missing
+function(check_nlm_dependencies)
+    # Try to find Python for Python bindings
+    if(TARGET pybind11::pybind11)
+        find_dependency(pybind11 REQUIRED)
+    endif()
+    
+    # Check for optional dependencies
+    if(TARGET nlohmann_json)
+        find_dependency(nlohmann_json REQUIRED)
+    endif()
+    
+    if(TARGET yaml-cpp)
+        find_dependency(yaml-cpp REQUIRED)
+    endif()
+endfunction()
+
+# Package-specific configuration
+if(NLM_ENABLE_PYTHON_BINDINGS AND pybind11_FOUND)
+    # Add Python module to targets
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../python)
+endif()
