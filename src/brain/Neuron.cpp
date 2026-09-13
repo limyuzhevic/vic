@@ -115,8 +115,28 @@ bool Neuron::checkThreshold() const {
     return pImpl->state.membranePotential >= pImpl->state.threshold;
 }
 
-float Neuron::getLastSpikeTime() const {
-    return pImpl->state.lastSpikeTime;
+MembranePotential Neuron::getMembranePotential() const {
+    return pImpl->state.membranePotential;
+}
+
+MembranePotential Neuron::getThreshold() const {
+    return pImpl->state.threshold;
+}
+
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
+}
+
+MembranePotential Neuron::getResetPotential() const {
+    return pImpl->state.resetPotential;
+}
+
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
 }
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
@@ -145,6 +165,14 @@ void Neuron::injectCurrent(MembranePotential current) {
 
 void Neuron::clearTotalCurrent() {
     pImpl->synapticInput = 0.0f;
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->synapticInput;
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {

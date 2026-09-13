@@ -289,54 +289,53 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
-        .def("reset", &Brain::reset,
-             "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
-        .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+    py::class_<Neuron>(m, "Neuron", R"pbdoc(Individual neuron model implementing Leaky Integrate-and-Fire dynamics)pbdoc")
+        .def(py::init<NeuronId>(), py::arg("id"))
+        .def("getId", &Neuron::getId)
+        .def("setType", &Neuron::setType, py::arg("type"))
+        .def("getType", &Neuron::getType)
+        .def("getMembranePotential", &Neuron::getMembranePotential)
+        .def("setMembranePotential", &Neuron::setMembranePotential, py::arg("potential"))
+        .def("addToMembranePotential", &Neuron::addToMembranePotential, py::arg("delta"))
+        .def("getThreshold", &Neuron::getThreshold)
+        .def("setThreshold", &Neuron::setThreshold, py::arg("threshold"))
+        .def("getFiringRate", &Neuron::getFiringRate)
+        .def("setFiringRate", &Neuron::setFiringRate, py::arg("rate"))
+        .def("getResetPotential", &Neuron::getResetPotential)
+        .def("setResetPotential", &Neuron::setResetPotential, py::arg("potential"))
+        .def("getLastSpikeTime", &Neuron::getLastSpikeTime)
+        .def("getTotalCurrent", &Neuron::getTotalCurrent)
+        .def("clearTotalCurrent", &Neuron::clearTotalCurrent)
+        .def("recordSpike", &Neuron::recordSpike, py::arg("timestamp"))
+        .def("getSpikeHistory", &Neuron::getSpikeHistory)
+        .def("clearSpikeHistory", &Neuron::clearSpikeHistory)
+        .def("enablePlasticity", &Neuron::enablePlasticity,
+             py::arg("hebbian"), py::arg("stdp"), py::arg("rewardModulated"))
+        .def("isFiring", &Neuron::isFiring)
+        .def("isRefractory", &Neuron::isRefractory)
+        .def("stepLIF", &Neuron::stepLIF, py::arg("currentTime"), py::arg("dt"))
+        .def("step", &Neuron::step, py::arg("currentTime"))
+        .def("reset", &Neuron::reset)
+        .def("initializeRandom", &Neuron::initializeRandom, py::arg("rng"))
+        .def("getIncomingSynapseCount", &Neuron::getIncomingSynapses)
+        .def("getOutgoingSynapseCount", &Neuron::getOutgoingSynapses)
+        .def("addIncomingSynapse", &Neuron::addIncomingSynapse, py::arg("handle"))
+        .def("addOutgoingSynapse", &Neuron::addOutgoingSynapse, py::arg("handle"))
+        .def("getRegionId", &Neuron::getRegionId)
+        .def("getPopulationId", &Neuron::getPopulationId)
+        .def("getRefractoryPeriod", &Neuron::getRefractoryPeriod)
+        .def("getRestingPotential", &Neuron::getRestingPotential)
+        .def("getLeakConductance", &Neuron::getLeakConductance)
+        .def("to_string", [](const Neuron& n) {
+            std::stringstream ss;
+            ss << "Neuron(id=" << n.getId().value
+               << ", type=" << static_cast<int>(n.getType())
+               << ", V=" << n.getMembranePotential()
+               << ", firing=" << (n.isFiring() ? "true" : "false")
+               << ", refractory=" << n.isRefractory()
+               << ")";
+            return ss.str();
+        });
              "Get average firing rate across all neurons")
         .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
              "Get excitation/inhibition balance ratio")
@@ -353,52 +352,19 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+    py::class_<VisualizationInterface>(m, "VisualizationInterface", R"pbdoc(Visualization interface for debugging and analysis)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &VisualizationInterface::initialize)
+        .def("update", &VisualizationInterface::update)
+        .def("render", &VisualizationInterface::render)
+        .def("close", &VisualizationInterface::close)
+        .def("isActive", &VisualizationInterface::isActive)
+        .def("setUpdateRate", &VisualizationInterface::setUpdateRate, py::arg("hz"))
+        .def("getUpdateRate", &VisualizationInterface::getUpdateRate)
+        .def("visualizeNetwork", &VisualizationInterface::visualizeNetwork, py::arg("brain"))
+        .def("visualizeActivity", &VisualizationInterface::visualizeActivity, py::arg("brain"))
+        .def("visualizeSpikes", &VisualizationInterface::visualizeSpikes, py::arg("spikes"))
+        .def("visualizeWeights", &VisualizationInterface::visualizeWeights, py::arg("brain"));
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
