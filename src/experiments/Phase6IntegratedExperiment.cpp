@@ -1,12 +1,3 @@
-#include "Phase6IntegratedExperiment.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include "../agent/AgentBrain.hpp"
-#include <chrono>
-#include <cmath>
-
 namespace nlm {
 
 Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
@@ -55,14 +46,24 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
+    // Verify integration by checking if brain subsystems are properly set up
+    if (!brain || !brain->getRegion(RegionId(1))) {
+        NLM_LOG_ERROR("Brain region not properly initialized!");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
     // Run simulation
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Update world to generate new sensory percept
+        world.update(0.001);
+        
+        // Get observation (already available from world)
+        const SensoryPercept& percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -73,15 +74,14 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        // Apply motor command to world and get result with reward
+        ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
         
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
-        totalReward += reward;
+        // The action result already contains the reward for this step
+        totalReward += actionResult.reward;
         
-        // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
+        // Apply reward modulation using the computed reward
+        agent.applyRewardModulation(actionResult.reward, 0.0f);
         
         // Update development
         if (config.enableDevelopment) {
@@ -101,7 +101,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
                             brain->getWorkingMemory()->getActiveTraces() : 0));
         }
     }
-    
+
     // Collect final metrics
     result.totalReward = totalReward / config.maxSteps;
     result.avgFiringRate = totalFiringRate / config.maxSteps;
@@ -110,21 +110,21 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
-    
+
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
-    
+
     NLM_LOG_INFO("=== Integration Verification ===");
     NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
-    
+
     // Test checkpointing
     if (config.enableCheckpointing) {
         NLM_LOG_INFO("Testing checkpoint save/load...");
@@ -145,17 +145,17 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
             NLM_LOG_ERROR("Failed to save checkpoint");
         }
     }
-    
+
     result.endTime = time(nullptr);
     auto endWall = std::chrono::high_resolution_clock::now();
     result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
-    
+
     NLM_LOG_INFO("=== Experiment Complete ===");
     NLM_LOG_INFO("Total reward: " + std::to_string(result.totalReward));
     NLM_LOG_INFO("Avg firing rate: " + std::to_string(result.avgFiringRate));
     NLM_LOG_INFO("Episodes stored: " + std::to_string(result.memoryEpisodesStored));
     NLM_LOG_INFO("Wall time: " + std::to_string(result.totalWallClockTime) + "s");
-    
+
     return result;
 }
 
