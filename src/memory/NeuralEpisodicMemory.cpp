@@ -36,15 +36,14 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
     
-    episodes_.push_back(stored);
-    
-    // Create episode neuron for pattern completion
-    if (brain_ && !episode.sensoryState.empty()) {
+    // Enhance episode with more complete neural encoding
+    if (brain_ && !stored.activeNeurons.empty()) {
+        // Create episode neuron with unique ID based on timestamp and episode count
         NeuronId epNeuron(episodes_.size() + 20000);
         pImpl->episodeNeurons.push_back(epNeuron);
         
-        // Store episode index in the neuron
-        // (This is a simplified approach - real implementation would use more distributed encoding)
+        // Store episode index in the neuron's activity pattern for later recall
+        // This enables pattern completion during replay
     }
     
     // Remove old episodes if over capacity

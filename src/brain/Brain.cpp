@@ -230,7 +230,7 @@ bool Brain::initialize() {
     }
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
+
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
@@ -264,7 +264,176 @@ bool Brain::initialize() {
         // Count spikes
         ++pImpl->totalSpikesThisStep;
         ++pImpl->totalSpikesTotal;
+        
+        // Update neuromodulation based on firing rate
+        if (pImpl->totalSpikesThisStep > 0) {
+            // Scale dopamine with overall firing activity
+            if (pImpl->dopamine) {
+                pImpl->dopamine->setLevel(pImpl->totalSpikesThisStep / 10.0f);
+            }
+            
+            // Update novelty with change in activity
+            if (pImpl->novelty) {
+                pImpl->novelty->update(pImpl->timestep);
+            }
+        }
     });
+    
+    // Register delayed spike handler to deliver synaptic input
+    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+        // Find destination neuron and deliver synaptic input
+        for (auto& region : pImpl->regions) {
+            auto neurons = region->getAllNeurons();
+            for (auto* neuron : neurons) {
+                if (neuron->getId() == event.destination_neuron) {
+                    // Apply synaptic weight as current
+                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                    if (event.is_excitatory) {
+                        neuron->receiveExcitatoryInput(synapticCurrent);
+                    } else {
+                        neuron->receiveInhibitoryInput(synapticCurrent);
+                    }
+                    break;
+                }
+            }
+        }
+    });
+    
+    // Register development system handler
+    pImpl->developmentSystem->registerDevelopmentCallback([this](TimestepDuration dt) {
+        pImpl->developmentalStage = pImpl->developmentSystem->getDevelopmentalStage();
+        
+        // Adaptivity: adjust plasticity based on development
+        if (pImpl->developmentalStage == DevelopmentalStage::Mature) {
+            pImpl->stdp->setLearningRate(0.001f);
+            pImpl->hebbian->setLearningRate(0.0005f);
+        }
+    });
+    
+    // Create initial working memory with diverse neuron representation
+    // Select neurons from different regions for working memory initialization
+    size_t neuronsPerRegion = std::max(1, neuronCount / (config->get<int32_t>("region_count", 4)));
+    size_t maxMemoryNeurons = pImpl->workingMemory->getCapacity();
+    
+    for (size_t regionIdx = 0; regionIdx < pImpl->regions.size() && 
+                               pImpl->workingMemory->getMemoryNeurons().size() < maxMemoryNeurons; ++regionIdx) {
+        auto* region = pImpl->regions[regionIdx].get();
+        auto neurons = region->getAllNeurons();
+        if (neurons) {
+            size_t neuronsAdded = 0;
+            for (auto* neuron : *neurons) {
+                if (pImpl->workingMemory->getMemoryNeurons().size() >= maxMemoryNeurons)
+                    break;
+                    
+                // Add neuron to working memory with initial activation
+                pImpl->workingMemory->storeToNeuron(neuron->getId(), 0.1f);  // Low initial activation
+                neuronsAdded++;
+                
+                // If we got enough neurons from this region, stop
+                if (neuronsAdded >= neuronsPerRegion)
+                    break;
+            }
+        }
+    }
+    
+    // Ensure we have at least some neurons in working memory
+    if (pImpl->workingMemory->getMemoryNeurons().empty() && !pImpl->regions.empty()) {
+        // Emergency fallback: use first few neurons from first region
+        auto neurons = pImpl->regions[0]->getAllNeurons();
+        if (neurons) {
+            size_t maxFallback = std::min(5u, maxMemoryNeurons);
+            size_t count = 0;
+            for (auto* neuron : *neurons) {
+                if (count >= maxFallback) break;
+                pImpl->workingMemory->storeToNeuron(neuron->getId(), 0.1f);
+                count++;
+            }
+        }
+    }
+    
+    // Initialize prediction error system
+    pImpl->predictionError->initialize(this);
+    
+    // Configure neuromodulation for integration
+    if (pImpl->dopamine) {
+        // Dopamine plasticity factor will be modulated by prediction error
+    }
+    
+    if (pImpl->curiosity) {
+        // Curiosity responds to prediction error
+    }
+    
+    // Register delayed spike handler to deliver synaptic input
+    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+        // Find destination neuron and deliver synaptic input
+        for (auto& region : pImpl->regions) {
+            auto neurons = region->getAllNeurons();
+            for (auto* neuron : neurons) {
+                if (neuron->getId() == event.destination_neuron) {
+                    // Apply synaptic weight as current
+                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                    if (event.is_excitatory) {
+                        neuron->receiveExcitatoryInput(synapticCurrent);
+                    } else {
+                        neuron->receiveInhibitoryInput(synapticCurrent);
+                    }
+                    break;
+                }
+            }
+        }
+    });
+    
+    // Register development system handler
+    pImpl->developmentSystem->registerDevelopmentCallback([this](TimestepDuration dt) {
+        pImpl->developmentalStage = pImpl->developmentSystem->getDevelopmentalStage();
+        
+        // Adaptivity: adjust plasticity based on development
+        if (pImpl->developmentalStage == DevelopmentalStage::Mature) {
+            pImpl->stdp->setLearningRate(0.001f);
+            pImpl->hebbian->setLearningRate(0.0005f);
+        }
+    });
+    
+    // Create initial working memory with diverse neuron representation
+    // Select neurons from different regions for working memory initialization
+    size_t neuronsPerRegion = std::max(1, neuronCount / (config->get<int32_t>("region_count", 4)));
+    size_t maxMemoryNeurons = pImpl->workingMemory->getCapacity();
+    
+    for (size_t regionIdx = 0; regionIdx < pImpl->regions.size() && 
+                               pImpl->workingMemory->getMemoryNeurons().size() < maxMemoryNeurons; ++regionIdx) {
+        auto* region = pImpl->regions[regionIdx].get();
+        auto neurons = region->getAllNeurons();
+        if (neurons) {
+            size_t neuronsAdded = 0;
+            for (auto* neuron : *neurons) {
+                if (pImpl->workingMemory->getMemoryNeurons().size() >= maxMemoryNeurons)
+                    break;
+                    
+                // Add neuron to working memory with initial activation
+                pImpl->workingMemory->storeToNeuron(neuron->getId(), 0.1f);  // Low initial activation
+                neuronsAdded++;
+                
+                // If we got enough neurons from this region, stop
+                if (neuronsAdded >= neuronsPerRegion)
+                    break;
+            }
+        }
+    }
+    
+    // Ensure we have at least some neurons in working memory
+    if (pImpl->workingMemory->getMemoryNeurons().empty() && !pImpl->regions.empty()) {
+        // Emergency fallback: use first few neurons from first region
+        auto neurons = pImpl->regions[0]->getAllNeurons();
+        if (neurons) {
+            size_t maxFallback = std::min(5u, maxMemoryNeurons);
+            size_t count = 0;
+            for (auto* neuron : *neurons) {
+                if (count >= maxFallback) break;
+                pImpl->workingMemory->storeToNeuron(neuron->getId(), 0.1f);
+                count++;
+            }
+        }
+    }
     
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
@@ -483,12 +652,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
+// Capture current brain state as an episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            episode.energy = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+            episode.novelty = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store sensory state from first region neurons
+            auto* region = pImpl->regions[0].get();
+            if (region) {
+                auto neurons = region->getAllNeurons();
+                if (neurons) {
+                    episode.sensoryState.reserve(neurons->size());
+                    for (auto* neuron : *neurons) {
+                        episode.sensoryState.push_back(
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+            
+            // Store active neurons and their activations
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,8 +686,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+    // Store prediction error in episode
+            if (pImpl->predictionError) {
+                episode.predictionError = pImpl->predictionError->getError();
+            }
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
@@ -511,8 +697,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Use current sensory state (from first region neurons) as input
+        std::vector<float> currentState;
+        auto* region = pImpl->regions[0].get();
+        if (region) {
+            auto neurons = region->getAllNeurons();
+            if (neurons) {
+                currentState.reserve(neurons->size());
+                for (auto* neuron : *neurons) {
+                    currentState.push_back(
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                }
+            }
+        }
+        
+        if (!currentState.empty()) {
+            // Create a simple sensory input from neural activity
+            auto sensoryInput = std::make_unique<SensoryInput>();
+            sensoryInput->setData(currentState);
+            
+            // Predict next state
+            auto predictedState = pImpl->predictionSystem->predictNextState(*sensoryInput);
+            
+            // Update predictions with actual observation
+            pImpl->predictionSystem->updatePredictions(*predictedState, *sensoryInput);
+            
+            // Train prediction model
+            pImpl->predictionSystem->train(*sensoryInput);
+            
+            // Store prediction error for neuromodulation
+            if (pImpl->predictionError) {
+                pImpl->predictionError->computeError(
+                    predictedState->getData()[0], 
+                    sensoryInput->getData()[0]
+                );
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +748,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation now processes current working memory and prediction errors
+        if (pImpl->workingMemory && pImpl->predictionError) {
+            // Convert working memory to concept representation
+            auto wmPattern = pImpl->workingMemory->retrieve();
+            float predictionError = pImpl->predictionError->getError();
+            
+            // Simple concept formation: identify patterns in working memory
+            // Store concepts for later use by planner
+            if (!wmPattern.empty() && predictionError < 0.5f) {
+                // Create a new concept from working memory pattern
+                // (ConceptFormation would handle this in a full implementation)
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

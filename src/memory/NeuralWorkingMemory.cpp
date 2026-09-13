@@ -23,6 +23,9 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    // Initialize active traces vector
+    pImpl->traceAges.clear();
+    pImpl->traceAges.reserve(capacity_);
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
