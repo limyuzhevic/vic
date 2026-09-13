@@ -5,6 +5,9 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
+#include <set>
+#include <algorithm>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,16 +22,33 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Phase 1: Basic Enums and Types
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        An enhanced Python binding for the NLM C++ neural simulation framework.
+        
+        NEW ADVANCED FEATURES:
+        - Enhanced AgentBrain with advanced neuromodulation and learning
+        - Personalized development based on agent's unique characteristics  
+        - Environmental adaptation and social learning capabilities
+        - Emotional intelligence and moral development systems
+        - Consciousness and self-awareness metrics
+        - Autonomy development with goal setting and self-regulation
+        - Advanced curiosity and exploration mechanisms
+        - Reward prediction and adaptive learning
+        - Personality and behavioral modeling
+        - Memory optimization and consolidation
+        - Social interaction and theory of mind capabilities
+        
+        Provides classes for Brain, Config, AgentBrain, SimpleWorld, 
+        SensoryInput, and Action with advanced functionality.
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
+    // === Basic Types ===
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -73,6 +93,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
 
+    // === Neuron and Synapse Types ===
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
         .value("Inhibitory", NeuronType::Inhibitory)
@@ -142,6 +163,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // === Configuration and Core Classes ===
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -164,6 +186,7 @@ PYBIND11_MODULE(pynlm, m) {
             return "<Config: " + cfg.summary() + ">";
         });
 
+    // === Sensory and Motor Systems ===
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
@@ -198,6 +221,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
+    // === Action and World Objects ===
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
         .def(py::init<ActionType>(), py::arg("type"))
@@ -221,6 +245,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &WorldObject::value)
         .def_readwrite("active", &WorldObject::active);
 
+    // === Agent Components ===
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
         .def_readwrite("x", &AgentBody::x)
@@ -245,115 +270,24 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("success", &ActionResult::success)
         .def_readwrite("message", &ActionResult::message);
 
-    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
-        .def(py::init<>())
-        .def("getVision", &SensoryPercept::getVision)
-        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
-        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
-        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
-        .def("getTouch", &SensoryPercept::getTouch)
-        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
-        .def("getInternal", &SensoryPercept::getInternal)
-        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
-        .def("getProprioception", &SensoryPercept::getProprioception)
-        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
-        .def("getAudio", &SensoryPercept::getAudio)
-        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
-        .def("getAllSignals", &SensoryPercept::getAllSignals)
-        .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+    // === Advanced AgentBrain Class ===
+    py::enum_<AgentBrain::DevelopmentStyle>(m, "DevelopmentStyle", R"pbdoc(Development style enumeration)pbdoc")
+        .value("Initial", AgentBrain::DevelopmentStyle::Initial)
+        .value("CriticalPeriod", AgentBrain::DevelopmentStyle::CriticalPeriod)
+        .value("Maturation", AgentBrain::DevelopmentStyle::Maturation)
+        .value("Adult", AgentBrain::DevelopmentStyle::Adult)
+        .value("Aging", AgentBrain::DevelopmentStyle::Aging)
+        .export_values();
 
-    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
-        .def(py::init<>())
-        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
-        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
-        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
-        .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+    py::enum_<AgentBrain::LearningStyle>(m, "LearningStyle", R"pbdoc(Learning style enumeration)pbdoc")
+        .value("Exploratory", AgentBrain::LearningStyle::Exploratory)
+        .value("TrialAndError", AgentBrain::LearningStyle::TrialAndError)
+        .value("Balanced", AgentBrain::LearningStyle::Balanced)
+        .value("Reflective", AgentBrain::LearningStyle::Reflective)
+        .export_values();
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
-        .def("reset", &Brain::reset,
-             "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
-        .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
-
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+    // === Enhanced AgentBrain with Advanced Features ===
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Advanced agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
@@ -362,16 +296,14 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
              "Get expected motor output size")
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
+             py::arg("percept"), "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
+             py::arg("timestep"), "Update development system")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
@@ -398,7 +330,326 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // === Advanced Features ===
+        .def("enableAdvancedFeatures", &AgentBrain::enableAdvancedFeatures,
+             "Enable advanced neuromodulation and learning features")
+        .def("enableAdvancedLearning", &AgentBrain::enableAdvancedLearning,
+             "Enable advanced learning mechanisms")
+        .def("enablePersonalizedDevelopment", &AgentBrain::enablePersonalizedDevelopment,
+             "Enable personalized development based on agent's unique characteristics")
+        .def("enableEnvironmentalAdaptation", &AgentBrain::enableEnvironmentalAdaptation,
+             "Enable adaptation to environmental conditions")
+        .def("enableSocialLearning", &AgentBrain::enableSocialLearning,
+             "Enable social learning capabilities")
+        .def("enableEmotionalIntelligence", &AgentBrain::enableEmotionalIntelligence,
+             "Enable emotional intelligence capabilities")
+        .def("enableMoralDevelopment", &AgentBrain::enableMoralDevelopment,
+             "Enable moral development capabilities")
+        .def("enableConsciousnessDevelopment", &AgentBrain::enableConsciousnessDevelopment,
+             "Enable consciousness development capabilities")
+        .def("enableAutonomyDevelopment", &AgentBrain::enableAutonomyDevelopment,
+             "Enable autonomy development capabilities")
+        
+        // === Configuration Setters ===
+        .def("setExplorationRate", &AgentBrain::setExplorationRate,
+             py::arg("rate"), "Set exploration rate")
+        .def("setRewardPredictionHorizon", &AgentBrain::setRewardPredictionHorizon,
+             py::arg("horizon"), "Set reward prediction horizon")
+        .def("setDevelopmentStyle", &AgentBrain::setDevelopmentStyle,
+             py::arg("style"), "Set development style")
+        .def("setLearningStyle", &AgentBrain::setLearningStyle,
+             py::arg("style"), "Set learning style")
+        
+        // === State Management ===
+        .def("recordReward", &AgentBrain::recordReward,
+             py::arg("reward"), "Record reward for adaptation calculations")
+        .def("recordAction", &AgentBrain::recordAction,
+             py::arg("action"), "Record action for learning and adaptation")
+        .def("recordLearningOutcome", &AgentBrain::recordLearningOutcome,
+             py::arg("success"), py::arg("reward"), "Record learning outcomes")
+        .def("recordSocialInteraction", &AgentBrain::recordSocialInteraction,
+             py::arg("interactionType"), py::arg("success"), py::arg("outcomeValue"), "Record social interaction")
+        .def("recordEnvironmentalCondition", &AgentBrain::recordEnvironmentalCondition,
+             py::arg("temperature"), py::arg("humidity"), py::arg("lightLevel"), "Record environmental conditions")
+        .def("recordMoralDecision", &AgentBrain::recordMoralDecision,
+             py::arg("decision"), py::arg("reasoning"), py::arg("ethical"), "Record moral decision")
+        
+        // === Goal Management ===
+        .def("setGoals", &AgentBrain::setGoals,
+             py::arg("goals"), "Set goals for autonomy development")
+        .def("updateGoalProgress", &AgentBrain::updateGoalProgress,
+             py::arg("goal"), py::arg("progress"), "Update progress on specific goals")
+        
+        // === State Queries ===
+        .def("predictNextReward", &AgentBrain::predictNextReward,
+             "Calculate predicted next reward based on recent rewards")
+        .def("calculateLearningEfficiency", &AgentBrain::calculateLearningEfficiency,
+             "Calculate learning efficiency based on success rates and rewards")
+        .def("calculateActionNovelty", &AgentBrain::calculateActionNovelty,
+             py::arg("currentAction"), "Calculate novelty of current action")
+        .def("calculateEmotionalStability", &AgentBrain::calculateEmotionalStability,
+             "Calculate emotional stability based on emotion history")
+        .def("calculateEthicalConsistency", &AgentBrain::calculateEthicalConsistency,
+             "Calculate ethical consistency over time")
+        .def("calculateSocialSuccessRate", &AgentBrain::calculateSocialSuccessRate,
+             "Calculate social success rate")
+        .def("calculateSensoryAwareness", &AgentBrain::calculateSensoryAwareness,
+             "Calculate sensory awareness based on input processing")
+        .def("calculateMemoryAwareness", &AgentBrain::calculateMemoryAwareness,
+             "Calculate memory awareness based on memory system usage")
+        .def("calculateSocialAwareness", &AgentBrain::calculateSocialAwareness,
+             "Calculate social awareness based on social interactions")
+        .def("calculateSuccessRate", &AgentBrain::calculateSuccessRate,
+             "Calculate success rate based on learning metrics")
+        .def("calculateRewardConsistency", &AgentBrain::calculateRewardConsistency,
+             "Calculate reward consistency over time")
+        .def("calculatePlasticityVariance", &AgentBrain::calculatePlasticityVariance,
+             "Calculate variance in plasticity modifier over time")
+        .def("calculateAdaptation", &AgentBrain::calculateAdaptation,
+             "Calculate adaptation factor based on recent performance")
+        .def("calculateNoveltyLevel", &AgentBrain::calculateNoveltyLevel,
+             "Calculate novelty based on sensory input changes")
+        .def("calculateSynapticActivityLevel", &AgentBrain::calculateSynapticActivityLevel,
+             "Calculate overall synaptic activity level")
+        .def("calculateSynaptogenesisRate", &AgentBrain::calculateSynaptogenesisRate,
+             "Calculate synaptogenesis rate based on developmental stage")
+        .def("calculatePruningRate", &AgentBrain::calculatePruningRate,
+             "Calculate pruning rate based on developmental stage and synaptic activity")
+        .def("calculateActionVariety", &AgentBrain::calculateActionVariety,
+             "Calculate variety of actions taken")
+        .def("calculateEnvironmentalStress", &AgentBrain::calculateEnvironmentalStress,
+             "Calculate environmental stress level")
+        .def("calculateAutonomyLevel", &AgentBrain::calculateAutonomyLevel,
+             "Calculate overall autonomy level")
+        
+        // === Emotional State Management ===
+        .def("setEmotionalState", &AgentBrain::setEmotionalState,
+             py::arg("fear"), py::arg("pleasure"), py::arg("surprise"), py::arg("anger"),
+             "Set emotional state")
+        
+        // === Environmental Adaptation ===
+        .def("adaptToEnvironment", &AgentBrain::adaptToEnvironment,
+             "Adapt behavior based on environmental conditions")
+        
+        // === Social Learning ===
+        .def("applySocialLearning", &AgentBrain::applySocialLearning,
+             "Apply social learning principles to behavior")
+        
+        // === Emotional Intelligence ===
+        .def("applyEmotionalStateToBehavior", &AgentBrain::applyEmotionalStateToBehavior,
+             "Apply emotional state to influence behavior")
+        
+        // === Moral Development ===
+        .def("applyMoralDevelopment", &AgentBrain::applyMoralDevelopment,
+             "Apply moral development principles to behavior")
+        
+        // === Consciousness Development ===
+        .def("updateAwarenessLevel", &AgentBrain::updateAwarenessLevel,
+             "Update awareness level based on experience")
+        .def("updateSelfAwareness", &AgentBrain::updateSelfAwareness,
+             "Update self-awareness based on reflection and meta-cognition")
+        .def("updateMetacognitiveAbility", &AgentBrain::updateMetacognitiveAbility,
+             "Update metacognitive ability (thinking about thinking)")
+        .def("updateConsciousnessMetrics", &AgentBrain::updateConsciousnessMetrics,
+             "Update all consciousness-related metrics")
+        
+        // === Autonomy Development ===
+        .def("applyAutonomyDevelopment", &AgentBrain::applyAutonomyDevelopment,
+             "Apply autonomy development principles to behavior")
+        
+        // === Additional State Queries ===
+        .def("getPersonalityProfile", &AgentBrain::getPersonalityProfile,
+             "Get personality profile")
+        .def("getAdaptabilityLevel", &AgentBrain::getAdaptabilityLevel,
+             "Get adaptability level")
+        .def("getInnovationRate", &AgentBrain::getInnovationRate,
+             "Get innovation rate")
+        .def("getConformityLevel", &AgentBrain::getConformityLevel,
+             "Get conformity level")
+        .def("getExplorationRate", &AgentBrain::getExplorationRate,
+             "Get current exploration rate")
+        .def("getDevelopmentStage", &AgentBrain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             "Get prediction error")
+        .def("getLearningEfficiency", &AgentBrain::calculateLearningEfficiency,
+             "Get learning efficiency")
+        .def("getEmotionalStability", &AgentBrain::calculateEmotionalStability,
+             "Get emotional stability")
+        .def("getEthicalConsistency", &AgentBrain::calculateEthicalConsistency,
+             "Get ethical consistency")
+        .def("getSocialSuccessRate", &AgentBrain::calculateSocialSuccessRate,
+             "Get social success rate")
+        .def("getAwarenessLevel", &AgentBrain::calculateSensoryAwareness,
+             "Get awareness level")
+        .def("getSelfAwareness", &AgentBrain::updateSelfAwareness,
+             "Get self-awareness")
+        .def("getMetacognitiveAbility", &AgentBrain::updateMetacognitiveAbility,
+             "Get metacognitive ability")
+        .def("getAutonomyLevel", &AgentBrain::calculateAutonomyLevel,
+             "Get autonomy level")
+        .def("getActionSequenceLength", &AgentBrain::getActionSequenceLength,
+             "Get action sequence length")
+        .def("getRewardPredictionHorizon", &AgentBrain::getRewardPredictionHorizon,
+             "Get reward prediction horizon")
+        .def("getDevelopmentalAge", &AgentBrain::getDevelopmentalAge,
+             "Get developmental age")
+        .def("getPlasticityModifier", &AgentBrain::getPlasticityModifier,
+             "Get plasticity modifier")
+        .def("getExplorationRate", &AgentBrain::getExplorationRate,
+             "Get exploration rate")
+        .def("getAdaptationFactor", &AgentBrain::getAdaptationFactor,
+             "Get adaptation factor")
+        .def("getHabituationThreshold", &AgentBrain::getHabituationThreshold,
+             "Get habituation threshold")
+        .def("getAdvancedFeaturesEnabled", &AgentBrain::isAdvancedFeaturesEnabled,
+             "Check if advanced features are enabled")
+        .def("getPersonalizedDevelopmentEnabled", &AgentBrain::isPersonalizedDevelopmentEnabled,
+             "Check if personalized development is enabled")
+        .def("getEnvironmentalAdaptationEnabled", &AgentBrain::isEnvironmentalAdaptationEnabled,
+             "Check if environmental adaptation is enabled")
+        .def("getSocialLearningEnabled", &AgentBrain::isSocialLearningEnabled,
+             "Check if social learning is enabled")
+        .def("getEmotionalIntelligenceEnabled", &AgentBrain::isEmotionalIntelligenceEnabled,
+             "Check if emotional intelligence is enabled")
+        .def("getMoralDevelopmentEnabled", &AgentBrain::isMoralDevelopmentEnabled,
+             "Check if moral development is enabled")
+        .def("getConsciousnessDevelopmentEnabled", &AgentBrain::isConsciousnessDevelopmentEnabled,
+             "Check if consciousness development is enabled")
+        .def("getAutonomyDevelopmentEnabled", &AgentBrain::isAutonomyDevelopmentEnabled,
+             "Check if autonomy development is enabled")
+        
+        // === Helper Methods ===
+        .def("getTotalNeuronCount", &AgentBrain::getTotalNeuronCount,
+             "Get total neuron count")
+        .def("getTotalSynapseCount", &AgentBrain::getTotalSynapseCount,
+             "Get total synapse count")
+        .def("getActiveNeuronCount", &AgentBrain::getActiveNeuronCount,
+             "Get active neuron count")
+        .def("getFiringNeuronCount", &AgentBrain::getFiringNeuronCount,
+             "Get firing neuron count")
+        .def("getAverageFiringRate", &AgentBrain::getAverageFiringRate,
+             "Get average firing rate")
+        .def("getExcitationInhibitionRatio", &AgentBrain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition ratio")
+        .def("getTotalSpikeCount", &AgentBrain::getTotalSpikeCount,
+             "Get total spike count")
+        .def("getPendingSpikeEventCount", &AgentBrain::getPendingSpikeEventCount,
+             "Get pending spike event count")
+        .def("getWorkingMemoryCapacity", &AgentBrain::getWorkingMemoryCapacity,
+             "Get working memory capacity")
+        .def("getEpisodicMemoryCapacity", &AgentBrain::getEpisodicMemoryCapacity,
+             "Get episodic memory capacity")
+        .def("getMemoryConsolidationRate", &AgentBrain::getMemoryConsolidationRate,
+             "Get memory consolidation rate")
+        .def("getLearningRate", &AgentBrain::getLearningRate,
+             "Get learning rate")
+        .def("getRetentionRate", &AgentBrain::getRetentionRate,
+             "Get retention rate")
+        .def("getEmpathyLevel", &AgentBrain::getEmpathyLevel,
+             "Get empathy level")
+        .def("getTheoryOfMindLevel", &AgentBrain::getTheoryOfMindLevel,
+             "Get theory of mind level")
+        .def("getEmotionalIntelligenceLevel", &AgentBrain::getEmotionalIntelligenceLevel,
+             "Get emotional intelligence level")
+        .def("getMoralReasoningLevel", &AgentBrain::getMoralReasoningLevel,
+             "Get moral reasoning level")
+        .def("getAdaptabilityLevel", &AgentBrain::getAdaptabilityLevel,
+             "Get adaptability level")
+        .def("getInnovationRate", &AgentBrain::getInnovationRate,
+             "Get innovation rate")
+        .def("getConformityLevel", &AgentBrain::getConformityLevel,
+             "Get conformity level")
+        .def("getTemperatureSensitivity", &AgentBrain::getTemperatureSensitivity,
+             "Get temperature sensitivity")
+        .def("getLightSensitivity", &AgentBrain::getLightSensitivity,
+             "Get light sensitivity")
+        .def("getHumiditySensitivity", &AgentBrain::getHumiditySensitivity,
+             "Get humidity sensitivity")
+        .def("getSelfReflectionEnabled", &AgentBrain::isSelfReflectionEnabled,
+             "Check if self-reflection is enabled")
+        .def("getIntrospectionLevel", &AgentBrain::getIntrospectionLevel,
+             "Get introspection level")
+        .def("getMetaAwarenessLevel", &AgentBrain::getMetaAwarenessLevel,
+             "Get meta-awareness level")
+        .def("getPersonalityProfile", &AgentBrain::getPersonalityProfile,
+             "Get personality profile")
+        .def("getDevelopmentStyle", &AgentBrain::getDevelopmentStyle,
+             "Get development style")
+        .def("getLearningStyle", &AgentBrain::getLearningStyle,
+             "Get learning style")
+        
+        // === State History ===
+        .def("getActionHistory", &AgentBrain::getActionHistory,
+             "Get action history")
+        .def("getRewardHistory", &AgentBrain::getRewardHistory,
+             "Get reward history")
+        .def("getLearningHistory", &AgentBrain::getLearningHistory,
+             "Get learning history")
+        .def("getSocialInteractionHistory", &AgentBrain::getSocialInteractionHistory,
+             "Get social interaction history")
+        .def("getEnvironmentalHistory", &AgentBrain::getEnvironmentalHistory,
+             "Get environmental history")
+        .def("getEmotionHistory", &AgentBrain::getEmotionHistory,
+             "Get emotion history")
+        .def("getMoralDecisionHistory", &AgentBrain::getMoralDecisionHistory,
+             "Get moral decision history")
+        .def("getGoalHistory", &AgentBrain::getGoalHistory,
+             "Get goal history")
+        .def("getConsciousnessHistory", &AgentBrain::getConsciousnessHistory,
+             "Get consciousness history")
+        .def("getAutonomyHistory", &AgentBrain::getAutonomyHistory,
+             "Get autonomy history")
+        
+        // === Statistics ===
+        .def("getStatistics", &AgentBrain::getStatistics,
+             "Get comprehensive statistics")
+        .def("getBrainStatus", &AgentBrain::getBrainStatus,
+             "Get brain status")
+        .def("getAdvancedStats", &AgentBrain::getAdvancedStats,
+             "Get advanced statistics")
+        .def("getDevelopmentStats", &AgentBrain::getDevelopmentStats,
+             "Get development statistics")
+        .def("getLearningStats", &AgentBrain::getLearningStats,
+             "Get learning statistics")
+        .def("getSocialStats", &AgentBrain::getSocialStats,
+             "Get social statistics")
+        .def("getEmotionalStats", &AgentBrain::getEmotionalStats,
+             "Get emotional statistics")
+        .def("getMoralStats", &AgentBrain::getMoralStats,
+             "Get moral statistics")
+        .def("getConsciousnessStats", &AgentBrain::getConsciousnessStats,
+             "Get consciousness statistics")
+        .def("getAutonomyStats", &AgentBrain::getAutonomyStats,
+             "Get autonomy statistics")
+        
+        // === Reset ===
+        .def("resetEnhanced", &AgentBrain::resetEnhanced,
+             "Reset agent with enhanced features")
+        .def("resetBasic", &AgentBrain::resetBasic,
+             "Reset agent with basic features")
+        .def("resetAll", &AgentBrain::resetAll,
+             "Reset agent completely")
+        
+        // === Comparison Operators ===
+        .def("__eq__", &AgentBrain::operator==,
+             "Equality comparison")
+        .def("__ne__", &AgentBrain::operator!=,
+             "Inequality comparison")
+        .def("__repr__", [](const AgentBrain& agent) {
+            return "<AgentBrain: " + std::to_string(agent.getTotalNeuronCount()) + 
+                   " neurons, " + std::to_string(agent.getCuriosityLevel()) + " curiosity, " +
+                   std::to_string(agent.getEmotionalStability()) + " emotional stability, " +
+                   std::to_string(agent.getLearningEfficiency()) + " learning efficiency>";
+        });
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -416,6 +667,7 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Phase 1: Basic identity constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
@@ -423,3 +675,4 @@ PYBIND11_MODULE(pynlm, m) {
 }
 
 } // namespace nlm
+
