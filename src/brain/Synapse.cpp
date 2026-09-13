@@ -192,33 +192,103 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    TimestepDuration dt = 0.001f;  // 1ms timestep
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
+    // Apply activity-dependent plasticity based on recent spikes
+    if (pImpl->plasticityFlags.stdp && !pImpl->preSpikeHistory.empty() && !pImpl->postSpikeHistory.empty()) {
+        // STDP weight updates based on spike timing
+        float maxPreTime = *std::max_element(pImpl->preSpikeHistory.begin(), pImpl->preSpikeHistory.end());
+        float maxPostTime = *std::max_element(pImpl->postSpikeHistory.begin(), pImpl->postSpikeHistory.end());
+        
+        float deltaT = maxPostTime - maxPreTime;
+        
+        // Apply STDP weight change
+        if (deltaT > 0.0f) {
+            // Post after pre: LTP (long-term potentiation)
+            float ltpChange = pImpl->weight * 0.01f * std::exp(-deltaT / 20.0f);  // tau = 20ms
+            addToWeight(ltpChange);
+        } else {
+            // Pre after post: LTD (long-term depression)
+            float ltdChange = pImpl->weight * 0.012f * std::exp(deltaT / 20.0f);  // tau = 20ms
+            addToWeight(ltdChange);
+        }
+    }
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
+    if (pImpl->plasticityFlags.hebbian && !pImpl->preSpikeHistory.empty() && !pImpl->postSpikeHistory.empty()) {
+        // Hebbian learning: co-activation strengthens synapses
+        size_t minHistorySize = std::min(pImpl->preSpikeHistory.size(), pImpl->postSpikeHistory.size());
+        if (minHistorySize > 0) {
+            // Use most recent spike pair
+            auto preIt = pImpl->preSpikeHistory.end();
+            auto postIt = pImpl->postSpikeHistory.end();
+            std::advance(preIt, -1);
+            std::advance(postIt, -1);
+            
+            float deltaT = *postIt - *preIt;
+            
+            if (std::abs(deltaT) < 10.0f) {  // Co-activation window
+                float hebbianChange = 0.005f * (isExcitatory() ? 1.0f : -0.5f);
+                addToWeight(hebbianChange);
+            }
+        }
+    }
+    
+    // Reward-modulated learning
+    if (pImpl->plasticityFlags.reward_modulated && pImpl->eligibilityTrace != 0.0f) {
+        // Apply reward modulation to eligibility trace
+        float rewardFactor = 0.1f;  // Simplified reward factor
+        float modulatedUpdate = pImpl->eligibilityTrace * rewardFactor * (isExcitatory() ? 1.0f : 0.5f);
+        addToWeight(modulatedUpdate);
+        
+        // Decay eligibility trace
+        decayEligibilityTrace(0.01f);
+    }
+    
+    // Decay eligibility trace for STDP (slow decay)
+    decayEligibilityTrace(0.001f);
+    
+    // Short-term plasticity: Tsodyks-Markram model
+    // Update utilization based on presynaptic spike
+    float x = pImpl->shortTermDepression;  // Depression variable (fraction of resources available)
+    float u = pImpl->shortTermFacilitation;  // Utilization (fraction of available resources used)
+    
+    // Decay dynamics toward baseline
+    const float tau_x = Impl::STP_DEPRESSION_TAU;  // Recovery time constant
+    const float tau_u = Impl::STP_FACILITATION_TAU;  // Utilization decay time constant
+    
+    float timeSincePre = 0.0f;
+    float timeSincePost = 0.0f;
+    
     if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+    }
+    if (pImpl->lastPostSpikeTime >= 0.0f) {
+        timeSincePost = static_cast<float>(currentTime - pImpl->lastPostSpikeTime);
     }
     
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+    // Update depression variable (recovery from depression)
+    float recoveryRate = (1.0f - x) * (1.0f - std::exp(-timeSincePre / tau_x));
+    pImpl->shortTermDepression = x + recoveryRate * (1.0f - x);
+    
+    // Update utilization (facilitation)
+    u *= std::exp(-timeSincePre / tau_u);
+    pImpl->shortTermFacilitation = u;
+    
+    // Apply efficacy modulation based on use history
+    pImpl->efficacy = std::clamp(pImpl->efficacy, 0.0f, 2.0f);
+    
+    // Apply weight bounds with C++20 clamp for stability
+    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    // Add small decay term for weight homeostasis
+    const float weightDecayRate = 0.00001f;  // 0.001% per ms
+    if (pImpl->weight > 0.0f) {
+        pImpl->weight *= (1.0f - weightDecayRate * static_cast<float>(dt));
+    } else if (pImpl->weight < 0.0f) {
+        pImpl->weight *= (1.0f + weightDecayRate * static_cast<float>(dt));
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
-    
-    // Clamp weight bounds
+    // Apply bounds again after decay
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
