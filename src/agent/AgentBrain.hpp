@@ -4,10 +4,14 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../core/Constants.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
+
+// Forward declaration to avoid circular dependency
+class Neuron;
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
@@ -78,7 +82,7 @@ private:
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
+    // Motor neuron groups - store references to existing neurons
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
