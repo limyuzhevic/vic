@@ -81,8 +81,46 @@ public:
     void initializeRandom(class RandomGenerator& rng);
     
 private:
-    struct Impl;
-    Impl* pImpl;
+    struct Impl {
+        SynapseId id;
+        NeuronId sourceNeuron;
+        NeuronId destinationNeuron;
+        SynapticWeight weight;
+        Delay delay;  // Synaptic delay in simulation steps
+        
+        // Synapse type
+        SynapseType type;
+        
+        // Spike history for STDP
+        std::vector<Timestamp> preSpikeHistory;
+        std::vector<Timestamp> postSpikeHistory;
+        
+        // Plasticity state
+        PlasticityFlags plasticityFlags;
+        
+        // Short-term plasticity state
+        float shortTermDepression;  // Utilization factor (0-1)
+        float shortTermFacilitation;  // Facilitation factor
+        float lastPreSpikeTime;  // For short-term dynamics
+        float lastPostSpikeTime;
+        
+        // Eligibility trace for reward-modulated learning
+        float eligibilityTrace;
+        
+        // Synaptic efficacy (use-dependent modulation)
+        float efficacy;
+        
+        // Weight bounds
+        static constexpr float MIN_WEIGHT = -1.0f;
+        static constexpr float MAX_WEIGHT = 1.0f;
+        
+        // Short-term plasticity parameters
+        static constexpr float STP_FACILITATION_TAU = 100.0f;  // ms
+        static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
+        static constexpr float STP_U_MAX = 1.0f;  // Max utilization
+        
+        static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    };
 };
 
 } // namespace nlm

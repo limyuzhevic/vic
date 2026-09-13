@@ -144,14 +144,38 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+        .def("loadFromFile", py::overload_cast<const std::string&>(&Config::loadFromFile),
+             py::arg("filepath"), "Load configuration from a key=value file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+            "Load configuration from command line arguments")
+        .def("saveToFile", py::overload_cast<const std::string&>(&Config::saveToFile),
+             py::arg("filepath"), "Save configuration to a key=value file")
+        .def("set", py::overload_cast<const std::string&, const std::string&>(&Config::set),
+             py::arg("key"), py::arg("value"), "Set a string configuration value")
+        .def("set", py::overload_cast<const std::string&, int>(&Config::set),
+             py::arg("key"), py::arg("value"), "Set an integer configuration value")
+        .def("set", py::overload_cast<const std::string&, double>(&Config::set),
+             py::arg("key"), py::arg("value"), "Set a double configuration value")
+        .def("set", py::overload_cast<const std::string&, bool>(&Config::set),
+             py::arg("key"), py::arg("value"), "Set a boolean configuration value")
+        .def("get", py::overload_cast<const std::string&>(&Config::get<std::string>),
+             py::arg("key"), "Get a string configuration value")
+        .def("get", py::overload_cast<const std::string&>(&Config::get<int64_t>),
+             py::arg("key"), "Get an integer configuration value")
+        .def("get", py::overload_cast<const std::string&>(&Config::get<double>),
+             py::arg("key"), "Get a double configuration value")
+        .def("get", py::overload_cast<const std::string&>(&Config::get<bool>),
+             py::arg("key"), "Get a boolean configuration value")
+        .def("getOr", py::overload_cast<const std::string&, const std::string&>(&Config::getOr<std::string>),
+             py::arg("key"), py::arg("defaultValue"), "Get a configuration value or return default")
+        .def("getOr", py::overload_cast<const std::string&, int64_t>(&Config::getOr<int64_t>),
+             py::arg("key"), py::arg("defaultValue"), "Get a configuration value or return default")
+        .def("getOr", py::overload_cast<const std::string&, double>(&Config::getOr<double>),
+             py::arg("key"), py::arg("defaultValue"), "Get a configuration value or return default")
+        .def("getOr", py::overload_cast<const std::string&, bool>(&Config::getOr<bool>),
+             py::arg("key"), py::arg("defaultValue"), "Get a configuration value or return default")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -160,6 +184,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
