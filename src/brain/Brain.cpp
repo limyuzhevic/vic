@@ -69,6 +69,9 @@ struct Brain::Impl {
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
     
+    // Current sensory state for prediction
+    std::unique_ptr<class SensoryInput> currentSensoryState;
+    
     // Integration state
     bool isResting;  // For sleep/rest cycle
     size_t stepsSinceLastEpisode;
@@ -116,10 +119,25 @@ struct Brain::Impl {
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
         
-        // Initialize cognition systems
+    // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        
+        // Configure planner
+        planner->setPlanningDepth(config->getOr<size_t>("planning_depth", 5));
+        
+        // Set initial goal from config
+        std::string goalStr = config->getOr<std::string>("planning_goal", "explore");
+        if (goalStr == "explore") {
+            planner->setCurrentGoal(std::vector<float>({0.5f, 0.5f, 0.5f}));
+        } else if (goalStr == "survive") {
+            planner->setCurrentGoal(std::vector<float>({1.0f, 0.0f, 0.0f}));
+        }
+        
+        // Initialize attention
+        attention->setInhibitionStrength(config->getOr<float>("attention_inhibition", 0.5f));
+        attention->setExcitationStrength(config->getOr<float>("attention_excitation", 1.5f));
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -149,8 +167,33 @@ struct Brain::Impl {
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+        // Configure neuromodulation systems
+        float dopamineBaseline = config->getOr<float>("dopamine_baseline", 0.0f);
+        float noveltyWeight = config->getOr<float>("novelty_weight", 0.5f);
+        float curiosityWeight = config->getOr<float>("curiosity_weight", 0.5f);
+        
+        if (dopamine) {
+            dopamine->setLevel(dopamineBaseline);
+            if (config->has("initial_dopamine")) {
+                dopamine->setLevel(config->get<float>("initial_dopamine"));
+            }
+        }
+        
+        if (curiosity) {
+            curiosity->setNoveltyWeight(noveltyWeight);
+            curiosity->setPredictionErrorWeight(curiosityWeight);
+        }
+        
+        // Configure working memory
+        if (workingMemory) {
+            workingMemory->setCapacity(config->getOr<size_t>("working_memory_capacity", 100));
+            workingMemory->setDecayRate(config->getOr<float>("working_memory_decay", 0.01f));
+        }
+        
+        // Configure episodic memory
+        if (episodicMemory) {
+            episodicMemory->setMaxEpisodes(config->getOr<size_t>("episodic_memory_max_episodes", 1000));
+        }
     }
     
     DevelopmentalStage developmentalStage;
@@ -511,8 +554,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state and dopamine signal
+        auto currentState = pImpl->currentSensoryState;
+        auto prediction = pImpl->predictionSystem->predictNextState(currentState);
+        if (prediction) {
+            pImpl->predictionSystem->updatePredictions(*prediction, currentState);
+            
+            // Use prediction error to update working memory and attention
+            float error = pImpl->predictionSystem->getPredictionError();
+            if (error > 0.5f) {
+                // High prediction error - increase novelty and curiosity signals
+                if (pImpl->novelty) {
+                    pImpl->novelty->setLevel(error * 2.0f);
+                }
+                if (pImpl->curiosity) {
+                    pImpl->curiosity->setLevel(error);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -589,6 +648,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
+    // Store current sensory state for prediction system
+    pImpl->currentSensoryState = std::make_unique<SensoryInput>(input);
+    
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     
@@ -609,7 +671,7 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
+        // Store in working memory if strong
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
