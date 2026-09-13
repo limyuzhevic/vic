@@ -2,73 +2,121 @@
 
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM is a **computational brain simulator** written in C++. It implements a spiking neural network with realistic neuron dynamics and synaptic plasticity. The brain can:
 
-Think of it like this:
-- **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
-- **Learning** = When connections get stronger or weaker based on what happens
-- **Memory** = The brain remembering patterns
+- Learn through STDP and Hebbian learning rules
+- Store information in working and episodic memory systems
+- Plan actions using neural computation
+- Adapt through developmental processes
+- React to environments through sensory-motor loops
 
-That's it! NLM simulates all of this.
+**Note:** NLM is primarily a C++ library. Python bindings may be available in future releases. This guide focuses on C++ usage.
 
 ---
 
 ## The 3 Things You Need to Know
 
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
+1. **Brain** - The virtual brain that thinks (implements neural computation)
+2. **World** - The environment the brain lives in (simulation environment)
+3. **Agent** - The bridge connecting brain to world (handles I/O and neuromodulation)
 
 ---
 
-## Quick Start (Copy & Paste)
+## Quick Start (C++ - Copy & Paste)
 
 ### Example 1: Simplest Brain
 
-```python
-import pynlm
+```cpp
+#include "brain/Brain.hpp"
+#include "core/Config/Config.hpp"
+#include <iostream>
 
-# Step 1: Make a brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Step 2: Turn it on
-brain.initialize()
-
-# Step 3: Make it think for 100 steps
-for i in range(100):
-    brain.step(i)  # One step of thinking
-
-print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+int main() {
+    // Step 1: Create configuration
+    auto config = std::make_shared<Config>();
+    
+    // Step 2: Make a brain
+    auto brain = std::make_shared<Brain>(config);
+    
+    // Step 3: Turn it on
+    if (!brain->initialize()) {
+        std::cerr << "Failed to initialize brain!" << std::endl;
+        return 1;
+    }
+    
+    // Step 4: Make it think for 100 steps
+    for (int i = 0; i < 100; ++i) {
+        brain->step(i);  // One step of thinking
+    }
+    
+    std::cout << "Done! Your brain thought " << brain->getTotalSpikeCount() 
+              << " times" << std::endl;
+    
+    return 0;
+}
 ```
 
 ### Example 2: Brain in a Simple World
 
-```python
-import pynlm
+```cpp
+#include "brain/Brain.hpp"
+#include "core/Config/Config.hpp"
+#include "world/SimpleWorld.hpp"
+#include "agent/AgentBrain.hpp"
+#include <iostream>
 
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
-
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
+int main() {
+    // Create configuration
+    auto config = std::make_shared<Config>();
+    
+    // Create everything
+    auto brain = std::make_shared<Brain>(config);
+    if (!brain->initialize()) {
+        std::cerr << "Brain initialization failed!" << std::endl;
+        return 1;
+    }
+    
+    // Create and configure world
+    SimpleWorld world;
+    world.configure(10, 10, 8, 8);  // width, height, visionWidth, visionHeight
+    world.reset();
+    
+    // Create agent interface
+    AgentBrain agent(brain);
+    agent.initialize(world);
+    
+    // Enable learning subsystems
+    agent.enableRewardModulation(true);
+    agent.enableDevelopment(true);
+    agent.enableCuriosity(true);
+    
+    // Run for 50 steps
+    for (int step = 0; step < 50; ++step) {
+        // Update world
+        world.update(0.1);  // 0.1 second timestep
+        
+        // Get what the agent sees
+        SensoryPercept percept = world.getSensoryPercept();
+        
+        // Tell the brain
+        agent.processSensoryInput(percept);
+        
+        // Brain thinks
+        brain->step(step);
+        
+        // Brain decides action
+        MotorCommand action = agent.decodeMotorCommand();
+        
+        // Do action in world
+        world.applyMotorCommand(action, world.getSimulationTime());
+    }
+    
+    std::cout << "Simulation finished!" << std::endl;
+    std::cout << "Firing neurons: " << brain->getFiringNeuronCount() << std::endl;
+    std::cout << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+    
+    return 0;
+}
 ```
 
 ---

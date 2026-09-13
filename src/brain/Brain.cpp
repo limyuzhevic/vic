@@ -231,26 +231,32 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
+    // Initialize working memory - stores active sensory patterns
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
+    // Initialize episodic memory - stores experienced episodes
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
+    // Initialize associative memory - forms pattern associations
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // Initialize prediction system - predicts sensory input
+    if (pImpl->predictionSystem) {
+        // Prediction system helps with novelty detection and anticipation
+        pImpl->predictionSystem->initialize(this);
+    }
     
     // Initialize cognition systems
+    // Neural planner - sequences actions based on goals and predictions
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
     
+    // Concept formation - abstracts patterns from sensory input
     pImpl->conceptFormation->initialize(this);
     
+    // Attentional selection - chooses what to focus on from working memory
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
@@ -511,33 +517,58 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Predict upcoming sensory input based on current brain state
+        // This helps with novelty detection and anticipation
+        if (pImpl->sensoryNeurons.size() > 0) {
+            pImpl->predictionSystem->update(pImpl->timestep);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
-        pImpl->attention->update(pImpl->timestep);
-        
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+        // Process working memory and episodic memory to determine focus
+        if (pImpl->workingMemory) {
+            // Get all memory traces to compete for attention
+            std::vector<NeuronId> competitors;
+            competitors.reserve(pImpl->workingMemory->getCapacity());
+            
+            // Add working memory entries to attention competition
+            for (size_t i = 0; i < pImpl->workingMemory->getCapacity(); ++i) {
+                NeuronId neuron = pImpl->workingMemory->getNeuron(i);
+                if (neuron != 0) {  // Invalid neuron ID
+                    competitors.push_back(neuron);
+                }
+            }
+            
+            // Process attention competition
+            pImpl->attention->update(pImpl->timestep);
+            
+            // Apply attention to working memory winners
+            if (!competitors.empty()) {
+                pImpl->attention->processCompetition(competitors);
+            }
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
+    // ========== STEP 3: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current working memory content to form concepts
+        // This helps with abstraction and generalization
+        if (pImpl->workingMemory) {
+            // Get current working memory traces and feed them to concept formation
+            auto memoryPatterns = pImpl->workingMemory->retrieve();
+            for (const auto& pattern : memoryPatterns) {
+                pImpl->conceptFormation->update(pattern, currentStep);
+            }
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 8: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
+    // ========== STEP 9: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
@@ -546,7 +577,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // ========== STEP 10: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -576,13 +607,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // ========== STEP 11: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 12: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
