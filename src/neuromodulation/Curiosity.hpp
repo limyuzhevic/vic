@@ -1,8 +1,12 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <memory>
 
 namespace nlm {
+
+// Forward declarations
+class Brain;
 
 // Curiosity drive: exploration motivation based on novelty and prediction error
 // Computed as weighted combination of novelty and prediction error
@@ -30,6 +34,9 @@ public:
     
     // Reset
     void reset();
+    
+    // Check if curiosity is initialized
+    bool isInitialized() const;
     
 private:
     struct Impl;

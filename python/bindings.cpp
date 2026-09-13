@@ -400,26 +400,53 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Add Curiosity class binding
+    py::class_<Curiosity>(m, "Curiosity", R"pbdoc(Curiosity system for exploration motivation)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &Curiosity::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("getLevel", &Curiosity::getLevel,
+             "Get curiosity level")
+        .def("update", &Curiosity::update, py::arg("novelty"), py::arg("predictionError"), py::arg("dt"),
+             "Update curiosity based on novelty and prediction error")
+        .def("getExplorationDrive", &Curiosity::getExplorationDrive,
+             "Get exploration drive (same as level)")
+        .def("setNoveltyWeight", &Curiosity::setNoveltyWeight, py::arg("weight"),
+             "Set novelty weight")
+        .def("setPredictionErrorWeight", &Curiosity::setPredictionErrorWeight, py::arg("weight"),
+             "Set prediction error weight")
+        .def("reset", &Curiosity::reset,
+             "Reset curiosity state")
+        .def("isInitialized", &Curiosity::isInitialized,
+             "Check if curiosity is initialized");
+
+    // Add Novelty class binding
+    py::class_<Novelty>(m, "Novelty", R"pbdoc(Novelty detection system)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &Novelty::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("getLevel", &Novelty::getLevel,
+             "Get novelty level")
+        .def("setLevel", &Novelty::setLevel, py::arg("level"),
+             "Set novelty level")
+        .def("detectNovelty", static_cast<void (Novelty::*)(const Observation&, const Observation&)>(&Novelty::detectNovelty),
+             py::arg("observation"), py::arg("previousObservation"),
+             "Detect novelty from observation")
+        .def("detectNovelty", static_cast<void (Novelty::*)(const std::vector<float>&, const std::vector<float>&)>(&Novelty::detectNovelty),
+             py::arg("currentPattern"), py::arg("previousPattern"),
+             "Detect novelty from sensory input pattern")
+        .def("update", &Novelty::update, py::arg("dt"),
+             "Decay novelty over time")
+        .def("getHistory", &Novelty::getHistory,
+             py::return_value_policy::reference_internal,
+             "Get novelty history")
+        .def("clearHistory", &Novelty::clearHistory,
+             "Clear novelty history")
+        .def("isInitialized", &Novelty::isInitialized,
+             "Check if novelty is initialized");
+
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
 
 } // namespace nlm

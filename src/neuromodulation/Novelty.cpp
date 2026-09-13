@@ -6,35 +6,57 @@
 namespace nlm {
 
 struct Novelty::Impl {
-    class Brain* brain;
+    std::weak_ptr<class Brain> brain;
     float level;
     float decayRate;
     std::vector<float> history;
     std::vector<float> lastPattern;
     float noveltyThreshold;
     
-    Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
+    Impl() 
+        : brain()
+        , level(0.0f)
+        , decayRate(0.1f)
+        , noveltyThreshold(0.3f) {}
 };
 
-Novelty::Novelty() : pImpl(new Impl) {}
+Novelty::Novelty() : pImpl(new Impl) {
+    // Note: Brain initialization deferred to initialize() call
+    // Callers must explicitly initialize with a Brain instance
+}
 
 Novelty::~Novelty() = default;
 
 void Novelty::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    NLM_LOG_INFO("Novelty detection initialized");
+    if (brain) {
+        pImpl->brain = std::shared_ptr<class Brain>(brain, [](class Brain*) {});
+        NLM_LOG_INFO("Novelty detection initialized");
+    }
+}
+
+bool Novelty::isInitialized() const {
+    return !pImpl->brain.expired();
 }
 
 float Novelty::getLevel() const {
-    return pImpl->level;
+    // Check if brain is still available before proceeding
+    if (isInitialized()) {
+        return pImpl->level;
+    }
+    return 0.0f;
 }
 
 void Novelty::setLevel(float level) {
-    pImpl->level = level;
+    if (isInitialized()) {
+        pImpl->level = level;
+    }
 }
 
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
+    if (!isInitialized()) {
+        return;
+    }
     // Extract features from observations and compare
     // Simple implementation: just set to a placeholder
     pImpl->level = 1.0f;
@@ -43,6 +65,10 @@ void Novelty::detectNovelty(const Observation& observation,
 
 void Novelty::detectNovelty(const std::vector<float>& currentPattern,
                             const std::vector<float>& previousPattern) {
+    if (!isInitialized()) {
+        return;
+    }
+    
     if (currentPattern.empty() || previousPattern.empty()) {
         pImpl->level = 0.0f;
         return;
@@ -69,6 +95,9 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
 }
 
 void Novelty::update(TimestepDuration dt) {
+    if (!isInitialized()) {
+        return;
+    }
     // Decay novelty
     pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
@@ -77,8 +106,11 @@ const std::vector<float>& Novelty::getHistory() const {
     return pImpl->history;
 }
 
-void Novelty::clearHistory() {
-    pImpl->history.clear();
+void Novelty::reset() {
+    if (!isInitialized()) {
+        return;
+    }
+    pImpl->level = 0.0f;
+    clearHistory();
+    pImpl->lastPattern.clear();
 }
-
-} // namespace nlm
