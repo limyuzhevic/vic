@@ -47,6 +47,10 @@ public:
     bool isExcitatory() const;
     bool isInhibitory() const;
     
+    // Short-term plasticity state
+    float getShortTermDepression() const;
+    float getShortTermFacilitation() const;
+    
     // Activity history for plasticity
     void recordPreSpike(Timestamp timestamp);
     void recordPostSpike(Timestamp timestamp);

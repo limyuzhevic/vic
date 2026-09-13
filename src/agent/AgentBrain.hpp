@@ -4,6 +4,7 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include <memory>
 #include <vector>
 
@@ -77,6 +78,7 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    nlm::Novelty novelty_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;

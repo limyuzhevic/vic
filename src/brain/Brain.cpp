@@ -819,7 +819,27 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                
+                // Get plasticity flags
+                const auto& flags = syn->getPlasticityFlags();
+                uint8_t plasticityFlagByte = 0;
+                if (flags.hebbian) plasticityFlagByte |= 0x01;
+                if (flags.stdp) plasticityFlagByte |= 0x02;
+                if (flags.reward_modulated) plasticityFlagByte |= 0x04;
+                synapseData.plasticityFlags.push_back(plasticityFlagByte);
+                
+                // Get eligibility trace
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                
+                // Get efficacy
+                synapseData.efficacy.push_back(syn->getEfficacy());
+                
+                // Get short-term plasticity state
+                // Note: shortTermDepression and shortTermFacilitation are internal
+                // state variables that would need to be exposed via Synapse API
+                // For now, we'll default to initial values (1.0f, 0.0f)
+                synapseData.shortTermDepression.push_back(1.0f);
+                synapseData.shortTermFacilitation.push_back(0.0f);
             }
         }
         
@@ -895,9 +915,97 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - recreate synapses from checkpoint data
+        size_t loadedCount = 0;
+        for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+            NeuronId sourceNeuron(synapseData.sourceNeuron[i]);
+            NeuronId destNeuron(synapseData.destinationNeuron[i]);
+            
+            // Find regions containing the source and destination neurons
+            const NeuralRegion* sourceRegion = nullptr;
+            const NeuralRegion* destRegion = nullptr;
+            
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        if (neuron->getId() == sourceNeuron && !sourceRegion) {
+                            sourceRegion = region.get();
+                        }
+                        if (neuron->getId() == destNeuron && !destRegion) {
+                            destRegion = region.get();
+                        }
+                        if (sourceRegion && destRegion) break;
+                    }
+                    if (sourceRegion && destRegion) break;
+                }
+                if (sourceRegion && destRegion) break;
+            }
+            
+            // Skip if neurons not found (should not happen in valid checkpoints)
+            if (!sourceRegion || !destRegion) {
+                continue;
+            }
+            
+            // For each region, check if the synapse already exists
+            // If not, create a new synapse
+            SynapseId synId;
+            bool synExists = false;
+            
+            // Check source region
+            auto sourceSynapses = sourceRegion->getSynapsesFrom(sourceNeuron);
+            for (Synapse* syn : sourceSynapses) {
+                if (syn->getDestinationNeuron() == destNeuron) {
+                    synId = syn->getId();
+                    synExists = true;
+                    break;
+                }
+            }
+            
+            if (!synExists) {
+                // Create new synapse
+                synId = sourceRegion->addSynapse(sourceNeuron, destNeuron, 
+                                                 synapseData.weight[i], synapseData.delay[i]);
+                if (synId.index() == 0) {
+                    // Failed to create synapse
+                    continue;
+                }
+            }
+            
+            // Get the synapse object
+            Synapse* syn = sourceRegion->getSynapse(synId);
+            if (!syn) {
+                continue;
+            }
+            
+            // Apply all synapse properties from checkpoint
+            syn->setWeight(synapseData.weight[i]);
+            syn->setDelay(synapseData.delay[i]);
+            syn->setType(static_cast<SynapseType>(synapseData.synapseType[i]));
+            
+            // Apply plasticity flags
+            PlasticityFlags flags;
+            flags.hebbian = (synapseData.plasticityFlags[i] & 0x01) != 0;
+            flags.stdp = (synapseData.plasticityFlags[i] & 0x02) != 0;
+            flags.reward_modulated = (synapseData.plasticityFlags[i] & 0x04) != 0;
+            syn->getPlasticityFlags() = flags;
+            
+            // Apply eligibility trace
+            syn->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+            
+            // Apply efficacy
+            syn->setEfficacy(synapseData.efficacy[i]);
+            
+                // Apply short-term plasticity state
+                syn->setShortTermDepression(synapseData.shortTermDepression[i]);
+                syn->setShortTermFacilitation(synapseData.shortTermFacilitation[i]);
+                
+                // Restore last spike times if needed (checkpoint doesn't store them currently)
+                // For now, they remain at -1 (unset)
+                
+                ++loadedCount;
+        }
+        
+        NLM_LOG_INFO("Loaded " + std::to_string(loadedCount) + " synapses");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

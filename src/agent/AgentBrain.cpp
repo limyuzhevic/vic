@@ -7,8 +7,8 @@ namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
+    , novelty_()
     , dopamineLevel_(0.0f)
-    , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
     , predictionError_(0.0f)
     , expectedReward_(0.0f)
@@ -20,6 +20,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Initialize novelty detector
+    if (brain_) {
+        novelty_.initialize(brain_.get());
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -124,23 +129,16 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
-        }
-        
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
+    // Detect novelty using Novelty class
+    if (!vision.empty() && !previousVision_.empty()) {
+        novelty_.detectNovelty(vision, previousVision_);
     }
+    
+    // Update novelty level from detector
+    noveltyLevel_ = novelty_.getLevel();
+    
+    // Store previous vision for next comparison
+    previousVision_ = vision;
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {

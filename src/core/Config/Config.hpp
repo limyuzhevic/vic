@@ -5,11 +5,23 @@
 #include <vector>
 #include <variant>
 #include <optional>
-
-namespace nlm {
+#include <filesystem>
 
 // Forward declarations
 class Config;
+
+namespace nlm {
+
+// File format detection
+enum class FileFormat {
+    Unknown,
+    JSON,
+    YAML,
+    SimpleKeyValue,
+    Properties,
+    Ini,
+    Cfg
+};
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -20,7 +32,8 @@ using ConfigValue = std::variant<
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<std::string>,
+    std::vector<bool>
 >;
 
 // Configuration source
@@ -100,6 +113,24 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML parsing helpers (declared later)
+    friend class ConfigConverter;
+};
+
+// Helper functions for JSON/YAML conversion
+class ConfigConverter {
+public:
+    static std::optional<ConfigValue> jsonValueToConfigValue(const nlohmann::json& j);
+    static nlohmann::json configValueToJsonValue(const ConfigValue& value);
+    static std::optional<ConfigValue> yamlValueToConfigValue(const YAML::Node& node);
+    static void configValueToYamlNode(const ConfigValue& value, YAML::Node& node);
+    
+    static std::string getFileExtension(const std::string& filepath);
+    static bool isJSONFile(const std::string& filepath);
+    static bool isYAMLFile(const std::string& filepath);
+    static bool isSimpleFormatFile(const std::string& filepath);
+    static FileFormat detectFileFormat(const std::string& filepath);
 };
 
 } // namespace nlm

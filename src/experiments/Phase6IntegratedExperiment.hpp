@@ -84,6 +84,13 @@ struct Phase6Config {
     bool enableReplay;
     bool enableDevelopment;
     std::string checkpointPath;
+    std::string outputFormat;
+    bool verbose;
+    bool quickMode;
+    bool saveConfiguration;
+    bool listCheckpoints;
+    bool loadCheckpoint;
+    std::string checkpointFile;
     
     Phase6Config()
         : maxSteps(10000)
@@ -93,7 +100,14 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , checkpointPath("./checkpoint_test.bin")
+        , outputFormat("text")
+        , verbose(false)
+        , quickMode(false)
+        , saveConfiguration(false)
+        , listCheckpoints(false)
+        , loadCheckpoint(false)
+        , checkpointFile("") {}
 };
 
 /**

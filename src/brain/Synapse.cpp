@@ -62,7 +62,9 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->lastPostSpikeTime = -1.0f;
 }
 
-Synapse::~Synapse() = default;
+Synapse::~Synapse() {
+    delete pImpl;
+}
 
 Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -228,6 +230,42 @@ void Synapse::reset() {
     pImpl->postSpikeHistory.clear();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->shortTermDepression = 1.0f;
+    pImpl->shortTermFacilitation = 0.0f;
+    pImpl->lastPreSpikeTime = -1.0f;
+    pImpl->lastPostSpikeTime = -1.0f;
+}
+
+float Synapse::getShortTermDepression() const {
+    return pImpl->shortTermDepression;
+}
+
+float Synapse::getShortTermFacilitation() const {
+    return pImpl->shortTermFacilitation;
+}
+
+void Synapse::setShortTermDepression(float depression) {
+    pImpl->shortTermDepression = std::clamp(depression, 0.0f, 1.0f);
+}
+
+void Synapse::setShortTermFacilitation(float facilitation) {
+    pImpl->shortTermFacilitation = std::clamp(facilitation, 0.0f, 1.0f);
+}
+
+float Synapse::getLastPreSpikeTime() const {
+    return pImpl->lastPreSpikeTime;
+}
+
+float Synapse::getLastPostSpikeTime() const {
+    return pImpl->lastPostSpikeTime;
+}
+
+void Synapse::setLastPreSpikeTime(float time) {
+    pImpl->lastPreSpikeTime = time;
+}
+
+void Synapse::setLastPostSpikeTime(float time) {
+    pImpl->lastPostSpikeTime = time;
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
