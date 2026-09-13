@@ -1,11 +1,10 @@
+// This is the COMPLETE main.cpp file with advanced command-line options implementation
+
 // NLM (熙然) - Neural Learning Machine
 // Phase 2: Real Neural Computation
 //
 // This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// - Leaky Integrate-and-Fire (LIF) neuronsn// - Event-driven spike propagation with synaptic delaysn// - STDP and Hebbian plasticityn// - Structural plasticity (synaptogenesis/pruning)
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -18,6 +17,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "experiments/CheckpointSystem.hpp"
 
 #include <iostream>
 #include <memory>
@@ -28,24 +28,37 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+// Print detailed help message
+void printHelp() {
+    std::cout << "\n" << std::string(70, '=') << "\n";
+    std::cout << "  NLM Phase 2: Advanced Command-Line Options\n";
+    std::cout << std::string(70, '=') << "\n\n";
+    
+    std::cout << "Core Options:\n";
+    std::cout << "  --config=FILE       Configuration file path (default: configs/default.cfg)\n";
+    std::cout << "  --seed=NUMBER       Random seed override (e.g., --seed=12345)\n";
+    std::cout << "  --steps=NUMBER      Simulation steps (overrides config)\n";
+    std::cout << "  --verbose=LEVEL     Verbosity level (0-3, 0=silent, 3=debug)\n\n";
+    
+    std::cout << "Advanced Options:\n";
+    std::cout << "  --network-topology=TYPE  Custom network topology (ring, grid, small-world)\n";
+    std::cout << "  --plasticity-config=FILE  Advanced plasticity rule settings file\n";
+    std::cout << "  --checkpoint-interval=NUMBER  Automatic checkpoint saving interval\n";
+    std::cout << "  --neuromodulation=TYPE   Neuromodulation configuration (dopamine, curiosity, novelty)\n";
+    std::cout << "  --development-stage=STAGE  Force developmental stage (initial, mature, aging)\n";
+    std::cout << "  --environment=TYPE    Environment type and parameters (default, grid, maze, open-field)\n\n";
+    
+    std::cout << "Power User Options:\n";
+    std::cout << "  --script=FILE        Run from Python script or configuration file\n";
+    std::cout << "  --telemetry          Enable detailed telemetry/logging\n";
+    std::cout << "  --performance-profile=TYPE  Profile specific performance aspects (cpu, memory, network)\n";
+    std::cout << "  --memory-limit=NUMBER  Memory usage limits in MB\n";
+    std::cout << "  --debug-mode         Enable debug features (neuron visualization, step-by-step execution)\n\n";
+    
+    std::cout << "Examples:\n";
+    std::cout << "  ./nlm --config=my_config.cfg --seed=123 --steps=5000 --verbose=2\n";
+    std::cout << "  ./nlm --network-topology=small-world --plasticity-config=advanced.cfg --checkpoint-interval=100\n";
+    std::cout << "  ./nlm --environment=open-field --neuromodulation=curiosity --debug-mode\n";
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -267,7 +280,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+                        " before: " + std::to_string(beforeWeights[i]));
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -301,8 +314,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
     }
     
     // Check if weights increased (LTP)
@@ -322,6 +335,15 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Check for help flag
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        }
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -343,18 +365,83 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
+    // Parse advanced command-line options
+    int64_t seedOverride = -1;
+    int64_t stepsOverride = -1;
+    int64_t verboseLevel = 1;  // Default verbosity
+    std::string networkTopology;
+    std::string plasticityConfig;
+    int64_t checkpointInterval = -1;
+    std::string neuromodulationType;
+    std::string developmentStage;
+    std::string environmentType;
+    std::string scriptFile;
+    bool enableTelemetry = false;
+    std::string performanceProfile;
+    int64_t memoryLimit = -1;
+    bool enableDebugMode = false;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                
+                // Core options
+                if (key == "seed") {
+                    seedOverride = std::stoll(value);
+                } else if (key == "steps") {
+                    stepsOverride = std::stoll(value);
+                } else if (key == "verbose") {
+                    verboseLevel = std::stoll(value);
+                } 
+                // Advanced options
+                else if (key == "network-topology") {
+                    networkTopology = value;
+                } else if (key == "plasticity-config") {
+                    plasticityConfig = value;
+                } else if (key == "checkpoint-interval") {
+                    checkpointInterval = std::stoll(value);
+                } else if (key == "neuromodulation") {
+                    neuromodulationType = value;
+                } else if (key == "development-stage") {
+                    developmentStage = value;
+                } else if (key == "environment") {
+                    environmentType = value;
+                } 
+                // Power user options
+                else if (key == "script") {
+                    scriptFile = value;
+                } else if (key == "telemetry") {
+                    enableTelemetry = true;
+                } else if (key == "performance-profile") {
+                    performanceProfile = value;
+                } else if (key == "memory-limit") {
+                    memoryLimit = std::stoll(value);
+                } else if (key == "debug-mode") {
+                    enableDebugMode = true;
+                }
+                // Legacy --config handling
+                else if (key == "config") {
+                    configFile = value;
+                }
+            } else {
+                // Handle boolean flags
+                if (arg == "--telemetry") {
+                    enableTelemetry = true;
+                } else if (arg == "--debug-mode") {
+                    enableDebugMode = true;
+                }
             }
         }
     }
+    
+    // Try to load from file if provided
+    std::string configFile = "configs/default.cfg";
     
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
@@ -363,8 +450,49 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Apply overrides to config
+    if (seedOverride != -1) {
+        config->set("random_seed", seedOverride, ConfigSource::CommandLine);
+    }
+    if (stepsOverride != -1) {
+        config->set("max_simulation_steps", stepsOverride, ConfigSource::CommandLine);
+    }
+    if (verboseLevel >= 0) {
+        config->set("log_level", static_cast<int>(verboseLevel), ConfigSource::CommandLine);
+    }
+    if (!networkTopology.empty()) {
+        config->set("network_topology", networkTopology, ConfigSource::CommandLine);
+    }
+    if (!plasticityConfig.empty()) {
+        config->set("plasticity_config_file", plasticityConfig, ConfigSource::CommandLine);
+    }
+    if (checkpointInterval != -1) {
+        config->set("checkpoint_interval", checkpointInterval, ConfigSource::CommandLine);
+    }
+    if (!neuromodulationType.empty()) {
+        config->set("neuromodulation_type", neuromodulationType, ConfigSource::CommandLine);
+    }
+    if (!developmentStage.empty()) {
+        config->set("developmental_stage", developmentStage, ConfigSource::CommandLine);
+    }
+    if (!environmentType.empty()) {
+        config->set("environment_type", environmentType, ConfigSource::CommandLine);
+    }
+    if (!scriptFile.empty()) {
+        config->set("script_file", scriptFile, ConfigSource::CommandLine);
+    }
+    if (enableTelemetry) {
+        config->set("enable_telemetry", true, ConfigSource::CommandLine);
+    }
+    if (!performanceProfile.empty()) {
+        config->set("performance_profile", performanceProfile, ConfigSource::CommandLine);
+    }
+    if (memoryLimit != -1) {
+        config->set("memory_limit_mb", memoryLimit, ConfigSource::CommandLine);
+    }
+    if (enableDebugMode) {
+        config->set("enable_debug_mode", true, ConfigSource::CommandLine);
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);

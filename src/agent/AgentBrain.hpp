@@ -3,6 +3,7 @@
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
+#include "../cognition/NeuralPlanner.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
@@ -11,6 +12,7 @@ namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Uses NeuralPlanner for goal-directed action planning
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -29,6 +31,7 @@ public:
     void processSensoryInput(const SensoryPercept& percept);
     
     // Decode brain motor activity into motor command
+    // Uses NeuralPlanner for goal-directed action planning
     MotorCommand decodeMotorCommand();
     
     // Apply neuromodulation based on reward
@@ -55,8 +58,9 @@ public:
     // Reset agent for new episode
     void reset();
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Neural planner configuration
+    void setPlanningDepth(size_t depth) { neuralPlanner_.setPlanningDepth(depth); }
+    void setCurrentGoal(const std::vector<float>& goal) { neuralPlanner_.setCurrentGoal(goal); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -68,7 +72,7 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
-    
+
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -77,6 +81,7 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    std::shared_ptr<NeuralPlanner> neuralPlanner_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -112,6 +117,9 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Current sensory state for planning
+    std::vector<float> currentSensoryState_;
 };
 
 } // namespace nlm

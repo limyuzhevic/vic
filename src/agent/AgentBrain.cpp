@@ -7,6 +7,7 @@ namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
+    , neuralPlanner_(std::make_shared<NeuralPlanner>())
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -20,6 +21,12 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Initialize neural planner with brain reference
+    if (brain_ && neuralPlanner_) {
+        neuralPlanner_->initialize(brain_.get());
+        NLM_LOG_INFO("NeuralPlanner integrated with AgentBrain");
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -150,16 +157,46 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_ || !neuralPlanner_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
+    // Get current sensory state for planning
+    // This would typically come from recent percepts
+    std::vector<float> currentState;
+    // For now, we'll use the stored current sensory state
+    // In a real implementation, this would be updated from the latest percept
     
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+    // Set planning depth if not already configured
+    static bool plannerConfigured = false;
+    if (!plannerConfigured) {
+        neuralPlanner_->setPlanningDepth(3);
+        plannerConfigured = true;
     }
     
-    return decoded;
+    // Plan action using neural planner
+    // Target reward could be derived from expected reward
+    float targetReward = expectedReward_ > 0 ? expectedReward_ : 0.5f;
+    
+    ActionType plannedAction = neuralPlanner_->planAction(currentState, targetReward);
+    
+    // Convert ActionType to MotorCommand
+    switch (plannedAction) {
+        case ActionType::MoveForward: return MotorCommand::MoveForward;
+        case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+        case ActionType::MoveLeft: return MotorCommand::TurnLeft;  // Note: mapping
+        case ActionType::MoveRight: return MotorCommand::TurnRight;
+        case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+        case ActionType::TurnRight: return MotorCommand::TurnRight;
+        case ActionType::Look: return MotorCommand::MoveForward;  // Use forward for look
+        case ActionType::LookUp: return MotorCommand::Interact;  // Use interact for look up
+        case ActionType::LookDown: return MotorCommand::Wait;  // Use wait for look down
+        case ActionType::Interact: return MotorCommand::Interact;
+        case ActionType::Eat: return MotorCommand::Interact;
+        case ActionType::Drink: return MotorCommand::Interact;
+        case ActionType::Rest: return MotorCommand::Wait;
+        case ActionType::Wait: return MotorCommand::Wait;
+        case ActionType::Custom: return MotorCommand::Wait;
+        default: return MotorCommand::Wait;
+    }
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
@@ -345,6 +382,42 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+// Update current sensory state from percept
+void AgentBrain::updateSensoryState(const SensoryPercept& percept) {
+    // Convert percept to state vector format expected by neural planner
+    // This includes vision, touch, internal, and proprioception signals
+    std::vector<float> state;
+    
+    // Vision data (assuming 16x16 grid = 256 values)
+    const auto& vision = percept.getVision();
+    state.insert(state.end(), vision.begin(), vision.end());
+    
+    // Touch data (assuming 8 touch sensors)
+    const auto& touch = percept.getTouch();
+    state.insert(state.end(), touch.begin(), touch.end());
+    
+    // Internal signals (assuming 4 signals)
+    const auto& internal = percept.getInternal();
+    state.insert(state.end(), internal.begin(), internal.end());
+    
+    // Proprioception (assuming 6 signals)
+    const auto& proprio = percept.getProprioception();
+    state.insert(state.end(), proprio.begin(), proprio.end());
+    
+    // Store current state
+    currentSensoryState_ = state;
+    
+    // Update neural planner's internal state
+    if (neuralPlanner_) {
+        neuralPlanner_->setCurrentGoal(currentSensoryState_);  // Self as goal to reach
+    }
+}
+
+// Get current sensory state for planning
+std::vector<float> AgentBrain::getCurrentSensoryState() const {
+    return currentSensoryState_;
 }
 
 } // namespace nlm

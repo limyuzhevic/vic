@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,40 +20,162 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        clear();
+        
+        if (!jsonData.is_object()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        for (const auto& [key, value] : jsonData.items()) {
+            ConfigValue configValue;
+            ConfigSource source = ConfigSource::File;
+            std::string description = "";
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            if (value.is_object() && value.contains("value") && value.contains("source")) {
+                // Object with metadata
+                if (value["value"].is_string()) {
+                    configValue = value["value"].get<std::string>();
+                } else if (value["value"].is_number_integer()) {
+                    configValue = value["value"].get<int>();
+                } else if (value["value"].is_number_unsigned()) {
+                    configValue = value["value"].get<int64_t>();
+                } else if (value["value"].is_number()) {
+                    configValue = value["value"].get<double>();
+                } else if (value["value"].is_boolean()) {
+                    configValue = value["value"].get<bool>();
+                } else if (value["value"].is_array()) {
+                    // Try to determine array element type
+                    auto arr = value["value"].get<std::vector<nlohmann::json>>();
+                    if (arr.empty()) {
+                        configValue = std::vector<int>{};
+                    } else {
+                        // Check if all elements are numbers
+                        bool allInt = true;
+                        for (const auto& elem : arr) {
+                            if (!elem.is_number_integer()) {
+                                allInt = false;
+                                break;
+                            }
+                        }
+                        if (allInt) {
+                            configValue = arr.get<std::vector<int>>();
+                        } else {
+                            // Check if all elements are floats
+                            bool allFloat = true;
+                            for (const auto& elem : arr) {
+                                if (!elem.is_number()) {
+                                    allFloat = false;
+                                    break;
+                                }
+                            }
+                            if (allFloat) {
+                                configValue = arr.get<std::vector<double>>();
+                            } else {
+                                configValue = arr.get<std::vector<std::string>>();
+                            }
+                        }
+                    }
+                }
+                
+                if (value.contains("source")) {
+                    int sourceVal = value["source"].get<int>();
+                    if (sourceVal >= 0 && sourceVal <= 3) {
+                        source = static_cast<ConfigSource>(sourceVal);
+                    }
+                }
+                
+                if (value.contains("description")) {
+                    description = value["description"].get<std::string>();
+                }
+            } else {
+                // Simple value
+                if (value.is_string()) {
+                    configValue = value.get<std::string>();
+                } else if (value.is_number_integer()) {
+                    configValue = value.get<int>();
+                } else if (value.is_number_unsigned()) {
+                    configValue = value.get<int64_t>();
+                } else if (value.is_number()) {
+                    configValue = value.get<double>();
+                } else if (value.is_boolean()) {
+                    configValue = value.get<bool>();
+                } else if (value.is_array()) {
+                    auto arr = value.get<std::vector<nlohmann::json>>();
+                    if (arr.empty()) {
+                        configValue = std::vector<int>{};
+                    } else {
+                        bool allInt = true;
+                        for (const auto& elem : arr) {
+                            if (!elem.is_number_integer()) {
+                                allInt = false;
+                                break;
+                            }
+                        }
+                        if (allInt) {
+                            configValue = arr.get<std::vector<int>>();
+                        } else {
+                            bool allFloat = true;
+                            for (const auto& elem : arr) {
+                                if (!elem.is_number()) {
+                                    allFloat = false;
+                                    break;
+                                }
+                            }
+                            if (allFloat) {
+                                configValue = arr.get<std::vector<double>>();
+                            } else {
+                                configValue = arr.get<std::vector<std::string>>();
+                            }
+                        }
+                    }
+                } else {
+                    return false; // Unsupported value type
+                }
             }
             
-            set(key, value, ConfigSource::File);
+            set(key, configValue, source);
+            setDescription(key, description);
         }
+        
+        return true;
+        
+    } catch (const nlohmann::json::parse_error& e) {
+        return false;
+    } catch (const std::exception& e) {
+        return false;
     }
-    
-    return true;
+}
+
+void Config::setDescription(const std::string& key, const std::string& description) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    if (it != pImpl->entries.end()) {
+        it->description = description;
+    }
+}
+
+bool Config::getDescription(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    if (it != pImpl->entries.end()) {
+        return it->description;
+    }
+    return "";
+}
+
+bool Config::hasDescription(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    return it != pImpl->entries.end() && !it->description.empty();
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,11 +207,60 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    nlohmann::json jsonData;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        nlohmann::json entryJson;
+        
+        if (entry.description.empty()) {
+            // Simple value entry
+            if (std::holds_alternative<int>(entry.value)) {
+                entryJson = entry.value.get<int>();
+            } else if (std::holds_alternative<int64_t>(entry.value)) {
+                entryJson = entry.value.get<int64_t>();
+            } else if (std::holds_alternative<double>(entry.value)) {
+                entryJson = entry.value.get<double>();
+            } else if (std::holds_alternative<bool>(entry.value)) {
+                entryJson = entry.value.get<bool>();
+            } else if (std::holds_alternative<std::string>(entry.value)) {
+                entryJson = entry.value.get<std::string>();
+            } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+                entryJson = entry.value.get<std::vector<int>>();
+            } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+                entryJson = entry.value.get<std::vector<double>>();
+            } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+                entryJson = entry.value.get<std::vector<std::string>>();
+            }
+        } else {
+            // Object with metadata
+            nlohmann::json valueJson;
+            if (std::holds_alternative<int>(entry.value)) {
+                valueJson = entry.value.get<int>();
+            } else if (std::holds_alternative<int64_t>(entry.value)) {
+                valueJson = entry.value.get<int64_t>();
+            } else if (std::holds_alternative<double>(entry.value)) {
+                valueJson = entry.value.get<double>();
+            } else if (std::holds_alternative<bool>(entry.value)) {
+                valueJson = entry.value.get<bool>();
+            } else if (std::holds_alternative<std::string>(entry.value)) {
+                valueJson = entry.value.get<std::string>();
+            } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+                valueJson = entry.value.get<std::vector<int>>();
+            } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+                valueJson = entry.value.get<std::vector<double>>();
+            } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+                valueJson = entry.value.get<std::vector<std::string>>();
+            }
+            
+            entryJson["value"] = valueJson;
+            entryJson["source"] = static_cast<int>(entry.source);
+            entryJson["description"] = entry.description;
+        }
+        
+        jsonData[entry.key] = entryJson;
     }
     
+    file << jsonData.dump(2) << std::endl;
     return true;
 }
 

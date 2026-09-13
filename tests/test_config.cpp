@@ -2,6 +2,8 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <fstream>
+#include <nlohmann/json.hpp>
 
 namespace test_config {
 
@@ -78,12 +80,91 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigJsonLoadSave() {
+    nlm::Config config;
+    
+    config.set("test_int", 42, nlm::ConfigSource::Runtime);
+    config.set("test_double", 3.14, nlm::ConfigSource::Runtime);
+    config.set("test_string", "hello world", nlm::ConfigSource::Runtime);
+    config.set("test_bool", true, nlm::ConfigSource::Runtime);
+    config.set("test_vector", std::vector<int>({1, 2, 3}), nlm::ConfigSource::Runtime);
+    config.setDescription("test_int", "Test integer value");
+    
+    // Save to temporary file
+    std::ofstream outfile("test_config.json");
+    config.saveToFile("test_config.json");
+    outfile.close();
+    
+    // Clear and load back
+    config.clear();
+    assert(config.loadFromFile("test_config.json"));
+    
+    // Verify values
+    auto intVal = config.get<int>("test_int");
+    assert(intVal.has_value());
+    assert(*intVal == 42);
+    
+    auto doubleVal = config.get<double>("test_double");
+    assert(doubleVal.has_value());
+    assert(*doubleVal > 3.13 && *doubleVal < 3.15);
+    
+    auto stringVal = config.get<std::string>("test_string");
+    assert(stringVal.has_value());
+    assert(*stringVal == "hello world");
+    
+    auto boolVal = config.get<bool>("test_bool");
+    assert(boolVal.has_value());
+    assert(*boolVal == true);
+    
+    auto vectorVal = config.get<std::vector<int>>("test_vector");
+    assert(vectorVal.has_value());
+    assert(vectorVal->size() == 3);
+    assert((*vectorVal)[0] == 1 && (*vectorVal)[1] == 2 && (*vectorVal)[2] == 3);
+    
+    // Check metadata was preserved
+    assert(config.hasDescription("test_int"));
+    assert(config.getDescription("test_int") == "Test integer value");
+    
+    // Clean up
+    std::remove("test_config.json");
+    
+    std::cout << "    testConfigJsonLoadSave passed" << std::endl;
+}
+
+void testConfigJsonErrorHandling() {
+    nlm::Config config;
+    
+    // Test invalid JSON file
+    std::ofstream invalidFile("invalid_config.json");
+    invalidFile << "invalid json content";
+    invalidFile.close();
+    
+    assert(!config.loadFromFile("invalid_config.json"));
+    
+    // Test empty JSON file
+    std::ofstream emptyFile("empty_config.json");
+    emptyFile.close();
+    
+    assert(!config.loadFromFile("empty_config.json"));
+    
+    // Test non-existent file
+    assert(!config.loadFromFile("non_existent_config.json"));
+    
+    // Clean up
+    std::remove("invalid_config.json");
+    std::remove("empty_config.json");
+    
+    std::cout << "    testConfigJsonErrorHandling passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigJsonLoadSave();
+    testConfigJsonErrorHandling();
 }
 
 } // namespace test_config
