@@ -134,8 +134,15 @@ public:
     size_t getTotalNeuronCount() const;
     size_t getTotalSynapseCount() const;
     size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
+    size_t getFiringNeuronCount() const;  // Neurons that fired in current step
+    size_t getNeuronCount() const;        // Total neurons in brain (convenience)
     float getAverageFiringRate() const;
+    
+    // Additional convenience methods
+    size_t getTotalSpikeCount() const;
+    
+    // Additional convenience methods
+    size_t getTotalSpikeCount() const;
     
     // ========== MEMORY SYSTEMS ==========
     

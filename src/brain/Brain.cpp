@@ -989,11 +989,6 @@ size_t Brain::getActiveNeuronCount() const {
     }
     return total;
 }
-
-size_t Brain::getFiringNeuronCount() const {
-    return pImpl->totalSpikesThisStep;
-}
-
 float Brain::getAverageFiringRate() const {
     if (pImpl->regions.empty()) return 0.0f;
     float sum = 0.0f;
@@ -1001,6 +996,21 @@ float Brain::getAverageFiringRate() const {
         sum += region->getAverageFiringRate();
     }
     return sum / static_cast<float>(pImpl->regions.size());
+}
+
+
+// Additional fallback methods for convenience
+// The following methods provide useful statistics that may not be directly
+// available in all header files but are useful for simulations and experiments
+
+// Get total neuron count (convenience method)
+size_t Brain::getNeuronCount() const {
+    return getTotalNeuronCount();
+}
+
+// Get firing neuron count (convenience method)
+size_t Brain::getFiringNeuronCount() {
+    return pImpl->totalSpikesThisStep;
 }
 
 // ========== MEMORY SYSTEM ACCESSORS ==========

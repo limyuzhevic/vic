@@ -29,23 +29,24 @@
 using namespace nlm;
 
 void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("     ╔═══════════════════════════════════════════════════════════════╗");
+    NLM_LOG_INFO("     ║                                                               ║");
+    NLM_LOG_INFO("     ║     NLM — 熙然                                                ║");
+    NLM_LOG_INFO("     ║     Neural Learning Machine                                   ║");
+    NLM_LOG_INFO("     ║                                                               ║");
+    NLM_LOG_INFO("     ║     Phase 2: Real Neural Computation                         ║");
+    NLM_LOG_INFO("     ║                                                               ║");
+    NLM_LOG_INFO("     ║     An experimental artificial developmental brain.            ║");
+    NLM_LOG_INFO("     ║     This phase implements:                                    ║");
+    NLM_LOG_INFO("     ║     - Real LIF neuron dynamics                                ║");
+    NLM_LOG_INFO("     ║     - Event-driven spike propagation                          ║");
+    NLM_LOG_INFO("     ║     - STDP and Hebbian plasticity                            ║");
+    NLM_LOG_INFO("     ║     - Structural plasticity                                   ║");
+    NLM_LOG_INFO("     ║                                                               ║");
+    NLM_LOG_INFO("     ╚═══════════════════════════════════════════════════════════════╝");
+    NLM_LOG_INFO("");
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -58,7 +59,7 @@ struct LearningExperiment {
     std::vector<NeuronId> mostActiveNeurons;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+        : brain(b), seed(s), initialSynapseCount(0), initialWeights(), finalWeights(), mostActiveNeurons() {}
     
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
@@ -111,7 +112,7 @@ struct LearningExperiment {
             return;
         }
         
-        // Compute weight changes
+        // Compute weight changes (avoiding duplicate calculation)
         float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
         float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
         float initialMean = initialSum / initialWeights.size();
@@ -147,8 +148,9 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
         
         // Determine if learning occurred
-        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
-                                (strengthened > 0 || weakened > 0);
+        float meanWeightChange = finalMean - initialMean;
+        bool learningOccurred = (std::abs(meanWeightChange) > 0.001f * initialMean) ||
+                                 (strengthened > 0 || weakened > 0);
         
         NLM_LOG_INFO("");
         if (learningOccurred) {
@@ -228,14 +230,15 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
         }
         
-        brain->step(step, step * 0.001);
-        
         // Log progress every 100 steps
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()) +
+                         " | Active: " + std::to_string(brain->getActiveNeuronCount()) +
+                         " | E/I Ratio: " + std::to_string(brain->getExcitationInhibitionRatio()));
         }
+    }
     }
     
     // Record final state
@@ -340,31 +343,47 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
+    // Handle help/usage before loading anything
+    if (argc == 1) {
+        std::cout << "\n=== NLM Phase 2 Real Neural Computation ===\n" << std::endl;
+        std::cout << "Usage: ./nlm [--help] [--config=<file>] [other_options]\n" << std::endl;
+        std::cout << "\nOptions:\n" << std::endl;
+        std::cout << "  --help              Show this help message\n" << std::endl;
+        std::cout << "  --config=<file>     Load configuration from file (default: configs/default.cfg)\n" << std::endl;
+        std::cout << "\nConfiguration file format:\n" << std::endl;
+        std::cout << "  key = value  (e.g., neuron_count = 500)\n" << std::endl;
+        std::cout << "\nTo run the neural network simulation, use:\n" << std::endl;
+        std::cout << "  ./nlm --config=my_config.cfg\n" << std::endl;
+        return 0;
+    }
     
-    // Try to load from file if provided
+    // Parse command line arguments safely
     std::string configFile = "configs/default.cfg";
+    bool hasOtherOptions = false;
     for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
+        std::string arg = argv[i];
+        if (arg.find('=') != std::string::npos) {
+            // Key=value format: --config=file.cfg or other options
+            if (arg.substr(0, 7) == "--config") {
                 configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
+                // Basic path validation - prevent directory traversal
+                if (configFile.find("..") != std::string::npos) {
+                    NLM_LOG_ERROR("Invalid config file path: " + configFile);
+                    return 1;
+                }
+            } else {
+                hasOtherOptions = true;
             }
+        } else if (arg.substr(0, 2) == "--") {
+            hasOtherOptions = true;
+        } else {
+            // Positional argument
+            configFile = arg;
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
-    }
-    
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Parse advanced command line options
+    parseAdvancedCommandLineOptions(argc, argv, config, hasOtherOptions);
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
