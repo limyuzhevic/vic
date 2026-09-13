@@ -142,24 +142,99 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    py::class_<Config>(m, "Config", R"pbdoc(
+        Configuration class for NLM system.
+        
+        This class provides access to neural learning machine configuration parameters.
+        Configuration can be loaded from files, command line arguments, or set at runtime.
+        Values include basic types (int, float, bool, string) and collections (vector of primitives).
+        
+        Usage:
+            config = pynlm.Config()
+            config.loadFromFile("settings.conf")
+            value = config.getOr("learning_rate", 0.01)
+            config.set("debug_mode", True)
+    )pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file. Returns True on success."
+             " Supports simple key=value format with comments."
+             " Example: config.loadFromFile('config.txt')")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+           "Load configuration from command line arguments."
+           " Accepts --key=value and -key value formats."
+           " Example: config.loadFromArgs(sys.argv)")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file. Returns True on success."
+             " Example: config.saveToFile('output.conf')")
         .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
+             "Check if a configuration key exists. Returns boolean."
+             " Example: if config.has('learning_rate'):")
         .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+             "Get all configuration keys as a list of strings."
+             " Example: keys = config.getKeys()")
         .def("clear", &Config::clear,
-             "Clear all configuration entries")
+             "Clear all configuration entries. Removes all settings.")
         .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+             "Get a summary string of the configuration."
+             " Shows all key-value pairs and their sources.
+             " Example: print(config.summary())")
+        .def("get", [](Config& self, const std::string& key) {
+            auto result = self.get<std::string>(key);
+            if (result) return *result;
+            return std::string("");
+        }, py::arg("key"),
+             "Get a string configuration value. Returns empty string if not found."
+             " Example: learning_rate = config.get('learning_rate')")
+        .def("getInt", [](Config& self, const std::string& key, int defaultValue = 0) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = 0,
+           "Get an integer configuration value. Returns default if not found."
+           " Example: neurons = config.getInt('neuron_count', 100)")
+        .def("getFloat", [](Config& self, const std::string& key, double defaultValue = 0.0) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = 0.0,
+           "Get a float configuration value. Returns default if not found."
+           " Example: learning_rate = config.getFloat('lr', 0.001)")
+        .def("getBool", [](Config& self, const std::string& key, bool defaultValue = false) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = false,
+           "Get a boolean configuration value. Returns default if not found."
+           " Example: enabled = config.getBool('enabled', True)")
+        .def("set", &Config::set, py::arg("key"), py::arg("value"),
+             "Set a configuration value. Accepts string, int, float, bool."
+             " Example: config.set('batch_size', 32)")
+        .def("setString", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a string configuration value."
+           " Example: config.setString('model_name', 'resnet50')")
+        .def("setInt", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set an integer configuration value."
+           " Example: config.setInt('epochs', 100)")
+        .def("setFloat", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a float configuration value."
+           " Example: config.setFloat('learning_rate', 0.001)")
+        .def("setBool", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a boolean configuration value."
+           " Example: config.setBool('enable_logging', True)")
+        .def("setBatch", [](Config& self, const std::unordered_map<std::string, std::string>& configMap) {
+            return self.setBatch(configMap);
+        }, py::arg("config_map"),
+             "Set multiple configuration values at once from a dictionary."
+             " All values must be strings. Returns True if all succeeded."
+             " Example: config.setBatch({'lr': '0.001', 'batch_size': '32'})")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key."
+             " Example: config.remove('temp_setting')")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -170,7 +245,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        .def("__repr__", [](const SensoryInput& self) {
+            return "<SensoryInput type=" + std::to_string(static_cast<int>(self.getType())) +
+                   " dims=" + std::to_string(self.getDimensions()) + " timestamp=" +
+                   std::to_string(self.getTimestamp()) + ">";
+        });
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())

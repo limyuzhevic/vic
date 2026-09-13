@@ -6,6 +6,7 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -57,6 +58,7 @@ public:
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    const Brain* getBrain() const { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }

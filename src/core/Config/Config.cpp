@@ -19,12 +19,16 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
+    if (filepath.empty()) {
+        throw std::invalid_argument("Config::loadFromFile: filepath cannot be empty");
+    }
+    
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        throw std::runtime_error("Config::loadFromFile: Cannot open file: " + filepath);
     }
     
     std::string line;
@@ -56,8 +60,17 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (!argv || argc <= 0) {
+        throw std::invalid_argument("Config::loadFromArgs: Invalid argc or argv pointer");
+    }
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
+        
+        // Validate argument
+        if (arg.empty()) {
+            throw std::invalid_argument("Config::loadFromArgs: Empty argument encountered");
+        }
         
         // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
@@ -65,23 +78,41 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key and value
+                if (key.empty()) {
+                    throw std::invalid_argument("Config::loadFromArgs: Key cannot be empty");
+                }
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                throw std::invalid_argument("Config::loadFromArgs: Invalid --key=value format: " + arg);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key and value
+            if (key.empty()) {
+                throw std::invalid_argument("Config::loadFromArgs: Key cannot be empty");
+            }
             set(key, value, ConfigSource::CommandLine);
+        } else {
+            throw std::invalid_argument("Config::loadFromArgs: Invalid argument format: " + arg);
         }
     }
     return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    if (filepath.empty()) {
+        throw std::invalid_argument("Config::saveToFile: filepath cannot be empty");
+    }
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        throw std::runtime_error("Config::saveToFile: Cannot open file for writing: " + filepath);
     }
     
     for (const auto& entry : pImpl->entries) {
@@ -94,6 +125,10 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    if (key.empty()) {
+        throw std::invalid_argument("Config::get: Key cannot be empty");
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -115,6 +150,10 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    if (key.empty()) {
+        throw std::invalid_argument("Config::set: Key cannot be empty");
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -199,17 +238,65 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+bool Config::setBatch(const std::unordered_map<std::string, ConfigValue>& configMap, ConfigSource source) {
+    bool allSuccessful = true;
+    for (const auto& pair : configMap) {
+        try {
+            set(pair.first, pair.second, source);
+        } catch (const std::exception& e) {
+            // Log error but continue with other entries
+            allSuccessful = false;
+        }
+    }
+    return allSuccessful;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool Config::setBatch(const std::unordered_map<std::string, std::string>& configMap, ConfigSource source) {
+    bool allSuccessful = true;
+    for (const auto& pair : configMap) {
+        try {
+            set(pair.first, pair.second, source);
+        } catch (const std::exception& e) {
+            allSuccessful = false;
+        }
+    }
+    return allSuccessful;
+}
+
+bool Config::setBatch(const std::unordered_map<std::string, int>& configMap, ConfigSource source) {
+    bool allSuccessful = true;
+    for (const auto& pair : configMap) {
+        try {
+            set(pair.first, pair.second, source);
+        } catch (const std::exception& e) {
+            allSuccessful = false;
+        }
+    }
+    return allSuccessful;
+}
+
+bool Config::setBatch(const std::unordered_map<std::string, double>& configMap, ConfigSource source) {
+    bool allSuccessful = true;
+    for (const auto& pair : configMap) {
+        try {
+            set(pair.first, pair.second, source);
+        } catch (const std::exception& e) {
+            allSuccessful = false;
+        }
+    }
+    return allSuccessful;
+}
+
+bool Config::setBatch(const std::unordered_map<std::string, bool>& configMap, ConfigSource source) {
+    bool allSuccessful = true;
+    for (const auto& pair : configMap) {
+        try {
+            set(pair.first, pair.second, source);
+        } catch (const std::exception& e) {
+            allSuccessful = false;
+        }
+    }
+    return allSuccessful;
+}
 
 } // namespace nlm

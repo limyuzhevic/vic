@@ -2,6 +2,7 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -20,40 +21,51 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Validate brain pointer
+    if (!brain_) {
+        throw std::invalid_argument("AgentBrain: brain pointer cannot be null");
+    }
+    
     // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            NeuronType type = pop->getNeuronType();
+            
+            if (type == NeuronType::Motor) {
+                for (Neuron* n : pop->getNeurons()) {
+                    // Check null neuron pointer
+                    if (!n) {
+                        continue;
                     }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
+                    // Distribute motor neurons to different action groups
+                    size_t idx = motorForward_.size() + motorBackward_.size() + 
+                                motorTurnLeft_.size() + motorTurnRight_.size() +
+                                motorInteract_.size() + motorWait_.size();
+                    
+                    switch (idx % 6) {
+                        case 0: motorForward_.push_back(n); break;
+                        case 1: motorBackward_.push_back(n); break;
+                        case 2: motorTurnLeft_.push_back(n); break;
+                        case 3: motorTurnRight_.push_back(n); break;
+                        case 4: motorInteract_.push_back(n); break;
+                        case 5: motorWait_.push_back(n); break;
+                    }
+                }
+            } else if (type == NeuronType::Sensory) {
+                for (Neuron* n : pop->getNeurons()) {
+                    // Check null neuron pointer
+                    if (!n) {
+                        continue;
+                    }
+                    // Distribute sensory neurons
+                    size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
+                                sensoryInternal_.size() + sensoryProprioception_.size();
+                    
+                    switch (idx % 4) {
+                        case 0: sensoryVision_.push_back(n); break;
+                        case 1: sensoryTouch_.push_back(n); break;
+                        case 2: sensoryInternal_.push_back(n); break;
+                        case 3: sensoryProprioception_.push_back(n); break;
                     }
                 }
             }
@@ -64,6 +76,10 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
+    if (!brain_) {
+        throw std::runtime_error("AgentBrain::initialize: Brain is null");
+    }
+    
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
@@ -85,13 +101,15 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        throw std::runtime_error("AgentBrain::processSensoryInput: Brain is null");
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
+            // Check null neuron before injecting current
             float current = vision[i] * 5.0f;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
         }
@@ -150,7 +168,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_) {
+        throw std::runtime_error("AgentBrain::decodeMotorCommand: Brain is null");
+    }
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
@@ -168,10 +188,12 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
+            // Check null neuron pointer
+            if (!n) continue;
             // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
         }
-        return sum / neurons.size();
+        return neurons.empty() ? 0.0f : sum / neurons.size();
     };
     
     float forwardAct = calcActivity(motorForward_);
@@ -236,7 +258,14 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    if (!brain_ || !rewardModulationEnabled_) {
+        throw std::runtime_error("AgentBrain::applyRewardModulation: Invalid state - brain is null or reward modulation is disabled");
+    }
+    
+    // Validate parameters
+    if (std::isnan(reward) || std::isnan(predictedReward)) {
+        throw std::invalid_argument("AgentBrain::applyRewardModulation: Reward or predictedReward cannot be NaN");
+    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -252,7 +281,9 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
+        if (!region) continue;
         for (auto* syn : region->getSynapses()) {
+            if (!syn) continue;
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
@@ -280,7 +311,13 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+    if (!brain_ || !developmentEnabled_) {
+        throw std::runtime_error("AgentBrain::updateDevelopment: Invalid state - brain is null or development is disabled");
+    }
+    
+    if (timestep < 0.0) {
+        throw std::invalid_argument("AgentBrain::updateDevelopment: timestep cannot be negative");
+    }
     
     developmentalAge_ += timestep;
     

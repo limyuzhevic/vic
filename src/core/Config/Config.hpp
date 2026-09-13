@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -77,6 +78,13 @@ public:
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Batch operations
+    bool setBatch(const std::unordered_map<std::string, ConfigValue>& configMap, ConfigSource source = ConfigSource::Runtime);
+    bool setBatch(const std::unordered_map<std::string, std::string>& configMap, ConfigSource source = ConfigSource::Runtime);
+    bool setBatch(const std::unordered_map<std::string, int>& configMap, ConfigSource source = ConfigSource::Runtime);
+    bool setBatch(const std::unordered_map<std::string, double>& configMap, ConfigSource source = ConfigSource::Runtime);
+    bool setBatch(const std::unordered_map<std::string, bool>& configMap, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
