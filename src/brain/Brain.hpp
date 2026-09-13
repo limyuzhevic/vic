@@ -25,9 +25,15 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class NeuralPrediction;
+class ActionConsequencePredictor;
+class PredictionErrorSignal;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -170,10 +176,14 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
@@ -184,14 +194,15 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Advanced neuromodulation systems
+    Acetylcholine* getAcetylcholine();
+    Norepinephrine* getNorepinephrine();
+    Serotonin* getSerotonin();
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
-    void logStatus() const;
+    // Neural prediction systems
+    NeuralPrediction* getNeuralPrediction();
+    ActionConsequencePredictor* getActionConsequencePredictor();
+    PredictionErrorSignal* getPredictionErrorSignalAdvanced();
     
 private:
     struct Impl;

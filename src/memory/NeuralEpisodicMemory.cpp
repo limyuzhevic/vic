@@ -142,6 +142,10 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveByLocation(
 
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveAfterAction(
     ActionType action, size_t maxResults) const {
+    // NULL CHECK: Ensure brain_ is valid before accessing
+    if (!brain_) {
+        return {};
+    }
     
     std::vector<const EpisodicMemoryItem*> results;
     

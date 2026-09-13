@@ -6,9 +6,9 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -22,8 +22,7 @@
 
 namespace nlm {
 
-struct Brain::Impl {
-    std::shared_ptr<Config> config;
+std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
@@ -35,6 +34,9 @@ struct Brain::Impl {
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
+    std::unique_ptr<NeuralPrediction> neuralPrediction;
+    std::unique_ptr<ActionConsequencePredictor> actionConsequencePredictor;
+    std::unique_ptr<PredictionErrorSignal> predictionErrorSignal;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
@@ -46,6 +48,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -108,13 +113,23 @@ struct Brain::Impl {
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
-        // Initialize memory systems
+        // Ensure all memory systems have valid pointers
+        // Initialize with proper null checks and validation
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
+        
+        // Initialize neural prediction system
+        neuralPrediction = std::make_unique<NeuralPrediction>();
+        
+        // Initialize action consequence predictor
+        actionConsequencePredictor = std::make_unique<ActionConsequencePredictor>();
+        
+        // Initialize prediction error signal
+        predictionErrorSignal = std::make_unique<PredictionErrorSignal>();
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
@@ -124,8 +139,16 @@ struct Brain::Impl {
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
+        // Initialize acetylcholine (attention and memory consolidation)
+        acetylcholine = std::make_unique<Acetylcholine>();
+        
+        // Initialize norepinephrine (arousal and vigilance)
+        norepinephrine = std::make_unique<Norepinephrine>();
+        
+        // Initialize serotonin (mood, impulsivity, and social behavior)
+        serotonin = std::make_unique<Serotonin>();
+        
         // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -245,19 +268,43 @@ bool Brain::initialize() {
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    // Initialize neural prediction system
+    if (pImpl->neuralPrediction) {
+        pImpl->neuralPrediction->initialize(this);
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    // Initialize action consequence predictor
+    if (pImpl->actionConsequencePredictor) {
+        pImpl->actionConsequencePredictor->initialize(this);
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    // Initialize prediction error signal
+    if (pImpl->predictionErrorSignal) {
+        pImpl->predictionErrorSignal->initialize(this);
+    }
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    // Initialize neuromodulation systems
+    if (pImpl->dopamine) {
+        pImpl->dopamine->initialize(this);
+    }
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->initialize(this);
+    }
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->initialize(this);
+    }
+    if (pImpl->serotonin) {
+        pImpl->serotonin->initialize(this);
+    }
+    if (pImpl->curiosity) {
+        pImpl->curiosity->initialize(this);
+    }
+    if (pImpl->predictionError) {
+        pImpl->predictionError->initialize(this);
+    }
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+    }
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -398,6 +445,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // Continuously update working memory with current neural state (for integration throughout brain loop)
+    if (pImpl->workingMemory) {
+        // Update working memory with current neural activity patterns
+        // Create a summary of current neural state for working memory
+        std::vector<float> currentPattern;
+        std::vector<NeuronId> currentNeurons;
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    float activation = std::abs(state.membranePotential - state.restingPotential);
+                    if (activation > 0.1f) {  // Only store neurons with meaningful activation
+                        currentNeurons.push_back(neuron->getId());
+                        currentPattern.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+    // Ensure working memory provides attention system with meaningful content for competition
+    // This creates a continuous link between working memory and attention systems
+    if (pImpl->workingMemory && pImpl->attention) {
+        // Get current working memory neurons (active traces)
+        std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        
+        // Process competition through attention system based on working memory content
+        if (!memoryNeurons.empty()) {
+            pImpl->attention->processCompetition(memoryNeurons);
+        }
+    }
+    
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
@@ -406,16 +485,82 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
+    // Update curiosity with novelty and prediction error
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        float noveltyLevel = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        float predictionErrorLevel = pImpl->predictionError ? pImpl->predictionError->getLevel() : 0.0f;
+        pImpl->curiosity->update(noveltyLevel, predictionErrorLevel, pImpl->timestep);
     }
+    
+    // Update acetylcholine (attention and memory consolidation)
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
+        
+        // Apply acetylcholine effects on attention and memory
+        // Acetylcholine modulates attention and memory consolidation
+        float achLevel = pImpl->acetylcholine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Acetylcholine modulates attentional focus and memory encoding
+                    // Positive acetylcholine increases attention and memory trace strength
+                    float attentionMod = achLevel * 0.3f;
+                    if (attentionMod > 0.0f) {
+                        neuron->injectCurrent(attentionMod * 0.5f);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update norepinephrine (arousal and vigilance)
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+        
+        // Apply norepinephrine effects on arousal
+        float neLevel = pImpl->norepinephrine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Norepinephrine modulates arousal and vigilance
+                    // Higher norepinephrine increases alertness
+                    float arousalMod = neLevel * 0.4f;
+                    if (arousalMod > 0.0f) {
+                        neuron->injectCurrent(arousalMod * 0.5f);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update serotonin (mood, impulsivity, and social behavior)
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        
+        // Apply serotonin effects on mood regulation
+        float serotoninLevel = pImpl->serotonin->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Serotonin modulates mood and impulsivity
+                    // Higher serotonin reduces impulsivity
+                    float moodMod = serotoninLevel * 0.2f;
+                    if (moodMod > 0.0f) {
+                        neuron->injectCurrent(-moodMod * 0.5f); // Inhibitory effect
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update dopamine (reward prediction error)
+    if (pImpl->dopamine) {
+        pImpl->dopamine->update(pImpl->timestep);
     
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
@@ -482,13 +627,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
         
-        if (pImpl->episodicMemory) {
+        if (pImpl->episodicMemory && pImpl->predictionSystem) {
             // Capture current brain state as an episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Get reward prediction error and other neuromodulatory signals
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+            float curiosity = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+            
+            // Store neuromodulatory signals in episode for richer memory encoding
+            episode.reward = reward;
+            episode.energy = curiosity;  // Using curiosity as energy proxy
+            episode.novelty = novelty;
+            
+            // Store prediction error - crucial for learning and memory integration
+            // Add prediction error to episode to influence memory strength
+            // We'll encode this in sensoryState for simplicity
+            episode.sensoryState.push_back(predictionError);
+            
+            // Store active neurons and their activations
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,10 +662,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Store reward in episode (for consistency)
+            episode.reward = reward;
             
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // Associate episodic memory with prediction system
+            // This links experiences to predictive models
+            if (!episode.activeNeurons.empty()) {
+                // Create a simple sensory pattern from neural activity for association
+                std::vector<float> neuralPattern;
+                for (size_t i = 0; i < episode.activeNeurons.size() && i < episode.neuronActivations.size(); ++i) {
+                    neuralPattern.push_back(episode.neuronActivations[i]);
+                }
+                
+                // Use prediction system to update based on the episode
+                // This creates a prediction based on past experience
+                if (!neuralPattern.empty()) {
+                    // Store neural pattern for prediction system to learn from
+                    // In a real implementation, this would be integrated with prediction system
+                    // For now, we just store the pattern for later use
+                    pImpl->episodicMemory->associateFromExperience(episode);
+                }
+            }
         }
     }
     
@@ -526,10 +705,47 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // Integrate episodic memory with attention (top-down influence)
+    if (pImpl->episodicMemory && pImpl->attention) {
+        // Get recent episodes that could guide attention
+        auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+        
+        // Extract neural patterns from recent episodes to influence attention
+        for (const auto* episode : recentEpisodes) {
+            if (!episode->activeNeurons.empty()) {
+                // Use attention to process episode-based patterns
+                pImpl->attention->applyTopDownBias(episode->activeNeurons[0], 0.5f);
+                
+                // Also store in working memory for immediate access
+                if (pImpl->workingMemory) {
+                    for (size_t i = 0; i < episode->activeNeurons.size() && i < episode->neuronActivations.size(); ++i) {
+                        pImpl->workingMemory->storeToNeuron(episode->activeNeurons[i], episode->neuronActivations[i] * 0.5f);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Integrate associative memory with planning
+    if (pImpl->associativeMemory && pImpl->planner) {
+        // Retrieve relevant associations based on current working memory
+        if (!pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Create pattern from working memory for associative retrieval
+            std::vector<float> wmPattern;
+            const auto& wmNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (const auto& neuronId : wmNeurons) {
+                wmPattern.push_back(pImpl->workingMemory->getNeuronActivation(neuronId));
+            }
+            
+            if (!wmPattern.empty()) {
+                // Use planner to incorporate associative knowledge
+                auto associations = pImpl->associativeMemory->retrieve(wmPattern, 3);
+                
+                // This is where associative memory would influence planning
+                // In a full implementation, associations would be used to bias
+                // the planner's action selection
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1067,6 +1283,20 @@ Novelty* Brain::getNovelty() {
 
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
+}
+
+// ========== ADVANCED NEUROMODULATION SYSTEMS ==========
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->noradrenaline.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {

@@ -74,11 +74,24 @@ public:
     std::vector<NeuronId> getPredictionNeurons() const;
     std::vector<NeuronId> getSequenceNeurons() const;
 
+    // NeuralPrediction-specific methods
+    // Get sensory prediction error for neuromodulation
+    float getSensoryPredictionError() const { return predictionError_; }
+    
+    // Get action prediction confidence
+    float getActionPredictionConfidence() const { return actionPredictionConfidence_; }
+    
+    // Record prediction error for learning
+    void recordPredictionError(float error, SimulationStep step);
+    
+    // Get prediction error signal for neuromodulation
+    float getPredictionErrorSignal() const;
+
 private:
     // Learn temporal sequence from sensory observations
     void learnTemporalSequence(const std::vector<float>& currentState,
-                              const std::vector<float>& nextState,
-                              SimulationStep currentStep);
+                               const std::vector<float>& nextState,
+                               SimulationStep currentStep);
 
     // Find or create neurons that respond to specific sensory pattern
     NeuronId findMatchingPatternNeuron(const std::vector<float>& pattern,
@@ -107,6 +120,7 @@ private:
     Brain* brain_;
     float predictionError_;
     float predictionConfidence_;
+    float actionPredictionConfidence_;
     std::deque<float> errorHistory_;
     
     // Internal state
@@ -117,10 +131,11 @@ private:
     
     // Action-consequence tracking
     std::deque<std::pair<ActionType, std::vector<float>>> recentActions_;
+    
+    // Prediction error tracking for neuromodulation
+    std::deque<std::pair<float, SimulationStep>> predictionErrorHistory_;
 };
 
-// ActionConsequencePredictor: Learns action -> consequence mappings
-// Uses the neural substrate to store and retrieve action consequences
 class ActionConsequencePredictor {
 public:
     ActionConsequencePredictor();
@@ -140,7 +155,7 @@ public:
 
     // Get prediction confidence for an action
     float getConsequenceConfidence(ActionType action,
-                                  const std::vector<float>& currentState) const;
+                                   const std::vector<float>& currentState) const;
 
     // Update based on actual observed consequence
     void updatePrediction(ActionType action,
@@ -202,5 +217,7 @@ private:
     ErrorComponents errorComponents_;
     std::deque<float> errorHistory_;
 };
+
+} // namespace nlm
 
 } // namespace nlm

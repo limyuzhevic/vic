@@ -199,8 +199,8 @@ void NeuralPrediction::recordAction(ActionType action, SimulationStep step) {
 }
 
 void NeuralPrediction::learnTemporalSequence(const std::vector<float>& currentState,
-                                            const std::vector<float>& nextState,
-                                            SimulationStep currentStep) {
+                                             const std::vector<float>& nextState,
+                                             SimulationStep currentStep) {
     // Find or create pattern neuron for current state
     NeuronId currentNeuron = findMatchingPatternNeuron(currentState);
     NeuronId nextNeuron = findMatchingPatternNeuron(nextState);
@@ -208,6 +208,28 @@ void NeuralPrediction::learnTemporalSequence(const std::vector<float>& currentSt
     if (currentNeuron != nextNeuron) {
         createSequenceAssociation(currentNeuron, nextNeuron, 0.8f);
     }
+}
+
+void NeuralPrediction::recordPredictionError(float error, SimulationStep step) {
+    predictionErrorHistory_.push_back({error, step});
+    if (predictionErrorHistory_.size() > 1000) {
+        predictionErrorHistory_.pop_front();
+    }
+}
+
+float NeuralPrediction::getPredictionErrorSignal() const {
+    if (predictionErrorHistory_.empty()) return 0.0f;
+    
+    // Compute neuromodulatory signal from prediction error
+    float totalError = 0.0f;
+    for (const auto& pair : predictionErrorHistory_) {
+        totalError += pair.first;
+    }
+    
+    float avgError = totalError / predictionErrorHistory_.size();
+    
+    // Convert to modulation signal (0-1, higher error = stronger modulation)
+    return std::min(1.0f, avgError * 2.0f);
 }
 
 NeuronId NeuralPrediction::findMatchingPatternNeuron(const std::vector<float>& pattern,
@@ -308,6 +330,40 @@ void NeuralPrediction::clearHistory() {
     pImpl->sequenceAssociations.clear();
 }
 
+void NeuralPrediction::learnTemporalSequence(const std::vector<float>& currentState,
+                                             const std::vector<float>& nextState,
+                                             SimulationStep currentStep) {
+    // Find or create pattern neuron for current state
+    NeuronId currentNeuron = findMatchingPatternNeuron(currentState);
+    NeuronId nextNeuron = findMatchingPatternNeuron(nextState);
+    
+    if (currentNeuron != nextNeuron) {
+        createSequenceAssociation(currentNeuron, nextNeuron, 0.8f);
+    }
+}
+
+void NeuralPrediction::recordPredictionError(float error, SimulationStep step) {
+    predictionErrorHistory_.push_back({error, step});
+    if (predictionErrorHistory_.size() > 1000) {
+        predictionErrorHistory_.pop_front();
+    }
+}
+
+float NeuralPrediction::getPredictionErrorSignal() const {
+    if (predictionErrorHistory_.empty()) return 0.0f;
+    
+    // Compute neuromodulatory signal from prediction error
+    float totalError = 0.0f;
+    for (const auto& pair : predictionErrorHistory_) {
+        totalError += pair.first;
+    }
+    
+    float avgError = totalError / predictionErrorHistory_.size();
+    
+    // Convert to modulation signal (0-1, higher error = stronger modulation)
+    return std::min(1.0f, avgError * 2.0f);
+}
+
 // ActionConsequencePredictor Implementation
 struct ActionConsequencePredictor::Impl {
     Brain* brain;
@@ -402,7 +458,7 @@ std::vector<float> ActionConsequencePredictor::predictConsequence(ActionType act
 }
 
 float ActionConsequencePredictor::getConsequenceConfidence(ActionType action,
-                                                          const std::vector<float>& currentState) const {
+                                                           const std::vector<float>& currentState) const {
     size_t matchingCount = 0;
     for (const auto& exp : pImpl->experiences) {
         if (exp.first.second == action) {

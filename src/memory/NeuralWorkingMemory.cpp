@@ -101,10 +101,16 @@ std::vector<float> NeuralWorkingMemory::retrieve() const {
 }
 
 bool NeuralWorkingMemory::contains(NeuronId neuron) const {
+    // NULL CHECK: Ensure brain_ is valid before accessing
+    if (!brain_) return false;
+    
     return std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) != memoryNeurons_.end();
 }
 
 float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
+    // NULL CHECK: Ensure brain_ is valid before accessing
+    if (!brain_) return 0.0f;
+    
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
