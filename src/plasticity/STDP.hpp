@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PlasticityRule.hpp"
+#include <string>
 
 namespace nlm {
 
@@ -29,6 +30,19 @@ public:
     
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
+    
+    // Configuration validation helpers
+    static bool validateSTDPParameters(float ltpWeight, float ltdWeight, float timeConstant);
+    static std::string getDefaultSTDPConfigDescription();
+    
+    // Get/set configurable parameters from config system
+    static constexpr float DEFAULT_LTP_WEIGHT = 0.01f;
+    static constexpr float DEFAULT_LTD_WEIGHT = 0.012f;
+    static constexpr float DEFAULT_TIME_CONSTANT = 20.0f;
+    static constexpr float MIN_TIME_CONSTANT = 1.0f;
+    static constexpr float MAX_TIME_CONSTANT = 100.0f;
+    static constexpr float MIN_WEIGHT = -1.0f;
+    static constexpr float MAX_WEIGHT = 1.0f;
     
 private:
     struct Impl;

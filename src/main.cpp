@@ -64,10 +64,14 @@ struct LearningExperiment {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
-        // Record initial weights from first region
+        // Record initial weights from first region - CHECK FOR NULL REGION
         if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+            const auto& synapses = region->getSynapses();
+            initialWeights.reserve(synapses.size());
+            for (const auto& syn : synapses) {
+                if (syn) {  // NULL CHECK
+                    initialWeights.push_back(syn->getWeight());
+                }
             }
         }
         
@@ -83,10 +87,14 @@ struct LearningExperiment {
     void recordFinalState() {
         finalWeights.clear();
         
-        // Record final weights from first region
+        // Record final weights from first region - CHECK FOR NULL REGION
         if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+            const auto& synapses = region->getSynapses();
+            finalWeights.reserve(synapses.size());
+            for (const auto& syn : synapses) {
+                if (syn) {  // NULL CHECK
+                    finalWeights.push_back(syn->getWeight());
+                }
             }
         }
         
@@ -165,7 +173,10 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_INFO("  ERROR: Region 1 not found!");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -178,8 +189,11 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+    size_t neuronsToStimulate = std::min(size_t(10), neurons.size());
+    for (size_t i = 0; i < neuronsToStimulate; ++i) {
+        if (neurons[i]) {  // NULL CHECK
+            neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        }
     }
     
     // Run a few steps
@@ -195,9 +209,11 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            if (neurons[i]) {  // NULL CHECK
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                            " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                            " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            }
         }
     }
 }

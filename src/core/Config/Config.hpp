@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
 
 namespace nlm {
 
@@ -55,7 +57,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or simple .cfg)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,6 +95,12 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +108,39 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File format loaders
+    bool loadFromSimpleFile(const std::string& filepath);
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    
+    // File format savers
+    bool saveToSimpleFile(const std::string& filepath) const;
+    bool saveToJSON(const std::string& filepath) const;
+    bool saveToYAML(const std::string& filepath) const;
+    
+    // Value conversion helpers
+    static ConfigValue jsonToConfigValue(const nlohmann::json& jsonValue);
+    static nlohmann::json configValueToJSON(const ConfigValue& value) const;
+    static ConfigValue yamlToConfigValue(const YAML::Node& yamlValue);
+    static YAML::Node configValueToYAML(const ConfigValue& value) const;
+    static std::string configValueToString(const ConfigValue& value) const;
+    
+    // Validation helpers
+    bool validateKeyValue(const std::string& key, const std::string& value) const;
+    
+    // Explicit template instantiations
+    template std::optional<int> get<int>(const std::string&) const;
+    template std::optional<int64_t> get<int64_t>(const std::string&) const;
+    template std::optional<double> get<double>(const std::string&) const;
+    template std::optional<bool> get<bool>(const std::string&) const;
+    template std::optional<std::string> get<std::string>(const std::string&) const;
+    
+    template int getOr<int>(const std::string&, const int&) const;
+    template int64_t getOr<int64_t>(const std::string&, const int64_t&) const;
+    template double getOr<double>(const std::string&, const double&) const;
+    template bool getOr<bool>(const std::string&, const bool&) const;
+    template std::string getOr<std::string>(const std::string&, const std::string&) const;
 };
 
 } // namespace nlm
