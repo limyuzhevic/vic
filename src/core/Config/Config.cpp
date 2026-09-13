@@ -3,11 +3,125 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <regex>
+#include <unordered_map>
+#include <stdexcept>
+#include <variant>
+#include <map>
+#include <string>
 
 namespace nlm {
 
+// Simple JSON parser for config files
+class SimpleJSONParser {
+public:
+    static bool parseFile(const std::string& filepath, std::map<std::string, std::string>& configMap) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        file.close();
+        
+        // Parse JSON-like content (simplified)
+        // Supports: {"key": "value", "nested": {"subkey": 123}}
+        configMap.clear();
+        
+        // Remove whitespace
+        std::string cleanContent = removeWhitespace(content);
+        
+        if (cleanContent.empty() || cleanContent[0] != '{') {
+            return false;
+        }
+        
+        // Parse top-level object
+        parseJSONObject(cleanContent, 0, configMap);
+        return true;
+    }
+    
+    static bool parseContent(const std::string& content, std::map<std::string, std::string>& configMap) {
+        std::string cleanContent = removeWhitespace(content);
+        
+        if (cleanContent.empty() || cleanContent[0] != '{') {
+            return false;
+        }
+        
+        parseJSONObject(cleanContent, 0, configMap);
+        return true;
+    }
+    
+private:
+    static std::string removeWhitespace(const std::string& str) {
+        std::string result;
+        result.reserve(str.size());
+        for (char c : str) {
+            if (!std::isspace(c)) {
+                result.push_back(c);
+            }
+        }
+        return result;
+    }
+    
+    static void parseJSONObject(const std::string& content, size_t start, std::map<std::string, std::string>& configMap) {
+        size_t pos = start + 1;  // Skip '{'
+        while (pos < content.size() && content[pos] != '}') {
+            // Parse key
+            size_t keyStart = content.find('"', pos);
+            if (keyStart == std::string::npos) break;
+            size_t keyEnd = content.find('"', keyStart + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+            
+            // Skip whitespace and colon
+            pos = keyEnd + 1;
+            while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == ':')) pos++;
+            
+            if (pos >= content.size()) break;
+            
+            // Parse value
+            if (content[pos] == '"') {
+                // String value
+                size_t valueStart = pos;
+                size_t valueEnd = content.find('"', valueStart + 1);
+                if (valueEnd == std::string::npos) break;
+                std::string value = content.substr(valueStart + 1, valueEnd - valueStart - 1);
+                configMap[key] = value;
+                pos = valueEnd + 1;
+            } else if (std::isdigit(content[pos]) || content[pos] == '-' || content[pos] == '+') {
+                // Number value
+                size_t valueEnd = content.find_first_of(",}", pos);
+                if (valueEnd == std::string::npos) break;
+                std::string value = content.substr(pos, valueEnd - pos);
+                configMap[key] = value;
+                pos = valueEnd;
+            } else if (content[pos] == '{') {
+                // Nested object - flatten with prefix
+                std::map<std::string, std::string> nestedMap;
+                parseJSONObject(content, pos, nestedMap);
+                // Flatten nested map with key prefix
+                for (const auto& nested : nestedMap) {
+                    std::string prefixedKey = key + "." + nested.first;
+                    configMap[prefixedKey] = nested.second;
+                }
+                // Find closing brace
+                pos = content.find('}', pos);
+                if (pos == std::string::npos) break;
+                pos++;
+            }
+            
+            // Skip whitespace and comma
+            while (pos < content.size() && (content[pos] == ' ' || content[pos] == ',')) {
+                pos++;
+            }
+        }
+    }
+};
+
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::mutex configMutex;  // For thread safety
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,9 +133,42 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON format first (Phase 2 implementation)
+    std::map<std::string, std::string> jsonConfig;
+    if (SimpleJSONParser::parseFile(filepath, jsonConfig)) {
+        // Convert flattened JSON keys to proper format for set()
+        for (const auto& pair : jsonConfig) {
+            const std::string& key = pair.first;
+            const std::string& value = pair.second;
+            
+            // Try to detect type and set appropriate value
+            try {
+                // Check if it's a boolean
+                if (value == "true" || value == "false") {
+                    bool boolValue = (value == "true");
+                    set(key, boolValue, ConfigSource::File);
+                } else if (value.find('.') != std::string::npos) {
+                    // Check if it's a float
+                    float floatValue = std::stof(value);
+                    set(key, floatValue, ConfigSource::File);
+                } else if (std::all_of(value.begin(), value.end(), ::isdigit) || 
+                          (value[0] == '-' && std::all_of(value.begin() + 1, value.end(), ::isdigit))) {
+                    // Integer
+                    int intValue = std::stoi(value);
+                    set(key, intValue, ConfigSource::File);
+                } else {
+                    // String
+                    set(key, value, ConfigSource::File);
+                }
+            } catch (const std::exception&) {
+                // If conversion fails, treat as string
+                set(key, value, ConfigSource::File);
+            }
+        }
+        return true;
+    }
     
+    // Fall back to simple key=value format (Phase 1)
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -86,14 +233,32 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Use proper formatting based on type
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Quote strings
+                file << entry.key << " = \"" << value << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (value ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << entry.key << " = " << value << "\n";
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << value << "\n";
+            } else {
+                // Fallback
+                file << entry.key << " = " << value << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
+// Thread-safe versions of key methods
+
+std::optional<std::string> Config::get(const std::string& key) const {
+    std::lock_guard<std::mutex> lock(pImpl->configMutex);
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -102,52 +267,20 @@ std::optional<T> Config::get(const std::string& key) const {
     }
     
     try {
-        return std::get<T>(it->value);
+        return std::get<std::string>(it->value);
     } catch (const std::bad_variant_access&) {
         return std::nullopt;
     }
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
 bool Config::has(const std::string& key) const {
+    std::lock_guard<std::mutex> lock(pImpl->configMutex);
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
+    std::lock_guard<std::mutex> lock(pImpl->configMutex);
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
@@ -156,6 +289,7 @@ void Config::remove(const std::string& key) {
 }
 
 std::vector<std::string> Config::getKeys() const {
+    std::lock_guard<std::mutex> lock(pImpl->configMutex);
     std::vector<std::string> keys;
     keys.reserve(pImpl->entries.size());
     for (const auto& entry : pImpl->entries) {

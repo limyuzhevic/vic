@@ -80,7 +80,6 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -229,7 +228,7 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
+        // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
@@ -733,32 +732,66 @@ void Brain::updatePlasticity() {
 void Brain::develop() {
     // Development updates structural plasticity
     pImpl->structuralPlasticity->update(this, *pImpl->rng);
-}
-
+// Add proper reset() method that provides proper cleanup with re-initialization
 void Brain::reset() {
-    NLM_LOG_INFO("Resetting NLM Brain...");
+    NLM_LOG_INFO("Resetting NLM Brain to initial state for new simulation...");
     
-    pImpl->currentStep = 0;
-    pImpl->currentTime = 0.0;
-    pImpl->totalSpikesThisStep = 0;
-    pImpl->totalSpikesTotal = 0;
-    pImpl->isResting = false;
-    pImpl->stepsSinceLastEpisode = 0;
+    // First, clear all state completely
+    clear();
     
-    for (auto& region : pImpl->regions) {
-        region->reset();
+    // If we have config, we can re-initialize to a clean state
+    if (pImpl->config) {
+        NLM_LOG_INFO("Re-creating brain structure from config...");
+        
+        // Get configuration values for re-initialization
+        size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
+        size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
+        float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+        
+        NLM_LOG_INFO("Re-initializing with " + std::to_string(neuronCount) + " neurons, " +
+                     std::to_string(regionCount) + " regions");
+        
+        // Create regions
+        for (size_t i = 0; i < regionCount; ++i) {
+            addRegion("Region_" + std::to_string(i + 1));
+        }
+        
+        // Create neurons across regions
+        size_t neuronsPerRegion = neuronCount / regionCount;
+        for (size_t i = 0; i < regionCount; ++i) {
+            auto* region = getRegion(RegionId(i + 1));
+            if (region) {
+                // Add populations
+                auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
+                auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
+                auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+                
+                // Collect sensory and motor neurons for I/O
+                auto* sensoryPop = region->getPopulation(sensoryPopId);
+                auto* motorPop = region->getPopulation(motorPopId);
+                if (sensoryPop) {
+                    for (auto* neuron : sensoryPop->getNeurons()) {
+                        pImpl->sensoryNeurons.push_back(neuron);
+                    }
+                }
+                if (motorPop) {
+                    for (auto* neuron : motorPop->getNeurons()) {
+                        pImpl->motorNeurons.push_back(neuron);
+                    }
+                }
+            }
+        }
+        
+        // Initialize connectivity with random weights
+        for (size_t i = 0; i < regionCount; ++i) {
+            auto* region = getRegion(RegionId(i + 1));
+            if (region) {
+                region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+            }
+        }
     }
     
-    pImpl->spikeSystem->reset();
-    pImpl->developmentalStage = DevelopmentalStage::Initial;
-    
-    // Reset memory systems
-    if (pImpl->workingMemory) pImpl->workingMemory->clear();
-    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
-    if (pImpl->attention) pImpl->attention->reset();
-    
-    NLM_LOG_INFO("NLM Brain reset complete");
+    NLM_LOG_INFO("NLM Brain reset complete - ready for new simulation");
 }
 
 bool Brain::save(const std::string& filepath) const {
@@ -888,16 +921,39 @@ bool Brain::load(const std::string& filepath) {
             }
         }
         
-        // Read synapses
+        // Read synapses - now with proper synapse matching
         SynapseCheckpointData synapseData;
         if (!reader.readSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to read synapses from checkpoint");
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states with proper matching by source and destination
+        size_t synapseIndex = 0;
+        for (auto& region : pImpl->regions) {
+            auto neurons = region->getAllNeurons();
+            for (Synapse* syn : region->getSynapses()) {
+                if (synapseIndex < synapseData.sourceNeuron.size()) {
+                    // Find matching neuron for source
+                    NeuronId sourceNeuron(synapseData.sourceNeuron[synapseIndex]);
+                    NeuronId destNeuron(synapseData.destinationNeuron[synapseIndex]);
+                    
+                    // Check if this synapse matches the current neurons
+                    if (syn->getSourceNeuron() == sourceNeuron && 
+                        syn->getDestinationNeuron() == destNeuron) {
+                        // Update synapse properties
+                        syn->setWeight(synapseData.weight[synapseIndex]);
+                        syn->setDelay(synapseData.delay[synapseIndex]);
+                        syn->setType(static_cast<SynapseType>(synapseData.synapseType[synapseIndex]));
+                        syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIndex]);
+                    }
+                    synapseIndex++;
+                }
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded and restored " + std::to_string(synapseIndex) + 
+                     " synapse states from checkpoint");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
