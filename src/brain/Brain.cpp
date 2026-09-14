@@ -130,6 +130,10 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
+        // Initialize neuromodulation systems with brain reference
+        // Note: These will be initialized with brain reference during Brain::initialize()
+        // as we don't have a pointer to the Brain instance yet in the constructor
+        
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
@@ -258,6 +262,8 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);
+    // Note: Dopamine doesn't require explicit initialization
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -412,9 +418,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
+    // Update curiosity - requires novelty and prediction error levels
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        float noveltyLevel = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        float predictionErrorLevel = pImpl->predictionError ? pImpl->predictionError->getMagnitude() : 0.0f;
+        pImpl->curiosity->update(noveltyLevel, predictionErrorLevel, pImpl->timestep);
+    }
+    
+    // Update prediction error (for reward prediction error signaling)
+    if (pImpl->predictionError) {
+        // For now, prediction error is updated from episodic memory reward
+        // TODO: Implement proper prediction error computation from prediction system
+        // Use curiosity as a simple proxy for prediction error
+        float curiosityLevel = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+        pImpl->predictionError->computeError(0.0f, curiosityLevel);
     }
     
     // Update dopamine (reward prediction error)
@@ -509,10 +526,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    // Update prediction error (for reward prediction error signaling)
+    if (pImpl->predictionError) {
+        // For now, prediction error is updated from episodic memory reward
+        // TODO: Implement proper prediction error computation from prediction system
+        // Use curiosity as a simple proxy for prediction error
+        float curiosityLevel = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+        pImpl->predictionError->computeError(0.0f, curiosityLevel);
     }
     
     // ========== STEP 9: Update attention system ==========
