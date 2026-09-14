@@ -11,6 +11,8 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralSemanticMemory.hpp"
+#include "../memory/NeuralProceduralMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
@@ -32,6 +34,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -112,6 +116,8 @@ struct Brain::Impl {
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        semanticMemory = std::make_unique<SemanticMemory>();
+        proceduralMemory = std::make_unique<ProceduralMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -239,11 +245,11 @@ bool Brain::initialize() {
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    // Initialize semantic memory
+    pImpl->semanticMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // Initialize procedural memory
+    pImpl->proceduralMemory->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -507,6 +513,46 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
+    }
+    
+    // ========== STEP 8: Update semantic memory ==========
+    if (pImpl->semanticMemory) {
+        // Learn from current neural activity patterns
+        std::vector<float> currentPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        currentPattern.push_back(
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 100.0f);
+                    } else {
+                        currentPattern.push_back(0.0f);
+                    }
+                }
+            }
+        }
+        
+        // Store in semantic memory if pattern is significant
+        if (!currentPattern.empty()) {
+            pImpl->semanticMemory->learnFromActivity(currentPattern, 0.01f);
+        }
+    }
+    
+    // ========== STEP 9: Update procedural memory ==========
+    if (pImpl->proceduralMemory) {
+        // Learn from current action patterns
+        // Get current action from brain
+        auto action = produceAction();
+        std::vector<ActionType> currentActionSequence;
+        currentActionSequence.push_back(action->getType());
+        
+        // Store memory trace
+        std::vector<float> actionPattern = pImpl->proceduralMemory->encodeActionSequence(currentActionSequence);
+        pImpl->proceduralMemory->storeMemoryTrace(currentActionSequence, 0.0f, actionPattern);
+        
+        // Learn from this experience
+        pImpl->proceduralMemory->learnFromExperience("current_action", currentActionSequence, 0.0f, 0.01f);
     }
     
     // ========== STEP 8: Update prediction system ==========
@@ -1005,43 +1051,51 @@ float Brain::getAverageFiringRate() const {
 
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
-NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
-}
+    NeuralWorkingMemory* Brain::getWorkingMemory() {
+        return pImpl->workingMemory.get();
+    }
+    
+    NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+        return pImpl->episodicMemory.get();
+    }
+    
+    NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+        return pImpl->associativeMemory.get();
+    }
+    
+    SemanticMemory* Brain::getSemanticMemory() {
+        return pImpl->semanticMemory.get();
+    }
+    
+    ProceduralMemory* Brain::getProceduralMemory() {
+        return pImpl->proceduralMemory.get();
+    }
 
-NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
-}
+    // ========== PREDICTION SYSTEM ACCESSOR ==========
 
-NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
-}
+    PredictionSystem* Brain::getPredictionSystem() {
+        return pImpl->predictionSystem.get();
+    }
+    
+    // ========== COGNITION SYSTEM ACCESSORS ==========
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
+    NeuralPlanner* Brain::getPlanner() {
+        return pImpl->planner.get();
+    }
+    
+    ConceptFormation* Brain::getConceptFormation() {
+        return pImpl->conceptFormation.get();
+    }
+    
+    AttentionalSelection* Brain::getAttention() {
+        return pImpl->attention.get();
+    }
 
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
-}
+    // ========== DEVELOPMENT SYSTEM ==========
 
-// ========== COGNITION SYSTEM ACCESSORS ==========
-
-NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
-}
-
-ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
-}
-
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
-}
-
-// ========== DEVELOPMENT SYSTEM ==========
-
-DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
-}
+    DevelopmentSystem* Brain::getDevelopmentSystem() {
+        return pImpl->developmentSystem.get();
+    }
 
 DevelopmentalStage Brain::getDevelopmentalStage() const {
     return pImpl->developmentalStage;
