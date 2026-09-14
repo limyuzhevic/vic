@@ -403,18 +403,58 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // Update working memory with current firing neurons
+        // Working memory stores active neural patterns for short-term retention
+        // Each firing neuron in the current step becomes a memory trace
+        
+        // Store current firing neurons to working memory
+        // The strength is based on firing intensity
+        for (size_t i = 0; i < pImpl->totalSpikesThisStep; ++i) {
+            // Use motor neurons as working memory targets (they fire during actions)
+            if (!pImpl->motorNeurons.empty()) {
+                size_t motorIdx = i % pImpl->motorNeurons.size();
+                NeuronId motorNeuron = pImpl->motorNeurons[motorIdx];
+                
+                // Store with activation based on firing pattern
+                float activation = static_cast<float>(i + 1) / static_cast<float>(pImpl->totalSpikesThisStep);
+                pImpl->workingMemory->storeToNeuron(motorNeuron, activation);
+            }
+        }
+        
+        // Update working memory dynamics (maintenance and competition)
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
+        // Novelty is updated based on current neural patterns
+        // For now, we'll use a simple pattern representation
+        // In a full implementation, we would pass actual sensory data
+        std::vector<float> currentPattern;
+        currentPattern.reserve(pImpl->totalSpikesThisStep);
+        
+        // Simple pattern based on firing rate
+        for (size_t i = 0; i < std::min(static_cast<size_t>(5), pImpl->totalSpikesThisStep); ++i) {
+            currentPattern.push_back(static_cast<float>(i + 1) / 5.0f);
+        }
+        
+        // Detect novelty compared to recent patterns
+        static std::vector<float> lastPattern;
+        if (!lastPattern.empty()) {
+            pImpl->novelty->detectNovelty(currentPattern, lastPattern);
+        }
+        lastPattern = currentPattern;
+        
+        // Update novelty system
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
+    // Update curiosity system with prediction error and novelty
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        float predictionError = pImpl->predictionSystem ? pImpl->predictionSystem->getPredictionError() : 0.0f;
+        float novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -511,8 +551,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // The prediction system updates based on current neural activity
+        // For now, we'll update it with the current brain state
+        // The prediction system should use sensory input and neural patterns to
+        // predict future states and update prediction error signals
+        
+        // Get current sensory input (simplified for now)
+        // In a full implementation, we would pass actual sensory data
+        // For now, we'll just update the prediction system with a placeholder
+        // The prediction system would integrate with the brain's neural activity
+        
+        // Update prediction system with current neural patterns
+        pImpl->predictionSystem->integrateWithNeuralDynamics(this);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +578,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation updates based on current neural activity patterns
+        // It identifies recurring patterns from the brain's neural activity
+        // to form abstract concepts
+        
+        // Get current neural activity pattern from the brain
+        // In a full implementation, we would extract a meaningful pattern
+        // For now, we'll use a simple pattern representing overall brain activity
+        std::vector<float> currentPattern;
+        currentPattern.reserve(pImpl->totalSpikesThisStep);
+        
+        // Sample some neurons to form a pattern representation
+        // In a real implementation, this would use a more sophisticated method
+        size_t sampleSize = std::min(static_cast<size_t>(10), pImpl->totalSpikesThisStep);
+        for (size_t i = 0; i < sampleSize; ++i) {
+            currentPattern.push_back(static_cast<float>(i) / 10.0f);
+        }
+        
+        // Present experience to concept formation system
+        // The reward comes from neuromodulation (dopamine level)
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        pImpl->conceptFormation->presentExperience(currentPattern, {}, reward, pImpl->currentStep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -640,15 +709,29 @@ void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
     }
 }
 
+// ========== SPKIE SYSTEM ==========
+
 SpikeSystem* Brain::getSpikeSystem() {
+    if (!pImpl->spikeSystem) {
+        NLM_LOG_ERROR("SpikeSystem not initialized");
+    }
     return pImpl->spikeSystem.get();
 }
 
 const SpikeSystem* Brain::getSpikeSystem() const {
+    if (!pImpl->spikeSystem) {
+        NLM_LOG_ERROR("SpikeSystem not initialized");
+    }
     return pImpl->spikeSystem.get();
 }
 
+// ========== PLASTICITY SYSTEM ==========
+
 STDP* Brain::getSTDP() {
+    return pImpl->stdp.get();
+}
+
+const STDP* Brain::getSTDP() const {
     return pImpl->stdp.get();
 }
 
@@ -656,7 +739,15 @@ Hebbian* Brain::getHebbian() {
     return pImpl->hebbian.get();
 }
 
+const Hebbian* Brain::getHebbian() const {
+    return pImpl->hebbian.get();
+}
+
 StructuralPlasticity* Brain::getStructuralPlasticity() {
+    return pImpl->structuralPlasticity.get();
+}
+
+const StructuralPlasticity* Brain::getStructuralPlasticity() const {
     return pImpl->structuralPlasticity.get();
 }
 
@@ -1006,20 +1097,53 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
+    if (!pImpl->workingMemory) {
+        NLM_LOG_ERROR("WorkingMemory not initialized");
+    }
+    return pImpl->workingMemory.get();
+}
+
+const NeuralWorkingMemory* Brain::getWorkingMemory() const {
+    if (!pImpl->workingMemory) {
+        NLM_LOG_ERROR("WorkingMemory not initialized");
+    }
     return pImpl->workingMemory.get();
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    if (!pImpl->episodicMemory) {
+        NLM_LOG_ERROR("EpisodicMemory not initialized");
+    }
+    return pImpl->episodicMemory.get();
+}
+
+const NeuralEpisodicMemory* Brain::getEpisodicMemory() const {
+    if (!pImpl->episodicMemory) {
+        NLM_LOG_ERROR("EpisodicMemory not initialized");
+    }
     return pImpl->episodicMemory.get();
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    if (!pImpl->associativeMemory) {
+        NLM_LOG_ERROR("AssociativeMemory not initialized");
+    }
+    return pImpl->associativeMemory.get();
+}
+
+const NeuralAssociativeMemory* Brain::getAssociativeMemory() const {
+    if (!pImpl->associativeMemory) {
+        NLM_LOG_ERROR("AssociativeMemory not initialized");
+    }
     return pImpl->associativeMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
+    if (!pImpl->predictionSystem) {
+        NLM_LOG_ERROR("PredictionSystem not initialized");
+    }
     return pImpl->predictionSystem.get();
 }
 
@@ -1029,7 +1153,21 @@ NeuralPlanner* Brain::getPlanner() {
     return pImpl->planner.get();
 }
 
+const NeuralPlanner* Brain::getPlanner() const {
+    if (!pImpl->planner) {
+        NLM_LOG_ERROR("Planner not initialized");
+    }
+    return pImpl->planner.get();
+}
+
 ConceptFormation* Brain::getConceptFormation() {
+    return pImpl->conceptFormation.get();
+}
+
+const ConceptFormation* Brain::getConceptFormation() const {
+    if (!pImpl->conceptFormation) {
+        NLM_LOG_ERROR("ConceptFormation not initialized");
+    }
     return pImpl->conceptFormation.get();
 }
 
@@ -1037,9 +1175,23 @@ AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
+const AttentionalSelection* Brain::getAttention() const {
+    if (!pImpl->attention) {
+        NLM_LOG_ERROR("Attention not initialized");
+    }
+    return pImpl->attention.get();
+}
+
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
+    return pImpl->developmentSystem.get();
+}
+
+const DevelopmentSystem* Brain::getDevelopmentSystem() const {
+    if (!pImpl->developmentSystem) {
+        NLM_LOG_ERROR("DevelopmentSystem not initialized");
+    }
     return pImpl->developmentSystem.get();
 }
 

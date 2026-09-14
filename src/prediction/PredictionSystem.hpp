@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
+#include "../sensory/SensoryInput.hpp"
 #include <vector>
 #include <memory>
 
@@ -33,6 +35,12 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Integrate prediction system with neural dynamics
+    void integrateWithNeuralDynamics(const Brain* brain);
+    
+    // Process sensory input through prediction system
+    void processSensoryInput(const SensoryInput& input, const Brain* brain);
     
 private:
     struct Impl;

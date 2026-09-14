@@ -141,32 +141,40 @@ public:
     
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
+    const NeuralWorkingMemory* getWorkingMemory() const;
     
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
+    const NeuralEpisodicMemory* getEpisodicMemory() const;
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    const NeuralAssociativeMemory* getAssociativeMemory() const;
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
+    const PredictionSystem* getPredictionSystem() const;
     
     // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
+    const NeuralPlanner* getPlanner() const;
     
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
+    const ConceptFormation* getConceptFormation() const;
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+    const AttentionalSelection* getAttention() const;
     
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
+    const DevelopmentSystem* getDevelopmentSystem() const;
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
@@ -174,15 +182,19 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    const Dopamine* getDopamine() const;
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
+    const Curiosity* getCuriosity() const;
     
     // Novelty - novelty detection
     Novelty* getNovelty();
+    const Novelty* getNovelty() const;
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    const PredictionError* getPredictionErrorSignal() const;
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

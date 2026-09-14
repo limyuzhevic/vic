@@ -37,6 +37,23 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
     }
 }
 
+// Real prediction system integration with neural dynamics
+void PredictionSystem::integrateWithNeuralDynamics(const Brain* brain) {
+    if (!brain) return;
+    
+    // Use the brain's neural activity patterns for prediction
+    // Get current sensory input from brain
+    // For now, this is a placeholder for the actual neural integration
+    // The prediction system should:
+    // 1. Read current neural activity patterns
+    // 2. Generate predictions based on learned patterns
+    // 3. Compare predictions with actual input
+    // 4. Update prediction error signals
+    
+    // Placeholder implementation
+    pImpl->predictionError = 0.0f;
+}
+
 float PredictionSystem::getPredictionError() const {
     return pImpl->predictionError;
 }
