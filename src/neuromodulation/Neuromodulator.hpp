@@ -13,18 +13,34 @@ class Neuromodulator {
 public:
     virtual ~Neuromodulator() = default;
     
-    // Get modulator name
+    /**
+     * @brief Get modulator name
+     * @return const char* descriptive name of neuromodulator
+     */
     virtual const char* getName() const = 0;
     
-    // Get current concentration/level
+    /**
+     * @brief Get current concentration/level
+     * @return float current neuromodulator level
+     */
     virtual float getLevel() const = 0;
+    
+    /**
+     * @brief Set neuromodulator concentration
+     * @param level New neuromodulator level
+     */
     virtual void setLevel(float level) = 0;
     
-    // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    /**
+     * @brief Get plasticity modulation factor
+     * @return float scaling factor for synaptic plasticity
+     */
     virtual float getPlasticityFactor() const = 0;
     
-    // Update neuromodulator state
+    /**
+     * @brief Update neuromodulator state for new timestep
+     * @param dt Timestep duration
+     */
     virtual void update(TimestepDuration dt) = 0;
     
 protected:

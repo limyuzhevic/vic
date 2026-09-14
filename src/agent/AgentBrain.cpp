@@ -5,6 +5,14 @@
 
 namespace nlm {
 
+// Constants for better maintainability
+static constexpr size_t NUM_MOTOR_ACTIONS = 6;
+static constexpr size_t NUM_SENSOIR_TYPES = 4;
+static constexpr float VISION_SCALE_FACTOR = 5.0f;
+static constexpr float TOUCH_SCALE_FACTOR = 8.0f;
+static constexpr float INTERNAL_SCALE_FACTOR = 5.0f;
+static constexpr float PROPRIOCEPTION_SCALE_FACTOR = 3.0f;
+
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
@@ -33,7 +41,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
                         
-                        switch (idx % 6) {
+                        switch (idx % NUM_MOTOR_ACTIONS) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
@@ -48,7 +56,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
-                        switch (idx % 4) {
+                        switch (idx % NUM_SENSOIR_TYPES) {
                             case 0: sensoryVision_.push_back(n); break;
                             case 1: sensoryTouch_.push_back(n); break;
                             case 2: sensoryInternal_.push_back(n); break;
@@ -64,6 +72,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
+    // Use getDimensions() if available, or ensure proper resize
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
@@ -81,7 +90,7 @@ size_t AgentBrain::getSensoryInputSize() const {
 
 size_t AgentBrain::getMotorOutputSize() const {
     // One motor neuron per action
-    return 6;
+    return NUM_MOTOR_ACTIONS;
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
@@ -91,8 +100,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            // Inject current proportional to vision intensity with scale factor
+            float current = vision[i] * VISION_SCALE_FACTOR;
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -101,7 +110,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = touch[i] * TOUCH_SCALE_FACTOR;
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -110,7 +119,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            // Center and scale the internal signal
+            float current = (intern[i] * 2.0f - 1.0f) * INTERNAL_SCALE_FACTOR;
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
@@ -119,7 +129,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            // Center and scale the proprioceptive signal
+            float current = (proprio[i] * 2.0f - 1.0f) * PROPRIOCEPTION_SCALE_FACTOR;
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
@@ -169,7 +180,9 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         float sum = 0.0f;
         for (Neuron* n : neurons) {
             // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            if (n->getState().membranePotential > 0 || n->getState().membranePotential < 0) {
+                sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            }
         }
         return sum / neurons.size();
     };
@@ -182,7 +195,12 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     float waitAct = calcActivity(motorWait_);
     
     // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
+    struct CommandWithActivity {
+        MotorCommand cmd;
+        float activity;
+    };
+    
+    CommandWithActivity commands[] = {
         {MotorCommand::MoveForward, forwardAct},
         {MotorCommand::MoveBackward, backwardAct},
         {MotorCommand::TurnLeft, leftAct},
@@ -201,8 +219,8 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         }
     }
     
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    // Only act if there's meaningful activity (reduced threshold)
+    if (bestActivity < 0.3f) {
         return MotorCommand::Wait;
     }
     

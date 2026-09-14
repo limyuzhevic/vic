@@ -15,6 +15,12 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/Hebbian.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -352,6 +358,39 @@ PYBIND11_MODULE(pynlm, m) {
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
+
+    py::class_<STDP, PlasticityRule>(m, "STDP", R"pbdoc(Spike Timing Dependent Plasticity)pbdoc")
+        .def(py::init<>())
+        .def("update", &STDP::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"),
+             "Update synaptic weights based on spike timing differences")
+        .def("applyWeightChange", &STDP::applyWeightChange, py::arg("synapse"), py::arg("delta"),
+             "Apply direct weight change to synapse")
+        .def("getName", &STDP::getName, "Get plasticity rule name")
+        .def("setLTPWeight", &STDP::setLTPWeight, py::arg("weight"),
+             "Set long-term potentiation weight")
+        .def("getLTPWeight", &STDP::getLTPWeight, "Get long-term potentiation weight")
+        .def("setLTDWeight", &STDP::setLTDWeight, py::arg("weight"),
+             "Set long-term depression weight")
+        .def("getLTDWeight", &STDP::getLTDWeight, "Get long-term depression weight")
+        .def("setTimeConstant", &STDP::setTimeConstant, py::arg("tau"),
+             "Set STDP time constant")
+        .def("getTimeConstant", &STDP::getTimeConstant, "Get STDP time constant")
+        .def("configure", &STDP::configure, py::arg("ltpWeight"), py::arg("ltdWeight"), py::arg("tau"),
+             "Configure STDP parameters");
+
+    py::class_<Hebbian, PlasticityRule>(m, "Hebbian", R"pbdoc(Hebbian learning: neurons that fire together, wire together)pbdoc")
+        .def(py::init<>())
+        .def("update", &Hebbian::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"),
+             "Update synaptic weights based on spike timing correlations")
+        .def("applyWeightChange", &Hebbian::applyWeightChange, py::arg("synapse"), py::arg("delta"),
+             "Apply direct weight change to synapse")
+        .def("getName", &Hebbian::getName, "Get plasticity rule name")
+        .def("setLearningRate", &Hebbian::setLearningRate, py::arg("rate"),
+             "Set Hebbian learning rate")
+        .def("getLearningRate", &Hebbian::getLearningRate, "Get Hebbian learning rate")
+        .def("setMaxWeight", &Hebbian::setMaxWeight, py::arg("maxWeight"),
+             "Set maximum synaptic weight")
+        .def("getMaxWeight", &Hebbian::getMaxWeight, "Get maximum synaptic weight");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
