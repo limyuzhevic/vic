@@ -528,8 +528,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Concept formation learns from working memory content and current activity
+        pImpl->conceptFormation->update(pImpl->timestep, currentStep);
+        
+        // Apply concept formation to attention and planning
+        if (pImpl->attention) {
+            auto currentConcepts = pImpl->conceptFormation->getActiveConcepts();
+            pImpl->attention->setConcepts(currentConcepts);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -576,10 +583,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+    // ========== STEP 14: Sleep/rest cycle and memory consolidation ==========
+    if (currentStep % pImpl->consolidationInterval == 0) {
+        // During sleep/rest, consolidate episodic memories and replay them
+        pImpl->isResting = true;
+        
+        // Consolidate memories
+        if (pImpl->episodicMemory) {
+            pImpl->episodicMemory->consolidate(0.3f);
+        }
+        
+        // Replay memories during sleep
+        if (pImpl->episodicMemory) {
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+        }
+        
+        // Update development based on sleep rest
+        if (pImpl->developmentSystem) {
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 100);
+        }
+        
+        // Reset resting state
+        pImpl->isResting = false;
+        
+        NLM_LOG_INFO("Sleep/rest cycle completed - memories consolidated");
+    } else {
+        pImpl->isResting = false;
     }
     
     // ========== STEP 15: Checkpoint management ==========
@@ -1014,6 +1046,14 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    return pImpl->associativeMemory.get();
+}
+
+NeuralAssociativeMemory* Brain::getSemanticMemory() {
+    return pImpl->associativeMemory.get();
+}
+
+NeuralAssociativeMemory* Brain::getProceduralMemory() {
     return pImpl->associativeMemory.get();
 }
 
