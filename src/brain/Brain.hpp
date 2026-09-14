@@ -138,7 +138,7 @@ public:
     float getAverageFiringRate() const;
     
     // ========== MEMORY SYSTEMS ==========
-    
+
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
     

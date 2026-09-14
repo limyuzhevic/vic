@@ -33,6 +33,24 @@ struct Brain::Impl {
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
+    // Helper method to create region neurons for memory systems
+    auto createMemoryRegion = [this](std::unique_ptr<NeuralWorkingMemory>& memorySystem) {
+        if (brain_) {
+            // Create dedicated region for memory storage
+            auto regionId = addRegion("Memory_" + std::to_string(memorySystem ? regionCounter++ : 0));
+            auto* region = getRegion(regionId);
+            if (region) {
+                // Add neurons for memory storage
+                size_t memoryNeurons = 100;
+                auto popId = region->addPopulation(memoryNeurons, NeuronType::Internal);
+                auto* pop = region->getPopulation(popId);
+                if (pop) {
+                    memoryNeurons_.assign(pop->getNeurons().begin(), pop->getNeurons().end());
+                }
+            }
+        }
+    };
+    
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
     
@@ -178,9 +196,9 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
     // Get configuration values
-    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
-    size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    size_t neuronCount = pImpl->config->getOr<size_t>("brain.neuron_count", 1000);
+    size_t regionCount = pImpl->config->getOr<size_t>("brain.region_count", 1);
+    float connectionProbability = pImpl->config->getOr<float>("brain.connection_probability", 0.1f);
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
@@ -1003,7 +1021,7 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
+// ========== INTEGRATED BRAIN SYSTEMS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
@@ -1017,13 +1035,13 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
+// ========== PREDICTION SYSTEM ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
 
-// ========== COGNITION SYSTEM ACCESSORS ==========
+// ========== COGNITION SYSTEMS ==========
 
 NeuralPlanner* Brain::getPlanner() {
     return pImpl->planner.get();
@@ -1068,8 +1086,6 @@ Novelty* Brain::getNovelty() {
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
-
-std::shared_ptr<const Config> Brain::getConfig() const {
     return pImpl->config;
 }
 
