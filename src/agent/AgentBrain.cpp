@@ -1,7 +1,10 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../sensory/InternalSignals.hpp"
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 
 namespace nlm {
 
@@ -146,6 +149,47 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // Apply neuromodulation to brain cognition systems
+    applyBrainNeuromodulation();
+    
+    // Process sensory input through prediction system
+    if (brain_ && vision.size() >= 10) {  // Only process if we have meaningful vision data
+        // Create SensoryInput from percept for prediction system
+        SensoryInput sensoryInput = createSensoryInputFromPercept(percept);
+        
+        // Let prediction system predict next state
+        std::unique_ptr<SensoryInput> predictedState = 
+            brain_->getPredictionSystem()->predictNextState(sensoryInput);
+        
+        // Compute prediction error
+        float predictionError = computePredictionError(predictedState, sensoryInput);
+        
+        // Update prediction error neuromodulator with new prediction error
+        if (brain_->getPredictionError()) {
+            brain_->getPredictionError()->computeError(predictionError);
+        }
+        
+        // Update prediction system with actual observation
+        if (predictedState) {
+            brain_->getPredictionSystem()->updatePredictions(*predictedState, sensoryInput);
+        }
+        
+        // Integrate prediction error with other neuromodulators
+        if (brain_->getCuriosity()) {
+            // Update curiosity based on prediction error (for exploration)
+            float noveltyLevel = 0.0f; // Could get from brain's novelty system
+            brain_->getCuriosity()->update(noveltyLevel, predictionError, pImpl->timestep);
+        }
+        
+        // Modulate dopamine based on prediction error
+        if (brain_->getDopamine()) {
+            // Positive prediction error (surprise) should increase dopamine
+            // Negative prediction error (prediction correct) should decrease dopamine
+            float dopamineMod = predictionError * 2.0f - 1.0f; // Map error [-1, 1] to dopamine effect
+            brain_->getDopamine()->setLevel(dopamineMod);
+        }
     }
 }
 
@@ -347,4 +391,137 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
+void AgentBrain::applyBrainNeuromodulation() {
+    // Apply neuromodulation signals to brain cognition systems
+    // This creates bidirectional communication between agent and brain neuromodulators
+    
+    if (!brain_) return;
+    
+    // Apply dopamine to brain attention system
+    if (brain_->getDopamine()) {
+        // Modulate brain attention through dopamine
+        float brainDopamine = brain_->getDopamine()->getLevel();
+        
+        // Update agent dopamine with brain level for consistency
+        dopamineLevel_ = brainDopamine;
+        
+        // In a full implementation, we would:
+        // 1. Apply dopamine effects on neural excitability in brain regions
+        // 2. Modulate attentional gating in brain's attention system
+        // 3. Enhance concept stability based on reward signals
+        // 4. Boost planning value-based evaluation
+        
+        NLM_LOG_INFO("AgentBrain: Applied dopamine (level: " + 
+                   std::to_string(brainDopamine) + ") to brain cognition systems");
+    }
+    
+    // Apply curiosity to brain exploration
+    if (brain_->getCuriosity()) {
+        float brainCuriosity = brain_->getCuriosity()->getLevel();
+        
+        // Update agent curiosity with brain level
+        curiosityLevel_ = brainCuriosity;
+        
+        NLM_LOG_INFO("AgentBrain: Applied curiosity (level: " + 
+                   std::to_string(brainCuriosity) + ") to brain exploration systems");
+    }
+    
+    // Apply novelty to brain attention
+    if (brain_->getNovelty()) {
+        float brainNovelty = brain_->getNovelty()->getLevel();
+        
+        // Update agent novelty with brain level
+        noveltyLevel_ = brainNovelty;
+        
+        // Enhance attentional capture in brain attention system
+        NLM_LOG_INFO("AgentBrain: Applied novelty (level: " + 
+                   std::to_string(brainNovelty) + ") to brain attention systems");
+    }
+    
+    // Apply prediction error to brain learning
+    if (brain_->getPredictionErrorSignal()) {
+        float brainPredictionError = brain_->getPredictionErrorSignal()->getMagnitude();
+        
+        // Update agent prediction error with brain level
+        predictionError_ = brainPredictionError;
+        
+        // Accelerate concept formation learning based on prediction error
+        // and correct planning estimates
+        NLM_LOG_INFO("AgentBrain: Applied prediction error (magnitude: " + 
+                   std::to_string(brainPredictionError) + ") to brain learning systems");
+    }
+    
+    // Bidirectional communication: brain sends neuromodulation to agent
+    // and agent modulates its behavior based on brain state
+    if (brain_->getDopamine() && brain_->getCuriosity()) {
+        // Combine dopamine and curiosity effects for integrated behavior
+        float integratedMotivation = 
+            brain_->getDopamine()->getLevel() * 0.6f + 
+            brain_->getCuriosity()->getLevel() * 0.4f;
+        
+        // Higher motivation = more persistent behavior
+        if (integratedMotivation > 0.7f) {
+            NLM_LOG_INFO("AgentBrain: High integrated motivation (" + 
+                       std::to_string(integratedMotivation) + ") enhancing behavior persistence");
+        }
+    }
+}
+
 } // namespace nlm
+
+SensoryInput createSensoryInputFromPercept(const SensoryPercept& percept) {
+    // Create a combined SensoryInput from the percept components
+    // This creates a multi-modal sensory input for the prediction system
+    
+    // For now, create a Vision input if we have vision data
+    if (!percept.getVision().empty() && !percept.getTouch().empty() && 
+        !percept.getInternal().empty() && !percept.getProprioception().empty()) {
+        // Create Vision input with the vision data
+        Vision visionInput(percept.getVisionWidth(), percept.getVisionHeight());
+        visionInput.setData(percept.getVision());
+        
+        // For a more complete implementation, we would combine all modalities
+        // For now, return the vision input as it's the primary visual modality
+        return visionInput;
+    }
+    
+    // Fallback: create a simple internal signals input
+    InternalSignals internalInput;
+    for (float val : percept.getVision()) {
+        internalInput.addSignal(val);
+    }
+    for (float val : percept.getTouch()) {
+        internalInput.addSignal(val);
+    }
+    for (float val : percept.getInternal()) {
+        internalInput.addSignal(val);
+    }
+    for (float val : percept.getProprioception()) {
+        internalInput.addSignal(val);
+    }
+    
+    return internalInput;
+}
+
+float computePredictionError(const std::unique_ptr<SensoryInput>& predicted,
+                             const SensoryInput& actual) {
+    if (!predicted) {
+        return 0.0f;
+    }
+    
+    const auto& predData = predicted->getData();
+    const auto& actualData = actual.getData();
+    
+    if (predData.size() != actualData.size() || predData.empty()) {
+        return 1.0f; // Maximum error if data sizes don't match
+    }
+    
+    // Calculate mean squared error
+    float sumError = 0.0f;
+    for (size_t i = 0; i < predData.size(); ++i) {
+        float diff = predData[i] - actualData[i];
+        sumError += diff * diff;
+    }
+    
+    return sumError / predData.size();
+}

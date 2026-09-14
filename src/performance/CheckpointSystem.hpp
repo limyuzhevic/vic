@@ -242,6 +242,28 @@ private:
 };
 
 /**
+ * Memory system state for checkpointing
+ */
+struct MemoryCheckpointData {
+    std::vector<uint32_t> workingMemoryTraces;
+    std::vector<uint64_t> workingMemoryNeurons;
+    std::vector<float> workingMemoryActivations;
+    
+    uint64_t episodicEpisodeCount;
+    uint64_t associativePatternCount;
+    uint64_t recentEpisodeRewards;
+    
+    // Developmental state
+    uint8_t developmentalStage;
+    
+    MemoryCheckpointData()
+        : episodicEpisodeCount(0)
+        , associativePatternCount(0)
+        , recentEpisodeRewards(0)
+        , developmentalStage(0) {}
+};
+
+/**
  * Checkpoint writer
  */
 class CheckpointWriter {
@@ -284,6 +306,11 @@ public:
     bool writeSynapses(const SynapseCheckpointData& data);
     
     /**
+     * Write memory checkpoint data
+     */
+    bool writeMemory(const MemoryCheckpointData& data);
+    
+    /**
      * Write raw section data
      */
     bool writeSection(CheckpointSection sectionType, const void* data, size_t size);
@@ -303,7 +330,7 @@ public:
      * Get total bytes written
      */
     uint64_t getBytesWritten() const { return bytesWritten_; }
-
+    
 private:
     bool writeHeader();
     bool writeSectionHeader(const SectionHeader& header);

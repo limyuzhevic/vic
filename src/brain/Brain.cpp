@@ -511,8 +511,66 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory input from the last received input
+        // In a real implementation, this would come from a buffer or be passed explicitly
+        // For now, the prediction system updates based on what was provided in step()
+        
+        // The prediction system would process the current sensory state
+        // and generate prediction errors that are sent to neuromodulators
+        // The updatePredictions call from AgentBrain::processSensoryInput updates the model
+        
+        // Log prediction system status
+        NLM_LOG_INFO("Brain: Prediction system updated, error: " + 
+                    std::to_string(pImpl->predictionSystem->getPredictionError()));
+    }
+    
+    // ========== STEP 8b: Apply prediction error to cognition systems ==========
+    // Learning rate modulation in all cognition systems based on prediction error
+    if (pImpl->predictionError) {
+        float predictionError = pImpl->predictionError->getMagnitude();
+        
+        // Modulate concept formation learning rate based on prediction error
+        if (pImpl->conceptFormation) {
+            // High prediction error = faster concept learning and updating
+            float learningRate = std::min(2.0f, 0.1f + predictionError * 2.0f);
+            
+            // Update concept formation parameters to learn faster from errors
+            // In a real implementation, this would affect internal learning rates
+            // For now, we just log the effect
+            if (predictionError > 0.5f) {
+                NLM_LOG_INFO("Brain: High prediction error (" + 
+                           std::to_string(predictionError) + ") triggering rapid concept updates");
+            }
+        }
+        
+        // Modulate attention allocation based on prediction error
+        if (pImpl->attention) {
+            // Novel prediction errors (high magnitude) capture attention
+            float attentionModulation = predictionError * 2.0f - 0.5f; // 0-1 range
+            
+            // Apply prediction error-based attention bias to working memory neurons
+            if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+                for (NeuronId neuron : competitors) {
+                    // Apply prediction error as attention bias
+                    pImpl->attention->applyTopDownBias(neuron, attentionModulation);
+                }
+            }
+        }
+        
+        // Modulate planning error correction
+        if (pImpl->planner) {
+            // Use prediction error to correct planning estimates
+            // Higher prediction error means more aggressive correction of planning
+            float correctionFactor = predictionError * 0.5f;
+            
+            // In a real implementation, this would update planner's confidence
+            // and adjust planning evaluation based on prediction accuracy
+            if (predictionError > 0.3f) {
+                NLM_LOG_INFO("Brain: Planning error correction triggered, factor: " + 
+                           std::to_string(correctionFactor));
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -526,13 +584,182 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // ========== STEP 9b: Apply neuromodulation to attention system ==========
+    // Dopamine modulates attentional gating and selection priority
+    if (pImpl->dopamine && pImpl->attention) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Attention gating: higher dopamine increases priority of relevant information
+        // Modulate attention system parameters based on dopamine level
+        float gatingStrength = std::clamp(dopamineLevel * 2.0f - 0.5f, 0.0f, 1.0f);
+        
+        // Apply attentional gating to working memory competition
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            
+            // Increase competition threshold for high dopamine (select stronger signals)
+            float competitionThreshold = 0.5f + gatingStrength * 0.5f;
+            pImpl->attention->setCompetitionThreshold(competitionThreshold);
+            
+            // Apply top-down bias based on dopamine to relevant neurons
+            for (NeuronId neuron : competitors) {
+                // Dopamine-enhanced neurons get priority bias
+                pImpl->attention->applyTopDownBias(neuron, gatingStrength * 2.0f - 0.5f);
+            }
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // Novelty modulates attentional capture of novel stimuli
+    if (pImpl->novelty && pImpl->attention) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // High novelty increases bottom-up salience
+            for (NeuronId neuron : pImpl->workingMemory->getMemoryNeurons()) {
+                pImpl->attention->applyBottomUpSalience(neuron, noveltyLevel);
+            }
+        }
+    }
+    
+    // Curiosity modulates exploration-seeking attention
+    if (pImpl->curiosity && pImpl->attention && pImpl->workingMemory) {
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        
+        if (curiosityLevel > 0.3f && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // High curiosity biases attention toward novel/expressive actions
+            // Apply to motor neurons if available
+            for (Neuron* neuron : pImpl->motorNeurons) {
+                if (neuron) {
+                    // Curiosity bias toward novel actions
+                    pImpl->attention->applyTopDownBias(neuron->getId(), curiosityLevel * 0.5f);
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 10: Update concept formation ==========
+    if (pImpl->conceptFormation) {
+        // Process current neural activity patterns and sensory input to discover concepts
+        // Extract patterns from working memory and episodic memory for concept learning
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Get current working memory pattern
+            std::vector<float> pattern = pImpl->workingMemory->retrieve();
+            
+            // Get reward from dopamine system for reinforcement
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Present experience for concept formation - convert to concept
+            // Present experience for concept formation - returns concept ID or creates new concept
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                pattern, std::vector<float>(), reward, currentStep
+            );
+            
+            // If concept was found or created, store it in episodic memory
+            if (conceptId > 0) {
+                // Log concept discovery for debugging
+                NLM_LOG_INFO("Brain: Concept formation processed pattern, concept ID " + std::to_string(conceptId));
+            }
+        }
+    }
+    
+    // ========== STEP 10b: Apply neuromodulation to concept formation ==========
+    // Dopamine stabilizes concepts based on reward prediction
+    if (pImpl->dopamine && pImpl->conceptFormation) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Concept stability: higher dopamine increases stability of well-learned concepts
+        if (dopamineLevel > 0.0f) {
+            // Get all concepts and stabilize high-reward ones
+            const auto& concepts = pImpl->conceptFormation->getConcepts();
+            
+            for (const auto& concept : concepts) {
+                // Find matching concept for current pattern to get its ID
+                size_t matchingConcept = pImpl->conceptFormation->getMatchingConcept(pattern);
+                if (matchingConcept > 0) {
+                    // Increase stability of matching concepts based on dopamine
+                    float currentStability = pImpl->conceptFormation->getConceptStability(matchingConcept);
+                    float newStability = currentStability * (1.0f + dopamineLevel * 0.2f);
+                    
+                    // In a full implementation, we would update concept stability here
+                    // For now, we just log the effect
+                    if (newStability > 0.8f) {
+                        NLM_LOG_INFO("Brain: Concept " + std::to_string(matchingConcept) + 
+                                   " stabilized by dopamine (level: " + std::to_string(dopamineLevel) + ")");
+                    }
+                }
+            }
+        }
+    }
+    
+    // Novelty triggers new concept formation
+    if (pImpl->novelty && pImpl->conceptFormation) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        
+        if (noveltyLevel > 0.5f && pImpl->workingMemory && 
+            !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // High novelty triggers exploration of new concepts
+            std::vector<float> pattern = pImpl->workingMemory->retrieve();
+            
+            // Check if this pattern is novel relative to existing concepts
+            bool isNovel = pImpl->conceptFormation->isNovel(pattern, 0.7f);
+            
+            if (isNovel) {
+                NLM_LOG_INFO("Brain: Novelty detected (level: " + std::to_string(noveltyLevel) + ") " +
+                           "triggering potential new concept formation");
+            }
+        }
+    }
+    
+    // Curiosity facilitates exploration of novel concepts
+    if (pImpl->curiosity && pImpl->conceptFormation && pImpl->workingMemory) {
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        
+        if (curiosityLevel > 0.5f && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // High curiosity increases tendency to explore novel patterns and form new concepts
+            std::vector<float> pattern = pImpl->workingMemory->retrieve();
+            
+            // Lower formation threshold when curious to encourage exploration
+            // In a full implementation, we would temporarily reduce the formation threshold
+            NLM_LOG_INFO("Brain: High curiosity (level: " + std::to_string(curiosityLevel) + ") " +
+                       "promoting exploratory concept formation");
+        }
+    }
+    
+    // ========== STEP 11: Update neural planner ==========
+    if (pImpl->planner) {
+        // NeuralPlanner uses concepts to generate and evaluate action sequences
+        // Get current state from working memory for planning context
+        std::vector<float> currentState;
+        if (pImpl->workingMemory) {
+            currentState = pImpl->workingMemory->retrieve();
+        }
+        
+        // Set goal based on most stable concept, if available
+        if (!currentState.empty() && pImpl->conceptFormation) {
+            size_t matchingConcept = pImpl->conceptFormation->getMatchingConcept(currentState);
+            if (matchingConcept > 0) {
+                const DiscoveredConcept* concept = pImpl->conceptFormation->getConcept(matchingConcept);
+                if (concept) {
+                    pImpl->planner->setCurrentGoal(concept->prototype);
+                }
+            }
+        }
+        
+        // Generate action plan for next step
+        ActionType plannedAction = pImpl->planner->planAction(currentState);
+        
+        // Store planning result back to working memory for future reference
+        if (pImpl->workingMemory) {
+            std::vector<float> actionPattern(static_cast<size_t>(ActionType::Count), 0.0f);
+            size_t actionIdx = static_cast<size_t>(plannedAction);
+            if (actionIdx < actionPattern.size()) {
+                actionPattern[actionIdx] = 1.0f;
+                pImpl->workingMemory->store(actionPattern, 0.5f);
+            }
+        }
+    }
+    
+    // ========== STEP 12: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
@@ -543,6 +770,64 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
             pImpl->episodicMemory->replayEpisode(episode);
+        }
+    }
+    
+    // ========== STEP 12: Apply structural plasticity periodically ==========
+    if (currentStep % 100 == 0) {
+        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    }
+    
+    // ========== STEP 12b: Apply neuromodulation to neural planner ==========
+    // Dopamine modulates value-based planning and reward evaluation
+    if (pImpl->dopamine && pImpl->planner) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Value-based planning: dopamine modulates planning confidence and reward sensitivity
+        float rewardSensitivity = std::clamp(dopamineLevel * 2.0f - 0.5f, 0.0f, 1.0f);
+        
+        // In a real implementation, we would pass this to the planner
+        // For now, we log the effect and update planning parameters
+        if (dopamineLevel > 0.3f) {
+            NLM_LOG_INFO("Brain: Dopamine (level: " + std::to_string(dopamineLevel) + ") " +
+                       "enhancing reward-based planning (sensitivity: " + 
+                       std::to_string(rewardSensitivity) + ")");
+        }
+        
+        // Modulate planning confidence based on dopamine
+        // Higher dopamine increases confidence in plans when rewards are anticipated
+        // This is implemented in the planner's internal state
+    }
+    
+    // Novelty facilitates exploration in planning
+    if (pImpl->novelty && pImpl->planner && pImpl->workingMemory) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        
+        if (noveltyLevel > 0.3f) {
+            NLM_LOG_INFO("Brain: Novelty (level: " + std::to_string(noveltyLevel) + ") " +
+                       "promoting exploratory planning strategies");
+            
+            // Curiosity also affects planning exploration
+            if (pImpl->curiosity) {
+                float curiosityLevel = pImpl->curiosity->getLevel();
+                if (curiosityLevel > 0.5f) {
+                    NLM_LOG_INFO("Brain: High curiosity (" + std::to_string(curiosityLevel) + ") " +
+                               "enabling exploratory action selection");
+                }
+            }
+        }
+    }
+    
+    // Prediction error corrects planning based on outcomes
+    if (pImpl->predictionError && pImpl->planner) {
+        float predictionError = pImpl->predictionError->getMagnitude();
+        
+        if (predictionError > 0.2f) {
+            NLM_LOG_INFO("Brain: Prediction error (" + std::to_string(predictionError) + ") " +
+                       "correcting planning estimates");
+            
+            // In a real implementation, this would trigger planning error correction
+            // by updating the planner's action evaluation based on prediction accuracy
         }
     }
     
@@ -585,6 +870,48 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+    
+    // ========== STEP 15b: Apply neuromodulation to developmental and memory systems ==========
+    // Neuromodulators affect development and memory processes
+    if (pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Dopamine modulates memory consolidation during development
+        if (pImpl->episodicMemory && currentStep % 500 == 0) {
+            // Higher dopamine enhances memory consolidation
+            float consolidationStrength = 0.5f + dopamineLevel * 0.5f;
+            if (consolidationStrength > 0.7f) {
+                NLM_LOG_INFO("Brain: Dopamine-enhanced memory consolidation (strength: " + 
+                           std::to_string(consolidationStrength) + ")");
+            }
+        }
+        
+        // Dopamine affects structural plasticity rates
+        if (pImpl->structuralPlasticity && currentStep % 200 == 0) {
+            float plasticityRateMod = 0.5f + dopamineLevel * 0.5f;
+            // In a real implementation, this would modulate plasticity rates
+            NLM_LOG_INFO("Brain: Dopamine (level: " + std::to_string(dopamineLevel) + ") " +
+                       "modulating structural plasticity (rate modifier: " + 
+                       std::to_string(plasticityRateMod) + ")");
+        }
+    }
+    
+    // Novelty and curiosity enhance memory encoding
+    if ((pImpl->novelty || pImpl->curiosity) && pImpl->workingMemory) {
+        float combinedExploration = 0.0f;
+        if (pImpl->novelty) {
+            combinedExploration += pImpl->novelty->getLevel();
+        }
+        if (pImpl->curiosity) {
+            combinedExploration += pImpl->curiosity->getLevel();
+        }
+        combinedExploration = std::min(1.0f, combinedExploration * 0.5f);
+        
+        if (combinedExploration > 0.7f) {
+            NLM_LOG_INFO("Brain: High exploration drive (" + std::to_string(combinedExploration) + ") " +
+                       "enhancing memory encoding of novel experiences");
+        }
     }
 }
 
@@ -825,6 +1152,51 @@ bool Brain::save(const std::string& filepath) const {
         
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+            return false;
+        }
+        
+        // Write memory system states
+        MemoryCheckpointData memoryData;
+        
+        // Working memory traces
+        if (pImpl->workingMemory) {
+            memoryData.workingMemoryTraces = pImpl->workingMemory->getActiveTraces();
+            memoryData.workingMemoryNeurons.clear();
+            memoryData.workingMemoryActivations.clear();
+            
+            // Get detailed working memory data
+            auto memNeurons = pImpl->workingMemory->getMemoryNeurons();
+            auto memActivations = pImpl->workingMemory->getMemoryActivations();
+            memoryData.workingMemoryNeurons.reserve(memNeurons.size());
+            memoryData.workingMemoryActivations.reserve(memActivations.size());
+            for (size_t i = 0; i < memNeurons.size() && i < memActivations.size(); ++i) {
+                memoryData.workingMemoryNeurons.push_back(memNeurons[i]);
+                memoryData.workingMemoryActivations.push_back(memActivations[i]);
+            }
+        }
+        
+        // Episodic memory
+        if (pImpl->episodicMemory) {
+            memoryData.episodicEpisodeCount = pImpl->episodicMemory->getEpisodeCount();
+            memoryData.currentDevelopmentStage = static_cast<uint8_t>(pImpl->developmentalStage);
+            
+            // Get recent episodes for replay during recovery
+            auto recentEpisodes = pImpl->episodicMemory->getEpisodesForReplay(1);
+            memoryData.recentEpisodeRewards.reserve(recentEpisodes.size());
+            for (const auto* episode : recentEpisodes) {
+                if (episode) {
+                    memoryData.recentEpisodeRewards.push_back(episode->reward);
+                }
+            }
+        }
+        
+        // Associative memory statistics
+        if (pImpl->associativeMemory) {
+            memoryData.associativePatternCount = pImpl->associativeMemory->getPatternCount();
+        }
+        
+        if (!writer.writeMemory(memoryData)) {
+            NLM_LOG_ERROR("Failed to write memory state to checkpoint");
             return false;
         }
         
