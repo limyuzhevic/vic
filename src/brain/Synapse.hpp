@@ -1,6 +1,10 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <vector>
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 namespace nlm {
 

@@ -3,6 +3,10 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <algorithm>
+#include <limits>
+
+namespace nlm {
 
 namespace nlm {
 
