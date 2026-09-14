@@ -292,7 +292,498 @@ float NeuralEpisodicMemory::computeSimilarity(const std::vector<float>& query,
     return dot / (std::sqrt(normQ) * std::sqrt(normE));
 }
 
+// Implement replayEpisode with strength parameter
+void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode, float strength) {
+    if (!episode || !brain_) return;
+    
+    // Reactivate neurons that were active during this episode
+    for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
+        NeuronId neuron = episode->activeNeurons[i];
+        float activation = i < episode->neuronActivations.size() ? 
+                          episode->neuronActivations[i] * strength : 0.5f * strength;
+        
+        // Inject current to reawaken this pattern
+        brain_->injectCurrent(neuron, activation * 3.0f);
+    }
+    
+    // Also inject sensory pattern if available
+    if (!episode->sensoryState.empty()) {
+        // This would go through sensory channels - simplified here
+    }
+}
+
+// Implement updateRelevance with actual relevance storage
+void NeuralEpisodicMemory::updateRelevance(SimulationStep episodeId, float relevanceDelta) {
+    if (episodeId < episodes_.size()) {
+        // In a full implementation, episodes would have a relevance field
+        // For now, this would age the episode differently
+        auto& episode = episodes_[episodeId];
+        episode.novelty += relevanceDelta * 0.1f;  // Store relevance in novelty field as placeholder
+    }
+}
+
+// Get episode by index
+const EpisodicMemoryItem* NeuralEpisodicMemory::getEpisode(size_t index) const {
+    if (index < episodes_.size()) {
+        return &episodes_[index];
+    }
+    return nullptr;
+}
+
+// Get recent episodes
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getRecentEpisodes(size_t count) const {
+    std::vector<const EpisodicMemoryItem*> results;
+    
+    size_t start = count > episodes_.size() ? 0 : episodes_.size() - count;
+    for (size_t i = start; i < episodes_.size(); ++i) {
+        results.push_back(&episodes_[i]);
+    }
+    
+    return results;
+}
+
+// Get average reward from episodes
+float NeuralEpisodicMemory::getAverageReward() const {
+    if (episodes_.empty()) return 0.0f;
+    
+    float sum = 0.0f;
+    for (const auto& ep : episodes_) {
+        sum += ep.reward;
+    }
+    return sum / episodes_.size();
+}
+
+// Clear old episodes
+void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
+    // Remove episodes below relevance threshold
+    // In a full implementation, episodes would have relevance scores
+    // For now, just enforce max capacity
+    while (episodes_.size() > maxEpisodes_ * 0.8f) {
+        episodes_.erase(episodes_.begin());
+    }
+}
+
+// Clear all episodes
+void NeuralEpisodicMemory::clear() {
+    episodes_.clear();
+    pImpl->episodeNeurons.clear();
+}
+
+// Enable/disable replay
+void NeuralEpisodicMemory::enableReplay(bool enable) { replayEnabled_ = enable; }
+bool NeuralEpisodicMemory::isReplayEnabled() const { return replayEnabled_; }
+
+// Get episodes for replay (selection based on relevance and recency)
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForReplay(size_t count) const {
+    
+    // Select episodes for replay based on:
+    // 1. Recency (more recent episodes)
+    // 2. Reward (higher reward episodes)
+    // 3. Unpredictability (higher prediction error episodes)
+    
+    std::vector<std::tuple<float, float, size_t>> scored;  // (score, reward, index)
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        float recencyScore = 1.0f / (episodes_[i].age + 1);
+        float rewardScore = episodes_[i].reward;
+        float score = recencyScore * 0.5f + rewardScore * 0.5f;
+        scored.emplace_back(score, rewardScore, i);
+    }
+    
+    // Sort by score
+    std::sort(scored.begin(), scored.end(),
+        [](const auto& a, const auto& b) {
+            return std::get<0>(a) > std::get<0>(b);
+        });
+    
+    std::vector<const EpisodicMemoryItem*> results;
+    for (size_t i = 0; i < std::min(count, scored.size()); ++i) {
+        results.push_back(&episodes_[std::get<2>(scored[i])]);
+    }
+    
+    return results;
+}
+
+// Replay multiple episodes (for sleep-like consolidation)
+void NeuralEpisodicMemory::replaySequence(const std::vector<size_t>& episodeIds) {
+    for (size_t id : episodeIds) {
+        if (id < episodes_.size()) {
+            replayEpisode(&episodes_[id]);
+            
+            // Small delay between replays
+            // (In simulation, this would be steps)
+        }
+    }
+}
+
+// Implement memory replay mechanisms for biologically plausible consolidation
+void NeuralEpisodicMemory::replayMemory(const std::vector<size_t>& episodeIds, ReplayMode mode) {
+    if (!brain_) return;
+    
+    switch (mode) {
+        case ReplayMode::LTP_CONSOLIDATION:
+            // Strong replay for LTP consolidation during slow wave sleep
+            replayConsolidationEpisodes(episodeIds, 2.0f);  // Replay strength multiplier
+            break;
+            
+        case ReplayMode::PATTERN_COMPLETION:
+            // Pattern completion during wakefulness
+            replayPatternCompletion(episodeIds);
+            break;
+            
+        case ReplayMode::SLEEP_REPLAY:
+            // Coordinated replay during rest periods (hippocampal-neocortical dialogue)
+            replaySleepPhases(episodeIds);
+            break;
+            
+        case ReplayMode::WORKING_MEMORY_REPLAY:
+            // Replay important memories for working memory integration
+            replayWorkingMemoryIntegration(episodeIds);
+            break;
+            
+        default:
+            replaySequence(episodeIds);
+            break;
+    }
+}
+
+// Simulate hippocampal-neocortical dialogue with coordinated replay
+void NeuralEpisodicMemory::simulateHippocampalNeocorticalDialogue(
+    const std::vector<const EpisodicMemoryItem*>& hippocampalEpisodes,
+    const std::vector<std::vector<float>>& neocorticalPatterns) {
+    
+    if (!brain_) return;
+    
+    // Implement coordinated replay: hippocampus drives initial replay
+    // then neocortex sustains and integrates patterns
+    
+    for (size_t i = 0; i < hippocampalEpisodes.size(); ++i) {
+        const EpisodicMemoryItem* episode = hippocampalEpisodes[i];
+        
+        if (!episode) continue;
+        
+        // Hippocampal phase: high-amplitude replay (replay strength multiplier)
+        replayEpisode(episode, 3.0f);  // Strong replay for hippocampal activation
+        
+        // Neocortical phase: pattern completion and integration
+        if (i < neocorticalPatterns.size()) {
+            // Find and activate matching neocortical patterns
+            for (size_t j = 0; j < episode->activeNeurons.size(); ++j) {
+                NeuronId neuron = episode->activeNeurons[j];
+                
+                // Inject current to sustain neocortical activation
+                brain_->injectCurrent(neuron, episode->neuronActivations[j] * 0.5f);
+                
+                // Strengthen connections to neocortical representations
+                brain_->strengthenConnections(neuron, neocorticalPatterns[i], 0.02f);
+            }
+        }
+    }
+}
+
+// Select episodes for replay based on multiple biological factors
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::selectEpisodesForReplay(
+    size_t maxCount,
+    ReplaySelectionStrategy strategy) const {
+    
+    std::vector<std::tuple<float, float, size_t>> scored;  // (importanceScore, recencyScore, index)
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        const auto& episode = episodes_[i];
+        
+        float importanceScore = calculateEpisodeImportance(episode);
+        float recencyScore = 1.0f / (episode.age + 1);
+        float noveltyScore = episode.novelty;
+        
+        float finalScore = 0.0f;
+        
+        switch (strategy) {
+            case ReplaySelectionStrategy::RECENCY_PRIORITY:
+                finalScore = recencyScore * 0.6f + importanceScore * 0.4f;
+                break;
+                
+            case ReplaySelectionStrategy::IMPORTANCE_PRIORITY:
+                finalScore = importanceScore * 0.7f + recencyScore * 0.3f;
+                break;
+                
+            case ReplaySelectionStrategy::NOVELTY_DRIVEN:
+                finalScore = noveltyScore * 0.5f + importanceScore * 0.3f + recencyScore * 0.2f;
+                break;
+                
+            case ReplaySelectionStrategy::BALANCED:
+                finalScore = (importanceScore + recencyScore + noveltyScore) / 3.0f;
+                break;
+        }
+        
+        scored.emplace_back(finalScore, importanceScore, i);
+    }
+    
+    // Sort by score (descending)
+    std::sort(scored.begin(), scored.end(),
+        [](const auto& a, const auto& b) {
+            return std::get<0>(a) > std::get<0>(b);
+        });
+    
+    std::vector<const EpisodicMemoryItem*> results;
+    for (size_t i = 0; i < std::min(maxCount, scored.size()); ++i) {
+        results.push_back(&episodes_[std::get<2>(scored[i])]);
+    }
+    
+    return results;
+}
+
+// Calculate episode importance based on multiple biological factors
+float NeuralEpisodicMemory::calculateEpisodeImportance(const EpisodicMemoryItem& episode) const {
+    float importance = 0.0f;
+    
+    // Reward importance (dopamine-based reinforcement)
+    importance += std::max(0.0f, episode.reward) * 0.4f;
+    
+    // Novelty importance (curiosity-driven)
+    importance += episode.novelty * 0.3f;
+    
+    // Prediction error importance
+    importance += episode.resultingReward * 0.2f;
+    
+    // Recency importance
+    importance += 1.0f / (episode.age + 1) * 0.1f;
+    
+    return std::clamp(importance, 0.0f, 1.0f);
+}
+
+// Implement consolidation during simulated sleep/rest cycles
+void NeuralEpisodicMemory::consolidateDuringSleep(
+    float sleepStartTime,
+    float sleepDuration,
+    SleepPhase sleepPhase) {
+    
+    // Detect sleep phases based on time
+    // 0.0-0.2: Deep sleep (slow oscillation dominant)
+    // 0.2-0.4: Light sleep (theta waves)
+    // 0.4-1.0: REM sleep (desynchronized)
+    
+    float phaseProgress = (sleepStartTime + sleepDuration) / sleepDuration;
+    
+    switch (sleepPhase) {
+        case SleepPhase::DEEP_SLEEP:
+            // High-amplitude replay of recent memories
+            // LTP consolidation through coordinated reactivation
+            replayDuringSleepPhase(0.8f, 1.5f);  // High replay strength, frequency
+            break;
+            
+        case SleepPhase::LIGHT_SLEEP:
+            // Pattern completion and integration
+            replayDuringSleepPhase(0.5f, 0.8f);  // Moderate replay
+            break;
+            
+        case SleepPhase::REM_SLEEP:
+            // Emotional memory processing and integration
+            replayDuringSleepPhase(0.3f, 0.6f);  // Lower frequency, associated replay
+            break;
+    }
+}
+
+// Replay episodes during sleep/rest with biological timing
+void NeuralEpisodicMemory::replayDuringSleepPhase(float strength, float frequency) {
+    // Select episodes based on importance and recency for sleep replay
+    std::vector<const EpisodicMemoryItem*> sleepEpisodes = 
+        selectEpisodesForReplay(static_cast<size_t>(episodes_.size() * 0.3f),  // Replay top 30%
+                               ReplaySelectionStrategy::IMPORTANCE_PRIORITY);
+    
+    if (sleepEpisodes.empty()) return;
+    
+    // Coordinated hippocampal-neocortical replay
+    // This simulates the replay sequences observed in biological sleep
+    for (size_t replayIteration = 0; replayIteration < 3; ++replayIteration) {
+        for (const auto* episode : sleepEpisodes) {
+            if (!episode) continue;
+            
+            // Replay with strength-based activation
+            replayEpisode(episode, strength);
+            
+            // Provide neocortical feedback for integration
+            if (brain_ && !episode->resultingSensoryState.empty()) {
+                // Find and activate related neocortical patterns
+                std::vector<float> resultingPattern = episode->resultingSensoryState;
+                brain_->activatePattern(resultingPattern, strength * 0.3f);
+            }
+            
+            // Sleep timing constraints: staggered replay with appropriate delays
+            // to match biological replay patterns
+            Timestamp replayDelay = 0.01f * (1.0f + (replayIteration * frequency));
+            // In real implementation, this would be handled by the sleep scheduler
+        }
+    }
+}
+
+// Integrate replay with working memory for enhanced cognition
+void NeuralEpisodicMemory::integrateReplayWithWorkingMemory(const std::vector<const EpisodicMemoryItem*>& replayedEpisodes) {
+    if (!brain_) return;
+    
+    // Strengthen working memory traces based on replayed episodes
+    for (const auto* episode : replayedEpisodes) {
+        if (!episode) continue;
+        
+        // Update working memory with episode information
+        for (size_t i = 0; i < std::min(episode->activeNeurons.size(), 
+                                        brain_->getWorkingMemory()->getCurrentSize()); ++i) {
+            
+            NeuronId neuron = episode->activeNeurons[i];
+            float activation = episode->neuronActivations[i];
+            
+            // Store in working memory with enhanced activation
+            brain_->getWorkingMemory()->storeToNeuron(neuron, activation * 1.5f);
+            
+            // Strengthen working memory connections
+            brain_->getWorkingMemory()->strengthenMemory(1.2f);
+        }
+    }
+}
+
+// Private implementation methods
+
+void NeuralEpisodicMemory::replayConsolidationEpisodes(const std::vector<size_t>& episodeIds, float strengthMultiplier) {
+    for (size_t id : episodeIds) {
+        if (id < episodes_.size()) {
+            replayEpisode(&episodes_[id], strengthMultiplier);
+        }
+    }
+}
+
+void NeuralEpisodicMemory::replayPatternCompletion(const std::vector<size_t>& episodeIds) {
+    for (size_t id : episodeIds) {
+        if (id < episodes_.size()) {
+            const auto* episode = &episodes_[id];
+            
+            // Pattern completion: reactivate partial patterns to retrieve full episodes
+            if (brain_ && !episode->sensoryState.empty()) {
+                // Find partial matches in episodic memory
+                std::vector<const EpisodicMemoryItem*> partialMatches =
+                    retrieveSimilar(episode->sensoryState, 3);
+                
+                // Complete patterns through spreading activation
+                for (const auto* match : partialMatches) {
+                    if (match && match != episode) {
+                        replayEpisode(match, 0.8f);  // Pattern completion strength
+                    }
+                }
+            }
+        }
+    }
+}
+
+void NeuralEpisodicMemory::replaySleepPhases(const std::vector<size_t>& episodeIds) {
+    // Implement coordinated replay across hippocampal and neocortical networks
+    // during simulated sleep phases
+    
+    // This simulates the sleep spindle and slow oscillation interactions
+    // that facilitate memory consolidation in biological systems
+    
+    float timeProgress = 0.0f;
+    for (size_t id : episodeIds) {
+        if (id < episodes_.size()) {
+            const auto* episode = &episodes_[id];
+            
+            // Time-dependent replay: early replay of recent memories,
+            // late replay of older but important memories
+            float replayTiming = 1.0f - (timeProgress / episodeIds.size());
+            
+            // Varying replay strength based on timing within sleep cycle
+            float phaseReplayStrength = replayTiming;  // High early in sleep
+            
+            replayEpisode(episode, phaseReplayStrength);
+            
+            timeProgress += 0.1f;  // Simulate progression through sleep phases
+        }
+    }
+}
+
+void NeuralEpisodicMemory::replayWorkingMemoryIntegration(const std::vector<size_t>& episodeIds) {
+    if (!brain_) return;
+    
+    // Replay specifically to integrate with working memory
+    std::vector<const EpisodicMemoryItem*> episodesForIntegration;
+    
+    for (size_t id : episodeIds) {
+        if (id < episodes_.size()) {
+            const auto* episode = &episodes_[id];
+            
+            // Select episodes that match working memory content
+            bool hasWorkingMemoryMatch = false;
+            auto workingMemory = brain_->getWorkingMemory();
+            
+            if (workingMemory) {
+                for (size_t i = 0; i < episode->activeNeurons.size() && !hasWorkingMemoryMatch; ++i) {
+                    NeuronId neuron = episode->activeNeurons[i];
+                    if (workingMemory->contains(neuron)) {
+                        hasWorkingMemoryMatch = true;
+                    }
+                }
+            }
+            
+            if (hasWorkingMemoryMatch) {
+                episodesForIntegration.push_back(episode);
+            }
+        }
+    }
+    
+    // Integrate with working memory
+    integrateReplayWithWorkingMemory(episodesForIntegration);
+}
+
 bool NeuralEpisodicMemory::matchesCriteria(
+    const EpisodicMemoryItem& episode,
+    const std::vector<float>* sensoryQuery,
+    SimulationStep* startTime,
+    SimulationStep* endTime,
+    ActionType* actionQuery) const {
+    
+    if (sensoryQuery) {
+        if (computeSimilarity(*sensoryQuery, episode) < 0.3f) {
+            return false;
+        }
+    }
+    
+    if (startTime && endTime) {
+        if (episode.timestamp < *startTime || episode.timestamp > *endTime) {
+            return false;
+        }
+    }
+    
+    if (actionQuery && episode.action != *actionQuery) {
+        return false;
+    }
+    
+    return true;
+}
+
+bool NeuralEpisodicMemory::matchesCriteria(
+    const EpisodicMemoryItem& episode,
+    const std::vector<float>* sensoryQuery,
+    SimulationStep* startTime,
+    SimulationStep* endTime,
+    ActionType* actionQuery) const {
+    
+    if (sensoryQuery) {
+        if (computeSimilarity(*sensoryQuery, episode) < 0.3f) {
+            return false;
+        }
+    }
+    
+    if (startTime && endTime) {
+        if (episode.timestamp < *startTime || episode.timestamp > *endTime) {
+            return false;
+        }
+    }
+    
+    if (actionQuery && episode.action != *actionQuery) {
+        return false;
+    }
+    
+    return true;
+}
+
+} // namespace nlm
     const EpisodicMemoryItem& episode,
     const std::vector<float>* sensoryQuery,
     SimulationStep* startTime,

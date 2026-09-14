@@ -18,18 +18,35 @@ struct NeuralWorkingMemory::Impl {
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    pImpl->brain = nullptr;
+    pImpl->maintenanceSynapses.clear();
+    pImpl->traceAges.clear();
+    
+    // Initialize attention system
+    attentionWeights_.clear();
+    attentionalSelectionWinners_.clear();
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Invalid brain pointer passed to NeuralWorkingMemory::initialize");
+        return;
+    }
+    
     pImpl->brain = brain;
     brain_ = brain;
+    
+    // Initialize attention system
+    attentionWeights_.assign(100, 0.0f);
+    attentionalSelectionWinners_.clear();
+    
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
@@ -250,24 +267,33 @@ struct AttentionalSelection::Impl {
     std::vector<float> competitionStrength;
     std::vector<float> inhibitionLevel;
     
-    Impl() {}
+    // Attention weights for neural populations
+    std::vector<float> attentionWeights;
+    
+    // Current attentional selection winners
+    std::vector<NeuronId> attentionalSelectionWinners;
+    
+    Impl() {
+        competitionStrength.clear();
+        inhibitionLevel.clear();
+        attentionWeights.clear();
+        attentionalSelectionWinners.clear();
+    }
 };
 
 AttentionalSelection::AttentionalSelection()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , inhibitionStrength_(0.5f)
     , excitationStrength_(1.5f)
     , competitionThreshold_(0.3f)
 {
-}
-
-AttentionalSelection::~AttentionalSelection() = default;
-
-void AttentionalSelection::initialize(Brain* brain) {
-    pImpl = std::make_unique<Impl>();
-    brain_ = brain;
-    NLM_LOG_INFO("AttentionalSelection initialized");
+    // Initialize attention system state
+    neuronSalience_.clear();
+    winners_.clear();
+    attendedRegions_.clear();
+    topDownBias_.clear();
+    bottomUpSalience_.clear();
 }
 
 std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector<NeuronId>& competitors,
@@ -421,6 +447,8 @@ void AttentionalSelection::reset() {
     topDownBias_.clear();
     bottomUpSalience_.clear();
     pImpl->inhibitionLevel.clear();
+    pImpl->attentionWeights.clear();
+    pImpl->attentionalSelectionWinners.clear();
 }
 
 } // namespace nlm

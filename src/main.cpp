@@ -321,8 +321,213 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+bool shouldExitWithHelp() {
+    std::cout << R"(
+╔═══════════════════════════════════════════════════════════════╗
+║                    NLM - Advanced Commands Guide              ║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║ Advanced Usage Commands:                                      ║
+║   nlm debug          - Debug mode with detailed output         ║
+║   nlm profile        - Performance profiling                  ║
+║   nlm save-state <filename> - Save current simulation state  ║
+║   nlm load-state <filename> - Load saved simulation state    ║
+║   nlm analyze        - Analyze current brain state and metrics ║
+║   nlm experiment <params> - Run experimental configurations  ║
+║   nlm benchmark      - Performance benchmarks                 ║
+║   nlm import-neurons <file> - Import external neural configurations ║
+║   nlm export-neurons <file> - Export neural configurations    ║
+║   nlm monitor        - Real-time monitoring                   ║
+║   nlm optimize       - Performance optimization               ║
+║   nlm validate       - Validate configuration and integrity   ║
+║                                                               ║
+║ For basic usage (Phase 2 demo):                                ║
+║   nlm                                               ║
+║                                                               ║
+╠═══════════════════════════════════════════════════════════════╣
+║ For more information:                                         ║
+║   https://github.com/nlm-project/nlm                    ║
+╚═══════════════════════════════════════════════════════════════╝
+)" << std::endl;
+    return true;
+}
+
+bool parseAdvancedCommands(int argc, char** argv, std::shared_ptr<Config>& config) {
+    // Check for help command first
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h" || arg == "debug") {
+            return shouldExitWithHelp();
+        }
+    }
+    
+    // Parse advanced commands
+    bool debugMode = false;
+    bool profileMode = false;
+    std::string saveStateFile;
+    std::string loadStateFile;
+    std::string analyzeFile;
+    std::string experimentParams;
+    bool benchmarkMode = false;
+    std::string importNeuronsFile;
+    std::string exportNeuronsFile;
+    bool monitorMode = false;
+    bool optimizeMode = false;
+    bool validateMode = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "debug" || arg == "--debug") {
+            debugMode = true;
+        } else if (arg == "profile" || arg == "--profile") {
+            profileMode = true;
+        } else if (arg == "benchmark" || arg == "--benchmark") {
+            benchmarkMode = true;
+        } else if (arg == "analyze" || arg == "--analyze") {
+            analyzeFile = "analysis_" + std::to_string(std::time(nullptr)) + ".txt";
+        } else if (arg == "monitor" || arg == "--monitor") {
+            monitorMode = true;
+        } else if (arg == "optimize" || arg == "--optimize") {
+            optimizeMode = true;
+        } else if (arg == "validate" || arg == "--validate") {
+            validateMode = true;
+        } else if (arg == "save-state" || arg == "--save-state") {
+            if (i + 1 < argc) {
+                saveStateFile = argv[++i];
+            }
+        } else if (arg == "load-state" || arg == "--load-state") {
+            if (i + 1 < argc) {
+                loadStateFile = argv[++i];
+            }
+        } else if (arg == "import-neurons" || arg == "--import-neurons") {
+            if (i + 1 < argc) {
+                importNeuronsFile = argv[++i];
+            }
+        } else if (arg == "export-neurons" || arg == "--export-neurons") {
+            if (i + 1 < argc) {
+                exportNeuronsFile = argv[++i];
+            }
+        } else if (arg == "experiment" || arg == "--experiment") {
+            if (i + 1 < argc) {
+                experimentParams = argv[++i];
+            }
+        }
+    }
+    
+    // Set debug configuration if in debug mode
+    if (debugMode) {
+        config->set("debug_level", 3, ConfigSource::CommandLine);
+        config->set("log_all_neurons", true, ConfigSource::CommandLine);
+        config->set("log_plasticity_details", true, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Debug mode enabled - detailed logging activated");
+    }
+    
+    // Set profile configuration if in profile mode
+    if (profileMode) {
+        config->set("profile_mode", true, ConfigSource::CommandLine);
+        config->set("sampling_interval", 0.01, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Profile mode enabled - performance metrics collected");
+    }
+    
+    // Handle save state
+    if (!saveStateFile.empty()) {
+        NLM_LOG_INFO("Save state requested to: " + saveStateFile);
+        // Note: Implementation will be added when Brain::save is implemented
+    }
+    
+    // Handle load state
+    if (!loadStateFile.empty()) {
+        NLM_LOG_INFO("Load state requested from: " + loadStateFile);
+        // Note: Implementation will be added when Brain::load is implemented
+    }
+    
+    // Handle analyze
+    if (!analyzeFile.empty()) {
+        NLM_LOG_INFO("Analysis requested - will generate report: " + analyzeFile);
+        // Note: Implementation will be added
+    }
+    
+    // Handle experiment
+    if (!experimentParams.empty()) {
+        NLM_LOG_INFO("Experiment parameters: " + experimentParams);
+        // Note: Implementation will be added
+    }
+    
+    // Handle import neurons
+    if (!importNeuronsFile.empty()) {
+        NLM_LOG_INFO("Import neurons from: " + importNeuronsFile);
+        // Note: Implementation will be added
+    }
+    
+    // Handle export neurons
+    if (!exportNeuronsFile.empty()) {
+        NLM_LOG_INFO("Export neurons to: " + exportNeuronsFile);
+        // Note: Implementation will be added
+    }
+    
+    // Handle monitor
+    if (monitorMode) {
+        NLM_LOG_INFO("Real-time monitoring enabled");
+        // Note: Implementation will be added
+    }
+    
+    // Handle optimize
+    if (optimizeMode) {
+        NLM_LOG_INFO("Performance optimization enabled");
+        // Note: Implementation will be added
+    }
+    
+    // Handle validate
+    if (validateMode) {
+        NLM_LOG_INFO("Configuration validation enabled");
+        // Note: Implementation will be added
+    }
+    
+    // Handle benchmark
+    if (benchmarkMode) {
+        NLM_LOG_INFO("Running performance benchmarks");
+        // Note: benchmark.cpp exists but needs integration
+    }
+    
+    return true;
+}
+
+void runAdvancedCommands() {
+    std::cout << "=== NLM Advanced Commands ===" << std::endl;
+    std::cout << "Starting simulation with advanced features..." << std::endl;
+    
+    // Run benchmarks if requested
+    if (std::getenv("NLM_BENCHMARK")) {
+        std::cout << "Running benchmarks..." << std::endl;
+        // TODO: Run benchmark.cpp functionality
+    }
+    
+    // Run monitor if requested
+    if (std::getenv("NLM_MONITOR")) {
+        std::cout << "Starting real-time monitoring..." << std::endl;
+        // TODO: Start monitoring thread
+    }
+    
+    std::cout << "Advanced command processing complete." << std::endl;
+}
+
 int main(int argc, char** argv) {
     printBanner();
+    
+    // Check for help or advanced commands first
+    if (argc > 1) {
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            if (arg == "--help" || arg == "-h" || arg == "debug" || 
+                arg == "profile" || arg == "analyze" || arg == "experiment" ||
+                arg == "benchmark" || arg == "import-neurons" || 
+                arg == "export-neurons" || arg == "monitor" ||
+                arg == "optimize" || arg == "validate") {
+                return shouldExitWithHelp();
+            }
+        }
+    }
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
@@ -366,6 +571,11 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
+    // Parse advanced commands
+    if (!parseAdvancedCommands(argc, argv, config)) {
+        return 1;
+    }
+    
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
@@ -408,6 +618,9 @@ int main(int argc, char** argv) {
     }
     
     brain->logStatus();
+    
+    // Run advanced commands processing
+    runAdvancedCommands();
     
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);

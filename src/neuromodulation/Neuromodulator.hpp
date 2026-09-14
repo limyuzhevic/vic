@@ -48,6 +48,9 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
 private:
     struct Impl;
     Impl* pImpl;

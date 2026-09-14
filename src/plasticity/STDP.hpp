@@ -1,12 +1,3 @@
-#pragma once
-
-#include "PlasticityRule.hpp"
-
-namespace nlm {
-
-// Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
-
 class STDP : public PlasticityRule {
 public:
     STDP();
@@ -29,6 +20,22 @@ public:
     
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
+    
+    // Trace access for debugging/monitoring
+    float getPreTrace(SynapseId synId) const;
+    float getPostTrace(SynapseId synId) const;
+    
+    // Enable/disable neuromodulation
+    void setNeuromodulationEnabled(bool enabled);
+    bool isNeuromodulationEnabled() const;
+    
+    // Set learning rate modulation
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    
+    // Set normalization factors
+    void setWeightNormalization(float factor);
+    void setTraceNormalization(float factor);
     
 private:
     struct Impl;

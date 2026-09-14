@@ -1,201 +1,145 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/SimulationClock/SimulationClock.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../motor/Action.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../performance/CheckpointSystem.hpp"
+#include <fstream>
+#include <algorithm>
+#include <cmath>
+#include <sstream>
+#include <iostream>
+#include <vector>
 #include <memory>
 #include <string>
 
-namespace nlm {
-
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
-
-// Inter-regional connection (long-range connectivity)
-struct InterRegionConnection {
-    RegionId sourceRegion;
-    RegionId targetRegion;
-    float weight;
-    Delay delay;
-    PlasticityFlags plasticityFlags;
-    
-    InterRegionConnection()
-        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
-    
-    InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
-        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
-};
-
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
-
+// Brain: The central artificial brain with integrated cognitive systems
+// Implements neural dynamics, memory, plasticity, and cognition
 class Brain {
 public:
-    // Create brain with configuration
-    explicit Brain(std::shared_ptr<Config> config);
-    
+    Brain();
     ~Brain();
     
-    // Disable copying, enable moving
-    Brain(const Brain&) = delete;
-    Brain& operator=(const Brain&) = delete;
-    Brain(Brain&&) noexcept;
-    Brain& operator=(Brain&&) noexcept;
-    
     // Initialize brain with configuration
-    bool initialize();
+    void initialize(Config config);
     
     // Main simulation step
-    void step(SimulationStep currentStep);
-    
-    // Simulation time step
     void step(SimulationStep currentStep, Timestamp currentTime);
     
-    // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
-    void receiveSensoryInput(const class SensoryInput& input);
-    
-    // Inject current directly into a specific neuron
-    void injectCurrent(NeuronId neuron, MembranePotential current);
-    
-    // Inject current into all neurons of a specific type
-    void injectCurrentToNeurons(NeuronType type, MembranePotential current);
-    
-    // Spike system access
-    SpikeSystem* getSpikeSystem();
-    const SpikeSystem* getSpikeSystem() const;
-    
-    // Plasticity system access
-    STDP* getSTDP();
-    Hebbian* getHebbian();
-    StructuralPlasticity* getStructuralPlasticity();
-    
-    // Statistics
-    float getExcitationInhibitionRatio() const;
-    size_t getTotalSpikeCount() const;
-    size_t getPendingSpikeEventCount() const;
-    
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
-    
-    // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
-    
-    // Update plasticity rules (called automatically in step)
-    void updatePlasticity();
-    
-    // Apply developmental changes (called automatically in step)
-    void develop();
-    
-    // Reset brain state
+    // Reset brain to initial state
     void reset();
     
-    // Save brain state to file (checkpointing)
+    // Save/load brain state
     bool save(const std::string& filepath) const;
-    
-    // Load brain state from file
     bool load(const std::string& filepath);
     
-    // Region management
-    RegionId addRegion(const std::string& name = "");
-    NeuralRegion* getRegion(RegionId id);
-    const NeuralRegion* getRegion(RegionId id) const;
-    size_t getRegionCount() const;
-    std::vector<RegionId> getRegionIds() const;
-    
-    // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
-    
-    // Inter-region connection management
-    void addInterRegionConnection(RegionId source, RegionId target, 
-                                  float weight = 0.0f, Delay delay = 1);
-    void removeInterRegionConnection(RegionId source, RegionId target);
-    
-    // Global statistics
-    size_t getTotalNeuronCount() const;
-    size_t getTotalSynapseCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
-    
-    // ========== MEMORY SYSTEMS ==========
-    
-    // Working memory - transient active information
+    // Getters for integrated systems
+    DevelopmentSystem* getDevelopmentSystem();
+    Neuromodulator* getNeuromodulator();
+    Curiosity* getCuriosity();
+    PredictionError* getPredictionError();
     NeuralWorkingMemory* getWorkingMemory();
-    
-    // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
-    
-    // ========== PREDICTION SYSTEM ==========
-    
-    // Prediction system for sensory prediction and error computation
+    SemanticMemory* getSemanticMemory();
+    ProceduralMemory* getProceduralMemory();
+    AssociativeMemory* getAssociativeMemory();
     PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
-    
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
-    
-    // Concept formation for pattern discovery
+    NeuralPlanner* getNeuralPlanner();
     ConceptFormation* getConceptFormation();
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // Configuration and state access
+    void setConfig(const Config& config);
+    const Config& getConfig() const;
     
-    // ========== DEVELOPMENT SYSTEM ==========
-    
-    DevelopmentSystem* getDevelopmentSystem();
+    SimulationStep getCurrentStep() const;
+    Timestamp getCurrentTime() const;
     DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
+    double getDevelopmentalAge() const;
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+    // Neural substrate access
+    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
+    std::vector<std::unique_ptr<NeuralRegion>>& getRegions();
     
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    // Statistics and debugging
+    void collectStatistics();
+    void generateReport();
+    std::string exportState() const;
+    void importState(const std::string& stateData);
     
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    // Cleanup resources
+    void cleanup();
     
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
-    
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
-    
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
-    void logStatus() const;
+    // Memory replay integration methods
+    void replayMemory(const std::vector<size_t>& episodeIds, ReplayMode mode);
+    void replayForConsolidation(const std::vector<size_t>& episodeIds);
+    void replayDuringSleep(float startTime, float duration, SleepPhase phase);
+    void injectCurrentToNeurons(NeuronType neuronType, float current);
+    void strengthenConnections(NeuronId source, const std::vector<float>& pattern, float delta);
+    void activatePattern(const std::vector<float>& pattern, float strength);
+    void updateWorkingMemoryIntegration();
+    std::vector<const EpisodicMemoryItem*> getRecentEpisodesForReplay(size_t count) const;
     
 private:
     struct Impl;
     Impl* pImpl;
 };
 
+// Memory replay type definitions for brain integration
+enum class ReplayMode {
+    LTP_CONSOLIDATION,     // Long-term potentiation during deep sleep
+    PATTERN_COMPLETION,   // Pattern completion during wakefulness
+    SLEEP_REPLAY,         // Coordinated replay during rest (hippocampal-neocortical dialogue)
+    WORKING_MEMORY_REPLAY // Integration with working memory
+};
+
+enum class ReplaySelectionStrategy {
+    RECENCY_PRIORITY,     // Prioritize recent memories
+    IMPORTANCE_PRIORITY,  // Prioritize important/rewarded memories
+    NOVELTY_DRIVEN,       // Prioritize novel experiences
+    BALANCED             // Balance between all factors
+};
+
+enum class SleepPhase {
+    DEEP_SLEEP,    // Slow wave sleep with high-amplitude replay
+    LIGHT_SLEEP,   // Intermediate sleep with moderate replay
+    REM_SLEEP      // Paradoxical sleep with emotional memory processing
+};
+
 } // namespace nlm
+
+class DevelopmentSystem;
+class Neuromodulator;
+class Curiosity;
+class PredictionError;
+class NeuralWorkingMemory;
+class NeuralEpisodicMemory;
+class SemanticMemory;
+class ProceduralMemory;
+class AssociativeMemory;
+class NeuralPlanner;
+class ConceptFormation;
+class PredictionSystem;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+
+struct Brain::Impl;

@@ -18,23 +18,34 @@ struct Novelty::Impl {
 
 Novelty::Novelty() : pImpl(new Impl) {}
 
-Novelty::~Novelty() = default;
+Novelty::~Novelty() {
+    delete pImpl;
+}
 
 void Novelty::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    NLM_LOG_INFO("Novelty detection initialized");
+    if (!pImpl) {
+        pImpl = new Impl;
+    }
+    if (pImpl) {
+        pImpl->brain = brain;
+        NLM_LOG_INFO("Novelty detection initialized");
+    }
 }
 
 float Novelty::getLevel() const {
+    if (!pImpl) return 0.0f;
     return pImpl->level;
 }
 
 void Novelty::setLevel(float level) {
+    if (!pImpl) return;
     pImpl->level = level;
 }
 
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
+    if (!pImpl) return;
+    
     // Extract features from observations and compare
     // Simple implementation: just set to a placeholder
     pImpl->level = 1.0f;
@@ -43,6 +54,8 @@ void Novelty::detectNovelty(const Observation& observation,
 
 void Novelty::detectNovelty(const std::vector<float>& currentPattern,
                             const std::vector<float>& previousPattern) {
+    if (!pImpl) return;
+    
     if (currentPattern.empty() || previousPattern.empty()) {
         pImpl->level = 0.0f;
         return;
@@ -69,15 +82,19 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
 }
 
 void Novelty::update(TimestepDuration dt) {
+    if (!pImpl) return;
+    
     // Decay novelty
     pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
 const std::vector<float>& Novelty::getHistory() const {
+    if (!pImpl) static const std::vector<float> empty{};
     return pImpl->history;
 }
 
 void Novelty::clearHistory() {
+    if (!pImpl) return;
     pImpl->history.clear();
 }
 

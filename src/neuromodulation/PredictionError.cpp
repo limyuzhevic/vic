@@ -16,18 +16,24 @@ struct PredictionError::Impl {
 
 PredictionError::PredictionError() : pImpl(new Impl) {}
 
-PredictionError::~PredictionError() = default;
+PredictionError::~PredictionError() {
+    delete pImpl;
+}
 
 void PredictionError::initialize(Brain* brain) {
+    if (!pImpl) return;
     pImpl->brain = brain;
     NLM_LOG_INFO("PredictionError system initialized");
 }
 
 float PredictionError::getError() const {
+    if (!pImpl) return 0.0f;
     return pImpl->error;
 }
 
 void PredictionError::computeError(float predicted, float actual) {
+    if (!pImpl) return;
+    
     pImpl->predictedValue = predicted;
     pImpl->actualValue = actual;
     pImpl->error = actual - predicted;
@@ -35,18 +41,25 @@ void PredictionError::computeError(float predicted, float actual) {
 }
 
 void PredictionError::updatePrediction(float newPrediction) {
+    if (!pImpl) return;
+    
     pImpl->predictedValue = newPrediction;
 }
 
 const std::vector<float>& PredictionError::getHistory() const {
+    if (!pImpl) static const std::vector<float> empty{};
     return pImpl->history;
 }
 
 void PredictionError::clearHistory() {
+    if (!pImpl) return;
+    
     pImpl->history.clear();
 }
 
 float PredictionError::getMagnitude() const {
+    if (!pImpl) return 0.0f;
+    
     return std::abs(pImpl->error);
 }
 

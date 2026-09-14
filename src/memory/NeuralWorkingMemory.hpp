@@ -104,6 +104,10 @@ private:
     
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;
+    
+    // Attention system
+    std::vector<float> attentionWeights_;
+    std::vector<NeuronId> attentionalSelectionWinners_;
 };
 
 // AttentionalSelection: Neural attention through competition

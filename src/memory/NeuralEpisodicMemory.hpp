@@ -123,6 +123,53 @@ public:
 
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
+    
+    // Real memory replay with biological mechanisms
+    enum class ReplayMode {
+        LTP_CONSOLIDATION,     // Long-term potentiation during deep sleep
+        PATTERN_COMPLETION,   // Pattern completion during wakefulness
+        SLEEP_REPLAY,         // Coordinated replay during rest (hippocampal-neocortical dialogue)
+        WORKING_MEMORY_REPLAY // Integration with working memory
+    };
+    
+    enum class ReplaySelectionStrategy {
+        RECENCY_PRIORITY,     // Prioritize recent memories
+        IMPORTANCE_PRIORITY,  // Prioritize important/rewarded memories
+        NOVELTY_DRIVEN,       // Prioritize novel experiences
+        BALANCED             // Balance between all factors
+    };
+    
+    enum class SleepPhase {
+        DEEP_SLEEP,    // Slow wave sleep with high-amplitude replay
+        LIGHT_SLEEP,   // Intermediate sleep with moderate replay
+        REM_SLEEP      // Paradoxical sleep with emotional memory processing
+    };
+    
+    // Advanced replay mechanisms
+    void replayMemory(const std::vector<size_t>& episodeIds, ReplayMode mode);
+    void simulateHippocampalNeocorticalDialogue(
+        const std::vector<const EpisodicMemoryItem*>& hippocampalEpisodes,
+        const std::vector<std::vector<float>>& neocorticalPatterns);
+    std::vector<const EpisodicMemoryItem*> selectEpisodesForReplay(
+        size_t maxCount,
+        ReplaySelectionStrategy strategy) const;
+    
+    // Integration with other brain systems
+    void consolidateDuringSleep(
+        float sleepStartTime,
+        float sleepDuration,
+        SleepPhase sleepPhase);
+    void integrateReplayWithWorkingMemory(const std::vector<const EpisodicMemoryItem*>& replayedEpisodes);
+    
+    // Helper methods for biologically plausible replay
+private:
+    void replayConsolidationEpisodes(const std::vector<size_t>& episodeIds, float strengthMultiplier);
+    void replayPatternCompletion(const std::vector<size_t>& episodeIds);
+    void replaySleepPhases(const std::vector<size_t>& episodeIds);
+    void replayWorkingMemoryIntegration(const std::vector<size_t>& episodeIds);
+    void replayDuringSleepPhase(float strength, float frequency);
+    
+    float calculateEpisodeImportance(const EpisodicMemoryItem& episode) const;
 
 private:
     // Compute similarity between query and stored episode

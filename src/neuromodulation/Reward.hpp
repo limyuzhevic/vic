@@ -12,6 +12,9 @@ public:
     Reward();
     ~Reward();
     
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
     // Get current reward value
     float getValue() const;
     void setValue(float value);
