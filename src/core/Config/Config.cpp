@@ -28,18 +28,34 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs with safety checks
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
+            // Prevent buffer overflow by limiting line length
+            if (line.length() > 4096) {
+                NLM_LOG_WARNING("Line " + std::to_string(lineNumber) + 
+                              " is too long (max 4096 chars)");
+                continue;
+            }
+            
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            // Safety checks for key and value
+            if (key.length() > 256) {
+                NLM_LOG_WARNING("Key in line " + std::to_string(lineNumber) + 
+                              " is too long (max 256 chars)");
+                continue;
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -48,7 +64,19 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Validate key contains only allowed characters
+            for (char c : key) {
+                if (!std::isalnum(c) && c != '_' && c != '-' && c != '.') {
+                    NLM_LOG_WARNING("Invalid character in key at line " + 
+                                  std::to_string(lineNumber));
+                    continue;
+                }
+            }
+            
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Line " + std::to_string(lineNumber) + 
+                          " doesn't contain '=' - ignoring");
         }
     }
     

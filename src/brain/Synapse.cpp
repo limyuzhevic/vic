@@ -47,7 +47,7 @@ struct Synapse::Impl {
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
-    : pImpl(new Impl) {
+    : pImpl(std::make_unique<Impl>()) {
     pImpl->id = id;
     pImpl->sourceNeuron = source;
     pImpl->destinationNeuron = destination;
@@ -70,7 +70,11 @@ Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        // Properly delete the old implementation
+        if (pImpl) {
+            delete pImpl;
+        }
+        // Transfer ownership from other to this
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }

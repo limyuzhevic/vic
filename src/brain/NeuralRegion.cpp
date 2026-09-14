@@ -61,7 +61,11 @@ NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    size_t idx = id.index() - 1;
+    if (idx >= pImpl->populations.size()) {
+        return nullptr;
+    }
+    return pImpl->populations[idx].get();
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
