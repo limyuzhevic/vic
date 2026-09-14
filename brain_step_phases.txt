@@ -1,0 +1,16 @@
+Step 1: Process pending delayed spike events (deliver synaptic input)
+Step 2: Update all neurons (LIF dynamics)
+Step 3: Detect spikes and schedule spike events
+Step 4: Update working memory (maintenance and competition)
+Step 5: Apply neuromodulation effects on neural excitability
+Step 6: Apply plasticity rules (STDP, Hebbian)
+Step 7: Update episodic memory with current experience
+Step 8: Update prediction system
+Step 9: Update attention system
+Step 10: Update concept formation
+Step 11: Apply structural plasticity (synaptogenesis, pruning)
+Step 12: Replay important memories (during rest or periodically)
+Step 13: Apply development effects
+Step 14: Periodic memory consolidation
+Step 15: Checkpoint management
+Step 16: Collect statistics

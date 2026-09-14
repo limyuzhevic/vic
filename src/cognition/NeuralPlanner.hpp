@@ -62,9 +62,14 @@ public:
     // Clear planning cache
     void clearCache();
 
-    // Set action quality function (from experience)
-    void setActionQuality(ActionType action, float quality) {
-        actionQuality_[static_cast<size_t>(action)] = quality;
+    // Set prediction system for better planning
+    void setPredictionSystem(PredictionSystem* predictionSystem) {
+        predictionSystem_ = predictionSystem;
+    }
+    
+    // Set self-model for adaptive planning
+    void setSelfModel(SelfModel* selfModel) {
+        selfModel_ = selfModel;
     }
 
     // Get current goal

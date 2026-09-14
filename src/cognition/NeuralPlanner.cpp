@@ -7,8 +7,10 @@ namespace nlm {
 
 struct NeuralPlanner::Impl {
     Brain* brain;
+    PredictionSystem* predictionSystem;
+    SelfModel* selfModel;
     
-    Impl() : brain(nullptr) {}
+    Impl() : brain(nullptr), predictionSystem(nullptr), selfModel(nullptr) {}
 };
 
 NeuralPlanner::NeuralPlanner()
@@ -25,6 +27,8 @@ NeuralPlanner::~NeuralPlanner() = default;
 void NeuralPlanner::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
+    pImpl->predictionSystem = nullptr;
+    pImpl->selfModel = nullptr;
     NLM_LOG_INFO("NeuralPlanner initialized");
 }
 

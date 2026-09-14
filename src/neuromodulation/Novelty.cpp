@@ -1,8 +1,4 @@
-#include "Novelty.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
-
+// Novelty Implementation
 namespace nlm {
 
 struct Novelty::Impl {
@@ -12,8 +8,9 @@ struct Novelty::Impl {
     std::vector<float> history;
     std::vector<float> lastPattern;
     float noveltyThreshold;
+    float surprisingThreshold;
     
-    Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
+    Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f), surprisingThreshold(0.5f) {}
 };
 
 Novelty::Novelty() : pImpl(new Impl) {}
@@ -79,6 +76,10 @@ const std::vector<float>& Novelty::getHistory() const {
 
 void Novelty::clearHistory() {
     pImpl->history.clear();
+}
+
+bool Novelty::isSurprising() const {
+    return pImpl->level > surprisingThreshold_;
 }
 
 } // namespace nlm

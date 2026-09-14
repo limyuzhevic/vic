@@ -94,8 +94,11 @@ public:
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    // Convert planned action to motor command
+    MotorCommand convertActionToMotorCommand(ActionType action);
+    
+    // Apply motor command to motor neuron groups
+    void applyMotorCommand(MotorCommand command);
     
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
@@ -161,14 +164,8 @@ public:
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
+    // Self-model for adaptive planning
+    SelfModel* getSelfModel();
     
     // ========== NEUROMODULATION SYSTEMS ==========
     

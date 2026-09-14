@@ -34,9 +34,17 @@ public:
     const std::vector<float>& getHistory() const;
     void clearHistory();
     
+    // Check if novelty exceeds threshold (surprising)
+    bool isSurprising() const;
+    
+    // Set surprising threshold
+    void setSurprisingThreshold(float threshold) { surprisingThreshold_ = threshold; }
+    
 private:
     struct Impl;
     Impl* pImpl;
+    
+    float surprisingThreshold_;
 };
 
 } // namespace nlm
