@@ -43,7 +43,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create simple world
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.configure(16.0f, 16.0f, static_cast<size_t>(16), static_cast<size_t>(16));  // width, height, visionWidth, visionHeight
     
     // Create agent
     AgentBrain agent(brain);
@@ -62,7 +62,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        const SensoryPercept& percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -74,10 +74,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
-        
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        ActionResult actionResult = world.applyMotorCommand(cmd, world.getSimulationTime());
+        float reward = actionResult.reward;
         totalReward += reward;
         
         // Apply reward modulation
@@ -103,18 +101,35 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     }
     
     // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
-    result.avgFiringRate = totalFiringRate / config.maxSteps;
+    // Guard against division by zero
+    size_t stepsForAverage = config.maxSteps > 0 ? config.maxSteps : 1;
+    
+    result.totalReward = totalReward / stepsForAverage;
+    result.avgFiringRate = totalFiringRate / stepsForAverage;
+    
+    // Calculate average synaptic weight
+    float totalSynapticWeight = 0.0f;
+    size_t synapseCount = 0;
+    for (const auto& region : brain->getRegions()) {
+        for (const auto& synapse : region->getSynapses()) {
+            totalSynapticWeight += synapse->getWeight();
+            synapseCount++;
+        }
+    }
+    result.avgSynapticWeight = synapseCount > 0 ? totalSynapticWeight / synapseCount : 0.0f;
+    
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
-    // Verify integration
+    // Verify integration - check both neuromodulation systems
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
-    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
+    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr && 
+                                         brain->getCuriosity() != nullptr && 
+                                         brain->getNovelty() != nullptr);
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
     
@@ -133,9 +148,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
             
             // Create new brain and load
             auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
+            if (!brain2->initialize()) {
+                NLM_LOG_ERROR("Failed to initialize brain2 for checkpoint loading");
+            } else if (brain2->load(config.checkpointPath)) {
                 NLM_LOG_INFO("Checkpoint loaded successfully");
                 result.checkpointingWorks = true;
             } else {
