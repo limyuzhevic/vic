@@ -219,12 +219,136 @@ float NeuralEpisodicMemory::getAverageReward() const {
 }
 
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
-    // Remove episodes below relevance threshold
-    // In a full implementation, episodes would have relevance scores
-    // For now, just enforce max capacity
-    while (episodes_.size() > maxEpisodes_ * 0.8f) {
-        episodes_.erase(episodes_.begin());
+    if (episodes_.empty()) return;
+    
+    // Compute relevance scores for all episodes
+    std::vector<std::pair<size_t, float>> scoredEpisodes;
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        const auto& episode = episodes_[i];
+        
+        // Base relevance components
+        float rewardScore = std::min(1.0f, episode.reward * 2.0f);  // Normalize reward
+        
+        // Recency score (more recent = higher relevance)
+        float recencyScore = 1.0f / (episode.age + 1);
+        
+        // Recency of timestamp (more recent timestamps = higher relevance)
+        float timestampRecency = static_cast<float>(episode.age) / 10000.0f;  // Normalize age
+        
+        // Importance from action type (some actions more important than others)
+        float actionImportance = 0.5f;
+        switch (episode.action) {
+            case ActionType::Interact:
+            case ActionType::Eat:
+                actionImportance = 1.0f;
+                break;
+            case ActionType::MoveForward:
+                actionImportance = 0.8f;
+                break;
+            case ActionType::TurnLeft:
+            case ActionType::TurnRight:
+                actionImportance = 0.6f;
+                break;
+            default:
+                actionImportance = 0.3f;
+                break;
+        }
+        
+        // Sensory salience (magnitude of sensory input)
+        float sensorySalience = 0.0f;
+        if (!episode.sensoryState.empty()) {
+            for (float val : episode.sensoryState) {
+                sensorySalience += std::abs(val);
+            }
+            sensorySalience = std::min(1.0f, sensorySalience / 10.0f);
+        }
+        
+        // Prediction error importance (if available)
+        float predictionError = 0.0f;  // Would come from agent's prediction system
+        float errorScore = std::min(1.0f, std::abs(predictionError) * 5.0f);
+        
+        // Compute weighted relevance score
+        float relevance = 
+            rewardScore * 0.25f +
+            recencyScore * 0.20f +
+            timestampRecency * 0.15f +
+            actionImportance * 0.15f +
+            sensorySalience * 0.10f +
+            errorScore * 0.15f;
+        
+        scoredEpisodes.emplace_back(i, relevance);
     }
+    
+    // Sort by relevance (descending)
+    std::sort(scoredEpisodes.begin(), scoredEpisodes.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+    
+    // Select episodes to protect based on threshold
+    std::vector<size_t> protectedIndices;
+    size_t targetProtected = static_cast<size_t>(episodes_.size() * relevanceThreshold);
+    
+    for (size_t i = 0; i < std::min(targetProtected, scoredEpisodes.size()); ++i) {
+        protectedIndices.push_back(scoredEpisodes[i].first);
+    }
+    
+    // Create new episodes list with only unprotected episodes
+    std::vector<EpisodicMemoryItem> newEpisodes;
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        // Check if this episode is protected
+        bool isProtected = false;
+        for (size_t protectedIdx : protectedIndices) {
+            if (i == protectedIdx) {
+                isProtected = true;
+                break;
+            }
+        }
+        
+        if (!isProtected) {
+            newEpisodes.push_back(episodes_[i]);
+        }
+    }
+    
+    // Compress some of the higher-value protected episodes for efficiency
+    // Keep all episodes but compress sensory states to reduce memory usage
+    for (size_t protectedIdx : protectedIndices) {
+        if (protectedIdx < episodes_.size()) {
+            // Compress sensory state if it's large
+            if (!episodes_[protectedIdx].sensoryState.empty()) {
+                // Reduce dimensionality while preserving key features
+                std::vector<float> original = episodes_[protectedIdx].sensoryState;
+                std::vector<float> compressed;
+                
+                // Simple compression: sample key points and reduce resolution
+                size_t sampleInterval = std::max(1, static_cast<int>(original.size() / 10));  // 10% resolution
+                for (size_t i = 0; i < original.size(); i += sampleInterval) {
+                    compressed.push_back(original[i]);
+                    // Add interpolated values for smoother representation
+                    if (i + 1 < original.size()) {
+                        float interpolated = (original[i] + original[i + 1]) * 0.5f;
+                        compressed.push_back(interpolated);
+                    }
+                }
+                
+                // Ensure we don't exceed capacity and maintain minimum quality
+                if (!compressed.empty() && compressed.size() < original.size() * 0.3f) {
+                    episodes_[protectedIdx].sensoryState = compressed;
+                }
+            }
+            
+            // Preserve in new list
+            newEpisodes.push_back(episodes_[protectedIdx]);
+        }
+    }
+    
+    // Replace old episodes with new consolidated list
+    episodes_ = std::move(newEpisodes);
+    
+    // Clear episode neurons since we may have removed some episodes
+    pImpl->episodeNeurons.clear();
+    
+    NLM_LOG_INFO("Memory consolidation complete: " + std::to_string(episodes_.size()) + " episodes remaining");
 }
 
 void NeuralEpisodicMemory::clear() {

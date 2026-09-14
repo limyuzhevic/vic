@@ -511,8 +511,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Real prediction system integration:
+        // 1. Get current sensory input from world
+        // 2. Generate prediction for next state
+        // 3. Compare with actual next state to compute prediction error
+        // 4. Update prediction model based on error
+        
+        // For now, use simplified prediction: estimate next state as weighted average
+        // This would be replaced with real predictive coding in Phase 2
+        
+        // Get current sensory input (available from previous step)
+        if (!pImpl->lastSensoryInput.empty()) {
+            auto predictedState = pImpl->predictionSystem->predictNextState(pImpl->lastSensoryInput);
+            pImpl->predictionSystem->updatePredictions(predictedState, pImpl->lastSensoryInput);
+            
+            // Store prediction error for neuromodulation
+            pImpl->lastPredictionError = pImpl->predictionSystem->getPredictionError();
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -887,7 +902,6 @@ bool Brain::load(const std::string& filepath) {
                 }
             }
         }
-        
         // Read synapses
         SynapseCheckpointData synapseData;
         if (!reader.readSynapses(synapseData)) {
@@ -898,6 +912,14 @@ bool Brain::load(const std::string& filepath) {
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // TODO: Implement proper synapse restoration
+        // In a complete implementation, we would:
+        // 1. Iterate through all brain regions
+        // 2. For each region, iterate through all synapses
+        // 3. Find matching synapse by source/destination neuron IDs
+        // 4. Restore synapse properties (weight, delay, type, eligibility trace)
+        // This is a placeholder for Phase 2 implementation
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

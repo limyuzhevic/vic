@@ -3,6 +3,13 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <optional>
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 namespace nlm {
 
@@ -19,9 +26,75 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to parse as JSON first
+    std::ifstream jsonFile(filepath);
+    if (jsonFile.is_open()) {
+        try {
+            json jsonData;
+            jsonFile >> jsonData;
+            
+            // Clear existing entries
+            pImpl->entries.clear();
+            
+            // Parse JSON data
+            if (jsonData.is_object()) {
+                for (const auto& [key, value] : jsonData.items()) {
+                    ConfigValue configValue;
+                    
+                    // Parse based on JSON type
+                    if (value.is_string()) {
+                        configValue = value.get<std::string>();
+                    } else if (value.is_number_integer()) {
+                        configValue = value.get<int>();
+                    } else if (value.is_number_float()) {
+                        configValue = value.get<double>();
+                    } else if (value.is_boolean()) {
+                        configValue = value.get<bool>();
+                    } else if (value.is_array()) {
+                        // Handle arrays
+                        std::vector<int> intArray;
+                        std::vector<double> doubleArray;
+                        std::vector<std::string> stringArray;
+                        
+                        if (std::all_of(value.begin(), value.end(), 
+                                      [](const json& v) { return v.is_number_integer(); })) {
+                            for (const auto& v : value) {
+                                intArray.push_back(v.get<int>());
+                            }
+                            configValue = intArray;
+                        } else if (std::all_of(value.begin(), value.end(),
+                                            [](const json& v) { return v.is_number_float(); })) {
+                            for (const auto& v : value) {
+                                doubleArray.push_back(v.get<double>());
+                            }
+                            configValue = doubleArray;
+                        } else if (std::all_of(value.begin(), value.end(),
+                                            [](const json& v) { return v.is_string(); })) {
+                            for (const auto& v : value) {
+                                stringArray.push_back(v.get<std::string>());
+                            }
+                            configValue = stringArray;
+                        } else {
+                            // Mixed or unknown type, store as string representation
+                            configValue = value.dump();
+                        }
+                    } else {
+                        // Unknown type, store as string representation
+                        configValue = value.dump();
+                    }
+                    
+                    set(key, configValue, ConfigSource::File);
+                }
+                
+                return true;
+            }
+        } catch (const json::parse_error& e) {
+            // JSON parsing failed, fall back to simple format
+            jsonFile.close();
+        }
+    }
     
+    // Fall back to simple key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -84,10 +157,16 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Create JSON object
+    json jsonData;
+    
+    // Add entries to JSON
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        jsonData[entry.key] = entry.value;
     }
+    
+    // Write JSON with pretty formatting
+    file << jsonData.dump(4);
     
     return true;
 }
