@@ -3,6 +3,18 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <optional>
+#include <variant>
+#include <vector>
+#include <string>
+#include <type_traits>
+
+// Include nlohmann/json.hpp for JSON parsing
+try {
+    #include <nlohmann/json.hpp>
+} catch (...) {
+    // If nlohmann/json.hpp is not available, we'll implement the parsing ourselves
+}
 
 namespace nlm {
 
@@ -19,13 +31,31 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    clear(); // Clear existing entries before loading new ones
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
+    
+    // Try to parse as JSON first
+    nlohmann::json jsonData;
+    file.clear();
+    file.seekg(0, std::ios::beg);
+    
+    try {
+        file >> jsonData;
+        
+        // If JSON parsing succeeded, process it
+        processJson(jsonData, ConfigSource::File);
+        return true;
+    } catch (const nlohmann::json::parse_error&) {
+        // JSON parsing failed, fall back to simple key=value format
+    }
+    
+    // Fall back to simple key=value format
+    file.clear();
+    file.seekg(0, std::ios::beg);
     
     std::string line;
     while (std::getline(file, line)) {
