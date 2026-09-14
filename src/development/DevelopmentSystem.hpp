@@ -3,8 +3,9 @@
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
 #include <functional>
+#include <vector>
 
-namespace nlm {
+namespace nlm;
 
 // Forward declarations
 class RandomGenerator;
@@ -45,6 +46,32 @@ public:
     
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
+    
+    // Enhanced development system functionality
+    
+    // Integrate neuromodulatory signals
+    void integrateNeuromodulation(float curiosity, float dopamine);
+    
+    // Integrate prediction signals
+    void integratePrediction(float predictionError, float predictionAccuracy);
+    
+    // Integrate memory consolidation
+    void integrateMemory(double consolidationLevel);
+    
+    // Integrate environmental interaction
+    void integrateEnvironmentalInteraction(double interactionStrength);
+    
+    // Get adaptive development parameters
+    float getMaturationRate() const;
+    float getCriticalPeriodReopening() const;
+    float getAttentionModulation() const;
+    float getEnvironmentalInteraction() const;
+    
+    // Get experience-dependent parameters
+    double getLearningExperience() const { return pImpl->learningExperience; }
+    double getEnvironmentalInteractionLevel() const { return pImpl->environmentalInteraction; }
+    double getPredictionAccuracy() const { return pImpl->predictionAccuracy; }
+    double getMemoryConsolidationLevel() const { return pImpl->memoryConsolidation; }
     
 private:
     struct Impl;

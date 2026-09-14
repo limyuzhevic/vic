@@ -8,7 +8,6 @@
 #include <functional>
 
 namespace nlm {
-
 // NeuralPrediction: Implements temporal prediction using the spiking substrate
 // NOT a Transformer - prediction emerges from learned synaptic dynamics
 //
@@ -16,7 +15,8 @@ namespace nlm {
 // - Prediction is encoded in patterns of neural activity
 // - Temporal sequences are learned through STDP and Hebbian plasticity
 // - Prediction error emerges from comparison of predicted vs actual sensory states
-// - No token prediction architecture - purely neural dynamics
+// - Temporal difference learning for forward prediction
+// - Neuromodulatory signals modulate prediction learning
 
 class NeuralPrediction {
 public:
@@ -27,10 +27,11 @@ public:
     void initialize(Brain* brain);
 
     // Record current sensory state for future prediction
+    // Integrate with working memory for persistence
     void recordSensoryState(const std::vector<float>& sensoryState, SimulationStep currentStep);
 
     // Generate prediction for next timestep based on learned sequences
-    // Returns predicted sensory state as neural activity pattern
+    // Uses neural dynamics and pattern completion
     std::vector<float> generatePrediction(SimulationStep currentStep);
 
     // Update predictions based on actual observed state
@@ -39,7 +40,7 @@ public:
                                SimulationStep currentStep);
 
     // Predict consequences of a potential action
-    // Uses learned action-consequence associations
+    // Uses learned action-consequence associations with neural credit assignment
     std::vector<float> predictActionConsequence(ActionType action,
                                                   const std::vector<float>& currentState);
 
@@ -73,12 +74,27 @@ public:
     // Get neurons involved in prediction
     std::vector<NeuronId> getPredictionNeurons() const;
     std::vector<NeuronId> getSequenceNeurons() const;
+    std::vector<NeuronId> getPatternNeurons() const;
+    std::vector<NeuronId> getActionNeurons() const;
+
+    // Get working with memory integration
+    const std::deque<SimulationStep>& getStateTimestamps() const { return stateTimestamps_; }
+
+    // Temporal difference learning
+    void setTDLearningRate(float rate) { tdLearningRate_ = rate; }
+
+    // Neuromodulation integration
+    void enableNeuromodulation(bool enable) { neuromodulationEnabled_ = enable; }
 
 private:
     // Learn temporal sequence from sensory observations
     void learnTemporalSequence(const std::vector<float>& currentState,
-                              const std::vector<float>& nextState,
-                              SimulationStep currentStep);
+                               const std::vector<float>& nextState,
+                               SimulationStep currentStep);
+
+    // Pattern completion using neural attractor dynamics
+    std::vector<float> patternCompletion(const std::vector<float>& partialPattern,
+                                         float threshold) const;
 
     // Find or create neurons that respond to specific sensory pattern
     NeuronId findMatchingPatternNeuron(const std::vector<float>& pattern,
@@ -87,34 +103,51 @@ private:
     // Create association between pattern neuron and predicted pattern
     void createSequenceAssociation(NeuronId from, NeuronId to, float strength);
 
-    // Compute neural representation similarity
-    float computeSimilarity(const std::vector<float>& a, const std::vector<float>& b) const;
+    // Update association strength based on prediction error
+    void updateSequenceAssociation(NeuronId from, NeuronId to, float predictionError);
 
-    // Strengthen synapses for successful predictions, weaken for errors
-    void modulatePredictionSynapses(float error, float reward);
+    // Neural credit assignment for action consequences
+    void computeNeuralCreditAssignment(const std::vector<float>& state,
+                                       ActionType action,
+                                       float reward);
+
+    // Temporal difference learning update
+    void temporalDifferenceUpdate(const std::vector<float>& currentState,
+                                  const std::vector<float>& nextState,
+                                  float reward,
+                                  float predictionError,
+                                  SimulationStep currentStep);
+
+    // Apply neuromodulatory signal to prediction learning
+    void applyNeuromodulation(float dopamineLevel, float noveltySignal);
 
     // Structure
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-    
+
     // Configuration
     size_t sequenceMemorySize_;
     size_t predictionHorizon_;
     bool temporalPredictionEnabled_;
     bool actionConsequenceEnabled_;
-    
+
     // State
     Brain* brain_;
     float predictionError_;
     float predictionConfidence_;
+    float tdLearningRate_;
+    bool rewardPredictionEnabled_;
+    bool neuromodulationEnabled_;
     std::deque<float> errorHistory_;
-    
-    // Internal state
+
+    // Neural state integration
     std::vector<std::vector<float>> recentSensoryStates_;
     std::deque<SimulationStep> stateTimestamps_;
     std::vector<NeuronId> predictionNeurons_;
     std::vector<NeuronId> sequenceNeurons_;
-    
+    std::vector<NeuronId> patternNeurons_;
+    std::vector<NeuronId> actionNeurons_;
+
     // Action-consequence tracking
     std::deque<std::pair<ActionType, std::vector<float>>> recentActions_;
 };

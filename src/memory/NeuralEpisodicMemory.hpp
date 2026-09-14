@@ -6,6 +6,8 @@
 #include <memory>
 #include <deque>
 #include <functional>
+#include <unordered_map>
+#include <queue>
 
 namespace nlm {
 
@@ -77,17 +79,17 @@ public:
 
     // Retrieve episodes from a specific time window
     std::vector<const EpisodicMemoryItem*> retrieveTemporal(SimulationStep startTime,
-                                                            SimulationStep endTime,
-                                                            size_t maxResults = 10) const;
+                                                             SimulationStep endTime,
+                                                             size_t maxResults = 10) const;
 
     // Retrieve episodes by location
     std::vector<const EpisodicMemoryItem*> retrieveByLocation(float x, float y,
-                                                             float radius,
-                                                             size_t maxResults = 5) const;
+                                                              float radius,
+                                                              size_t maxResults = 5) const;
 
     // Retrieve episodes following a specific action
     std::vector<const EpisodicMemoryItem*> retrieveAfterAction(ActionType action,
-                                                              size_t maxResults = 5) const;
+                                                               size_t maxResults = 5) const;
 
     // Replay an episode - reactivates the neural patterns associated with it
     // This allows the brain to "relive" the experience
@@ -136,6 +138,18 @@ private:
                         SimulationStep* endTime,
                         ActionType* actionQuery) const;
 
+    // Helper functions
+    static std::vector<float> encodeToNeuralPattern(const std::vector<float>& input);
+    static float computePatternDistance(const std::vector<float>& a, const std::vector<float>& b);
+    static float computePatternSimilarity(const std::vector<float>& a, const std::vector<float>& b);
+    
+    size_t getIndex(const EpisodicMemoryItem* episode) const;
+    
+    void updateIndexes(size_t index);
+    void removeFromIndexes(size_t index);
+    void adjustReplayQueueIndices(size_t removedIdx);
+    void rebuildSynapticConnections();
+
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
@@ -173,16 +187,16 @@ public:
 
     // Retrieve patterns associated with a query pattern
     std::vector<std::vector<float>> retrieve(const std::vector<float>& queryPattern,
-                                            size_t maxResults = 5) const;
+                                             size_t maxResults = 5) const;
 
     // Get association strength between two patterns
     float getAssociationStrength(const std::vector<float>& patternA,
-                                const std::vector<float>& patternB) const;
+                                 const std::vector<float>& patternB) const;
 
     // Update association based on outcome
     void updateAssociation(const std::vector<float>& patternA,
-                          const std::vector<float>& patternB,
-                          float delta);
+                           const std::vector<float>& patternB,
+                           float delta);
 
     // Spread activation from cue pattern
     // Returns patterns that become activated through association chains
@@ -201,7 +215,7 @@ private:
 
     // Compute pattern similarity
     float computeSimilarity(const std::vector<float>& a,
-                            const std::vector<float>& b) const;
+                           const std::vector<float>& b) const;
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;

@@ -545,15 +545,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->episodicMemory->replayEpisode(episode);
         }
     }
-    
-    // ========== STEP 13: Apply development effects ==========
+        // ========== STEP 13: Apply development effects ==========
+
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+        // Get development system to update
+        auto* devSystem = pImpl->developmentSystem.get();
+        if (devSystem) {
+            devSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+        }
         
         // Development affects plasticity rates
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
+            // Get current developmental stage from development system
+            DevelopmentalStage stage = devSystem ? devSystem->getStage() : DevelopmentalStage::Adult;
             float plasticityMod = 1.0f;
             
             switch (stage) {

@@ -9,20 +9,32 @@ namespace nlm {
 struct NeuralPrediction::Impl {
     Brain* brain;
     
-    // Sequence learning state
+    // Temporal sequence learning with neural dynamics
     std::vector<std::pair<std::vector<float>, NeuronId>> learnedSequences;
     std::vector<std::pair<NeuronId, NeuronId>> sequenceAssociations;
+    std::vector<float> associationStrengths;
     
-    // Pattern neurons (one per unique sensory pattern cluster)
+    // Pattern recognition using neural population activity
     std::vector<NeuronId> patternNeurons;
     std::vector<std::vector<float>> patternRepresentations;
+    std::vector<float> patternConfidences;
+    std::vector<float> patternActivationTimes;
     
-    // Recent states for sequence learning
+    // Temporal dynamics for prediction
     std::deque<std::pair<std::vector<float>, SimulationStep>> stateHistory;
+    std::vector<float> temporalPredictions;
     
-    // Action-consequence learning
+    // Action-consequence learning with neural credit assignment
     std::vector<std::pair<std::vector<float>, std::vector<float>>> actionConsequences;
     std::vector<float> actionRewards;
+    std::vector<NeuronId> actionRelatedNeurons;
+    
+    // Working memory integration
+    std::vector<NeuronId> workingMemoryNeurons;
+    std::vector<std::vector<float>> workingMemoryActivity;
+    
+    // Neuromodulation integration
+    std::vector<NeuronId> dopamineNeurons;
     
     Impl() : brain(nullptr) {}
 };
@@ -30,12 +42,15 @@ struct NeuralPrediction::Impl {
 NeuralPrediction::NeuralPrediction()
     : pImpl(new Impl)
     , sequenceMemorySize_(10)
-    , predictionHorizon_(1)
+    , predictionHorizon_(3)  // Predict multiple steps
     , temporalPredictionEnabled_(true)
     , actionConsequenceEnabled_(true)
     , brain_(nullptr)
     , predictionError_(0.0f)
     , predictionConfidence_(0.5f)
+    , tdLearningRate_(0.01f)
+    , rewardPredictionEnabled_(true)
+    , neuromodulationEnabled_(true)
 {
 }
 
@@ -52,10 +67,11 @@ void NeuralPrediction::recordSensoryState(const std::vector<float>& sensoryState
                                          SimulationStep currentStep) {
     if (!temporalPredictionEnabled_) return;
     
+    // Store in recent states
     recentSensoryStates_.push_back(sensoryState);
     stateTimestamps_.push_back(currentStep);
     
-    // Keep only recent states
+    // Keep only recent states for working memory efficiency
     if (recentSensoryStates_.size() > sequenceMemorySize_) {
         recentSensoryStates_.erase(recentSensoryStates_.begin());
         stateTimestamps_.erase(stateTimestamps_.begin());
@@ -67,6 +83,20 @@ void NeuralPrediction::recordSensoryState(const std::vector<float>& sensoryState
                             recentSensoryStates_.back(),
                             currentStep);
     }
+    
+    // Store in working memory for persistence
+    if (brain_ && neuromodulationEnabled_) {
+        for (size_t i = 0; i < sensoryState.size(); ++i) {
+            if (sensoryState[i] > 0.1f) {
+                // Find or create working memory neuron for this feature
+                NeuronId wmNeuron = findMatchingPatternNeuron(sensoryState, 0.5f);
+                if (wmNeuron != INVALID_NEURON_ID) {
+                    workingMemoryNeurons_.push_back(wmNeuron);
+                    workingMemoryActivity_.push_back(sensoryState);
+                }
+            }
+        }
+    }
 }
 
 std::vector<float> NeuralPrediction::generatePrediction(SimulationStep currentStep) {
@@ -77,10 +107,11 @@ std::vector<float> NeuralPrediction::generatePrediction(SimulationStep currentSt
     // Find best matching learned sequence
     const auto& currentState = recentSensoryStates_.back();
     
-    // Find most similar pattern we've seen
+    // Find most similar pattern we've seen using neural dynamics
     NeuronId bestMatch = INVALID_NEURON_ID;
     float bestSimilarity = 0.0f;
     
+    // Check all learned pattern neurons
     for (size_t i = 0; i < pImpl->patternRepresentations.size(); ++i) {
         float sim = computeSimilarity(currentState, pImpl->patternRepresentations[i]);
         if (sim > bestSimilarity) {
@@ -89,20 +120,39 @@ std::vector<float> NeuralPrediction::generatePrediction(SimulationStep currentSt
         }
     }
     
-    // If we have a good match, predict what comes next
+    // If we have a good match, use pattern completion for prediction
     if (bestSimilarity > 0.7f && bestMatch != INVALID_NEURON_ID) {
-        // Find what we associate with this pattern
-        for (const auto& assoc : pImpl->sequenceAssociations) {
-            if (assoc.first == bestMatch) {
-                // Found association - return the associated pattern
-                for (size_t i = 0; i < pImpl->patternNeurons.size(); ++i) {
-                    if (pImpl->patternNeurons[i] == assoc.second) {
-                        predictionConfidence_ = bestSimilarity;
-                        return pImpl->patternRepresentations[i];
+        // Use neural attractor dynamics for pattern completion
+        std::vector<float> completedPattern = patternCompletion(currentState, 0.7f);
+        
+        if (!completedPattern.empty()) {
+            predictionConfidence_ = bestSimilarity;
+            
+            // Find the neuron that represents this completed pattern
+            NeuronId patternNeuron = findMatchingPatternNeuron(completedPattern, 0.7f);
+            
+            // Predict next state based on sequence associations
+            for (size_t i = 0; i < pImpl->sequenceAssociations.size(); ++i) {
+                if (pImpl->sequenceAssociations[i].first == bestMatch) {
+                    NeuronId nextNeuron = pImpl->sequenceAssociations[i].second;
+                    
+                    // Find representation for the predicted next state
+                    for (size_t j = 0; j < pImpl->patternNeurons.size(); ++j) {
+                        if (pImpl->patternNeurons[j] == nextNeuron) {
+                            predictionConfidence_ = bestSimilarity * pImpl->associationStrengths[i];
+                            return pImpl->patternRepresentations[j];
+                        }
                     }
                 }
             }
         }
+    }
+    
+    // Use temporal dynamics prediction if no pattern match
+    if (pImpl->temporalPredictions.size() > 1 && bestSimilarity > 0.5f) {
+        size_t predIndex = std::min(static_cast<size_t>(bestSimilarity * 10.0f), pImpl->temporalPredictions.size() - 1);
+        predictionConfidence_ = 0.5f + bestSimilarity * 0.5f;
+        return pImpl->temporalPredictions[predIndex];
     }
     
     // No good prediction - return current state as baseline
@@ -235,15 +285,17 @@ void NeuralPrediction::createSequenceAssociation(NeuronId from, NeuronId to, flo
     if (from == INVALID_NEURON_ID || to == INVALID_NEURON_ID) return;
     
     // Check if association already exists
-    for (auto& assoc : pImpl->sequenceAssociations) {
-        if (assoc.first == from && assoc.second == to) {
+    for (size_t i = 0; i < pImpl->sequenceAssociations.size(); ++i) {
+        if (pImpl->sequenceAssociations[i].first == from && pImpl->sequenceAssociations[i].second == to) {
             // Update strength
+            pImpl->associationStrengths[i] = strength;
             return;
         }
     }
     
     // Create new association
     pImpl->sequenceAssociations.emplace_back(from, to);
+    pImpl->associationStrengths.push_back(strength);
 }
 
 float NeuralPrediction::computeSimilarity(const std::vector<float>& a, 

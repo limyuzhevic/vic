@@ -7,18 +7,17 @@
 namespace nlm {
 
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// ENHANCED - Real neural storage with competitive dynamics and capacity limits
 
 class WorkingMemory {
 public:
     WorkingMemory();
     ~WorkingMemory();
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
+    // Store item with competitive dynamics
     void store(NeuronId neuron, float value);
     
-    // Retrieve item
+    // Retrieve item with decay adjustment
     float retrieve(NeuronId neuron) const;
     
     // Check if item exists
@@ -31,8 +30,17 @@ public:
     size_t getCapacity() const;
     size_t getCurrentSize() const;
     
-    // Decay all items
+    // Decay all items with competitive dynamics
     void decay(float decayRate);
+    
+    // Competition-based selection for attentional selection
+    std::vector<NeuronId> selectWinners(float competitionThreshold) const;
+    
+    // Get memory items sorted by priority
+    std::vector<std::pair<NeuronId, float>> getSortedItems() const;
+    
+    // Consolidate high-priority items to long-term memory
+    void consolidate(float relevanceThreshold);
     
 private:
     struct Impl;

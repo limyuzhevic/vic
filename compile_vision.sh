@@ -1,0 +1,1 @@
+g++ -c src/sensory/Vision.cpp -std=c++17 -I src/sensory

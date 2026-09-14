@@ -1,36 +1,33 @@
-#include "NeuralWorkingMemory.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
+#include <unordered_map>
 
 namespace nlm {
 
-struct NeuralWorkingMemory::Impl {
-    Brain* brain;
+// Helper functions for neural working memory
+float computePatternDistance(const std::vector<float>& a, const std::vector<float>& b) {
+    if (a.size() != b.size() || a.empty()) return 1.0f;
     
-    // Maintenance connections (recurrent)
-    std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
+    float dist = 0.0f;
+    for (size_t i = 0; i < a.size(); ++i) {
+        float diff = a[i] - b[i];
+        dist += diff * diff;
+    }
     
-    // Memory trace ages
-    std::vector<SimulationStep> traceAges;
-    
-    Impl() : brain(nullptr) {}
-};
-
-NeuralWorkingMemory::NeuralWorkingMemory()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-    , capacity_(100)
-    , decayRate_(0.01f)
-{
+    return std::sqrt(dist);
 }
 
-NeuralWorkingMemory::~NeuralWorkingMemory() = default;
-
-void NeuralWorkingMemory::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("NeuralWorkingMemory initialized");
+float computePatternSimilarity(const std::vector<float>& a, const std::vector<float>& b) {
+    // Cosine similarity
+    float dot = 0.0f, normA = 0.0f, normB = 0.0f;
+    
+    for (size_t i = 0; i < a.size(); ++i) {
+        dot += a[i] * b[i];
+        normA += a[i] * a[i];
+        normB += b[i] * b[i];
+    }
+    
+    if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
+    
+    return dot / (std::sqrt(normA) * std::sqrt(normB));
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
