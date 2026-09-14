@@ -1,4 +1,5 @@
 #include "PredictionError.hpp"
+#include "NeuromodulatorBase.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <cmath>
 
@@ -14,7 +15,11 @@ struct PredictionError::Impl {
     Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
 };
 
-PredictionError::PredictionError() : pImpl(new Impl) {}
+PredictionError::PredictionError() : NeuromodulatorBase(), pImpl(new Impl) {
+    currentLevel = 0.0f;
+    lastUpdateTime = 0;
+    strength = 1.0f;
+}
 
 PredictionError::~PredictionError() = default;
 
@@ -48,6 +53,31 @@ void PredictionError::clearHistory() {
 
 float PredictionError::getMagnitude() const {
     return std::abs(pImpl->error);
+}
+
+float PredictionError::getLevel() const {
+    return currentLevel;
+}
+
+void PredictionError::setLevel(float level) {
+    currentLevel = level;
+}
+
+float PredictionError::getPlasticityFactor() const {
+    return std::abs(pImpl->error);
+}
+
+void PredictionError::update(TimestepDuration dt) {
+    // Decay error magnitude using common helper
+    currentLevel = computeDecay(currentLevel, 0.1f, dt);
+}
+
+NeuromodulatorType PredictionError::getType() const {
+    return NeuromodulatorType::PredictionError;
+}
+
+void PredictionError::loadConfig(const std::string& key, float value) {
+    // Configuration loading for PredictionError
 }
 
 } // namespace nlm

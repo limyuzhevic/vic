@@ -1,4 +1,5 @@
 #include "Curiosity.hpp"
+#include "NeuromodulatorBase.hpp"
 #include "../core/Logger/Logger.hpp"
 
 namespace nlm {
@@ -18,7 +19,11 @@ struct Curiosity::Impl {
         , decayRate(0.05f) {}
 };
 
-Curiosity::Curiosity() : pImpl(new Impl) {}
+Curiosity::Curiosity() : NeuromodulatorBase(), pImpl(new Impl) {
+    currentLevel = 0.0f;
+    lastUpdateTime = 0;
+    strength = 1.0f;
+}
 
 Curiosity::~Curiosity() = default;
 
@@ -28,23 +33,24 @@ void Curiosity::initialize(Brain* brain) {
 }
 
 float Curiosity::getLevel() const {
-    return pImpl->level;
+    return currentLevel;
 }
 
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
+    currentLevel = pImpl->level;
     // Curiosity increases with novelty and prediction error
     float target = pImpl->noveltyWeight * novelty + 
                    pImpl->predictionErrorWeight * predictionError;
     
-    // Smooth update
-    pImpl->level += (target - pImpl->level) * 0.1f;
+    // Smooth update using common helper
+    applySmoothing(currentLevel, target, 0.1f);
     
-    // Decay
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Decay using common helper
+    currentLevel = computeDecay(currentLevel, pImpl->decayRate, dt);
 }
 
 float Curiosity::getExplorationDrive() const {
-    return pImpl->level;
+    return currentLevel;
 }
 
 void Curiosity::setNoveltyWeight(float weight) {
@@ -56,7 +62,7 @@ void Curiosity::setPredictionErrorWeight(float weight) {
 }
 
 void Curiosity::reset() {
-    pImpl->level = 0.0f;
+    currentLevel = 0.0f;
 }
 
 } // namespace nlm

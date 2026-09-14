@@ -1,35 +1,33 @@
 #pragma once
 
+#include "NeuromodulatorBase.hpp"
 #include "../core/Types/Types.hpp"
 
 namespace nlm {
 
 // Prediction error signal for curiosity and learning
-// Computes difference between predicted and actual values
-
-class PredictionError {
+// PLACEHOLDER - Phase 2
+class PredictionError : public NeuromodulatorBase {
 public:
     PredictionError();
-    ~PredictionError();
+    ~PredictionError() override;
     
-    // Initialize with brain reference
-    void initialize(class Brain* brain);
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    void initialize(class Brain* brain) override;
+    NeuromodulatorType getType() const override;
+    void loadConfig(const std::string& key, float value) override;
     
-    // Get error value
+    // Prediction error-specific methods
     float getError() const;
-    
-    // Compute prediction error
     void computeError(float predicted, float actual);
-    
-    // Update prediction
     void updatePrediction(float newPrediction);
-    
-    // Get history
+    float getMagnitude() const;
     const std::vector<float>& getHistory() const;
     void clearHistory();
-    
-    // Get error magnitude for neuromodulation
-    float getMagnitude() const;
     
 private:
     struct Impl;

@@ -195,7 +195,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;  // FIXED: Use unique_ptr for automatic memory management
 };
 
 } // namespace nlm
