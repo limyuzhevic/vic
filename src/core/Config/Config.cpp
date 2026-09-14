@@ -19,20 +19,40 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to parse as JSON first if nlohmann/json is available
+    // For now, use the simple key=value format but with better error handling
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to parse as JSON if the file starts with "{" (basic heuristic)
+    std::string firstChar;
+    file.get(firstChar);
+    file.clear();
+    file.seekg(0);
+    
+    if (firstChar == "{") {
+        // TODO: Implement JSON parsing (requires nlohmann/json library)
+        NLM_LOG_ERROR("JSON format detected but JSON parser not implemented. Falling back to simple key=value format.");
+    }
+    
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
+        }
+        
+        // Support comments after values (like # comment)
+        size_t commentPos = line.find('#');
+        if (commentPos != std::string::npos) {
+            line = line.substr(0, commentPos);
+            line = trim(line);
         }
         
         // Parse simple key=value pairs
@@ -49,9 +69,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING(std::string("Invalid config line " + std::to_string(lineNumber) + ": '" + line + "'"));
         }
     }
     
+    NLM_LOG_INFO(std::string("Loaded config from " + filepath + " (" + std::to_string(pImpl->entries.size()) + " entries)"));
     return true;
 }
 
