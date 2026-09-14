@@ -18,11 +18,11 @@ public:
     // Get curiosity level
     float getLevel() const;
     
-    // Update curiosity based on novelty and prediction error
-    void update(float novelty, float predictionError, TimestepDuration dt);
-    
     // Get exploration drive (same as level)
     float getExplorationDrive() const;
+    
+    // Update curiosity based on novelty and prediction error
+    void update(float novelty, float predictionError, TimestepDuration dt);
     
     // Set curiosity parameters
     void setNoveltyWeight(float weight);

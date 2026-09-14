@@ -74,6 +74,12 @@ public:
     std::vector<NeuronId> getPredictionNeurons() const;
     std::vector<NeuronId> getSequenceNeurons() const;
 
+    // Update neural activity patterns with prediction error
+    void applyPredictionErrorToNeurons(float error);
+    
+    // Update action selection based on predictions
+    ActionType selectActionBasedOnPredictions(const std::vector<float>& currentState);
+
 private:
     // Learn temporal sequence from sensory observations
     void learnTemporalSequence(const std::vector<float>& currentState,
@@ -117,7 +123,7 @@ private:
     
     // Action-consequence tracking
     std::deque<std::pair<ActionType, std::vector<float>>> recentActions_;
-};
+};;
 
 // ActionConsequencePredictor: Learns action -> consequence mappings
 // Uses the neural substrate to store and retrieve action consequences

@@ -1,17 +1,26 @@
 #include "Neuromodulator.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
-struct Dopamine::Impl {
+struct Neuromodulator::Impl {
+    class Brain* brain;
     float level;
-    float baseline;
-    float peak;
+    float plasticityFactor;
+    float excitabilityFactor;
     float decayRate;
-    float releaseRate;
     
-    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
+    Impl() 
+        : brain(nullptr)
+        , level(0.0f)
+        , plasticityFactor(1.0f)
+        , excitabilityFactor(1.0f)
+        , decayRate(0.05f) {}
 };
+
+Neuromodulator::Neuromodulator() : pImpl(new Impl) {}
 
 Dopamine::Dopamine() : pImpl(new Impl) {}
 

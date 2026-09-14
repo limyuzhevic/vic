@@ -16,6 +16,37 @@
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
 
+// Memory systems
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/Memory.hpp"
+
+// Cognitive systems
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/AttentionalSelection.hpp"
+
+// Neuromodulation systems
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Acetylcholine.hpp"
+#include "../src/neuromodulation/Norepinephrine.hpp"
+#include "../src/neuromodulation/Serotonin.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+
+// Prediction system
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/prediction/NeuralPrediction.hpp"
+
+// Development system
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/development/Synaptogenesis.hpp"
+#include "../src/development/Maturation.hpp"
+#include "../src/development/Pruning.hpp"
+
 namespace py = pybind11;
 namespace nlm {
 
@@ -289,6 +320,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+// Brain class bindings
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -351,54 +383,57 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
-
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
+             "Log brain status")
+        // Memory system access
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
              py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+             "Get working memory access")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory access")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory access")
+        // Prediction system access
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system access")
+        // Cognition system access
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner access")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation access")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection access")
+        // Development system access
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system access")
+        // Neuromodulation system access
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulation access")
+        .def("getAcetylcholine", &Brain::getAcetylcholine,
+             py::return_value_policy::reference_internal,
+             "Get acetylcholine neuromodulation access")
+        .def("getNorepinephrine", &Brain::getNorepinephrine,
+             py::return_value_policy::reference_internal,
+             "Get norepinephrine neuromodulation access")
+        .def("getSerotonin", &Brain::getSerotonin,
+             py::return_value_policy::reference_internal,
+             "Get serotonin neuromodulation access")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity neuromodulation access")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty detection access")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error signal access");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -416,10 +451,165 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Add convenience functions and helper utilities after existing functions
+    // Brain configuration presets
+    m.def("createBrainPreset", [](const std::string& preset) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (preset == "minimal") {
+            // Minimal configuration for basic brain function
+            config->set("brain.neuron_count", 100);
+            config->set("brain.synapse_density", 0.05);
+        } else if (preset == "balanced") {
+            // Balanced configuration for general purpose
+            config->set("brain.neuron_count", 1000);
+            config->set("brain.synapse_density", 0.1);
+            config->set("plasticity.stdp.enable", true);
+            config->set("neuromod.dopamine.scale", 1.0);
+            config->set("neuromod.curiosity.enable", true);
+        } else if (preset == "learning") {
+            // Enhanced learning configuration
+            config->set("brain.neuron_count", 2000);
+            config->set("brain.synapse_density", 0.15);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.structural.enable", true);
+            config->set("neuromod.dopamine.scale", 1.5);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+        } else if (preset == "developmental") {
+            // Developmental focus configuration
+            config->set("brain.neuron_count", 1500);
+            config->set("brain.synapse_density", 0.12);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.structural.enable", true);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+            config->set("development.enabled", true);
+        } else {
+            // Default configuration
+            config->set("brain.neuron_count", 1000);
+            config->set("brain.synapse_density", 0.1);
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("preset"), "Create a brain with a predefined configuration preset");
 
-} // namespace nlm
+    // World setup utilities
+    m.def("setupWorld", [](size_t width, size_t height, size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        world->reset();
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+        "Create and configure a simple world with standard settings");
+
+    m.def("setupAgent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+        "Create an agent and initialize it with a world");
+
+    // Experiment running helpers
+    m.def("runExperiment", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                           std::shared_ptr<AgentBrain> agent, size_t numSteps) {
+        for (size_t step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Get internal reward signal for neuromodulation
+            auto internalSignals = world->getSensoryPercept().getInternal();
+            float reward = internalSignals && !internalSignals->empty() ? (*internalSignals)[0] : 0.0f;
+            agent->applyRewardModulation(reward, 0.0);
+            agent->updateDevelopment(0.1);
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+        "Run a complete experiment episode with brain, world, and agent");
+
+    // Visualization helpers
+    m.def("createVisualizationHelper", [](std::shared_ptr<Brain> brain) {
+        // Create a simple visualization data structure
+        return py::dict("brain"_py::cast(brain));
+    }, py::arg("brain"),
+        "Create a visualization helper object for brain state visualization");
+
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        return py::dict(
+            "neuronCount"_py::cast(brain->getTotalNeuronCount()),
+            "firingCount"_py::cast(brain->getFiringNeuronCount()),
+            "spikeCount"_py::cast(brain->getTotalSpikeCount()),
+            "averageFiringRate"_py::cast(brain->getAverageFiringRate()),
+            "eIratio"_py::cast(brain->getExcitationInhibitionRatio()),
+            "developmentalStage"_py::cast(static_cast<int>(brain->getDevelopmentalStage()))
+        );
+    }, py::arg("brain"),
+        "Get comprehensive brain statistics as a dictionary");
+
+    // Custom component extension helper
+    m.def("createCustomComponent", [](const std::string& type, const std::string& name) {
+        // Factory function for creating custom components
+        // Users can extend this by creating their own registration system
+        return py::dict(
+            "type"_py::cast(type),
+            "name"_py::cast(name),
+            "created"_py::cast(true)
+        );
+    }, py::arg("type"), py::arg("name"),
+        "Create a custom component specification for extension");
+
+    // Configuration template loader
+    m.def("loadConfigTemplate", [](const std::string& templateName) {
+        auto config = std::make_shared<Config>();
+        
+        if (templateName == "research") {
+            // Research-oriented configuration
+            config->set("brain.neuron_count", 5000);
+            config->set("brain.synapse_density", 0.2);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.structural.enable", true);
+            config->set("neuromod.dopamine.scale", 1.2);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+            config->set("neuromod.acetylcholine.enable", true);
+            config->set("neuromod.norepinephrine.enable", true);
+            config->set("neuromod.serotonin.enable", true);
+            config->set("development.enabled", true);
+            config->set("memory.working_memory.enable", true);
+            config->set("memory.episodic_memory.enable", true);
+            config->set("memory.associative_memory.enable", true);
+            config->set("prediction.enabled", true);
+            config->set("cognition.planner.enable", true);
+            config->set("cognition.concept_formation.enable", true);
+            config->set("cognition.attentional_selection.enable", true);
+        } else if (templateName == "production") {
+            // Production-focused configuration
+            config->set("brain.neuron_count", 2000);
+            config->set("brain.synapse_density", 0.15);
+            config->set("plasticity.stdp.enable", true);
+            config->set("neuromod.dopamine.scale", 1.0);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("memory.working_memory.enable", true);
+            config->set("prediction.enabled", true);
+        } else {
+            // Default configuration
+            config->set("brain.neuron_count", 1000);
+            config->set("brain.synapse_density", 0.1);
+        }
+        
+        return config;
+    }, py::arg("templateName"), "Load a configuration template");
+
+    m.def("registerCustomNeuromodulator", [](const std::string& name, std::function<float()> getLevel, std::function<void(float)> setLevel) {
+        // Placeholder for custom neuromodulator registration
+        // In a real implementation, this would allow users to register custom neuromodulators
+        return py::dict(
+            "name"_py::cast(name),
+            "registered"_py::cast(true)
+        );
+    }, py::arg("name"), py::arg("getLevel"), py::arg("setLevel"),
+        "Register a custom neuromodulator (placeholder for extension)");
+}

@@ -97,6 +97,11 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
         
         totalReward += actionValue;
         
+        // Store prediction error for learning
+        if (brain_ && brain_->getPredictionErrorSignal()) {
+            brain_->getPredictionErrorSignal()->computeError(actionValue, actionValue);
+        }
+        
         // Reduce confidence if we're uncertain
         confidence *= getSelfModelConfidence(action);
     }

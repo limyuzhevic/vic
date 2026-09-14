@@ -15,7 +15,7 @@ public:
     ~PredictionSystem();
     
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
+    // TODO PHASE 2: Implement real prediction using NLM's neural substrate
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
@@ -33,6 +33,16 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Update prediction with neural state and return error
+    // Extracts sensory state from neural activity and updates prediction
+    float updateWithObservation(const std::vector<float>& neuralState, SimulationStep step);
+    
+    // Update prediction error signal for neuromodulation
+    void updatePredictionErrorSignal();
+    
+    // Apply prediction error to attention and action selection
+    void applyToAttentionAndAction();
     
 private:
     struct Impl;
