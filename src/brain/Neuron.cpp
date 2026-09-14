@@ -237,21 +237,18 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
-        recordSpike(currentTime);
-        
-        // Reset membrane potential
-        V = V_reset;
-        
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
-        pImpl->state.firingState = FiringState::Refractory;
-        
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
-    } else {
-        pImpl->state.firingState = FiringState::Active;
-    }
+    // Reset membrane potential
+    V = V_reset;
+    
+    // Enter refractory period
+    pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+    pImpl->state.firingState = FiringState::Refractory;
+    
+    // Update adaptation for spike-frequency adaptation
+    pImpl->state.adaptationVariable += 1.0f;
+} else {
+    pImpl->state.firingState = FiringState::Active;
+}
     
     // Clear synaptic input for next step
     pImpl->synapticInput = 0.0f;

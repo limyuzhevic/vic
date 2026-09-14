@@ -142,6 +142,44 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
+    // Store sensory input pattern in working memory for memory system integration
+    // Convert vision and other sensory inputs into a unified pattern
+    std::vector<float> sensoryPattern;
+    sensoryPattern.reserve(vision.size() + touch.size() + intern.size() + proprio.size());
+    
+    // Add vision pattern
+    sensoryPattern.insert(sensoryPattern.end(), vision.begin(), vision.end());
+    
+    // Add touch pattern
+    sensoryPattern.insert(sensoryPattern.end(), touch.begin(), touch.end());
+    
+    // Add internal signals
+    sensoryPattern.insert(sensoryPattern.end(), intern.begin(), intern.end());
+    
+    // Add proprioception
+    sensoryPattern.insert(sensoryPattern.end(), proprio.begin(), proprio.end());
+    
+    if (!sensoryPattern.empty() && brain_) {
+        // Store pattern in working memory with novelty as strength
+        brain_->getWorkingMemory()->store(sensoryPattern, noveltyLevel_ + 0.1f);
+        
+        // Also store in episodic memory as a new episode
+        NeuralEpisodicMemory::EpisodicMemoryItem episode;
+        episode.timestamp = static_cast<SimulationStep>(brain_->getTotalSpikeCount());
+        
+        // Copy sensory states
+        episode.sensoryState = std::vector<float>(sensoryPattern);
+        
+        // Set action to wait (default for sensory-only processing)
+        episode.action = ActionType::Wait;
+        
+        // Set reward based on dopamine level (from prediction error)
+        episode.reward = dopamineLevel_;
+        
+        // Store in episodic memory
+        brain_->getEpisodicMemory()->storeEpisode(episode);
+    }
+    
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;

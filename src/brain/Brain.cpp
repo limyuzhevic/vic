@@ -528,11 +528,126 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Collect sensory state for concept formation
+        // Use current neural activity patterns to discover concepts
+        std::vector<float> sensoryPattern;
+        sensoryPattern.reserve(pImpl->sensoryNeurons.size());
+        
+        // Sample neural activity from sensory neurons
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 100; ++i) {
+            if (pImpl->sensoryNeurons[i]) {
+                const auto& state = pImpl->sensoryNeurons[i]->getState();
+                // Normalize activity to 0-1 range
+                float activity = (state.membranePotential - state.restingPotential) / 50.0f;
+                activity = std::clamp(activity, 0.0f, 1.0f);
+                sensoryPattern.push_back(activity);
+            }
+        }
+        
+        if (!sensoryPattern.empty()) {
+            // Get current reward for concept formation
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Present experience to concept formation system
+            pImpl->conceptFormation->presentExperience(sensoryPattern, 
+                                                     std::vector<float>(sensoryPattern.size(), 0.0f),  // features placeholder
+                                                     reward,
+                                                     pImpl->currentStep);
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Update neural planner with concepts ==========
+    if (pImpl->planner && pImpl->conceptFormation) {
+        // Get current state from sensory neurons for planning
+        std::vector<float> currentState;
+        currentState.reserve(pImpl->sensoryNeurons.size());
+        
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 50; ++i) {
+            if (pImpl->sensoryNeurons[i]) {
+                const auto& state = pImpl->sensoryNeurons[i]->getState();
+                float activity = (state.membranePotential - state.restingPotential) / 50.0f;
+                activity = std::clamp(activity, 0.0f, 1.0f);
+                currentState.push_back(activity);
+            }
+        }
+        
+        if (!currentState.empty()) {
+            // Get goal from concept formation if available
+            std::vector<float> goal;
+            size_t conceptCount = pImpl->conceptFormation->getConceptCount();
+            if (conceptCount > 0) {
+                // Use the most stable concept as goal
+                size_t bestConcept = 0;
+                float bestStability = 0.0f;
+                for (size_t i = 0; i < conceptCount; ++i) {
+                    float stability = pImpl->conceptFormation->getConceptStability(i);
+                    if (stability > bestStability) {
+                        bestStability = stability;
+                        bestConcept = i;
+                    }
+                }
+                
+                goal = pImpl->conceptFormation->getConceptPrototype(bestConcept);
+            }
+            
+            pImpl->planner->setCurrentGoal(goal);
+            
+            // Update action quality based on experience
+            float actionValue = 0.0f;
+            if (pImpl->dopamine) {
+                actionValue = pImpl->dopamine->getLevel();
+            }
+            
+            // Update quality for move forward action (index 0)
+            pImpl->planner->setActionQuality(ActionType::MoveForward, actionValue);
+        }
+    }
+    
+    // ========== STEP 12: Replay important memories ==========
+    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
+        // Get episodes for replay
+        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+        for (const auto* episode : episodesToReplay) {
+            pImpl->episodicMemory->replayEpisode(episode);
+        }
+    }
+    
+    // ========== STEP 13: Update prediction system ==========
+    if (pImpl->predictionSystem) {
+        // Use current state for prediction updates
+        std::vector<float> currentState;
+        currentState.reserve(pImpl->sensoryNeurons.size());
+        
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 50; ++i) {
+            if (pImpl->sensoryNeurons[i]) {
+                const auto& state = pImpl->sensoryNeurons[i]->getState();
+                float activity = (state.membranePotential - state.restingPotential) / 50.0f;
+                activity = std::clamp(activity, 0.0f, 1.0f);
+                currentState.push_back(activity);
+            }
+        }
+        
+        if (!currentState.empty()) {
+            // Generate prediction and compute error
+            auto prediction = pImpl->predictionSystem->predictNextState(currentState);
+            if (!prediction.empty()) {
+                // Compute prediction error
+                float error = 0.0f;
+                for (size_t i = 0; i < currentState.size() && i < prediction.size(); ++i) {
+                    error += std::abs(currentState[i] - prediction[i]);
+                }
+                error /= std::max<size_t>(currentState.size(), 1);
+                
+                // Use error to modulate plasticity
+                if (error > 0.1f) {
+                    // Update neuromodulation based on prediction error
+                    if (pImpl->predictionError) {
+                        pImpl->predictionError->setError(error, currentStep);
+                    }
+                }
+            }
+        }
+    }
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
@@ -543,6 +658,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
             pImpl->episodicMemory->replayEpisode(episode);
+        }
+    }
+    
+    // ========== STEP 13: Update prediction system ==========
+    if (pImpl->predictionSystem) {
+        // TODO: Use actual sensory input from environment for prediction updates
+        // For now, just maintain prediction error history
+        if (currentStep % 10 == 0) {  // Update every 10 steps
+            // Get current state (simplified - use first sensory neuron's membrane potential)
+            float currentState = 0.0f;
+            if (!pImpl->sensoryNeurons.empty()) {
+                auto& state = pImpl->sensoryNeurons[0]->getState();
+                currentState = state.membranePotential;
+            }
+            
+            // Simple prediction error based on state change
+            static float lastState = 0.0f;
+            float predictionError = std::abs(currentState - lastState);
+            lastState = currentState;
+            
+            // Update prediction system with error
+            pImpl->predictionSystem->getPredictionError();  // TODO: Implement proper error updates
         }
     }
     
