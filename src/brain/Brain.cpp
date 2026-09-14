@@ -159,7 +159,9 @@ struct Brain::Impl {
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
-Brain::~Brain() = default;
+Brain::~Brain() {
+    delete pImpl;
+}
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -191,7 +193,7 @@ bool Brain::initialize() {
     }
     
     // Create neurons across regions
-    size_t neuronsPerRegion = neuronCount / regionCount;
+    size_t neuronsPerRegion = neuronCount / std::max<size_t>(regionCount, 1);
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {

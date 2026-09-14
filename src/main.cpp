@@ -224,7 +224,8 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     for (SimulationStep step = 0; step < 1000; ++step) {
         // Create input pattern - inject current into sensory neurons
-        for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
+        size_t totalNeurons = brain->getTotalNeuronCount();
+        for (size_t i = 0; i < 20 && i < totalNeurons / std::max<size_t>(4, 1); ++i) {
             brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
         }
         
@@ -354,6 +355,19 @@ int main(int argc, char** argv) {
                 configFile = argv[++i];
             }
         }
+    }
+    
+    // Remove trailing whitespace and quotes from configFile
+    // Handle cases like --config "configs/my_config.cfg"
+    if (!configFile.empty() && configFile.front() == '"' && configFile.back() == '"') {
+        configFile = configFile.substr(1, configFile.size() - 2);
+    }
+    
+    // Trim whitespace
+    size_t start = configFile.find_first_not_of(" \t\r\n");
+    size_t end = configFile.find_last_not_of(" \t\r\n");
+    if (start != std::string::npos && end != std::string::npos) {
+        configFile = configFile.substr(start, end - start + 1);
     }
     
     // Load config from file (ignore if not found)
