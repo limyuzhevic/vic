@@ -56,19 +56,6 @@ struct Brain::Impl {
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
-    // Simulation parameters
-    TimestepDuration timestep;
-    SimulationStep currentStep;
-    Timestamp currentTime;
-    
-    // Statistics
-    size_t totalSpikesThisStep;
-    size_t totalSpikesTotal;
-    
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
-    
     // Integration state
     bool isResting;  // For sleep/rest cycle
     size_t stepsSinceLastEpisode;
@@ -77,6 +64,10 @@ struct Brain::Impl {
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
+    
+    // Prediction error tracking
+    float currentPredictionError;
+    float currentPlasticityMod;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -92,6 +83,8 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , currentPredictionError(0.0f)
+        , currentPlasticityMod(1.0f)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -419,6 +412,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
+        // Update dopamine based on prediction error if available
+        if (pImpl->predictionError) {
+            pImpl->dopamine->signalPredictionError(pImpl->predictionError->getLevel());
+        }
+        
         pImpl->dopamine->update(pImpl->timestep);
         
         // Apply dopamine effects on neural excitability
@@ -446,6 +444,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
+    // Apply prediction error modulation if available
+    if (pImpl->predictionError) {
+        plasticityMod *= (1.0f + pImpl->predictionError->getLevel() * 0.05f);
+    }
+    
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
             // Apply STDP with neuromodulation
@@ -470,6 +473,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 if (!preSpikes.empty() && !postSpikes.empty()) {
                     pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
                 }
+            }
+            
+            // Apply reward-modulated plasticity if enabled
+            if (syn->getPlasticityFlags().reward_modulated) {
+                // Apply reward modulation from dopamine
+                float rewardMod = (pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f) * 0.01f;
+                float weight = syn->getWeight();
+                weight += (weight > 0 ? 1.0f : -1.0f) * rewardMod;
+                syn->setWeight(weight);
             }
             
             // Update synapse state
@@ -511,8 +523,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current state
+        // This integrates prediction with working memory and sensory input
+        
+        // Get current sensory pattern from working memory
+        std::vector<float> currentPattern;
+        if (pImpl->workingMemory) {
+            currentPattern = pImpl->workingMemory->retrieve();
+        }
+        
+        // If we have a prediction system, use current state to update predictions
+        // The prediction system would predict next sensory state based on current
+        // This is a simplified integration - full implementation would use learned forward models
+        
+        // Use prediction error signals for neuromodulation
+        if (pImpl->predictionError && pImpl->dopamine) {
+            float predictionError = pImpl->predictionError->getLevel();
+            
+            // Apply prediction error to dopamine system for reward prediction error learning
+            pImpl->dopamine->signalPredictionError(predictionError);
+            
+            // Scale prediction error for plasticity modulation
+            float plasticityMod = 1.0f + predictionError * 0.1f;
+            
+            // Store for use in plasticity step 6
+            pImpl->currentPredictionError = predictionError;
+            pImpl->currentPlasticityMod = plasticityMod;
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,9 +564,56 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Get current working memory content for concept formation
+        auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        if (!memoryNeurons.empty()) {
+            // Create pattern from working memory activations
+            std::vector<float> conceptPattern;
+            conceptPattern.reserve(memoryNeurons.size());
+            
+            for (NeuronId neuronId : memoryNeurons) {
+                // Get neuron activation level
+                float activation = 0.0f;
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron->getId() == neuronId) {
+                                activation = std::abs(neuron->getState().membranePotential - 
+                                                   neuron->getState().restingPotential) / 20.0f;
+                                break;
+                            }
+                        }
+                    }
+                }
+                conceptPattern.push_back(activation);
+            }
+            
+            if (!conceptPattern.empty()) {
+                // Present pattern to concept formation
+                size_t conceptId = pImpl->conceptFormation->presentExperience(
+                    conceptPattern,
+                    conceptPattern,  // features = pattern for now
+                    pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                    currentStep
+                );
+                
+                // Store pattern in episodic memory for concept learning
+                if (pImpl->episodicMemory && conceptId > 0) {
+                    EpisodicMemoryItem episode;
+                    episode.timestamp = currentStep;
+                    episode.sensoryState = conceptPattern;
+                    episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                    
+                    // Extract active neurons from working memory
+                    for (NeuronId neuronId : memoryNeurons) {
+                        episode.activeNeurons.push_back(neuronId);
+                    }
+                    
+                    pImpl->episodicMemory->storeEpisode(episode);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1031,6 +1115,52 @@ NeuralPlanner* Brain::getPlanner() {
 
 ConceptFormation* Brain::getConceptFormation() {
     return pImpl->conceptFormation.get();
+}
+
+const std::unordered_map<std::string, std::string>& Brain::getConceptPrototypes() const {
+    static std::unordered_map<std::string, std::string> empty;
+    if (pImpl->conceptFormation) {
+        // Return concept prototypes for debugging
+        static std::unordered_map<std::string, std::string> prototypes;
+        prototypes.clear();
+        
+        for (size_t i = 1; i < pImpl->conceptFormation->getConceptCount(); ++i) {
+            const auto* concept = pImpl->conceptFormation->getConcept(i);
+            if (concept) {
+                std::string key = "concept_" + std::to_string(i);
+                std::string patternStr = "[";
+                for (size_t j = 0; j < concept->prototype.size(); ++j) {
+                    if (j > 0) patternStr += ", ";
+                    patternStr += std::to_string(concept->prototype[j]);
+                }
+                patternStr += "] stability=" + std::to_string(concept->avgStability);
+                prototypes[key] = patternStr;
+            }
+        }
+        return prototypes;
+    }
+    return empty;
+}
+
+std::vector<float> Brain::getWorkingMemoryNeurons() const {
+    std::vector<float> result;
+    if (pImpl->workingMemory) {
+        auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        result.reserve(memoryNeurons.size());
+        for (NeuronId neuron : memoryNeurons) {
+            result.push_back(static_cast<float>(neuron.index()));
+        }
+    }
+    return result;
+}
+
+std::vector<float> Brain::getPredictionSystemOutput() const {
+    std::vector<float> result;
+    if (pImpl->predictionSystem) {
+        // Get current predictions
+        result = pImpl->predictionSystem->getCurrentPredictions();
+    }
+    return result;
 }
 
 AttentionalSelection* Brain::getAttention() {

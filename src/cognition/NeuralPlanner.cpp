@@ -97,13 +97,12 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
         
         totalReward += actionValue;
         
-        // Reduce confidence if we're uncertain
         confidence *= getSelfModelConfidence(action);
     }
-    
+
     candidate.expectedReward = totalReward;
     candidate.confidence = confidence;
-    
+
     return candidate;
 }
 
