@@ -9,15 +9,6 @@
 
 namespace nlm {
 
-// NeuralWorkingMemory: Implements working memory using neural dynamics
-// NOT a simple storage vector - uses persistent activity and recurrent connections
-//
-// Key mechanisms:
-// - Persistent neural activity (reverberating activity)
-// - Recurrent synaptic connections for maintaining information
-// - Activity-dependent short-term plasticity
-// - Neural competition for selective retention
-
 class NeuralWorkingMemory {
 public:
     NeuralWorkingMemory();
@@ -84,7 +75,18 @@ private:
     // Decay weak memory traces
     void decayWeakTraces();
 
-    struct Impl;
+    struct Impl {
+        Brain* brain;
+        
+        // Maintenance connections (recurrent)
+        std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
+        
+        // Memory trace ages
+        std::vector<SimulationStep> traceAges;
+        
+        Impl() : brain(nullptr) {}
+    };
+
     std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
@@ -105,15 +107,6 @@ private:
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;
 };
-
-// AttentionalSelection: Neural attention through competition
-// NOT Transformer attention - uses lateral inhibition and gain modulation
-//
-// Mechanisms:
-// - Competition between neural populations
-// - Salience-based selection
-// - Recurrent amplification of winners
-// - Inhibitory surround suppression
 
 class AttentionalSelection {
 public:
@@ -167,7 +160,14 @@ public:
     void reset();
 
 private:
-    struct Impl;
+    struct Impl {
+        // Neuron competition state
+        std::vector<float> competitionStrength;
+        std::vector<float> inhibitionLevel;
+        
+        Impl() {}
+    };
+
     std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
