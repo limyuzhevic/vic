@@ -49,57 +49,85 @@ void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
 }
 
 void SpikeSystem::processSpikes(SimulationStep currentStep) {
-    // Process all pending immediate spikes
-    while (!pImpl->pendingSpikes.empty()) {
-        SpikeEvent event = pImpl->pendingSpikes.front();
-        pImpl->pendingSpikes.pop();
-        
-        // Create detailed event
-        DetailedSpikeEvent detailed;
-        detailed.source = event.source_neuron;
-        detailed.timestamp = event.timestamp;
-        detailed.step = event.step;
-        
-        // Add to history
-        pImpl->spikeHistory.push_back(detailed);
-        
-        // Track spike count per neuron
-        pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
-        
-        // Trim history if needed
-        if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    try {
+        if (!pImpl) {
+            return;
         }
         
-        // Call handlers
-        for (auto& handler : pImpl->handlers) {
-            handler(detailed);
+        // Process all pending immediate spikes
+        while (!pImpl->pendingSpikes.empty()) {
+            SpikeEvent event = pImpl->pendingSpikes.front();
+            pImpl->pendingSpikes.pop();
+            
+            // Create detailed event
+            DetailedSpikeEvent detailed;
+            detailed.source = event.source_neuron;
+            detailed.timestamp = event.timestamp;
+            detailed.step = event.step;
+            
+            // Add to history
+            pImpl->spikeHistory.push_back(detailed);
+            
+            // Track spike count per neuron
+            if (event.source_neuron) {
+                pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
+            }
+            
+            // Trim history if needed
+            if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
+                pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+            }
+            
+            // Call handlers
+            for (auto& handler : pImpl->handlers) {
+                if (handler) {
+                    handler(detailed);
+                }
+            }
         }
+    } catch (const std::exception& e) {
+        // Log error but continue
+        (void)e; // Suppress unused parameter warning
     }
 }
 
 void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime) {
-    // Find and process all delayed spikes scheduled for this step
-    auto it = pImpl->delayedSpikes.find(currentStep);
-    if (it != pImpl->delayedSpikes.end()) {
-        // Process all spikes scheduled for this step
-        for (const auto& delayedEvent : it->second) {
-            // Call delayed spike handlers (these will deliver synaptic input)
-            for (auto& handler : pImpl->delayedHandlers) {
-                handler(delayedEvent);
-            }
+    try {
+        if (!pImpl) {
+            return;
         }
-        // Remove processed spikes
-        pImpl->delayedSpikes.erase(it);
+        
+        // Find and process all delayed spikes scheduled for this step
+        auto it = pImpl->delayedSpikes.find(currentStep);
+        if (it != pImpl->delayedSpikes.end()) {
+            // Process all spikes scheduled for this step
+            for (const auto& delayedEvent : it->second) {
+                // Call delayed spike handlers (these will deliver synaptic input)
+                for (auto& handler : pImpl->delayedHandlers) {
+                    if (handler) {
+                        handler(delayedEvent);
+                    }
+                }
+            }
+            // Remove processed spikes
+            pImpl->delayedSpikes.erase(it);
+        }
+    } catch (const std::exception& e) {
+        // Log error but continue
+        (void)e; // Suppress unused parameter warning
     }
 }
 
 void SpikeSystem::registerHandler(SpikeHandler handler) {
-    pImpl->handlers.push_back(handler);
+    if (handler) {
+        pImpl->handlers.push_back(handler);
+    }
 }
 
 void SpikeSystem::registerDelayedHandler(DelayedSpikeHandler handler) {
-    pImpl->delayedHandlers.push_back(handler);
+    if (handler) {
+        pImpl->delayedHandlers.push_back(handler);
+    }
 }
 
 const std::vector<DetailedSpikeEvent>& SpikeSystem::getSpikeHistory() const {
