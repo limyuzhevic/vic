@@ -1,11 +1,3 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include <vector>
-#include <memory>
-
-namespace nlm {
-
 // Prediction system: predicts future sensory states and consequences
 // PLACEHOLDER - Phase 2 will implement real predictive coding
 
@@ -20,6 +12,9 @@ public:
     
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
+    
+    // NEW: Update prediction error directly
+    void updatePredictionError(float error);
     
     // Get prediction error
     float getPredictionError() const;
@@ -38,5 +33,3 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 };
-
-} // namespace nlm

@@ -509,10 +509,56 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+// ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Make predictions about next state based on current brain activity
+        if (pImpl->sensoryNeurons.size() > 0) {
+            // Extract current sensory state from neuron activities
+            std::vector<float> currentSensoryState;
+            for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 20; ++i) {
+                NeuronId neuronId = pImpl->sensoryNeurons[i];
+                float activation = 0.0f;
+                for (auto& region : pImpl->regions) {
+                    auto neurons = region->getAllNeurons();
+                    for (auto* neuron : neurons) {
+                        if (neuron->getId() == neuronId) {
+                            activation = neuron->getMembranePotential();
+                            if (activation < -60) activation = -60;
+                            activation = (activation + 70) / 100.0f;
+                            break;
+                        }
+                    }
+                }
+                currentSensoryState.push_back(activation);
+            }
+            
+            if (!currentSensoryState.empty()) {
+                // Create sensory input for prediction system
+                auto sensoryInput = std::make_unique<SensoryInput>();
+                sensoryInput->setData(currentSensoryState);
+                
+                // Make prediction for next state
+                auto predictedState = pImpl->predictionSystem->predictNextState(*sensoryInput);
+                
+                // Update prediction system with actual observation
+                pImpl->predictionSystem->updatePredictions(predictedState, *sensoryInput);
+                
+                // Get prediction error and confidence for neuromodulation
+                float error = pImpl->predictionSystem->getPredictionError();
+                float confidence = pImpl->predictionSystem->getConfidence();
+                
+                // Update prediction error signal for neuromodulation
+                if (pImpl->predictionError) {
+                    pImpl->predictionError->computeError(predictedState->getData().empty() ? 0.0f : predictedState->getData()[0], 
+                                                         currentSensoryState.empty() ? 0.0f : currentSensoryState[0]);
+                }
+                
+                // Feed prediction error to curiosity system
+                if (pImpl->curiosity && error > 0.1f) {
+                    pImpl->curiosity->setPredictionError(error);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +574,55 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Collect current neural activity patterns for concept formation
+        
+        // Get current neural activity from sensory and internal neurons
+        std::vector<float> currentPatterns;
+        
+        // Collect activity from sensory neurons
+        for (NeuronId sensoryId : pImpl->sensoryNeurons) {
+            for (auto& region : pImpl->regions) {
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron->getId() == sensoryId) {
+                        // Get normalized activation
+                        float activation = neuron->getMembranePotential();
+                        if (activation < -60) activation = -60;  // Clamp
+                        activation = (activation + 70) / 100.0f;  // Normalize to [0,1]
+                        currentPatterns.push_back(activation);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Collect activity from internal neurons for concept formation
+        for (auto& region : pImpl->regions) {
+            auto neurons = region->getAllNeurons();
+            for (auto* neuron : neurons) {
+                if (neuron->getId() != NeuronId() && neuron->isFiring()) {
+                    // Get average membrane potential of firing neurons
+                    float avgPotential = neuron->getMembranePotential();
+                    if (avgPotential < -60) avgPotential = -60;
+                    currentPatterns.push_back((avgPotential + 70) / 100.0f);
+                }
+            }
+        }
+        
+        // Update concept formation with current neural activity
+        if (!currentPatterns.empty()) {
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            pImpl->conceptFormation->presentExperience(currentPatterns, currentPatterns, reward, currentStep);
+            
+            // Check for concept formation and activate related neurons
+            size_t matchingConcept = pImpl->conceptFormation->getMatchingConcept(currentPatterns);
+            if (matchingConcept > 0) {
+                // For now, just log that concept was detected
+                // In full implementation, would activate concept-related neural assemblies
+                NLM_LOG_INFO("ConceptFormation: Pattern matched concept " + std::to_string(matchingConcept));
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
