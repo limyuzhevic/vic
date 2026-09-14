@@ -15,21 +15,31 @@ endif()
 if(MSVC)
     add_compile_options(/W4)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+endif()
+
+# Performance optimizations
+option(NLM_ENABLE_SIMD "Enable SIMD optimizations for neuron dynamics" ON)
+option(NLM_ENABLE_PERF "Enable performance profiling" OFF)
+
+option(NLM_ENABLE_TESTING "Enable comprehensive testing" ON)
+
+if(NLM_ENABLE_SIMD)
+    add_compile_options(-msse4.1 -mpopcnt -march=native)
 endif()
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
+# Core library with better dependency management
 add_library(nlm_core STATIC
-    # Core
+    # Core utilities
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
+    # Brain components
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
@@ -121,7 +131,7 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable with advanced features
 add_executable(nlm
     src/main.cpp
 )
@@ -140,12 +150,34 @@ add_executable(nlm_phase4_demo
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Testing
-enable_testing()
-add_subdirectory(tests)
+if(NLM_ENABLE_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+# Install targets
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/configs/default.cfg
+    DESTINATION etc/nlm
+)
+
+# Configure file for runtime configuration
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/configs/default.cfg
+    ${CMAKE_CURRENT_BINARY_DIR}/nlm_config.cfg
+    COPYONLY
+)
+
+# Summary of configuration
+message(STATUS "NLM Configuration:")
+message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  SIMD Optimizations: ${NLM_ENABLE_SIMD}")
+message(STATUS "  Performance Profiling: ${NLM_ENABLE_PERF}")
+message(STATUS "  Testing: ${NLM_ENABLE_TESTING}")
