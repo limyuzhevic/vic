@@ -1006,6 +1006,15 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
+    if (!pImpl->workingMemory) {
+        // Create working memory if it doesn't exist
+        pImpl->workingMemory = std::make_unique<NeuralWorkingMemory>();
+        if (pImpl->config) {
+            size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
+            pImpl->workingMemory->initialize(this);
+            pImpl->workingMemory->setCapacity(neuronCount / 10);
+        }
+    }
     return pImpl->workingMemory.get();
 }
 
