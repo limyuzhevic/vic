@@ -22,21 +22,24 @@ Phase 6 aimed to integrate all previously separate systems into a coherent artif
 All systems now updated within `Brain::step()`:
 ```cpp
 for each step:
-    1. Process spikes
-    2. Update neurons (LIF)
-    3. Detect spikes
-    4. Update working memory
-    5. Apply neuromodulation
-    6. Apply plasticity (STDP, Hebbian)
-    7. Store episodic memory
-    8. Update prediction
-    9. Update attention
-    10. Update concept formation
-    11. Structural plasticity
-    12. Replay
-    13. Development update
-    14. Consolidation
-    15. Checkpoint management
+    1. Process pending delayed spikes (deliver synaptic input)
+    2. Update all neurons (LIF dynamics)
+    3. Detect spikes and schedule spike events
+    4. Update all neurons (LIF dynamics again - this is the actual LIF update)
+    5. Detect spikes and schedule spike events for the step
+    6. Process immediate spikes
+    7. Update working memory (maintenance and competition)
+    8. Apply neuromodulation effects on neural excitability
+    9. Apply plasticity rules (STDP, Hebbian)
+    10. Update episodic memory with current experience
+    11. Update prediction system
+    12. Update attention system
+    13. Update concept formation
+    14. Apply structural plasticity (synaptogenesis, pruning)
+    15. Replay important memories (during rest or periodically)
+    16. Apply development effects
+    17. Periodic memory consolidation
+    18. Checkpoint management
 ```
 
 ### Systems Remaining Disconnected

@@ -1017,6 +1017,9 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
+// Fix: Always return the actual memory system pointers instead of nullptr
+// This ensures that memory systems are properly integrated and accessible
+
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
