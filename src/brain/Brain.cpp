@@ -234,30 +234,33 @@ bool Brain::initialize() {
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
-    
+
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
-    
+
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
-    
+
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
-    
+    // PredictionSystem doesn't have initialize method currently
+    // but it is created in the constructor
+
     // Initialize cognition systems
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
-    
+
     pImpl->conceptFormation->initialize(this);
-    
+
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
-    
-    // Initialize neuromodulation
+
+    // Initialize neuromodulation systems
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->predictionError->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -316,7 +319,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 5. Apply neuromodulation effects on neural excitability
      * 6. Apply plasticity rules (STDP, Hebbian)
      * 7. Update episodic memory with current experience
-     * 8. Update prediction system
+     * 8. Update prediction system with sensory input
      * 9. Update attention system
      * 10. Update concept formation
      * 11. Apply structural plasticity (synaptogenesis, pruning)
@@ -477,7 +480,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 7: Update episodic memory ==========
+    // ========== STEP 7: Update episodic memory with current experience ==========
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
@@ -509,10 +512,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+    // ========== STEP 8: Update prediction system with sensory input ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Check if we have new sensory input from the last step
+        if (pImpl->lastSensoryInput) {
+            // Predict next state based on current sensory input
+            auto predicted = pImpl->predictionSystem->predictNextState(*pImpl->lastSensoryInput);
+            
+            // Update predictions with actual sensory input (if available)
+            if (pImpl->sensoryInputBuffer.size() >= 2) {
+                pImpl->predictionSystem->updatePredictions(
+                    pImpl->sensoryInputBuffer[0],
+                    pImpl->sensoryInputBuffer[1]
+                );
+            }
+            
+            // Store new sensory input for prediction
+            pImpl->sensoryInputBuffer.push_back(*pImpl->lastSensoryInput);
+            if (pImpl->sensoryInputBuffer.size() > 2) {
+                pImpl->sensoryInputBuffer.erase(pImpl->sensoryInputBuffer.begin());
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -529,7 +549,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // This requires sensory state encoding - simplified for now
+        // Concept formation would integrate with working memory and attention
+        pImpl->conceptFormation->update(pImpl->timestep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -585,6 +607,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+    
+    // ========== STEP 16: Integrate with agent systems ==========
+    // Update AgentBrain systems based on current brain state
+    // This happens at the application level but we can prepare for it here
+    if (currentStep % 100 == 0) {
+        // Update prediction error based on sensory predictions
+        if (pImpl->predictionSystem && pImpl->dopamine) {
+            float error = pImpl->predictionSystem->getPredictionError();
+            if (error > 0.5f) {
+                pImpl->predictionError->update(error, pImpl->timestep);
+                pImpl->dopamine->update(pImpl->timestep);
+            }
+        }
+        
+        // Update curiosity based on novelty
+        if (pImpl->novelty && pImpl->curiosity) {
+            pImpl->curiosity->update(pImpl->timestep);
+        }
+        
+        // Apply developmental changes to neural plasticity
+        pImpl->developmentSystem->applyEffects(this, pImpl->timestep);
     }
 }
 
