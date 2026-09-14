@@ -2,9 +2,22 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/iostream.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <functional>
+#include <optional>
+#include <variant>
+#include <stdexcept>
+#include <iostream>
+#include <sstream>
+
+// Forward declarations for forward referencing
+namespace nlm {
+    class CheckpointSystem;
+}
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -12,9 +25,621 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/visualization/VisualizationInterface.hpp"
+#include "../src/performance/Performance.hpp"
+#include "../src/performance/CheckpointSystem.hpp"
+
+// Custom exception types
+class NLMRuntimeError : public std::runtime_error {
+public:
+    explicit NLMRuntimeError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class NLMValidationError : public std::runtime_error {
+public:
+    explicit NLMValidationError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class NLMConfigurationError : public std::runtime_error {
+public:
+    explicit NLMConfigurationError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class NLMPermissionError : public std::runtime_error {
+public:
+    explicit NLMPermissionError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class NLMSerializationError : public std::runtime_error {
+public:
+    explicit NLMSerializationError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+// Context manager wrapper for automatic cleanup
+class BrainContextManager {
+private:
+    std::shared_ptr<nlm::Brain> brain_;
+    std::shared_ptr<nlm::Config> config_;
+    bool initialized_;
+
+public:
+    explicit BrainContextManager(std::shared_ptr<nlm::Config> config = nullptr)
+        : config_(config), initialized_(false) {
+        if (!config_) {
+            config_ = std::make_shared<nlm::Config>();
+        }
+    }
+
+    ~BrainContextManager() {
+        if (initialized_) {
+            try {
+                reset();
+            } catch (...) {
+                // Ignore errors in destructor
+            }
+        }
+    }
+
+    std::shared_ptr<nlm::Brain> createBrain() {
+        brain_ = std::make_shared<nlm::Brain>(config_);
+        return brain_;
+    }
+
+    bool initialize(double timestep = 0.01) {
+        if (!brain_) {
+            throw NLMConfigurationError("Brain not created. Call createBrain() first.");
+        }
+        
+        // Initialize brain with default parameters
+        bool success = brain_->initialize();
+        if (!success) {
+            throw NLMRuntimeError("Failed to initialize brain.");
+        }
+        
+        initialized_ = true;
+        return true;
+    }
+
+    void reset() {
+        if (brain_) {
+            brain_->reset();
+            initialized_ = false;
+            brain_.reset();
+        }
+    }
+
+    std::shared_ptr<nlm::Brain> getBrain() const {
+        return brain_;
+    }
+
+    bool isInitialized() const {
+        return initialized_;
+    }
+
+    // Python context manager support
+    void __enter__() {
+        if (brain_ && !initialized_) {
+            initialize();
+        }
+    }
+
+    void __exit__(int type, const char* value, const char* traceback) {
+        reset();
+    }
+};
+
+// Batch processing utilities
+class BatchProcessor {
+private:
+    std::shared_ptr<nlm::Brain> brain_;
+    std::shared_ptr<nlm::SimpleWorld> world_;
+    std::vector<std::shared_ptr<nlm::SensoryInput>> sensoryInputs_;
+    std::vector<std::shared_ptr<nlm::ActionResult>> results_;
+
+public:
+    BatchProcessor(std::shared_ptr<nlm::Brain> brain, std::shared_ptr<nlm::SimpleWorld> world)
+        : brain_(brain), world_(world) {}
+
+    void addSensoryInput(std::shared_ptr<nlm::SensoryInput> input) {
+        sensoryInputs_.push_back(input);
+    }
+
+    void processBatch(double timestep = 0.01) {
+        results_.clear();
+        
+        if (!world_) {
+            throw NLMConfigurationError("World not available for batch processing.");
+        }
+        
+        for (auto& input : sensoryInputs_) {
+            // Process each input through the brain
+            brain_->receiveSensoryInput(*input);
+            auto action = brain_->produceAction();
+            
+            // Apply action in world
+            if (action) {
+                world_->applyMotorCommand(
+                    static_cast<nlm::MotorCommand>(action->getType()),
+                    0.0 // currentTime
+                );
+                
+                // Get result
+                auto percept = world_->getSensoryPercept();
+                auto agentBody = world_->getAgentBody();
+                
+                // Create result (simplified)
+                auto result = std::make_shared<nlm::ActionResult>(
+                    0.0, true, "Processed"
+                );
+                results_.push_back(result);
+            }
+        }
+    }
+
+    std::vector<std::shared_ptr<nlm::ActionResult>> getResults() const {
+        return results_;
+    }
+
+    size_t getProcessedCount() const {
+        return results_.size();
+    }
+
+    void clear() {
+        sensoryInputs_.clear();
+        results_.clear();
+    }
+};
+
+// Performance monitoring utilities
+class PerformanceMonitor {
+private:
+    struct Metrics {
+        double fps = 0.0;
+        double timestep = 0.0;
+        size_t totalSteps = 0;
+        size_t totalSpikes = 0;
+        double memoryUsage = 0.0;
+        double cpuUsage = 0.0;
+        double neuronActivity = 0.0;
+        double synapticActivity = 0.0;
+        uint64_t simulationTime = 0;
+    };
+
+    Metrics currentMetrics_;
+    std::chrono::high_resolution_clock::time_point lastUpdateTime_;
+    size_t updateCount_ = 0;
+
+public:
+    PerformanceMonitor() {
+        lastUpdateTime_ = std::chrono::high_resolution_clock::now();
+    }
+
+    void updateMetrics(const nlm::Brain& brain, const nlm::SimpleWorld& world,
+                      uint64_t currentStep, double currentTime) {
+        auto now = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(now - lastUpdateTime_);
+        
+        updateCount_++;
+        
+        if (duration.count() > 0.0) {
+            currentMetrics_.fps = 1.0 / duration.count();
+        }
+        
+        currentMetrics_.timestep = duration.count();
+        currentMetrics_.totalSteps = currentStep;
+        currentMetrics_.totalSpikes = brain.getTotalSpikeCount();
+        currentMetrics_.neuronActivity = static_cast<double>(brain.getActiveNeuronCount()) / 
+                                         std::max(1.0, static_cast<double>(brain.getTotalNeuronCount()));
+        currentMetrics_.synapticActivity = static_cast<double>(brain.getTotalSynapseCount()) / 
+                                           std::max(1.0, static_cast<double>(brain.getActiveNeuronCount()));
+        currentMetrics_.simulationTime = currentTime * 1e6; // Convert to microseconds
+        
+        lastUpdateTime_ = now;
+    }
+
+    double getFPS() const { return currentMetrics_.fps; }
+    double getTimestep() const { return currentMetrics_.timestep; }
+    size_t getTotalSteps() const { return currentMetrics_.totalSteps; }
+    size_t getTotalSpikes() const { return currentMetrics_.totalSpikes; }
+    double getNeuronActivity() const { return currentMetrics_.neuronActivity; }
+    double getSynapticActivity() const { return currentMetrics_.synapticActivity; }
+    uint64_t getSimulationTime() const { return currentMetrics_.simulationTime; }
+
+    std::string getReport() const {
+        std::stringstream ss;
+        ss << "Performance Report:\n";
+        ss << "  FPS: " << currentMetrics_.fps << "\n";
+        ss << "  Timestep: " << currentMetrics_.timestep << "\n";
+        ss << "  Total Steps: " << currentMetrics_.totalSteps << "\n";
+        ss << "  Total Spikes: " << currentMetrics_.totalSpikes << "\n";
+        ss << "  Neuron Activity: " << (currentMetrics_.neuronActivity * 100) << "%\n";
+        ss << "  Synaptic Activity: " << (currentMetrics_.synapticActivity * 100) << "%\n";
+        ss << "  Simulation Time: " << currentMetrics_.simulationTime << " μs\n";
+        return ss.str();
+    }
+};
+
+// Checkpoint utilities
+class CheckpointManager {
+private:
+    std::shared_ptr<nlm::CheckpointManager> manager_;
+
+public:
+    CheckpointManager() {
+        manager_ = std::make_shared<nlm::CheckpointManager>();
+    }
+
+    void configure(const std::string& checkpointDir, uint64_t saveIntervalSteps = 10000,
+                   size_t maxCheckpoints = 10, bool compress = true) {
+        manager_->configure(checkpointDir, saveIntervalSteps, maxCheckpoints, compress);
+    }
+
+    bool save(const std::string& name = "") {
+        return manager_->saveImmediately(name);
+    }
+
+    bool load(const std::string& name) {
+        return manager_->load(name);
+    }
+
+    std::vector<std::string> listCheckpoints() const {
+        std::vector<std::string> names;
+        auto infos = manager_->listCheckpoints();
+        for (const auto& info : infos) {
+            names.push_back(info.name);
+        }
+        return names;
+    }
+
+    void prune(size_t keepCount) {
+        manager_->pruneOldCheckpoints(keepCount);
+    }
+
+    std::string getLastCheckpointPath() const {
+        return manager_->getLastCheckpointPath();
+    }
+};
+
+// Serialization utilities
+namespace serialization {
+    template<typename T>
+    class Serializer {
+    public:
+        static std::vector<uint8_t> toBinary(const T& obj) {
+            // Simplified serialization
+            std::vector<uint8_t> buffer;
+            buffer.reserve(sizeof(T));
+            const uint8_t* ptr = reinterpret_cast<const uint8_t*>(&obj);
+            buffer.insert(buffer.end(), ptr, ptr + sizeof(T));
+            return buffer;
+        }
+
+        static T fromBinary(const std::vector<uint8_t>& buffer) {
+            if (buffer.size() < sizeof(T)) {
+                throw NLMSerializationError("Buffer too small for deserialization");
+            }
+            T obj;
+            std::copy(buffer.begin(), buffer.begin() + sizeof(T), 
+                     reinterpret_cast<uint8_t*>(&obj));
+            return obj;
+        }
+
+        static std::string toJSON(const T& obj) {
+            // Simplified JSON serialization
+            std::stringstream ss;
+            ss << "{\"data\":\"" << std::to_string(reinterpret_cast<uintptr_t>(&obj)) 
+               << "\"}";
+            return ss.str();
+        }
+
+        static T fromJSON(const std::string& json) {
+            // Simplified JSON deserialization
+            throw NLMSerializationError("JSON deserialization not implemented for this type");
+        }
+    };
+
+    // Specialized serializers for common types
+    template<typename T>
+    class SmartPointerSerializer {
+    public:
+        static std::vector<uint8_t> toBinary(const std::shared_ptr<T>& obj) {
+            if (!obj) return std::vector<uint8_t>();
+            return Serializer<T>::toBinary(*obj);
+        }
+
+        static std::shared_ptr<T> fromBinary(const std::vector<uint8_t>& buffer) {
+            if (buffer.empty()) return nullptr;
+            return std::make_shared<T>(Serializer<T>::fromBinary(buffer));
+        }
+    };
+}
+
+// Configuration utilities
+namespace config {
+    class ConfigBuilder {
+    public:
+        static std::shared_ptr<nlm::Config> createDefaultConfig() {
+            auto config = std::make_shared<nlm::Config>();
+            
+            // Set default values
+            config->set("brain.simType", std::string("spiking"));
+            config->set("brain.maxNeurons", 10000);
+            config->set("brain.maxSynapses", 100000);
+            config->set("brain.dt", 0.01);
+            config->set("brain.tau", 10.0);
+            config->set("brain.v_thresh", -50.0);
+            config->set("brain.v_reset", -65.0);
+            config->set("brain.v_rest", -65.0);
+            
+            // Sensory defaults
+            config->set("sensory.vision.width", 64);
+            config->set("sensory.vision.height", 64);
+            config->set("sensory.vision.channels", 3);
+            
+            // Motor defaults
+            config->set("motor.maxForce", 10.0);
+            config->set("motor.maxTorque", 5.0);
+            
+            // Development defaults
+            config->set("development.enabled", true);
+            config->set("development.stageDuration", 1000);
+            
+            return config;
+        }
+
+        static std::shared_ptr<nlm::Config> loadFromFile(const std::string& filepath) {
+            auto config = std::make_shared<nlm::Config>();
+            if (!config->loadFromFile(filepath)) {
+                throw NLMRuntimeError("Failed to load configuration from file: " + filepath);
+            }
+            return config;
+        }
+
+        static std::shared_ptr<nlm::Config> loadFromString(const std::string& json) {
+            auto config = std::make_shared<nlm::Config>();
+            
+            // Write JSON to temporary file
+            const char* tmpFilename = "temp_config.json";
+            std::ofstream file(tmpFilename);
+            if (!file) {
+                throw NLMRuntimeError("Failed to create temporary file for JSON parsing");
+            }
+            file << json;
+            file.close();
+            
+            if (!config->loadFromFile(tmpFilename)) {
+                std::remove(tmpFilename);
+                throw NLMRuntimeError("Failed to parse JSON configuration");
+            }
+            std::remove(tmpFilename);
+            return config;
+        }
+    };
+}
+
+// Workflow convenience functions
+namespace workflows {
+    class AgentTrainingWorkflow {
+    private:
+        std::shared_ptr<nlm::Brain> brain_;
+        std::shared_ptr<nlm::SimpleWorld> world_;
+        std::shared_ptr<nlm::AgentBrain> agentBrain_;
+        PerformanceMonitor monitor_;
+
+    public:
+        AgentTrainingWorkflow() {
+            world_ = std::make_shared<nlm::SimpleWorld>();
+            auto config = config::ConfigBuilder::createDefaultConfig();
+            brain_ = std::make_shared<nlm::Brain>(config);
+            agentBrain_ = std::make_shared<nlm::AgentBrain>(brain_);
+            
+            world_->configure(100, 100, 64, 64);
+            brain_->initialize();
+        }
+
+        void trainEpisode(int steps) {
+            world_->reset();
+            agentBrain_->initialize(*world_);
+            
+            for (int step = 0; step < steps; ++step) {
+                // Get sensory percept
+                auto percept = world_->getSensoryPercept();
+                
+                // Process through agent brain
+                agentBrain_->processSensoryInput(percept);
+                
+                // Get action
+                auto action = brain_->produceAction();
+                if (action) {
+                    world_->applyMotorCommand(
+                        static_cast<nlm::MotorCommand>(action->getType()),
+                        step * 0.01
+                    );
+                }
+                
+                // Update world
+                world_->update(0.01);
+                
+                // Update monitoring
+                monitor_.updateMetrics(*brain_, *world_, step, step * 0.01);
+            }
+        }
+
+        double getTrainingEfficiency() const {
+            return monitor_.getFPS() * monitor_.getNeuronActivity();
+        }
+
+        std::string getSummary() const {
+            std::stringstream ss;
+            ss << "Training Summary:\n";
+            ss << "  Efficiency: " << getTrainingEfficiency() << "\n";
+            ss << "  Total Steps: " << monitor_.getTotalSteps() << "\n";
+            ss << "  Total Spikes: " << monitor_.getTotalSpikes() << "\n";
+            ss << "  Average FPS: " << monitor_.getFPS() << "\n";
+            return ss.str();
+        }
+    };
+
+    class SimulationControlFlow {
+    public:
+        static void runStandardSimulation(std::shared_ptr<nlm::Brain> brain,
+                                         std::shared_ptr<nlm::SimpleWorld> world,
+                                         uint64_t steps,
+                                         const std::string& outputDir = "") {
+            if (!brain) {
+                throw NLMConfigurationError("Brain is null.");
+            }
+            
+            if (!world) {
+                throw NLMConfigurationError("World is null.");
+            }
+            
+            brain->initialize();
+            world->reset();
+            
+            PerformanceMonitor monitor;
+            
+            for (uint64_t step = 0; step < steps; ++step) {
+                // Get sensory input from world
+                auto percept = world->getSensoryPercept();
+                
+                // Process through brain
+                brain->receiveSensoryInput(*percept);
+                
+                // Generate action
+                auto action = brain->produceAction();
+                if (action) {
+                    world->applyMotorCommand(
+                        static_cast<nlm::MotorCommand>(action->getType()),
+                        step * 0.01
+                    );
+                }
+                
+                // Update simulation
+                world->update(0.01);
+                
+                // Update metrics
+                monitor.updateMetrics(*brain, *world, step, step * 0.01);
+                
+                // Save checkpoint if output directory specified
+                if (!outputDir.empty() && step % 1000 == 0) {
+                    std::stringstream filename;
+                    filename << outputDir << "/checkpoint_step_" << step << ".bin";
+                    brain->save(filename.str());
+                }
+            }
+        }
+
+        static void runAgentWorldSimulation(std::shared_ptr<nlm::AgentBrain> agentBrain,
+                                           std::shared_ptr<nlm::SimpleWorld> world,
+                                           uint64_t episodes,
+                                           uint64_t stepsPerEpisode) {
+            if (!agentBrain) {
+                throw NLMConfigurationError("AgentBrain is null.");
+            }
+            
+            if (!world) {
+                throw NLMConfigurationError("World is null.");
+            }
+            
+            for (uint64_t episode = 0; episode < episodes; ++episode) {
+                world->reset();
+                agentBrain->initialize(*world);
+                
+                for (uint64_t step = 0; step < stepsPerEpisode; ++step) {
+                    auto percept = world->getSensoryPercept();
+                    agentBrain->processSensoryInput(percept);
+                    
+                    auto command = agentBrain->decodeMotorCommand();
+                    if (command) {
+                        world->applyMotorCommand(
+                            static_cast<nlm::MotorCommand>(*command),
+                            step * 0.01
+                        );
+                    }
+                    
+                    world->update(0.01);
+                }
+            }
+        }
+    };
+}
+
+// Visualization utilities
+namespace visualization {
+    class VisualizationHelper {
+    private:
+        std::shared_ptr<nlm::VisualizationInterface> viz_;
+
+    public:
+        VisualizationHelper() {
+            viz_ = std::make_shared<nlm::VisualizationInterface>();
+            viz_->initialize();
+        }
+
+        ~VisualizationHelper() {
+            if (viz_->isActive()) {
+                viz_->close();
+            }
+        }
+
+        void visualizeBrain(const nlm::Brain& brain, bool network = true,
+                          bool activity = true, bool spikes = true) {
+            if (!viz_->isActive()) {
+                return;
+            }
+            
+            if (network) {
+                viz_->visualizeNetwork(brain);
+            }
+            if (activity) {
+                viz_->visualizeActivity(brain);
+            }
+            if (spikes) {
+                // Would need to collect spikes from brain
+                // viz_->visualizeSpikes(brain.getRecentSpikes());
+            }
+        }
+
+        void visualizeWorld(const nlm::SimpleWorld& world, bool objects = true,
+                          bool agent = true, bool sensor = true) {
+            if (!viz_->isActive()) {
+                return;
+            }
+            
+            // Visualization logic would go here
+            // viz_->visualizeWorldState(world, objects, agent, sensor);
+        }
+
+        void render() {
+            if (viz_->isActive()) {
+                viz_->render();
+            }
+        }
+
+        void update() {
+            if (viz_->isActive()) {
+                viz_->update();
+            }
+        }
+
+        bool isActive() const {
+            return viz_->isActive();
+        }
+
+        void setUpdateRate(double hz) {
+            if (viz_->isActive()) {
+                viz_->setUpdateRate(hz);
+            }
+        }
+    };
+}
 
 namespace py = pybind11;
 namespace nlm {

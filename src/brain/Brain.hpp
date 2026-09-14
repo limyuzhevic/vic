@@ -19,6 +19,8 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class NeuralSemanticMemory;
+class NeuralProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
@@ -158,11 +160,11 @@ public:
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
     
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    // Semantic memory - stable knowledge and concepts
+    NeuralSemanticMemory* getSemanticMemory();
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // Procedural memory - skills and habits
+    NeuralProceduralMemory* getProceduralMemory();
     
     // ========== DEVELOPMENT SYSTEM ==========
     
