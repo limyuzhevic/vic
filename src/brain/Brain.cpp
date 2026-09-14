@@ -407,18 +407,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
+    
     // Update novelty detection
     if (pImpl->novelty) {
+        // Need to get observation data for novelty detection
+        // For now, just update based on neural activity
+        float noveltyScore = 0.0f;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        float activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        noveltyScore += activity;
+                    }
+                }
+            }
+        }
+        // Normalize novelty
+        pImpl->novelty->setLevel(std::min(1.0f, noveltyScore / 100.0f));
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
+    // Update curiosity with novelty and prediction error
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        float novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        // Use prediction error if available
+        float predictionError = 0.0f;
+        if (pImpl->predictionSystem) {
+            predictionError = pImpl->predictionSystem->getPredictionError();
+        }
+        pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
+        // In real integration, this would receive reward prediction errors from the environment
+        // For now, maintain basic dynamics
         pImpl->dopamine->update(pImpl->timestep);
         
         // Apply dopamine effects on neural excitability
@@ -437,7 +461,77 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
         }
-    }
+        
+        // Apply dopamine effects on memory consolidation
+        // Dopamine enhances consolidation of important memories during rest/replay
+        if (currentStep % pImpl->replayInterval == 0 && pImpl->dopamine->getLevel() > 0.5f && pImpl->episodicMemory) {
+            pImpl->episodicMemory->consolidate(0.2f + pImpl->dopamine->getLevel() * 0.3f);
+        }
+        
+        // Apply acetylcholine effects on attention and learning
+        // ACh enhances signal-to-noise ratio and modulates attention
+        // Higher dopamine correlates with ACh release for focused attention
+        if (dopamineLevel > 0.3f) {
+            float acetylcholineLevel = dopamineLevel * 0.3f;  // Correlated with dopamine
+            if (acetylcholineLevel > 0.1f && pImpl->attention) {
+                // ACh increases attentional gain and focus
+                pImpl->attention->setInhibitionStrength(std::max(0.2f, pImpl->attention->getInhibitionStrength() - acetylcholineLevel * 0.1f));
+                // Lower inhibition = more focused attention
+                // Also enhance concept formation
+                if (pImpl->conceptFormation) {
+                    pImpl->conceptFormation->setLearningRate(std::min(1.0f, pImpl->conceptFormation->getLearningRate() + acetylcholineLevel * 0.1f));
+                }
+            }
+        }
+        
+        // Apply norepinephrine effects on arousal and vigilance
+        // NE increases overall neural excitability and response gain, correlated with dopamine
+        if (dopamineLevel > 0.2f) {
+            float norepinephrineLevel = dopamineLevel * 0.2f;  // Correlated with dopamine
+            if (norepinephrineLevel > 0.1f) {
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            // NE increases responsiveness and lowers firing threshold
+                            neuron->setThreshold(neuron->getThreshold() - norepinephrineLevel * 2.0f);
+                            // Also increases baseline firing rate
+                            float baselineRate = neuron->getState().firingRate;
+                            neuron->setFiringRate(baselineRate * (1.0f + norepinephrineLevel * 0.05f));
+                        }
+                    }
+                }
+                // NE also enhances working memory encoding
+                if (pImpl->workingMemory && norepinephrineLevel > 0.3f) {
+                    pImpl->workingMemory->setEncodingStrength(pImpl->workingMemory->getEncodingStrength() + norepinephrineLevel * 0.1f);
+                }
+            }
+        }
+        
+        // Apply serotonin effects on mood and impulsivity
+        // 5-HT stabilizes network and regulates impulsivity, correlated with dopamine levels
+        if (dopamineLevel > 0.1f) {
+            float serotoninLevel = dopamineLevel * 0.3f;  // Correlated with dopamine
+            if (serotoninLevel > 0.1f) {
+                // 5-HT reduces burst firing and stabilizes firing rates
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            float currentRate = neuron->getState().firingRate;
+                            // Reduce high firing rates for stability
+                            if (currentRate > 20.0f) {
+                                neuron->setFiringRate(currentRate * (1.0f - serotoninLevel * 0.1f));
+                            }
+                            // Increase firing threshold to reduce impulsivity
+                            neuron->setThreshold(neuron->getThreshold() + serotoninLevel * 1.0f);
+                        }
+                    }
+                }
+                // 5-HT enhances prediction error signaling for learning
+                if (pImpl->predictionSystem) {
+                    pImpl->predictionSystem->setConfidence(std::min(1.0f, pImpl->predictionSystem->getConfidence() + serotoninLevel * 0.05f));
+                }
+            }
+        }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
@@ -509,13 +603,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
-    }
-    
-    // ========== STEP 9: Update attention system ==========
+            // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -523,13 +611,55 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Attention also modulates working memory encoding
+            // Higher attention improves memory encoding fidelity
+            float attentionStrength = pImpl->attention->getAttentionStrength();
+            if (pImpl->workingMemory && attentionStrength > 0.5f) {
+                pImpl->workingMemory->setEncodingStrength(std::min(1.0f, 
+                    pImpl->workingMemory->getEncodingStrength() + attentionStrength * 0.05f));
+            }
+            
+            // Attention connects to concept formation
+            if (pImpl->conceptFormation) {
+                // Concept formation processes attended patterns
+                // For now, just update based on attentional focus
+                pImpl->conceptFormation->update(pImpl->timestep);
+            }
+        }
+        
+        // Attention also connects to action selection
+        // The planner and concept formation influence attention, 
+        // and attention influences which actions are selected
+        if (pImpl->planner) {
+            pImpl->planner->updateAttention(pImpl->attention->getAttentionStrength());
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation integrates with:
+        // - Working memory: extracts patterns from memory traces
+        // - Attention: focuses on relevant patterns
+        // - Prediction errors: signals unexpected patterns
+        
+        // Process attended neural patterns for concept formation
+        if (pImpl->workingMemory && pImpl->attention) {
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            if (!memoryNeurons.empty()) {
+                // Sample some neurons for concept extraction
+                size_t sampleSize = std::min(size_t(20), memoryNeurons.size());
+                std::vector<NeuronId> sample(memoryNeurons.begin(), memoryNeurons.begin() + sampleSize);
+                
+                pImpl->conceptFormation->processPattern(sample);
+            }
+        }
+        
+        // Update concept formation with prediction errors
+        if (pImpl->predictionSystem) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            pImpl->conceptFormation->setPredictionError(predictionError);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1006,6 +1136,8 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
+    NLM_LOG_DEBUG("getWorkingMemory() called - returning pointer: " + 
+                  std::to_string(pImpl->workingMemory.get() != nullptr));
     return pImpl->workingMemory.get();
 }
 
@@ -1020,26 +1152,36 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
+    NLM_LOG_DEBUG("getPredictionSystem() called - returning pointer: " + 
+                  std::to_string(pImpl->predictionSystem.get() != nullptr));
     return pImpl->predictionSystem.get();
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
+    NLM_LOG_DEBUG("getPlanner() called - returning pointer: " + 
+                  std::to_string(pImpl->planner.get() != nullptr));
     return pImpl->planner.get();
 }
 
 ConceptFormation* Brain::getConceptFormation() {
+    NLM_LOG_DEBUG("getConceptFormation() called - returning pointer: " + 
+                  std::to_string(pImpl->conceptFormation.get() != nullptr));
     return pImpl->conceptFormation.get();
 }
 
 AttentionalSelection* Brain::getAttention() {
+    NLM_LOG_DEBUG("getAttention() called - returning pointer: " + 
+                  std::to_string(pImpl->attention.get() != nullptr));
     return pImpl->attention.get();
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
+    NLM_LOG_DEBUG("getDevelopmentSystem() called - returning pointer: " + 
+                  std::to_string(pImpl->developmentSystem.get() != nullptr));
     return pImpl->developmentSystem.get();
 }
 
@@ -1054,14 +1196,20 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 // ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
+    NLM_LOG_DEBUG("getDopamine() called - returning pointer: " + 
+                  std::to_string(pImpl->dopamine.get() != nullptr));
     return pImpl->dopamine.get();
 }
 
 Curiosity* Brain::getCuriosity() {
+    NLM_LOG_DEBUG("getCuriosity() called - returning pointer: " + 
+                  std::to_string(pImpl->curiosity.get() != nullptr));
     return pImpl->curiosity.get();
 }
 
 Novelty* Brain::getNovelty() {
+    NLM_LOG_DEBUG("getNovelty() called - returning pointer: " + 
+                  std::to_string(pImpl->novelty.get() != nullptr));
     return pImpl->novelty.get();
 }
 
@@ -1092,6 +1240,7 @@ void Brain::logStatus() const {
     // Memory system status
     if (pImpl->workingMemory) {
         NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+        NLM_LOG_INFO("Working memory encoding strength: " + std::to_string(pImpl->workingMemory->getEncodingStrength()));
     }
     if (pImpl->episodicMemory) {
         NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
@@ -1100,6 +1249,12 @@ void Brain::logStatus() const {
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
     }
     
     // Development status
