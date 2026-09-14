@@ -53,4 +53,44 @@ void Dopamine::signalRewardPredictionError(float error) {
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 
+void Dopamine::signalPredictionError(float error) {
+    // TODO PHASE 2: Implement prediction error signaling
+    // PLACEHOLDER: Dopamine responds to prediction error directly
+    // Note: Prediction error typically includes both reward prediction error and curiosity prediction error
+    // For now, use absolute value to ensure positive response to prediction errors
+    float effectiveError = std::abs(error);
+    pImpl->level = std::max(0.0f, pImpl->level + effectiveError * pImpl->releaseRate * 0.5f);
+}
+
+void Dopamine::signalNovelty(float novelty) {
+    // TODO PHASE 2: Implement novelty signaling
+    // PLACEHOLDER: Dopamine responds to novelty
+    // Novelty drives exploration, so increase dopamine with novelty signals
+    pImpl->level = std::min(pImpl->peak, pImpl->level + novelty * pImpl->releaseRate * 0.3f);
+}
+
+void Dopamine::updateFromSources(float rewardPredictionError, float curiosity, float novelty, TimestepDuration dt) {
+    // TODO PHASE 2: Implement unified neuromodulator update
+    // Integrate multiple signals into a unified dopamine response
+    
+    // Base update (decay)
+    update(dt);
+    
+    // Signal from reward prediction error (strong influence)
+    signalRewardPredictionError(rewardPredictionError);
+    
+    // Signal from prediction error (medium influence)
+    signalPredictionError(rewardPredictionError * 0.7f);  // Scale relative to RPE
+    
+    // Signal from novelty (exploration drive)
+    signalNovelty(novelty);
+    
+    // Combine curiosity signal (modulates overall exploration tendency)
+    if (curiosity > 0.0f) {
+        // Curiosity drives learning and exploration
+        float curiosityBoost = curiosity * 0.5f;
+        pImpl->level = std::min(pImpl->peak, pImpl->level + curiosityBoost * pImpl->releaseRate * 0.4f);
+    }
+}
+
 } // namespace nlm

@@ -23,6 +23,7 @@ class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
+class SelfModel;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
@@ -158,11 +159,8 @@ public:
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
     
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
-    
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+// Self model of the agent (body awareness, action consequences)
+    SelfModel* getSelfModel();
     
     // ========== DEVELOPMENT SYSTEM ==========
     

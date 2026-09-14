@@ -31,8 +31,7 @@ public:
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
     
-    // Train prediction model
-    void train(const SensoryInput& observation);
+    void train(const std::vector<float>& pattern);
     
 private:
     struct Impl;

@@ -47,6 +47,11 @@ public:
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    void signalPredictionError(float error);
+    void signalNovelty(float novelty);
+    
+    // Update from multiple sources
+    void updateFromSources(float rewardPredictionError, float curiosity, float novelty, TimestepDuration dt);
     
 private:
     struct Impl;
