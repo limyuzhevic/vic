@@ -1,40 +1,40 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
 
+#include "TestFramework.h"
 #include <iostream>
-#include <cassert>
 
-// Forward declarations of test functions
+// Forward declarations of test registration functions
 namespace test_types {
-    void runAll();
+    void registerTypesTests(TestRunner& runner);
 }
 
 namespace test_config {
-    void runAll();
+    void registerConfigTests(TestRunner& runner);
 }
 
 namespace test_random {
-    void runAll();
+    void registerRandomTests(TestRunner& runner);
 }
 
 namespace test_clock {
-    void runAll();
+    void registerClockTests(TestRunner& runner);
 }
 
 namespace test_neuron {
-    void runAll();
+    void registerNeuronTests(TestRunner& runner);
 }
 
 namespace test_synapse {
-    void runAll();
+    void registerSynapseTests(TestRunner& runner);
 }
 
 namespace test_stdp {
-    void runAll();
+    void registerSTDPTests(TestRunner& runner);
 }
 
 namespace test_brain {
-    void runAll();
+    void registerBrainTests(TestRunner& runner);
 }
 
 int main() {
@@ -45,85 +45,25 @@ int main() {
     std::cout << "  - STDP Plasticity" << std::endl;
     std::cout << std::endl;
     
-    bool allPassed = true;
+    TestRunner runner;
     
-    std::cout << "Running Types tests..." << std::endl;
+    // Register all test suites
+    test_types::registerTypesTests(runner);
+    test_config::registerConfigTests(runner);
+    test_random::registerRandomTests(runner);
+    test_clock::registerClockTests(runner);
+    test_neuron::registerNeuronTests(runner);
+    test_synapse::registerSynapseTests(runner);
+    test_stdp::registerSTDPTests(runner);
+    test_brain::registerBrainTests(runner);
+    
     try {
-        test_types::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Config tests..." << std::endl;
-    try {
-        test_config::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Random tests..." << std::endl;
-    try {
-        test_random::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Clock tests..." << std::endl;
-    try {
-        test_clock::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Neuron tests..." << std::endl;
-    try {
-        test_neuron::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Synapse tests..." << std::endl;
-    try {
-        test_synapse::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running STDP tests..." << std::endl;
-    try {
-        test_stdp::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Brain tests..." << std::endl;
-    try {
-        test_brain::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << std::endl;
-    if (allPassed) {
+        runner.runAll();
+        std::cout << std::endl;
         std::cout << "=== All Tests PASSED ===" << std::endl;
         return 0;
-    } else {
+    } catch (const std::exception& e) {
+        std::cout << std::endl;
         std::cout << "=== Some Tests FAILED ===" << std::endl;
         return 1;
     }

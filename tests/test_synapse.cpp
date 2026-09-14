@@ -1,21 +1,281 @@
 // Synapse Tests
 #include "brain/Synapse.hpp"
 #include "core/Random/Random.hpp"
+#include "TestFramework.h"
 #include <cassert>
 #include <iostream>
 #include <cmath>
 
 namespace test_synapse {
 
-void testSynapseCreation() {
-    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+class TestSynapseCreation : public TestBase {
+public:
+    std::string getName() const override {
+        return "testSynapseCreation";
+    }
     
-    assert(synapse.getId() == nlm::SynapseId(1));
-    assert(synapse.getSourceNeuron() == nlm::NeuronId(1));
-    assert(synapse.getDestinationNeuron() == nlm::NeuronId(2));
+    void run() override {
+        nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+        
+        assert(synapse.getId() == nlm::SynapseId(1));
+        assert(synapse.getSourceNeuron() == nlm::NeuronId(1));
+        assert(synapse.getDestinationNeuron() == nlm::NeuronId(2));
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+class TestSynapseWeight : public TestBase {
+public:
+    std::string getName() const override {
+        return "testSynapseWeight";
+    }
     
-    std::cout << "    testSynapseCreation passed" << std::endl;
+    void run() override {
+        nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+        
+        assert(synapse.getWeight() == 0.0f);
+        
+        synapse.setWeight(0.5f);
+        assert(synapse.getWeight() == 0.5f);
+        
+        synapse.addToWeight(0.2f);
+        assert(synapse.getWeight() == 0.7f);
+        
+        synapse.addToWeight(-0.3f);
+        assert(synapse.getWeight() == 0.4f);
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+class TestSynapseWeightBounds : public TestBase {
+public:
+    std::string getName() const override {
+        return "testSynapseWeightBounds";
+    }
+    
+    void run() override {
+        nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+        
+        // Test upper bound
+        synapse.setWeight(10.0f);
+        assert(synapse.getWeight() <= 1.0f);  // Should be clamped
+        
+        // Test lower bound
+        synapse.setWeight(-10.0f);
+        assert(synapse.getWeight() >= -1.0f);  // Should be clamped
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+class TestSynapseType : public TestBase {
+public:
+    std::string getName() const override {
+        return "testSynapseType";
+    }
+    
+    void run() override {
+        nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+        
+        synapse.setType(nlm::SynapseType::Excitatory);
+        assert(synapse.getType() == nlm::SynapseType::Excitatory);
+        assert(synapse.isExcitatory());
+        assert(!synapse.isInhibitory());
+        
+        synapse.setType(nlm::SynapseType::Inhibitory);
+        assert(synapse.getType() == nlm::SynapseType::Inhibitory);
+        assert(synapse.isInhibitory());
+        assert(!synapse.isExcitatory());
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+class TestSynapseDelay : public TestBase {
+public:
+    std::string getName() const override {
+        return "testSynapseDelay";
+    }
+    
+    void run() override {
+        nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+        
+        assert(synapse.getDelay() == 1);  // Default
+        
+        synapse.setDelay(5);
+        assert(synapse.getDelay() == 5);
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+class TestSynapseSpikeHistory : public TestBase {
+public:
+    std::string getName() const override {
+        return "testSynapseSpikeHistory";
+    }
+    
+    void run() override {
+        nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+        
+        assert(synapse.getPreSpikeHistory().empty());
+        assert(synapse.getPostSpikeHistory().empty());
+        
+        synapse.recordPreSpike(0.1);
+        synapse.recordPreSpike(0.2);
+        synapse.recordPostSpike(0.15);
+        
+        assert(synapse.getPreSpikeHistory().size() == 2);
+        assert(synapse.getPostSpikeHistory().size() == 1);
+        
+        synapse.clearHistory();
+        assert(synapse.getPreSpikeHistory().empty());
+        assert(synapse.getPostSpikeHistory().empty());
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+class TestSynapseEligibilityTrace : public TestBase {
+public:
+    std::string getName() const override {
+        return "testSynapseEligibilityTrace";
+    }
+    
+    void run() override {
+        nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+        
+        assert(synapse.getEligibilityTrace() == 0.0f);
+        
+        synapse.setEligibilityTrace(0.5f);
+        assert(synapse.getEligibilityTrace() == 0.5f);
+        
+        // Test decay
+        synapse.decayEligibilityTrace(0.1f);
+        assert(synapse.getEligibilityTrace() < 0.5f);
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+class TestSynapseEfficacy : public TestBase {
+public:
+    std::string getName() const override {
+        return "testSynapseEfficacy";
+    }
+    
+    void run() override {
+        nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+        
+        assert(synapse.getEfficacy() == 1.0f);  // Default
+        
+        synapse.setEfficacy(0.5f);
+        assert(synapse.getEfficacy() == 0.5f);
+        
+        // Test bounds
+        synapse.setEfficacy(5.0f);
+        assert(synapse.getEfficacy() <= 2.0f);  // Clamped
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+class TestSynapseRandomInitialization : public TestBase {
+public:
+    std::string getName() const override {
+        return "testSynapseRandomInitialization";
+    }
+    
+    void run() override {
+        nlm::RandomGenerator rng(42);
+        nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+        
+        synapse.setType(nlm::SynapseType::Excitatory);
+        synapse.initializeRandom(rng);
+        
+        // Weight should be positive for excitatory
+        assert(synapse.getWeight() > 0.0f);
+        
+        // Delay should be in valid range
+        assert(synapse.getDelay() >= 1 && synapse.getDelay() <= 5);
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+class TestSynapseReset : public TestBase {
+public:
+    std::string getName() const override {
+        return "testSynapseReset";
+    }
+    
+    void run() override {
+        nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+        
+        synapse.setWeight(0.5f);
+        synapse.recordPreSpike(0.1);
+        synapse.recordPostSpike(0.2);
+        synapse.setEligibilityTrace(0.3f);
+        
+        synapse.reset();
+        
+        assert(synapse.getWeight() == 0.0f);
+        assert(synapse.getPreSpikeHistory().empty());
+        assert(synapse.getPostSpikeHistory().empty());
+        assert(synapse.getEligibilityTrace() == 0.0f);
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+class TestSynapsePlasticityFlags : public TestBase {
+public:
+    std::string getName() const override {
+        return "testSynapsePlasticityFlags";
+    }
+    
+    void run() override {
+        nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+        
+        assert(!synapse.getPlasticityFlags().hebbian);
+        assert(!synapse.getPlasticityFlags().stdp);
+        
+        synapse.enablePlasticity(true, true, false);
+        
+        assert(synapse.getPlasticityFlags().hebbian);
+        assert(synapse.getPlasticityFlags().stdp);
+        assert(!synapse.getPlasticityFlags().reward_modulated);
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+// Function to register all synapse tests
+void registerSynapseTests(TestRunner& runner) {
+    runner.registerTest<TestSynapseCreation>();
+    runner.registerTest<TestSynapseWeight>();
+    runner.registerTest<TestSynapseWeightBounds>();
+    runner.registerTest<TestSynapseType>();
+    runner.registerTest<TestSynapseDelay>();
+    runner.registerTest<TestSynapseSpikeHistory>();
+    runner.registerTest<TestSynapseEligibilityTrace>();
+    runner.registerTest<TestSynapseEfficacy>();
+    runner.registerTest<TestSynapseRandomInitialization>();
+    runner.registerTest<TestSynapseReset>();
+    runner.registerTest<TestSynapsePlasticityFlags>();
 }
+
+// Keep backward compatibility
+void runAll() {
+    std::cout << "Running Synapse tests..." << std::endl;
+    TestRunner runner;
+    registerSynapseTests(runner);
+    runner.runAll();
+}
+
+} // namespace test_synapse
 
 void testSynapseWeight() {
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));

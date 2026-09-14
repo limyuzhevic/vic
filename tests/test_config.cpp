@@ -1,16 +1,137 @@
 // Config Tests
 #include "core/Config/Config.hpp"
+#include "TestFramework.h"
 #include <cassert>
 #include <iostream>
 
 namespace test_config {
 
-void testConfigCreation() {
-    nlm::Config config;
-    assert(!config.has("test"));
+class TestConfigCreation : public TestBase {
+public:
+    std::string getName() const override {
+        return "testConfigCreation";
+    }
     
-    std::cout << "    testConfigCreation passed" << std::endl;
+    void run() override {
+        nlm::Config config;
+        assert(!config.has("test"));
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+class TestConfigSetAndGet : public TestBase {
+public:
+    std::string getName() const override {
+        return "testConfigSetAndGet";
+    }
+    
+    void run() override {
+        nlm::Config config;
+        
+        config.set("int_value", 42, nlm::ConfigSource::Runtime);
+        assert(config.has("int_value"));
+        
+        auto intVal = config.get<int>("int_value");
+        assert(intVal.has_value());
+        assert(*intVal == 42);
+        
+        config.set("double_value", 3.14, nlm::ConfigSource::Runtime);
+        auto doubleVal = config.get<double>("double_value");
+        assert(doubleVal.has_value());
+        assert(*doubleVal > 3.13 && *doubleVal < 3.15);
+        
+        config.set("string_value", std::string("hello"), nlm::ConfigSource::Runtime);
+        auto stringVal = config.get<std::string>("string_value");
+        assert(stringVal.has_value());
+        assert(*stringVal == "hello");
+        
+        config.set("bool_value", true, nlm::ConfigSource::Runtime);
+        auto boolVal = config.get<bool>("bool_value");
+        assert(boolVal.has_value());
+        assert(*boolVal == true);
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+class TestConfigGetOr : public TestBase {
+public:
+    std::string getName() const override {
+        return "testConfigGetOr";
+    }
+    
+    void run() override {
+        nlm::Config config;
+        
+        int val = config.getOr<int>("missing", 100);
+        assert(val == 100);
+        
+        config.set("existing", 50, nlm::ConfigSource::Runtime);
+        val = config.getOr<int>("existing", 100);
+        assert(val == 50);
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+class TestConfigRemove : public TestBase {
+public:
+    std::string getName() const override {
+        return "testConfigRemove";
+    }
+    
+    void run() override {
+        nlm::Config config;
+        
+        config.set("test", 123, nlm::ConfigSource::Runtime);
+        assert(config.has("test"));
+        
+        config.remove("test");
+        assert(!config.has("test"));
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+class TestConfigKeys : public TestBase {
+public:
+    std::string getName() const override {
+        return "testConfigKeys";
+    }
+    
+    void run() override {
+        nlm::Config config;
+        
+        config.set("key1", 1, nlm::ConfigSource::Runtime);
+        config.set("key2", 2, nlm::ConfigSource::Runtime);
+        config.set("key3", 3, nlm::ConfigSource::Runtime);
+        
+        auto keys = config.getKeys();
+        assert(keys.size() == 3);
+        
+        std::cout << "    " << getName() << " passed" << std::endl;
+    }
+};
+
+// Function to register all config tests
+void registerConfigTests(TestRunner& runner) {
+    runner.registerTest<TestConfigCreation>();
+    runner.registerTest<TestConfigSetAndGet>();
+    runner.registerTest<TestConfigGetOr>();
+    runner.registerTest<TestConfigRemove>();
+    runner.registerTest<TestConfigKeys>();
 }
+
+// Keep backward compatibility
+void runAll() {
+    std::cout << "Running Config tests..." << std::endl;
+    TestRunner runner;
+    registerConfigTests(runner);
+    runner.runAll();
+}
+
+} // namespace test_config
 
 void testConfigSetAndGet() {
     nlm::Config config;

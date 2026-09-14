@@ -1,0 +1,50 @@
+#pragma once
+
+#include <memory>
+#include <string>
+#include "../brain/Brain.hpp"
+#include "../experiments/LearningExperiment.hpp"
+#include <vector>
+
+namespace nlm {
+
+class BasicConnectivityTest {
+public:
+    #pragma once
+
+#include <memory>
+#include <string>
+#include "../brain/Brain.hpp"
+#include "../experiments/LearningExperiment.hpp"
+#include <vector>
+
+namespace nlm {
+
+class BasicConnectivityTest {
+public:
+    BasicConnectivityTest() = default;
+    ~BasicConnectivityTest() = default;
+    
+    // Run the basic connectivity test
+    void run(std::shared_ptr<Brain> brain);
+};
+
+class PlasticityExperimentTest {
+public:
+    PlasticityExperimentTest() = default;
+    ~PlasticityExperimentTest() = default;
+    
+    // Run the plasticity learning experiment
+    void run(std::shared_ptr<Brain> brain);
+};
+
+class StdpVerificationTest {
+public:
+    StdpVerificationTest() = default;
+    ~StdpVerificationTest() = default;
+    
+    // Run the STDP verification test
+    void run(std::shared_ptr<Brain> brain);
+};
+
+} // namespace nlm

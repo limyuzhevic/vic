@@ -1,16 +1,19 @@
 #pragma once
 
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
-#include <vector>
+#include "AgentBrainSetup.hpp"
+#include "AgentBrainConfig.hpp"
+#include "AgentBrainSensory.hpp"
+#include "AgentBrainMotor.hpp"
+#include "AgentBrainModulation.hpp"
+#include "AgentBrainDevelopment.hpp"
+#include "AgentBrainState.hpp"
+#include "AgentBrainReset.hpp"
 
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Now modularized into focused submodules for better maintainability
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -56,26 +59,21 @@ public:
     void reset();
     
     // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    Brain* getBrain();
     
     // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void enableRewardModulation(bool enable);
+    void enableStructuralPlasticity(bool enable);
+    void enableDevelopment(bool enable);
+    void enableCuriosity(bool enable);
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
-    
+    bool isRewardModulationEnabled() const;
+    bool isStructuralPlasticityEnabled() const;
+    bool isDevelopmentEnabled() const;
+    bool isCuriosityEnabled() const;
+
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
+    // Brain pointer
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups
