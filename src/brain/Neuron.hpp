@@ -25,6 +25,15 @@ struct NeuronState {
     float adaptationVariable;              // For spike-frequency adaptation
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
+    // Hodgkin-Huxley gating variables
+    float m;                               // Sodium activation gate (0-1)
+    float h;                               // Sodium inactivation gate (0-1)
+    float n;                               // Potassium activation gate (0-1)
+    float caConcentration;                 // Intracellular calcium concentration (μM)
+    
+    // Calcium-dependent potassium channel conductance
+    float gkCa;                           // Calcium-dependent potassium conductance (nS)
+    
     NeuronState()
         : membranePotential(-70.0f)
         , restingPotential(-70.0f)
@@ -37,7 +46,12 @@ struct NeuronState {
         , refractoryRemaining(0)
         , refractoryPeriod(5)
         , adaptationVariable(0.0f)
-        , lastSpikeTime(-1.0f) {}
+        , lastSpikeTime(-1.0f)
+        , m(0.05f)
+        , h(0.6f)
+        , n(0.32f)
+        , caConcentration(0.0f)
+        , gkCa(0.0f) {}
 };
 
 // Neuron class representing a single neuron

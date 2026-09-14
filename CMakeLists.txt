@@ -107,6 +107,24 @@ add_library(nlm_world STATIC
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+# Performance library (checkpoint encryption, parallel processing)
+add_library(nlm_performance STATIC
+    src/performance/CheckpointSystem.cpp
+    src/performance/CheckpointEncryption.cpp
+    src/performance/ParallelProcessing.cpp
+)
+target_include_directories(nlm_performance PUBLIC src/performance)
+target_link_libraries(nlm_performance PUBLIC nlm_core)
+
+# Check for OpenSSL
+find_package(OpenSSL)
+
+if(OPENSSL_FOUND)
+    target_link_libraries(nlm_performance PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+else()
+    message(WARNING "OpenSSL not found. Encryption features will be limited.")
+endif()
+
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp

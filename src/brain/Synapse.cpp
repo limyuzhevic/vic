@@ -199,27 +199,136 @@ void Synapse::step(Timestamp currentTime) {
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
-    if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
-    }
-    
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
+    try {
+        // Validate current time
+        if (currentTime < 0.0) {
+            nlm::ErrorHandler::getInstance().logError(
+                nlm::ErrorCode::InvalidParameter,
+                "Negative timestamp in synapse step",
+                __FILE__, __LINE__, "Synapse::step",
+                nlm::LogLevel::Warning,
+                pImpl->sourceNeuron.index(), pImpl->id.index(), -1,
+                static_cast<SimulationStep>(currentTime), currentTime
+            );
+        }
+        
+        // Decay short-term facilitation (Tsodyks-Markram model)
+        if (pImpl->lastPreSpikeTime >= 0.0f) {
+            float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+            if (timeSincePre < 0.0f) {
+                nlm::ErrorHandler::getInstance().logError(
+                    nlm::ErrorCode::InvalidParameter,
+                    "Negative time since pre spike in synapse",
+                    __FILE__, __LINE__, "Synapse::step",
+                    nlm::LogLevel::Warning,
+                    pImpl->sourceNeuron.index(), pImpl->id.index(), -1,
+                    static_cast<SimulationStep>(currentTime), currentTime
+                );
+            } else {
+                pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+            }
+        }
+        
+        // Decay short-term depression
+        if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
+            float timeSinceActivity = std::max(
+                pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
+                pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
+            );
+            if (timeSinceActivity < 0.0f) {
+                nlm::ErrorHandler::getInstance().logError(
+                    nlm::ErrorCode::InvalidParameter,
+                    "Negative time since activity in synapse",
+                    __FILE__, __LINE__, "Synapse::step",
+                    nlm::LogLevel::Warning,
+                    pImpl->sourceNeuron.index(), pImpl->id.index(), -1,
+                    static_cast<SimulationStep>(currentTime), currentTime
+                );
+            } else {
+                // Recovery from depression toward 1.0
+                pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+            }
+        }
+        
+        // Decay eligibility trace for reward-modulated learning
+        decayEligibilityTrace(0.001f);  // Fast decay
+        
+        // Apply bounds checking for weight
+        if (std::isnan(pImpl->weight) || std::isinf(pImpl->weight)) {
+            nlm::ErrorHandler::getInstance().logError(
+                nlm::ErrorCode::ComputationOverflow,
+                "NaN or infinite synapse weight",
+                __FILE__, __LINE__, "Synapse::step",
+                nlm::LogLevel::Critical,
+                pImpl->sourceNeuron.index(), pImpl->id.index(), -1,
+                static_cast<SimulationStep>(currentTime), currentTime
+            );
+            pImpl->weight = 0.0f;
+        }
+        
+        // Clamp weight bounds with overflow protection
+        float originalWeight = pImpl->weight;
+        pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+        
+        if (std::abs(pImpl->weight - originalWeight) > 0.1f) {
+            nlm::ErrorHandler::getInstance().logWarning(
+                nlm::ErrorCode::ComputationOverflow,
+                "Large weight change in synapse: " + std::to_string(originalWeight) + " -> " + std::to_string(pImpl->weight),
+                __FILE__, __LINE__, "Synapse::step",
+                nlm::LogLevel::Warning,
+                pImpl->sourceNeuron.index(), pImpl->id.index(), -1,
+                static_cast<SimulationStep>(currentTime), currentTime
+            );
+        }
+        
+        // Apply bounds checking for efficacy
+        if (std::isnan(pImpl->efficacy) || std::isinf(pImpl->efficacy)) {
+            nlm::ErrorHandler::getInstance().logError(
+                nlm::ErrorCode::ComputationOverflow,
+                "NaN or infinite synapse efficacy",
+                __FILE__, __LINE__, "Synapse::step",
+                nlm::LogLevel::Critical,
+                pImpl->sourceNeuron.index(), pImpl->id.index(), -1,
+                static_cast<SimulationStep>(currentTime), currentTime
+            );
+            pImpl->efficacy = 1.0f;
+        }
+        
+        // Check for potential instability in facilitation
+        if (pImpl->shortTermFacilitation < 0.0f) {
+            nlm::ErrorHandler::getInstance().logError(
+                nlm::ErrorCode::ComputationUnderflow,
+                "Negative short-term facilitation",
+                __FILE__, __LINE__, "Synapse::step",
+                nlm::LogLevel::Critical,
+                pImpl->sourceNeuron.index(), pImpl->id.index(), -1,
+                static_cast<SimulationStep>(currentTime), currentTime
+            );
+            pImpl->shortTermFacilitation = std::max(0.0f, pImpl->shortTermFacilitation);
+        }
+        
+        if (pImpl->shortTermDepression < 0.0f) {
+            nlm::ErrorHandler::getInstance().logError(
+                nlm::ErrorCode::ComputationUnderflow,
+                "Negative short-term depression",
+                __FILE__, __LINE__, "Synapse::step",
+                nlm::LogLevel::Critical,
+                pImpl->sourceNeuron.index(), pImpl->id.index(), -1,
+                static_cast<SimulationStep>(currentTime), currentTime
+            );
+            pImpl->shortTermDepression = std::max(0.0f, pImpl->shortTermDepression);
+        }
+        
+    } catch (const std::exception& e) {
+        nlm::ErrorHandler::getInstance().logError(
+            nlm::ErrorCode::ComputationOverflow,
+            "Exception during synapse step: " + std::string(e.what()),
+            __FILE__, __LINE__, "Synapse::step",
+            nlm::LogLevel::Error,
+            pImpl->sourceNeuron.index(), pImpl->id.index(), -1,
+            static_cast<SimulationStep>(currentTime), currentTime
         );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
-    
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
-    
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::reset() {

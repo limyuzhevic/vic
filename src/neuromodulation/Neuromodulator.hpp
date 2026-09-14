@@ -6,6 +6,8 @@
 
 namespace nlm {
 
+class Synapse;
+
 // Neuromodulator: Abstract base for neuromodulatory signals
 // PLACEHOLDER - Phase 2 will implement real neuromodulation effects
 
@@ -47,6 +49,27 @@ public:
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    
+    // Spike recording for plasticity
+    void recordPreSpike(class Synapse* synapse, float time, float weight);
+    void recordPostSpike(class Synapse* synapse, float time);
+    
+    // Dopamine state accessors
+    float getPredictionError() const;
+    void resetPredictionError();
+    float getD1Modulation() const;
+    float getD2Modulation() const;
+    
+    // Eligibility trace management
+    float getEligibilityTrace() const;
+    void updateEligibilityTrace(float delta, float decayRate);
+    
+    // TD learning computation
+    float computeTDUpdate(float predictionError, float learningRate, float eligibilityTrace);
+    float getLearningRate(float predictionError, float baselineRate);
+    
+    // Reset and state management
+    void reset();
     
 private:
     struct Impl;

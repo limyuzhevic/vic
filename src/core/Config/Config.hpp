@@ -3,8 +3,11 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <map>
 #include <variant>
 #include <optional>
+#include <chrono>
+#include <functional>
 
 namespace nlm {
 
@@ -20,7 +23,14 @@ using ConfigValue = std::variant<
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<std::string>,
+    std::vector<std::vector<int>>,
+    std::vector<std::vector<double>>,
+    std::vector<std::vector<std::string>>,
+    std::map<std::string, int>,
+    std::map<std::string, double>,
+    std::map<std::string, bool>,
+    std::map<std::string, std::string>
 >;
 
 // Configuration source
@@ -55,7 +65,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -92,6 +102,17 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Get configuration as string
+    std::string toString() const;
+    
+    // Check if configuration is valid
+    bool isValid() const;
+    
+    // Add validation rules
+    void addRequiredField(const std::string& fieldName);
+    void addTypeValidator(const std::string& key, std::function<bool(const ConfigValue&)> validator);
+    void addRangeValidator(const std::string& key, double min, double max);
     
 private:
     struct Impl;
