@@ -1,0 +1,93 @@
+# CLI Configuration Makefile
+# This file is included by the main Makefile
+
+# Check for required dependencies
+CXX := $(shell which g++ 2>/dev/null)
+ifeq ($(CXX),)
+$(error "g++ compiler not found. Please install g++.")
+endif
+
+# Check for C++20 support
+CXX_STANDARD_CHECK := $(shell $(CXX) -std=c++20 -E -x c++ /dev/null 2>&1 | head -n 1)
+CXX_VERSION_OUTPUT := $(shell $(CXX) --version | head -n 1)
+
+# Compiler flags
+CXXFLAGS = -std=c++20 -Wall -Wextra -Wpedantic -I./src -I./src/core -I./src/brain -I./src/cli
+LDFLAGS = -pthread -lstdc++
+
+# Source and build directories
+CLI_SRC_DIR = src/cli
+CLI_BUILD_DIR = build/cli
+
+# CLI source files
+CLI_SOURCES = $(wildcard $(CLI_SRC_DIR)/*.cpp)
+
+# CLI object files
+CLI_OBJECTS = $(patsubst $(CLI_SRC_DIR)/%.cpp,$(CLI_BUILD_DIR)/%.o,$(CLI_SOURCES))
+
+# CLI executable
+CLI_EXECUTABLE = $(CLI_BUILD_DIR)/nlm_cli
+
+# Demo executable
+DEMO_EXECUTABLE = $(CLI_BUILD_DIR)/nlm_cli_demo
+
+# Test executable
+TEST_EXECUTABLE = $(CLI_BUILD_DIR)/test_cli
+
+# All CLI targets
+all: $(CLI_EXECUTABLE) $(DEMO_EXECUTABLE) $(TEST_EXECUTABLE)
+
+# Build CLI executable
+$(CLI_EXECUTABLE): $(CLI_OBJECTS) | $(CLI_BUILD_DIR)
+	@echo "Linking CLI executable..."
+	$(CXX) $(LDFLAGS) -o $@ $(CLI_OBJECTS)
+
+# Build demo executable
+$(DEMO_EXECUTABLE): $(CLI_BUILD_DIR)/demo_main.o $(CLI_BUILD_DIR)/cli.o | $(CLI_BUILD_DIR)
+	@echo "Linking demo executable..."
+	$(CXX) $(LDFLAGS) -o $@ $(CLI_BUILD_DIR)/demo_main.o $(CLI_BUILD_DIR)/cli.o
+
+# Build test executable
+$(TEST_EXECUTABLE): $(CLI_BUILD_DIR)/test_cli.o $(CLI_BUILD_DIR)/cli.o | $(CLI_BUILD_DIR)
+	@echo "Linking test executable..."
+	$(CXX) $(LDFLAGS) -o $@ $(CLI_BUILD_DIR)/test_cli.o $(CLI_BUILD_DIR)/cli.o
+
+# Compile source files to object files
+$(CLI_BUILD_DIR)/%.o: $(CLI_SRC_DIR)/%.cpp
+	@echo "Compiling $<..."
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# Create build directories
+$(CLI_BUILD_DIR):
+	mkdir -p $(CLI_BUILD_DIR)
+
+# Clean CLI build artifacts
+clean-cli:
+	rm -rf $(CLI_BUILD_DIR)
+
+# Install CLI executable
+install-cli: $(CLI_EXECUTABLE)
+	@echo "Installing CLI executable to /usr/local/bin/nlm..."
+	install -m 755 $(CLI_EXECUTABLE) /usr/local/bin/nlm
+
+# Run demo
+run-demo: $(DEMO_EXECUTABLE)
+	@echo "Running CLI demo..."
+	$(DEMO_EXECUTABLE) --help
+
+# Run tests
+run-tests: $(TEST_EXECUTABLE)
+	@echo "Running CLI tests..."
+	cd $(CLI_BUILD_DIR) && ./test_cli
+
+# Help
+help:
+	@echo "CLI Targets:"
+	@echo "  all              - Build all CLI executables (main, demo, test)"
+	@echo "  clean-cli        - Clean CLI build artifacts"
+	@echo "  install-cli      - Install CLI executable to /usr/local/bin/nlm"
+	@echo "  run-demo         - Run CLI demo with --help"
+	@echo "  run-tests        - Run CLI tests"
+	@echo "  help             - Show this help"
+
+.PHONY: all clean-cli install-cli run-demo run-tests help
