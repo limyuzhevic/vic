@@ -50,6 +50,11 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
+    // ========== SENSORIMOTOR INTEGRATION ==========
+    std::unique_ptr<SensorimotorInterface> sensorimotorInterface;
+    
+    std::unique_ptr<SensorimotorInterface> sensorimotorInterface;
+    
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
@@ -129,6 +134,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize sensorimotor interface for agent-brain integration
+        sensorimotorInterface = std::make_unique<SensorimotorInterface>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
