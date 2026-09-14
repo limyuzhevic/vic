@@ -1,0 +1,63 @@
+#!/bin/bash
+# Create a test program to check the workingMemory issue
+
+cat > /tmp/test_brain.cpp << 'EOF'
+#include "src/brain/Brain.hpp"
+#include "src/core/Config/Config.hpp"
+#include <iostream>
+
+int main() {
+    // Create config
+    auto config = std::make_shared<Config>();
+    config->set("neuron_count", 1000ull);
+    config->set("region_count", 1ull);
+    config->set("connection_probability", 0.1f);
+    
+    // Create brain
+    nlm::Brain brain(config);
+    
+    // Initialize brain
+    std::cout << "Initializing brain..." << std::endl;
+    bool initSuccess = brain.initialize();
+    std::cout << "Brain initialization: " << (initSuccess ? "SUCCESS" : "FAILED") << std::endl;
+    
+    // Check working memory
+    std::cout << "Checking working memory..." << std::endl;
+    auto* workingMem = brain.getWorkingMemory();
+    
+    if (workingMem) {
+        std::cout << "SUCCESS: workingMemory is NOT nullptr" << std::endl;
+        std::cout << "Active traces: " << workingMem->getActiveTraces() << std::endl;
+        std::cout << "Capacity: " << workingMem->getCapacity() << std::endl;
+        std::cout << "Brain is set: " << (workingMem->getBrain() ? "YES" : "NO") << std::endl;
+    } else {
+        std::cout << "FAILED: workingMemory is nullptr" << std::endl;
+        return 1;
+    }
+    
+    // Check other memory systems
+    std::cout << "\nChecking other memory systems:" << std::endl;
+    auto* episodicMem = brain.getEpisodicMemory();
+    std::cout << "EpisodicMemory: " << (episodicMem ? "OK" : "nullptr") << std::endl;
+    
+    auto* associativeMem = brain.getAssociativeMemory();
+    std::cout << "AssociativeMemory: " << (associativeMem ? "OK" : "nullptr") << std::endl;
+    
+    auto* predictionSys = brain.getPredictionSystem();
+    std::cout << "PredictionSystem: " << (predictionSys ? "OK" : "nullptr") << std::endl;
+    
+    return 0;
+}
+EOF
+
+cat > /tmp/Makefile.test << 'EOF'
+CXX = g++
+CXXFLAGS = -std=c++17 -I./src -I./src/core -I./src/memory -I./src/brain -I./src/planning -I./src/neuromodulation -I./src/prediction -I./src/development
+LDFLAGS = -pthread
+
+all: test_brain
+
+test_brain: /tmp/test_brain.cpp
+	$(CXX) $(CXXFLAGS) -o /tmp/test_brain /tmp/test_brain.cpp
+
+EOF
