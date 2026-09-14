@@ -27,7 +27,7 @@ NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
 
 void NeuralEpisodicMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
+    // brain_ = brain;  // Fixed: removed redundant assignment, using only pImpl->brain
     NLM_LOG_INFO("NeuralEpisodicMemory initialized");
 }
 
@@ -335,7 +335,7 @@ NeuralAssociativeMemory::~NeuralAssociativeMemory() = default;
 
 void NeuralAssociativeMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
+    // brain_ = brain;  // Fixed: removed redundant assignment, using only pImpl->brain
     NLM_LOG_INFO("NeuralAssociativeMemory initialized");
 }
 

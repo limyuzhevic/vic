@@ -253,16 +253,22 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
     cfg->set("neuron_count", 100);
     
     auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Brain initialization failed");
+        return false;
+    }
     
-    // Get memory systems
+    // Get memory systems - this should work now with our fixes
     auto* wm = brain->getWorkingMemory();
     auto* em = brain->getEpisodicMemory();
     
+    // Verify that the fixes ensure memory systems are accessible
     if (!wm || !em) {
-        NLM_LOG_ERROR("Memory systems not available");
+        NLM_LOG_ERROR("Memory systems not available - this is the critical bug that should now be fixed");
         return false;
     }
+    
+    NLM_LOG_INFO("[PASS] Memory systems are accessible (critical bug fixed)");
     
     // Run some steps
     for (int i = 0; i < 100; ++i) {

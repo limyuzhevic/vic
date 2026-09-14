@@ -26,7 +26,7 @@ ConceptFormation::~ConceptFormation() = default;
 
 void ConceptFormation::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
+    // brain_ = brain;  // Fixed: removed redundant assignment, using only pImpl->brain
     NLM_LOG_INFO("ConceptFormation initialized");
 }
 
@@ -316,7 +316,7 @@ SpatialRepresentation::~SpatialRepresentation() = default;
 
 void SpatialRepresentation::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
+    // brain_ = brain;  // Fixed: removed redundant assignment, using only pImpl->brain
     NLM_LOG_INFO("SpatialRepresentation initialized");
 }
 
@@ -416,7 +416,8 @@ TemporalRelation::~TemporalRelation() = default;
 
 void TemporalRelation::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
+    // brain_ = brain;  // Fixed: removed redundant assignment, using only pImpl->brain
+    NLM_LOG_INFO("TemporalRelation initialized");
 }
 
 void TemporalRelation::recordSequence(const std::vector<float>& eventA,

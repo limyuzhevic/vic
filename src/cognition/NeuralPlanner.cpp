@@ -24,7 +24,7 @@ NeuralPlanner::~NeuralPlanner() = default;
 
 void NeuralPlanner::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
+    // brain_ = brain;  // Fixed: removed redundant assignment, using only pImpl->brain
     NLM_LOG_INFO("NeuralPlanner initialized");
 }
 
@@ -271,7 +271,7 @@ SelfModel::~SelfModel() = default;
 
 void SelfModel::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
+    // brain_ = brain;  // Fixed: removed redundant assignment, using only pImpl->brain
     NLM_LOG_INFO("SelfModel initialized");
 }
 
@@ -456,7 +456,7 @@ SocialLearning::~SocialLearning() = default;
 
 void SocialLearning::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
+    // brain_ = brain;  // Fixed: removed redundant assignment, using only pImpl->brain
     NLM_LOG_INFO("SocialLearning initialized");
 }
 

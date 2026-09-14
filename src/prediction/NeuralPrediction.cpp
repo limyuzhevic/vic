@@ -43,8 +43,7 @@ NeuralPrediction::~NeuralPrediction() = default;
 
 void NeuralPrediction::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
-    
+    // brain_ = brain;  // Fixed: removed redundant assignment, using only pImpl->brain
     NLM_LOG_INFO("NeuralPrediction initialized");
 }
 

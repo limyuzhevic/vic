@@ -8,6 +8,9 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+#include <chrono>
+#include <ctime>
 
 namespace nlm {
 
@@ -86,8 +89,13 @@ public:
     
     // Plasticity system access
     STDP* getSTDP();
+    const STDP* getSTDP() const;
+    
     Hebbian* getHebbian();
+    const Hebbian* getHebbian() const;
+    
     StructuralPlasticity* getStructuralPlasticity();
+    const StructuralPlasticity* getStructuralPlasticity() const;
     
     // Statistics
     float getExcitationInhibitionRatio() const;
@@ -141,57 +149,106 @@ public:
     
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
+    const NeuralWorkingMemory* getWorkingMemory() const;
     
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
+    const NeuralEpisodicMemory* getEpisodicMemory() const;
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    const NeuralAssociativeMemory* getAssociativeMemory() const;
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
+    const PredictionSystem* getPredictionSystem() const;
     
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
+    const NeuralPlanner* getPlanner() const;
     
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
+    const ConceptFormation* getConceptFormation() const;
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+    const AttentionalSelection* getAttention() const;
     
-    // ========== DEVELOPMENT SYSTEM ==========
-    
+    // Development system
     DevelopmentSystem* getDevelopmentSystem();
+    const DevelopmentSystem* getDevelopmentSystem() const;
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    const Dopamine* getDopamine() const;
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
+    const Curiosity* getCuriosity() const;
     
     // Novelty - novelty detection
     Novelty* getNovelty();
+    const Novelty* getNovelty() const;
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    const PredictionError* getPredictionErrorSignal() const;
     
-    // Get current configuration
+    // Get random generator
     std::shared_ptr<const Config> getConfig() const;
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
+    const RandomGenerator* getRandomGenerator() const;
     
-    // Logging
+// Logging
     void logStatus() const;
+
+    // ========== ERROR REPORTING AND VALIDATION ==========
+    
+    // System integration validation
+    bool validateSystemIntegration() const;
+    
+    // Integrated system status
+    std::string getIntegratedSystemStatus() const;
+    
+    // Error collection and reporting
+    void collectErrors() const;
+    std::vector<std::string> getSystemErrors() const;
+    bool hasSystemErrors() const;
+    void resetSystemValidation() const;
+    void checkSystemHealth() const;
+    bool isSystemHealthy() const;
+    
+    // Integration report
+    std::string getIntegrationReport() const;
+    
+    // Performance metrics
+    struct PerformanceMetrics {
+        size_t totalNeurons;
+        size_t totalSynapses;
+        size_t activeNeurons;
+        size_t firingNeurons;
+        float averageFiringRate;
+        float excitationInhibitionRatio;
+        size_t totalSpikeCount;
+        size_t pendingSpikeEvents;
+        float workingMemoryLoad;
+        float episodicMemoryLoad;
+        float predictionAccuracy;
+        float planningConfidence;
+        float noveltyLevel;
+        float curiosityLevel;
+        float dopamineLevel;
+        DevelopmentStage developmentalStage;
+    };
+    
+    PerformanceMetrics getPerformanceMetrics() const;
     
 private:
     struct Impl;
