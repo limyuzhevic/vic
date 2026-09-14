@@ -4,6 +4,10 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../core/Types/Types.hpp"
 #include <memory>
 #include <vector>
 
@@ -69,6 +73,20 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Cognitive system configuration
+    void enableNeuralPlanner(bool enable) { neuralPlannerEnabled_ = enable; }
+    void enableConceptFormation(bool enable) { conceptFormationEnabled_ = enable; }
+    void enableAttention(bool enable) { attentionEnabled_ = enable; }
+    
+    bool isNeuralPlannerEnabled() const { return neuralPlannerEnabled_; }
+    bool isConceptFormationEnabled() const { return conceptFormationEnabled_; }
+    bool isAttentionEnabled() const { return attentionEnabled_; }
+    
+    // Cognitive system access
+    NeuralPlanner* getNeuralPlanner() { return neuralPlanner_.get(); }
+    ConceptFormation* getConceptFormation() { return conceptFormation_.get(); }
+    AttentionalSelection* getAttention() { return attention_.get(); }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -77,6 +95,16 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    
+    // Cognitive systems
+    std::unique_ptr<NeuralPlanner> neuralPlanner_;
+    std::unique_ptr<ConceptFormation> conceptFormation_;
+    std::unique_ptr<AttentionalSelection> attention_;
+    
+    // Cognitive system configuration flags
+    bool neuralPlannerEnabled_;
+    bool conceptFormationEnabled_;
+    bool attentionEnabled_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;

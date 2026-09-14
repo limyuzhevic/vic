@@ -1,9 +1,16 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include <algorithm>
 #include <cmath>
+#include <random>
+#include <chrono>
 
 namespace nlm {
+
+static SimulationStep currentStepCounter = 0;
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
@@ -19,7 +26,15 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , neuralPlannerEnabled_(true)
+    , conceptFormationEnabled_(true)
+    , attentionEnabled_(true)
 {
+    // Initialize cognitive systems
+    neuralPlanner_ = std::make_unique<NeuralPlanner>();
+    conceptFormation_ = std::make_unique<ConceptFormation>();
+    attention_ = std::make_unique<AttentionalSelection>();
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -59,6 +74,17 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
             }
         }
     }
+    
+    // Initialize cognitive systems with brain reference if available
+    if (neuralPlanner_) {
+        neuralPlanner_->initialize(brain_.get());
+    }
+    if (conceptFormation_) {
+        conceptFormation_->initialize(brain_.get());
+    }
+    if (attention_) {
+        attention_->initialize(brain_.get());
+    }
 }
 
 AgentBrain::~AgentBrain() = default;
@@ -85,6 +111,8 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
+    currentStepCounter++;
+    
     if (!brain_) return;
     
     // Vision input (256 values -> sensoryVision_ neurons)
@@ -124,6 +152,55 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
+    // Concept formation: extract patterns from sensory input
+    if (conceptFormationEnabled_ && conceptFormation_) {
+        // Prepare pattern for concept formation
+        std::vector<float> pattern = percept.getVision();
+        if (!pattern.empty()) {
+            // Add features from touch and internal state
+            std::vector<float> features = percept.getTouch();
+            features.insert(features.end(), percept.getInternal().begin(), percept.getInternal().end());
+            
+            // Present to concept formation with current curiosity level
+            float reward = curiosityLevel_ * 2.0f;  // Higher curiosity = higher reward for novelty
+            size_t conceptId = conceptFormation_->presentExperience(pattern, features, reward, currentStepCounter);
+            
+            // If a new concept was formed, use it for planning
+            if (conceptId > 0) {
+                NLM_LOG_INFO("AgentBrain: New concept formed (ID: " + std::to_string(conceptId) + ")");
+                // Store concept ID for potential use in planning
+                // In a real implementation, this could influence NeuralPlanner
+            }
+        }
+    }
+    
+    // Attention mechanism: select most relevant sensory inputs
+    if (attentionEnabled_ && attention_) {
+        // Collect all sensory neuron activities for attention selection
+        std::vector<NeuronId> sensoryNeurons;
+        
+        // Collect vision neurons
+        for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+            if (sensoryVision_[i]) {
+                // Mark active neurons for attention
+                // In a real implementation, we would get the neuron's ID
+                // For now, we'll use a simple index-based approach
+                sensoryNeurons.push_back(static_cast<uint64_t>(i));
+            }
+        }
+        
+        if (!sensoryNeurons.empty()) {
+            // Process attention competition
+            auto attended = attention_->processCompetition(sensoryNeurons, 0.5f);
+            
+            // Apply top-down bias based on current goal
+            // In a real implementation, this would come from NeuralPlanner
+            for (const auto& neuronId : attended) {
+                attention_->applyTopDownBias(neuronId, 0.8f);
+            }
+        }
+    }
+    
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
         float totalDiff = 0.0f;
@@ -152,11 +229,65 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
+    MotorCommand decoded = MotorCommand::Wait;
     
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+    // Use NeuralPlanner for sophisticated action selection if enabled
+    if (neuralPlannerEnabled_ && neuralPlanner_ && curiosityLevel_ > 0.1f) {
+        // Build current state vector from sensory input
+        // This would typically come from current brain state
+        std::vector<float> currentState;
+        
+        // Collect current sensory values
+        // In a real implementation, we'd extract these from the brain's state
+        // For now, use a simplified representation
+        currentState.push_back(getNeuromodulationLevel());  // From existing method
+        currentState.push_back(curiosityLevel_);       // Current curiosity
+        currentState.push_back(predictionError_);     // Prediction error
+        
+        // Add some randomness for exploration based on curiosity
+        std::mt19937 rng(std::chrono::steady_clock::now().time_since_epoch().count());
+        std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+        
+        float explorationFactor = curiosityLevel_ * 0.5f;  // Higher curiosity = more exploration
+        
+        // Plan action using NeuralPlanner
+        ActionType plannedAction = neuralPlanner_->planAction(currentState, 0.5f);
+        
+        // Convert ActionType to MotorCommand
+        switch (plannedAction) {
+            case ActionType::MoveForward: decoded = MotorCommand::MoveForward; break;
+            case ActionType::MoveBackward: decoded = MotorCommand::MoveBackward; break;
+            case ActionType::TurnLeft: decoded = MotorCommand::TurnLeft; break;
+            case ActionType::TurnRight: decoded = MotorCommand::TurnRight; break;
+            case ActionType::Interact: decoded = MotorCommand::Interact; break;
+            case ActionType::Wait: decoded = MotorCommand::Wait; break;
+            case ActionType::LookLeft: decoded = MotorCommand::LookLeft; break;
+            case ActionType::LookRight: decoded = MotorCommand::LookRight; break;
+        }
+        
+        // Occasionally override planned action with curiosity-driven exploration
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            std::uniform_real_distribution<float> exploreDist(0.0f, 1.0f);
+            if (exploreDist(rng) < curiosityLevel_ * 0.3f) {
+                // Pick random action for exploration
+                std::vector<MotorCommand> allCommands = {
+                    MotorCommand::MoveForward, MotorCommand::MoveBackward,
+                    MotorCommand::TurnLeft, MotorCommand::TurnRight,
+                    MotorCommand::Interact, MotorCommand::Wait,
+                    MotorCommand::LookLeft, MotorCommand::LookRight
+                };
+                size_t randomIndex = static_cast<size_t>(dist(rng) * allCommands.size());
+                decoded = allCommands[randomIndex];
+            }
+        }
+    } else {
+        // Fallback to traditional decoding if cognitive systems not enabled
+        decoded = decodeFromMotorNeurons();
+        
+        // Apply curiosity-based exploration
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            decoded = selectWithCuriosity(decoded);
+        }
     }
     
     return decoded;
