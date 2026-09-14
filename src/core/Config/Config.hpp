@@ -5,6 +5,14 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <vector>
+#include <string>
+#include <variant>
+
+// Try to use nlohmann/json if available, otherwise provide minimal JSON support
+#if __has_include(<nlohmann/json.hpp>)
+#include <nlohmann/json.hpp>
+#endif
 
 namespace nlm {
 
@@ -100,6 +108,26 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON conversion helpers
+#if __has_include(<nlohmann/json.hpp>)
+    static nlohmann::json configValueToJson(const ConfigValue& value);
+    static bool jsonToConfigValue(const nlohmann::json& json, ConfigValue& value);
+    static bool jsonToConfigEntry(const nlohmann::json& json, ConfigEntry& entry);
+#endif
+    
+    // File format detection and parsing
+    bool parseFile(const std::string& filepath);
+    bool parseKeyValueFile(const std::string& filepath);
+#if __has_include(<nlohmann/json.hpp>)
+    bool parseJsonFile(const std::string& filepath);
+#endif
+    
+    // Serialization
+#if __has_include(<nlohmann/json.hpp>)
+    static void configValueToJson(const ConfigValue& value, nlohmann::json& json) const;
+    static void configEntryToJson(const ConfigEntry& entry, nlohmann::json& json) const;
+#endif
 };
 
 } // namespace nlm

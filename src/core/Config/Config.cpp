@@ -1,8 +1,23 @@
+// Project: NLM (Neural Learning Machine)
+// Description: Enhanced Config class with JSON/YAML support and backward compatibility
+// File: Config.cpp
+// Author: Kilo
+// Date: 2026-09-14
+
 #include "Config.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
+#include <unordered_map>
+#include <cctype>
+#include <numeric>
+
+// Try to use nlohmann/json if available, otherwise provide minimal JSON support
+#if __has_include(<nlohmann/json.hpp>)
+#include <nlohmann/json.hpp>
+#endif
 
 namespace nlm {
 
@@ -18,15 +33,74 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+bool Config::parseFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Read first few bytes to detect format
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0);
+    
+    // Check if file appears to be JSON (starts with { or [ or has ", etc.)
+    bool isJson = false;
+    if (!firstLine.empty()) {
+        // Check for obvious JSON indicators
+        if ((firstLine.find('{') != std::string::npos && firstLine.find('}') != std::string::npos) ||
+            (firstLine.find('[') != std::string::npos && firstLine.find(']') != std::string::npos) ||
+            firstLine.find('"') != std::string::npos) {
+            isJson = true;
+        }
+        
+        // Also check for JSON-like content in the file
+        if (!isJson) {
+            file.clear();
+            file.seekg(0);
+            std::string line;
+            size_t bracketCount = 0;
+            while (std::getline(file, line)) {
+                if (line.find('"') != std::string::npos) {
+                    isJson = true;
+                    break;
+                }
+                bracketCount += std::count(line.begin(), line.end(), '{');
+                bracketCount -= std::count(line.begin(), line.end(), '}');
+                if (bracketCount > 0) {
+                    isJson = true;
+                    break;
+                }
+            }
+            file.clear();
+            file.seekg(0);
+        }
+    }
+    
+    // Parse based on detected format
+    if (isJson) {
+#if __has_include(<nlohmann/json.hpp>)
+        return parseJsonFile(filepath);
+#else
+        // Fallback to key=value format
+        clear();
+        return parseKeyValueFile(filepath);
+#endif
+    } else {
+        // Parse as key=value format
+        clear();
+        return parseKeyValueFile(filepath);
+    }
+}
+
+bool Config::parseKeyValueFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    clear();
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -35,7 +109,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -55,64 +129,49 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
-}
-
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
+#if __has_include(<nlohmann/json.hpp>)
+bool Config::parseJsonFile(const std::string& filepath) {
+    std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    clear();
+    
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Parse JSON object
+        if (jsonData.is_object()) {
+            for (const auto& item : jsonData.items()) {
+                ConfigEntry entry;
+                entry.key = item.key();
+                entry.source = ConfigSource::File;
+                
+                // Try to convert JSON value to ConfigValue
+                if (jsonToConfigValue(item.value(), entry.value)) {
+                    // Set description if present
+                    if (item.value().is_object() && item.value().contains("__description__")) {
+                        entry.description = item.value()["__description__"].get<std::string>();
+                    }
+                    pImpl->entries.push_back(entry);
+                }
+            }
+        } else {
+            // JSON array not supported for config
+            return false;
+        }
+    } catch (const std::exception& e) {
+        // JSON parsing failed, try legacy format
+        file.clear();
+        file.seekg(0);
+        return parseKeyValueFile(filepath);
     }
     
     return true;
 }
-
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
+#endif
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
@@ -142,9 +201,222 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
+// Helper functions for JSON conversion
+namespace {
+
+inline bool isNumber(const std::string& str, double& value) {
+    try {
+        size_t pos;
+        value = std::stod(str, &pos);
+        return pos == str.size();
+    } catch (...) {
+        return false;
+    }
+}
+
+inline bool isInt(const std::string& str, int64_t& value) {
+    try {
+        size_t pos;
+        value = std::stoll(str, &pos);
+        return pos == str.size();
+    } catch (...) {
+        return false;
+    }
+}
+
+inline bool isBool(const std::string& str, bool& value) {
+    if (str == "true" || str == "1") {
+        value = true;
+        return true;
+    } else if (str == "false" || str == "0") {
+        value = false;
+        return true;
+    }
+    return false;
+}
+
+} // anonymous namespace
+
+#if __has_include(<nlohmann/json.hpp>)
+
+nlohmann::json Config::configValueToJson(const ConfigValue& value) {
+    nlohmann::json jsonValue;
+    
+    std::visit([&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            jsonValue = nlohmann::json::array();
+            for (const auto& item : arg) {
+                jsonValue.push_back(item);
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            jsonValue = nlohmann::json::array();
+            for (const auto& item : arg) {
+                jsonValue.push_back(item);
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            jsonValue = nlohmann::json::array();
+            for (const auto& item : arg) {
+                jsonValue.push_back(item);
+            }
+        }
+    }, value);
+    
+    return jsonValue;
+}
+
+bool Config::jsonToConfigValue(const nlohmann::json& json, ConfigValue& value) {
+    if (json.is_number_integer()) {
+        int64_t intVal = json.get<int64_t>();
+        if (intVal >= std::numeric_limits<int>::min() && intVal <= std::numeric_limits<int>::max()) {
+            value = static_cast<int>(intVal);
+        } else {
+            value = intVal;
+        }
+        return true;
+    } else if (json.is_number_float()) {
+        double doubleVal = json.get<double>();
+        if (std::floor(doubleVal) == doubleVal) {
+            int64_t intVal = static_cast<int64_t>(doubleVal);
+            if (intVal >= std::numeric_limits<int>::min() && intVal <= std::numeric_limits<int>::max()) {
+                value = static_cast<int>(intVal);
+            } else {
+                value = intVal;
+            }
+            return true;
+        }
+        value = doubleVal;
+        return true;
+    } else if (json.is_boolean()) {
+        value = json.get<bool>();
+        return true;
+    } else if (json.is_string()) {
+        value = json.get<std::string>();
+        return true;
+    } else if (json.is_array()) {
+        if (!json.empty()) {
+            const auto& first = json[0];
+            if (first.is_number_integer()) {
+                std::vector<int> intArray;
+                for (const auto& item : json) {
+                    intArray.push_back(item.get<int>());
+                }
+                value = intArray;
+                return true;
+            } else if (first.is_number_float()) {
+                std::vector<double> doubleArray;
+                for (const auto& item : json) {
+                    doubleArray.push_back(item.get<double>());
+                }
+                value = doubleArray;
+                return true;
+            } else if (first.is_string()) {
+                std::vector<std::string> stringArray;
+                for (const auto& item : json) {
+                    stringArray.push_back(item.get<std::string>());
+                }
+                value = stringArray;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool Config::jsonToConfigEntry(const nlohmann::json& json, ConfigEntry& entry) {
+    if (!json.is_object()) {
+        return false;
+    }
+    
+    for (const auto& item : json.items()) {
+        if (item.key() == "__key__") {
+            entry.key = item.value().get<std::string>();
+        } else if (item.key() == "__value__") {
+            if (jsonToConfigValue(item.value(), entry.value)) {
+                if (json.contains("__source__")) {
+                    entry.source = static_cast<ConfigSource>(json["__source__"].get<int>());
+                }
+                if (json.contains("__description__")) {
+                    entry.description = json["__description__"].get<std::string>();
+                }
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void Config::configValueToJson(const ConfigValue& value, nlohmann::json& json) const {
+    std::visit([&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            json = arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            json = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            json = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            json = arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            json = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            json = nlohmann::json::array();
+            for (const auto& item : arg) {
+                json.push_back(item);
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            json = nlohmann::json::array();
+            for (const auto& item : arg) {
+                json.push_back(item);
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            json = nlohmann::json::array();
+            for (const auto& item : arg) {
+                json.push_back(item);
+            }
+        }
+    }, value);
+}
+
+void Config::configEntryToJson(const ConfigEntry& entry, nlohmann::json& json) const {
+    json["__key__"] = entry.key;
+    json["__value__"] = configValueToJson(entry.value);
+    json["__source__"] = static_cast<int>(entry.source);
+    json["__description__"] = entry.description;
+}
+
+#endif
+
+template<typename T>
+std::optional<T> Config::get(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+    
+    try {
+        return std::get<T>(it->value);
+    } catch (const std::bad_variant_access&) {
+        return std::nullopt;
+    }
+}
+
+template<typename T>
+T Config::getOr(const std::string& key, const T& defaultValue) const {
+    auto val = get<T>(key);
+    return val.has_value() ? val.value() : defaultValue;
 }
 
 void Config::remove(const std::string& key) {
@@ -200,6 +472,7 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;

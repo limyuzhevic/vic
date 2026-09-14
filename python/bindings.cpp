@@ -2,9 +2,13 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/iostream.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
+#include <chrono>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -16,19 +20,376 @@
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
 
+// Version information
+constexpr const char* NLM_VERSION = "1.0.0";
+constexpr const char* NLM_BUILD = "Phase 6.3 - Advanced Bindings";
+
 namespace py = pybind11;
 namespace nlm {
+
+// Brain configuration APIs
+static void setBrainParameter(std::shared_ptr<Brain> brain, const std::string& key, const ConfigValue& value) {
+    brain->getConfig()->set(key, value);
+}
+
+static std::optional<ConfigValue> getBrainParameter(std::shared_ptr<Brain> brain, const std::string& key) {
+    return brain->getConfig()->get<ConfigValue>(key);
+}
+
+static bool loadBrainBatchConfiguration(std::shared_ptr<Brain> brain, const std::map<std::string, ConfigValue>& configs) {
+    bool success = true;
+    for (const auto& [key, value] : configs) {
+        brain->getConfig()->set(key, value);
+    }
+    return success;
+}
+
+// Advanced brain operations
+static size_t batchStep(std::shared_ptr<Brain> brain, size_t steps, double timestep = 0.0) {
+    if (timestep == 0.0) {
+        timestep = brain->getConfig()->getOr<double>("simulation_timestep", 0.001);
+    }
+    for (size_t i = 0; i < steps; ++i) {
+        brain->step(static_cast<SimulationStep>(i), i * timestep);
+    }
+    return steps;
+}
+
+static bool saveBrainStateAdvanced(std::shared_ptr<Brain> brain, const std::string& filepath, 
+                                    bool compress = true, bool metadata = true) {
+    try {
+        return brain->save(filepath);
+    } catch (const std::exception& e) {
+        std::cerr << "Error saving brain state: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+static bool loadBrainStateAdvanced(std::shared_ptr<Brain> brain, const std::string& filepath) {
+    try {
+        return brain->load(filepath);
+    } catch (const std::exception& e) {
+        std::cerr << "Error loading brain state: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+static std::map<std::string, double> getBrainStatistics(std::shared_ptr<Brain> brain) {
+    std::map<std::string, double> stats;
+    stats["total_neurons"] = brain->getTotalNeuronCount();
+    stats["total_synapses"] = brain->getTotalSynapseCount();
+    stats["active_neurons"] = brain->getActiveNeuronCount();
+    stats["firing_neurons"] = brain->getFiringNeuronCount();
+    stats["total_spikes"] = brain->getTotalSpikeCount();
+    stats["average_firing_rate"] = brain->getAverageFiringRate();
+    stats["excitement_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+    stats["pending_spike_events"] = brain->getPendingSpikeEventCount();
+    
+    if (auto* workingMem = brain->getWorkingMemory()) {
+        stats["working_memory_traces"] = workingMem->getActiveTraces();
+    }
+    
+    if (auto* episodicMem = brain->getEpisodicMemory()) {
+        stats["episodic_memory_episodes"] = episodicMem->getEpisodeCount();
+    }
+    
+    if (auto* dopamine = brain->getDopamine()) {
+        stats["dopamine_level"] = dopamine->getLevel();
+    }
+    
+    stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+    
+    return stats;
+}
+
+// Enhanced AgentBrain APIs
+static void enableAllNeuromodulators(std::shared_ptr<AgentBrain> agent, bool enable = true) {
+    agent->enableRewardModulation(enable);
+    agent->enableCuriosity(enable);
+    // Note: Novelty is currently integrated with curiosity
+    agent->enableDevelopment(enable);
+    agent->enableStructuralPlasticity(enable);
+}
+
+static void setDevelopmentStage(std::shared_ptr<AgentBrain> agent, DevelopmentalStage stage) {
+    if (auto* brain = agent->getBrain()) {
+        brain->setDevelopmentalStage(stage);
+    }
+}
+
+static std::map<std::string, double> getBrainStatus(std::shared_ptr<AgentBrain> agent) {
+    std::map<std::string, double> status;
+    
+    if (auto* brain = agent->getBrain()) {
+        auto stats = getBrainStatistics(brain);
+        status.insert(stats.begin(), stats.end());
+        
+        // Add AgentBrain-specific status
+        status["dopamine_level"] = agent->getNeuromodulationLevel();
+        status["curiosity_level"] = agent->getCuriosityLevel();
+        status["novelty_level"] = agent->getNoveltyLevel();
+        status["prediction_error"] = agent->getPredictionError();
+        status["developmental_stage"] = static_cast<int>(agent->getDevelopmentalStage());
+    }
+    
+    return status;
+}
+
+// World configuration APIs
+static std::shared_ptr<SimpleWorld> createAdvancedWorld(float width, float height, 
+                                                          size_t visionWidth, size_t visionHeight,
+                                                          float maxEnergy, float energyDecayRate,
+                                                          float timestep) {
+    auto world = std::make_shared<SimpleWorld>();
+    world->configure(width, height, visionWidth, visionHeight);
+    world->setMaxEnergy(maxEnergy);
+    world->setEnergyDecayRate(energyDecayRate);
+    return world;
+}
+
+static bool worldConfigure(std::shared_ptr<SimpleWorld> world, 
+                           const std::map<std::string, double>& config) {
+    bool success = true;
+    for (const auto& [key, value] : config) {
+        if (key == "max_energy") {
+            world->setMaxEnergy(static_cast<float>(value));
+        } else if (key == "energy_decay_rate") {
+            world->setEnergyDecayRate(static_cast<float>(value));
+        } else if (key == "random_seed") {
+            world->setRandomSeed(static_cast<uint64_t>(value));
+        }
+    }
+    return success;
+}
+
+// Utility functions
+static std::string getVersionInfo() {
+    std::ostringstream versionInfo;
+    versionInfo << "NLM (Neural Learning Machine) " << NLM_VERSION << " (" << NLM_BUILD << ")";
+    return versionInfo.str();
+}
+
+static double benchmarkBrain(std::shared_ptr<Brain> brain, size_t steps = 100, double timestep = 0.0) {
+    if (timestep == 0.0) {
+        timestep = brain->getConfig()->getOr<double>("simulation_timestep", 0.001);
+    }
+    
+    auto start = std::chrono::high_resolution_clock::now();
+    batchStep(brain, steps, timestep);
+    auto end = std::chrono::high_resolution_clock::now();
+    
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    return static_cast<double>(duration.count()) / 1000000.0; // Return seconds
+}
+
+static bool validateConfig(const std::map<std::string, ConfigValue>& config) {
+    bool valid = true;
+    for (const auto& [key, value] : config) {
+        // Basic validation - can be extended
+        if (key.empty()) {
+            std::cerr << "Config key cannot be empty" << std::endl;
+            valid = false;
+            continue;
+        }
+        
+        // Validate value types
+        if (std::holds_alternative<int>(value) && std::get<int>(value) > 1000000) {
+            std::cerr << "Config key '" << key << "' has suspiciously large integer value" << std::endl;
+            valid = false;
+        }
+        
+        if (std::holds_alternative<double>(value) && std::get<double>(value) < -1e6) {
+            std::cerr << "Config key '" << key << "' has suspiciously small negative double value" << std::endl;
+            valid = false;
+        }
+    }
+    return valid;
+}
+
+// Context Managers
+class SimulationContext {
+public:
+    SimulationContext(std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent,
+                      std::shared_ptr<SimpleWorld> world, bool verbose = false)
+        : brain_(brain), agent_(agent), world_(world), verbose_(verbose), 
+          timestep_(brain ? brain->getConfig()->getOr<double>("simulation_timestep", 0.001) : 0.001),
+          step_count_(0) {
+        if (verbose_) {
+            std::cout << "[SimulationContext] Initialized simulation with timestep = " << timestep_ << std::endl;
+        }
+    }
+    
+    ~SimulationContext() {
+        if (verbose_) {
+            std::cout << "[SimulationContext] Simulation ended after " << step_count_ << " steps" << std::endl;
+        }
+        reset();
+    }
+    
+    void step() {
+        if (!world_ || !brain_ || !agent_) return;
+        
+        world_->update(timestep_);
+        auto percept = world_->getSensoryPercept();
+        agent_->processSensoryInput(percept);
+        brain_->step(static_cast<SimulationStep>(step_count_), step_count_ * timestep_);
+        auto action = agent_->decodeMotorCommand();
+        world_->applyMotorCommand(action, step_count_ * timestep_);
+        
+        step_count_++;
+        
+        if (verbose_) {
+            std::cout << "[SimulationContext] Step " << (step_count_ - 1) << " completed" << std::endl;
+        }
+    }
+    
+    void reset() {
+        if (brain_) brain_->reset();
+        if (agent_) agent_->reset();
+        if (world_) world_->reset();
+        step_count_ = 0;
+        
+        if (verbose_) {
+            std::cout << "[SimulationContext] Reset all components" << std::endl;
+        }
+    }
+    
+    void setTimestep(double timestep) {
+        timestep_ = timestep;
+        if (verbose_) {
+            std::cout << "[SimulationContext] Timestep set to " << timestep_ << std::endl;
+        }
+    }
+    
+    double getTimestep() const { return timestep_; }
+    
+    size_t getStepCount() const { return step_count_; }
+    
+    std::map<std::string, double> getStatus() const {
+        std::map<std::string, double> status;
+        status["step_count"] = step_count_;
+        status["timestep"] = timestep_;
+        
+        if (brain_) {
+            auto stats = getBrainStatistics(brain_);
+            status.insert(stats.begin(), stats.end());
+        }
+        
+        return status;
+    }
+    
+private:
+    std::shared_ptr<Brain> brain_;
+    std::shared_ptr<AgentBrain> agent_;
+    std::shared_ptr<SimpleWorld> world_;
+    double timestep_;
+    size_t step_count_;
+    bool verbose_;
+};
+
+class WorldContext {
+public:
+    WorldContext(std::shared_ptr<SimpleWorld> world, bool verbose = false)
+        : world_(world), verbose_(verbose) {
+        if (verbose_) {
+            std::cout << "[WorldContext] World context initialized" << std::endl;
+        }
+    }
+    
+    ~WorldContext() {
+        if (verbose_) {
+            std::cout << "[WorldContext] World context released" << std::endl;
+        }
+    }
+    
+    void configureWorld(float width, float height, size_t visionWidth, size_t visionHeight) {
+        world_->configure(width, height, visionWidth, visionHeight);
+        if (verbose_) {
+            std::cout << "[WorldContext] World configured: " << width << "x" << height 
+                      << ", vision: " << visionWidth << "x" << visionHeight << std::endl;
+        }
+    }
+    
+    void setAgentStart(float x, float y) {
+        world_->setAgentStart(x, y);
+        if (verbose_) {
+            std::cout << "[WorldContext] Agent start set to (" << x << ", " << y << ")" << std::endl;
+        }
+    }
+    
+    const SensoryPercept& getSensoryPercept() const {
+        return world_->getSensoryPercept();
+    }
+    
+    const AgentBody& getAgentBody() const {
+        return world_->getAgentBody();
+    }
+    
+    void update(double timestep) {
+        world_->update(timestep);
+        if (verbose_) {
+            std::cout << "[WorldContext] World updated for " << timestep << " seconds" << std::endl;
+        }
+    }
+    
+    double getSimulationTime() const {
+        return world_->getSimulationTime();
+    }
+    
+    std::map<std::string, double> getWorldInfo() const {
+        std::map<std::string, double> info;
+        info["width"] = world_->getWidth();
+        info["height"] = world_->getHeight();
+        info["max_energy"] = world_->getMaxEnergy();
+        info["energy_decay_rate"] = world_->getEnergyDecayRate();
+        info["simulation_time"] = world_->getSimulationTime();
+        return info;
+    }
+    
+private:
+    std::shared_ptr<SimpleWorld> world_;
+    bool verbose_;
+};
+
+// Performance optimizations
+static void enableVerboseLogging(bool enable) {
+    if (enable) {
+        Logger::setGlobal(std::make_shared<ConsoleLogger>(LogLevel::Debug));
+        Logger::getGlobal().setLevel(LogLevel::Debug);
+        std::cout << "[Performance] Verbose logging enabled" << std::endl;
+    } else {
+        Logger::getGlobal().setLevel(LogLevel::Info);
+        std::cout << "[Performance] Verbose logging disabled" << std::endl;
+    }
+}
+
+static void setSimulationTimestep(std::shared_ptr<Brain> brain, double timestep) {
+    if (brain) {
+        brain->getConfig()->set("simulation_timestep", timestep);
+    }
+}
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
+        -----------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Advanced Edition - Includes Context Managers, Batch Operations,
+        and Enhanced Configuration APIs for power users.
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
+    // Version information
+    m.def("get_version_info", &getVersionInfo, R"pbdoc(
+        Get detailed version information about NLM.
+        
+        Returns:
+            str: Version information string
+    )pbdoc");
+
+    // Type definitions
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -142,6 +503,104 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Brain configuration APIs
+    m.def("setBrainParameter", &setBrainParameter, py::arg("brain"), py::arg("key"), py::arg("value"),
+          "Configure a brain parameter");
+    
+    m.def("getBrainParameter", &getBrainParameter, py::arg("brain"), py::arg("key"),
+          "Get a brain parameter value");
+    
+    m.def("loadBrainBatchConfiguration", &loadBrainBatchConfiguration, py::arg("brain"), py::arg("config"),
+          "Load multiple brain configuration parameters at once");
+
+    // Advanced brain operations
+    m.def("batchStep", &batchStep, py::arg("brain"), py::arg("steps"), py::arg("timestep") = 0.0,
+          "Efficiently perform multiple simulation steps");
+    
+    m.def("saveBrainState", &saveBrainStateAdvanced, py::arg("brain"), py::arg("filepath"),
+          py::arg("compress") = true, py::arg("metadata") = true,
+          "Save brain state with enhanced error handling");
+    
+    m.def("loadBrainState", &loadBrainStateAdvanced, py::arg("brain"), py::arg("filepath"),
+          "Load brain state with enhanced error handling");
+    
+    m.def("getBrainStatistics", &getBrainStatistics, py::arg("brain"),
+          "Get comprehensive brain metrics and statistics");
+
+    // Enhanced AgentBrain APIs
+    m.def("enableAllNeuromodulators", &enableAllNeuromodulators, py::arg("agent"), py::arg("enable") = true,
+          "Enable all neuromodulators (reward, curiosity, novelty, development, plasticity) at once");
+    
+    m.def("setDevelopmentStage", &setDevelopmentStage, py::arg("agent"), py::arg("stage"),
+          "Manually set developmental stage");
+    
+    m.def("getBrainStatus", &getBrainStatus, py::arg("agent"),
+          "Get detailed brain status information including stats and neuromodulation levels");
+
+    // World configuration APIs
+    m.def("createAdvancedWorld", &createAdvancedWorld, py::arg("width"), py::arg("height"),
+          py::arg("visionWidth"), py::arg("visionHeight"), py::arg("maxEnergy") = 100.0f,
+          py::arg("energyDecayRate") = 0.01f, py::arg("timestep") = 0.1,
+          "Create a world with custom configuration");
+    
+    m.def("worldConfigure", &worldConfigure, py::arg("world"), py::arg("config"),
+          "Batch world configuration");
+
+    // Utility functions
+    m.def("benchmarkBrain", &benchmarkBrain, py::arg("brain"), py::arg("steps") = 100,
+          py::arg("timestep") = 0.0,
+          "Benchmark brain performance over multiple steps");
+    
+    m.def("validateConfig", &validateConfig, py::arg("config"),
+          "Validate configuration parameters");
+
+    // Performance optimizations
+    m.def("enableVerboseLogging", &enableVerboseLogging, py::arg("enable") = true,
+          "Enable/disable verbose logging for debugging");
+    
+    m.def("setSimulationTimestep", &setSimulationTimestep, py::arg("brain"), py::arg("timestep"),
+          "Set the simulation timestep");
+
+    // Context managers
+    py::class_<SimulationContext>(m, "SimulationContext", R"pbdoc(
+        Context manager for automatic brain/step/reset management.
+        
+        Provides a Pythonic interface for running complete simulation
+        sequences with automatic cleanup.
+    )pbdoc")
+        .def(py::init<std::shared_ptr<Brain>, std::shared_ptr<AgentBrain>, 
+                       std::shared_ptr<SimpleWorld>, bool>(),
+             py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("verbose") = false)
+        .def("step", &SimulationContext::step, "Perform one simulation step")
+        .def("reset", &SimulationContext::reset, "Reset all components")
+        .def("set_timestep", &SimulationContext::setTimestep, "Set the simulation timestep",
+             py::arg("timestep"))
+        .def("get_timestep", &SimulationContext::getTimestep, "Get the current timestep")
+        .def("get_step_count", &SimulationContext::getStepCount, "Get the current step count")
+        .def("get_status", &SimulationContext::getStatus, "Get current simulation status");
+
+    py::class_<WorldContext>(m, "WorldContext", R"pbdoc(
+        Context manager for automatic world lifecycle management.
+        
+        Provides a Pythonic interface for world configuration and management.
+    )pbdoc")
+        .def(py::init<std::shared_ptr<SimpleWorld>, bool>(),
+             py::arg("world"), py::arg("verbose") = false)
+        .def("configure_world", &WorldContext::configureWorld, "Configure world dimensions",
+             py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"))
+        .def("set_agent_start", &WorldContext::setAgentStart, "Set agent starting position",
+             py::arg("x"), py::arg("y"))
+        .def("get_sensory_percept", &WorldContext::getSensoryPercept,
+             "Get current sensory percept")
+        .def("get_agent_body", &WorldContext::getAgentBody, "Get current agent body state")
+        .def("update", &WorldContext::update, "Update world state",
+             py::arg("timestep"))
+        .def("get_simulation_time", &WorldContext::getSimulationTime,
+             "Get current simulation time")
+        .def("get_world_info", &WorldContext::getWorldInfo,
+             "Get detailed world information");
+
+    // Existing simple API (backward compatibility)
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -400,6 +859,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Factory functions
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,10 +876,16 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Invalid ID sentinels
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Python-style documentation
+    m.attr("__version__") = NLM_VERSION;
+    m.attr("__build__") = NLM_BUILD;
 }
 
 } // namespace nlm
+

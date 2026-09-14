@@ -1,10 +1,3 @@
-#include "AgentBrain.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
-
-namespace nlm {
-
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
@@ -61,7 +54,111 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::AgentBrain(AgentBrain&& other) noexcept : 
+    brain_(std::move(other.brain_))
+    , dopamineLevel_(other.dopamineLevel_)
+    , noveltyLevel_(other.noveltyLevel_)
+    , curiosityLevel_(other.curiosityLevel_)
+    , predictionError_(other.predictionError_)
+    , expectedReward_(other.expectedReward_)
+    , developmentalAge_(other.developmentalAge_)
+    , plasticityModifier_(other.plasticityModifier_)
+    , rewardModulationEnabled_(other.rewardModulationEnabled_)
+    , structuralPlasticityEnabled_(other.structuralPlasticityEnabled_)
+    , developmentEnabled_(other.developmentEnabled_)
+    , curiosityEnabled_(other.curiosityEnabled_)
+    , sensoryNoveltyDecay_(other.sensoryNoveltyDecay_)
+    , previousVision_(std::move(other.previousVision_))
+{
+    // Transfer neuron pointers
+    motorForward_ = std::move(other.motorForward_);
+    motorBackward_ = std::move(other.motorBackward_);
+    motorTurnLeft_ = std::move(other.motorTurnLeft_);
+    motorTurnRight_ = std::move(other.motorTurnRight_);
+    motorInteract_ = std::move(other.motorInteract_);
+    motorWait_ = std::move(other.motorWait_);
+    
+    sensoryVision_ = std::move(other.sensoryVision_);
+    sensoryTouch_ = std::move(other.sensoryTouch_);
+    sensoryInternal_ = std::move(other.sensoryInternal_);
+    sensoryProprioception_ = std::move(other.sensoryProprioception_);
+    
+    // Clear other's data
+    other.dopamineLevel_ = 0.0f;
+    other.noveltyLevel_ = 0.0f;
+    other.curiosityLevel_ = 0.0f;
+    other.predictionError_ = 0.0f;
+    other.expectedReward_ = 0.0f;
+    other.developmentalAge_ = 0.0;
+    other.plasticityModifier_ = 1.0f;
+    other.rewardModulationEnabled_ = true;
+    other.structuralPlasticityEnabled_ = true;
+    other.developmentEnabled_ = true;
+    other.curiosityEnabled_ = true;
+    other.sensoryNoveltyDecay_ = 0.99f;
+}
+
+AgentBrain& AgentBrain::operator=(AgentBrain&& other) noexcept {
+    if (this != &other) {
+        // Clean up current state
+        motorForward_.clear();
+        motorBackward_.clear();
+        motorTurnLeft_.clear();
+        motorTurnRight_.clear();
+        motorInteract_.clear();
+        motorWait_.clear();
+        
+        sensoryVision_.clear();
+        sensoryTouch_.clear();
+        sensoryInternal_.clear();
+        sensoryProprioception_.clear();
+        previousVision_.clear();
+        
+        // Move data
+        brain_ = std::move(other.brain_);
+        dopamineLevel_ = other.dopamineLevel_;
+        noveltyLevel_ = other.noveltyLevel_;
+        curiosityLevel_ = other.curiosityLevel_;
+        predictionError_ = other.predictionError_;
+        expectedReward_ = other.expectedReward_;
+        developmentalAge_ = other.developmentalAge_;
+        plasticityModifier_ = other.plasticityModifier_;
+        rewardModulationEnabled_ = other.rewardModulationEnabled_;
+        structuralPlasticityEnabled_ = other.structuralPlasticityEnabled_;
+        developmentEnabled_ = other.developmentEnabled_;
+        curiosityEnabled_ = other.curiosityEnabled_;
+        sensoryNoveltyDecay_ = other.sensoryNoveltyDecay_;
+        
+        // Transfer neuron pointers
+        motorForward_ = std::move(other.motorForward_);
+        motorBackward_ = std::move(other.motorBackward_);
+        motorTurnLeft_ = std::move(other.motorTurnLeft_);
+        motorTurnRight_ = std::move(other.motorTurnRight_);
+        motorInteract_ = std::move(other.motorInteract_);
+        motorWait_ = std::move(other.motorWait_);
+        
+        sensoryVision_ = std::move(other.sensoryVision_);
+        sensoryTouch_ = std::move(other.sensoryTouch_);
+        sensoryInternal_ = std::move(other.sensoryInternal_);
+        sensoryProprioception_ = std::move(other.sensoryProprioception_);
+        previousVision_ = std::move(other.previousVision_);
+        
+        // Clear other's data
+        other.dopamineLevel_ = 0.0f;
+        other.noveltyLevel_ = 0.0f;
+        other.curiosityLevel_ = 0.0f;
+        other.predictionError_ = 0.0f;
+        other.expectedReward_ = 0.0f;
+        other.developmentalAge_ = 0.0;
+        other.plasticityModifier_ = 1.0f;
+        other.rewardModulationEnabled_ = true;
+        other.structuralPlasticityEnabled_ = true;
+        other.developmentEnabled_ = true;
+        other.curiosityEnabled_ = true;
+        other.sensoryNoveltyDecay_ = 0.99f;
+    }
+    return *this;
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
@@ -84,7 +181,38 @@ size_t AgentBrain::getMotorOutputSize() const {
     return 6;
 }
 
+AgentBrain::~AgentBrain() {
+    // Clean up neural pointers by clearing all collections
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    previousVision_.clear();
+}
+
+void AgentBrain::initialize(const SimpleWorld& world) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    developmentalAge_ = 0.0;
+    plasticityModifier_ = 1.0f;
+    
+    NLM_LOG_INFO("AgentBrain initialized with " + 
+                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
+                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
+                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+}
+
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     if (!brain_) return;
     
     // Vision input (256 values -> sensoryVision_ neurons)
@@ -150,6 +278,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     if (!brain_) return MotorCommand::Wait;
     
     MotorCommand decoded = decodeFromMotorNeurons();
@@ -236,6 +366,8 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     if (!brain_ || !rewardModulationEnabled_) return;
     
     // Compute prediction error
@@ -280,6 +412,8 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     if (!brain_ || !developmentEnabled_) return;
     
     developmentalAge_ += timestep;
@@ -314,27 +448,35 @@ void AgentBrain::updateDevelopment(double timestep) {
 }
 
 DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     if (!brain_) return DevelopmentalStage::Initial;
     return brain_->getDevelopmentalStage();
 }
 
 float AgentBrain::getNeuromodulationLevel() const {
+    std::lock_guard<std::mutex> lock(mutex_);
     return dopamineLevel_;
 }
 
 float AgentBrain::getCuriosityLevel() const {
+    std::lock_guard<std::mutex> lock(mutex_);
     return curiosityLevel_;
 }
 
 float AgentBrain::getNoveltyLevel() const {
+    std::lock_guard<std::mutex> lock(mutex_);
     return noveltyLevel_;
 }
 
 float AgentBrain::getPredictionError() const {
+    std::lock_guard<std::mutex> lock(mutex_);
     return predictionError_;
 }
 
 void AgentBrain::reset() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;

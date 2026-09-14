@@ -6,6 +6,7 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <mutex>
 
 namespace nlm {
 
@@ -15,6 +16,12 @@ class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
+    
+    // Disable copying, enable moving
+    AgentBrain(const AgentBrain&) = delete;
+    AgentBrain& operator=(const AgentBrain&) = delete;
+    AgentBrain(AgentBrain&&) noexcept;
+    AgentBrain& operator=(AgentBrain&&) noexcept;
     
     // Initialize with world
     void initialize(const SimpleWorld& world);
@@ -112,6 +119,9 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Thread safety
+    mutable std::mutex mutex_;
 };
 
 } // namespace nlm

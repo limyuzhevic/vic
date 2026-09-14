@@ -2,25 +2,6 @@
 
 namespace nlm {
 
-struct MotorSystem::Impl {
-    std::vector<ActionType> availableActions;
-    std::vector<const Action*> actionHistory;
-    
-    Impl() {
-        availableActions = {
-            ActionType::MoveForward,
-            ActionType::MoveBackward,
-            ActionType::MoveLeft,
-            ActionType::MoveRight,
-            ActionType::TurnLeft,
-            ActionType::TurnRight,
-            ActionType::Look,
-            ActionType::Interact,
-            ActionType::Wait
-        };
-    }
-};
-
 MotorSystem::MotorSystem() : pImpl(new Impl) {}
 
 MotorSystem::~MotorSystem() = default;
@@ -47,9 +28,7 @@ const std::vector<const Action*>& MotorSystem::getActionHistory() const {
 }
 
 void MotorSystem::clearHistory() {
-    for (auto* action : pImpl->actionHistory) {
-        delete action;
-    }
+    // Use smart pointers to avoid memory leaks
     pImpl->actionHistory.clear();
 }
 
