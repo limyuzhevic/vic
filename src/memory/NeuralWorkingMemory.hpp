@@ -75,14 +75,23 @@ public:
     float getMemoryActivity() const;
 
 private:
-    // Create recurrent connection for maintenance
-    void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
-
-    // Update recurrent connections for maintenance
-    void updateRecurrentConnections();
-
+    // Create real synaptic connections in the brain's neural network
+    void createRealRecurrentConnection(NeuronId from, NeuronId to, float strength);
+    
+    // Update actual synaptic weights for maintenance
+    void updateRealRecurrentConnections();
+    
     // Decay weak memory traces
     void decayWeakTraces();
+    
+    // Feed sensory input to working memory
+    void feedSensoryToWorkingMemory(const std::vector<NeuronId>& activeNeurons);
+    
+    // Integrate with attention system
+    void integrateWithAttention();
+    
+    // Prepare input for planning system
+    void prepareForPlanning(std::vector<NeuronId>& planningInputs);
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -91,16 +100,16 @@ private:
     size_t capacity_;
     float decayRate_;
     
-    // Memory content
+    // Memory content - stores actual brain neuron activations
     std::vector<NeuronId> memoryNeurons_;
     std::vector<float> memoryActivations_;
     std::vector<SimulationStep> memoryTimestamps_;
     
-    // Active memory traces
+    // Active memory traces (neuron indices, not IDs)
     std::vector<size_t> activeTraces_;
     
-    // Recurrent connections for maintenance
-    std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
+    // Integration with other systems
+    std::vector<NeuronId> planningInputs_;
     
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;

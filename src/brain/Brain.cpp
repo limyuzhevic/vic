@@ -403,7 +403,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // Get active neurons from brain for working memory feed
+        std::vector<NeuronId> activeNeurons;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 10.0f) {
+                        activeNeurons.push_back(neuron->getId());
+                    }
+                }
+            }
+        }
+        
+        // Feed sensory input to working memory
+        if (!activeNeurons.empty()) {
+            pImpl->workingMemory->feedSensoryToWorkingMemory(activeNeurons);
+        }
+        
+        // Update working memory (maintenance and competition)
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Prepare input for planning system
+        std::vector<NeuronId> planningInputs;
+        pImpl->workingMemory->prepareForPlanning(planningInputs);
+        
+        // Feed planning inputs to planner
+        if (!planningInputs.empty() && pImpl->planner) {
+            pImpl->planner->setPlanningInputs(planningInputs);
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========

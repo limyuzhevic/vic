@@ -31,46 +31,72 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
+    
+    // Initialize attention system integration
+    if (brain) {
+        pImpl->attention = brain->getAttention();
+    }
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    // Capture the brain's actual active neurons from sensory input
+    // This is the key fix: working memory should store what the brain is actually doing
+    std::vector<NeuronId> activeNeurons;
+    for (auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                if (neuron->isFiring() || 
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 10.0f) {
+                    activeNeurons.push_back(neuron->getId());
+                }
+            }
+        }
+    }
     
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
+    // Store the actual active neurons, not pattern-based ones
+    for (const auto& neuronId : activeNeurons) {
+        if (memoryNeurons_.size() >= capacity_) {
+            // Remove oldest trace to make room
+            memoryNeurons_.erase(memoryNeurons_.begin());
+            memoryActivations_.erase(memoryActivations_.begin());
+            memoryTimestamps_.erase(memoryTimestamps_.begin());
+        }
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+        memoryNeurons_.push_back(neuronId);
+        
+        // Get actual activation from brain
+        float activation = 0.0f;
+        for (auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->getId() == neuronId) {
+                        activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                        break;
+                    }
                 }
             }
         }
         
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
-        }
+        memoryActivations_.push_back(activation * strength);
+        memoryTimestamps_.push_back(0);
+        
+        // Create real synaptic connections for maintenance
+        createRealRecurrentConnection(neuronId, neuronId, strength * 0.5f);
     }
     
-    // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    // Update active traces (neuron indices, not IDs)
+    activeTraces_.clear();
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (memoryActivations_[i] > 0.01f) {
+            activeTraces_.push_back(i);
+        }
     }
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
-    // Find or add this neuron to memory
+    // Find or add this neuron to memory based on actual brain activity
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     
     if (it != memoryNeurons_.end()) {
@@ -83,7 +109,12 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryTimestamps_.push_back(0);
     }
     
-    // Inject current to maintain activation
+    // Create real synaptic connection for maintenance
+    // The connection is from the neuron to itself (auto-associative)
+    createRealRecurrentConnection(neuron, neuron, activation * 0.5f);
+    
+    // Inject current to maintain actual activation in brain
+    // This is critical for persistent activity
     if (brain_) {
         brain_->injectCurrent(neuron, activation * 5.0f);
     }
@@ -140,8 +171,40 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     // Decay weak traces
     decayWeakTraces();
     
-    // Run competition to select winners
-    runCompetition();
+    // Step 4: Integrate with attention and planning systems
+    if (brain_ && brain_->getAttention()) {
+        // Get active neurons from brain for attention selection
+        std::vector<NeuronId> activeNeurons;
+        for (const auto& neuronId : memoryNeurons_) {
+            activeNeurons.push_back(neuronId);
+        }
+        
+        if (!activeNeurons.empty()) {
+            brain_->getAttention()->processCompetition(activeNeurons, 0.5f);
+        }
+        
+        // Get attention winners
+        std::vector<NeuronId> attentionWinners = brain_->getAttention()->getWinners();
+        
+        // Keep only attention-winners in working memory (attention gating)
+        std::vector<size_t> toRemove;
+        for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+            bool isAttended = std::find(attentionWinners.begin(), attentionWinners.end(), memoryNeurons_[i]) != attentionWinners.end();
+            if (!isAttended) {
+                toRemove.push_back(i);
+            }
+        }
+        
+        // Remove unattended traces
+        for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+            memoryNeurons_.erase(memoryNeurons_.begin() + *it);
+            memoryActivations_.erase(memoryActivations_.begin() + *it);
+            memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
+        }
+        
+        // Clear attention winners after processing
+        brain_->getAttention()->reset();
+    }
 }
 
 void NeuralWorkingMemory::clear() {
@@ -198,12 +261,9 @@ float NeuralWorkingMemory::getMemoryActivity() const {
 }
 
 void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
-    // Check if connection already exists
-    for (const auto& conn : pImpl->maintenanceSynapses) {
-        if (conn.first == from && conn.second == to) return;
-    }
-    
-    pImpl->maintenanceSynapses.emplace_back(from, to);
+    // DEPRECATED: Use createRealRecurrentConnection instead
+    // This method is kept for backward compatibility
+    createRealRecurrentConnection(from, to, strength);
 }
 
 void NeuralWorkingMemory::updateRecurrentConnections() {
