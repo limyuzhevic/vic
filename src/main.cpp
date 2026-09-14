@@ -6,6 +6,8 @@
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// Enhanced with comprehensive command-line interface for flexibility and ease of use
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -18,6 +20,9 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "experiments/Phase6IntegratedExperiment.hpp"
+#include "experiments/Phase3Experiment.hpp"
+#include "experiments/Phase4Experiment.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,8 +30,58 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
+#include <algorithm>
+#include <fstream>
+#include <sstream>
 
 using namespace nlm;
+
+// Command-line interface structure
+struct CommandLineOptions {
+    std::string configFile = "configs/default.cfg";
+    std::string outputFile;
+    uint32_t steps = 1000;
+    uint32_t neurons = 1000;
+    uint32_t regions = 1;
+    float connectionProb = 0.1f;
+    float learningRate = 0.01f;
+    bool enableRewardMod = true;
+    bool enableDevelopment = true;
+    bool enableCuriosity = true;
+    std::string checkpointPath;
+    bool saveCheckpoint = false;
+    bool loadCheckpoint = false;
+    bool runTests = false;
+    bool verbose = false;
+    std::string logLevel = "INFO";
+    std::string demoMode = "basic"; // "basic", "phase3", "phase4", "phase6"
+    bool helpRequested = false;
+    bool versionRequested = false;
+    bool listConfigs = false;
+    std::string customConfig;
+};
+
+// Function prototypes for command-line parsing and execution
+CommandLineOptions parseCommandLine(int argc, char** argv);
+void printHelp();
+void printVersion();
+void printAvailableConfigs();
+LogLevel parseLogLevel(const std::string& level);
+void runBasicDemo(std::shared_ptr<Brain> brain, uint32_t steps);
+void runPhase3Demo(std::shared_ptr<Brain> brain, uint32_t steps);
+void runPhase4Demo(std::shared_ptr<Brain> brain, uint32_t steps);
+void runPhase6Demo(std::shared_ptr<Brain> brain, uint32_t steps, bool saveCheckpoint, const std::string& checkpointPath);
+void runCustomSimulation(std::shared_ptr<Brain> brain, const CommandLineOptions& options);
+void applyDefaultConfiguration(std::shared_ptr<Config> config, const CommandLineOptions& options);
+
+// Forward declarations for experiment functions
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain);
+void runPlasticityExperiment(std::shared_ptr<Brain> brain);
+void runStdpVerification(std::shared_ptr<Brain> brain);
+void runPhase3Experiment(std::shared_ptr<Brain> brain, uint32_t steps);
+void runPhase4Experiment(std::shared_ptr<Brain> brain, uint32_t steps);
+void runPhase6Experiment(std::shared_ptr<Brain> brain, uint32_t steps);
 
 void printBanner() {
     std::cout << R"(
