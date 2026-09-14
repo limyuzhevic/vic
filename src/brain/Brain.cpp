@@ -393,58 +393,97 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                         pImpl->workingMemory->storeToNeuron(neuron->getId(), 
                             std::abs(state.membranePotential - state.restingPotential) / 10.0f);
                     }
-                }
-            }
-        }
-    }
-    
-    // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
-    
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
-    }
-    
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
-    
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
-        
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+                    
+                    // Update attention with newly active neurons
+                    if (pImpl->attention && pImpl->workingMemory) {
+                        pImpl->attention->updateCurrentFocus(neuron->getId());
+                    }
+                    
+                    // Update concept formation with neural patterns
+                    if (pImpl->conceptFormation) {
+                        std::vector<NeuronId> activeNeurons;
+                        for (auto& region : pImpl->regions) {
+                            for (auto& pop : region->getPopulations()) {
+                                for (auto* n : pop->getNeurons()) {
+                                    if (n->isFiring()) {
+                                        activeNeurons.push_back(n->getId());
+                                    }
+                                }
+                            }
+                        }
+                        if (!activeNeurons.empty()) {
+                            pImpl->conceptFormation->processPattern(activeNeurons, currentTime);
+                        }
                     }
                 }
             }
         }
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
-    float plasticityMod = 1.0f;
-    if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+// Process immediate spikes
+    pImpl->spikeSystem->processSpikes(currentStep);
+
+// ========== STEP 4: Update working memory ==========
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Update attention with working memory contents
+        if (pImpl->attention) {
+            std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(memoryNeurons);
+        }
     }
+
+    // ========== STEP 5: Update prediction system ==========
+    if (pImpl->predictionSystem) {
+        // Process predictions and prediction errors
+        pImpl->predictionSystem->update(pImpl->timestep);
+    }
+
+    // ========== STEP 6: Update attention system ==========
+    if (pImpl->attention) {
+        pImpl->attention->update(pImpl->timestep);
+        
+        // Apply attention to working memory winners
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+        }
+    }
+
+    // ========== STEP 7: Update concept formation ==========
+    if (pImpl->conceptFormation) {
+        // Process neural activity patterns to form concepts
+        std::vector<NeuronId> activeNeurons;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        activeNeurons.push_back(neuron->getId());
+                    }
+                }
+            }
+        }
+        if (!activeNeurons.empty()) {
+            pImpl->conceptFormation->processPattern(activeNeurons, currentTime);
+        }
+    }
+
+    // ========== STEP 8: Update prediction system ==========
+    if (pImpl->predictionSystem) {
+        // Would process predictions and prediction errors
+        // For now, just track prediction error history
+        pImpl->predictionError->update(pImpl->timestep);
+    }
+
+    // ========== STEP 9: Update neural planner ==========
+    if (pImpl->planner) {
+        // Would use working memory and attention to plan actions
+        // For now, just update planning mechanisms
+        pImpl->planner->update(pImpl->timestep);
+    }
+
+    // ========== STEP 10: Apply structural plasticity periodically ==========
     
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
@@ -780,52 +819,94 @@ bool Brain::save(const std::string& filepath) const {
             pImpl->currentTime
         );
         
-        // Write neurons
-        NeuronCheckpointData neuronData;
-        neuronData.membranePotential.reserve(getTotalNeuronCount());
-        neuronData.restingPotential.reserve(getTotalNeuronCount());
-        neuronData.threshold.reserve(getTotalNeuronCount());
-        neuronData.resetPotential.reserve(getTotalNeuronCount());
-        neuronData.leakConductance.reserve(getTotalNeuronCount());
+        // Set metadata
+        writer.setMetadata(
+            getTotalNeuronCount(),
+            getTotalSynapseCount(),
+            getRegionCount(),
+            pImpl->currentStep,
+            pImpl->currentTime
+        );
         
-        for (const auto& region : pImpl->regions) {
-            for (const auto& pop : region->getPopulations()) {
-                for (const auto* neuron : pop->getNeurons()) {
-                    const auto& state = neuron->getState();
-                    neuronData.membranePotential.push_back(state.membranePotential);
-                    neuronData.restingPotential.push_back(state.restingPotential);
-                    neuronData.threshold.push_back(state.threshold);
-                    neuronData.resetPotential.push_back(state.resetPotential);
-                    neuronData.leakConductance.push_back(state.leakConductance);
-                    neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
-                    neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
-                    neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
-                    neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
-                }
+        // Write memory systems
+        if (pImpl->workingMemory) {
+            if (!writer.writeWorkingMemory(*pImpl->workingMemory)) {
+                NLM_LOG_ERROR("Failed to write working memory to checkpoint");
+                return false;
             }
         }
         
-        if (!writer.writeNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to write neurons to checkpoint");
-            return false;
-        }
-        
-        // Write synapses
-        SynapseCheckpointData synapseData;
-        for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+        if (pImpl->episodicMemory) {
+            if (!writer.writeEpisodicMemory(*pImpl->episodicMemory)) {
+                NLM_LOG_ERROR("Failed to write episodic memory to checkpoint");
+                return false;
             }
         }
         
-        if (!writer.writeSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to write synapses to checkpoint");
-            return false;
+        if (pImpl->associativeMemory) {
+            if (!writer.writeAssociativeMemory(*pImpl->associativeMemory)) {
+                NLM_LOG_ERROR("Failed to write associative memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write prediction system
+        if (pImpl->predictionSystem) {
+            if (!writer.writePredictionSystem(*pImpl->predictionSystem)) {
+                NLM_LOG_ERROR("Failed to write prediction system to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write cognition systems
+        if (pImpl->planner) {
+            if (!writer.writeNeuralPlanner(*pImpl->planner)) {
+                NLM_LOG_ERROR("Failed to write neural planner to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->conceptFormation) {
+            if (!writer.writeConceptFormation(*pImpl->conceptFormation)) {
+                NLM_LOG_ERROR("Failed to write concept formation to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->attention) {
+            if (!writer.writeAttentionalSelection(*pImpl->attention)) {
+                NLM_LOG_ERROR("Failed to write attentional selection to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write neuromodulation systems
+        if (pImpl->dopamine) {
+            if (!writer.writeNeuromodulator(*pImpl->dopamine, "dopamine")) {
+                NLM_LOG_ERROR("Failed to write dopamine to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->curiosity) {
+            if (!writer.writeNeuromodulator(*pImpl->curiosity, "curiosity")) {
+                NLM_LOG_ERROR("Failed to write curiosity to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->novelty) {
+            if (!writer.writeNeuromodulator(*pImpl->novelty, "novelty")) {
+                NLM_LOG_ERROR("Failed to write novelty to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->predictionError) {
+            if (!writer.writePredictionError(*pImpl->predictionError)) {
+                NLM_LOG_ERROR("Failed to write prediction error to checkpoint");
+                return false;
+            }
         }
         
         // Finalize
@@ -1006,41 +1087,41 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
+    return pImpl->workingMemory ? pImpl->workingMemory.get() : nullptr;
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
+    return pImpl->episodicMemory ? pImpl->episodicMemory.get() : nullptr;
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
+    return pImpl->associativeMemory ? pImpl->associativeMemory.get() : nullptr;
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
+    return pImpl->predictionSystem ? pImpl->predictionSystem.get() : nullptr;
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
+    return pImpl->planner ? pImpl->planner.get() : nullptr;
 }
 
 ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
+    return pImpl->conceptFormation ? pImpl->conceptFormation.get() : nullptr;
 }
 
 AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
+    return pImpl->attention ? pImpl->attention.get() : nullptr;
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
+    return pImpl->developmentSystem ? pImpl->developmentSystem.get() : nullptr;
 }
 
 DevelopmentalStage Brain::getDevelopmentalStage() const {
@@ -1054,19 +1135,19 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 // ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
+    return pImpl->dopamine ? pImpl->dopamine.get() : nullptr;
 }
 
 Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
+    return pImpl->curiosity ? pImpl->curiosity.get() : nullptr;
 }
 
 Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
+    return pImpl->novelty ? pImpl->novelty.get() : nullptr;
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
+    return pImpl->predictionError ? pImpl->predictionError.get() : nullptr;
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
