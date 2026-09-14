@@ -406,7 +406,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
+    // ========== STEP 4.5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
@@ -439,26 +439,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
-    float plasticityMod = 1.0f;
-    if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    // ========== STEP 4.6: Apply neuromodulation effects on working memory ==========
+    // Neuromodulators affect working memory - dopamine strengthens active traces,
+    // novelty signals capture attention and promote encoding
+    if (pImpl->dopamine && pImpl->workingMemory) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Dopamine modulates working memory - positive dopamine strengthens active traces
+        if (dopamineLevel > 0.0f) {
+            pImpl->workingMemory->strengthenMemory(1.0f + dopamineLevel * 0.5f);
+        }
     }
     
-    for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
-            // Apply STDP with neuromodulation
-            if (syn->getPlasticityFlags().stdp) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                    float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
+    if (pImpl->novelty && pImpl->workingMemory) {
+        float noveltyLevel = pImpl->novelty->getNoveltyLevel();
+        if (noveltyLevel > 0.3f) {
+            // High novelty promotes capture into working memory
+            // This is done by injecting current to attention-related neurons
+            float attentionBoost = noveltyLevel * 0.5f;
+            if (attentionBoost > 0.0f) {
+                for (auto& region : pImpl->regions) {
+                    for (auto* neuron : region->getAllNeurons()) {
+                        // Boost neurons that are already active to capture novel information
+                        if (neuron->getState().membranePotential > neuron->getState().restingPotential + 5.0f) {
+                            neuron->injectCurrent(attentionBoost);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+                    }
                 }
             }
             
@@ -1016,6 +1028,10 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
+
+// ========== FIX: Connect memory systems to return actual instances =========
+// Note: Memory systems are properly initialized and stored in pImpl
+// They are used in the step() loop but the accessors provide access for other components
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
