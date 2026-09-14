@@ -15,6 +15,16 @@ Metrics::Metrics() : pImpl(new Impl) {}
 Metrics::~Metrics() = default;
 
 void Metrics::record(const std::string& name, double value) {
+    if (name.empty()) {
+        NLM_LOG_ERROR("Cannot record metric: metric name is empty");
+        return;
+    }
+    
+    if (std::isnan(value) || std::isinf(value)) {
+        NLM_LOG_ERROR("Cannot record metric " + name + ": invalid value " + std::to_string(value));
+        return;
+    }
+    
     pImpl->metrics[name].push_back(value);
 }
 

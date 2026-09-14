@@ -35,22 +35,43 @@ float Dopamine::getPlasticityFactor() const {
     return 0.5f + 0.5f * pImpl->level;
 }
 
-void Dopamine::update(TimestepDuration dt) {
+bool Dopamine::update(TimestepDuration dt) {
+    // Validate timestep
+    if (dt <= 0.0) {
+        NLM_LOG_WARNING("Invalid timestep " + std::to_string(dt) + " in dopamine update");
+        return false;
+    }
+    
     // TODO PHASE 2: Implement real dopamine dynamics
     // PLACEHOLDER: Decay towards baseline
     pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    return true;
 }
 
-void Dopamine::signalReward(float reward) {
+bool Dopamine::signalReward(float reward) {
+    // Validate reward
+    if (std::isnan(reward) || std::isinf(reward)) {
+        NLM_LOG_ERROR("Invalid reward value: " + std::to_string(reward));
+        return false;
+    }
+    
     // TODO PHASE 2: Implement real reward signaling
     // PLACEHOLDER: Burst of dopamine on reward
     pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+    return true;
 }
 
-void Dopamine::signalRewardPredictionError(float error) {
+bool Dopamine::signalRewardPredictionError(float error) {
+    // Validate error
+    if (std::isnan(error) || std::isinf(error)) {
+        NLM_LOG_ERROR("Invalid reward prediction error value: " + std::to_string(error));
+        return false;
+    }
+    
     // TODO PHASE 2: Implement reward prediction error signaling
     // PLACEHOLDER: Dopamine responds to prediction error
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+    return true;
 }
 
 } // namespace nlm

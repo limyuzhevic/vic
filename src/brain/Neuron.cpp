@@ -120,18 +120,58 @@ float Neuron::getLastSpikeTime() const {
 }
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
+    if (pImpl->state.firingState == FiringState::Refractory) {
+        NLM_LOG_DEBUG("Ignoring excitatory input during refractory period");
+        return;
+    }
+    
+    // Validate input amplitude
+    if (std::isnan(amplitude) || std::isinf(amplitude)) {
+        NLM_LOG_ERROR("Invalid excitatory input amplitude: " + std::to_string(amplitude));
+        return;
+    }
+    
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
     pImpl->synapticInput += amplitude;
+    
+    // Clamp to prevent instability
+    if (pImpl->synapticInput > 100.0f) {
+        pImpl->synapticInput = 100.0f;
+        NLM_LOG_WARNING("Synaptic input clamped to max value");
+    }
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
+    if (pImpl->state.firingState == FiringState::Refractory) {
+        NLM_LOG_DEBUG("Ignoring inhibitory input during refractory period");
+        return;
+    }
+    
+    // Validate input amplitude
+    if (std::isnan(amplitude) || std::isinf(amplitude)) {
+        NLM_LOG_ERROR("Invalid inhibitory input amplitude: " + std::to_string(amplitude));
+        return;
+    }
+    
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
     pImpl->synapticInput -= amplitude;
+    
+    // Clamp to prevent instability
+    if (pImpl->synapticInput < -100.0f) {
+        pImpl->synapticInput = -100.0f;
+        NLM_LOG_WARNING("Inhibitory synaptic input clamped to min value");
+    }
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
+    // Validate input amplitude
+    if (std::isnan(amplitude) || std::isinf(amplitude)) {
+        NLM_LOG_ERROR("Invalid modulatory input amplitude: " + std::to_string(amplitude));
+        return;
+    }
+    
     // Modulatory input affects plasticity but not directly integrated
     // Used for neuromodulation (e.g., dopamine, acetylcholine)
     pImpl->state.adaptationVariable += amplitude * 0.1f;

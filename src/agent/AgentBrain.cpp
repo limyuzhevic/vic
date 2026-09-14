@@ -85,42 +85,169 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot process sensory input: brain not available");
+        return;
+    }
+    
+    // Validate percept data
+    if (!percept.getVision().empty()) {
+        size_t visionSize = percept.getVisionWidth() * percept.getVisionHeight();
+        if (percept.getVision().size() != visionSize) {
+            NLM_LOG_WARNING("Vision data size mismatch: expected " + std::to_string(visionSize) +
+                         " but got " + std::to_string(percept.getVision().size()));
+        }
+    }
+    
+    if (percept.getTouch().size() > 8) {
+        NLM_LOG_WARNING("Touch data exceeds expected size of 8: " + std::to_string(percept.getTouch().size()));
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+    if (!sensoryVision_.empty()) {
+        bool allNeuronsValid = true;
+        for (size_t i = 0; i < sensoryVision_.size(); ++i) {
+            if (!sensoryVision_[i]) {
+                NLM_LOG_ERROR("Null vision neuron encountered at index " + std::to_string(i));
+                allNeuronsValid = false;
+            }
         }
+        
+        if (!allNeuronsValid) {
+            NLM_LOG_ERROR("Cannot process vision input due to invalid neurons");
+        } else {
+            for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+                if (sensoryVision_[i]) {
+                    // Inject current proportional to vision intensity
+                    float current = vision[i] * 5.0f;  // Scale factor
+                    sensoryVision_[i]->injectCurrent(current);
+                }
+            }
+        }
+    } else {
+        NLM_LOG_WARNING("No vision neurons available for input processing");
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+    if (!sensoryTouch_.empty()) {
+        bool allNeuronsValid = true;
+        for (size_t i = 0; i < sensoryTouch_.size(); ++i) {
+            if (!sensoryTouch_[i]) {
+                NLM_LOG_ERROR("Null touch neuron encountered at index " + std::to_string(i));
+                allNeuronsValid = false;
+            }
         }
+        
+        if (!allNeuronsValid) {
+            NLM_LOG_ERROR("Cannot process touch input due to invalid neurons");
+        } else {
+            for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
+                if (sensoryTouch_[i]) {
+                    float current = touch[i] * 8.0f;  // Collision signal
+                    sensoryTouch_[i]->injectCurrent(current);
+                }
+            }
+        }
+    } else {
+        NLM_LOG_WARNING("No touch neurons available for input processing");
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+    if (!sensoryInternal_.empty()) {
+        bool allNeuronsValid = true;
+        for (size_t i = 0; i < sensoryInternal_.size(); ++i) {
+            if (!sensoryInternal_[i]) {
+                NLM_LOG_ERROR("Null internal neuron encountered at index " + std::to_string(i));
+                allNeuronsValid = false;
+            }
         }
+        
+        if (!allNeuronsValid) {
+            NLM_LOG_ERROR("Cannot process internal signals due to invalid neurons");
+        } else {
+            for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+                if (sensoryInternal_[i]) {
+                    float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+                    sensoryInternal_[i]->injectCurrent(current);
+                }
+            }
+        }
+    } else {
+        NLM_LOG_WARNING("No internal neurons available for input processing");
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+    if (!sensoryProprioception_.empty()) {
+        bool allNeuronsValid = true;
+        for (size_t i = 0; i < sensoryProprioception_.size(); ++i) {
+            if (!sensoryProprioception_[i]) {
+                NLM_LOG_ERROR("Null proprioception neuron encountered at index " + std::to_string(i));
+                allNeuronsValid = false;
+            }
+        }
+        
+        if (!allNeuronsValid) {
+            NLM_LOG_ERROR("Cannot process proprioception due to invalid neurons");
+        } else {
+            for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
+                if (sensoryProprioception_[i]) {
+                    float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+                    sensoryProprioception_[i]->injectCurrent(current);
+                }
+            }
+        }
+    } else {
+        NLM_LOG_WARNING("No proprioception neurons available for input processing");
+    }
+    
+    // Store sensory pattern in working memory for later recall
+    if (brain_) {
+        // Convert percept to vector pattern for working memory
+        std::vector<float> sensoryPattern;
+        
+        // Vision pattern
+        sensoryPattern.insert(sensoryPattern.end(), vision.begin(), vision.end());
+        
+        // Touch pattern  
+        sensoryPattern.insert(sensoryPattern.end(), touch.begin(), touch.end());
+        
+        // Internal pattern
+        sensoryPattern.insert(sensoryPattern.end(), intern.begin(), intern.end());
+        
+        // Proprioception pattern
+        sensoryPattern.insert(sensoryPattern.end(), proprio.begin(), proprio.end());
+        
+        // Store in working memory if available
+        if (auto* workingMemory = brain_->getWorkingMemory()) {
+            if (!workingMemory->store(sensoryPattern, 0.5f)) {
+                NLM_LOG_ERROR("Failed to store sensory pattern in working memory");
+            }
+        }
+        }
+        
+        // Update prediction system if available
+        if (auto* predictionSystem = brain_->getPredictionSystem()) {
+            if (!predictionSystem->updatePrediction(sensoryPattern)) {
+                NLM_LOG_WARNING("Failed to update prediction system");
+            }
+        }
+        
+        // Update novelty detection with current percept
+        if (auto* novelty = brain_->getNovelty()) {
+            if (!novelty->update(brain_->getConfig()->getOr<double>("simulation_timestep", 0.001))) {
+                NLM_LOG_WARNING("Failed to update novelty detector");
+            }
+        }
+        
+        // Apply neuromodulation to working memory traces
+        if (auto* dopamine = brain_->getDopamine()) {
+            if (!dopamine->applyToWorkingMemory(brain_->getWorkingMemory())) {
+                NLM_LOG_WARNING("Failed to apply dopamine modulation to working memory");
+            }
         }
     }
     
@@ -150,13 +277,27 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot decode motor command: brain not available");
+        return MotorCommand::Wait;
+    }
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
+    // Validate decoded command
+    if (decoded == MotorCommand::Wait) {
+        NLM_LOG_DEBUG("Motor command decoded as Wait (no activity)");
+    }
+    
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+        MotorCommand curiosityCmd = selectWithCuriosity(decoded);
+        if (curiosityCmd != decoded) {
+            NLM_LOG_DEBUG("Curiosity-based exploration changed command from " + 
+                         std::to_string(static_cast<int>(decoded)) + " to " +
+                         std::to_string(static_cast<int>(curiosityCmd)));
+        }
+        decoded = curiosityCmd;
     }
     
     return decoded;
@@ -236,7 +377,38 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    if (!brain_ || !rewardModulationEnabled_) {
+        NLM_LOG_WARNING("Reward modulation disabled or brain not available");
+        return;
+    }
+    
+    // Validate reward values
+    if (std::isnan(reward) || std::isinf(reward)) {
+        NLM_LOG_ERROR("Invalid reward value: " + std::to_string(reward));
+        return;
+    }
+    
+    if (std::isnan(predictedReward) || std::isinf(predictedReward)) {
+        NLM_LOG_ERROR("Invalid predicted reward value: " + std::to_string(predictedReward));
+        return;
+    }
+    
+    // Clip rewards to reasonable range to prevent instability
+    const float MAX_REWARD = 10.0f;
+    const float MIN_REWARD = -10.0f;
+    
+    if (reward > MAX_REWARD || reward < MIN_REWARD) {
+        NLM_LOG_WARNING("Reward value " + std::to_string(reward) + " outside expected range [" +
+                      std::to_string(MIN_REWARD) + ", " + std::to_string(MAX_REWARD) + "]");
+        reward = std::clamp(reward, MIN_REWARD, MAX_REWARD);
+    }
+    
+    if (predictedReward > MAX_REWARD || predictedReward < MIN_REWARD) {
+        NLM_LOG_WARNING("Predicted reward value " + std::to_string(predictedReward) + 
+                      " outside expected range [" + std::to_string(MIN_REWARD) + ", " +
+                      std::to_string(MAX_REWARD) + "]");
+        predictedReward = std::clamp(predictedReward, MIN_REWARD, MAX_REWARD);
+    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -251,19 +423,30 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
     // Apply to all synapses with eligibility traces
+    bool synapsesUpdated = false;
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
+            if (!syn) {
+                NLM_LOG_ERROR("Null synapse encountered during reward modulation");
+                continue;
+            }
+            
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
                 // Apply reward-modulated weight change
                 float delta = eligibility * dopamineLevel_ * plasticityModifier_;
                 syn->addToWeight(delta);
+                synapsesUpdated = true;
                 
                 // Decay eligibility trace
                 syn->decayEligibilityTrace(0.1f);
             }
         }
+    }
+    
+    if (!synapsesUpdated) {
+        NLM_LOG_DEBUG("No synapses with eligibility traces to update");
     }
     
     // Modulate plasticity based on dopamine
@@ -274,8 +457,14 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Apply to STDP
     auto* stdp = brain_->getSTDP();
     if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+        if (!stdp->setLTPWeight(0.01f * plasticityFactor)) {
+            NLM_LOG_WARNING("Failed to set LTP weight in STDP");
+        }
+        if (!stdp->setLTDWeight(0.012f * plasticityFactor)) {
+            NLM_LOG_WARNING("Failed to set LTD weight in STDP");
+        }
+    } else {
+        NLM_LOG_WARNING("STDP system not available for plasticity modulation");
     }
 }
 

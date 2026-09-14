@@ -32,6 +32,22 @@ float Curiosity::getLevel() const {
 }
 
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
+    // Validate inputs
+    if (std::isnan(novelty) || std::isinf(novelty)) {
+        NLM_LOG_WARNING("Invalid novelty value: " + std::to_string(novelty));
+        novelty = 0.0f;
+    }
+    
+    if (std::isnan(predictionError) || std::isinf(predictionError)) {
+        NLM_LOG_WARNING("Invalid prediction error value: " + std::to_string(predictionError));
+        predictionError = 0.0f;
+    }
+    
+    if (dt <= 0.0) {
+        NLM_LOG_WARNING("Invalid timestep " + std::to_string(dt) + " in curiosity update");
+        dt = 0.001;
+    }
+    
     // Curiosity increases with novelty and prediction error
     float target = pImpl->noveltyWeight * novelty + 
                    pImpl->predictionErrorWeight * predictionError;

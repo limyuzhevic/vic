@@ -140,49 +140,73 @@ public:
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    NeuralWorkingMemory* getWorkingMemory() { 
+        return pImpl ? pImpl->workingMemory.get() : nullptr; 
+    }
     
     // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    NeuralEpisodicMemory* getEpisodicMemory() { 
+        return pImpl ? pImpl->episodicMemory.get() : nullptr; 
+    }
     
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    NeuralAssociativeMemory* getAssociativeMemory() { 
+        return pImpl ? pImpl->associativeMemory.get() : nullptr; 
+    }
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    PredictionSystem* getPredictionSystem() { 
+        return pImpl ? pImpl->predictionSystem.get() : nullptr; 
+    }
     
     // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    NeuralPlanner* getPlanner() { 
+        return pImpl ? pImpl->planner.get() : nullptr; 
+    }
     
     // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    ConceptFormation* getConceptFormation() { 
+        return pImpl ? pImpl->conceptFormation.get() : nullptr; 
+    }
     
     // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    AttentionalSelection* getAttention() { 
+        return pImpl ? pImpl->attention.get() : nullptr; 
+    }
     
     // ========== DEVELOPMENT SYSTEM ==========
     
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
+    DevelopmentSystem* getDevelopmentSystem() { 
+        return pImpl ? pImpl->developmentSystem.get() : nullptr; 
+    }
+    DevelopmentalStage getDevelopmentalStage() const; 
     void setDevelopmentalStage(DevelopmentalStage stage);
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
     // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    Dopamine* getDopamine() { 
+        return pImpl ? pImpl->dopamine.get() : nullptr; 
+    }
     
     // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    Curiosity* getCuriosity() { 
+        return pImpl ? pImpl->curiosity.get() : nullptr; 
+    }
     
     // Novelty - novelty detection
-    Novelty* getNovelty();
+    Novelty* getNovelty() { 
+        return pImpl ? pImpl->novelty.get() : nullptr; 
+    }
     
     // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    PredictionError* getPredictionErrorSignal() { 
+        return pImpl ? pImpl->predictionError.get() : nullptr; 
+    }
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

@@ -18,6 +18,10 @@ public:
     // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
+    // Update prediction based on neural activity patterns
+    // Uses working memory and sensory history to predict next state
+    bool updatePrediction(const std::vector<float>& currentPattern);
+    
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     

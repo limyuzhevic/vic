@@ -80,6 +80,15 @@ public:
     // Initialize with random parameters
     void initializeRandom(class RandomGenerator& rng);
     
+    // Validation and utility methods
+    bool isValid() const;  // Check if synapse is properly initialized
+    void logState() const;  // Log synapse state for debugging
+    
+private:
+    // Internal validation helper methods
+    bool validateState() const;
+    void checkForNaNValues() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

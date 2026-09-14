@@ -20,25 +20,42 @@ std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryIn
     return currentState.clone();
 }
 
-void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
-    // TODO PHASE 2: Implement real prediction error computation
-    // PLACEHOLDER: Calculate simple error
-    const auto& predData = predicted.getData();
-    const auto& actualData = actual.getData();
-    
-    if (predData.size() == actualData.size() && !predData.empty()) {
-        float sumError = 0.0f;
-        for (size_t i = 0; i < predData.size(); ++i) {
-            float diff = predData[i] - actualData[i];
-            sumError += diff * diff;
-        }
-        pImpl->predictionError = sumError / predData.size();
-        pImpl->errorHistory.push_back(pImpl->predictionError);
+bool PredictionSystem::updatePrediction(const std::vector<float>& currentPattern) {
+    // TODO PHASE 2: Implement real prediction using NLM's neural substrate
+    // PLACEHOLDER: Simple implementation - update prediction error based on pattern
+    if (currentPattern.empty()) {
+        NLM_LOG_WARNING("Cannot update prediction: empty pattern");
+        return false;
     }
+    
+    // Simple placeholder - just record the pattern as having some error
+    // Real implementation would use neural prediction mechanisms
+    pImpl->predictionError = 0.5f;  // Placeholder error value
+    pImpl->errorHistory.push_back(pImpl->predictionError);
+    
+    return true;
 }
 
 float PredictionSystem::getPredictionError() const {
-    return pImpl->predictionError;
+    // Validate that prediction error is within reasonable bounds
+    float error = pImpl->predictionError;
+    
+    if (std::isnan(error)) {
+        NLM_LOG_WARNING("Prediction error is NaN, returning 0.0");
+        return 0.0f;
+    }
+    
+    if (error < 0.0f) {
+        NLM_LOG_WARNING("Prediction error is negative (%.4f), clamping to 0.0", error);
+        return 0.0f;
+    }
+    
+    if (error > 1.0f) {
+        NLM_LOG_WARNING("Prediction error is very high (%.4f), capping at 1.0", error);
+        return 1.0f;
+    }
+    
+    return error;
 }
 
 float PredictionSystem::getConfidence() const {

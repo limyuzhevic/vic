@@ -143,6 +143,10 @@ public:
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     
+    // Validation and utility methods
+    bool isValid() const;  // Check if neuron is properly initialized
+    void logState() const;  // Log neuron state for debugging
+    
 private:
     struct Impl;
     Impl* pImpl;
