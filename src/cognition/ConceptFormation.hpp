@@ -77,9 +77,6 @@ public:
     ConceptFormation();
     ~ConceptFormation();
 
-    // Initialize with brain reference
-    void initialize(Brain* brain);
-
     // Present a new experience to the concept formation system
     // Returns concept ID if this experience belongs to an existing concept,
     // or 0 if it's too early to tell, or new concept ID if novel
@@ -87,6 +84,13 @@ public:
                             const std::vector<float>& features,
                             float reward,
                             SimulationStep currentTime);
+
+    // Record an action-effect relationship (what led to what outcome)
+    // This helps learn cause-and-effect relationships
+    void recordActionEffect(const std::vector<float>& actionPattern,
+                           const std::vector<float>& features,
+                           float reward,
+                           SimulationStep currentTime);
 
     // Get the concept that best matches a pattern
     size_t getMatchingConcept(const std::vector<float>& pattern,

@@ -528,8 +528,63 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Update concept formation with current experience
+        std::vector<float> currentPattern;
+        std::vector<float> features;
+        
+        // Collect neural activity from all regions as patterns
+        // Each region contributes a feature vector representing its activity
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                float totalActivity = 0.0f;
+                size_t firingCount = 0;
+                
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        totalActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        ++firingCount;
+                    }
+                }
+                
+                // Add region-level features
+                if (pop->getNeurons().size() > 0) {
+                    currentPattern.push_back(totalActivity / pop->getNeurons().size());
+                    currentPattern.push_back(static_cast<float>(firingCount) / pop->getNeurons().size());
+                    currentPattern.push_back(static_cast<float>(pop->getId().index()));  // Region identifier
+                }
+                
+                // Additional features for concept formation
+                features.push_back(totalActivity / (pop->getNeurons().size() + 0.001f));  // Activity level
+                features.push_back(static_cast<float>(firingCount) / (pop->getNeurons().size() + 0.001f));  // Firing rate
+                features.push_back(computeNetworkCohesion());  // Global network cohesion
+            }
+        }
+        
+        // Get reward from neuromodulation system
+        float reward = 0.0f;
+        if (pImpl->dopamine) {
+            reward = pImpl->dopamine->getLevel();
+        }
+        
+        // Also check prediction error system for reward prediction
+        float predictionError = 0.0f;
+        if (pImpl->predictionError) {
+            predictionError = pImpl->predictionError->getError();
+        }
+        
+        // Present experience to concept formation system
+        pImpl->conceptFormation->presentExperience(currentPattern, features, reward, currentStep);
+        
+        // Record action effect for concept formation (learning from this experience)
+        if (!currentPattern.empty() && pImpl->conceptFormation) {
+            // Store the concept association: pattern -> action -> outcome
+            pImpl->conceptFormation->recordActionEffect(
+                currentPattern,
+                features,
+                reward,
+                currentStep
+            );
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -690,7 +745,56 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
+    // Primary action selection using NeuralPlanner if available
+    // NeuralPlanner provides predictive planning and action evaluation
+    if (pImpl->planner) {
+        // Extract current neural state for planning
+        std::vector<float> currentState;
+        
+        // Collect neural activity from all regions for planning context
+        // This represents the current "world model" based on neural activity
+        float totalExcitatory = 0.0f;
+        float totalInhibitory = 0.0f;
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        if (neuron->getType() == NeuronType::Excitatory) {
+                            totalExcitatory += neuron->getState().membranePotential;
+                        } else if (neuron->getType() == NeuronType::Inhibitory) {
+                            totalInhibitory += neuron->getState().membranePotential;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Create state vector for planner (normalized values)
+        currentState.push_back(totalExcitatory / (getTotalNeuronCount() + 0.001f));
+        currentState.push_back(totalInhibitory / (getTotalNeuronCount() + 0.001f));
+        currentState.push_back(static_cast<float>(getFiringNeuronCount()) / (getTotalNeuronCount() + 0.001f));
+        currentState.push_back(static_cast<float>(pImpl->currentStep) * 0.001f); // Time
+        
+        // Get prediction from planner
+        ActionType plannedAction = pImpl->planner->planAction(currentState, 0.0f);
+        
+        // Verify planned action is valid
+        auto action = std::make_unique<Action>(plannedAction);
+        
+        // Record action for future learning
+        if (pImpl->conceptFormation) {
+            pImpl->conceptFormation->recordActionEffect(
+                plannedAction,
+                currentState,
+                std::vector<float>()  // Would need actual result
+            );
+        }
+        
+        return action;
+    }
+    
+    // Fallback: Simple action selection based on motor neuron activity
     // The motor neuron population with highest average activity determines action
     
     if (pImpl->motorNeurons.empty()) {

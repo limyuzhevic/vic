@@ -399,7 +399,65 @@ void SpatialRepresentation::clear() {
     currentY_ = 0;
 }
 
-// TemporalRelation Implementation
+void ConceptFormation::recordActionEffect(const std::vector<float>& actionPattern,
+                                         const std::vector<float>& features,
+                                         float reward,
+                                         SimulationStep currentTime) {
+    // Record an action-effect relationship to learn cause-and-effect
+    // This helps the system understand what actions lead to what outcomes
+    
+    if (actionPattern.empty()) return;
+    
+    // Find or create a concept that matches the action pattern
+    size_t conceptId = findConceptForPattern(actionPattern);
+    
+    if (conceptId == 0) {
+        // Create new concept for this action pattern
+        conceptId = createConcept(actionPattern, features, reward);
+    } else {
+        // Update existing concept with new outcome
+        updateConcept(conceptId, actionPattern, features, reward);
+    }
+    
+    // Record the specific action-effect instance
+    ConceptInstance actionInstance;
+    actionInstance.pattern = actionPattern;
+    actionInstance.features = features;
+    actionInstance.observationCount = 1;
+    actionInstance.lastObserved = currentTime;
+    actionInstance.avgReward = reward;
+    actionInstance.stability = 1.0f;
+    
+    // Add to the concept's instances
+    for (auto& concept : concepts_) {
+        if (concept.id == conceptId) {
+            concept.instances.push_back(actionInstance);
+            concept.totalObservations++;
+            
+            // Update concept stability
+            float newStability = 1.0f;
+            if (concept.instances.size() > 1) {
+                // Compute stability as average similarity to prototype
+                float totalSim = 0.0f;
+                size_t recentCount = std::min(concept.instances.size(), stabilityWindow_);
+                
+                for (size_t i = concept.instances.size() - recentCount; 
+                     i < concept.instances.size(); ++i) {
+                    totalSim += computeSimilarity(concept.instances[i].pattern, concept.prototype);
+                }
+                
+                newStability = totalSim / recentCount;
+                concept.avgStability = concept.avgStability * 0.9f + newStability * 0.1f;
+            }
+            
+            actionInstance.stability = newStability;
+            
+            NLM_LOG_INFO("ConceptFormation: Recorded action-effect for concept " + 
+                        std::to_string(conceptId) + " (reward: " + std::to_string(reward) + ")");
+            break;
+        }
+    }
+}
 struct TemporalRelation::Impl {
     Brain* brain;
     

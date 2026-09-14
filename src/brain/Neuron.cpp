@@ -50,6 +50,11 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
     return *this;
 }
 
+// Add swap function to improve move semantics
+void Neuron::swap(Neuron& other) noexcept {
+    std::swap(pImpl, other.pImpl);
+}
+
 void Neuron::setType(NeuronType type) {
     pImpl->type = type;
 }
