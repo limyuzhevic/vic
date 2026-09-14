@@ -3,6 +3,10 @@
  * 
  * This demo runs the Phase 6 integration experiment to verify
  * that all brain systems are properly connected.
+ * 
+ * CRITICAL BUG FIXES APPLIED:
+ * 1. Added error handling for experiment.run()
+ * 2. Properly initialize all Phase6Config fields
  */
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
@@ -60,7 +64,16 @@ int main(int argc, char* argv[]) {
     config.enableReplay = true;
     config.enableDevelopment = true;
     
+    // FIXED: Properly initialize all required config fields
+    config.regionCount = 1;  // Set region count
+    config.connectionProbability = 0.1f;  // Set connection probability
+    config.checkpointPath = "./checkpoint_test.bin";  // Set checkpoint path
+    
+    // FIXED: Add error handling for experiment.run()
     auto result = experiment.run(config);
+    if (result.totalReward == 0.0f && result.avgFiringRate == 0.0f) {
+        std::cerr << "WARNING: Experiment may have failed! All metrics are zero." << std::endl;
+    }
     
     std::cout << std::endl;
     std::cout << "=== FINAL RESULTS ===" << std::endl;

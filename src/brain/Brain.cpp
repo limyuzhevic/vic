@@ -167,7 +167,9 @@ Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl != nullptr) {
+            delete pImpl;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -488,7 +490,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Calculate total neuron count for pre-allocation
+            size_t totalNeurons = 0;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    totalNeurons += pop->getNeurons().size();
+                }
+            }
+            
+            // Pre-allocate memory to avoid repeated reallocations
+            episode.activeNeurons.reserve(totalNeurons);
+            episode.neuronActivations.reserve(totalNeurons);
+            
+            // Store active neurons with bounds checking
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
