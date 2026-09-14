@@ -1,8 +1,4 @@
-#include "SpikeSystem.hpp"
-#include <algorithm>
-#include <limits>
-
-namespace nlm {
+#include <mutex>
 
 struct SpikeSystem::Impl {
     std::queue<SpikeEvent> pendingSpikes;
@@ -10,6 +6,8 @@ struct SpikeSystem::Impl {
     std::vector<SpikeHandler> handlers;
     std::vector<DelayedSpikeHandler> delayedHandlers;
     std::unordered_map<SimulationStep, std::vector<DelayedSpikeEvent>> delayedSpikes;  // Grouped by delivery step
+    std::mutex handlersMutex;
+    std::mutex delayedHandlersMutex;
     size_t maxHistorySize;
     
     // Spike counting for statistics
@@ -22,15 +20,12 @@ SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
 
 SpikeSystem::~SpikeSystem() = default;
 
-SpikeSystem::SpikeSystem(SpikeSystem&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+SpikeSystem::SpikeSystem(SpikeSystem&& other) noexcept : pImpl(std::move(other.pImpl)) {
 }
 
 SpikeSystem& SpikeSystem::operator=(SpikeSystem&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -95,10 +90,12 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
 }
 
 void SpikeSystem::registerHandler(SpikeHandler handler) {
+    std::lock_guard<std::mutex> lock(pImpl->handlersMutex);
     pImpl->handlers.push_back(handler);
 }
 
 void SpikeSystem::registerDelayedHandler(DelayedSpikeHandler handler) {
+    std::lock_guard<std::mutex> lock(pImpl->delayedHandlersMutex);
     pImpl->delayedHandlers.push_back(handler);
 }
 

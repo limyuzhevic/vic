@@ -136,21 +136,7 @@ struct Brain::Impl {
         float tau = config->getOr<float>("stdp_tau", 20.0f);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+initializeIntegratedSystems();
     }
     
     DevelopmentalStage developmentalStage;
@@ -161,15 +147,12 @@ Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
 Brain::~Brain() = default;
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Brain::Brain(Brain&& other) noexcept : pImpl(std::move(other.pImpl)) {
 }
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -349,7 +332,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
                                  state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 0.5f &&
+                                 state.refractoryRemaining == state.refractoryPeriod);  // Check if just entered refractory period
 
                 if (justFired) {
                     // Neuron fired this step - queue the spike
@@ -879,7 +863,9 @@ bool Brain::load(const std::string& filepath) {
                         if (idx < neuronData.firingState.size()) {
                             neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
                         }
-                        if (idx < neuronData.refractoryRemaining.size()) {
+if (idx < neuronData.refractoryRemaining.size()) {
+                            neuron->setRefractoryPeriod(neuronData.refractoryRemaining[idx]);
+                        } else if (idx < neuronData.refractoryPeriod.size()) {
                             neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
                         }
                     }

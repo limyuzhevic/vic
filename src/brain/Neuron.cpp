@@ -37,15 +37,12 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(std::move(other.pImpl)) {
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -159,19 +156,121 @@ void Neuron::clearSpikeHistory() {
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
+    // Validate synapse handle before adding
+    if (pImpl->id.value == 0) {
+        NLM_LOG_WARNING("Attempted to add synapse to uninitialized neuron");
+    }
     pImpl->incomingSynapses.push_back(handle);
+    
+    // Safety check: prevent buffer overflow
+    static constexpr size_t MAX_SYNAPSES_PER_NEURON = 10000;
+    if (pImpl->incomingSynapses.size() > MAX_SYNAPSES_PER_NEURON) {
+        NLM_LOG_ERROR("Synapse count exceeds safe limit for neuron");
+    }
 }
 
 void Neuron::addOutgoingSynapse(SynapseHandle handle) {
+    // Validate synapse handle before adding
+    if (pImpl->id.value == 0) {
+        NLM_LOG_WARNING("Attempted to add synapse from uninitialized neuron");
+    }
     pImpl->outgoingSynapses.push_back(handle);
+    
+    // Safety check: prevent buffer overflow
+    static constexpr size_t MAX_SYNAPSES_PER_NEURON = 10000;
+    if (pImpl->outgoingSynapses.size() > MAX_SYNAPSES_PER_NEURON) {
+        NLM_LOG_ERROR("Synapse count exceeds safe limit for neuron");
+    }
 }
 
 NeuronState& Neuron::getState() {
     return pImpl->state;
 }
 
+const NeuronState& Neuron::getState() const {
+    return pImpl->state;
+}
+
 PlasticityFlags& Neuron::getPlasticityFlags() {
     return pImpl->plasticityFlags;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
+}
+
+NeuronId Neuron::getId() const {
+    return pImpl->id;
+}
+
+NeuronType Neuron::getType() const {
+    return pImpl->type;
+}
+
+MembranePotential Neuron::getMembranePotential() const {
+    return pImpl->state.membranePotential;
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->synapticInput;
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
+}
+
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
+}
+
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
+}
+
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active ||
+           pImpl->state.firingState == FiringState::Refractory;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
+// Add missing method implementations
+NeuronType Neuron::getType() const {
+    return pImpl->type;
+}
+
+MembranePotential Neuron::getThreshold() const {
+    return pImpl->state.threshold;
+}
+
+MembranePotential Neuron::getRestingPotential() const {
+    return pImpl->state.restingPotential;
+}
+
+MembranePotential Neuron::getResetPotential() const {
+    return pImpl->state.resetPotential;
+}
+
+MembranePotential Neuron::getLeakConductance() const {
+    return pImpl->state.leakConductance;
+}
+
+uint32_t Neuron::getRefractoryPeriod() const {
+    return pImpl->state.refractoryPeriod;
 }
 
 void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
