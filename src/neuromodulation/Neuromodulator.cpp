@@ -51,6 +51,14 @@ void Dopamine::signalRewardPredictionError(float error) {
     // TODO PHASE 2: Implement reward prediction error signaling
     // PLACEHOLDER: Dopamine responds to prediction error
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
-}
+    }
+    
+    void Dopamine::updatePredictionError(float error) {
+        // Alternative way to update dopamine based on prediction error
+        // Higher prediction error = stronger dopamine signal
+        if (error > pImpl->level) {
+            pImpl->level = std::min(pImpl->peak, pImpl->level + error * 0.5f);
+        }
+    }
 
 } // namespace nlm

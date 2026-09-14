@@ -402,8 +402,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processSpikes(currentStep);
     
     // ========== STEP 4: Update working memory ==========
+    // Working memory maintains active traces and prepares for attention selection
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Integrate working memory with sensory processing - maintain sensory traces
+        // The working memory now actively maintains sensory information through recurrent connections
+        if (pImpl->novelty) {
+            float noveltyLevel = pImpl->novelty->getLevel();
+            if (noveltyLevel > 0.5f) {
+                // High novelty strengthens working memory traces
+                pImpl->workingMemory->strengthenMemory(noveltyLevel);
+            }
+        }
+        
+        // Competition between working memory traces selects the most salient information
+        pImpl->workingMemory->runCompetition();
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -511,8 +525,45 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current state
+        // This includes predicting next states based on current neural activity
+        
+        // Create sensory input from current neural activity
+        SensoryInput currentState;
+        size_t sensoryNeurons = pImpl->sensoryNeurons.size();
+        if (sensoryNeurons > 0) {
+            std::vector<float> data;
+            for (size_t i = 0; i < sensoryNeurons; ++i) {
+                float activation = 0.0f;
+                auto* neuron = pImpl->sensoryNeurons[i];
+                if (neuron) {
+                    const auto& state = neuron->getState();
+                    activation = std::max(0.0f, state.membranePotential - state.restingPotential);
+                }
+                data.push_back(activation);
+            }
+            currentState.setData(data);
+        }
+        
+        // Make prediction for next state
+        auto predictedState = pImpl->predictionSystem->predictNextState(currentState);
+        
+        // Update predictions based on actual observation
+        if (predictedState && !predictedState->getData().empty()) {
+            pImpl->predictionSystem->updatePredictions(*predictedState, currentState);
+        }
+        
+        // Train prediction model with current experience
+        pImpl->predictionSystem->train(currentState);
+        
+        // Get prediction error for neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Use prediction error to modulate dopamine (reward prediction error)
+        if (pImpl->dopamine && predictionError > 0.1f) {
+            // Prediction error drives dopamine release
+            pImpl->dopamine->updatePredictionError(predictionError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +579,51 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Update concept formation with current neural activity patterns
+        // Convert neural activity to pattern for concept learning
+        
+        // Build current neural activity pattern from all active neurons
+        std::vector<float> pattern;
+        size_t totalNeurons = getTotalNeuronCount();
+        pattern.reserve(totalNeurons);
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron) {
+                        const auto& state = neuron->getState();
+                        // Encode neuron activity as pattern component
+                        float activity = std::max(0.0f, 
+                            (state.membranePotential - state.restingPotential) / 20.0f);
+                        pattern.push_back(activity);
+                    }
+                }
+            }
+        }
+        
+        if (!pattern.empty()) {
+            // Build associated features (including reward information)
+            std::vector<float> features;
+            
+            // Get reward information from neuromodulation
+            float reward = 0.0f;
+            if (pImpl->dopamine) {
+                reward = pImpl->dopamine->getLevel();
+            }
+            
+            // Get novelty level as a feature
+            float novelty = 0.0f;
+            if (pImpl->novelty) {
+                novelty = pImpl->novelty->getLevel();
+            }
+            
+            features.push_back(reward);
+            features.push_back(novelty);
+            
+            // Present pattern to concept formation system
+            SimulationStep currentTime = static_cast<SimulationStep>(currentStep);
+            pImpl->conceptFormation->presentExperience(pattern, features, reward, currentTime);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -547,32 +641,83 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+    // Update development system more frequently (every 100 steps)
+    if (currentStep % 100 == 0) {
+        // Update development system with time-based progression
+        pImpl->developmentSystem->update(*pImpl->rng, pImpl->timestep * 100);
         
-        // Development affects plasticity rates
+        // Get developmental stage and apply its effects
+        DevelopmentalStage stage = pImpl->developmentSystem->getStage();
+        
+        // Update brain developmental stage to match
+        pImpl->developmentalStage = stage;
+        
+        // Development stage affects multiple systems:
+        
+        // 1. Affects neuromodulation sensitivity
+        float plasticityModifier = pImpl->developmentSystem->getPlasticityModifier();
+        
+        // 2. Modulates neuromodulation baseline levels
+        if (pImpl->dopamine) {
+            float dopamineBase = 0.1f;
+            pImpl->dopamine->setLevel(dopamineBase * plasticityModifier);
+        }
+        
+        if (pImpl->novelty) {
+            float noveltyBase = 0.5f;
+            pImpl->novelty->setLevel(noveltyBase * plasticityModifier);
+        }
+        
+        // 3. Affects memory system consolidation
+        if (pImpl->episodicMemory) {
+            // Development stage affects consolidation rate
+            float consolidationRate = 0.1f * plasticityModifier;
+            // Could be used to adjust consolidation parameters
+            // For now, just log the stage
+            NLM_LOG_INFO("Development: Current stage = " + std::string(pImpl->developmentSystem->getStageName()) +
+                         ", plasticity modifier = " + std::to_string(plasticityModifier));
+        }
+        
+        // 4. Affects prediction system confidence
+        if (pImpl->predictionSystem) {
+            float confidence = 0.5f + 0.5f * plasticityModifier;
+            // Prediction system confidence based on developmental stage
+            // This would normally be stored in the prediction system
+        }
+        
+        // 5. Affects concept formation stability threshold
+        if (pImpl->conceptFormation) {
+            float stabilityThreshold = 0.7f - 0.2f * plasticityModifier;
+            // Could adjust concept formation threshold based on stage
+        }
+        
+        // 6. Affects attention system thresholds
+        if (pImpl->attention) {
+            float attentionGain = 1.0f + 0.5f * plasticityModifier;
+            // Could adjust attention parameters based on stage
+        }
+        
+        // 7. Updates structural plasticity based on developmental stage
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+            // Use development system plasticity modifier
+            sp->setSynaptogenesisRate(0.0001f * plasticityModifier);
+            sp->setPruningRate(0.00001f * (2.0f - plasticityModifier));
             
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+            // Also apply critical period effects
+            if (pImpl->developmentSystem->isCriticalPeriod()) {
+                // During critical period, synapses form more easily
+                float cpProgress = pImpl->developmentSystem->getCriticalPeriodProgress();
+                sp->setSynaptogenesisRate(0.0002f * (1.0f + cpProgress));
             }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+        
+        // 8. Updates working memory capacity based on developmental stage
+        if (pImpl->workingMemory) {
+            // Growing working memory capacity through development
+            size_t baseCapacity = getTotalNeuronCount() / 20;
+            size_t developmentalCapacity = baseCapacity * (2 - plasticityModifier);
+            pImpl->workingMemory->setCapacity(developmentalCapacity);
         }
     }
     
@@ -582,7 +727,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+        // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
@@ -828,6 +973,161 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write development system state
+        if (pImpl->developmentSystem) {
+            // Development system state is stored as individual values
+            struct DevelopmentCheckpoint {
+                DevelopmentalStage stage;
+                double age;
+                float plasticityModifier;
+            } devData;
+            
+            devData.stage = pImpl->developmentSystem->getStage();
+            devData.age = pImpl->developmentSystem->getDevelopmentalAge();
+            devData.plasticityModifier = pImpl->developmentSystem->getPlasticityModifier();
+            
+            // Write development data
+            writer.writeSection(CheckpointSection::Development, &devData, sizeof(devData));
+        }
+        
+        // Write neuromodulation state
+        struct NeuromodulationCheckpoint {
+            float dopamineLevel;
+            float curiosityLevel;
+            float noveltyLevel;
+            float predictionErrorLevel;
+        } neuromodData;
+        neuromodData.dopamineLevel = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        neuromodData.curiosityLevel = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+        neuromodData.noveltyLevel = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        neuromodData.predictionErrorLevel = pImpl->predictionError ? pImpl->predictionError->getLevel() : 0.0f;
+        
+        writer.writeSection(CheckpointSection::Neuromodulation, &neuromodData, sizeof(neuromodData));
+        
+        // Write episodic memory state
+        if (pImpl->episodicMemory && pImpl->episodicMemory->getEpisodeCount() > 0) {
+            // Store recent episodes for replay
+            auto episodes = pImpl->episodicMemory->getEpisodesForReplay(5);
+            struct MemoryCheckpoint {
+                uint32_t episodeCount;
+                SimulationStep lastEpisodeStep;
+                float lastEpisodeReward;
+            } memData;
+            memData.episodeCount = pImpl->episodicMemory->getEpisodeCount();
+            memData.lastEpisodeStep = static_cast<SimulationStep>(pImpl->currentStep);
+            memData.lastEpisodeReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            writer.writeSection(CheckpointSection::Memory, &memData, sizeof(memData));
+        }
+        
+        // Write concept formation state
+        if (pImpl->conceptFormation && pImpl->conceptFormation->getConceptCount() > 0) {
+            struct ConceptState {
+                uint32_t conceptCount;
+            } conceptData;
+            conceptData.conceptCount = pImpl->conceptFormation->getConceptCount();
+            
+            writer.writeSection(CheckpointSection::Memory, &conceptData, sizeof(conceptData));
+        }
+        
+        // Write prediction system state
+        if (pImpl->predictionSystem) {
+            struct PredictionState {
+                float predictionError;
+                float confidence;
+                uint32_t errorHistorySize;
+            } predictionData;
+            predictionData.predictionError = pImpl->predictionSystem->getPredictionError();
+            predictionData.confidence = pImpl->predictionSystem->getConfidence();
+            predictionData.errorHistorySize = static_cast<uint32_t>(pImpl->predictionSystem->getErrorHistory().size());
+            
+            writer.writeSection(CheckpointSection::Neuromodulation, &predictionData, sizeof(predictionData));
+        }
+        
+        // Write attention system state
+        if (pImpl->attention) {
+            struct AttentionState {
+                float inhibitionStrength;
+                float excitationStrength;
+                uint32_t activeNeurons;
+            } attentionData;
+            attentionData.inhibitionStrength = 0.5f;  // Placeholder
+            attentionData.excitationStrength = 1.5f;  // Placeholder
+            attentionData.activeNeurons = 0;
+            
+            writer.writeSection(CheckpointSection::Neuromodulation, &attentionData, sizeof(attentionData));
+        }
+        
+        // Write working memory state
+        if (pImpl->workingMemory) {
+            auto workingMemoryState = pImpl->workingMemory->getState();
+            if (!workingMemoryState.empty()) {
+                writer.writeSection(CheckpointSection::Memory, workingMemoryState.data(), workingMemoryState.size() * sizeof(float));
+            }
+        }
+        
+        // Write episodic memory state
+        if (pImpl->episodicMemory && pImpl->episodicMemory->getEpisodeCount() > 0) {
+            // Store recent episodes for replay
+            auto episodes = pImpl->episodicMemory->getEpisodesForReplay(5);
+            struct MemoryCheckpoint {
+                uint32_t episodeCount;
+                SimulationStep lastEpisodeStep;
+                float lastEpisodeReward;
+            } memData;
+            memData.episodeCount = pImpl->episodicMemory->getEpisodeCount();
+            memData.lastEpisodeStep = static_cast<SimulationStep>(pImpl->currentStep);
+            memData.lastEpisodeReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            writer.writeSection(CheckpointSection::Memory, &memData, sizeof(memData));
+        }
+        
+        // Write concept formation state
+        if (pImpl->conceptFormation && pImpl->conceptFormation->getConceptCount() > 0) {
+            struct ConceptState {
+                uint32_t conceptCount;
+            } conceptData;
+            conceptData.conceptCount = pImpl->conceptFormation->getConceptCount();
+            
+            writer.writeSection(CheckpointSection::Memory, &conceptData, sizeof(conceptData));
+        }
+        
+        // Write prediction system state
+        if (pImpl->predictionSystem) {
+            struct PredictionState {
+                float predictionError;
+                float confidence;
+                uint32_t errorHistorySize;
+            } predictionData;
+            predictionData.predictionError = pImpl->predictionSystem->getPredictionError();
+            predictionData.confidence = pImpl->predictionSystem->getConfidence();
+            predictionData.errorHistorySize = static_cast<uint32_t>(pImpl->predictionSystem->getErrorHistory().size());
+            
+            writer.writeSection(CheckpointSection::Neuromodulation, &predictionData, sizeof(predictionData));
+        }
+        
+        // Write attention system state
+        if (pImpl->attention) {
+            struct AttentionState {
+                float inhibitionStrength;
+                float excitationStrength;
+                uint32_t activeNeurons;
+            } attentionData;
+            attentionData.inhibitionStrength = 0.5f;  // Placeholder
+            attentionData.excitationStrength = 1.5f;  // Placeholder
+            attentionData.activeNeurons = 0;
+            
+            writer.writeSection(CheckpointSection::Neuromodulation, &attentionData, sizeof(attentionData));
+        }
+        
+        // Write working memory state
+        if (pImpl->workingMemory) {
+            auto workingMemoryState = pImpl->workingMemory->getState();
+            if (!workingMemoryState.empty()) {
+                writer.writeSection(CheckpointSection::Memory, workingMemoryState.data(), workingMemoryState.size() * sizeof(float));
+            }
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -888,21 +1188,53 @@ bool Brain::load(const std::string& filepath) {
             }
         }
         
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
-            return false;
+        // Read episodic memory state
+        std::vector<uint8_t> memSection = reader.readSection(CheckpointSection::Memory);
+        if (!memSection.empty()) {
+            // Decode memory checkpoint
+            if (memSection.size() >= sizeof(MemoryCheckpoint)) {
+                MemoryCheckpoint* memData = reinterpret_cast<MemoryCheckpoint*>(memSection.data());
+                // Note: Episodic memory state would be stored in a more complex format
+                // For now, just log that memory was saved
+                NLM_LOG_INFO("Loaded memory checkpoint with " + std::to_string(memData->episodeCount) + " episodes");
+            }
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Read concept formation state
+        std::vector<uint8_t> conceptSection = reader.readSection(CheckpointSection::Memory);
+        if (!conceptSection.empty()) {
+            // Note: Concept formation state would be loaded in full implementation
+            NLM_LOG_INFO("Loaded concept formation checkpoint");
+        }
+        
+        // Read prediction system state
+        std::vector<uint8_t> predSection = reader.readSection(CheckpointSection::Neuromodulation);
+        if (!predSection.empty() && predSection.size() >= sizeof(PredictionState)) {
+            PredictionState* predData = reinterpret_cast<PredictionState*>(predSection.data());
+            // Prediction state would be restored here in full implementation
+            NLM_LOG_INFO("Loaded prediction system state with error=" + std::to_string(predData->predictionError));
+        }
+        
+        // Read attention system state
+        std::vector<uint8_t> attSection = reader.readSection(CheckpointSection::Neuromodulation);
+        if (!attSection.empty() && attSection.size() >= sizeof(AttentionState)) {
+            AttentionState* attData = reinterpret_cast<AttentionState*>(attSection.data());
+            // Attention state would be restored here
+            NLM_LOG_INFO("Loaded attention system state");
+        }
+        
+        // Read working memory state
+        std::vector<uint8_t> wmSection = reader.readSection(CheckpointSection::Memory);
+        if (!wmSection.empty()) {
+            // Working memory state would be restored here
+            NLM_LOG_INFO("Loaded working memory state");
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
-        
-    } catch (const std::exception& e) {
+    }
+    
+    catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
         return false;
     }

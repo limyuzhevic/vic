@@ -76,11 +76,6 @@ void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
     }
 }
 
-void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDuration dt) {
-    age_ += dt;
-    pImpl->stageAge += dt;
-    ++pImpl->stepsInCurrentStage;
-    
     // Auto-advance stage based on developmental age
     // These thresholds are in simulation seconds
     if (pImpl->stage == DevelopmentalStage::Initial && age_ > 60.0) {
@@ -90,6 +85,10 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
     } else if (pImpl->stage == DevelopmentalStage::Maturation && age_ > 960.0) {
         advanceStage();
     }
+}
+
+void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
+    update(brain, *brain->getRandomGenerator(), brain->getConfig()->getOr<double>("simulation_timestep", 0.001) * 1000);
 }
 
 float DevelopmentSystem::getPlasticityModifier() const {

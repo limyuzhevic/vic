@@ -47,6 +47,7 @@ public:
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    void updatePredictionError(float error);
     
 private:
     struct Impl;

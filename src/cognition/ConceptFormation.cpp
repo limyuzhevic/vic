@@ -3,13 +3,23 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <unordered_map>
 
 namespace nlm {
 
 struct ConceptFormation::Impl {
     Brain* brain;
+    // Add prediction system reference for integration
+    std::shared_ptr<class PredictionSystem> predictionSystem;
     
-    Impl() : brain(nullptr) {}
+    // Track concept predictions for prediction errors
+    std::unordered_map<size_t, float> conceptPredictions;  // conceptId -> predicted reward
+    std::unordered_map<size_t, std::vector<float>> conceptPredictionPatterns;  // conceptId -> predicted pattern
+    
+    // Track prediction errors for neuromodulation
+    std::vector<float> predictionErrors;  // Aligned with concepts_ indices
+    
+    Impl() : brain(nullptr), predictionSystem(nullptr) {}
 };
 
 ConceptFormation::ConceptFormation()
@@ -27,7 +37,17 @@ ConceptFormation::~ConceptFormation() = default;
 void ConceptFormation::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("ConceptFormation initialized");
+    
+    // Get prediction system from brain for integration
+    if (brain) {
+        pImpl->predictionSystem = brain->getPredictionSystem();
+    }
+    
+    // Initialize concept formation
+    concepts_.clear();
+    nextConceptId_ = 1;
+    
+    NLM_LOG_INFO("ConceptFormation: Initialized with prediction system integration");
 }
 
 size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
@@ -40,13 +60,40 @@ size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
     size_t matchingConcept = findConceptForPattern(pattern);
     
     if (matchingConcept > 0) {
-        // Update existing concept
+        // Update existing concept with prediction error if available
         updateConcept(matchingConcept, pattern, features, reward);
+        
+        // Compute prediction error for this concept
+        if (pImpl->predictionSystem && !pImpl->conceptPredictions.empty()) {
+            auto it = pImpl->conceptPredictions.find(matchingConcept);
+            if (it != pImpl->conceptPredictions.end()) {
+                float predictedReward = it->second;
+                float predictionError = std::abs(predictedReward - reward);
+                pImpl->predictionErrors[matchingConcept] = predictionError;
+                
+                NLM_LOG_INFO("ConceptFormation: Prediction error for concept " + std::to_string(matchingConcept) +
+                             " = " + std::to_string(predictionError));
+            }
+        }
+        
         return matchingConcept;
     }
     
     // Check if this is novel enough to form a new concept
-    if (isNovel(pattern, formationThreshold_)) {
+    // Use formation threshold - potentially adjusted by prediction system
+    float currentFormationThreshold = formationThreshold_;
+    if (pImpl->predictionSystem) {
+        float avgPredictionError = 0.0f;
+        if (!pImpl->predictionErrors.empty()) {
+            float total = 0.0f;
+            for (float error : pImpl->predictionErrors) total += error;
+            avgPredictionError = total / pImpl->predictionErrors.size();
+        }
+        // Higher prediction error = more conservative formation
+        currentFormationThreshold = std::max(0.5f, formationThreshold_ + avgPredictionError * 0.5f);
+    }
+    
+    if (isNovel(pattern, currentFormationThreshold)) {
         // But wait - we need a few observations before committing to a concept
         // This prevents forming concepts from noise
         
@@ -84,6 +131,11 @@ size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
     } else {
         concept.categoryHint = "neutral";
     }
+    
+    // Initialize prediction tracking for this concept
+    pImpl->conceptPredictions[concept.id] = reward;
+    pImpl->conceptPredictionPatterns[concept.id] = pattern;
+    pImpl->predictionErrors.push_back(0.0f);
     
     concepts_.push_back(concept);
     

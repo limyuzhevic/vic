@@ -30,7 +30,10 @@ public:
     // Update development (simple version)
     void update(Brain* brain, SimulationStep currentStep);
     
-    // Update development with full parameters
+    // Update development with full parameters (alternative signature)
+    void update(Brain* brain, SimulationStep currentStep, TimestepDuration dt);
+    
+    // Update development with brain and random generator
     void update(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
     
     // Get plasticity modifier for current stage

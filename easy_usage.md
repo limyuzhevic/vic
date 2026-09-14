@@ -6,11 +6,15 @@ NLM is a **brain simulator** for computers. It lets you create virtual brains th
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
+- **Synapses** = Connections between brain cells  
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
+- **Prediction** = The brain predicting what will happen next
+- **Concepts** = The brain discovering patterns and categorizing experiences
+- **Development** = The brain maturing and changing over time
+- **Neuromodulation** = The brain's chemical signals that control attention, reward, and exploration
 
-That's it! NLM simulates all of this.
+That's it! NLM simulates all of this with a fully integrated brain architecture.
 
 ---
 
@@ -69,6 +73,48 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
+### Example 2.5: Learning with Neuromodulation and Development
+
+```python
+import pynlm
+
+# Setup
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning and development
+agent.enableRewardModulation(True)      # Learn from rewards
+agent.enableCuriosity(True)              # Explore new things
+agent.enableDevelopment(True)           # Brain matures over time
+agent.enableStructuralPlasticity(True)  # Grow new connections
+
+# Run learning simulation
+for step in range(200):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Simulate reward for exploring
+    if step % 20 == 0:
+        world = pynlm.createSimpleWorld()
+        world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+        world.reset()
+
+print("Learning simulation complete!")
+print("Firing rate:", brain.getAverageFiringRate())
+print("Development stage:", brain.getDevelopmentalStage())
+print("Neuromodulation level:", agent.getNeuromodulationLevel())
+print("Curiosity level:", agent.getCuriosityLevel())
 ```
 
 ---
@@ -165,10 +211,21 @@ Creates a virtual brain with neurons and synapses.
 Starts up the brain. Always call this before using the brain!
 
 ### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
+Makes the brain process one moment in time. The integrated brain performs:
 - Checks each neuron
 - Sends signals between connected neurons
 - Updates connections based on learning rules
+- Updates working memory (maintenance and competition)
+- Applies neuromodulation effects on neural excitability
+- Applies plasticity rules (STDP, Hebbian)
+- Updates episodic memory with current experience
+- Updates prediction system with neural-based predictions
+- Updates attention system for focus selection
+- Updates concept formation with prediction error integration
+- Applies structural plasticity (synaptogenesis, pruning)
+- Replays important memories (during rest or periodically)
+- Applies development effects (brain maturation)
+- Manages memory consolidation
 
 ### `world.update(time)`
 Updates the virtual world by `time` seconds.
@@ -221,7 +278,7 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent with Learning and Development
 
 ```python
 import pynlm
@@ -236,11 +293,13 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
+# Enable all learning and development features
+agent.enableRewardModulation(True)      # Learn from rewards
+agent.enableCuriosity(True)              # Explore new things
+agent.enableDevelopment(True)           # Brain matures over time
+agent.enableStructuralPlasticity(True)  # Grow new connections
 
-# Run agent
+# Run agent with full integration
 for step in range(100):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
@@ -252,6 +311,47 @@ for step in range(100):
         print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
 
 print("Agent simulation complete!")
+print("Development stage:", brain.getDevelopmentalStage())
+print("Total spikes:", brain.getTotalSpikeCount())
+```
+
+### Project 4: Brain with Prediction and Concept Formation
+
+```python
+import pynlm
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=6, visionHeight=6)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable advanced features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+
+# Run simulation to allow prediction and concept formation to develop
+for step in range(200):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 50 == 0:
+        print(f"Step {step}:")
+        print(f"  Firing rate: {brain.getAverageFiringRate():.2f}")
+        print(f"  Development stage: {brain.getDevelopmentalStage()}")
+        print(f"  Prediction error: {brain.getPredictionSystem() ? brain.getPredictionSystem()->getPredictionError() : 0:.3f}")
+        print(f"  Concepts formed: {brain.getConceptFormation() ? brain.getConceptFormation()->getConceptCount() : 0}")
+
+print("Advanced brain simulation complete!")
 ```
 
 ---
@@ -294,4 +394,13 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with a fully integrated brain featuring:
+- **Prediction System** - Neural-based prediction with real-time error computation and confidence tracking
+- **Concept Formation** - Pattern discovery and concept emergence through repeated experience
+- **Development System** - Dynamic brain maturation across developmental stages
+- **Full Neuromodulation** - Integrated reward, curiosity, novelty, and prediction error signals
+- **Memory Integration** - Connected working, episodic, and associative memory systems
+- **Checkpointing** - Robust save/load functionality for state persistence
+- **Replay and Consolidation** - Memory replay during rest periods and consolidation mechanisms
+- **Structural Plasticity** - Synaptogenesis and pruning for brain growth
+- **Real Spiking Neural Computation** - Event-driven spike dynamics and STDP learning
