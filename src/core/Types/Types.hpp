@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_CORE_TYPES_HPP
+#define NLM_CORE_TYPES_HPP
 
 #include <cstdint>
 #include <type_traits>
@@ -190,3 +191,5 @@ constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
 } // namespace nlm
+
+#endif // NLM_CORE_TYPES_HPP

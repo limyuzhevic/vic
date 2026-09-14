@@ -2,229 +2,316 @@
 
 **An Experimental Artificial Developmental Brain**
 
-## What is NLM?
+## Quick Start
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+This repository contains a biologically-inspired neural simulation framework that implements an artificial brain capable of learning, memory, and development. Below are practical examples to get you started:
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+### Example 1: Basic Brain Simulation
+```cpp
+#include <nlm.hpp>
+#include <iostream>
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+int main() {
+    // Create brain with default configuration
+    auto config = nlm::createDefaultConfig();
+    config.set("neuron_count", 500);
+    config.set("simulation_timestep", 0.001);
+    
+    auto brain = nlm::createBrain(config);
+    brain->initialize();
+    
+    std::cout << "Initialized NLM brain with " 
+              << brain->getTotalNeuronCount() << " neurons" << std::endl;
+    std::cout << "Total synapses: " << brain->getTotalSynapseCount() << std::endl;
+    
+    // Run 100 simulation steps
+    for (uint64_t step = 0; step < 100; ++step) {
+        brain->step(step);
+        
+        if (step % 10 == 0) {
+            std::cout << "Step " << step << ": " 
+                      << brain->getFiringNeuronCount() << " firing neurons" << std::endl;
+        }
+    }
+    
+    std::cout << "Final spike count: " << brain->getTotalSpikeCount() << std::endl;
+    return 0;
+}
+```
 
-## Current Phase
+### Example 2: Complete Agent in a World
+```python
+import pynlm
 
-**PHASE 6: FINAL INTEGRATION**
+def run_agent_simulation(steps=500):
+    """Complete example of an agent interacting with a world."""
+    
+    # 1. Setup the brain
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 2. Create agent interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 3. Setup the world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    # 4. Initialize agent
+    agent.initialize(world)
+    
+    # 5. Enable learning capabilities
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    agent.enableDevelopment(True)
+    
+    # 6. Run simulation
+    for step in range(steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process in brain
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        
+        # Get action from brain
+        action = agent.decodeMotorCommand()
+        
+        # Execute in world
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Learn from experience
+        reward = world.getAgentBody().energy / 100.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Log progress
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing: {brain.getFiringNeuronCount()} neurons")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Location: ({world.getAgentBody().x:.1f}, {world.getAgentBody().y:.1f})")
+    
+    print(f"\nSimulation complete!")
+    print(f"Total spikes: {brain.getTotalSpikeCount()}")
+    print(f"Final curiosity: {agent.getCuriosityLevel():.3f}")
+    return brain, agent, world
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+# Run the simulation
+brain, agent, world = run_agent_simulation(500)
+```
 
-### Phase 6 Integration Achievements
+### Example 3: Learning Experiment with STDP
+```cpp
+// LearningExperiment.cpp - Demonstrates synaptic learning
+#include "Brain.hpp"
+#include "STDP.hpp"
+#include <iostream>
+#include <vector>
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+void demonstrateSTDP() {
+    std::cout << "=== NLM STDP Learning Demonstration ===\n" << std::endl;
+    
+    // Create brain configuration
+    auto config = std::make_shared<Config>();
+    config->set("neuron_count", 200);
+    config->set("random_seed", 42);
+    config->set("stdp_ltp_weight", 0.02f);
+    config->set("stdp_ltd_weight", 0.015f);
+    
+    // Initialize brain
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
+    
+    // Record initial weights
+    std::cout << "Initial brain state:" << std::endl;
+    brain->logStatus();
+    std::cout << std::endl;
+    
+    // Enable STDP on all synapses
+    for (auto& region : brain->getRegions()) {
+        for (auto& syn : region->getSynapses()) {
+            syn->enablePlasticity(false, true, false);  // STDP only
+        }
+    }
+    
+    // Run correlated input to trigger STDP
+    std::cout << "Applying correlated pre->post activity (50 trials)..." << std::endl;
+    
+    auto* region = brain->getRegion(RegionId(1));
+    if (region) {
+        auto neurons = region->getAllNeurons();
+        if (neurons.size() >= 2) {
+            Neuron* pre = neurons[0];
+            Neuron* post = neurons[1];
+            
+            // Pre-before-post protocol for LTP
+            for (int trial = 0; trial < 50; ++trial) {
+                // Fire pre-synaptic neuron first
+                pre->injectCurrent(60.0f);
+                brain->step(trial * 2, trial * 2 * 0.001);
+                
+                // Then post-synaptic neuron (creates spike pairing)
+                post->injectCurrent(60.0f);
+                brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+            }
+        }
+    }
+    
+    // Check for learning
+    std::cout << "\nPost-experiment brain state:" << std::endl;
+    brain->logStatus();
+    
+    // Calculate synaptic changes
+    float totalWeightChange = 0.0f;
+    size_t synapseCount = 0;
+    
+    for (auto& region : brain->getRegions()) {
+        for (auto& syn : region->getSynapses()) {
+            if (syn->getPlasticityFlags().stdp) {
+                totalWeightChange += syn->getWeight();
+                synapseCount++;
+            }
+        }
+    }
+    
+    if (synapseCount > 0) {
+        float avgWeightChange = totalWeightChange / synapseCount;
+        std::cout << "\nSTDP Results:" << std::endl;
+        std::cout << "  Average synaptic weight: " << avgWeightChange << std::endl;
+        std::cout << "  Synapses with STDP: " << synapseCount << std::endl;
+        
+        if (avgWeightChange > 0.001f) {
+            std::cout << "  ✓ LTP detected: Pre-before-post strengthened connections" << std::endl;
+        } else if (avgWeightChange < -0.001f) {
+            std::cout << "  ! LTD detected: Check STDP parameters" << std::endl;
+        } else {
+            std::cout << "  ! No change: STDP may not be active" << std::endl;
+        }
+    }
+    
+    std::cout << "\n=== STDP Demonstration Complete ===\n" << std::endl;
+}
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+int main() {
+    demonstrateSTDP();
+    return 0;
+}
+```
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+## Available Examples
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+The NLM framework includes several example programs in `src/examples/`:
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+1. **`basic_example.cpp`** - Simple brain initialization and simulation
+2. **`learning_example.cpp`** - Demonstrates synaptic plasticity (STDP, Hebbian)
+3. **`agent_world_example.cpp`** - Complete agent-environment interaction
+4. **`memory_example.cpp`** - Shows working, episodic, and associative memory
+5. **`neuromodulation_example.cpp`** - Demonstrates curiosity, novelty, and reward
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+## Building and Running Examples
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
-
-## Building
+### From Source
 
 ```bash
-mkdir build
-cd build
+# Create build directory
+mkdir build && cd build
+
+# Configure with CMake
 cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+
+# Build all targets
+make -j$(nproc)
+
+# Run specific example
+./nlm_example_name
 ```
 
-## Running
+### Python Examples
 
-### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase6_demo
+# Install Python bindings
+pip install .
+
+# Run Python examples
+cd python/examples
+python basic_example.py
+python learning_example.py
+python agent_example.py
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+## Quick Reference
 
-## Project Structure
+### Core Components
 
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
-```
+| Component | Purpose | Key Methods |
+|-----------|---------|-------------|
+| **Brain** | Main neural simulation engine | `initialize()`, `step()`, `save()`, `load()` |
+| **AgentBrain** | Bridges brain to world | `processSensoryInput()`, `decodeMotorCommand()` |
+| **SimpleWorld** | Environment simulation | `update()`, `applyMotorCommand()` |
+| **Config** | Configuration management | `set()`, `get()`, `loadFromFile()` |
 
-## Phase Summary
+### Common Patterns
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+```python
+# Pattern 1: Simple Simulation
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+for step in range(1000):
+    brain.step(step)
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+# Pattern 2: Agent-World Loop
+world = pynlm.createSimpleWorld()
+agent = pynlm.createAgentBrain(brain)
+for step in range(500):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+# Pattern 3: Learning with Neuromodulation
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+for step in range(1000):
+    # ... simulation loop ...
+    reward = world.getSensoryPercept().getInternal()[0]
+    agent.applyRewardModulation(reward, 0.0)
 ```
 
-## License
+### Performance Tips
 
-MIT
+1. **Use larger timesteps** for faster simulations (at cost of accuracy)
+2. **Enable event-driven processing** for sparse activity
+3. **Use memory pools** for reduced allocation overhead
+4. **Multithreading** for parallel processing on multi-core systems
 
-## Authors
+## Getting Started
 
-Research project — See docs for scientific background.
+1. **Read the documentation**: `docs/ARCHITECTURE.md` for technical details
+2. **Run examples**: Check `src/examples/` for complete working examples
+3. **Experiment**: Modify configuration files in `configs/` to explore different brain parameters
+4. **Contribute**: Add your own examples and improvements to the repository
+
+## Scientific Background
+
+NLM implements a biologically-inspired neural architecture based on:
+
+- **Leaky Integrate-and-Fire (LIF) neurons** for spike generation
+- **Spike-Timing-Dependent Plasticity (STDP)** for learning
+- **Hebbian learning** for co-activation strengthening
+- **Neuromodulation** (dopamine, curiosity) for adaptive behavior
+- **Memory systems** (working, episodic, associative) for information storage
+- **Development** for plasticity changes over time
+
+This framework is NOT a transformer or LLM, but rather a research platform for studying emergent cognition in artificial neural systems.
+
