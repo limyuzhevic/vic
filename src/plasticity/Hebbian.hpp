@@ -23,6 +23,12 @@ public:
     void setMaxWeight(float maxWeight);
     float getMaxWeight() const;
     
+    // Advanced covariance computation
+    float computeCovarianceUpdate(const std::vector<Timestamp>& preSpikes,
+                                  const std::vector<Timestamp>& postSpikes);
+    double computeSpikeCoincidence(const std::vector<Timestamp>& preSpikes,
+                                   const std::vector<Timestamp>& postSpikes);
+    
 private:
     struct Impl;
     Impl* pImpl;

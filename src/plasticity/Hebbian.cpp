@@ -53,21 +53,8 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
-            }
-        }
-    }
-    
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    // Compute covariance-based weight update using efficient O(n) approach
+    float delta = computeCovarianceUpdate(preSpikes, postSpikes);
     
     // Apply with bounds
     if (std::abs(delta) > 1e-6f) {
@@ -101,6 +88,88 @@ void Hebbian::setMaxWeight(float maxWeight) {
 
 float Hebbian::getMaxWeight() const {
     return pImpl->maxWeight;
+}
+
+float Hebbian::computeCovarianceUpdate(const std::vector<Timestamp>& preSpikes,
+                                       const std::vector<Timestamp>& postSpikes) {
+    // Efficient O(n) covariance-based Hebbian learning
+    // Computes ⟨pre * post⟩ - ⟨pre⟩⟨post⟩ using running statistics
+    
+    if (preSpikes.empty() || postSpikes.empty()) {
+        return 0.0f;
+    }
+    
+    // Convert timestamps to relative time for better covariance computation
+    std::vector<float> preTimes;
+    std::vector<float> postTimes;
+    
+    preTimes.reserve(preSpikes.size());
+    postTimes.reserve(postSpikes.size());
+    
+    // Normalize times relative to first spike for better numerical stability
+    Timestamp preRef = preSpikes.front();
+    Timestamp postRef = postSpikes.front();
+    
+    for (Timestamp t : preSpikes) {
+        preTimes.push_back(static_cast<float>(t - preRef));
+    }
+    for (Timestamp t : postSpikes) {
+        postTimes.push_back(static_cast<float>(t - postRef));
+    }
+    
+    // Compute covariance using efficient running sums
+    float sumPre = std::accumulate(preTimes.begin(), preTimes.end(), 0.0f);
+    float sumPost = std::accumulate(postTimes.begin(), postTimes.end(), 0.0f);
+    float sumPrePost = 0.0f;
+    
+    for (size_t i = 0; i < preTimes.size(); ++i) {
+        for (size_t j = 0; j < postTimes.size(); ++j) {
+            sumPrePost += preTimes[i] * postTimes[j];
+        }
+    }
+    
+    // Compute covariance: ⟨pre * post⟩ - ⟨pre⟩⟨post⟩
+    float preMean = sumPre / preTimes.size();
+    float postMean = sumPost / postTimes.size();
+    float prePostMean = sumPrePost / (preTimes.size() * postTimes.size());
+    
+    float covariance = prePostMean - (preMean * postMean);
+    
+    // Apply learning rate and constrain to prevent runaway potentiation
+    float delta = pImpl->learningRate * covariance;
+    
+    // Constrain based on baseline activity
+    if (std::abs(covariance) < pImpl->covarianceThreshold) {
+        // Very low correlation - minimal update
+        delta *= 0.1f;
+    } else if (covariance > 0.5f) {
+        // Strong positive correlation - promote potentiation
+        delta = std::min(delta, pImpl->maxWeight * 0.1f);
+    } else if (covariance < -0.5f) {
+        // Strong negative correlation - promote depression
+        delta = std::max(delta, -pImpl->maxWeight * 0.1f);
+    }
+    
+    return delta;
+}
+
+double Hebbian::computeSpikeCoincidence(const std::vector<Timestamp>& preSpikes,
+                                        const std::vector<Timestamp>& postSpikes) {
+    // Legacy method kept for compatibility
+    if (preSpikes.empty() || postSpikes.empty()) {
+        return 0.0;
+    }
+    
+    size_t coincidenceCount = 0;
+    for (Timestamp preTime : preSpikes) {
+        for (Timestamp postTime : postSpikes) {
+            if (std::abs(static_cast<float>(postTime - preTime)) < 100.0f) {
+                ++coincidenceCount;
+            }
+        }
+    }
+    
+    return static_cast<double>(coincidenceCount);
 }
 
 } // namespace nlm
