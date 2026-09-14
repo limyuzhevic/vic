@@ -137,8 +137,8 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
-    
+// ========== MEMORY SYSTEMS ==========
+
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
     

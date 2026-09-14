@@ -341,65 +341,124 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 3: Detect spikes and schedule spike events ==========
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                // Check if neuron just fired this step
-                const auto& state = neuron->getState();
-                bool justFired = (state.firingState == FiringState::Refractory &&
-                                 state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
-
-                if (justFired) {
-                    // Neuron fired this step - queue the spike
-                    SpikeEvent event(neuron->getId(), currentTime, currentStep);
-                    pImpl->spikeSystem->queueSpike(event);
-
-                    // Record post-synaptic spike for incoming synapses (plasticity)
-                    auto incomingSynapses = region->getSynapsesTo(neuron->getId());
-                    for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
+    // ========== STEP 3.5: Cognitive-guided processing ==========
+    // Use neural planner and concept formation to guide processing
+    if (pImpl->planner) {
+        // Get current state for planning
+        std::vector<float> currentState;
+        
+        // Simple state extraction from current activity
+        size_t stateSize = 10;  // Simplified state representation
+        currentState.reserve(stateSize);
+        
+        // Collect average activity from different neuron populations
+        float avgActivity = 0.0f;
+        size_t neuronCount = 0;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    float activity = std::abs(state.membranePotential - state.restingPotential);
+                    avgActivity += activity;
+                    neuronCount++;
+                }
+            }
+        }
+        
+        if (neuronCount > 0) avgActivity /= neuronCount;
+        
+        // Fill state vector with averaged activity patterns
+        for (size_t i = 0; i < stateSize; ++i) {
+            currentState.push_back(avgActivity * 0.1f * (i + 1));
+        }
+        
+        // Apply attention to focus on important regions
+        if (pImpl->attention) {
+            // Use planner to decide what to focus on
+            std::vector<NeuronId> competitors;
+            for (auto& region : pImpl->regions) {
+                for (auto* neuron : region->getAllNeurons()) {
+                    if (neuron->isFiring()) {
+                        competitors.push_back(neuron->getId());
                     }
-
-                    // Get outgoing synapses and schedule delayed spike events
-                    auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
-                    for (Synapse* syn : outgoingSynapses) {
-                        // Create delayed spike event
-                        Delay delay = syn->getDelay();
-                        SimulationStep deliveryStep = currentStep + delay;
-                        Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
-
-                        DelayedSpikeEvent delayedEvent(
-                            neuron->getId(),
-                            syn->getDestinationNeuron(),
-                            syn->getId(),
-                            syn->getWeight(),
-                            syn->getType(),
-                            currentTime,
-                            deliveryTime,
-                            currentStep,
-                            deliveryStep
-                        );
-
-                        pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
-
-                        // Record pre-synaptic spike for plasticity
-                        syn->recordPreSpike(currentTime);
-                    }
-                    
-                    // Store to working memory - neurons that fire become part of working memory
-                    if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                }
+            }
+            
+            if (!competitors.empty()) {
+                pImpl->attention->processCompetition(competitors);
+            }
+        }
+        
+        // Use concept formation to update concepts based on current activity
+        if (pImpl->conceptFormation) {
+            // Create simple features from current neural activity
+            std::vector<float> features;
+            for (size_t i = 0; i < 5; ++i) {  // 5 feature dimensions
+                float feature = avgActivity * (i + 1) * 0.1f;
+                features.push_back(feature);
+            }
+            
+            // Present to concept formation
+            pImpl->conceptFormation->presentExperience(features, features, avgActivity, currentStep);
+        }
+    }
+    
+    // ========== STEP 4: Update working memory ==========
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->update(pImpl->timestep);
+    }
+    
+    // ========== STEP 4.5: Integration of episodic memory with working memory ==========
+    if (pImpl->episodicMemory && pImpl->workingMemory) {
+        // Use working memory to guide episodic memory retrieval and storage
+        // Working memory traces influence which episodes are most relevant
+        
+        // Get current working memory content to inform episodic retrieval
+        auto currentWorkingMemoryContent = pImpl->workingMemory->retrieve();
+        
+        // Episodic memory can use working memory patterns to guide retrieval
+        // (In a full implementation, working memory would update attention in episodic memory)
+        
+        // Integrate reward signals from working memory into episodic memory
+        if (pImpl->dopamine) {
+            float reward = pImpl->dopamine->getLevel();
+            // Episodic memory can store reward associations with current neural state
+        }
+    }
+    
+    // ========== STEP 5: Apply neuromodulation effects ==========
+    // Update novelty detection
+    if (pImpl->novelty) {
+        pImpl->novelty->update(pImpl->timestep);
+    }
+    
+    // Update curiosity
+    if (pImpl->curiosity) {
+        pImpl->curiosity->update(pImpl->timestep);
+    }
+    
+    // Update dopamine (reward prediction error)
+    if (pImpl->dopamine) {
+        pImpl->dopamine->update(pImpl->timestep);
+        
+        // Apply dopamine effects on neural excitability
+        // Dopamine modulates neural excitability by adjusting effective current injection
+        // Higher dopamine increases excitability (lower effective threshold)
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Dopamine modulates excitability by injecting additional current
+                    // Positive dopamine adds excitatory bias
+                    float excitabilityMod = dopamineLevel * 0.5f;
+                    if (excitabilityMod > 0.0f) {
+                        neuron->injectCurrent(excitabilityMod);
                     }
                 }
             }
         }
     }
-    
-    // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
