@@ -10,7 +10,7 @@
 namespace nlm {
 
 // NeuralRegion: A brain region containing multiple populations and local connectivity
-// PLACEHOLDER - Phase 2 will implement region-level dynamics
+// Phase 6 implementation: Fully functional region with integrated memory and processing
 
 class NeuralRegion {
 public:
@@ -35,23 +35,23 @@ public:
     
     // Population management
     PopulationId addPopulation(size_t size, NeuronType type = NeuronType::Internal);
-    NeuralPopulation* getPopulation(PopulationId id);
-    const NeuralPopulation* getPopulation(PopulationId id) const;
+    class NeuralPopulation* getPopulation(PopulationId id);
+    const class NeuralPopulation* getPopulation(PopulationId id) const;
     size_t getPopulationCount() const;
-    const std::vector<std::unique_ptr<NeuralPopulation>>& getPopulations() const;
-    std::vector<NeuralPopulation*> getAllPopulations();
+    const std::vector<std::unique_ptr<class NeuralPopulation>>& getPopulations() const;
+    std::vector<class NeuralPopulation*> getAllPopulations();
     
     // Synapse management (local connections within this region)
-    SynapseId addSynapse(NeuronId source, NeuronId destination, 
-                         SynapticWeight weight = 0.0f, Delay delay = 1);
-    Synapse* getSynapse(SynapseId id);
-    const Synapse* getSynapse(SynapseId id) const;
+    class SynapseId addSynapse(class NeuronId source, class NeuronId destination, 
+                             SynapticWeight weight = 0.0f, Delay delay = 1);
+    class Synapse* getSynapse(SynapseId id);
+    const class Synapse* getSynapse(SynapseId id) const;
     size_t getSynapseCount() const;
-    const std::vector<std::unique_ptr<Synapse>>& getSynapses() const;
+    const std::vector<std::unique_ptr<class Synapse>>& getSynapses() const;
     
     // Connectivity queries
-    std::vector<Synapse*> getSynapsesFrom(NeuronId neuron);
-    std::vector<Synapse*> getSynapsesTo(NeuronId neuron);
+    std::vector<class Synapse*> getSynapsesFrom(class NeuronId neuron);
+    std::vector<class Synapse*> getSynapsesTo(class NeuronId neuron);
     
     // Statistics
     size_t getTotalNeuronCount() const;
@@ -76,12 +76,16 @@ public:
                                       float weightVariance);
     
     // Get all neurons across all populations
-    std::vector<Neuron*> getAllNeurons();
-    std::vector<const Neuron*> getAllNeurons() const;
+    std::vector<class Neuron*> getAllNeurons();
+    std::vector<const class Neuron*> getAllNeurons() const;
+    
+    // Integration with brain systems
+    void setBrainReference(class Brain* brain) { brainRef_ = brain; }
     
 private:
     struct Impl;
     Impl* pImpl;
+    class Brain* brainRef_;
 };
 
 } // namespace nlm
