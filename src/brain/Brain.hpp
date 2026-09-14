@@ -137,16 +137,35 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
+    // Convenience helper functions
+    // Check if neurons are connected by synapse
+    bool hasSynapticConnection(NeuronId source, NeuronId target) const;
+    
+    // Get list of firing neurons by type
+    std::vector<NeuronId> getFiringNeurons(NeuronType type) const;
+    
+    // Get average activity in a region
+    float getAverageActivity(RegionId region) const;
+    
+    // Get excitation/inhibition ratio for specific region
+    float getEIRatio(RegionId region) const;
+    
+    // Check if region has active neurons
+    bool hasActiveNeurons(RegionId region) const;
+    
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
-    
+NeuralWorkingMemory* getWorkingMemory();
+    const NeuralWorkingMemory* getWorkingMemory() const;
+
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
+    const NeuralEpisodicMemory* getEpisodicMemory() const;
+
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    const NeuralAssociativeMemory* getAssociativeMemory() const;
     
     // ========== PREDICTION SYSTEM ==========
     
@@ -184,14 +203,27 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Get action based on neural planning
+    ActionType getPlannedAction(const std::vector<float>& currentState,
+                              float targetReward = 0.5f);
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Evaluate action sequence for planning
+    PlanningCandidate evaluatePlannedSequence(const std::vector<ActionType>& actions,
+                                            const std::vector<float>& startState);
     
-    // Logging
-    void logStatus() const;
+    // Predict consequences of an action
+    std::vector<float> predictActionConsequence(ActionType action,
+                                               const std::vector<float>& currentState);
+    
+    // Get planning depth
+    size_t getPlanningDepth() const;
+    void setPlanningDepth(size_t depth);
+    
+    // Get planning confidence
+    float getPlanningConfidence() const;
+    
+    // Get self model confidence for action
+    float getSelfModelConfidence(ActionType action) const;
     
 private:
     struct Impl;

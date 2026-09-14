@@ -70,6 +70,10 @@ void Neuron::setFiringState(FiringState state) {
     pImpl->state.firingState = state;
 }
 
+void Neuron::setRefractoryRemaining(uint32_t steps) {
+    pImpl->state.refractoryRemaining = steps;
+}
+
 void Neuron::decrementRefractory() {
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
@@ -109,6 +113,10 @@ MembranePotential Neuron::getRestingPotential() const {
 
 void Neuron::setResetPotential(MembranePotential potential) {
     pImpl->state.resetPotential = potential;
+}
+
+void Neuron::setRefractoryPeriod(uint32_t steps) {
+    pImpl->state.refractoryPeriod = steps;
 }
 
 bool Neuron::checkThreshold() const {
@@ -273,20 +281,27 @@ void Neuron::reset() {
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
     // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
-    // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Resting potential typically -70mV with biological variation
+    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-3.0f, 3.0f);
     
-    // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Threshold is typically -55mV but relative to resting potential
+    // More biologically realistic: threshold is about 15mV above resting
+    pImpl->state.threshold = pImpl->state.restingPotential + 15.0f + rng.uniformReal(-2.0f, 2.0f);
     
-    // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    // Reset potential is usually close to resting (about 5mV above)
+    pImpl->state.resetPotential = pImpl->state.restingPotential + 5.0f + rng.uniformReal(0.0f, 2.0f);
     
-    // Refractory period: 2-10ms typical
+    // Leak conductance: typical range 5-15 nS
+    pImpl->state.leakConductance = 10.0f + rng.uniformReal(-5.0f, 5.0f);
+    
+    // Refractory period: 2-10ms typical, with some biological correlation to excitability
+    // Higher excitability (lower threshold) tends to have shorter refractory periods
+    float excitabilityFactor = 1.0f - std::abs(pImpl->state.threshold - pImpl->state.restingPotential) / 100.0f;
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    
+    // Initial membrane potential: near resting but with small noise
+    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-1.0f, 1.0f);
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;

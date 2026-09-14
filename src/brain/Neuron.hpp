@@ -64,35 +64,16 @@ public:
     
     // State access
     const NeuronState& getState() const;
-    NeuronState& getState();
-    
-    // Membrane potential
-    MembranePotential getMembranePotential() const;
-    void setMembranePotential(MembranePotential potential);
-    void addToMembranePotential(MembranePotential delta);
-    
-    // Threshold
-    MembranePotential getThreshold() const;
-    void setThreshold(MembranePotential threshold);
-    
-    // Firing state
-    bool isFiring() const;
-    bool isRefractory() const;
     void setFiringState(FiringState state);
-    void setRefractoryPeriod(uint32_t steps);
+    void setRefractoryRemaining(uint32_t steps);
     void decrementRefractory();
-    
-    // Firing rate (for rate-based computation)
-    FiringRate getFiringRate() const;
-    void setFiringRate(FiringRate rate);
-    
-    // LIF neuron parameters
-    void setLeakConductance(MembranePotential conductance);
-    MembranePotential getLeakConductance() const;
-    uint32_t getRefractoryPeriod() const;
+    void setRefractoryPeriod(uint32_t steps);
     void setRestingPotential(MembranePotential potential);
-    MembranePotential getRestingPotential() const;
     void setResetPotential(MembranePotential potential);
+    MembranePotential getRestingPotential() const;
+    uint32_t getRefractoryPeriod() const;
+    void setMembranePotential(MembranePotential potential);
+    MembranePotential getMembranePotential() const;
     
     // Spike detection
     bool checkThreshold() const;
