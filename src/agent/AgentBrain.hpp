@@ -1,11 +1,11 @@
 #pragma once
 
-#include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -57,6 +57,7 @@ public:
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    const Brain* getBrain() const { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -69,6 +70,19 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Get neuron distribution statistics
+    size_t getMotorNeuronCount() const;
+    size_t getSensoryNeuronCount() const;
+    
+    // Get neuromodulation parameters
+    float getDopamineLevel() const { return dopamineLevel_; }
+    float getSensoryNoveltyDecay() const { return sensoryNoveltyDecay_; }
+    void setSensoryNoveltyDecay(float decay) { sensoryNoveltyDecay_ = decay; }
+    
+    // Get development state
+    double getDevelopmentalAge() const { return developmentalAge_; }
+    float getPlasticityModifier() const { return plasticityModifier_; }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -76,21 +90,30 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Validate brain state before operations
+    bool validateBrainState() const;
+    
+    // Validate sensory data ranges
+    void validateSensoryData(const std::vector<float>& vision, 
+                           const std::vector<float>& touch,
+                           const std::vector<float>& internal,
+                           const std::vector<float>& proprio) const;
+    
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    // Motor neuron groups - use weak_ptr to avoid memory ownership issues
+    std::vector<std::weak_ptr<Neuron>> motorForward_;
+    std::vector<std::weak_ptr<Neuron>> motorBackward_;
+    std::vector<std::weak_ptr<Neuron>> motorTurnLeft_;
+    std::vector<std::weak_ptr<Neuron>> motorTurnRight_;
+    std::vector<std::weak_ptr<Neuron>> motorInteract_;
+    std::vector<std::weak_ptr<Neuron>> motorWait_;
     
     // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    std::vector<std::weak_ptr<Neuron>> sensoryVision_;
+    std::vector<std::weak_ptr<Neuron>> sensoryTouch_;
+    std::vector<std::weak_ptr<Neuron>> sensoryInternal_;
+    std::vector<std::weak_ptr<Neuron>> sensoryProprioception_;
     
     // Neuromodulation state
     float dopamineLevel_;

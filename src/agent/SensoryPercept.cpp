@@ -1,4 +1,14 @@
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc++98-compat"
+#endif
+
 #include "SensoryPercept.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <algorithm>
+#include <numeric>
+#include <sstream>
+#include <iomanip>
 
 namespace nlm {
 
@@ -11,13 +21,14 @@ SensoryPercept::SensoryPercept()
     touch_.resize(8, 0.0f);
     internal_.resize(4, 0.0f);
     proprioception_.resize(6, 0.0f);
-    audio_.resize(0, 0.0f);
+    // Audio removed as it was unused and not part of core functionality
 }
 
 std::vector<float> SensoryPercept::getAllSignals() const {
     std::vector<float> all;
     
     // Vision (flattened)
+    all.reserve(vision_.size() + touch_.size() + internal_.size() + proprioception_.size());
     all.insert(all.end(), vision_.begin(), vision_.end());
     
     // Touch
@@ -28,9 +39,6 @@ std::vector<float> SensoryPercept::getAllSignals() const {
     
     // Proprioception
     all.insert(all.end(), proprioception_.begin(), proprioception_.end());
-    
-    // Audio
-    all.insert(all.end(), audio_.begin(), audio_.end());
     
     return all;
 }
