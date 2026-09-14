@@ -21,6 +21,12 @@ public:
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
+    // Main update method called during brain step loop
+    // Encodes sensory input into state representation, predicts next state,
+    // computes prediction error, and updates internal model
+    void update(const SensoryInput& currentSensory, float neuralState,
+                const std::vector<float>& workingMemory);
+    
     // Get prediction error
     float getPredictionError() const;
     
@@ -34,6 +40,16 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Get current model state
+    const std::vector<float>& getModelState() const { return pImpl->currentModel; }
+    
+    // Get prediction statistics
+    size_t getSuccessfulPredictions() const { return pImpl->successfulPredictions; }
+    size_t getTotalPredictions() const { return pImpl->totalPredictions; }
+    
+    // Get average confidence
+    float getAverageConfidence() const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

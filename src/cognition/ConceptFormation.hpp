@@ -88,6 +88,15 @@ public:
                             float reward,
                             SimulationStep currentTime);
 
+    // Update concept formation system
+    void update(SimulationStep currentStep, TimestepDuration dt);
+
+    // Check if there are recent concepts that have been formed
+    bool hasRecentConcepts() const;
+
+    // Get concepts that have been recently formed
+    const std::vector<DiscoveredConcept>& getRecentConcepts() const { return concepts_; }
+
     // Get the concept that best matches a pattern
     size_t getMatchingConcept(const std::vector<float>& pattern,
                               float similarityThreshold = 0.7f) const;

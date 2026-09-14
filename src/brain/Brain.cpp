@@ -511,8 +511,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural state
+        // The prediction system should encode sensory input and predict next state
+        // Update prediction with current brain state for learning
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Apply prediction error learning signals
+        if (pImpl->predictionError) {
+            pImpl->predictionError->update(pImpl->timestep);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +535,49 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Concept formation extracts patterns from neural activity and working memory
+        
+        // Encode current neural state for concept formation
+        std::vector<float> neuralState;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    // Use membrane potential as part of neural state representation
+                    const auto& state = neuron->getState();
+                    neuralState.push_back(state.membranePotential - state.restingPotential);
+                }
+            }
+        }
+        
+        // Also include working memory content
+        std::vector<float> workingMemoryContent;
+        if (pImpl->workingMemory) {
+            workingMemoryContent = pImpl->workingMemory->retrieve();
+        }
+        
+        // Form concepts from the combined neural state and working memory
+        // Reward comes from dopamine level for reinforcement learning
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Pass neural state and features to concept formation
+        if (!neuralState.empty()) {
+            pImpl->conceptFormation->presentExperience(neuralState, workingMemoryContent, reward, currentStep);
+        }
+        
+        // Note: ConceptFormation doesn't have an update method that takes timestep
+        // The presentExperience method above performs the actual concept formation
+        
+        // Apply concepts to attention and planning
+        if (pImpl->conceptFormation->hasRecentConcepts()) {
+            // Get recently formed concepts
+            const auto& concepts = pImpl->conceptFormation->getConcepts();
+            // Apply concepts to attention system
+            for (const auto& concept : concepts) {
+                // Apply top-down bias from concepts to attention
+                pImpl->attention->applyTopDownBias(NeuronId(concept.id), 0.5f);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1095,6 +1143,20 @@ void Brain::logStatus() const {
     }
     if (pImpl->episodicMemory) {
         NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    }
+    
+    // Prediction system status
+    if (pImpl->predictionSystem) {
+        // Prediction system would provide prediction error statistics
+        if (pImpl->predictionError) {
+            NLM_LOG_INFO("Prediction error: " + std::to_string(pImpl->predictionError->getLevel()));
+        }
+    }
+    
+    // Cognition system status
+    if (pImpl->conceptFormation) {
+        // Concept formation would track number of concepts formed
+        NLM_LOG_INFO("Concepts formed: " + std::to_string(pImpl->conceptFormation->getConceptCount()));
     }
     
     // Neuromodulation status
