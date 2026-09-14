@@ -3,6 +3,17 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include <variant>
+#include <optional>
+#include <type_traits>
+
+#ifdef HAS_NLOHMANN_JSON
+#include "nlohmann/json.hpp"
+using json = nlohmann::json;
+#endif
 
 namespace nlm {
 
@@ -19,16 +30,55 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Check if file is JSON format (by checking first non-empty line)
+    std::ifstream checkFile(filepath);
+    std::string firstLine;
+    bool isJSON = false;
+    if (std::getline(checkFile, firstLine)) {
+        // Check for JSON structure indicators: starts with { or [ or has "key": value pattern
+        std::string trimmed = trim(firstLine);
+        if (!trimmed.empty() && (trimmed[0] == '{' || trimmed[0] == '[')) {
+            isJSON = true;
+        } else if (trimmed.find('"') != std::string::npos) {
+            // Might be a key: value pair
+            size_t colonPos = trimmed.find(':');
+            if (colonPos != std::string::npos && colonPos > 0) {
+                isJSON = true;
+            }
+        }
+    }
+    
+    if (isJSON) {
+#ifdef HAS_NLOHMANN_JSON
+        // Load JSON content
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        file.close();
+        
+        try {
+            nlohmann::json j = nlohmann::json::parse(content);
+            return parseJSON(j, ConfigSource::File);
+        } catch (const nlohmann::json::parse_error& e) {
+            return false;
+        }
+#else
+        // Fallback to simple parser if nlohmann/json is not available
+#endif
+    }
+    
+    // Parse simple key=value format (original implementation)
+    file.close();
+    std::ifstream simpleFile(filepath);
+    if (!simpleFile.is_open()) {
+        return false;
+    }
+    
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(simpleFile, line)) {
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -86,32 +136,116 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = " << convertValueToString(entry.value) << "\n";
     }
     
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
+bool Config::parseJSON(const std::string& jsonStr, ConfigSource source) {
+#ifdef HAS_NLOHMANN_JSON
     try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
+        nlohmann::json j = nlohmann::json::parse(jsonStr);
+        return parseJSON(j, source);
+    } catch (const nlohmann::json::parse_error& e) {
+        return false;
+    }
+#else
+    return false;
+#endif
+}
+
+bool Config::parseJSON(const nlohmann::json& j, ConfigSource source) {
+    try {
+        if (j.is_object()) {
+            for (auto it = j.begin(); it != j.end(); ++it) {
+                std::string key = it.key();
+                std::string description = "";
+                
+                const nlohmann::json& value = it.value();
+                
+                setFromJSON(key, value, description, source);
+            }
+            return true;
+        }
+    } catch (const std::exception& e) {
+        return false;
+    }
+    return false;
+}
+
+void Config::setFromJSON(const std::string& key, const nlohmann::json& j, 
+                        const std::string& description, ConfigSource source) {
+    if (j.is_string()) {
+        set(key, j.get<std::string>(), source);
+    } else if (j.is_number_integer()) {
+        set(key, j.get<int64_t>(), source);
+    } else if (j.is_number_unsigned()) {
+        set(key, static_cast<int64_t>(j.get<uint64_t>()), source);
+    } else if (j.is_number_float()) {
+        set(key, j.get<double>(), source);
+    } else if (j.is_boolean()) {
+        set(key, j.get<bool>(), source);
+    } else if (j.is_array()) {
+        // Handle arrays
+        std::vector<std::string> arrayValues;
+        for (const auto& elem : j) {
+            if (elem.is_string()) {
+                arrayValues.push_back(elem.get<std::string>());
+            } else if (elem.is_number_integer()) {
+                arrayValues.push_back(std::to_string(elem.get<int64_t>()));
+            } else if (elem.is_number_float()) {
+                arrayValues.push_back(std::to_string(elem.get<double>()));
+            } else if (elem.is_number_unsigned()) {
+                arrayValues.push_back(std::to_string(elem.get<uint64_t>()));
+            } else if (elem.is_boolean()) {
+                arrayValues.push_back(elem.get<bool>() ? "true" : "false");
+            }
+        }
+        set(key, arrayValues, source);
     }
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+std::string Config::convertValueToString(const ConfigValue& value) {
+    if (std::holds_alternative<int>(value)) {
+        return std::to_string(std::get<int>(value));
+    } else if (std::holds_alternative<int64_t>(value)) {
+        return std::to_string(std::get<int64_t>(value));
+    } else if (std::holds_alternative<double>(value)) {
+        return std::to_string(std::get<double>(value));
+    } else if (std::holds_alternative<bool>(value)) {
+        return std::get<bool>(value) ? "true" : "false";
+    } else if (std::holds_alternative<std::string>(value)) {
+        return "\"" + std::get<std::string>(value) + "\"";
+    } else if (std::holds_alternative<std::vector<int>>(value)) {
+        std::string result = "[";
+        const auto& vec = std::get<std::vector<int>>(value);
+        for (size_t i = 0; i < vec.size(); ++i) {
+            if (i > 0) result += ", ";
+            result += std::to_string(vec[i]);
+        }
+        result += "]";
+        return result;
+    } else if (std::holds_alternative<std::vector<double>>(value)) {
+        std::string result = "[";
+        const auto& vec = std::get<std::vector<double>>(value);
+        for (size_t i = 0; i < vec.size(); ++i) {
+            if (i > 0) result += ", ";
+            result += std::to_string(vec[i]);
+        }
+        result += "]";
+        return result;
+    } else if (std::holds_alternative<std::vector<std::string>>(value)) {
+        std::string result = "[";
+        const auto& vec = std::get<std::vector<std::string>>(value);
+        for (size_t i = 0; i < vec.size(); ++i) {
+            if (i > 0) result += ", ";
+            result += "\"" + vec[i] + "\"";
+        }
+        result += "]";
+        return result;
+    }
+    return "";
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {

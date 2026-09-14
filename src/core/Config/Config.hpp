@@ -78,6 +78,13 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Set values from JSON
+    bool parseJSON(const std::string& jsonStr, ConfigSource source);
+    bool parseJSON(const nlohmann::json& j, ConfigSource source);
+    
+    // Convert ConfigValue to string
+    static std::string convertValueToString(const ConfigValue& value);
+    
     // Check existence
     bool has(const std::string& key) const;
     
@@ -100,6 +107,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper to set from JSON value
+    void setFromJSON(const std::string& key, const nlohmann::json& j, 
+                    const std::string& description, ConfigSource source);
 };
 
 } // namespace nlm
