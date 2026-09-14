@@ -28,7 +28,9 @@ struct StructuralPlasticity::Impl {
 
 StructuralPlasticity::StructuralPlasticity() : pImpl(new Impl) {}
 
-StructuralPlasticity::~StructuralPlasticity() = default;
+StructuralPlasticity::~StructuralPlasticity() {
+    delete pImpl;
+}
 
 SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source, 
                                                NeuronId destination, SynapticWeight weight) {

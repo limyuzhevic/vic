@@ -51,7 +51,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     agent.enableRewardModulation(true);
     agent.enableStructuralPlasticity(config.enableDevelopment);
     agent.enableDevelopment(config.enableDevelopment);
-    agent.enableCuriosity(true);
+    agent.enableCuriosity(config.enableCuriosity);
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
@@ -128,21 +128,30 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Test checkpointing
     if (config.enableCheckpointing) {
         NLM_LOG_INFO("Testing checkpoint save/load...");
-        if (brain->save(config.checkpointPath)) {
-            NLM_LOG_INFO("Checkpoint saved successfully");
-            
-            // Create new brain and load
-            auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
-                NLM_LOG_INFO("Checkpoint loaded successfully");
-                result.checkpointingWorks = true;
-            } else {
-                NLM_LOG_ERROR("Failed to load checkpoint");
-            }
+        
+        // Check if checkpoint path is valid
+        if (config.checkpointPath.empty()) {
+            NLM_LOG_ERROR("Empty checkpoint path provided");
         } else {
-            NLM_LOG_ERROR("Failed to save checkpoint");
+            // Try to save with error handling
+            if (brain->save(config.checkpointPath)) {
+                NLM_LOG_INFO("Checkpoint saved successfully");
+                
+                // Create new brain and load
+                auto brain2 = std::make_shared<Brain>(cfg);
+                if (brain2->initialize()) {
+                    if (brain2->load(config.checkpointPath)) {
+                        NLM_LOG_INFO("Checkpoint loaded successfully");
+                        result.checkpointingWorks = true;
+                    } else {
+                        NLM_LOG_ERROR("Failed to load checkpoint");
+                    }
+                } else {
+                    NLM_LOG_ERROR("Failed to initialize brain2 for checkpoint loading");
+                }
+            } else {
+                NLM_LOG_ERROR("Failed to save checkpoint");
+            }
         }
     }
     
@@ -253,14 +262,22 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
     cfg->set("neuron_count", 100);
     
     auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain in testMemoryIntegration");
+        return false;
+    }
     
-    // Get memory systems
+    // Get memory systems with null checks
     auto* wm = brain->getWorkingMemory();
     auto* em = brain->getEpisodicMemory();
     
-    if (!wm || !em) {
-        NLM_LOG_ERROR("Memory systems not available");
+    if (!wm) {
+        NLM_LOG_ERROR("Working memory system not available");
+        return false;
+    }
+    
+    if (!em) {
+        NLM_LOG_ERROR("Episodic memory system not available");
         return false;
     }
     
@@ -327,7 +344,7 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     brain1->initialize();
     
     // Run some steps
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 100; i++) {
         brain1->step(i, i * 0.001);
     }
     
@@ -379,7 +396,7 @@ bool Phase6IntegratedExperiment::testReplay() {
     }
     
     // Run some steps
-    for (int i = 0; i < 200; ++i) {
+    for (int i = 0; i < 200; i++) {
         brain->step(i, i * 0.001);
     }
     

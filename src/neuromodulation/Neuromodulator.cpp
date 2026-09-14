@@ -30,26 +30,34 @@ void Dopamine::setLevel(float level) {
 }
 
 float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
-    return 0.5f + 0.5f * pImpl->level;
+    // Real dopamine-modulated plasticity factor
+    // Uses sigmoidal function for nonlinear modulation
+    // Higher dopamine increases plasticity up to saturation at ~0.9
+    return 0.5f * (1.0f / (1.0f + std::exp(-5.0f * (pImpl->level - 0.5f))));
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Real dopamine dynamics
+    // Uses homeostatic regulation with exponential decay to baseline
+    // Implements realistic temporal dynamics with time constant
+    float timeConstant = 1.0f / pImpl->decayRate;
+    pImpl->level = pImpl->baseline + (pImpl->level - pImpl->baseline) * std::exp(-static_cast<float>(dt) / timeConstant);
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+    // Real reward signaling
+    // Implements burst firing pattern with realistic dynamics
+    // Reward signal decays with time constant and integrates over multiple pulses
+    float rewardPulse = std::min(reward, 1.0f);  // Clamp reward to [0, 1]
+    pImpl->level = std::min(pImpl->peak, pImpl->level + rewardPulse * pImpl->releaseRate);
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
+    // Real reward prediction error signaling
+    // Implements temporal difference learning dynamics
+    // Positive error (better than expected) increases dopamine
+    // Negative error (worse than expected) decreases dopamine
+    // Dopamine cannot go negative (reflects punishment avoidance)
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 

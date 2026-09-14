@@ -12,8 +12,6 @@
 #include "memory/NeuralWorkingMemory.hpp"
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
-#include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;
 
@@ -144,8 +142,13 @@ int main(int argc, char* argv[]) {
         printResult("Planning Accuracy", results.planningAccuracy);
         printResult("Planning Confidence", results.planningConfidence);
         
-        if (results.planningAccuracy > 0.4f) {
+        float improvement = results.planningAccuracy - 0.0f;
+        if (improvement > 0.4f) {
             std::cout << "  [SUCCESS] Planning ability demonstrated!\n";
+        } else {
+            std::cout << "  [INFO] Planning under development.\n";
+        } else {
+            std::cout << "  [INFO] Planning under development.\n";
         }
     }
     

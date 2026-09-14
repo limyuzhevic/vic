@@ -85,7 +85,10 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_ERROR("Brain not initialized in AgentBrain::processSensoryInput");
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -236,7 +239,12 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    if (!brain_ || !rewardModulationEnabled_) {
+        if (!brain_) {
+            NLM_LOG_ERROR("Brain not initialized in AgentBrain::applyRewardModulation");
+        }
+        return;
+    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -253,6 +261,8 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
+            if (!syn) continue;  // Add null check for synapse
+            
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
@@ -333,6 +343,16 @@ float AgentBrain::getNoveltyLevel() const {
 float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
+
+void AgentBrain::enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
+void AgentBrain::enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
+void AgentBrain::enableDevelopment(bool enable) { developmentEnabled_ = enable; }
+void AgentBrain::enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+
+bool AgentBrain::isRewardModulationEnabled() const { return rewardModulationEnabled_; }
+bool AgentBrain::isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
+bool AgentBrain::isDevelopmentEnabled() const { return developmentEnabled_; }
+bool AgentBrain::isCuriosityEnabled() const { return curiosityEnabled_; }
 
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;

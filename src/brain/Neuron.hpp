@@ -133,16 +133,65 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+// Update neuron for one simulation step
+    // 
+    // Implements Leaky Integrate-and-Fire (LIF) neuron dynamics with event-driven
+    // spike processing. This is the core neuron processing function that determines
+    // how neurons integrate inputs, update their membrane potential, and generate
+    // spike outputs.
+    // 
+    // The LIF dynamics include:
+    // - Membrane potential integration (dV/dt = -(V - V_rest)/tau + I_leak)
+    // - Spike threshold detection and reset
+    // - Refractory period enforcement
+    // - Synaptic conductance integration
+    // - Adaptation variable dynamics
+    // - Spike recording for STDP
+    // 
+    // Args:
+    //   currentTime: The current simulation time in seconds. Used for timing
+    //               spike generation and synaptic plasticity computations.
+    // 
+    // Returns:
+    //   true if the neuron fired (spiked) during this time step, false otherwise
+    // 
+    // Note: This implementation represents the standard LIF model. In future
+    // enhancements, this could be extended to include more biologically realistic
+    // models (e.g., Hodgkin-Huxley, Morris-Lecar) with detailed ion channel dynamics
+    // and spike shape computation.
+
     void step(Timestamp currentTime);
-    
+
     // Reset to initial state
+    // 
+    // Resets the neuron to its initial resting state, including:
+    // - Membrane potential to resting potential
+    // - Synaptic conductances to zero
+    // - Refractory period to zero
+    // - Adaptation variable to baseline
+    // - Firing state to resting
+    // - Spike time history cleared
+    // 
+    // This is typically called at the beginning of simulation or when
+    // the neuron needs to be reset to a clean state.
     void reset();
-    
+
     // Initialize with random parameters
+    // 
+    // Randomizes neuron parameters including:
+    // - Membrane potential parameters (resting, threshold, reset)
+    // - Time constants (membrane time, refractory period)
+    // - Conductances (leak, synaptic)
+    // - Ion channel properties
+    // - Initial adaptation state
+    // 
+    // Args:
+    //   rng: Random number generator for stochastic initialization
+    // 
+    // Used during brain initialization to create diverse neuronal properties
+    // with biologically plausible parameter distributions.
     void initializeRandom(RandomGenerator& rng);
-    
+
 private:
     struct Impl;
     Impl* pImpl;

@@ -94,7 +94,13 @@ public:
     std::string summary() const;
     
 private:
-    struct Impl;
+    struct Impl {
+        std::vector<ConfigEntry> entries;
+        
+        Impl() = default;
+        ~Impl() = default;
+    };
+    
     std::unique_ptr<Impl> pImpl;
     
     // Internal helpers
