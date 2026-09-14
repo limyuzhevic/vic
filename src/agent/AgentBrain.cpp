@@ -244,20 +244,19 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
+    // Use brain's dopamine instead of AgentBrain's own
+    if (auto* dopamine = brain_->getDopamine()) {
+        dopamine->signalRewardPredictionError(predictionError_);
+    }
     
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
-    
-    // Apply to all synapses with eligibility traces
+    // Apply neuromodulation to synapses using brain's dopamine
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                // Use brain's dopamine level instead of AgentBrain's dopamineLevel_
+                float delta = eligibility * predictionError_ * plasticityModifier_;
                 syn->addToWeight(delta);
                 
                 // Decay eligibility trace
@@ -266,16 +265,11 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
-    
-    // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+    // Update curiosity based on novelty and prediction error
+    if (curiosityEnabled_) {
+        float novelty = noveltyLevel_;  // Get from brain's novelty if available
+        curiosityLevel_ = novelty * 2.0f + std::abs(predictionError_) * 0.5f;
+        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
 
@@ -319,15 +313,40 @@ DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
 }
 
 float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
+    // Get neuromodulation level from brain's neuromodulation systems
+    // Use combined level from dopamine, curiosity, and novelty systems
+    if (!brain_) return 0.0f;
+    
+    float level = 0.0f;
+    if (auto* dopamine = brain_->getDopamine()) {
+        level += std::abs(dopamine->getLevel());
+    }
+    if (auto* curiosity = brain_->getCuriosity()) {
+        level += curiosity->getLevel();
+    }
+    if (auto* novelty = brain_->getNovelty()) {
+        level += novelty->getLevel();
+    }
+    
+    return level / 3.0f;  // Average of the three systems
 }
 
 float AgentBrain::getCuriosityLevel() const {
-    return curiosityLevel_;
+    // Get curiosity level from brain's curiosity system
+    if (!brain_) return 0.0f;
+    if (auto* curiosity = brain_->getCuriosity()) {
+        return curiosity->getLevel();
+    }
+    return 0.0f;
 }
 
 float AgentBrain::getNoveltyLevel() const {
-    return noveltyLevel_;
+    // Get novelty level from brain's novelty system
+    if (!brain_) return 0.0f;
+    if (auto* novelty = brain_->getNovelty()) {
+        return novelty->getLevel();
+    }
+    return 0.0f;
 }
 
 float AgentBrain::getPredictionError() const {

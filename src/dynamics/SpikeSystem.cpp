@@ -94,8 +94,10 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
     }
 }
 
-void SpikeSystem::registerHandler(SpikeHandler handler) {
-    pImpl->handlers.push_back(handler);
+std::unique_ptr<SensoryInput> SpikeSystem::getSensoryPrediction() const {
+    // Get current sensory input from spike history if available
+    // For now, return nullptr as sensory prediction requires integration with brain
+    return nullptr;
 }
 
 void SpikeSystem::registerDelayedHandler(DelayedSpikeHandler handler) {

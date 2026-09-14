@@ -56,9 +56,8 @@ public:
     using DelayedSpikeHandler = std::function<void(const DelayedSpikeEvent&)>;
     void registerDelayedHandler(DelayedSpikeHandler handler);
     
-    // Get spike history
-    const std::vector<DetailedSpikeEvent>& getSpikeHistory() const;
-    void clearHistory();
+    // Get current sensory prediction (if any)
+    std::unique_ptr<class SensoryInput> getSensoryPrediction() const;
     
     // Get spike count
     size_t getSpikeCount() const;

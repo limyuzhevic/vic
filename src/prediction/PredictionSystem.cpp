@@ -6,17 +6,31 @@ struct PredictionSystem::Impl {
     float predictionError;
     float confidence;
     std::vector<float> errorHistory;
+    class Brain* brain;  // Add brain reference for integration
+    std::unique_ptr<class SensoryInput> storedSensoryInput;  // Store for training
     
-    Impl() : predictionError(0.0f), confidence(0.5f) {}
+    Impl() : predictionError(0.0f), confidence(0.5f), brain(nullptr), storedSensoryInput(nullptr) {}
 };
 
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
-PredictionSystem::~PredictionSystem() = default;
+void PredictionSystem::initialize(class Brain* brain) {
+    if (brain) {
+        pImpl->brain = brain;
+    }
+}
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
-    // PLACEHOLDER: Just return a copy of current state
+    // PLACEHOLDER: For now, return copy of current state
+    // In a real implementation, this would use brain's neural dynamics
+    // to generate predictions based on learned patterns from previous activity
+    
+    // Store current state for potential training
+    pImpl->storedSensoryInput = std::make_unique<SensoryInput>(currentState);
+    
+    // For now, return copy of current state as placeholder
+    // Real implementation would use brain's neural network to predict future states
     return currentState.clone();
 }
 
