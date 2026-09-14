@@ -190,8 +190,15 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
+    // ========== BRAIN STATUS REPORT ==========
+    
     void logStatus() const;
+    
+    // Record developmental changes (called automatically)
+    void recordDevelopmentChange();
+    
+    // Cleanup and shutdown
+    void cleanup();
     
 private:
     struct Impl;

@@ -98,7 +98,17 @@ public:
     bool checkThreshold() const;
     float getLastSpikeTime() const;
     
-    // LIF step function - returns true if neuron fired
+    // Update neuron for one simulation step with default timestep (1ms)
+    // Calls stepLIF with standard timestep
+    void step(Timestamp currentTime);
+    
+    // Update neuron for one simulation step with explicit timestep
+    // Useful for variable timesteps in adaptive simulations
+    void step(Timestamp currentTime, TimestepDuration dt);
+    
+    // Full LIF step implementation
+    // Returns true if neuron fired during this step
+    // This is the complete integrate-and-fire dynamics implementation (Phase 6)
     bool stepLIF(Timestamp currentTime, TimestepDuration dt);
     
     // Incoming signals (post-synaptic potentials)
@@ -132,10 +142,6 @@ public:
     RegionId getRegionId() const;
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
-    
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
     
     // Reset to initial state
     void reset();
