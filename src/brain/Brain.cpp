@@ -74,6 +74,8 @@ struct Brain::Impl {
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
+    DevelopmentalStage developmentalStage;  // Add developmentalStage member
+    size_t nextRegionId;  // Add nextRegionId member
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
@@ -149,13 +151,10 @@ struct Brain::Impl {
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+    // Initialize checkpoint manager
+    checkpointManager = std::make_unique<CheckpointManager>();
     }
-    
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
-};
+}
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 

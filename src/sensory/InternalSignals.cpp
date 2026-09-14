@@ -6,7 +6,10 @@ struct InternalSignalsProcessor::Impl {
     std::vector<float> processedSignals;
     std::vector<float> homeostaticSignals;
     
-    Impl() = default;
+    Impl() {
+        processedSignals.reserve(100);
+        homeostaticSignals.reserve(50);
+    }
 };
 
 InternalSignalsProcessor::InternalSignalsProcessor() : pImpl(new Impl) {}
@@ -14,14 +17,21 @@ InternalSignalsProcessor::InternalSignalsProcessor() : pImpl(new Impl) {}
 InternalSignalsProcessor::~InternalSignalsProcessor() = default;
 
 void InternalSignalsProcessor::process(const InternalSignals& signals) {
-    // TODO PHASE 2: Implement real internal signal processing
-    // PLACEHOLDER: Just pass through
+    // TODO PHASE 2: Implement real internal signals processing
+    // PLACEHOLDER: Just pass through raw data
     pImpl->processedSignals = signals.getData();
     
-    // Generate some homeostatic signals
+    // Simple homeostatic signal calculation
     pImpl->homeostaticSignals.clear();
-    pImpl->homeostaticSignals.push_back(1.0f);  // Allostatic load
-    pImpl->homeostaticSignals.push_back(0.5f);  // Metabolic state
+    float sum = 0.0f;
+    for (float val : pImpl->processedSignals) {
+        sum += val;
+    }
+    if (!pImpl->processedSignals.empty()) {
+        float mean = sum / pImpl->processedSignals.size();
+        pImpl->homeostaticSignals.push_back(mean);
+        pImpl->homeostaticSignals.push_back(1.0f / (1.0f + std::abs(mean))); // Energy signal
+    }
 }
 
 const std::vector<float>& InternalSignalsProcessor::getProcessedSignals() const {
