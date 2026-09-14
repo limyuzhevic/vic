@@ -11,7 +11,8 @@ SensoryPercept::SensoryPercept()
     touch_.resize(8, 0.0f);
     internal_.resize(4, 0.0f);
     proprioception_.resize(6, 0.0f);
-    audio_.resize(0, 0.0f);
+    audio_.resize(0, 0.0f); // For backward compatibility with old API, create empty audio vector
+     // Note: audio data can be set via setAudio() method when available
 }
 
 std::vector<float> SensoryPercept::getAllSignals() const {

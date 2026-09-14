@@ -58,6 +58,8 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
 }
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
+    // PopulationId uses 1-based indexing: id.index() == 0 is invalid
+    // Valid indices start from 1, array access uses id.index() - 1
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
@@ -65,6 +67,8 @@ NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
+    // PopulationId uses 1-based indexing: id.index() == 0 is invalid
+    // Valid indices start from 1, array access uses id.index() - 1
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
