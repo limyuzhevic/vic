@@ -87,10 +87,12 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
-    const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
+    if (sensoryVision_.size() != vision_.size()) {
+        NLM_LOG_WARNING("Vision buffer size mismatch");
+        return;
+    }
+    for (size_t i = 0; i < sensoryVision_.size() && i < vision_.size(); ++i) {
+        if (sensoryVision_[i] && sensoryVision_[i]->getState().firingState != FiringState::Refractory) {
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
@@ -118,7 +120,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
+        if (sensoryProprioception_[i] && sensoryProprioception_[i]->getState().firingState != FiringState::Refractory) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
         }

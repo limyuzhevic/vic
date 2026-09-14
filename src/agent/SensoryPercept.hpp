@@ -40,6 +40,12 @@ public:
     // Get all signals concatenated (for brain input)
     std::vector<float> getAllSignals() const;
     
+    // Get total number of signal components for validation and optimization
+    size_t getTotalSignalCount() const;
+    
+    // Check if all signal vectors have expected sizes
+    bool validateSignalSizes() const;
+    
     // Timestamp
     double getTimestamp() const { return timestamp_; }
     void setTimestamp(double t) { timestamp_ = t; }
