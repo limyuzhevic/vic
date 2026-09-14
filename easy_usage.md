@@ -4,11 +4,21 @@
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
 
+### Core Concepts
+
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
 - **Synapses** = Connections between brain cells
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
+
+### Why Use NLM?
+
+- **Learn by doing**: Watch your brain grow and learn from experience
+- **Brain-inspired**: Based on how real brains work with spiking neurons
+- **No ML frameworks**: Implements its own neural computation from scratch
+- **Educational**: Great for understanding how brains think
+- **Research platform**: Test hypotheses about learning and cognition
 
 That's it! NLM simulates all of this.
 
@@ -69,6 +79,58 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
+### Example 3: Learning with Neuromodulation
+
+```python
+import pynlm
+
+# Setup with learning capabilities
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run learning episode
+for step in range(200):
+    world.update(0.1)
+    
+    # Get sensory input and process it
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    
+    # Brain thinks
+    brain.step(step)
+    
+    # Make and execute action
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply learning from experience
+    reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    
+    # Print progress periodically
+    if step % 50 == 0:
+        print(f"Step {step}:")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+        print(f"  Developmental stage: {brain.getDevelopmentalStage().name}")
+
+print("Learning episode complete!")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
 ```
 
 ---

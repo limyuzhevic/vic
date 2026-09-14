@@ -102,4 +102,10 @@ private:
     std::unique_ptr<Impl> pImpl;
 };
 
+// Touch/proximity sensors (binary collision signals)
+class Touch : public SensoryInput;
+
+// Proprioception: body position/velocity signals
+class Proprioception : public SensoryInput;
+
 } // namespace nlm
