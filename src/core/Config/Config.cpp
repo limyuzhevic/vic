@@ -108,6 +108,22 @@ std::optional<T> Config::get(const std::string& key) const {
     }
 }
 
+// Get string value specifically (convenience method)
+std::optional<std::string> Config::getString(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+    
+    try {
+        return std::get<std::string>(it->value);
+    } catch (const std::bad_variant_access&) {
+        return std::nullopt;
+    }
+}
+
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
@@ -211,5 +227,8 @@ template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) cons
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Additional instantiations for float	template std::optional<float> Config::get<float>(const std::string&) const;
+template float Config::getOr<float>(const std::string&, const float&) const;
 
 } // namespace nlm

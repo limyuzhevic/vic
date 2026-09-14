@@ -68,6 +68,9 @@ public:
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
+    // Get string value specifically (convenience method)
+    std::optional<std::string> getString(const std::string& key) const;
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     

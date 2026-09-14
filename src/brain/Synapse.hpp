@@ -1,20 +1,15 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <memory>
 
 namespace nlm {
 
-// Forward declaration
-class Neuron;
-
-// Synapse representing a connection between neurons
-// Implements real synaptic transmission with delays and short-term plasticity
-
+// Synapse: Connects neurons with synaptic transmission
+// Includes real synaptic dynamics: STDP, short-term plasticity, and reward-modulated learning
 class Synapse {
 public:
-    // Create synapse with IDs
     Synapse(SynapseId id, NeuronId source, NeuronId destination);
-    
     ~Synapse();
     
     // Disable copying, enable moving
@@ -23,45 +18,36 @@ public:
     Synapse(Synapse&&) noexcept;
     Synapse& operator=(Synapse&&) noexcept;
     
-    // Identity
+    // Basic synapse properties
     SynapseId getId() const;
-    
-    // Connection
     NeuronId getSourceNeuron() const;
     NeuronId getDestinationNeuron() const;
-    
-    // Weight
     SynapticWeight getWeight() const;
     void setWeight(SynapticWeight weight);
     void addToWeight(SynapticWeight delta);
     
-    // Delay (in simulation steps)
     Delay getDelay() const;
     void setDelay(Delay delay);
     
-    // Type
     SynapseType getType() const;
     void setType(SynapseType type);
     
-    // Excitatory/Inhibitory
     bool isExcitatory() const;
     bool isInhibitory() const;
     
-    // Activity history for plasticity
+    // Spike recording and history
     void recordPreSpike(Timestamp timestamp);
     void recordPostSpike(Timestamp timestamp);
     const std::vector<Timestamp>& getPreSpikeHistory() const;
     const std::vector<Timestamp>& getPostSpikeHistory() const;
     void clearHistory();
     
-    // Plasticity flags
+    // Plasticity control
     const PlasticityFlags& getPlasticityFlags() const;
     PlasticityFlags& getPlasticityFlags();
-    
-    // Enable/disable plasticity rules
     void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
     
-    // Eligibility trace (for reward-modulated learning)
+    // Reward-modulated learning
     float getEligibilityTrace() const;
     void setEligibilityTrace(float trace);
     void decayEligibilityTrace(float decayRate);
@@ -70,19 +56,14 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
-    // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Simulation updates
     void step(Timestamp currentTime);
-    
-    // Reset to initial state
     void reset();
-    
-    // Initialize with random parameters
     void initializeRandom(class RandomGenerator& rng);
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
