@@ -126,8 +126,8 @@ Phase4Results WorkingMemoryExperiment::run(Brain* brain, size_t numTrials) {
     
     if (!brain) return results;
     
-    NeuralWorkingMemory wm;
-    wm.initialize(brain);
+    auto* workingMemory = brain->getWorkingMemory();
+    if (!workingMemory) return results;
     
     float initialRetention = 0.0f;
     float finalRetention = 0.0f;
@@ -136,15 +136,15 @@ Phase4Results WorkingMemoryExperiment::run(Brain* brain, size_t numTrials) {
     
     for (size_t trial = 0; trial < numTrials; ++trial) {
         // Store pattern
-        wm.store(testPattern, 1.0f);
+        workingMemory->store(testPattern, 1.0f);
         
         // Wait some time
         for (size_t delay = 0; delay < 10; ++delay) {
-            wm.update(0.001f);
+            workingMemory->update(0.001f);
         }
         
         // Retrieve
-        auto retrieved = wm.retrieve();
+        auto retrieved = workingMemory->retrieve();
         float retention = RepresentationAnalyzer::computePatternSimilarity(testPattern, retrieved);
         
         if (trial < numTrials / 4) {
@@ -159,7 +159,7 @@ Phase4Results WorkingMemoryExperiment::run(Brain* brain, size_t numTrials) {
             retentionByDelay_.push_back(retention);
         }
         
-        wm.clear();
+        workingMemory->clear();
     }
     
     initialRetention /= (numTrials / 4);
@@ -167,7 +167,7 @@ Phase4Results WorkingMemoryExperiment::run(Brain* brain, size_t numTrials) {
     
     results.workingMemoryRetentionInitial = initialRetention;
     results.workingMemoryRetentionFinal = finalRetention;
-    results.workingMemoryCapacity = wm.getCapacity();
+    results.workingMemoryCapacity = workingMemory->getCapacity();
     
     return results;
 }
