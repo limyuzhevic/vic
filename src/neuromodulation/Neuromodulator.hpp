@@ -48,6 +48,11 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Eligibility trace for reward-modulated learning
+    float getEligibilityTrace() const;
+    void setEligibilityTrace(float trace);
+    void decayEligibilityTrace(float decayRate);
+    
 private:
     struct Impl;
     Impl* pImpl;

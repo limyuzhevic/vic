@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include "nlohmann/json.hpp"
+#include "yaml-cpp/yaml.h"
 
 namespace nlm {
 
@@ -18,17 +20,206 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Convert nlohmann::json to ConfigValue
+ConfigValue Config::convertToConfigValue(const nlohmann::json& j) {
+    if (j.is_string()) {
+        return j.get<std::string>();
+    } else if (j.is_number_integer()) {
+        return j.get<int>();
+    } else if (j.is_number_unsigned()) {
+        return j.get<uint64_t>();
+    } else if (j.is_number()) {
+        return j.get<double>();
+    } else if (j.is_boolean()) {
+        return j.get<bool>();
+    } else if (j.is_array()) {
+        // Handle arrays - try to determine element type
+        std::vector<int> intArray;
+        bool allInts = true;
+        for (const auto& item : j) {
+            if (item.is_number_integer()) {
+                intArray.push_back(item.get<int>());
+            } else {
+                allInts = false;
+                break;
+            }
+        }
+        if (allInts) {
+            return intArray;
+        }
+        
+        std::vector<double> doubleArray;
+        bool allDoubles = true;
+        for (const auto& item : j) {
+            if (item.is_number()) {
+                doubleArray.push_back(item.get<double>());
+            } else {
+                allDoubles = false;
+                break;
+            }
+        }
+        if (allDoubles) {
+            return doubleArray;
+        }
+        
+        std::vector<std::string> stringArray;
+        bool allStrings = true;
+        for (const auto& item : j) {
+            if (item.is_string()) {
+                stringArray.push_back(item.get<std::string>());
+            } else {
+                allStrings = false;
+                break;
+            }
+        }
+        if (allStrings) {
+            return stringArray;
+        }
+    }
     
+    // Default to string for unknown types
+    return j.get<std::string>();
+}
+
+// Convert YAML::Node to ConfigValue
+ConfigValue Config::convertToConfigValue(const YAML::Node& node) {
+    if (node.IsScalar()) {
+        std::string value = node.as<std::string>();
+        
+        // Try to convert to appropriate type
+        try {
+            if (value.find('.') != std::string::npos) {
+                return std::stod(value);
+            } else {
+                return std::stoll(value);
+            }
+        } catch (...) {
+            // Check if it's a boolean
+            if (value == "true" || value == "false") {
+                return value == "true";
+            }
+            return value;
+        }
+    } else if (node.IsSequence()) {
+        std::vector<int> intArray;
+        bool allInts = true;
+        for (const auto& item : node) {
+            if (item.IsScalar()) {
+                try {
+                    intArray.push_back(std::stoll(item.as<std::string>()));
+                } catch (...) {
+                    allInts = false;
+                    break;
+                }
+            } else {
+                allInts = false;
+                break;
+            }
+        }
+        if (allInts) {
+            return intArray;
+        }
+        
+        std::vector<double> doubleArray;
+        bool allDoubles = true;
+        for (const auto& item : node) {
+            if (item.IsScalar()) {
+                try {
+                    doubleArray.push_back(std::stod(item.as<std::string>()));
+                } catch (...) {
+                    allDoubles = false;
+                    break;
+                }
+            } else {
+                allDoubles = false;
+                break;
+            }
+        }
+        if (allDoubles) {
+            return doubleArray;
+        }
+        
+        std::vector<std::string> stringArray;
+        for (const auto& item : node) {
+            if (item.IsScalar()) {
+                stringArray.push_back(item.as<std::string>());
+            }
+        }
+        return stringArray;
+    }
+    
+    return node.as<std::string>();
+}
+
+// Parse JSON string
+bool Config::parseJson(const std::string& jsonStr) {
+    try {
+        nlohmann::json j = nlohmann::json::parse(jsonStr);
+        
+        if (j.is_object()) {
+            for (auto& [key, value] : j.items()) {
+                set(key, convertToConfigValue(value), ConfigSource::File);
+            }
+            return true;
+        }
+    } catch (const nlohmann::json::parse_error& e) {
+        // JSON parsing failed
+    }
+    return false;
+}
+
+// Parse YAML string
+bool Config::parseYaml(const std::string& yamlStr) {
+    try {
+        YAML::Node node = YAML::Load(yamlStr);
+        
+        if (node.IsMap()) {
+            for (auto it = node.begin(); it != node.end(); ++it) {
+                std::string key = it->first.as<std::string>();
+                set(key, convertToConfigValue(*it), ConfigSource::File);
+            }
+            return true;
+        }
+    } catch (const YAML::ParserException& e) {
+        // YAML parsing failed
+    }
+    return false;
+}
+
+// Implementation of remaining Config methods
+
+bool Config::loadFromFile(const std::string& filepath) {
+    // Parse JSON/YAML format files for Phase 2
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Read entire file content
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    if (!content.empty()) {
+        // Try to parse as JSON first
+        bool success = parseJson(content);
+        if (success) {
+            return true;
+        }
+        
+        // Try YAML format if JSON parsing fails
+        bool yamlSuccess = parseYaml(content);
+        if (yamlSuccess) {
+            return true;
+        }
+    }
+    
+    // Fall back to simple key=value format for backward compatibility
+    std::ifstream file2(filepath);
+    if (!file2.is_open()) {
+        return false;
+    }
+    
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(file2, line)) {
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -84,10 +275,17 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Save in JSON format for Phase 2
+    nlohmann::json j;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Convert ConfigValue to nlohmann::json
+        std::visit([&](const auto& val) {
+            j[entry.key] = val;
+        }, entry.value);
     }
+    
+    file << j.dump(2); // Pretty print with 2-space indentation
     
     return true;
 }
@@ -200,6 +398,7 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
@@ -213,3 +412,4 @@ template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
+
