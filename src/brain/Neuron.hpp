@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/BasePImpl.hpp"
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
@@ -42,7 +43,7 @@ struct NeuronState {
 
 // Neuron class representing a single neuron
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
-class Neuron {
+class Neuron : public PImplBase<Neuron> {
 public:
     // Create neuron with ID
     explicit Neuron(NeuronId id);
@@ -145,7 +146,6 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
 };
 
 } // namespace nlm

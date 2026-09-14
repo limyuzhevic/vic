@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/BasePImpl.hpp"
 #include "../core/Types/Types.hpp"
 
 namespace nlm {
@@ -10,7 +11,7 @@ class Neuron;
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
 
-class Synapse {
+class Synapse : public PImplBase<Synapse> {
 public:
     // Create synapse with IDs
     Synapse(SynapseId id, NeuronId source, NeuronId destination);
@@ -82,7 +83,6 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
 };
 
 } // namespace nlm

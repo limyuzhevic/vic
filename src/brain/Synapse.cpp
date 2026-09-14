@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -44,222 +45,223 @@ struct Synapse::Impl {
     static constexpr float STP_U_MAX = 1.0f;  // Max utilization
     
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    Impl(SynapseId id, NeuronId source, NeuronId dest) 
+        : id(id), sourceNeuron(source), destinationNeuron(dest)
+        , weight(0.0f), delay(1), type(SynapseType::Excitatory)
+        , eligibilityTrace(0.0f), efficacy(1.0f)
+        , shortTermDepression(1.0f), shortTermFacilitation(0.0f)
+        , lastPreSpikeTime(-1.0f), lastPostSpikeTime(-1.0f) {}
 };
-
-Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
-    : pImpl(new Impl) {
-    pImpl->id = id;
-    pImpl->sourceNeuron = source;
-    pImpl->destinationNeuron = destination;
-    pImpl->weight = 0.0f;
-    pImpl->delay = 1;  // Default: 1 step delay
-    pImpl->type = SynapseType::Excitatory;
-    pImpl->eligibilityTrace = 0.0f;
-    pImpl->efficacy = 1.0f;
-    pImpl->shortTermDepression = 1.0f;
-    pImpl->shortTermFacilitation = 0.0f;
-    pImpl->lastPreSpikeTime = -1.0f;
-    pImpl->lastPostSpikeTime = -1.0f;
-}
 
 Synapse::~Synapse() = default;
 
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Synapse::Synapse(Synapse&& other) noexcept : PImplBase(std::move(other.pImpl)) {}
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        PImplBase::operator=(std::move(other));
     }
     return *this;
 }
 
 SynapseId Synapse::getId() const {
-    return pImpl->id;
+    return getImpl().id;
 }
 
 NeuronId Synapse::getSourceNeuron() const {
-    return pImpl->sourceNeuron;
+    return getImpl().sourceNeuron;
 }
 
 NeuronId Synapse::getDestinationNeuron() const {
-    return pImpl->destinationNeuron;
+    return getImpl().destinationNeuron;
 }
 
 SynapticWeight Synapse::getWeight() const {
-    return pImpl->weight;
+    return getImpl().weight;
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
-    pImpl->weight = weight;
+    auto& impl = getImpl();
+    impl.weight = weight;
+    // Clamp to reasonable bounds to prevent instability
+    impl.weight = std::clamp(impl.weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
-    pImpl->weight += delta;
-    // Clamp to reasonable bounds to prevent instability
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    auto& impl = getImpl();
+    impl.weight += delta;
+    impl.weight = std::clamp(impl.weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 Delay Synapse::getDelay() const {
-    return pImpl->delay;
+    return getImpl().delay;
 }
 
 void Synapse::setDelay(Delay delay) {
-    pImpl->delay = delay;
+    getImpl().delay = delay;
 }
 
 SynapseType Synapse::getType() const {
-    return pImpl->type;
+    return getImpl().type;
 }
 
 void Synapse::setType(SynapseType type) {
-    pImpl->type = type;
+    getImpl().type = type;
 }
 
 bool Synapse::isExcitatory() const {
-    return pImpl->type == SynapseType::Excitatory;
+    return getImpl().type == SynapseType::Excitatory;
 }
 
 bool Synapse::isInhibitory() const {
-    return pImpl->type == SynapseType::Inhibitory;
+    return getImpl().type == SynapseType::Inhibitory;
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
-    pImpl->preSpikeHistory.push_back(timestamp);
-    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+    auto& impl = getImpl();
+    impl.preSpikeHistory.push_back(timestamp);
+    impl.lastPreSpikeTime = static_cast<float>(timestamp);
+    if (impl.preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        impl.preSpikeHistory.erase(impl.preSpikeHistory.begin());
     }
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
-    pImpl->postSpikeHistory.push_back(timestamp);
-    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+    auto& impl = getImpl();
+    impl.postSpikeHistory.push_back(timestamp);
+    impl.lastPostSpikeTime = static_cast<float>(timestamp);
+    if (impl.postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        impl.postSpikeHistory.erase(impl.postSpikeHistory.begin());
     }
 }
 
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
-    return pImpl->preSpikeHistory;
+    return getImpl().preSpikeHistory;
 }
 
 const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
-    return pImpl->postSpikeHistory;
+    return getImpl().postSpikeHistory;
 }
 
 void Synapse::clearHistory() {
-    pImpl->preSpikeHistory.clear();
-    pImpl->postSpikeHistory.clear();
+    auto& impl = getImpl();
+    impl.preSpikeHistory.clear();
+    impl.postSpikeHistory.clear();
+    impl.lastPreSpikeTime = -1.0f;
+    impl.lastPostSpikeTime = -1.0f;
 }
 
 PlasticityFlags& Synapse::getPlasticityFlags() {
-    return pImpl->plasticityFlags;
-}
-
-void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
-    pImpl->plasticityFlags.hebbian = hebbian;
-    pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
+    return getImpl().plasticityFlags;
 }
 
 const PlasticityFlags& Synapse::getPlasticityFlags() const {
-    return pImpl->plasticityFlags;
+    return getImpl().plasticityFlags;
+}
+
+void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
+    auto& impl = getImpl();
+    impl.plasticityFlags.hebbian = hebbian;
+    impl.plasticityFlags.stdp = stdp;
+    impl.plasticityFlags.reward_modulated = rewardModulated;
 }
 
 float Synapse::getEligibilityTrace() const {
-    return pImpl->eligibilityTrace;
+    return getImpl().eligibilityTrace;
 }
 
 void Synapse::setEligibilityTrace(float trace) {
-    pImpl->eligibilityTrace = trace;
+    getImpl().eligibilityTrace = trace;
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
-    pImpl->eligibilityTrace *= (1.0f - decayRate);
-    if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
-        pImpl->eligibilityTrace = 0.0f;
+    auto& impl = getImpl();
+    impl.eligibilityTrace *= (1.0f - decayRate);
+    if (std::abs(impl.eligibilityTrace) < 0.001f) {
+        impl.eligibilityTrace = 0.0f;
     }
 }
 
 float Synapse::getEfficacy() const {
-    return pImpl->efficacy;
+    return getImpl().efficacy;
 }
 
 void Synapse::setEfficacy(float efficacy) {
-    pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
+    getImpl().efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
-    
+    auto& impl = getImpl();
     TimestepDuration dt = 0.001;  // 1ms timestep
     
     // Decay short-term facilitation (Tsodyks-Markram model)
-    if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+    if (impl.lastPreSpikeTime >= 0.0f) {
+        float timeSincePre = static_cast<float>(currentTime - impl.lastPreSpikeTime);
+        impl.shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
     // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
+    if (impl.lastPostSpikeTime >= 0.0f || impl.lastPreSpikeTime >= 0.0f) {
         float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
+            impl.lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - impl.lastPostSpikeTime) : 0.0f,
+            impl.lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - impl.lastPreSpikeTime) : 0.0f
         );
         // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        impl.shortTermDepression += (1.0f - impl.shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
     // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    impl.weight = std::clamp(impl.weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::reset() {
-    pImpl->weight = 0.0f;
-    pImpl->preSpikeHistory.clear();
-    pImpl->postSpikeHistory.clear();
-    pImpl->eligibilityTrace = 0.0f;
-    pImpl->efficacy = 1.0f;
+    auto& impl = getImpl();
+    impl.weight = 0.0f;
+    impl.preSpikeHistory.clear();
+    impl.postSpikeHistory.clear();
+    impl.eligibilityTrace = 0.0f;
+    impl.efficacy = 1.0f;
+    impl.shortTermDepression = 1.0f;
+    impl.shortTermFacilitation = 0.0f;
+    impl.lastPreSpikeTime = -1.0f;
+    impl.lastPostSpikeTime = -1.0f;
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
+    auto& impl = getImpl();
     // Proper random initialization based on synapse type
-    if (pImpl->type == SynapseType::Excitatory) {
+    if (impl.type == SynapseType::Excitatory) {
         // Excitatory synapses: small positive weights
-        pImpl->weight = rng.uniformReal(0.1f, 0.4f);
+        impl.weight = rng.uniformReal(0.1f, 0.4f);
         // Excitatory synapses have moderate initial efficacy
-        pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
-    } else if (pImpl->type == SynapseType::Inhibitory) {
+        impl.efficacy = rng.uniformReal(0.8f, 1.0f);
+    } else if (impl.type == SynapseType::Inhibitory) {
         // Inhibitory synapses: negative weights
-        pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
-        pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        impl.weight = -rng.uniformReal(0.1f, 0.4f);
+        impl.efficacy = rng.uniformReal(0.8f, 1.0f);
     } else {
         // Other types: small random weights
-        pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
-        pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
+        impl.weight = rng.uniformReal(-0.1f, 0.1f);
+        impl.efficacy = rng.uniformReal(0.9f, 1.0f);
     }
     
     // Random delay: 1-5 steps (1-5ms at 1ms timestep)
-    pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
+    impl.delay = static_cast<Delay>(rng.uniformInt(1, 5));
     
     // Initialize short-term plasticity state
-    pImpl->shortTermDepression = 1.0f;  // Fully recovered
-    pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
+    impl.shortTermDepression = 1.0f;  // Fully recovered
+    impl.shortTermFacilitation = 0.0f;  // No initial facilitation
     
     // Initialize eligibility trace to 0
-    pImpl->eligibilityTrace = 0.0f;
+    impl.eligibilityTrace = 0.0f;
     
     // Initialize last spike times
-    pImpl->lastPreSpikeTime = -1.0f;
-    pImpl->lastPostSpikeTime = -1.0f;
+    impl.lastPreSpikeTime = -1.0f;
+    impl.lastPostSpikeTime = -1.0f;
 }
 
 } // namespace nlm

@@ -1,9 +1,11 @@
 #include "Logger.hpp"
+#include "../core/BasePImpl.hpp"
 #include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -12,22 +14,26 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    
+    Impl() : level(LogLevel::Info), useColors(true) {}
 };
 
-ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
+ConsoleLogger::ConsoleLogger() : PImplBase(std::make_unique<Impl>()) {}
 
-ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
-    pImpl->level = level;
+ConsoleLogger::ConsoleLogger(LogLevel level) : PImplBase(std::make_unique<Impl>()) {
+    getImpl().level = level;
 }
 
 ConsoleLogger::~ConsoleLogger() = default;
 
 void ConsoleLogger::log(const LogEntry& entry) {
-    if (entry.level < pImpl->level) {
+    auto& impl = getImpl();
+    
+    if (entry.level < impl.level) {
         return;
     }
     
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    std::lock_guard<std::mutex> lock(impl.mutex);
     
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
@@ -41,42 +47,47 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::string output = oss.str();
     
     // Console output
-    if (pImpl->useColors) {
+    if (impl.useColors) {
         std::cout << levelToColor(entry.level) << output << "\033[0m\n";
     } else {
         std::cout << output << "\n";
     }
     
     // File output if set
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+    if (impl.fileOut.is_open()) {
+        impl.fileOut << output << "\n";
+        impl.fileOut.flush();
     }
 }
 
 void ConsoleLogger::setLevel(LogLevel level) {
-    pImpl->level = level;
+    getImpl().level = level;
 }
 
 LogLevel ConsoleLogger::getLevel() const {
-    return pImpl->level;
+    return getImpl().level;
 }
 
 void ConsoleLogger::setUseColors(bool useColors) {
-    pImpl->useColors = useColors;
+    getImpl().useColors = useColors;
 }
 
 bool ConsoleLogger::getUseColors() const {
-    return pImpl->useColors;
+    return getImpl().useColors;
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    auto& impl = getImpl();
+    impl.fileOut.open(filepath, std::ios::app);
+    if (!impl.fileOut.is_open()) {
+        throw std::runtime_error("Failed to open log file: " + filepath);
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
+    auto& impl = getImpl();
+    if (impl.fileOut.is_open()) {
+        impl.fileOut.close();
     }
 }
 
@@ -106,32 +117,38 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    
+    Impl() {}
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+Logger::Logger() : PImplBase(std::make_unique<Impl>()) {}
 
 Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
+    if (!logger) {
+        throw std::invalid_argument("Logger cannot be null");
+    }
+    
+    std::lock_guard<std::mutex> lock(getImpl().mutex);
+    getImpl().loggers.push_back(logger);
 }
 
 void Logger::clearLoggers() {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.clear();
+    std::lock_guard<std::mutex> lock(getImpl().mutex);
+    getImpl().loggers.clear();
 }
 
 void Logger::setLevel(LogLevel level) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
+    std::lock_guard<std::mutex> lock(getImpl().mutex);
+    for (auto& logger : getImpl().loggers) {
         logger->setLevel(level);
     }
 }
 
 void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    std::lock_guard<std::mutex> lock(getImpl().mutex);
     
     LogEntry entry;
     entry.level = level;
@@ -141,8 +158,10 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
     
-    for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+    for (auto& logger : getImpl().loggers) {
+        if (logger) {
+            logger->log(entry);
+        }
     }
 }
 
@@ -167,9 +186,9 @@ void Logger::critical(const std::string& message, const std::string& file, int l
 }
 
 bool Logger::isEnabled(LogLevel level) const {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
-        if (logger->getLevel() <= level) {
+    std::lock_guard<std::mutex> lock(getImpl().mutex);
+    for (const auto& logger : getImpl().loggers) {
+        if (logger && logger->getLevel() <= level) {
             return true;
         }
     }

@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <memory>
+#include "../brain/Brain.hpp"
 
 namespace nlm {
 
@@ -13,6 +14,9 @@ class PredictionSystem {
 public:
     PredictionSystem();
     ~PredictionSystem();
+    
+    // Initialize with brain reference for neural computation
+    void initialize(Brain* brain);
     
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
@@ -34,9 +38,14 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Convenience methods for Phase 6 integration
+    std::vector<float> getPrediction(float horizon = 0.1f) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    Brain* brain;
 };
 
 } // namespace nlm
