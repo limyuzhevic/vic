@@ -34,6 +34,12 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
         }
         pImpl->predictionError = sumError / predData.size();
         pImpl->errorHistory.push_back(pImpl->predictionError);
+        
+        // Update confidence based on prediction error
+        // Lower error = higher confidence
+        pImpl->confidence = std::max(0.1f, 1.0f - pImpl->predictionError);
+    } else {
+        pImpl->confidence *= 0.95f; // Reduce confidence on mismatch
     }
 }
 
