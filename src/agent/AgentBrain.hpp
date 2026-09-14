@@ -1,19 +1,25 @@
-#pragma once
+// Forward declarations for internal classes
+struct EpisodicMemoryEntry {
+    double timestamp;
+    std::vector<float> visionPattern;
+    MotorCommand action;
+    float reward;
+    float importance;
+    std::string context;
+};
 
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
-#include <vector>
-
-namespace nlm {
+struct LearnedSequence {
+    MotorCommand action;
+    float frequency;
+    std::string context;
+};
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
+    AgentBrain(std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrainConfig> config);
     ~AgentBrain();
     
     // Initialize with world
@@ -52,6 +58,12 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Get energy level
+    float getEnergyLevel() const;
+    
+    // Get stress level
+    float getStressLevel() const;
+    
     // Reset agent for new episode
     void reset();
     
@@ -69,14 +81,44 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Configuration access
+    void setConfig(std::shared_ptr<AgentBrainConfig> config) { config_ = config; }
+    std::shared_ptr<AgentBrainConfig> getConfig() const { return config_; }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
-    // Motor command selection with curiosity/exploration
+    // Motor command selection with curiosity/exploration (enhanced version)
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Enhanced neuron organization
+    void organizeNeuronsImproved();
+    void distributeMotorNeuronsBiased(const std::vector<Neuron*>& motorNeurons);
+    void distributeSensoryNeuronsHierarchical(const std::vector<Neuron*>& sensoryNeurons);
+    
+    // Enhanced curiosity computation
+    float computeCuriosityEnhanced(const std::vector<float>& vision, float predictionError);
+    float computeNoveltyEnhanced(const std::vector<float>& vision);
+    
+    // Enhanced development system
+    void updateDevelopmentEnhanced(double timestep);
+    
+    // Learning and memory integration
+    void learnFromExplorationHistory();
+    void updateMemoryIntegration(const std::vector<float>& vision, const MotorCommand& action, float reward);
+    
+    // Enhanced neuromodulation with stress and energy factors
+    void applyRewardModulationEnhanced(float reward, float predictedReward);
+    
+    // Helper functions
+    const char* motorCommandToStringEnhanced(MotorCommand cmd);
+    
     std::shared_ptr<Brain> brain_;
+    std::shared_ptr<AgentBrainConfig> config_;
+    
+    // Random number generator for exploration
+    std::mt19937 randomEngine_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -103,6 +145,10 @@ private:
     double developmentalAge_;
     float plasticityModifier_;
     
+    // Stress and energy state
+    float stressLevel_;
+    float energyLevel_;
+    
     // Configuration flags
     bool rewardModulationEnabled_;
     bool structuralPlasticityEnabled_;
@@ -112,6 +158,12 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Exploration history for learning
+    std::vector<MotorCommand> explorationHistory_;
+    
+    // Learned sequences and patterns
+    std::vector<LearnedSequence> learnedSequences_;
 };
 
 } // namespace nlm

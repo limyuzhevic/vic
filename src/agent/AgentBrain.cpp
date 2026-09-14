@@ -1,12 +1,70 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../brain/DevelopmentalStage.hpp"
 #include <algorithm>
 #include <cmath>
+#include <random>
+#include <unordered_map>
+#include <memory>
 
 namespace nlm {
 
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
+// AgentBrain Configuration
+struct AgentBrainConfig {
+    // Motor neuron organization
+    float motorNeuronDistributionBias_;  // Bias for action selection (0.0 = uniform, 1.0 = forward preference)
+    
+    // Curiosity parameters
+    float curiosityThreshold_;           // Minimum curiosity level to trigger exploration
+    float explorationDecayRate_;          // How quickly curiosity decays over time
+    float noveltySensitivity_;            // How sensitive agent is to novelty
+    float predictionErrorWeight_;         // Weight of prediction error in curiosity calculation
+    
+    // Development parameters
+    float developmentSpeed_;              // Rate of developmental progression
+    float plasticityCurve_[4];            // Plasticity modifiers for each developmental stage
+    
+    // Neuromodulation parameters
+    float dopamineLearningRate_;          // Rate of dopamine signal adaptation
+    float rewardPredictionErrorGain_;     // Gain factor for prediction error signals
+    
+    // Memory integration
+    bool episodicMemoryEnabled_;          // Enable episodic memory recording
+    float memoryConsolidationRate_;       // Rate at which memories consolidate
+    
+    // Environmental adaptation
+    float temperatureAdaptation_;         // Adaptation to environmental stability
+    float socialLearningRate_;             // Rate of social learning from other agents
+    
+    // Safety and constraints
+    float maxEnergyLevel_;                 // Maximum energy before fatigue
+    float stressThreshold_;               // Stress level triggering defensive behaviors
+    
+    AgentBrainConfig() 
+        : motorNeuronDistributionBias_(0.5f)
+        , curiosityThreshold_(0.3f)
+        , explorationDecayRate_(0.995f)
+        , noveltySensitivity_(1.0f)
+        , predictionErrorWeight_(0.5f)
+        , developmentSpeed_(1.0f)
+        , episodicMemoryEnabled_(true)
+        , memoryConsolidationRate_(0.9f)
+        , temperatureAdaptation_(0.8f)
+        , socialLearningRate_(0.2f)
+        , maxEnergyLevel_(1.0f)
+        , stressThreshold_(0.8f) {
+        
+        // Initialize developmental plasticity curve
+        plasticityCurve_[0] = 1.0f;  // Initial - high plasticity
+        plasticityCurve_[1] = 0.8f;  // Critical period - peak plasticity
+        plasticityCurve_[2] = 0.5f;  // Maturation - moderate plasticity
+        plasticityCurve_[3] = 0.2f;  // Adult - low plasticity
+    }
+};
+
+AgentBrain::AgentBrain(std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrainConfig> config)
     : brain_(brain)
+    , config_(config ? config : std::make_shared<AgentBrainConfig>())
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -19,6 +77,19 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , stressLevel_(0.0f)
+    , energyLevel_(1.0f)
+    , explorationHistory_()
+    , learnedSequences_() {
+    
+    // Initialize random number generator for exploration
+    randomEngine_.seed(std::chrono::system_clock::now().time_since_epoch().count());
+    
+    // Initialize motor and sensory neuron groups with improved organization
+    if (brain_) {
+        organizeNeuronsImproved();
+    }
+}
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -209,31 +280,493 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     return best;
 }
 
-MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+// Improved neuron organization with better distribution and dynamics
+    void organizeNeuronsImproved() {
+        // Clear existing groups
+        motorForward_.clear();
+        motorBackward_.clear();
+        motorTurnLeft_.clear();
+        motorTurnRight_.clear();
+        motorInteract_.clear();
+        motorWait_.clear();
         
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+        sensoryVision_.clear();
+        sensoryTouch_.clear();
+        sensoryInternal_.clear();
+        sensoryProprioception_.clear();
+        
+        if (!brain_) return;
+        
+        // Get all regions and populations
+        auto regions = brain_->getRegions();
+        if (regions.empty()) return;
+        
+        std::vector<Neuron*> allMotorNeurons;
+        std::vector<Neuron*> allSensoryNeurons;
+        
+        // Collect neurons by type
+        for (const auto& region : regions) {
+            if (!region) continue;
+            auto populations = region->getPopulations();
+            for (auto& pop : populations) {
+                if (!pop) continue;
+                NeuronType type = pop->getNeuronType();
+                
+                for (Neuron* n : pop->getNeurons()) {
+                    if (!n) continue;
+                    
+                    if (type == NeuronType::Motor) {
+                        allMotorNeurons.push_back(n);
+                    } else if (type == NeuronType::Sensory) {
+                        allSensoryNeurons.push_back(n);
+                    }
+                }
+            }
+        }
+        
+        // Improved motor neuron distribution with bias
+        if (!allMotorNeurons.empty()) {
+            distributeMotorNeuronsBiased(allMotorNeurons);
+        }
+        
+        // Improved sensory neuron distribution based on type hierarchy
+        if (!allSensoryNeurons.empty()) {
+            distributeSensoryNeuronsHierarchical(allSensoryNeurons);
+        }
+        
+        NLM_LOG_INFO("Improved neuron organization: " +
+                    std::to_string(allMotorNeurons.size()) + " motor, " +
+                    std::to_string(allSensoryNeurons.size()) + " sensory neurons distributed");
+    }
+    
+    // Biased motor neuron distribution
+    void distributeMotorNeuronsBiased(const std::vector<Neuron*>& motorNeurons) {
+        // Apply bias based on configuration
+        float bias = config_->motorNeuronDistributionBias_;
+        bias = std::clamp(bias, 0.0f, 1.0f);
+        
+        std::vector<std::pair<Neuron*, float>> weightedNeurons;
+        
+        for (Neuron* n : motorNeurons) {
+            // Higher probability for forward movement if bias > 0.5
+            float weight = 1.0f;
+            if (bias > 0.5f) {
+                // Preference for forward action
+                weight = 1.0f + (bias - 0.5f) * 2.0f;  // Weight range: 1.0 to 3.0
+            } else if (bias < 0.5f) {
+                // Preference for other actions
+                weight = 1.0f + (0.5f - bias) * 1.5f;  // Weight range: 1.0 to 2.0
+            }
+            
+            weightedNeurons.push_back({n, weight});
+        }
+        
+        // Sort by weight for deterministic distribution
+        std::sort(weightedNeurons.begin(), weightedNeurons.end(),
+                  [](const auto& a, const auto& b) { return a.second > b.second; });
+        
+        // Distribute with priority
+        for (size_t i = 0; i < weightedNeurons.size(); ++i) {
+            Neuron* n = weightedNeurons[i].first;
+            
+            // Calculate priority based on index
+            float priority = static_cast<float>(i) / weightedNeurons.size();
+            
+            if (priority > 0.6f) {  // Top 40% get forward action
+                motorForward_.push_back(n);
+            } else if (priority > 0.4f) {  // Next 20% get turn actions
+                if (i % 2 == 0) motorTurnLeft_.push_back(n);
+                else motorTurnRight_.push_back(n);
+            } else if (priority > 0.2f) {  // Next 20% get backward and interact
+                if (i % 2 == 0) motorBackward_.push_back(n);
+                else motorInteract_.push_back(n);
+            } else {  // Bottom 20% get wait
+                motorWait_.push_back(n);
             }
         }
     }
     
-    return defaultCmd;
-}
+    // Hierarchical sensory neuron distribution
+    void distributeSensoryNeuronsHierarchical(const std::vector<Neuron*>& sensoryNeurons) {
+        // Determine distribution based on sensory importance hierarchy
+        // Vision (0) > Touch (1) > Internal (2) > Proprioception (3)
+        
+        // Estimate neuron types by sampling (full scan would be expensive)
+        std::vector<NeuronType> typeSamples;
+        typeSamples.reserve(std::min(size_t(50), sensoryNeurons.size()));
+        
+        size_t sampleCount = std::min(size_t(50), sensoryNeurons.size());
+        for (size_t i = 0; i < sampleCount; ++i) {
+            // Try to get neuron type from brain (approximation)
+            if (brain_) {
+                // Use a simple heuristic - in practice, you'd have better access
+                // to neuron type information
+                typeSamples.push_back(NeuronType::Sensory);  // Default to sensory
+            }
+        }
+        
+        // Count estimated types
+        size_t visionCount = 0, touchCount = 0, internalCount = 0, proprioCount = 0;
+        
+        // Distribute based on estimated counts and hierarchy
+        for (Neuron* n : sensoryNeurons) {
+            if (!n) continue;
+            
+            // Simple round-robin based on hierarchy
+            size_t total = visionCount + touchCount + internalCount + proprioCount;
+            if (total >= sensoryNeurons.size()) {
+                proprioCount++;  // Default to proprioception
+            } else if (visionCount <= touchCount && visionCount <= internalCount && visionCount <= proprioCount) {
+                visionCount++;
+                sensoryVision_.push_back(n);
+            } else if (touchCount <= internalCount && touchCount <= proprioCount) {
+                touchCount++;
+                sensoryTouch_.push_back(n);
+            } else if (internalCount <= proprioCount) {
+                internalCount++;
+                sensoryInternal_.push_back(n);
+            } else {
+                proprioCount++;
+                sensoryProprioception_.push_back(n);
+            }
+        }
+        
+        NLM_LOG_INFO("Hierarchical sensory distribution: " +
+                    std::to_string(sensoryVision_.size()) + " vision, " +
+                    std::to_string(sensoryTouch_.size()) + " touch, " +
+                    std::to_string(sensoryInternal_.size()) + " internal, " +
+                    std::to_string(sensoryProprioception_.size()) + " proprioception");
+    }
+    
+    // Enhanced novelty computation with memory comparison
+    float computeNoveltyEnhanced(const std::vector<float>& vision) {
+        if (vision.empty() || previousVision_.empty())
+            return 0.0f;
+        
+        float totalDiff = 0.0f;
+        size_t count = std::min(vision.size(), previousVision_.size());
+        
+        // Multiple comparison strategies
+        for (size_t i = 0; i < count; ++i) {
+            float diff = std::abs(vision[i] - previousVision_[i]);
+            totalDiff += diff;
+            
+            // Emphasize sudden changes vs gradual changes
+            if (diff > 0.5f) {
+                totalDiff += diff * 0.5f;  // Boost for large changes
+            }
+        }
+        
+        // Normalize
+        float novelty = totalDiff / std::max<size_t>(count, 1);
+        
+        // Apply temperature adaptation - reduce novelty sensitivity in stable environments
+        novelty *= config_->temperatureAdaptation_;
+        
+        // Store for next time
+        previousVision_ = vision;
+        
+        return novelty;
+    }
+    
+    // Enhanced curiosity computation with multiple factors
+    float computeCuriosityEnhanced(const std::vector<float>& vision, float predictionError) {
+        float novelty = computeNoveltyEnhanced(vision);
+        
+        // Multiple curiosity components
+        float noveltyComponent = novelty * config_->noveltySensitivity_;
+        float predictionErrorComponent = std::abs(predictionError) * config_->predictionErrorWeight_;
+        
+        // Exploration history factor - more exploration if we've tried same actions
+        float explorationFactor = 1.0f;
+        if (!explorationHistory_.empty()) {
+            // Analyze recent exploration patterns
+            size_t recentActions = std::min(size_t(10), explorationHistory_.size());
+            float explorationRate = 0.0f;
+            for (size_t i = 0; i < recentActions; ++i) {
+                if (explorationHistory_[i] == MotorCommand::Wait) {
+                    explorationRate += 0.1f;
+                }
+            }
+            explorationFactor = 1.0f + explorationRate;
+        }
+        
+        // Combined curiosity with non-linear interaction
+        float curiosity = noveltyComponent * 0.6f + predictionErrorComponent * 0.4f;
+        curiosity *= explorationFactor;
+        
+        // Apply curiosity threshold from config
+        if (curiosity < config_->curiosityThreshold_) {
+            curiosity = 0.0f;
+        }
+        
+        // Clamp to reasonable range
+        curiosity = std::clamp(curiosity, 0.0f, 1.0f);
+        
+        return curiosity;
+    }
+    
+    // Enhanced development stage system with gradual transitions
+    void updateDevelopmentEnhanced(double timestep) {
+        if (!brain_ || !developmentEnabled_) return;
+        
+        developmentalAge_ += timestep * config_->developmentSpeed_;
+        
+        // Smooth developmental transitions
+        float normalizedAge = std::clamp(static_cast<float>(developmentalAge_) / 900.0f, 0.0f, 1.0f);
+        
+        // Quadratic easing for smooth transitions between stages
+        float stageProgress;
+        DevelopmentalStage newStage;
+        
+        if (normalizedAge < 0.33f) {
+            stageProgress = normalizedAge / 0.33f;
+            stageProgress = stageProgress * stageProgress;  // Quadratic ease-in
+            newStage = DevelopmentalStage::Initial;
+            plasticityModifier_ = config_->plasticityCurve_[0] * (1.0f - stageProgress) + 
+                                config_->plasticityCurve_[1] * stageProgress;
+        } else if (normalizedAge < 0.67f) {
+            float progress = (normalizedAge - 0.33f) / 0.34f;
+            stageProgress = progress * progress;
+            newStage = DevelopmentalStage::CriticalPeriod;
+            plasticityModifier_ = config_->plasticityCurve_[1] * (1.0f - stageProgress) + 
+                                config_->plasticityCurve_[2] * stageProgress;
+        } else if (normalizedAge < 0.97f) {
+            float progress = (normalizedAge - 0.67f) / 0.3f;
+            stageProgress = progress * progress;
+            newStage = DevelopmentalStage::Maturation;
+            plasticityModifier_ = config_->plasticityCurve_[2] * (1.0f - stageProgress) + 
+                                config_->plasticityCurve_[3] * stageProgress;
+        } else {
+            stageProgress = (normalizedAge - 0.97f) / 0.03f;
+            stageProgress = stageProgress * stageProgress;
+            newStage = DevelopmentalStage::Adult;
+            plasticityModifier_ = config_->plasticityCurve_[3] * (1.0f - stageProgress) + 0.1f * stageProgress;
+        }
+        
+        brain_->setDevelopmentalStage(newStage);
+        
+        // Enhanced structural plasticity with developmental modulation
+        if (structuralPlasticityEnabled_) {
+            auto* sp = brain_->getStructuralPlasticity();
+            if (sp) {
+                // Dynamic rates based on developmental stage
+                float synaptogenesisFactor = 1.0f;
+                float pruningFactor = 1.0f;
+                
+                switch (newStage) {
+                    case DevelopmentalStage::Initial:
+                        synaptogenesisFactor = 2.0f;
+                        pruningFactor = 0.5f;
+                        break;
+                    case DevelopmentalStage::CriticalPeriod:
+                        synaptogenesisFactor = 1.5f;
+                        pruningFactor = 0.8f;
+                        break;
+                    case DevelopmentalStage::Maturation:
+                        synaptogenesisFactor = 1.0f;
+                        pruningFactor = 1.2f;
+                        break;
+                    case DevelopmentalStage::Adult:
+                        synaptogenesisFactor = 0.5f;
+                        pruningFactor = 1.5f;
+                        break;
+                    case DevelopmentalStage::Aging:
+                        synaptogenesisFactor = 0.2f;
+                        pruningFactor = 2.0f;
+                        break;
+                }
+                
+                // Temperature adaptation affects plasticity
+                synaptogenesisFactor *= config_->temperatureAdaptation_;
+                pruningFactor /= config_->temperatureAdaptation_;
+                
+                float synRate = 0.0001f * synaptogenesisFactor * plasticityModifier_;
+                float pruneRate = 0.00001f * pruningFactor * (2.0f - plasticityModifier_);
+                
+                sp->setSynaptogenesisRate(synRate);
+                sp->setPruningRate(pruneRate);
+            }
+        }
+        
+        // Stress level affects development
+        if (stressLevel_ > config_->stressThreshold_) {
+            // Stress slows development but increases plasticity
+            developmentSpeed_ *= 0.8f;
+            plasticityModifier_ *= 1.5f;
+        }
+    }
+    
+    // Social learning and pattern extraction from exploration history
+    void learnFromExplorationHistory() {
+        if (explorationHistory_.size() < 10) return;
+        
+        // Analyze action sequences for learned behaviors
+        std::unordered_map<MotorCommand, int> actionCounts;
+        for (size_t i = 0; i < explorationHistory_.size(); ++i) {
+            actionCounts[explorationHistory_[i]]++;
+        }
+        
+        // Identify dominant action patterns
+        MotorCommand mostCommonAction = MotorCommand::Wait;
+        int maxCount = 0;
+        for (const auto& pair : actionCounts) {
+            if (pair.second > maxCount) {
+                maxCount = pair.second;
+                mostCommonAction = pair.first;
+            }
+        }
+        
+        // Store learned sequence if significant
+        if (maxCount >= explorationHistory_.size() / 2) {
+            LearnedSequence seq;
+            seq.action = mostCommonAction;
+            seq.frequency = static_cast<float>(maxCount) / explorationHistory_.size();
+            seq.context = "exploration_pattern";
+            
+            // Check if we already have this sequence
+            bool exists = false;
+            for (const auto& existing : learnedSequences_) {
+                if (existing.action == seq.action) {
+                    exists = true;
+                    existing.frequency = (existing.frequency + seq.frequency) * 0.5f;
+                    break;
+                }
+            }
+            
+            if (!exists) {
+                learnedSequences_.push_back(seq);
+            }
+        }
+        
+        // Clear old history to prevent memory buildup
+        if (explorationHistory_.size() > 100) {
+            explorationHistory_.erase(explorationHistory_.begin(), 
+                                    explorationHistory_.begin() + 50);
+        }
+    }
+    
+    // Enhanced neuromodulation with stress and energy factors
+    void applyRewardModulationEnhanced(float reward, float predictedReward) {
+        if (!brain_ || !rewardModulationEnabled_) return;
+        
+        // Compute prediction error
+        predictionError_ = reward - predictedReward;
+        
+        // Update expected reward with adaptive learning rate
+        expectedReward_ = expectedReward_ * (1.0f - config_->dopamineLearningRate_) + 
+                         reward * config_->dopamineLearningRate_;
+        
+        // Enhanced dopamine-like signal with multiple factors
+        float predictionErrorComponent = predictionError_ * config_->rewardPredictionErrorGain_;
+        
+        // Energy and stress modulation
+        float energyFactor = energyLevel_ / config_->maxEnergyLevel_;
+        float stressFactor = 1.0f + stressLevel_ * 0.5f;  // Stress amplifies dopamine response
+        
+        float dopamineLevel = predictionErrorComponent * energyFactor * stressFactor;
+        
+        // Clamp to reasonable range
+        dopamineLevel = std::clamp(dopamineLevel, -1.0f, 1.0f);
+        
+        // Apply neuromodulation with eligibility traces
+        for (const auto& region : brain_->getRegions()) {
+            for (auto* syn : region->getSynapses()) {
+                float eligibility = syn->getEligibilityTrace();
+                
+                if (std::abs(eligibility) > 0.001f) {
+                    // Enhanced plasticity modulation
+                    float plasticityFactor = plasticityModifier_;
+                    
+                    // Energy-dependent plasticity
+                    if (energyLevel_ < 0.5f) {
+                        plasticityFactor *= 0.5f;
+                    }
+                    
+                    // Temperature adaptation
+                    plasticityFactor *= config_->temperatureAdaptation_;
+                    
+                    // Stress-dependent modulation
+                    if (stressLevel_ > config_->stressThreshold_) {
+                        plasticityFactor *= 0.7f;  // Stress reduces learning efficiency
+                    }
+                    
+                    float delta = eligibility * dopamineLevel * plasticityFactor;
+                    syn->addToWeight(delta);
+                    
+                    // Decay eligibility trace with stress modulation
+                    float decayRate = 0.1f;
+                    if (stressLevel_ > config_->stressThreshold_) {
+                        decayRate *= 1.5f;  // Stress accelerates trace decay
+                    }
+                    syn->decayEligibilityTrace(decayRate);
+                }
+            }
+        }
+        
+        // Update stress level based on prediction error
+        if (predictionError_ < -0.5f) {  // Large negative error = stress
+            stressLevel_ = std::min(1.0f, stressLevel_ + 0.05f);
+        } else if (predictionError_ > 0.5f) {  // Large positive error = relief
+            stressLevel_ = std::max(0.0f, stressLevel_ - 0.05f);
+        } else {
+            // Gradual stress decay
+            stressLevel_ *= 0.95f;
+        }
+        
+        // Energy drain based on neuromodulation
+        float energyDrain = 0.001f * std::abs(dopamineLevel);
+        energyLevel_ = std::max(0.0f, energyLevel_ - energyDrain);
+        
+        // Recovery if energy is low and stress is low
+        if (energyLevel_ < config_->maxEnergyLevel_ && stressLevel_ < 0.3f) {
+            float recovery = 0.0005f;
+            energyLevel_ = std::min(config_->maxEnergyLevel_, energyLevel_ + recovery);
+        }
+        
+        dopamineLevel_ = dopamineLevel;
+    }
+    
+    // Memory integration for episodic memory
+    void updateMemoryIntegration(const std::vector<float>& vision, const MotorCommand& action, float reward) {
+        if (!config_->episodicMemoryEnabled_) return;
+        
+        // Create episodic memory entry
+        EpisodicMemoryEntry entry;
+        entry.timestamp = developmentalAge_;
+        entry.visionPattern = vision;
+        entry.action = action;
+        entry.reward = reward;
+        entry.context = "enhanced_agent_brain";
+        
+        // Compute contextual importance
+        float novelty = computeNoveltyEnhanced(vision);
+        float predictionError = std::abs(predictionError_);
+        
+        entry.importance = (novelty * 0.6f + predictionError * 0.4f) * config_->memoryConsolidationRate_;
+        
+        // Store in episodic memory (simplified - would use actual memory system)
+        // For now, store in exploration history for analysis
+        explorationHistory_.push_back(action);
+        
+        // Learn from this experience
+        learnFromExplorationHistory();
+    }
+    
+    // Helper function for motor command to string conversion
+    const char* motorCommandToStringEnhanced(MotorCommand cmd) {
+        switch (cmd) {
+            case MotorCommand::MoveForward: return "MoveForward";
+            case MotorCommand::MoveBackward: return "MoveBackward";
+            case MotorCommand::TurnLeft: return "TurnLeft";
+            case MotorCommand::TurnRight: return "TurnRight";
+            case MotorCommand::LookLeft: return "LookLeft";
+            case MotorCommand::LookRight: return "LookRight";
+            case MotorCommand::Interact: return "Interact";
+            case MotorCommand::Wait: return "Wait";
+            default: return "Unknown";
+        }
+    }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
