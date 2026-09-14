@@ -4,9 +4,6 @@
 
 namespace nlm {
 
-// Vision processing (placeholder)
-// PLACEHOLDER - Phase 2 will implement real vision processing using NLM's own neurons
-
 class VisionProcessor {
 public:
     VisionProcessor();

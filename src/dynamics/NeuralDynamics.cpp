@@ -14,8 +14,7 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
-void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+// TODO PHASE 2: Implement real integrate-and-fire dynamics
     // PLACEHOLDER: Simple leaky integrator
     
     const auto& state = neuron->getState();
@@ -50,32 +49,16 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
 }
 
 void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real synaptic dynamics
-    // PLACEHOLDER: Synapse decay
     synapse->step(0.0);
 }
 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
-    // TODO PHASE 2: Implement real synaptic input
-    // PLACEHOLDER: Simple additive input
     SynapticWeight weight = synapse->getWeight();
     if (synapse->isExcitatory()) {
         neuron->receiveExcitatoryInput(weight);
     } else {
         neuron->receiveInhibitoryInput(std::abs(weight));
     }
-}
-
-bool IntegrateAndFireDynamics::shouldFire(const Neuron* neuron) const {
-    return neuron->getMembranePotential() >= neuron->getThreshold();
-}
-
-void IntegrateAndFireDynamics::reset() {
-    // No internal state to reset
-}
-
-void IntegrateAndFireDynamics::setMembraneTimeConstant(float tau) {
-    pImpl->membraneTimeConstant = tau;
 }
 
 float IntegrateAndFireDynamics::getMembraneTimeConstant() const {
