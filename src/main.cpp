@@ -7,6 +7,7 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
+#include "main_constants.hpp"
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
@@ -179,7 +180,7 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        neurons[i]->injectCurrent(nlm::MainConfig::TEST_CURRENT_INJECTION);  // Strong excitatory input
     }
     
     // Run a few steps
@@ -225,7 +226,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     for (SimulationStep step = 0; step < 1000; ++step) {
         // Create input pattern - inject current into sensory neurons
         for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+            brain->injectCurrentToNeurons(NeuronType::Sensory, nlm::MainConfig::PLASTICITY_EXPERIMENT_CURRENT_INJECTION);
         }
         
         brain->step(step, step * 0.001);
@@ -287,11 +288,11 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         
         if (preNeuron && postNeuron) {
             // Pre fires first
-            preNeuron->injectCurrent(60.0f);
+            preNeuron->injectCurrent(nlm::MainConfig::STDP_VERIFICATION_CURRENT_INJECTION);
             brain->step(trial * 2, trial * 2 * 0.001);
             
             // Then post fires
-            postNeuron->injectCurrent(60.0f);
+            postNeuron->injectCurrent(nlm::MainConfig::STDP_VERIFICATION_CURRENT_INJECTION);
             brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
         }
     }

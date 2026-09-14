@@ -189,6 +189,10 @@ void Neuron::setPopulationId(PopulationId population) {
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    if (!pImpl) {
+        return false;
+    }
+    
     bool fired = false;
     
     // Handle refractory period
@@ -206,33 +210,31 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // dV/dt = (V_rest - V)/tau + I/C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
     
-    MembranePotential& V = pImpl->state.membranePotential;
-    MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
-    
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
-    
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
-    
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
-    
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    // Check for null config constants before accessing
+    if (nlm::NeuronConfig::DEFAULT_MEMBRANE_CAPACITANCE == 0.0f || 
+        nlm::NeuronConfig::DEFAULT_TIME_CONSTANT == 0.0f) {
+        NLM_LOG_ERROR("Invalid NeuronConfig constants accessed");
+        return fired;
     }
     
+    // Synaptic input contributes to membrane potential change
+    float synapticContribution = pImpl->synapticInput / nlm::NeuronConfig::DEFAULT_MEMBRANE_CAPACITANCE;
+    
+    // Leak contribution
+    float leakContribution = (pImpl->state.restingPotential - pImpl->state.membranePotential) / nlm::NeuronConfig::DEFAULT_TIME_CONSTANT;
+    
+    // Update membrane potential using exponential Euler integration
+    pImpl->state.membranePotential = pImpl->state.membranePotential + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    
+    float adaptationDecay = nlm::NeuronConfig::ADAPTATION_DECAY_RATE;
+    pImpl->state.membranePotential -= pImpl->state.adaptationVariable * nlm::NeuronConfig::ADAPTATION_CORRECTION_FACTOR;
+    pImpl->state.adaptationVariable *= adaptationDecay;  // Decay adaptation
+    
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    pImpl->state.membranePotential = std::clamp(pImpl->state.membranePotential, -100.0f, 50.0f);
     
     // Check for spike
-    if (V >= threshold) {
+    if (pImpl->state.membranePotential >= pImpl->state.threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
@@ -241,7 +243,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         recordSpike(currentTime);
         
         // Reset membrane potential
-        V = V_reset;
+        pImpl->state.membranePotential = pImpl->state.resetPotential;
         
         // Enter refractory period
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
@@ -266,21 +268,25 @@ void Neuron::step(Timestamp currentTime) {
 }
 
 void Neuron::reset() {
+    if (!pImpl) {
+        // Cannot reset without valid pImpl
+        return;
+    }
+    
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
 }
 
-void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
+// Real random initialization with biological constraints
     // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-nlm::NeuronConfig::DEFAULT_RANDOM_RANGE, nlm::NeuronConfig::DEFAULT_RANDOM_RANGE);
     
     // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.threshold = nlm::NeuronConfig::DEFAULT_THRESHOLD + rng.uniformReal(-nlm::NeuronConfig::DEFAULT_RANDOM_RANGE/2.0f, nlm::NeuronConfig::DEFAULT_RANDOM_RANGE/2.0f);
     
     // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.restingPotential = nlm::NeuronConfig::DEFAULT_RESTING_POTENTIAL + rng.uniformReal(-nlm::NeuronConfig::DEFAULT_RANDOM_RANGE/2.0f, nlm::NeuronConfig::DEFAULT_RANDOM_RANGE/2.0f);
     
     // Reset potential is usually close to resting
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
@@ -291,12 +297,11 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
-    pImpl->state.adaptationVariable = 0.0f;
-    pImpl->state.lastSpikeTime = -1.0f;
+    pImpl->state.adaptationVariable = nlm::NeuronConfig::DEFAULT_ADAPTATION_RESET;
+    pImpl->state.lastSpikeTime = nlm::NeuronConfig::DEFAULT_LAST_SPIKE_TIME;
     
     // Clear any residual state
-    pImpl->synapticInput = 0.0f;
+    pImpl->synapticInput = nlm::NeuronConfig::DEFAULT_SYNAPTIC_INPUT_RESET;
     pImpl->spikeHistory.clear();
-}
 
 } // namespace nlm

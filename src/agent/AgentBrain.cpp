@@ -92,7 +92,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            float current = vision[i] * nlm::AgentBrainConfig::SENSORY_VISION_SCALE;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -101,7 +101,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = touch[i] * nlm::AgentBrainConfig::SENSORY_TOUCH_SCALE;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -110,7 +110,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            float current = (intern[i] * 2.0f - 1.0f) * nlm::AgentBrainConfig::SENSORY_INTERNAL_SCALE;
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
@@ -119,7 +119,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            float current = (proprio[i] * 2.0f - 1.0f) * nlm::AgentBrainConfig::SENSORY_PROPRIOCEPTION_SCALE;
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
@@ -286,17 +286,17 @@ void AgentBrain::updateDevelopment(double timestep) {
     
     // Simple developmental stages based on age
     // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
-        plasticityModifier_ = 1.0f;  // High plasticity
+    if (developmentalAge_ < nlm::AgentBrainConfig::INITIAL_STAGE_AGE) {  // ~1 minute
+        plasticityModifier_ = nlm::AgentBrainConfig::PLASTICITY_INITIAL;  // High plasticity
         brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
-        plasticityModifier_ = 0.8f;
+    } else if (developmentalAge_ < nlm::AgentBrainConfig::CRITICAL_PERIOD_AGE) {  // ~5 minutes
+        plasticityModifier_ = nlm::AgentBrainConfig::PLASTICITY_CRITICAL_PERIOD;
         brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
-    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
-        plasticityModifier_ = 0.5f;
+    } else if (developmentalAge_ < nlm::AgentBrainConfig::MATURATION_AGE) {  // ~15 minutes
+        plasticityModifier_ = nlm::AgentBrainConfig::PLASTICITY_MATURATION;
         brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
     } else {
-        plasticityModifier_ = 0.2f;  // Adult - more stable
+        plasticityModifier_ = nlm::AgentBrainConfig::PLASTICITY_ADULT;  // Adult - more stable
         brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
     }
     
