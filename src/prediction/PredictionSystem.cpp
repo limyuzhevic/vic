@@ -10,7 +10,11 @@ struct PredictionSystem::Impl {
     Impl() : predictionError(0.0f), confidence(0.5f) {}
 };
 
-PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
+PredictionSystem::PredictionSystem() : pImpl(new Impl) {
+    // Initialize neural prediction system
+    neuralPrediction_ = std::make_unique<NeuralPrediction>();
+    predictionError_ = std::make_unique<PredictionError>();
+}
 
 PredictionSystem::~PredictionSystem() = default;
 

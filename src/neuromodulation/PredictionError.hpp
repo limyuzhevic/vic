@@ -31,6 +31,12 @@ public:
     // Get error magnitude for neuromodulation
     float getMagnitude() const;
     
+    // Update with prediction error for neuromodulation
+    void updatePredictionError(float error, TimestepDuration dt);
+    
+    // Get prediction error level for neuromodulation
+    float getPredictionErrorLevel() const { return getMagnitude(); }
+
 private:
     struct Impl;
     Impl* pImpl;

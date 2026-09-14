@@ -50,4 +50,8 @@ float PredictionError::getMagnitude() const {
     return std::abs(pImpl->error);
 }
 
+void PredictionError::updatePredictionError(float error, TimestepDuration dt) {
+    computeError(0.0f, error);
+}
+
 } // namespace nlm
