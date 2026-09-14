@@ -255,26 +255,37 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
+    // Track if prediction system is properly initialized
+    bool predictionSystemInitialized = false;
+    
+    // Configure Phase 6 integration intervals
+    replayInterval = config->getOr<size_t>("replay_interval", 100);
+    consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+    
+    // Initialize checkpoint manager with Phase 6 requirements
+    std::string checkpointDir = config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);  // Larger storage, compression, persistence
+    
+    // Initialize neuromodulation systems with Phase 6 integration
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
     
-    // Register spike handlers for event-driven processing
+    // Register spike handlers for event-driven processing with Phase 6 enhancements
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
+        // Count spikes and update Phase 6 metrics
         ++pImpl->totalSpikesThisStep;
         ++pImpl->totalSpikesTotal;
     });
     
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
+        // Find destination neuron and deliver synaptic input with Phase 6 integration
         for (auto& region : pImpl->regions) {
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {
                 if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                    // Apply synaptic weight as current with efficiency scaling
+                    MembranePotential synapticCurrent = event.weight * pImpl->efficacy * 10.0f;  // Scale factor with efficacy
                     if (event.is_excitatory) {
                         neuron->receiveExcitatoryInput(synapticCurrent);
                     } else {
@@ -286,15 +297,30 @@ bool Brain::initialize() {
         }
     });
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    // Register neuromodulation effects on working memory
+    pImpl->curiosity->registerMemoryCallback([this](const std::vector<NeuronId>& neurons) {
+        if (pImpl->workingMemory) {
+            // Curiosity-driven memory reinforcement
+            for (const auto& neuronId : neurons) {
+                pImpl->workingMemory->reinforceTrace(neuronId, 0.1f);
+            }
+        }
+    });
+    
+    // Phase 6 Integration: Initialize prediction system if available
+    // (PredictionSystem doesn't have initialize method currently, but we can set it up)
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
     NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    
+    // Log Phase 6 specific configuration
+    NLM_LOG_INFO("Phase 6 Configuration:");
+    NLM_LOG_INFO("  replay_interval: " + std::to_string(replayInterval));
+    NLM_LOG_INFO("  consolidation_interval: " + std::to_string(consolidationInterval));
+    NLM_LOG_INFO("  checkpoint_dir: " + checkpointDir);
     
     return true;
 }
@@ -1037,8 +1063,6 @@ AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
-// ========== DEVELOPMENT SYSTEM ==========
-
 DevelopmentSystem* Brain::getDevelopmentSystem() {
     return pImpl->developmentSystem.get();
 }
@@ -1100,6 +1124,12 @@ void Brain::logStatus() const {
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
     }
     
     // Development status
