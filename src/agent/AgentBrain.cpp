@@ -76,11 +76,13 @@ void AgentBrain::initialize(const SimpleWorld& world) {
 
 size_t AgentBrain::getSensoryInputSize() const {
     // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
+    // These correspond to the brain's sensory neuron populations
+    return 256 + 8 + 4 + 6;  // = 274 total sensory channels
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
+    // One motor neuron per action (Forward, Backward, TurnLeft, TurnRight, Interact, Wait)
+    // Each motor neuron represents the output channel for that specific action
     return 6;
 }
 
