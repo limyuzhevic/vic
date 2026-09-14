@@ -20,18 +20,29 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     
     const auto& state = neuron->getState();
     
-    // Leaky integration: dV/dt = -(V - V_rest) / tau + I / C
-    // For simplicity using explicit Euler:
-    // V_new = V_old + dt * (-(V_old - V_rest) / tau + I / C)
+    // Bounds checking: ensure neuron has valid parameters
+    if (!neuron) return;
     
+    // Bound membrane potential to prevent numerical instability
     float V = neuron->getMembranePotential();
+    V = std::clamp(V, -100.0f, 50.0f);
+    neuron->setMembranePotential(V);
+    
     float V_rest = state.restingPotential;
     float I = neuron->getTotalCurrent();
     float tau = pImpl->membraneTimeConstant;
     float R = pImpl->membraneResistance;
     
-    // Simple Euler integration
+    // Bound parameters to prevent division by zero or extreme values
+    if (tau <= 0.0f || R <= 0.0f) {
+        tau = std::max(tau, 0.1f);
+        R = std::max(R, 0.1f);
+    }
+    
+    // Simple Euler integration with bounds checking
     float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
+    dV = std::clamp(dV, -10.0f, 10.0f); // Prevent excessive voltage changes
+    
     neuron->setMembranePotential(V + dV);
     
     // Check for firing
@@ -40,10 +51,15 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
         neuron->recordSpike(0.0);  // TODO: pass actual time
     }
     
-    // Refractory mechanism
+    // Refractory mechanism with bounds checking
     if (neuron->isRefractory()) {
         neuron->setMembranePotential(state.resetPotential);
     }
+    
+    // Ensure membrane potential doesn't exceed bounds
+    float finalV = neuron->getMembranePotential();
+    finalV = std::clamp(finalV, -100.0f, 50.0f);
+    neuron->setMembranePotential(finalV);
     
     // Clear current for next step
     neuron->clearTotalCurrent();

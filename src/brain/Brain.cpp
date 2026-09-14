@@ -75,6 +75,9 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // Thread synchronization
+    mutable std::mutex brainMutex;
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -92,7 +95,24 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
-    {
+        , brainMutex()  // Initialize mutex
+        , workingMemory(nullptr)
+        , episodicMemory(nullptr)
+        , associativeMemory(nullptr)
+        , predictionSystem(nullptr)
+        , planner(nullptr)
+        , conceptFormation(nullptr)
+        , attention(nullptr)
+        , developmentSystem(nullptr)
+        , dopamine(nullptr)
+        , curiosity(nullptr)
+        , predictionError(nullptr)
+        , novelty(nullptr)
+        , spikeSystem(nullptr)
+        , stdp(nullptr)
+        , hebbian(nullptr)
+        , structuralPlasticity(nullptr)
+        , checkpointManager(nullptr) {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
@@ -325,6 +345,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 14. Collect statistics
      */
     
+    // Thread synchronization for safe access to shared resources
+    std::lock_guard<std::mutex> lock(pImpl->brainMutex);
+    
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
@@ -444,10 +467,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        // Bound plasticity modifier to reasonable range
+        plasticityMod = std::clamp(plasticityMod, 0.1f, 10.0f);
     }
+    
+    // Thread synchronization for safe access to shared resources during plasticity updates
+    std::lock_guard<std::mutex> lock(pImpl->brainMutex);
     
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
+            // Skip null synapse pointers
+            if (!syn) continue;
+            
             // Apply STDP with neuromodulation
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
@@ -457,8 +488,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     // Modify weight change based on dopamine
                     pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
                     float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
+                    
+                    // Apply neuromodulation with bounds checking
+                    float weightChange = (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    weight += weightChange;
+                    
+                    // Strict bounds checking to prevent instability
+                    const float MIN_WEIGHT = -1.0f;
+                    const float MAX_WEIGHT = 1.0f;
+                    weight = std::clamp(weight, MIN_WEIGHT, MAX_WEIGHT);
+                    
+                    // Only apply if weight actually changed
+                    if (weight != syn->getWeight()) {
+                        syn->setWeight(weight);
+                    }
                 }
             }
             
