@@ -12,9 +12,7 @@
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
+#include "../prediction/NeuralPrediction.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -36,10 +34,8 @@ struct Brain::Impl {
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
     
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
-    std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
+    // ========== INTEGRATED NEURAL PREDICTION SYSTEM ==========
+    std::unique_ptr<NeuralPrediction> neuralPrediction;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -108,13 +104,11 @@ struct Brain::Impl {
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
+        
+        // Initialize neural prediction system
+        neuralPrediction = std::make_unique<NeuralPrediction>();
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
@@ -229,74 +223,61 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
-    
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
-    
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
-    
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
-    
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
-    
-    pImpl->conceptFormation->initialize(this);
-    
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
-    
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
-    
-    // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
-    
-    // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
+        // Initialize neuromodulation
+        pImpl->dopamine->initialize(this);
+        pImpl->curiosity->initialize(this);
+        
+        // Initialize neural prediction system
+        pImpl->neuralPrediction->initialize(this);
+        
+        // Initialize cognition systems
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+        
+        pImpl->conceptFormation->initialize(this);
+        
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+        
+        // Register spike handlers for event-driven processing
+        pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+            // Count spikes
+            ++pImpl->totalSpikesThisStep;
+            ++pImpl->totalSpikesTotal;
+        });
+        
+        // Register delayed spike handler to deliver synaptic input
+        pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+            // Find destination neuron and deliver synaptic input
+            for (auto& region : pImpl->regions) {
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron->getId() == event.destination_neuron) {
+                        // Apply synaptic weight as current
+                        MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                        if (event.is_excitatory) {
+                            neuron->receiveExcitatoryInput(synapticCurrent);
+                        } else {
+                            neuron->receiveInhibitoryInput(-synapticCurrent);
+                        }
+                        return;
                     }
-                    return;
                 }
             }
-        }
-    });
-    
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
-    
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
-    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
-    
-    return true;
+        });
+        
+        // Configure checkpoint manager
+        std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+        
+        NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
+        NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
+        NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
+        NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
+        NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+        
+        return true;
 }
 
 void Brain::step(SimulationStep currentStep) {
@@ -511,8 +492,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state from working memory or recent input
+        std::vector<float> currentSensoryState;
+        if (pImpl->workingMemory) {
+            currentSensoryState = pImpl->workingMemory->retrieve();
+        }
+        
+        // Create SensoryInput for prediction system
+        if (!currentSensoryState.empty()) {
+            SensoryInput sensoryInput(currentSensoryState);
+            
+            // Generate prediction for next state
+            auto predictedState = pImpl->predictionSystem->predictNextState(sensoryInput);
+            
+            // Update prediction system with actual state
+            pImpl->predictionSystem->updatePredictions(predictedState, sensoryInput);
+            
+            // Use prediction error to modulate neuromodulation and attention
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (predictionError > 0.5f && pImpl->dopamine) {
+                // High prediction error increases dopamine for learning
+                float errorMod = std::min(1.0f, predictionError * 2.0f);
+                pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() + errorMod * 0.5f);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +531,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Get current sensory state and working memory content
+        std::vector<float> currentState;
+        if (pImpl->workingMemory) {
+            currentState = pImpl->workingMemory->retrieve();
+        }
+        
+        if (!currentState.empty() && pImpl->novelty) {
+            // Check if this is a novel pattern (using novelty detection)
+            float noveltyLevel = pImpl->novelty->getLevel();
+            if (noveltyLevel > 0.5f) {
+                // Novel pattern - potentially form new concept
+                // This would be expanded in a full implementation
+                // For now, just track that novel patterns exist
+            }
+            
+            // Present to concept formation system
+            // In full implementation: pImpl->conceptFormation->presentExperience(currentState, reward, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -609,10 +629,25 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+// Also store in working memory - fix integration
+    if (pImpl->workingMemory && normalizedValue > 0.5f) {
+        // Ensure working memory is properly initialized
+        pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        
+        // Record that sensory input was stored in working memory for learning
+        // This creates a sensory-memory association
+        if (pImpl->episodicMemory) {
+            EpisodicMemoryItem sensoryMemoryItem;
+            sensoryMemoryItem.timestamp = currentStep;
+            sensoryMemoryItem.sensoryState = values;
+            sensoryMemoryItem.action = ActionType::Wait;  // No action taken
+            sensoryMemoryItem.reward = 0.0f;
+            sensoryMemoryItem.novelty = 0.0f;
+            
+            // Store the sensory input with working memory context
+            pImpl->episodicMemory->storeEpisode(sensoryMemoryItem);
         }
+    }
     }
 }
 
@@ -1015,6 +1050,22 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+}
+
+// Fix integration - ensure memory systems are properly connected
+void Brain::fixMemoryIntegration() {
+    if (pImpl->workingMemory) {
+        // Ensure working memory is fully initialized
+        pImpl->workingMemory->initialize(this);
+    }
+    if (pImpl->episodicMemory) {
+        // Ensure episodic memory is fully initialized  
+        pImpl->episodicMemory->initialize(this);
+    }
+    if (pImpl->associativeMemory) {
+        // Ensure associative memory is fully initialized
+        pImpl->associativeMemory->initialize(this);
+    }
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========

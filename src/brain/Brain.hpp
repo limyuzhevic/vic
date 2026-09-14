@@ -27,7 +27,7 @@ class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
 class Novelty;
-class PredictionError;
+class NeuralPrediction;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -147,6 +147,9 @@ public:
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    
+    // Fix integration - ensure memory systems are properly connected
+    void fixMemoryIntegration();
     
     // ========== PREDICTION SYSTEM ==========
     
