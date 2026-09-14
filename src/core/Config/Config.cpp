@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -10,25 +12,87 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
-
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Enhanced JSON/YAML parser with fallback to simple key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to parse as JSON first (nlohmann/json library)
+    try {
+        nlohmann::json j;
+        file >> j;
+        
+        // Convert JSON to config entries
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            std::string key = it.key();
+            ConfigValue value;
+            
+            // Handle different JSON types
+            if (it->is_string()) {
+                value = it->get<std::string>();
+            } else if (it->is_number_integer()) {
+                value = it->get<int64_t>();
+            } else if (it->is_number_unsigned()) {
+                value = it->get<uint64_t>();
+            } else if (it->is_number_float()) {
+                value = it->get<double>();
+            } else if (it->is_boolean()) {
+                value = it->get<bool>();
+            } else if (it->is_array()) {
+                // Convert array to appropriate vector type based on element type
+                const auto& arr = *it;
+                if (!arr.empty()) {
+                    if (arr[0].is_string()) {
+                        std::vector<std::string> strVec;
+                        strVec.reserve(arr.size());
+                        for (const auto& elem : arr) {
+                            strVec.push_back(elem.get<std::string>());
+                        }
+                        value = strVec;
+                    } else if (arr[0].is_number_integer()) {
+                        std::vector<int64_t> intVec;
+                        intVec.reserve(arr.size());
+                        for (const auto& elem : arr) {
+                            intVec.push_back(elem.get<int64_t>());
+                        }
+                        value = intVec;
+                    } else if (arr[0].is_number_float()) {
+                        std::vector<double> doubleVec;
+                        doubleVec.reserve(arr.size());
+                        for (const auto& elem : arr) {
+                            doubleVec.push_back(elem.get<double>());
+                        }
+                        value = doubleVec;
+                    } else if (arr[0].is_boolean()) {
+                        std::vector<bool> boolVec;
+                        boolVec.reserve(arr.size());
+                        for (const auto& elem : arr) {
+                            boolVec.push_back(elem.get<bool>());
+                        }
+                        value = boolVec;
+                    }
+                }
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+        return true;
+    } catch (const std::exception&) {
+        // JSON parsing failed, fall back to simple key=value format
+    }
+    
+    // Fall back to simple key=value format
+    std::ifstream file2(filepath);
+    if (!file2.is_open()) {
+        return false;
+    }
+    
     std::string line;
-    while (std::getline(file, line)) {
+    int lineNumber = 0;
+    while (std::getline(file2, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,7 +112,58 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Try to convert value to appropriate type
+            bool converted = false;
+            
+            // Try boolean
+            if (!converted) {
+                if (value == "true" || value == "false") {
+                    bool boolVal = (value == "true");
+                    set(key, boolVal, ConfigSource::File);
+                    converted = true;
+                }
+            }
+            
+            // Try integer
+            if (!converted) {
+                try {
+                    size_t posEnd;
+                    int64_t intVal = std::stoll(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        set(key, intVal, ConfigSource::File);
+                        converted = true;
+                    }
+                } catch (const std::exception&) {}
+            }
+            
+            // Try unsigned integer
+            if (!converted) {
+                try {
+                    size_t posEnd;
+                    uint64_t uintVal = std::stoull(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        set(key, uintVal, ConfigSource::File);
+                        converted = true;
+                    }
+                } catch (const std::exception&) {}
+            }
+            
+            // Try floating point
+            if (!converted) {
+                try {
+                    size_t posEnd;
+                    double doubleVal = std::stod(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        set(key, doubleVal, ConfigSource::File);
+                        converted = true;
+                    }
+                } catch (const std::exception&) {}
+            }
+            
+            // If not convertible to simple type, treat as string
+            if (!converted) {
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
