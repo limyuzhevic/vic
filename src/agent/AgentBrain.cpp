@@ -142,10 +142,30 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty and prediction error
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // Connect to concept formation if available - process and form concepts from sensory patterns
+    if (brain_ && brain_->getConceptFormation() && !vision.empty()) {
+        // Use current sensory input to update concept formation
+        // This creates abstract representations of sensory patterns
+        brain_->getConceptFormation()->processSensoryInput(vision);
+    }
+    
+    // Connect to prediction system if available - use sensory input for prediction
+    if (brain_ && brain_->getPredictionSystem() && !vision.empty()) {
+        // Update prediction system with current sensory input
+        // This helps the brain anticipate future states
+        brain_->getPredictionSystem()->update(vision);
+    }
+    
+    // Connect to attention system if available - focus on salient sensory features
+    if (brain_ && brain_->getAttention() && !vision.empty()) {
+        // Update attention with current sensory input
+        brain_->getAttention()->updateAttentionalFocus(vision);
     }
 }
 
@@ -157,6 +177,65 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
+    }
+    
+    // For enhanced planning, use NeuralPlanner when available
+    // This provides sophisticated multi-step planning based on learned predictions
+    if (brain_ && brain_->getPlanner()) {
+        // Get current sensory state for planning
+        std::vector<float> currentState;
+        if (!brain_->getRegions().empty() && !brain_->getRegions()[0].empty()) {
+            // Extract sensory neuron activity as state representation
+            const auto& sensoryNeurons = sensoryVision_;
+            currentState.reserve(sensoryNeurons.size());
+            for (auto* neuron : sensoryNeurons) {
+                if (neuron) {
+                    const auto& state = neuron->getState();
+                    currentState.push_back(std::abs(state.membranePotential - state.restingPotential));
+                }
+            }
+        }
+        
+        if (!currentState.empty()) {
+            // Get planned action using NeuralPlanner's sophisticated prediction system
+            ActionType plannedAction = brain_->getPlanner()->planAction(currentState, 0.5f);
+            
+            // Convert ActionType to MotorCommand
+            MotorCommand plannedCommand = MotorCommand::Wait;
+            switch (plannedAction) {
+                case ActionType::MoveForward: plannedCommand = MotorCommand::MoveForward; break;
+                case ActionType::MoveBackward: plannedCommand = MotorCommand::MoveBackward; break;
+                case ActionType::TurnLeft: plannedCommand = MotorCommand::TurnLeft; break;
+                case ActionType::TurnRight: plannedCommand = MotorCommand::TurnRight; break;
+                case ActionType::LookLeft: plannedCommand = MotorCommand::LookLeft; break;
+                case ActionType::LookRight: plannedCommand = MotorCommand::LookRight; break;
+                case ActionType::Interact: plannedCommand = MotorCommand::Interact; break;
+                case ActionType::Wait: plannedCommand = MotorCommand::Wait; break;
+                case ActionType::MoveForward: plannedCommand = MotorCommand::MoveForward; break;
+                case ActionType::MoveBackward: plannedCommand = MotorCommand::MoveBackward; break;
+                case ActionType::TurnLeft: plannedCommand = MotorCommand::TurnLeft; break;
+                case ActionType::TurnRight: plannedCommand = MotorCommand::TurnRight; break;
+                case ActionType::Look: plannedCommand = MotorCommand::Interact; break;  // Fallback
+                case ActionType::LookUp: plannedCommand = MotorCommand::Interact; break;  // Fallback
+                case ActionType::LookDown: plannedCommand = MotorCommand::Interact; break;  // Fallback
+                case ActionType::Eat: plannedCommand = MotorCommand::Interact; break;  // Fallback
+                case ActionType::Drink: plannedCommand = MotorCommand::Interact; break;  // Fallback;
+                case ActionType::Rest: plannedCommand = MotorCommand::Wait; break;
+                case ActionType::Custom: plannedCommand = decoded; break;  // Keep original if custom
+            }
+            
+            // Use planned action if it's meaningful (not wait or same as original)
+            if (plannedCommand != MotorCommand::Wait && 
+                (plannedCommand != decoded || 
+                 plannedCommand == MotorCommand::Interact)) {
+                // Log the planning decision for debugging
+                NLM_LOG_INFO("AgentBrain: Planned action override: " + 
+                           std::to_string(static_cast<int>(plannedAction)) + 
+                           " (curiosity: " + std::to_string(curiosityLevel_) + ")");
+                
+                return plannedCommand;
+            }
+        }
     }
     
     return decoded;

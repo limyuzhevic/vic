@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Implements biological neuromodulators that regulate attention, learning, arousal, and memory
 
 class Neuromodulator {
 public:
