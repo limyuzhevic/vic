@@ -83,6 +83,11 @@ void Neuron::setFiringRate(FiringRate rate) {
     pImpl->state.firingRate = rate;
 }
 
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active || 
+           pImpl->state.firingState == FiringState::Refractory;
+}
+
 void Neuron::setLeakConductance(MembranePotential conductance) {
     pImpl->state.leakConductance = conductance;
 }
