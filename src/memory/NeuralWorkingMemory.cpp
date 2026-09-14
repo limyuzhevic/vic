@@ -1,10 +1,3 @@
-#include "NeuralWorkingMemory.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
-
-namespace nlm {
-
 struct NeuralWorkingMemory::Impl {
     Brain* brain;
     
@@ -18,18 +11,22 @@ struct NeuralWorkingMemory::Impl {
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
-    : pImpl(new Impl)
-    , brain_(nullptr)
+    : brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , pImpl(new Impl)
 {
 }
 
-NeuralWorkingMemory::~NeuralWorkingMemory() = default;
+NeuralWorkingMemory::~NeuralWorkingMemory() {
+    if (pImpl) {
+        delete pImpl;
+        pImpl = nullptr;
+    }
+}
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
@@ -44,11 +41,13 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+        if (auto* region = brain_->getRegion(neuron.getId() / 1000)) {
+            if (auto* neurons = region->getAllNeurons()) {
+                for (auto* nn : *neurons) {
+                    if (nn && nn->getId() == neuron) {
+                        nn->injectCurrent(activation * 5.0f);
+                        break;
+                    }
                 }
             }
         }

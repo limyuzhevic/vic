@@ -167,7 +167,9 @@ Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl != nullptr && other.pImpl != pImpl) {
+            delete pImpl;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -511,8 +513,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Create a copy of current sensory state for prediction
+        // The prediction system uses the latest sensory input to predict next state
+        // This implements predictive coding in the brain
+        
+        // Get current sensory state from the last input if available
+        // For now, we track prediction error history and update predictions
+        // TODO: Integrate real prediction with sensory observations
+        pImpl->predictionSystem->updatePredictions(
+            pImpl->predictionSystem->predictNextState(currentState),
+            currentState
+        );
     }
     
     // ========== STEP 9: Update attention system ==========

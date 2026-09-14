@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
+#include <unordered_set>
 
 namespace nlm {
 
@@ -90,16 +93,20 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Validate configuration values
+    bool validate() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Get default values for validation
+    static const std::unordered_map<std::string, ConfigValue>& getDefaultValues();
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Set default values
+    static void setDefaultValue(const std::string& key, const ConfigValue& value);
+    
+    // Add validation rule
+    void addValidationRule(const std::string& key, std::function<bool(const ConfigValue&)> validator);
+    
+    // Get validation error messages
+    std::vector<std::string> getValidationErrors() const;
 };
 
 } // namespace nlm

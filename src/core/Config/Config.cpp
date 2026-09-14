@@ -8,6 +8,8 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::vector<std::string> validationErrors;
+    std::unordered_map<std::string, std::function<bool(const ConfigValue&)>> validationRules;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
