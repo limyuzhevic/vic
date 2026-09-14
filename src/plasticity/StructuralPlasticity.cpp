@@ -3,6 +3,7 @@
 #include "../../brain/NeuralRegion.hpp"
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -40,41 +41,61 @@ SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source,
      * 
      * Returns INVALID_SYNAPSE_ID if creation fails.
      */
-    if (!brain) {
-        return INVALID_SYNAPSE_ID;
-    }
+    // Search for region containing destination neuron and source neuron
+    NeuralRegion* sourceRegion = nullptr;
+    NeuralRegion* targetRegion = nullptr;
     
-    // Find the region containing the destination neuron
     for (auto& region : brain->getRegions()) {
-        auto synapsesTo = region->getSynapsesTo(destination);
-        
-        // Check if connection already exists
-        for (Synapse* syn : synapsesTo) {
-            if (syn->getSourceNeuron() == source) {
-                return INVALID_SYNAPSE_ID;  // Connection already exists
+        // Find source region (contains source neuron)
+        if (!sourceRegion) {
+            auto neurons = region->getAllNeurons();
+            for (auto* neuron : neurons) {
+                if (neuron->getId() == source) {
+                    sourceRegion = region.get();
+                    break;
+                }
             }
         }
         
-        // Check max synapses limit
-        if (region->getSynapseCount() >= pImpl->maxTotalSynapses) {
-            return INVALID_SYNAPSE_ID;
+        // Find target region (contains destination neuron)
+        if (!targetRegion) {
+            auto neurons = region->getAllNeurons();
+            for (auto* neuron : neurons) {
+                if (neuron->getId() == destination) {
+                    targetRegion = region.get();
+                    break;
+                }
+            }
         }
         
-        // Count outgoing synapses from source in this region
-        auto synapsesFrom = region->getSynapsesFrom(source);
-        if (synapsesFrom.size() >= pImpl->maxSynapsesPerNeuron) {
-            continue;  // Try next region
-        }
-        
-        // Create the synapse
-        SynapseId synId = region->addSynapse(source, destination, weight, 1);
-        if (synId != INVALID_SYNAPSE_ID) {
-            ++pImpl->totalSynapsesCreated;
-            return synId;
+        if (sourceRegion && targetRegion) break;
+    }
+    
+    if (!sourceRegion || !targetRegion) {
+        return INVALID_SYNAPSE_ID;
+    }
+    
+    // Check if connection already exists within the target region
+    auto synapsesTo = targetRegion->getSynapsesTo(destination);
+    for (Synapse* syn : synapsesTo) {
+        if (syn->getSourceNeuron() == source) {
+            return INVALID_SYNAPSE_ID;  // Connection already exists
         }
     }
     
-    return INVALID_SYNAPSE_ID;
+    // Check max synapses limit for source neuron
+    auto synapsesFrom = sourceRegion->getSynapsesFrom(source);
+    if (synapsesFrom.size() >= pImpl->maxSynapsesPerNeuron) {
+        return INVALID_SYNAPSE_ID;
+    }
+    
+    // Create the synapse
+    SynapseId synId = targetRegion->addSynapse(source, destination, weight, 1);
+    if (synId != INVALID_SYNAPSE_ID) {
+        ++pImpl->totalSynapsesCreated;
+    }
+    
+    return synId;
 }
 
 bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
@@ -152,16 +173,14 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
         
         if (neuronCount < 2) continue;
         
-        // Collect activity statistics
-        struct NeuronActivity {
-            NeuronId id;
-            float activity;
-            float avgWeight;
-        };
+        // Create lookup tables for efficient access
+        std::unordered_map<NeuronId, size_t> neuronIndexMap;
         std::vector<NeuronActivity> activities;
         activities.reserve(neuronCount);
         
-        for (auto* neuron : neurons) {
+        // Fill activities array and create lookup table
+        for (size_t i = 0; i < neuronCount; ++i) {
+            auto* neuron = neurons[i];
             float activity = 0.0f;
             float avgWeight = 0.0f;
             size_t synCount = 0;
@@ -184,11 +203,15 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
             }
             
             activities.push_back({neuron->getId(), activity, avgWeight});
+            neuronIndexMap[neuron->getId()] = i;
         }
         
         // Synaptogenesis: Create new synapses between active neurons
         if (region->getSynapseCount() < pImpl->maxTotalSynapses) {
-            for (size_t attempt = 0; attempt < neuronCount; ++attempt) {
+            // Pre-calculate the number of attempts
+            size_t attempts = std::min(neuronCount * neuronCount, size_t(1000));
+            
+            for (size_t attempt = 0; attempt < attempts; ++attempt) {
                 // Probabilistic synapse formation
                 if (!rng.bernoulli(pImpl->synaptogenesisRate)) continue;
                 
@@ -210,7 +233,15 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
         }
         
         // Pruning: Remove weak or unused synapses
-        for (auto& syn : region->getSynapses()) {
+        // Create cache of neuron activities for faster lookup
+        std::unordered_map<NeuronId, float> neuronActivityMap;
+        for (const auto& activity : activities) {
+            neuronActivityMap[activity.id] = activity.activity;
+        }
+        
+        // Iterate over synapses once
+        auto synapses = region->getSynapses();
+        for (auto& syn : synapses) {
             float weight = std::abs(syn->getWeight());
             
             // Check pruning conditions

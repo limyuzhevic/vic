@@ -191,9 +191,12 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
+    // Handle refractory period - check for negative due to integer underflow
     if (pImpl->state.refractoryRemaining > 0) {
-        --pImpl->state.refractoryRemaining;
+        // Prevent underflow and ensure refractory period doesn't go negative
+        if (pImpl->state.refractoryRemaining > 0) {
+            --pImpl->state.refractoryRemaining;
+        }
         // During refractory period, clear synaptic input but don't integrate
         pImpl->synapticInput = 0.0f;
         if (pImpl->state.refractoryRemaining == 0) {
@@ -250,7 +253,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        // Neuron is not firing - should be resting or active based on input
+        pImpl->state.firingState = FiringState::Resting;
     }
     
     // Clear synaptic input for next step

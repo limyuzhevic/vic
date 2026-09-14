@@ -19,13 +19,22 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
+#include <limits>
+#include <cmath>
+#include <algorithm>
 
+const double DEFAULT_TIMESTEP = 0.001;  // 1ms
+const size_t DEFAULT_NEURON_COUNT = 500;
+const size_t DEFAULT_REGION_COUNT = 1;
+const float DEFAULT_CONNECTION_PROBABILITY = 0.15f;
+const float DEFAULT_STDP_LTP_WEIGHT = 0.02f;
+const float DEFAULT_STDP_LTD_WEIGHT = 0.015f;
+const float DEFAULT_STDP_TAU = 20.0f;
+const float DEFAULT_SYNAPTOGENESIS_RATE = 0.0001f;
+const float DEFAULT_PRUNING_RATE = 0.00001f;
+const float CURRENT_INJECTION_AMOUNT = 50.0f;
+const SimulationStep PLASTICITY_STEPS = 1000;
+const SimulationStep STDP_VERIFICATION_TRIALS = 50;
 using namespace nlm;
 
 void printBanner() {
@@ -47,8 +56,6 @@ void printBanner() {
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
 }
-
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
