@@ -50,6 +50,10 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
+    // ========== PREDICTION SYSTEM INPUT STORAGE ==========
+    // Store recent sensory input for prediction system updates
+    std::unique_ptr<SensoryInput> lastSensoryInput;
+    
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
@@ -106,8 +110,6 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
@@ -115,20 +117,6 @@ struct Brain::Impl {
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -299,7 +287,7 @@ bool Brain::initialize() {
     return true;
 }
 
-void Brain::step(SimulationStep currentStep) {
+    void step(SimulationStep currentStep) {
     step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
 }
 
@@ -507,13 +495,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
-    }
-    
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
-    }
+            }
+            
+        // Store last sensory input for prediction system update (STEP 8)
+        pImpl->lastSensoryInput = std::make_unique<SensoryInput>(input);
+        
+        // Update prediction system with stored sensory input (STEP 8)
+        // This happens every step, not just occasionally
+        if (pImpl->lastSensoryInput) {
+            if (pImpl->predictionSystem) {
+                // Predict next state based on current sensory input
+                auto predictedInput = pImpl->predictionSystem->predictNextState(*pImpl->lastSensoryInput);
+                
+                // Update predictions with actual sensory input
+                pImpl->predictionSystem->updatePredictions(*predictedInput, *pImpl->lastSensoryInput);
+                
+                // Train prediction system based on error
+                pImpl->predictionSystem->train(*pImpl->lastSensoryInput);
+            }
+            
+            // Clear stored input to prevent reuse
+            pImpl->lastSensoryInput = nullptr;
+        }
     
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
