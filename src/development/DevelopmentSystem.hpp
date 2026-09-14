@@ -33,6 +33,9 @@ public:
     // Update development with full parameters
     void update(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
     
+    // Apply developmental effects to brain systems
+    void applyStageEffects(Brain* brain, TimestepDuration dt);
+    
     // Get plasticity modifier for current stage
     float getPlasticityModifier() const;
     
@@ -48,7 +51,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
     double age_;
 };
 

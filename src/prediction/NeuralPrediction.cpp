@@ -299,13 +299,101 @@ std::vector<NeuronId> NeuralPrediction::getSequenceNeurons() const {
     return result;
 }
 
-void NeuralPrediction::clearHistory() {
-    errorHistory_.clear();
-    recentSensoryStates_.clear();
-    stateTimestamps_.clear();
-    recentActions_.clear();
-    pImpl->learnedSequences.clear();
-    pImpl->sequenceAssociations.clear();
+void NeuralPrediction::createPrediction() {
+    // Create forward model using learned sequences
+    // This builds predictive representations from recent sensory history
+    if (recentSensoryStates_.size() < 2) return;
+    
+    // Use most recent state as starting point
+    const auto& currentState = recentSensoryStates_.back();
+    
+    // Create prediction neuron for current pattern if not exists
+    NeuronId patternNeuron = findMatchingPatternNeuron(currentState);
+    if (patternNeuron == INVALID_NEURON_ID && brain_) {
+        patternNeuron = NeuronId(pImpl->patternNeurons.size() + 10000);
+        pImpl->patternNeurons.push_back(patternNeuron);
+        pImpl->patternRepresentations.push_back(currentState);
+    }
+    
+    // Store prediction in prediction neurons vector
+    if (patternNeuron != INVALID_NEURON_ID) {
+        predictionNeurons_.push_back(patternNeuron);
+        
+        // Use stored pattern for prediction
+        for (size_t i = 0; i < pImpl->patternNeurons.size(); ++i) {
+            if (pImpl->patternNeurons[i] == patternNeuron) {
+                // Predict next state based on learned associations
+                for (const auto& assoc : pImpl->sequenceAssociations) {
+                    if (assoc.first == patternNeuron) {
+                        for (size_t j = 0; j < pImpl->patternNeurons.size(); ++j) {
+                            if (pImpl->patternNeurons[j] == assoc.second) {
+                                predictionNeurons_.push_back(assoc.second);
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+    }
+}
+
+void NeuralPrediction::updatePrediction(const std::vector<float>& newData, 
+                                      SimulationStep currentStep) {
+    // Update prediction model with new sensory data
+    // This refines internal forward models based on actual observations
+    
+    // Generate prediction for new data
+    auto predicted = generatePrediction(currentStep);
+    
+    // Compute prediction error
+    float error = 0.0f;
+    if (!predicted.empty() && !newData.empty()) {
+        error = computeSimilarity(predicted, newData);
+        predictionError_ = 1.0f - error;  // Convert to error
+    }
+    
+    // Record the new observation
+    recordSensoryState(newData, currentStep);
+    
+    // Modulate synapses based on prediction error
+    float reward = 1.0f - predictionError_;
+    modulatePredictionSynapses(predictionError_, reward);
+    
+    // Create new prediction for next step
+    createPrediction();
+}
+
+float NeuralPrediction::getPredictionError() const {
+    // Compute prediction error from internal prediction
+    return predictionError_;
+}
+
+float NeuralPrediction::calculateNovelty(const std::vector<float>& input) const {
+    // Calculate how novel an input is based on learned patterns
+    if (input.empty()) return 0.0f;
+    
+    float maxSimilarity = 0.0f;
+    
+    // Find most similar learned pattern
+    for (size_t i = 0; i < pImpl->patternRepresentations.size(); ++i) {
+        float sim = computeSimilarity(input, pImpl->patternRepresentations[i]);
+        if (sim > maxSimilarity) {
+            maxSimilarity = sim;
+        }
+    }
+    
+    // Novelty = 1 - similarity (lower similarity = higher novelty)
+    float novelty = 1.0f - maxSimilarity;
+    
+    // Apply suppression for highly similar patterns
+    if (maxSimilarity > 0.8f) {
+        novelty *= 0.1f;  // Suppress novelty for familiar patterns
+    }
+    
+    return std::min(1.0f, novelty);
 }
 
 // ActionConsequencePredictor Implementation

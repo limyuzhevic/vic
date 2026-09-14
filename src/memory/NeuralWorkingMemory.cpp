@@ -33,6 +33,26 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
+void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
+    // Find or add this neuron to memory
+    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    
+    if (it != memoryNeurons_.end()) {
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        memoryActivations_[idx] = activation;
+        memoryTimestamps_[idx] = 0;
+    } else if (memoryNeurons_.size() < capacity_) {
+        memoryNeurons_.push_back(neuron);
+        memoryActivations_.push_back(activation);
+        memoryTimestamps_.push_back(0);
+    }
+    
+    // Inject current to maintain activation
+    if (brain_) {
+        brain_->injectCurrent(neuron, activation * 5.0f);
+    }
+}
+
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
@@ -66,26 +86,6 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     // Create maintenance connections if needed
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
         createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
-    }
-}
-
-void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
-    // Find or add this neuron to memory
-    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-    
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
-        memoryActivations_[idx] = activation;
-        memoryTimestamps_[idx] = 0;
-    } else if (memoryNeurons_.size() < capacity_) {
-        memoryNeurons_.push_back(neuron);
-        memoryActivations_.push_back(activation);
-        memoryTimestamps_.push_back(0);
-    }
-    
-    // Inject current to maintain activation
-    if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
     }
 }
 
@@ -137,11 +137,6 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         }
     }
     
-    // Decay weak traces
-    decayWeakTraces();
-    
-    // Run competition to select winners
-    runCompetition();
 }
 
 void NeuralWorkingMemory::clear() {

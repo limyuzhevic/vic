@@ -406,6 +406,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
+    // ========== STEP 8: Update prediction system ==========
+    if (pImpl->predictionSystem) {
+        // Connect prediction system to sensory processing via prediction error
+        if (pImpl->dopamine && pImpl->predictionError) {
+            // Simple placeholder implementation: use a dummy sensory observation
+            // In real implementation, this would process actual sensory input
+            float currentError = pImpl->predictionSystem->getPredictionError();
+            pImpl->predictionError->computeError(0.5f, 0.5f + currentError); // Dummy prediction error
+        }
+    }
+    
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
@@ -439,7 +450,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
@@ -468,7 +478,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
+                    // Dopamine modulates Hebbian plasticity strength
                     pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    float weight = syn->getWeight();
+                    weight += (plasticityMod - 1.0f) * 0.0005f; // Dopamine modulates Hebbian weight
+                    syn->setWeight(weight);
                 }
             }
             
@@ -546,30 +560,68 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+// ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
         // Development affects plasticity rates
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
+            // Get plasticity modifier from development system
+            float plasticityMod = pImpl->developmentSystem->getPlasticityModifier();
+            
+            // Apply developmental stage effects on structural plasticity
+            // Higher plasticity in early stages, lower in later stages
             DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+            float baseRate = 0.0001f;
+            float pruningRate = 0.00001f;
             
             switch (stage) {
                 case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
+                    // High synaptogenesis, low pruning
+                    sp->setSynaptogenesisRate(baseRate * plasticityMod);
+                    sp->setPruningRate(pruningRate * 0.1f);
                     break;
                 case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
+                    // Moderate synaptogenesis, low pruning
+                    sp->setSynaptogenesisRate(baseRate * plasticityMod);
+                    sp->setPruningRate(pruningRate * 0.5f);
                     break;
                 case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
+                    // Low synaptogenesis, moderate pruning
+                    sp->setSynaptogenesisRate(baseRate * plasticityMod * 0.5f);
+                    sp->setPruningRate(pruningRate * 1.0f);
                     break;
                 case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
+                    // Very low synaptogenesis, high pruning
+                    sp->setSynaptogenesisRate(baseRate * 0.1f);
+                    sp->setPruningRate(pruningRate * 2.0f);
+                    break;
+                case DevelopmentalStage::Aging:
+                    // Minimal synaptogenesis, high pruning
+                    sp->setSynaptogenesisRate(baseRate * 0.01f);
+                    sp->setPruningRate(pruningRate * 3.0f);
                     break;
             }
+            
+            // Also apply development system effects on dopamine modulation
+            if (pImpl->dopamine) {
+                // Development stage affects baseline dopamine
+                float dopamineBaseline = 0.1f;
+                switch (stage) {
+                    case DevelopmentalStage::Initial:
+                        dopamineBaseline = 0.5f;  // Higher initial motivation
+                        break;
+                    case DevelopmentalStage::Adult:
+                        dopamineBaseline = 0.2f;  // Stable adult levels
+                        break;
+                    default:
+                        dopamineBaseline = 0.1f;
+                }
+                pImpl->dopamine->setLevel(dopamineBaseline);
+            }
+        }
+    }
             
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
