@@ -28,31 +28,24 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                        if (n) {  // Null safety check
+                            // Create weak pointer from raw neuron
+                            motorForward_.push_back(std::weak_ptr<Neuron>(n));
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
+                        if (n) {  // Null safety check
+                            // Distribute sensory neurons: prioritize vision, then touch, internal, proprioception
+                            if (sensoryVision_.size() < 64) {  // Vision gets first 64 neurons
+                                sensoryVision_.push_back(std::weak_ptr<Neuron>(n));
+                            } else if (sensoryTouch_.size() < 8) {
+                                sensoryTouch_.push_back(std::weak_ptr<Neuron>(n));
+                            } else if (sensoryInternal_.size() < 4) {
+                                sensoryInternal_.push_back(std::weak_ptr<Neuron>(n));
+                            } else {
+                                sensoryProprioception_.push_back(std::weak_ptr<Neuron>(n));
+                            }
                         }
                     }
                 }
