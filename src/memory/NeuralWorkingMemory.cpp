@@ -1,3 +1,6 @@
+// Implementation for NeuralWorkingMemory
+// Provides working memory functionality using neural dynamics
+
 #include "NeuralWorkingMemory.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>

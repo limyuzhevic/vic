@@ -118,6 +118,20 @@ void testBrainStatus() {
     assert(brain.getFiringNeuronCount() >= 0);
     assert(brain.getAverageFiringRate() >= 0.0f);
     
+    // Verify cognitive systems are integrated
+    auto* planner = brain.getPlanner();
+    auto* conceptFormation = brain.getConceptFormation();
+    auto* attention = brain.getAttention();
+    
+    assert(planner != nullptr);
+    assert(conceptFormation != nullptr);
+    assert(attention != nullptr);
+    
+    // Verify cognitive systems have been initialized
+    assert(planner->getPlanningDepth() > 0);
+    assert(attention->getExcitationStrength() > 0.0f);
+    assert(attention->getInhibitionStrength() > 0.0f);
+    
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 

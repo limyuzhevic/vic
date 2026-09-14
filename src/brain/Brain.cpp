@@ -19,6 +19,8 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <numeric>
+#include <random>
 
 namespace nlm {
 
@@ -258,6 +260,7 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -265,6 +268,11 @@ bool Brain::initialize() {
         ++pImpl->totalSpikesThisStep;
         ++pImpl->totalSpikesTotal;
     });
+    
+    // Initialize prediction system
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->initialize(this);
+    }
     
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
@@ -401,7 +409,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
+// ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
@@ -524,12 +532,95 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Apply attentional modulation to neural regions based on winners
+        if (!pImpl->attention->getWinners().empty()) {
+            // Modulate neural excitability in attended regions
+            for (auto& region : pImpl->regions) {
+                for (auto& neuron : region->getAllNeurons()) {
+                    // Check if neuron is being attended
+                    bool isAttended = std::find(
+                        pImpl->attention->getWinners().begin(),
+                        pImpl->attention->getWinners().end(),
+                        neuron->getId()) != pImpl->attention->getWinners().end();
+                    
+                    if (isAttended) {
+                        // Apply excitation to attended neurons (gain modulation)
+                        neuron->injectCurrent(pImpl->attention->getExcitationFor(neuron->getId()));
+                    } else {
+                        // Apply inhibition to unattended neurons (competition)
+                        neuron->injectCurrent(-pImpl->attention->getInhibitionFor(neuron->getId()));
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts from experiences
+        // Extract relevant neural activity patterns for concept formation
+        std::vector<float> currentPattern;
+        currentPattern.reserve(getTotalNeuronCount());
+        
+        // Sample neurons for pattern extraction (weighted by activation)
+        size_t sampleCount = std::min<size_t>(100, getTotalNeuronCount());
+        std::vector<size_t> indices(getTotalNeuronCount());
+        std::iota(indices.begin(), indices.end(), 0);
+        
+        // Shuffle and sample
+        std::random_shuffle(indices.begin(), indices.end());
+        
+        float totalActivation = 0.0f;
+        for (size_t i = 0; i < sampleCount; ++i) {
+            size_t idx = indices[i];
+            // Get neuron activation - this is simplified; actual implementation
+            // would need proper neuron access
+            totalActivation += 0.5f; // Placeholder activation
+        }
+        
+        // Create pattern from sampled neurons (simplified)
+        for (size_t i = 0; i < sampleCount; ++i) {
+            float activation = 0.5f * (1.0f - static_cast<float>(i) / sampleCount);
+            currentPattern.push_back(activation);
+        }
+        
+        // Extract features from pattern (simplified)
+        std::vector<float> features;
+        for (size_t i = 0; i < std::min<size_t>(10, currentPattern.size()); ++i) {
+            features.push_back(currentPattern[i * currentPattern.size() / 10]);
+        }
+        
+        // Present experience to concept formation system
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentPattern, features, 
+            pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f,
+            currentStep
+        );
+        
+        // If concept was formed or updated, influence neural activity
+        if (conceptId > 0) {
+            // Apply concept knowledge to bias neural activity
+            // Get concept prototype
+            std::vector<float> prototype = pImpl->conceptFormation->getConceptPrototype(conceptId);
+            
+            // Apply prototype-based modulation to neuron activity
+            for (size_t i = 0; i < std::min<size_t>(50, prototype.size()); ++i) {
+                // Find corresponding neuron (simplified mapping)
+                NeuronId testId(i + 1);
+                for (auto& region : pImpl->regions) {
+                    auto neurons = region->getAllNeurons();
+                    for (auto* neuron : neurons) {
+                        if (neuron->getId().index() == testId.index()) {
+                            // Apply concept-based modulation
+                            float modulation = prototype[i] * 0.5f;
+                            neuron->injectCurrent(modulation);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -582,11 +673,51 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 15: Generate action based on planning ==========
+    if (pImpl->planner) {
+        // Generate state representation for planning
+        std::vector<float> currentState;
+        currentState.reserve(getTotalNeuronCount());
+        
+        // Sample current neural activity (simplified)
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Get normalized activation (0-1)
+                    float activation = 0.5f;  // Simplified - would use actual activation
+                    currentState.push_back(activation);
+                }
+            }
+        }
+        
+        // Get planning target from prediction error or other signals
+        float targetReward = 0.5f;
+        if (pImpl->predictionError) {
+            targetReward = pImpl->predictionError->getLevel();
+        }
+        
+        // Plan action
+        ActionType action = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Execute the action
+        if (action != ActionType::Wait) {
+            // Create motor command
+            // For now, just log the planned action
+            NLM_LOG_INFO("Planner selected action: " + std::to_string(static_cast<int>(action)));
+            
+            // Apply action to the system (would integrate with motor system)
+            // This is a simplified example - real implementation would send to motor control
+        }
+    }
+    
+    // ========== STEP 16: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
-}
+    
+    // ========== STEP 17: Collect statistics ==========
+    // Statistics collection would happen here
+}}
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // Inject current into sensory neurons based on input
