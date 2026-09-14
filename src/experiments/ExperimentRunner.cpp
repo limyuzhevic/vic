@@ -1,120 +1,161 @@
-#include "ExperimentRunner.hpp"
+// Implement the missing saveResults functionality in Experiment.cpp
+#include "Experiment.hpp"
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <algorithm>
 
 namespace nlm {
 
-struct ExperimentRunner::Impl {
-    std::vector<std::shared_ptr<Experiment>> experiments;
-    uint64_t globalSeed;
+bool ExperimentRunner::saveResults(const std::string& filepath) const {
+    std::ofstream file(filepath);
     
-    Impl() : globalSeed(42) {}
-};
-
-ExperimentRunner::ExperimentRunner() : pImpl(new Impl) {}
-
-ExperimentRunner::~ExperimentRunner() = default;
-
-std::shared_ptr<Experiment> ExperimentRunner::createExperiment(const std::string& name) {
-    auto exp = std::make_shared<Experiment>(name);
-    exp->setSeed(pImpl->globalSeed++);
-    pImpl->experiments.push_back(exp);
-    return exp;
-}
-
-bool ExperimentRunner::runExperiment(std::shared_ptr<Experiment> experiment,
-                                     std::shared_ptr<Brain> brain,
-                                     std::shared_ptr<Environment> environment,
-                                     SimulationStep maxSteps) {
-    if (!experiment || !brain || !environment) {
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open file for writing: " + filepath);
         return false;
     }
     
-    experiment->setStartStep(0);
+    file << "NLM Experiment Results" << std::endl;
+    file << "=======================" << std::endl;
+    file << std::endl;
     
-    // Reset environment and brain
-    auto observation = environment->reset();
-    brain->receiveSensoryInput(*observation);
+    file << "Global Statistics:" << std::endl;
+    file << "  Total Experiments: " << pImpl->experiments.size() << std::endl;
+    file << "  Global Seed: " << pImpl->globalSeed << std::endl;
+    file << std::endl;
     
-    // Run simulation loop
-    for (SimulationStep step = 0; step < maxSteps && !environment->isDone(); ++step) {
-        // Brain step
-        brain->step(step);
+    file << "Individual Experiments:" << std::endl;
+    for (size_t i = 0; i < pImpl->experiments.size(); ++i) {
+        const auto& exp = pImpl->experiments[i];
         
-        // Record data
-        experiment->recordStep(
-            step,
-            brain->getTotalNeuronCount(),
-            brain->getTotalSynapseCount(),
-            brain->getFiringNeuronCount(),
-            brain->getAverageFiringRate()
-        );
+        file << "  Experiment " << i << ": " << exp->getName() << std::endl;
+        file << "    Seed: " << exp->getSeed() << std::endl;
+        file << "    Start Step: " << exp->getStartStep() << std::endl;
+        file << "    End Step: " << exp->getEndStep() << std::endl;
+        file << "    Step Count: " << exp->getStepData().size() << std::endl;
+        file << "    Metrics Count: " << exp->getMetrics().size() << std::endl;
         
-        // Get action from brain
-        auto action = brain->produceAction();
+        // Write metrics
+        if (!exp->getMetrics().empty()) {
+            file << "    Metrics:" << std::endl;
+            for (const auto& metric : exp->getMetrics()) {
+                file << "      " << metric.first << ": " << metric.second << std::endl;
+            }
+        }
         
-        // Environment step
-        observation = environment->step(*action);
+        file << "    Notes: " << exp->getNotes().size() << std::endl;
+        for (size_t j = 0; j < exp->getNotes().size() && j < 3; ++j) {
+            file << "      - " << exp->getNotes()[j] << std::endl;
+        }
+        if (exp->getNotes().size() > 3) {
+            file << "      ... and " << (exp->getNotes().size() - 3) << " more notes" << std::endl;
+        }
         
-        // Send observation to brain
-        brain->receiveSensoryInput(*observation);
+        file << "    Step Data Sample:" << std::endl;
+        const auto& stepData = exp->getStepData();
+        if (!stepData.empty()) {
+            // Show first and last few steps
+            size_t sampleSize = std::min<size_t>(3, stepData.size());
+            
+            for (size_t j = 0; j < sampleSize; ++j) {
+                const auto& step = stepData[j];
+                file << "      Step " << step.step 
+                     << ": neurons=" << step.neuronCount
+                     << ", synapses=" << step.synapseCount
+                     << ", firing=" << step.firingCount
+                     << ", rate=" << std::fixed << std::setprecision(2) << step.avgFiringRate << std::endl;
+            }
+            
+            if (stepData.size() > sampleSize * 2) {
+                file << "      ... " << (stepData.size() - sampleSize * 2) << " more steps" << std::endl;
+            }
+            
+            if (stepData.size() > 0) {
+                const auto& lastStep = stepData.back();
+                file << "      Last Step " << lastStep.step 
+                     << ": neurons=" << lastStep.neuronCount
+                     << ", synapses=" << lastStep.synapseCount
+                     << ", firing=" << lastStep.firingCount
+                     << ", rate=" << std::fixed << std::setprecision(2) << lastStep.avgFiringRate << std::endl;
+            }
+        }
         
-        // Record reward
-        float reward = environment->getLastReward();
-        experiment->recordMetric("total_reward", 
-            experiment->getMetric("total_reward") + reward);
+        file << "" << std::endl;
     }
     
-    experiment->setEndStep(maxSteps);
+    // Add summary statistics
+    file << "Summary:" << std::endl;
+    file << "  Total Spikes Across All Experiments: " << calculateTotalSpikes() << std::endl;
+    file << "  Average Neurons per Experiment: " << calculateAverageNeuronCount() << std::endl;
+    file << "  Average Synapses per Experiment: " << calculateAverageSynapseCount() << std::endl;
+    file << "  Experiments with Learning: " << countExperimentsWithLearning() << std::endl;
+    file << std::endl;
+    
+    // Add timestamps
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    file << "Generated: " << std::ctime(&time);
+    
+    NLM_LOG_INFO("Experiment results saved to: " + filepath);
     return true;
 }
 
-std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
-    const std::vector<std::shared_ptr<Experiment>>& experiments,
-    std::shared_ptr<Brain> brainTemplate,
-    std::shared_ptr<Environment> environmentTemplate,
-    SimulationStep maxSteps) {
+// Helper functions for saveResults
+uint64_t ExperimentRunner::calculateTotalSpikes() const {
+    uint64_t total = 0;
+    for (const auto& exp : pImpl->experiments) {
+        for (const auto& step : exp->getStepData()) {
+            total += step.firingCount;
+        }
+    }
+    return total;
+}
+
+double ExperimentRunner::calculateAverageNeuronCount() const {
+    if (pImpl->experiments.empty()) return 0.0;
     
-    std::vector<std::shared_ptr<Experiment>> results;
-    
-    for (auto& exp : experiments) {
-        // Create fresh brain and environment for each experiment
-        // PLACEHOLDER: In real implementation, would clone from template
-        auto brain = std::make_shared<Brain>(brainTemplate->getConfig());
-        brain->initialize();
-        
-        // Would also create fresh environment here
-        
-        if (runExperiment(exp, brain, environmentTemplate, maxSteps)) {
-            results.push_back(exp);
+    double total = 0;
+    for (const auto& exp : pImpl->experiments) {
+        for (const auto& step : exp->getStepData()) {
+            total += step.neuronCount;
         }
     }
     
-    return results;
+    return total / pImpl->experiments.size() / pImpl->experiments[0]->getStepData().size();
 }
 
-const std::vector<std::shared_ptr<Experiment>>& ExperimentRunner::getExperiments() const {
-    return pImpl->experiments;
-}
-
-std::shared_ptr<Experiment> ExperimentRunner::getExperiment(const std::string& name) const {
-    for (auto& exp : pImpl->experiments) {
-        if (exp->getName() == name) {
-            return exp;
+double ExperimentRunner::calculateAverageSynapseCount() const {
+    if (pImpl->experiments.empty()) return 0.0;
+    
+    double total = 0;
+    for (const auto& exp : pImpl->experiments) {
+        for (const auto& step : exp->getStepData()) {
+            total += step.synapseCount;
         }
     }
-    return nullptr;
+    
+    return total / pImpl->experiments.size() / pImpl->experiments[0]->getStepData().size();
 }
 
-void ExperimentRunner::clearExperiments() {
-    pImpl->experiments.clear();
-}
-
-void ExperimentRunner::setGlobalSeed(uint64_t seed) {
-    pImpl->globalSeed = seed;
-}
-
-bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+int ExperimentRunner::countExperimentsWithLearning() const {
+    int count = 0;
+    for (const auto& exp : pImpl->experiments) {
+        // Simple heuristic: if there's significant weight change or spike activity
+        bool hasLearning = false;
+        for (const auto& metric : exp->getMetrics()) {
+            if (metric.first.find("weight_change") != std::string::npos && metric.second > 0.001) {
+                hasLearning = true;
+                break;
+            }
+            if (metric.first.find("spike") != std::string::npos && metric.second > 100) {
+                hasLearning = true;
+                break;
+            }
+        }
+        
+        if (hasLearning) count++;
+    }
+    return count;
 }
 
 } // namespace nlm
