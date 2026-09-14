@@ -105,6 +105,38 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Inhibited", FiringState::Inhibited)
         .export_values();
 
+    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
+        .value("Excitatory", NeuronType::Excitatory)
+        .value("Inhibitory", NeuronType::Inhibitory)
+        .value("Modulatory", NeuronType::Modulatory)
+        .value("Sensory", NeuronType::Sensory)
+        .value("Motor", NeuronType::Motor)
+        .value("Internal", NeuronType::Internal)
+        .export_values();
+
+    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
+        .value("Excitatory", SynapseType::Excitatory)
+        .value("Inhibitory", SynapseType::Inhibitory)
+        .value("Modulatory", SynapseType::Modulatory)
+        .value("Electrical", SynapseType::Electrical)
+        .value("GapJunction", SynapseType::GapJunction)
+        .export_values();
+
+    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
+        .value("Initial", DevelopmentalStage::Initial)
+        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
+        .value("Maturation", DevelopmentalStage::Maturation)
+        .value("Adult", DevelopmentalStage::Adult)
+        .value("Aging", DevelopmentalStage::Aging)
+        .export_values();
+
+    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
+        .value("Resting", FiringState::Resting)
+        .value("Active", FiringState::Active)
+        .value("Refractory", FiringState::Refractory)
+        .value("Inhibited", FiringState::Inhibited)
+        .export_values();
+
     py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
         .value("MoveForward", ActionType::MoveForward)
         .value("MoveBackward", ActionType::MoveBackward)
@@ -162,7 +194,24 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Add validation methods
+        .def("validate", &Config::validate,
+             "Validate configuration parameters")
+        .def("getInt", &Config::getOr<int64_t>, py::arg("key"), py::arg("default"),
+             "Get integer configuration value with default")
+        .def("getFloat", &Config::getOr<float>, py::arg("key"), py::arg("default"),
+             "Get float configuration value with default")
+        .def("getDouble", &Config::getOr<double>, py::arg("key"), py::arg("default"),
+             "Get double configuration value with default")
+        .def("setInt", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value, ConfigSource::Programmatic);
+        }, py::arg("key"), py::arg("value"),
+           "Set integer configuration value")
+        .def("setFloat", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, ConfigSource::Programmatic);
+        }, py::arg("key"), py::arg("value"),
+           "Set float configuration value");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
