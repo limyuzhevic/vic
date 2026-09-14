@@ -7,48 +7,47 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
-#include "brain/Brain.hpp"
-#include "brain/Neuron.hpp"
-#include "brain/Synapse.hpp"
-#include "sensory/SensoryInput.hpp"
-#include "motor/Action.hpp"
-#include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
-
 #include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <algorithm>
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printBanner();
+void printUsage();
+void printVersion();
+
+void printUsage() {
+    std::cout << "Usage: nlm [options]\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  --help, -h                 Show this help message\n";
+    std::cout << "  --version, -v              Show version information\n";
+    std::cout << "  --verbose, -V              Increase verbosity\n";
+    std::cout << "  --quiet, -q                Decrease verbosity\n";
+    std::cout << "  --config <file>            Load configuration from file\n";
+    std::cout << "  --test <name>              Run specific test (connectivity, plasticity, stdp)\n";
+    std::cout << "  --benchmark                Run benchmarks\n";
+    std::cout << "\n";
+    std::cout << "Configuration file format: key=value pairs\n";
+    std::cout << "Configuration sources (order of precedence):\n";
+    std::cout << "  1. Default configuration\n";
+    std::cout << "  2. Configuration file\n";
+    std::cout << "  3. Command line arguments\n";
+    std::cout << "  4. Runtime settings\n";
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+void printVersion() {
+    std::cout << "NLM (Neural Learning Machine) Phase 2 - Real Neural Computation\n";
+    std::cout << "Version: 0.1.0\n";
+    std::cout << "Build date: " __DATE__ " " __TIME__ "\n";
+    std::cout << "\n";
+    std::cout << "Project homepage: https://github.com/nlm-project/nlm\n";
+    std::cout << "Phase 6 Integration: Final integration of all neural systems\n";
+}
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -321,10 +320,56 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
-    printBanner();
+// Argument parsing
+    bool showHelp = false;
+    bool showVersion = false;
+    bool verbose = false;
+    bool quiet = false;
+    std::string testName = "";
+    bool runBenchmark = false;
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--version" || arg == "-v") {
+            showVersion = true;
+        } else if (arg == "--verbose" || arg == "-V") {
+            verbose = true;
+        } else if (arg == "--quiet" || arg == "-q") {
+            quiet = true;
+        } else if (arg.substr(0, 6) == "--test=") {
+            testName = arg.substr(6);
+        } else if (arg == "--benchmark") {
+            runBenchmark = true;
+        }
+    }
+    
+    if (showHelp) {
+        printUsage();
+        return 0;
+    }
+    
+    if (showVersion) {
+        printVersion();
+        return 0;
+    }
+    
+    if (verbose) {
+        // Set console logger to verbose
+    }
+    
+    if (quiet) {
+        // Set console logger to quiet
+    }
+    
+    if (!testName.empty()) {
+        NLM_LOG_INFO("Running test: " + testName);
+        // TODO: Implement test runner
+    }
+    
+    printBanner();
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();

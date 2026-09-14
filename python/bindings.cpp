@@ -25,7 +25,40 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Version: 0.1.0
+        Build date: " __DATE__ " " __TIME__ "
+        
+        Usage example:
+        ```python
+        import pynlm
+        
+        # Create a default configuration
+        config = pynlm.createDefaultConfig()
+        
+        # Create a brain with the configuration
+        brain = pynlm.createBrain(config)
+        
+        # Initialize the brain
+        brain.initialize()
+        
+        # Run a simulation step
+        brain.step(0, 0.001)
+        
+        # Produce an action
+        action = brain.produceAction()
+        ```
     )pbdoc";
+
+    // Set module version
+    m.attr("__version__") = "0.1.0";
+    
+    // Set build information
+    m.attr("__build_date__") = std::string(__DATE__ " " __TIME__);
+    
+    // Set project information
+    m.attr("__project_name__") = "NLM";
+    m.attr("__project_description__") = "Neural Learning Machine - Python Bindings";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
@@ -400,6 +433,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Add basic initialization and helper functions
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,10 +450,112 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Add global constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Add enumeration helper functions
+    m.def("neuron_type_names", []() {
+        return std::vector<std::string>{
+            "Excitatory", "Inhibitory", "Modulatory", 
+            "Sensory", "Motor", "Internal"
+        };
+    }, "Get list of neuron type names");
+
+    m.def("synapse_type_names", []() {
+        return std::vector<std::string>{
+            "Excitatory", "Inhibitory", "Modulatory",
+            "Electrical", "GapJunction"
+        };
+    }, "Get list of synapse type names");
+
+    m.def("developmental_stage_names", []() {
+        return std::vector<std::string>{
+            "Initial", "CriticalPeriod", "Maturation", "Adult", "Aging"
+        };
+    }, "Get list of developmental stage names");
+
+    m.def("action_type_names", []() {
+        return std::vector<std::string>{
+            "MoveForward", "MoveBackward", "MoveLeft", "MoveRight",
+            "TurnLeft", "TurnRight", "Look", "LookUp", "LookDown",
+            "Interact", "Eat", "Drink", "Rest", "Wait", "Custom"
+        };
+    }, "Get list of action type names");
+
+    m.def("motor_command_names", []() {
+        return std::vector<std::string>{
+            "MoveForward", "MoveBackward", "TurnLeft", "TurnRight",
+            "LookLeft", "LookRight", "Interact", "Wait"
+        };
+    }, "Get list of motor command names");
+
+    m.def("world_object_type_names", []() {
+        return std::vector<std::string>{
+            "Empty", "Resource", "Hazard", "Wall", "Marker"
+        };
+    }, "Get list of world object type names");
+
+    // Add convenience functions for common use cases
+    m.def("initialize_brain_with_config", 
+        [](std::shared_ptr<Brain> brain) {
+            if (!brain->initialize()) {
+                py::cpp_function(py::cpp_function([]() {
+                    py::register_exception<std::runtime_error>(py::module::import("pynlm"), "RuntimeError");
+                    throw std::runtime_error("Failed to initialize brain");
+                }));
+            }
+        }, 
+        py::arg("brain"), 
+        "Initialize a brain with error handling");
+
+    m.def("save_brain_state", 
+        [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+            bool success = brain->save(filepath);
+            if (!success) {
+                py::cpp_function(py::cpp_function([]() {
+                    py::register_exception<std::runtime_error>(py::module::import("pynlm"), "RuntimeError");
+                    throw std::runtime_error("Failed to save brain state");
+                }));
+            }
+            return success;
+        }, 
+        py::arg("brain"), 
+        py::arg("filepath"), 
+        "Save brain state to file");
+
+    m.def("load_brain_state", 
+        [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+            bool success = brain->load(filepath);
+            if (!success) {
+                py::cpp_function(py::cpp_function([]() {
+                    py::register_exception<std::runtime_error>(py::module::import("pynlm"), "RuntimeError");
+                    throw std::runtime_error("Failed to load brain state");
+                }));
+            }
+            return success;
+        }, 
+        py::arg("brain"), 
+        py::arg("filepath"), 
+        "Load brain state from file");
+
+    // Add type conversion helpers for better Python integration
+    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &NeuronId::value)
+        .def("index", &NeuronId::index)
+        .def("__eq__", &NeuronId::operator==)
+        .def("__ne__", &NeuronId::operator!=)
+        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const NeuronId& id) {
+            return "<NeuronId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const NeuronId& id) {
+            return std::to_string(id.value);
+        });
 }
 
 } // namespace nlm

@@ -24,11 +24,14 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +44,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key
+            if (key.empty()) {
+                NLM_LOG_WARNING("Empty key at line " + std::to_string(lineNumber));
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -49,7 +58,13 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid line format at line " + std::to_string(lineNumber) + ": " + line);
         }
+    }
+    
+    if (lineNumber == 0) {
+        NLM_LOG_WARNING("Configuration file is empty: " + filepath);
     }
     
     return true;
@@ -81,12 +96,47 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to save configuration to file: " + filepath);
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Generated on " << __DATE__ << " " << __TIME__ << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << "\"" << arg[i] << "\"";
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
+        file << "\n";
     }
     
     return true;
