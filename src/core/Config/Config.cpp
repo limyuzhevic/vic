@@ -1,4 +1,7 @@
 #include "Config.hpp"
+#include <cassert>
+#include <cstring>
+#include <typeinfo>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -19,36 +22,208 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+    // Read entire file
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    clear();
+    
+    // Simple JSON parser for configuration files
+    // Handles: { "key": "value", "num": 42, "bool": true, "array": [1, 2, 3] }
+    size_t pos = 0;
+    while (pos < content.length()) {
+        // Skip whitespace
+        while (pos < content.length() && std::isspace(content[pos])) {
+            pos++;
+        }
+        
+        if (pos >= content.length()) break;
+        
+        if (content[pos] == '}') {
+            break; // End of object
+        }
+        
+        if (content[pos] != '"') {
+            // Skip malformed entry
+            pos++;
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Parse key
+        size_t keyStart = ++pos; // Skip opening quote
+        while (pos < content.length() && content[pos] != '"') {
+            if (content[pos] == '\\') pos++; // Skip escaped characters
+            pos++;
+        }
+        
+        if (pos >= content.length()) break;
+        
+        std::string key = content.substr(keyStart, pos - keyStart);
+        pos++; // Skip closing quote
+        
+        // Skip whitespace
+        while (pos < content.length() && std::isspace(content[pos])) {
+            pos++;
+        }
+        
+        if (pos >= content.length() || content[pos] != ':') {
+            continue; // Malformed JSON
+        }
+        pos++; // Skip colon
+        
+        // Skip whitespace
+        while (pos < content.length() && std::isspace(content[pos])) {
+            pos++;
+        }
+        
+        if (pos >= content.length()) break;
+        
+        // Parse value based on type
+        ConfigValue value;
+        
+        if (content[pos] == '"') {
+            // String value
+            size_t valueStart = ++pos;
+            while (pos < content.length() && content[pos] != '"') {
+                if (content[pos] == '\\') pos++; // Skip escaped characters
+                pos++;
             }
             
+            if (pos < content.length()) {
+                value = content.substr(valueStart, pos - valueStart);
+                pos++; // Skip closing quote
+            }
+        } else if (content[pos] == 't' || content[pos] == 'f') {
+            // Boolean value
+            if (content.substr(pos, 4) == "true") {
+                value = true;
+                pos += 4;
+            } else if (content.substr(pos, 5) == "false") {
+                value = false;
+                pos += 5;
+            }
+        } else if (content[pos] == '-' || std::isdigit(content[pos])) {
+            // Number value
+            size_t numStart = pos;
+            while (pos < content.length() && (std::isdigit(content[pos]) || content[pos] == '.' || content[pos] == '-')) {
+                pos++;
+            }
+            
+            std::string numStr = content.substr(numStart, pos - numStart);
+            
+            // Try to parse as integer first
+            try {
+                size_t endpos;
+                int64_t intVal = std::stoll(numStr, &endpos);
+                if (endpos == numStr.length()) {
+                    value = intVal;
+                } else {
+                    // Try as double
+                    double doubleVal = std::stod(numStr);
+                    value = doubleVal;
+                }
+            } catch (...) {
+                // If parsing fails, treat as string
+                value = numStr;
+            }
+        } else if (content[pos] == '[') {
+            // Array value
+            std::vector<ConfigValue> array;
+            pos++; // Skip opening bracket
+            
+            while (pos < content.length() && content[pos] != ']') {
+                // Skip whitespace
+                while (pos < content.length() && std::isspace(content[pos])) {
+                    pos++;
+                }
+                
+                if (pos >= content.length()) break;
+                
+                ConfigValue arrayItem;
+                
+                if (content[pos] == '"') {
+                    size_t valueStart = ++pos;
+                    while (pos < content.length() && content[pos] != '"') {
+                        if (content[pos] == '\\') pos++;
+                        pos++;
+                    }
+                    if (pos < content.length()) {
+                        arrayItem = content.substr(valueStart, pos - valueStart);
+                        pos++; // Skip closing quote
+                    }
+                } else if (content[pos] == 't' || content[pos] == 'f') {
+                    if (content.substr(pos, 4) == "true") {
+                        arrayItem = true;
+                        pos += 4;
+                    } else if (content.substr(pos, 5) == "false") {
+                        arrayItem = false;
+                        pos += 5;
+                    }
+                } else if (content[pos] == '-' || std::isdigit(content[pos])) {
+                    size_t numStart = pos;
+                    while (pos < content.length() && (std::isdigit(content[pos]) || content[pos] == '.' || content[pos] == '-')) {
+                        pos++;
+                    }
+                    
+                    std::string numStr = content.substr(numStart, pos - numStart);
+                    try {
+                        size_t endpos;
+                        int64_t intVal = std::stoll(numStr, &endpos);
+                        if (endpos == numStr.length()) {
+                            arrayItem = intVal;
+                        } else {
+                            double doubleVal = std::stod(numStr);
+                            arrayItem = doubleVal;
+                        }
+                    } catch (...) {
+                        arrayItem = numStr;
+                    }
+                }
+                
+                // Add to array
+                if (!std::holds_alternative<std::monostate>(arrayItem)) {
+                    array.push_back(arrayItem);
+                }
+                
+                // Skip whitespace and comma
+                while (pos < content.length() && std::isspace(content[pos])) {
+                    pos++;
+                }
+                
+                if (pos < content.length() && content[pos] == ',') {
+                    pos++;
+                }
+            }
+            
+            if (pos < content.length() && content[pos] == ']') {
+                pos++; // Skip closing bracket
+            }
+            
+            value = array;
+        } else {
+            // Skip unknown value type
+            while (pos < content.length() && content[pos] != ',' && content[pos] != '}') {
+                pos++;
+            }
+            continue;
+        }
+        
+        // Skip whitespace
+        while (pos < content.length() && std::isspace(content[pos])) {
+            pos++;
+        }
+        
+        // Add entry
+        if (!std::holds_alternative<std::monostate>(value)) {
             set(key, value, ConfigSource::File);
+        }
+        
+        // Skip comma or closing brace
+        if (pos < content.length() && content[pos] == ',') {
+            pos++; // Skip comma
         }
     }
     
@@ -86,7 +261,45 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Store actual value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_integral_v<T> && !std::is_same_v<T, bool>) {
+                file << arg;
+            } else if constexpr (std::is_floating_point_v<T>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << "UNKNOWN_TYPE";
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;
