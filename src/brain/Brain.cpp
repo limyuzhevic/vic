@@ -511,8 +511,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural activity
+        // The prediction system learns to predict upcoming sensory states
+        // We use the current brain state (neural activity pattern) as input
+        
+        // Create a simple representation of current brain state for prediction
+        std::vector<float> currentActivity;
+        
+        // Sample neural activity from representative neurons
+        size_t sampleSize = std::min(static_cast<size_t>(10), pImpl->sensoryNeurons.size());
+        if (sampleSize > 0) {
+            // Use a subset of sensory neuron membrane potentials as prediction input
+            for (size_t i = 0; i < sampleSize; ++i) {
+                if (pImpl->sensoryNeurons[i]) {
+                    float activity = std::abs(pImpl->sensoryNeurons[i]->getState().membranePotential - 
+                                             pImpl->sensoryNeurons[i]->getState().restingPotential);
+                    currentActivity.push_back(activity);
+                }
+            }
+        }
+        
+        // Create SensoryInput from neural activity (placeholder for real integration)
+        if (!currentActivity.empty()) {
+            // Update prediction system with current brain state
+            // This is a simplified integration - real implementation would use
+            // actual sensory input or more sophisticated neural activity patterns
+            if (!pImpl->predictionSystem->getErrorHistory().empty()) {
+                // We've had predictions, so we can compute prediction error
+                float predictionError = pImpl->predictionSystem->getPredictionError();
+                // Update prediction based on current activity
+                // In a real implementation, this would involve training the prediction model
+                // For now, we just store the prediction error
+                pImpl->predictionSystem->getErrorHistory().push_back(predictionError);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========

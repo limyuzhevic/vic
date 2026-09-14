@@ -152,6 +152,63 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // Check if we have a neural planner
+    if (brain_->getPlanner()) {
+        // Get current state as neural activity for planning
+        std::vector<float> currentState;
+        
+        // Sample neural activity for planning
+        size_t neuronsToSample = std::min(static_cast<size_t>(20), brain_->getTotalNeuronCount());
+        if (neuronsToSample > 0) {
+            // Sample from motor neuron activity to understand current state
+            if (!brain_->getMotorNeurons().empty()) {
+                // Get activity levels of a subset of motor neurons
+                size_t motorNeuronsToSample = std::min(neuronsToSample, 
+                                                      brain_->getMotorNeurons().size());
+                for (size_t i = 0; i < motorNeuronsToSample; ++i) {
+                    auto* neuron = brain_->getMotorNeurons()[i];
+                    float activity = std::abs(neuron->getState().membranePotential - 
+                                             neuron->getState().restingPotential);
+                    currentState.push_back(activity);
+                }
+            }
+            
+            // Get planning target from neuromodulation
+            float rewardPrediction = 0.0f;
+            if (brain_->getPredictionErrorSignal()) {
+                rewardPrediction = brain_->getPredictionErrorSignal()->getLevel();
+            }
+            
+            // Plan action using neural planner
+            ActionType plannedAction = brain_->getPlanner()->planAction(currentState, rewardPrediction);
+            
+            // Convert neural planner's planned action to MotorCommand
+            // Map common action types to motor commands
+            MotorCommand plannedMotorCmd = actionToMotorCommand(plannedAction);
+            
+            // Compare with default action and choose based on confidence
+            MotorCommand defaultAction = decodeFromMotorNeurons();
+            
+            // Use planned action if planner has high confidence
+            float plannerConfidence = brain_->getPlanner()->getPlanningConfidence();
+            if (plannerConfidence > 0.5f && plannedAction != ActionType::Wait) {
+                // Override default with planned action
+                return plannedMotorCmd;
+            } else if (plannerConfidence < 0.3f) {
+                // Low confidence from planner - use more exploration
+                // Let curiosity system influence the decision
+                if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+                    // Apply curiosity-based exploration
+                    return selectWithCuriosity(defaultAction);
+                }
+            }
+            
+            // Fall back to motor neuron decoding
+            return defaultAction;
+        }
+    }
+    
+    // Original motor neuron decoding
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
@@ -233,6 +290,37 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     }
     
     return defaultCmd;
+}
+
+// Helper function to convert ActionType to MotorCommand
+MotorCommand actionToMotorCommand(ActionType actionType) {
+    // Map from ActionType to MotorCommand
+    // This is a simplified mapping - in a real implementation,
+    // the mapping would be more sophisticated
+    
+    switch (actionType) {
+        case ActionType::MoveForward:
+            return MotorCommand::MoveForward;
+        case ActionType::MoveBackward:
+            return MotorCommand::MoveBackward;
+        case ActionType::TurnLeft:
+            return MotorCommand::TurnLeft;
+        case ActionType::TurnRight:
+            return MotorCommand::TurnRight;
+        case ActionType::Interact:
+            return MotorCommand::Interact;
+        case ActionType::MoveLeft:
+        case ActionType::MoveRight:
+        case ActionType::Look:
+        case ActionType::LookUp:
+        case ActionType::LookDown:
+        case ActionType::Eat:
+        case ActionType::Drink:
+        case ActionType::Rest:
+        case ActionType::Custom:
+        default:
+            return MotorCommand::Wait;
+    }
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {

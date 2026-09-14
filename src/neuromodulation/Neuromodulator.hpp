@@ -1,8 +1,6 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include <string>
-#include <vector>
+#include "Neuromodulator.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <algorithm>
 
 namespace nlm {
 
@@ -50,40 +48,73 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation
 // PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
     const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
+    float getLevel() const override;
+    void setLevel(float level) override;
     float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    void update(TimestepDuration dt) override;
+    
+    // Enhance attention and memory consolidation
+    void enhanceAttention(float focusLevel);
+    void strengthenMemoryConsolidation(bool duringSleep);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
 // PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
     const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
+    float getLevel() const override;
+    void setLevel(float level) override;
     float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    void update(TimestepDuration dt) override;
+    
+    // Enhance alertness and signal detection
+    void increaseAlertness(float level);
+    void enhanceSensoryProcessing(float gain);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
 // PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
+    Serotonin();
+    ~Serotonin() override;
+    
     const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
+    float getLevel() const override;
+    void setLevel(float level) override;
     float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    void update(TimestepDuration dt) override;
+    
+    // Modulate social behavior and impulse control
+    void modulateSocialBehavior(float socialDrive);
+    void reduceImpulsivity(float level);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
