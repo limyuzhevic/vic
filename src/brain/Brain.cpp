@@ -528,8 +528,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        pImpl->conceptFormation->update(pImpl->timestep);
+        
+        // Apply concept formation to working memory
+        if (pImpl->workingMemory) {
+            // Would extract features and store in concept memory
+            // For now, just log that concept formation is active
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
