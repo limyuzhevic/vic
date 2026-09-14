@@ -31,6 +31,8 @@ struct Brain::Impl {
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
+    std::unique_ptr<NeuralSemanticMemory> semanticMemory;
+    std::unique_ptr<NeuralProceduralMemory> proceduralMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
@@ -111,6 +113,8 @@ struct Brain::Impl {
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        semanticMemory = std::make_unique<NeuralSemanticMemory>();
+        proceduralMemory = std::make_unique<NeuralProceduralMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
         // Initialize prediction system
@@ -241,6 +245,7 @@ bool Brain::initialize() {
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
+    // Set up pattern-based associations for neural pattern completion
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -401,9 +406,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
+    // ========== STEP 4: Connect working memory to episodic memory ==========
+    if (pImpl->workingMemory && pImpl->episodicMemory) {
+        // Store working memory traces as episodes every 10 steps
+        pImpl->stepsSinceLastEpisode++;
+        if (pImpl->stepsSinceLastEpisode >= 10) {
+            pImpl->stepsSinceLastEpisode = 0;
+            
+            EpisodicMemoryItem episode;
+            episode.timestamp = currentStep;
+            episode.metadata = "Working memory consolidation";
+            
+            // Capture working memory traces as episode content
+            size_t numTraces = pImpl->workingMemory->getActiveTraces();
+            for (size_t i = 0; i < std::min(numTraces, static_cast<size_t>(50)); ++i) {
+                episode.neurons.push_back(static_cast<NeuronId>(i));
+                episode.values.push_back(pImpl->workingMemory->getTrace(i));
+            }
+            
+            // Store in episodic memory
+            pImpl->episodicMemory->storeEpisode(episode);
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -505,7 +528,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Store episode in episodic memory
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // Store in associative memory for pattern completion
+            if (pImpl->associativeMemory && !episode.sensoryState.empty()) {
+                pImpl->associativeMemory->associateFromExperience(episode);
+            }
         }
     }
     
@@ -530,6 +559,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
+    }
+    
+    // ========== STEP 10.5: Update associative memory ==========
+    if (pImpl->associativeMemory) {
+        // Form associations between neural patterns for rapid pattern completion
+        // This creates pattern-based associations that integrate with concept formation
+        // Associations are formed based on co-activation of neural patterns
+        pImpl->associativeMemory->processExperience(
+            std::vector<float>(), // Would come from working memory/active patterns
+            std::vector<float>(), // Would come from future states or predictions
+            0.0f                 // Would come from prediction error or reward
+        );
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1013,17 +1054,21 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
 }
 
+NeuralSemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+NeuralProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
+}
+
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
-
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
-
-// ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
     return pImpl->planner.get();
@@ -1037,8 +1082,6 @@ AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
-// ========== DEVELOPMENT SYSTEM ==========
-
 DevelopmentSystem* Brain::getDevelopmentSystem() {
     return pImpl->developmentSystem.get();
 }
@@ -1050,8 +1093,6 @@ DevelopmentalStage Brain::getDevelopmentalStage() const {
 void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;
 }
-
-// ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
