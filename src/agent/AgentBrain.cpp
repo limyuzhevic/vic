@@ -87,6 +87,32 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
+    // Store sensory input in working memory for cognitive processing
+    if (brain_->getWorkingMemory()) {
+        // Combine all sensory modalities into a single pattern
+        std::vector<float> sensoryPattern;
+        
+        // Vision input (256 values -> primary feature)
+        const auto& vision = percept.getVision();
+        sensoryPattern.insert(sensoryPattern.end(), vision.begin(), vision.end());
+        
+        // Touch input (8 values -> appended)
+        const auto& touch = percept.getTouch();
+        sensoryPattern.insert(sensoryPattern.end(), touch.begin(), touch.end());
+        
+        // Internal signals (4 values -> appended)
+        const auto& intern = percept.getInternal();
+        sensoryPattern.insert(sensoryPattern.end(), intern.begin(), intern.end());
+        
+        // Proprioception (6 values -> appended)
+        const auto& proprio = percept.getProprioception();
+        sensoryPattern.insert(sensoryPattern.end(), proprio.begin(), proprio.end());
+        
+        // Store in working memory with current neuromodulation strength
+        float storageStrength = curiosityEnabled_ ? curiosityLevel_ : 0.5f;
+        brain_->getWorkingMemory()->store(sensoryPattern, storageStrength);
+    }
+    
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
@@ -123,31 +149,6 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
-    
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
-        }
-        
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
-    }
-    
-    // Update curiosity based on novelty
-    if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
-        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
-    }
-}
 
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
