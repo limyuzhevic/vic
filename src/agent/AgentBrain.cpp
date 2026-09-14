@@ -1,7 +1,12 @@
-#include "AgentBrain.hpp"
+// Include SimulationStep type for timestamps
+#include "../core/Types/Types.hpp"
+
+// Include necessary headers for new functionality
 #include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/ConceptFormation.hpp"
 
 namespace nlm {
 
@@ -232,51 +237,75 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         }
     }
     
-    return defaultCmd;
+    // Update prediction system with new reward
+    auto* predictionSystem = brain_->getPredictionSystem();
+    if (predictionSystem) {
+        predictionSystem->updateReward(predictionError_, reward);
+    }
+    
+    // Update cognitive systems with new experience
+    auto* conceptFormation = brain_->getConceptFormation();
+    if (conceptFormation) {
+        // Create concept from recent sensory patterns
+        createConceptFromExperience();
+    }
 }
 
-void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+void AgentBrain::storeExperienceInBrain() {
+    if (!brain_) return;
     
-    // Compute prediction error
-    predictionError_ = reward - predictedReward;
+    // Create an episodic memory item from recent experience
+    // This captures the agent's experience in the brain's episodic memory
     
-    // Update expected reward (exponential moving average)
-    expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
+    // For now, store simple experience in working memory
+    // Later, this could be enhanced to store rich episodic memories
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
-    
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
-    
-    // Apply to all synapses with eligibility traces
-    for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
-            
-            if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
-                syn->addToWeight(delta);
-                
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
-            }
+    if (auto* workingMemory = brain_->getWorkingMemory()) {
+        // Store current novelty as a memory trace
+        if (noveltyLevel_ > 0.1f) {
+            workingMemory->storeToNeuron(
+                static_cast<NeuronId>(1000),  // Special ID for experiences
+                noveltyLevel_ * 2.0f
+            );
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
-    
-    // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+    if (auto* episodicMemory = brain_->getEpisodicMemory()) {
+        // Create a simple episode
+        EpisodicMemoryItem episode;
+        episode.timestamp = static_cast<SimulationStep>(100);  // Would need current step
+        episode.reward = dopamineLevel_ * 0.1f;  // Convert dopamine to reward scale
+        
+        // Store a few key neurons as active in this episode
+        episode.activeNeurons.push_back(static_cast<NeuronId>(1000));  // Novelty neuron
+        episode.activeNeurons.push_back(static_cast<NeuronId>(1001));  // Reward neuron
+        
+        for (size_t i = 0; i < episode.activeNeurons.size(); ++i) {
+            episode.neuronActivations.push_back(1.0f - i * 0.2f);
+        }
+        
+        episodicMemory->storeEpisode(episode);
     }
+}
+
+void AgentBrain::createConceptFromExperience() {
+    if (!brain_) return;
+    
+    auto* conceptFormation = brain_->getConceptFormation();
+    if (!conceptFormation) return;
+    
+    // Build a concept from recent patterns
+    std::vector<float> experiencePattern;
+    
+    // Include novelty, curiosity, and prediction error
+    experiencePattern.push_back(noveltyLevel_);      // Novelty
+    experiencePattern.push_back(curiosityLevel_);   // Curiosity
+    experiencePattern.push_back(predictionError_);   // Prediction error
+    experiencePattern.push_back(dopamineLevel_);     // Reward prediction error
+    experiencePattern.push_back(plasticityModifier_); // Plasticity state
+    
+    // Create the concept
+    conceptFormation->updateConcept(experiencePattern);
 }
 
 void AgentBrain::updateDevelopment(double timestep) {

@@ -511,8 +511,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current state
+        // Prediction error drives learning through neuromodulation
+        if (pImpl->dopamine) {
+            float predictionError = pImpl->dopamine->getPredictionError();
+            pImpl->predictionSystem->updatePrediction(currentStep, predictionError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +532,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract patterns from neural activity for concept formation
+        // This requires building a representation of current neural state
+        std::vector<float> neuralPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    neuralPattern.push_back(
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 100.0f);
+                }
+            }
+        }
+        
+        if (!neuralPattern.empty()) {
+            pImpl->conceptFormation->updateConcept(neuralPattern);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
