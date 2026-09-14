@@ -258,6 +258,203 @@ print("Agent simulation complete!")
 
 ## Quick Reference
 
+# Mini Projects
+
+### Project 1: Silent Brain (Just Neurons)
+
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+for i in range(10):
+    brain.step(i)
+
+print("Silent brain test done!")
+```
+
+### Project 2: Brain Watching a World
+
+```python
+import pynlm
+
+# Setup
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Watch the world for 30 steps
+for i in range(30):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(i)
+    
+print("Watched world for 30 steps")
+print("Firing rate:", brain.getAverageFiringRate())
+```
+
+### Project 3: Complete Agent
+
+```python
+import pynlm
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Run agent
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+print("Agent simulation complete!")
+```
+
+### Project 4: Advanced Brain with Memory (NEW)
+
+```python
+import pynlm
+
+# Create and initialize a sophisticated brain
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 5000)
+config.set("brain.synapse_density", 0.15)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Enable all advanced subsystems
+agent = pynlm.createAgentBrain(brain)
+
+# Access and configure memory systems
+working_memory = brain.getWorkingMemory()
+episodic_memory = brain.getEpisodicMemory()
+associative_memory = brain.getAssociativeMemory()
+
+# Configure prediction system
+prediction_system = brain.getPredictionSystem()
+
+# Configure development
+brain.enableDevelopment(True)
+development_system = brain.getDevelopmentSystem()
+
+# Configure neuromodulation
+brain.enableRewardModulation(True)
+brain.enableCuriosity(True)
+brain.enableNovelty(True)
+
+# Run simulation with learning
+for step in range(1000):
+    world = pynlm.createSimpleWorld()
+    world.configure(width=30, height=30, visionWidth=16, visionHeight=16)
+    world.reset()
+    
+    agent.initialize(world)
+    
+    # Process sensory input
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    
+    # Run brain step
+    brain.step(step)
+    
+    # Get action and apply
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply reward modulation
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    
+    # Update development
+    agent.updateDevelopment(0.1)
+    
+    # Log progress
+    if step % 100 == 0:
+        print(f"Step {step}:")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Memory capacity: {working_memory.getCapacity()}")
+        print(f"  Working memory usage: {working_memory.getUsage()}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+
+print("Advanced simulation complete!")
+```
+
+### Project 5: Sensory Processing Demo (NEW)
+
+```python
+import pynlm
+import math
+
+# Create brain with enhanced sensory processing
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Create sophisticated sensory inputs
+vision = pynlm.createVision(width=64, height=64, channels=3)
+
+# Create a checkerboard pattern
+for y in range(64):
+    for x in range(64):
+        if (x + y) % 2 == 0:
+            vision.setData([1.0, 1.0, 1.0])
+        else:
+            vision.setData([0.0, 0.0, 0.0])
+
+# Process through neural system
+brain.receiveSensoryInput(vision)
+
+# Apply image processing through brain
+for step in range(10):
+    brain.step(step)
+
+# Apply Python-style image processing through brain
+brain.receiveSensoryInput(vision)
+
+# Enhanced processing through Python utilities
+vision_normalized = vision.normalize()
+vision_smoothed = vision.resizeBilinear(32, 32)
+
+# Create world and agent
+world = pynlm.createSimpleWorld()
+world.configure(width=64, height=64, visionWidth=32, visionHeight=32)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+print(f"Original resolution: {vision.getWidth()}x{vision.getHeight()}")
+print(f"Normalized range: {vision_normalized.getWidth()}x{vision_normalized.getHeight()}")
+print(f"Smoothed resolution: {vision_smoothed.getWidth()}x{vision_smoothed.getHeight()}")
+
+print("Sensory processing demo complete!")
+```
+
+---
+
+## Quick Reference
+
 | What you want | Code |
 |--------------|------|
 | Create brain | `pynlm.createBrain(config)` |
@@ -268,6 +465,18 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+
+| Advanced Features | Code |
+|------------------|------|
+| Access working memory | `brain.getWorkingMemory()` |
+| Access episodic memory | `brain.getEpisodicMemory()` |
+| Access associative memory | `brain.getAssociativeMemory()` |
+| Access prediction system | `brain.getPredictionSystem()` |
+| Access development system | `brain.getDevelopmentSystem()` |
+| Access neuromodulation | `brain.getDopamine()`, `brain.getCuriosity()`, etc. |
+| Enhanced config methods | `config.get_int()`, `config.get_float()` |
+| Vision processing | `vision.normalize()`, `vision.resizeBilinear()` |
+| Audio effects | `audio.applyEffect("reverse")` |
 
 ---
 
@@ -285,13 +494,127 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
----
+**"Getting new errors with advanced features"**
+- Check that you're using the updated pynlm bindings
+- Some new methods may require recent builds
+- Try simpler configurations first
 
-## Next Steps
+### Project 4: Advanced Brain with Memory (NEW)
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+```python
+import pynlm
 
-That's it! You're now ready to use NLM.
+# Create and initialize a sophisticated brain
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 5000)
+config.set("brain.synapse_density", 0.15)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Enable all advanced subsystems
+agent = pynlm.createAgentBrain(brain)
+
+# Access and configure memory systems
+working_memory = brain.getWorkingMemory()
+episodic_memory = brain.getEpisodicMemory()
+associative_memory = brain.getAssociativeMemory()
+
+# Configure prediction system
+prediction_system = brain.getPredictionSystem()
+
+# Configure development
+brain.enableDevelopment(True)
+development_system = brain.getDevelopmentSystem()
+
+# Configure neuromodulation
+brain.enableRewardModulation(True)
+brain.enableCuriosity(True)
+brain.enableNovelty(True)
+
+# Run simulation with learning
+for step in range(1000):
+    world = pynlm.createSimpleWorld()
+    world.configure(width=30, height=30, visionWidth=16, visionHeight=16)
+    world.reset()
+    
+    agent.initialize(world)
+    
+    # Process sensory input
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    
+    # Run brain step
+    brain.step(step)
+    
+    # Get action and apply
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply reward modulation
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    
+    # Update development
+    agent.updateDevelopment(0.1)
+    
+    # Log progress
+    if step % 100 == 0:
+        print(f"Step {step}:")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Memory capacity: {working_memory.getCapacity()}")
+        print(f"  Working memory usage: {working_memory.getUsage()}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+
+print("Advanced simulation complete!")
+```
+
+### Project 5: Sensory Processing Demo (NEW)
+
+```python
+import pynlm
+import math
+
+# Create brain with enhanced sensory processing
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Create sophisticated sensory inputs
+vision = pynlm.createVision(64, 64, 3)
+
+# Create a checkerboard pattern
+for y in range(64):
+    for x in range(64):
+        if (x + y) % 2 == 0:
+            vision.setData([1.0, 1.0, 1.0])
+        else:
+            vision.setData([0.0, 0.0, 0.0])
+
+# Process through neural system
+brain.receiveSensoryInput(vision)
+
+# Apply image processing through brain
+for step in range(10):
+    brain.step(step)
+
+# Apply Python-style image processing through brain
+brain.receiveSensoryInput(vision)
+
+# Enhanced processing through Python utilities
+vision_normalized = vision.normalize()
+vision_smoothed = vision.resizeBilinear(32, 32)
+
+# Create world and agent
+world = pynlm.createSimpleWorld()
+world.configure(width=64, height=64, visionWidth=32, visionHeight=32)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+print(f"Original resolution: {vision.getWidth()}x{vision.getHeight()}")
+print(f"Normalized range: {vision_normalized.getWidth()}x{vision_normalized.getHeight()}")
+print(f"Smoothed resolution: {vision_smoothed.getWidth()}x{vision_smoothed.getHeight()}")
+
+print("Sensory processing demo complete!")
+```

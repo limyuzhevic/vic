@@ -290,6 +290,25 @@ brain.load("checkpoint.bin")       # Load state
 # Regions
 region_id = brain.addRegion("cortex")
 region = brain.getRegion(region_id)
+
+# Enhanced Brain API (NEW)
+brain.getWorkingMemory()          # Access working memory system
+brain.getEpisodicMemory()        # Access episodic memory system
+brain.getAssociativeMemory()     # Access associative memory system
+brain.getPredictionSystem()      # Access prediction system
+brain.getPlanner()               # Access neural planner
+brain.getConceptFormation()      # Access concept formation
+brain.getAttention()             # Access attentional selection
+brain.getDevelopmentSystem()     # Access development system
+brain.getDopamine()              # Access dopamine neuromodulation
+brain.getCuriosity()             # Access curiosity system
+brain.getNovelty()               # Access novelty detection
+brain.getPredictionError()       # Access prediction error
+brain.getRandomGenerator()       # Access random number generator
+brain.getSpikeSystem()           # Access spike system
+brain.getSTDP()                  # Access STDP plasticity
+brain.getHebbian()               # Access Hebbian plasticity
+brain.getStructuralPlasticity()  # Access structural plasticity
 ```
 
 #### Config Class
@@ -309,6 +328,14 @@ config.set("learning.rate", 0.001)
 # File I/O
 config.loadFromFile("config.json")
 config.saveToFile("config.json")
+
+# Enhanced Config API (NEW)
+config.get_int("key", default)     # Type-safe int getter
+config.get_float("key", default)   # Type-safe float getter
+config.get_string("key", default)  # Type-safe string getter
+config.set_int("key", value)       # Type-safe int setter
+config.set_float("key", value)     # Type-safe float setter
+config.set_string("key", value)    # Type-safe string setter
 ```
 
 #### AgentBrain Class
@@ -344,6 +371,55 @@ agent.getCuriosityLevel()
 agent.getNoveltyLevel()
 agent.getPredictionError()
 agent.getNeuromodulationLevel()
+
+# Enhanced AgentBrain API (NEW)
+agent.getTotalNeurons()           # Convenience wrapper
+agent.getTotalSynapses()          # Convenience wrapper
+agent.getActiveNeurons()          # Convenience wrapper
+agent.getFiringNeurons()          # Convenience wrapper
+agent.getAverageFiringRate()      # Convenience wrapper
+```
+
+#### Vision Class (Enhanced)
+
+```python
+# Creation
+vision = pynlm.createVision(width, height, channels=3)
+
+# Data handling
+vision.setData(data)              # Set raw data
+vision.setDataRaw(data, size)     # Set raw pointer data
+
+# Image processing
+vision.normalize()               # Normalize pixel values
+vision.resizeBilinear(width, height)  # Resize with interpolation
+vision.isValid()                 # Check if data is valid
+```
+
+#### Audio Class (Enhanced)
+
+```python
+# Creation
+audio = pynlm.createAudio(sampleRate, numSamples)
+
+# Audio processing
+audio.setData(data)              # Set audio samples
+audio.normalize(targetLevel=0.5)  # Normalize volume
+audio.applyEffect(effect, param=0.5)  # Apply echo, reverse
+```
+
+#### InternalSignals Class (Enhanced)
+
+```python
+# Signal processing
+internal.addSignal(value)        # Add a signal
+internal.clearSignals()          # Clear all signals
+internal.getMaxSignal()          # Get maximum value
+internal.getMinSignal()          # Get minimum value
+internal.getAverageSignal()      # Get average value
+internal.getStdDev()             # Get standard deviation
+internal.addNoise(noiseLevel=0.1)  # Add Gaussian noise
+internal.smooth(alpha=0.5)      # Apply exponential smoothing
 ```
 
 #### SimpleWorld Class
