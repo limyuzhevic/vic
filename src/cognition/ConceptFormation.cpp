@@ -1,13 +1,19 @@
 #include "ConceptFormation.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <unordered_map>
 
 namespace nlm {
 
 struct ConceptFormation::Impl {
     Brain* brain;
+    std::unordered_map<size_t, std::vector<size_t>> conceptToWorkingMemoryConnections;
     
     Impl() : brain(nullptr) {}
 };
@@ -90,7 +96,141 @@ size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
     NLM_LOG_INFO("ConceptFormation: Created concept " + std::to_string(concept.id) +
                  " (category: " + concept.categoryHint + ")");
     
+    // Store concept information in episodic memory for consolidation
+    if (brain_) {
+        storeConceptsInEpisodicMemory(concept.id, 0);
+    }
+    
     return concept.id;
+}
+
+void ConceptFormation::storeConceptsInEpisodicMemory(size_t conceptId, SimulationStep currentStep) {
+    if (!brain_) return;
+    
+    auto* episodicMemory = brain_->getEpisodicMemory();
+    if (!episodicMemory) return;
+    
+    // Get concept information
+    const DiscoveredConcept* concept = getConcept(conceptId);
+    if (!concept) return;
+    
+    // Create a concept information episode for consolidation
+    EpisodicMemoryItem conceptEpisode;
+    conceptEpisode.timestamp = currentStep;
+    conceptEpisode.conceptId = conceptId;
+    
+    // Store concept prototype as sensory state
+    conceptEpisode.sensoryState = concept->prototype;
+    
+    // Store reward/purpose information
+    float conceptReward = 0.0f;
+    for (const auto& instance : concept->instances) {
+        conceptReward += instance.avgReward;
+    }
+    conceptEpisode.reward = conceptReward / concept->instances.size();
+    
+    // Store concept category as novelty
+    conceptEpisode.novelty = 1.0f - concept->avgStability;
+    
+    // Add to episodic memory for later consolidation
+    episodicMemory->storeEpisode(conceptEpisode);
+}
+
+std::vector<float> ConceptFormation::getConceptInformationForPrediction(size_t conceptId) const {
+    const DiscoveredConcept* concept = getConcept(conceptId);
+    if (!concept) return {};
+    
+    std::vector<float> conceptInfo;
+    conceptInfo.reserve(concept->prototype.size() + 3);
+    
+    // Add prototype
+    conceptInfo.insert(conceptInfo.end(), concept->prototype.begin(), concept->prototype.end());
+    
+    // Add stability
+    conceptInfo.push_back(concept->avgStability);
+    
+    // Add how many observations
+    conceptInfo.push_back(static_cast<float>(concept->totalObservations) / 10.0f);
+    
+    // Add generalization ability
+    conceptInfo.push_back(getGeneralizationAbility(conceptId));
+    
+    return conceptInfo;
+}
+
+std::vector<std::vector<float>> ConceptFormation::getAllConceptPrototypes() const {
+    std::vector<std::vector<float>> prototypes;
+    prototypes.reserve(concepts_.size());
+    
+    for (const auto& concept : concepts_) {
+        prototypes.push_back(concept.prototype);
+    }
+    
+    return prototypes;
+}
+
+void ConceptFormation::enhancePredictionWithConcepts(float predictionError, float currentTime) {
+    if (concepts_.empty() || !brain_) return;
+    
+    // Find the most stable concept that matches current prediction error
+    size_t bestConceptId = 0;
+    float bestMatch = 0.0f;
+    
+    for (const auto& concept : concepts_) {
+        if (concept.avgStability > 0.5f) {
+            // Concept matches if its stability is similar to prediction error
+            float match = 1.0f - std::abs(concept.avgStability - predictionError);
+            if (match > bestMatch) {
+                bestMatch = match;
+                bestConceptId = concept.id;
+            }
+        }
+    }
+    
+    if (bestConceptId > 0) {
+        // Get concept information and enhance prediction system
+        auto conceptInfo = getConceptInformationForPrediction(bestConceptId);
+        
+        if (!conceptInfo.empty() && brain_->getPredictionSystem()) {
+            // Store concept-enhanced prediction error
+            // In a full implementation, this would update the prediction system's
+            // internal model with the abstract concept information
+            NLM_LOG_INFO("ConceptFormation: Enhanced prediction error " + 
+                         std::to_string(predictionError) + " with concept " +
+                         std::to_string(bestConceptId));
+        }
+    }
+}
+
+void ConceptFormation::connectToWorkingMemory(const std::vector<float>& workingMemoryPattern) {
+    if (!brain_ || workingMemoryPattern.empty()) return;
+    
+    // Find concepts that match working memory content
+    size_t matchingConcept = findConceptForPattern(workingMemoryPattern);
+    
+    if (matchingConcept > 0) {
+        // Store this connection for later use
+        pImpl->conceptToWorkingMemoryConnections[matchingConcept].push_back(0); // Would need neuron ID
+        NLM_LOG_INFO("ConceptFormation: Connected concept " + std::to_string(matchingConcept) +
+                     " to working memory");
+    }
+}
+
+size_t ConceptFormation::getBestConceptForPlanning(const std::vector<float>& currentState) const {
+    if (concepts_.empty()) return 0;
+    
+    size_t bestConceptId = 0;
+    float bestMatch = 0.0f;
+    
+    for (const auto& concept : concepts_) {
+        float sim = computeSimilarity(currentState, concept.prototype);
+        if (sim > bestMatch && concept.avgStability > 0.5f) {
+            bestMatch = sim;
+            bestConceptId = concept.id;
+        }
+    }
+    
+    return bestConceptId;
 }
 
 void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>& newPattern,

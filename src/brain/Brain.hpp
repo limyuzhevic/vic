@@ -25,9 +25,10 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+class Oxytocin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -174,6 +175,18 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and working memory
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, emotion, and sleep
+    Serotonin* getSerotonin();
+    
+    // Oxytocin - social bonding
+    Oxytocin* getOxytocin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();

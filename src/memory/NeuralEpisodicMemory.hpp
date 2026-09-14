@@ -41,11 +41,14 @@ struct EpisodicMemoryItem {
     // Time since this episode
     SimulationStep age;
     
+    // Concept that best matches this episode (for concept formation integration)
+    size_t conceptId;
+    
     EpisodicMemoryItem()
         : timestamp(0), positionX(0), positionY(0), orientation(0)
         , action(ActionType::Wait)
         , reward(0), energy(0), novelty(0)
-        , resultingReward(0), age(0) {}
+        , resultingReward(0), age(0), conceptId(0) {}
 };
 
 // NeuralEpisodicMemory: Stores experiences in a way that interacts with neural substrate

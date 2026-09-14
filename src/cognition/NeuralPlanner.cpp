@@ -237,8 +237,78 @@ void NeuralPlanner::updatePlanQuality(const std::vector<ActionType>& plannedActi
     }
 }
 
-void NeuralPlanner::clearCache() {
-    // Clear any planning cache
+void NeuralPlanner::integrateConceptPlanning(const std::vector<std::vector<float>>& conceptPrototypes,
+                                           const std::vector<size_t>& conceptIds) {
+    conceptPrototypes_ = conceptPrototypes;
+    conceptIds_ = conceptIds;
+    
+    // Use concepts to bias action selection
+    // Concepts with higher stability have more influence on planning
+    std::vector<size_t> stableConceptIndices;
+    for (size_t i = 0; i < conceptIds_.size(); ++i) {
+        // Find concept stability (not accessible directly in NeuralPlanner, would need ConceptFormation reference)
+        // For now, use all concepts with index > 0 (non-zero IDs)
+        if (conceptIds_[i] > 0) {
+            stableConceptIndices.push_back(i);
+        }
+    }
+    
+void NeuralPlanner::integrateConceptPlanning(const std::vector<std::vector<float>>& conceptPrototypes,
+                                           const std::vector<size_t>& conceptIds) {
+    conceptPrototypes_ = conceptPrototypes;
+    conceptIds_ = conceptIds;
+    
+    // Use concepts to bias action selection
+    // Concepts with higher stability have more influence on planning
+    std::vector<size_t> stableConceptIndices;
+    for (size_t i = 0; i < conceptIds_.size(); ++i) {
+        // Find concept stability (not accessible directly in NeuralPlanner, would need ConceptFormation reference)
+        // For now, use all concepts with index > 0 (non-zero IDs)
+        if (conceptIds_[i] > 0) {
+            stableConceptIndices.push_back(i);
+        }
+    }
+    
+    // If we have stable concepts, use them to influence planning
+    if (!stableConceptIndices.empty() && brain_) {
+        // Get working memory content
+        auto* workingMemory = brain_->getWorkingMemory();
+        if (workingMemory) {
+            auto memoryNeurons = workingMemory->getMemoryNeurons();
+            if (!memoryNeurons.empty()) {
+                // Find matching concept for current working memory
+                auto* conceptFormation = brain_->getConceptFormation();
+                if (conceptFormation) {
+                    // Convert memory to pattern for concept matching
+                    std::vector<float> currentState;
+                    for (NeuronId neuronId : memoryNeurons) {
+                        // Find neuron activation
+                        for (auto& region : brain_->getRegions()) {
+                            auto neurons = region->getAllNeurons();
+                            for (auto* neuron : neurons) {
+                                if (neuron->getId() == neuronId) {
+                                    currentState.push_back(
+                                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (!currentState.empty()) {
+                        size_t bestConcept = conceptFormation->getBestConceptForPlanning(currentState);
+                        if (bestConcept > 0) {
+                            setBestConceptForPlanning(bestConcept);
+                            NLM_LOG_INFO("NeuralPlanner: Integrated concept " + std::to_string(bestConcept) +
+                                         " into planning");
+        size_t bestConcept = conceptFormation->getBestConceptForPlanning(currentState);
+        if (bestConcept > 0) {
+            setBestConceptForPlanning(bestConcept);
+            NLM_LOG_INFO("NeuralPlanner: Integrated concept " + std::to_string(bestConcept) +
+                         " into planning");
+        }
+    }
+}
 }
 
 bool NeuralPlanner::wasRecentPlanSuccessful() const {

@@ -88,7 +88,7 @@ public:
                             float reward,
                             SimulationStep currentTime);
 
-    // Get the concept that best matches a pattern
+// Get the concept that best matches a pattern
     size_t getMatchingConcept(const std::vector<float>& pattern,
                               float similarityThreshold = 0.7f) const;
 
@@ -137,6 +137,26 @@ public:
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+    
+    // NEW METHODS FOR INTEGRATION:
+    
+    // Store current working memory concepts in episodic memory for consolidation
+    void storeConceptsInEpisodicMemory(size_t conceptId, SimulationStep currentStep);
+    
+    // Get concept information for prediction system
+    std::vector<float> getConceptInformationForPrediction(size_t conceptId) const;
+    
+    // Get all concept prototypes for planning
+    std::vector<std::vector<float>> getAllConceptPrototypes() const;
+    
+    // Use concepts to enhance prediction by combining with prediction error
+    void enhancePredictionWithConcepts(float predictionError, float currentTime);
+    
+    // Connect to working memory for retrieval
+    void connectToWorkingMemory(const std::vector<float>& workingMemoryPattern);
+    
+    // Get the best concept for planning given current state
+    size_t getBestConceptForPlanning(const std::vector<float>& currentState) const;
 
 private:
     // Create new concept from pattern

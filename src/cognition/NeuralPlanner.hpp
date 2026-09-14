@@ -74,6 +74,20 @@ public:
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
 
+    // Concept-based planning integration
+    // Use concepts to guide planning
+    void integrateConceptPlanning(const std::vector<std::vector<float>>& conceptPrototypes,
+                                 const std::vector<size_t>& conceptIds);
+    
+    // Get the best concept for planning given current state
+    size_t getBestConceptForPlanning(const std::vector<float>& currentState) const {
+        return 0;  // Not implemented yet
+    }
+    
+    void setBestConceptForPlanning(size_t conceptId) {
+        // Not implemented yet
+    }
+
 private:
     // Generate possible action sequences
     std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
@@ -96,6 +110,11 @@ private:
     
     // Recent plan success history
     std::deque<bool> recentPlanSuccess_;
+    
+    // Concept-based planning
+    size_t bestConceptId_;
+    std::vector<std::vector<float>> conceptPrototypes_;
+    std::vector<size_t> conceptIds_;
 };
 
 // SelfModel: Represents the agent's internal model of itself
@@ -129,9 +148,9 @@ public:
     float getSelfModelConfidence(ActionType action) const;
 
     // Is this change likely caused by self (action) vs external?
-    float computeSelfGenerated Likeness(const std::vector<float>& beforeState,
-                                       const std::vector<float>& afterState,
-                                       ActionType action) const;
+    float computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
+                                    const std::vector<float>& afterState,
+                                    ActionType action) const;
 
     // Get the body schema (preferred actions in different states)
     // Returns map of state -> preferred action

@@ -36,6 +36,11 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
     
+    // Add prediction error to episode if available
+    if (brain_ && brain_->getPredictionErrorSignal()) {
+        stored.novelty = brain_->getPredictionErrorSignal()->getError();
+    }
+    
     episodes_.push_back(stored);
     
     // Create episode neuron for pattern completion

@@ -4,12 +4,10 @@
 #include <vector>
 #include <functional>
 
-namespace nlm {
-
-// Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
-
-class WorkingMemory {
+// Forward declarations for integrated memory systems
+class NeuralWorkingMemory;
+class NeuralEpisodicMemory;
+class NeuralAssociativeMemory;
 public:
     WorkingMemory();
     ~WorkingMemory();
