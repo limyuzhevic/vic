@@ -511,8 +511,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // The prediction system is updated with current sensory input
+        // It computes prediction error and updates internal model
+        if (pImpl->workingMemory) {
+            // Extract current activity pattern from working memory
+            std::vector<float> currentActivity = pImpl->workingMemory->retrieve();
+            
+            // Create a minimal sensory input from working memory
+            class SensoryInput input;
+            input.setVision(currentActivity);  // Use as vision proxy
+            
+            // Predict next state based on current activity
+            auto prediction = pImpl->predictionSystem->predictNextState(input);
+            
+            // Update predictions based on actual activity
+            if (!currentActivity.empty()) {
+                pImpl->predictionSystem->updatePredictions(prediction, input);
+                
+                // The prediction error affects neuromodulation and learning
+                float error = pImpl->predictionSystem->getPredictionError();
+                if (pImpl->curiosity) {
+                    // Novelty influences curiosity based on prediction error
+                    pImpl->curiosity->updateFromPredictionError(error);
+                }
+                if (pImpl->dopamine) {
+                    // Prediction error affects dopamine signaling
+                    pImpl->dopamine->setLevel(std::max(0.0f, pImpl->dopamine->getLevel() + error));
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,13 +554,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Process current neural activity patterns to form concepts
+        // Use working memory activity as input for concept formation
+        auto memoryActivity = pImpl->workingMemory->retrieve();
+        if (!memoryActivity.empty()) {
+            // Store the pattern in concept formation
+            pImpl->conceptFormation->learnPattern(memoryActivity);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
+    if (currentStep % 100 == 0 && pImpl->structuralPlasticity) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
@@ -547,7 +579,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+    if (currentStep % 1000 == 0 && pImpl->developmentSystem) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
         // Development affects plasticity rates
