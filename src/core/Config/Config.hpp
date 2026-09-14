@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include "../Exceptions.hpp"
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -92,6 +94,11 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // JSON processing
+    void processJSON(const nlohmann::json& json, ConfigSource source);
+    void processNestedJSON(const nlohmann::json& json, const std::string& prefix, ConfigSource source);
+    void setConfigEntryFromJSON(const std::string& key, const nlohmann::json& value, ConfigSource source);
     
 private:
     struct Impl;

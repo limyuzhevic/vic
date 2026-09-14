@@ -150,13 +150,37 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     auto endWall = std::chrono::high_resolution_clock::now();
     result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
     
-    NLM_LOG_INFO("=== Experiment Complete ===");
-    NLM_LOG_INFO("Total reward: " + std::to_string(result.totalReward));
-    NLM_LOG_INFO("Avg firing rate: " + std::to_string(result.avgFiringRate));
-    NLM_LOG_INFO("Episodes stored: " + std::to_string(result.memoryEpisodesStored));
-    NLM_LOG_INFO("Wall time: " + std::to_string(result.totalWallClockTime) + "s");
+    NLM_LOG_INFO("=== Integration Verification ===");
+    NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Checkpointing: " + std::string(result.checkpointingWorks ? "WORKING" : "NOT WORKING"));
+    NLM_LOG_INFO("Replay: " + std::string(result.replayWorks ? "WORKING" : "NOT WORKING"));
     
-    return result;
+    NLM_LOG_INFO("=== Integration Verification Summary ===");
+    
+    int integratedSystems = 0;
+    if (result.memoryWorkingMemoryIntegrated) integratedSystems++;
+    if (result.memoryEpisodicMemoryIntegrated) integratedSystems++;
+    if (result.neuromodulationIntegrated) integratedSystems++;
+    if (result.predictionIntegrated) integratedSystems++;
+    if (result.developmentIntegrated) integratedSystems++;
+    if (result.checkpointingWorks) integratedSystems++;
+    if (result.replayWorks) integratedSystems++;
+    
+    float integrationScore = (static_cast<float>(integratedSystems) / 7.0f) * 100.0f;
+    NLM_LOG_INFO("Integration Score: " + std::to_string(integrationScore) + "%");
+    
+    if (integrationScore >= 85.0f) {
+        NLM_LOG_INFO("✓ SUCCESS: Brain systems are well integrated (Phase 6 completed)");
+    } else {
+        NLM_LOG_WARN("⚠ WARNING: Some systems not fully integrated (Phase 6 partial)");
+    }
+    
+    NLM_LOG_INFO("=== Phase 6 Integration Complete ===");
+}
 }
 
 bool Phase6IntegratedExperiment::verifyIntegration() {

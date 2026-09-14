@@ -1,215 +1,207 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <filesystem>
-
-namespace nlm {
-
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
-
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
-
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
-}
-
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
+// Handle --key=value format
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key
+                if (key.empty()) {
+                    NLM_LOG_ERROR("Error: Empty key in command line argument: " + arg);
+                    return false;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_WARN("Warning: Invalid command line argument format (missing '='): " + arg);
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (arg[0] == '-') {
+            if (arg.length() == 1) {
+                NLM_LOG_ERROR("Error: Invalid command line argument: -");
+                return false;
+            }
+            
             std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            if (key.empty()) {
+                NLM_LOG_ERROR("Error: Empty key in command line argument: " + arg);
+                return false;
+            }
+            
+            if (i + 1 < argc) {
+                std::string value = argv[++i];
+                set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_ERROR("Error: Missing value for command line argument: -" + key);
+                return false;
+            }
+        } else {
+            NLM_LOG_WARN("Warning: Unknown command line argument format: " + arg);
         }
     }
+    
     return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Validate filepath
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Error: Empty file path provided for saving");
+        return false;
+    }
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Error: Cannot open file for writing: " + filepath);
         return false;
+    }
+    
+    // Check if we have entries to save
+    if (pImpl->entries.empty()) {
+        NLM_LOG_WARN("Warning: No configuration entries to save to " + filepath);
     }
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
+    NLM_LOG_INFO("Successfully saved configuration to file: " + filepath);
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
+void Config::processJSON(const nlohmann::json& json, ConfigSource source) {
+    if (!json.is_object()) {
+        NLM_LOG_ERROR("Error: JSON data must be an object, got " + json.type_name());
+        return;
     }
     
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
+    for (const auto& [key, value] : json.items()) {
+        if (key.empty()) {
+            NLM_LOG_ERROR("Error: Empty key in JSON object");
+            continue;
+        }
+        
+        if (value.is_object() || value.is_array()) {
+            // For nested objects or arrays, flatten the structure
+            processNestedJSON(value, key, source);
+        } else {
+            setConfigEntryFromJSON(key, value, source);
+        }
     }
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
-    }
-    return keys;
-}
-
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
+void Config::processNestedJSON(const nlohmann::json& json, const std::string& prefix, ConfigSource source) {
+    if (json.is_array()) {
+        for (size_t i = 0; i < json.size(); ++i) {
+            std::string key = prefix + "[" + std::to_string(i) + "]";
+            if (json[i].is_object() || json[i].is_array()) {
+                processNestedJSON(json[i], key + ".", source);
             } else {
-                oss << arg;
+                setConfigEntryFromJSON(key, json[i], source);
             }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        }
+    } else if (json.is_object()) {
+        for (const auto& [key, value] : json.items()) {
+            if (key.empty()) {
+                NLM_LOG_ERROR("Error: Empty key in nested JSON object");
+                continue;
+            }
+            
+            std::string newKey = prefix + "." + key;
+            if (value.is_object() || value.is_array()) {
+                processNestedJSON(value, newKey, source);
+            } else {
+                setConfigEntryFromJSON(newKey, value, source);
+            }
+        }
     }
-    return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+void Config::setConfigEntryFromJSON(const std::string& key, const nlohmann::json& value, ConfigSource source) {
+    ConfigValue configValue;
+    
+    if (value.is_string()) {
+        configValue = value.get<std::string>();
+    } else if (value.is_number_integer()) {
+        // Check if it fits into int64_t
+        try {
+            int64_t val = value.get<int64_t>();
+            configValue = val;
+        } catch (const std::out_of_range&) {
+            NLM_LOG_ERROR("Error: Integer value " + value.dump() + " for key " + key + " is too large for int64_t");
+            configValue = 0; // Default value
+        }
+    } else if (value.is_number_unsigned()) {
+        // Check if it fits into uint64_t
+        try {
+            uint64_t val = value.get<uint64_t>();
+            configValue = val;
+        } catch (const std::out_of_range&) {
+            NLM_LOG_ERROR("Error: Unsigned integer value " + value.dump() + " for key " + key + " is too large for uint64_t");
+            configValue = 0; // Default value
+        }
+    } else if (value.is_number()) {
+        // Check if it's actually an integer
+        if (value.is_number_integer()) {
+            // Check range
+            double intpart;
+            if (std::modf(value.get<double>(), &intpart) == 0.0 && 
+                value.get<double>() >= static_cast<double>(std::numeric_limits<int64_t>::min()) &&
+                value.get<double>() <= static_cast<double>(std::numeric_limits<int64_t>::max())) {
+                configValue = static_cast<int64_t>(value.get<double>());
+            } else {
+                NLM_LOG_ERROR("Error: Integer value " + value.dump() + " for key " + key + " is out of range for int64_t");
+                configValue = 0; // Default value
+            }
+        } else {
+            // Double value
+            double dval = value.get<double>();
+            if (std::isfinite(dval)) {
+                configValue = dval;
+            } else {
+                NLM_LOG_ERROR("Error: Invalid (non-finite) double value " + value.dump() + " for key " + key);
+                configValue = 0.0f; // Default value
+            }
+        }
+    } else if (value.is_boolean()) {
+        configValue = value.get<bool>();
+    } else if (value.is_array()) {
+        // Handle arrays - for now just store as string representation
+        std::vector<std::string> strArray;
+        for (size_t i = 0; i < value.size(); ++i) {
+            if (value[i].is_string()) {
+                strArray.push_back(value[i].get<std::string>());
+            } else if (value[i].is_number()) {
+                strArray.push_back(std::to_string(value[i].get<double>()));
+            } else {
+                strArray.push_back(value[i].dump());
+            }
+        }
+        configValue = strArray;
+    } else {
+        // Fallback to string representation
+        configValue = value.dump();
+    }
+    
+    set(key, configValue, source);
 }
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
