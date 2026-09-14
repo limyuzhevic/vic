@@ -190,6 +190,48 @@ bool Brain::initialize() {
         addRegion("Region_" + std::to_string(i + 1));
     }
     
+    // CONNECT INTEGRATED SYSTEMS TO THE BRAIN LOOP
+    
+    // Initialize working memory - CRITICAL FOR PERCEPTION MEMORY
+    pImpl->workingMemory->initialize(this);
+    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    
+    // Initialize episodic memory - CRITICAL FOR EXPERIENCE STORAGE
+    pImpl->episodicMemory->initialize(this);
+    pImpl->episodicMemory->setMaxEpisodes(1000);
+    
+    // Initialize associative memory - CRITICAL FOR PATTERN RECALL
+    pImpl->associativeMemory->initialize(this);
+    
+    // Initialize prediction system - CRITICAL FOR EXPECTATION
+    // (PredictionSystem doesn't have initialize method currently)
+    
+    // Initialize cognition systems
+    pImpl->planner->initialize(this);
+    pImpl->planner->setPlanningDepth(5);
+    
+    pImpl->conceptFormation->initialize(this);
+    
+    pImpl->attention->initialize(this);
+    pImpl->attention->setInhibitionStrength(0.5f);
+    pImpl->attention->setExcitationStrength(1.5f);
+    
+    // Initialize neuromodulation
+    pImpl->novelty->initialize(this);
+    pImpl->curiosity->initialize(this);
+    
+    // Register for spike handling in event-driven processing
+    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+        // Count spikes
+        ++pImpl->totalSpikesThisStep;
+        ++pImpl->totalSpikesTotal;
+        
+        // Store active neurons in working memory
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->storeToNeuron(event.neuron_id, 0.5f);
+        }
+    });
+    
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
     for (size_t i = 0; i < regionCount; ++i) {
@@ -231,29 +273,8 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
-    
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
-    
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
-    
-    // Initialize prediction system
+    // Initialize prediction system - CRITICAL FOR EXPECTATION
     // (PredictionSystem doesn't have initialize method currently)
-    
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
-    
-    pImpl->conceptFormation->initialize(this);
-    
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -264,6 +285,11 @@ bool Brain::initialize() {
         // Count spikes
         ++pImpl->totalSpikesThisStep;
         ++pImpl->totalSpikesTotal;
+        
+        // Store active neurons in working memory
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->storeToNeuron(event.neuron_id, 0.5f);
+        }
     });
     
     // Register delayed spike handler to deliver synaptic input
@@ -899,7 +925,10 @@ bool Brain::load(const std::string& filepath) {
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         
-        NLM_LOG_INFO("Brain state loaded successfully");
+        // TODO: Implement actual synapse restoration from checkpoint data
+        // This would involve reconstructing the synaptic connections using the saved data
+        // For now, just log that loading is successful
+        NLM_LOG_INFO("Brain state loaded successfully (note: synapse data not restored yet)");
         return true;
         
     } catch (const std::exception& e) {
