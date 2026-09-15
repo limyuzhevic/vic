@@ -1,4 +1,7 @@
 #include "PlasticityRule.hpp"
+#include "../brain/Synapse.hpp"
+#include <cmath>
+#include <algorithm>
 
 namespace nlm {
 

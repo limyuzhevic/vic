@@ -66,11 +66,34 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### Standard Build
 ```bash
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
+```
+
+### Python Bindings Build
+```bash
+# Install build dependencies
+pip install pybind11 scikit-build-core pytest numpy
+
+# Build and install
+pip install .
+```
+
+### Using pyproject.toml (Modern Python Packaging)
+```bash
+# Install with scikit-build-core (used automatically by pip)
+pip install .
+
+# Build only (without installing)
+pip install build
+python -m build
+
+# Install specific build from wheel
+pip install dist/*.whl
 ```
 
 ## Running
