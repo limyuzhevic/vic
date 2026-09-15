@@ -1,12 +1,18 @@
-#pragma once
+#ifndef AGENT_BODY_HPP
+#define AGENT_BODY_HPP
 
 #include <cstdint>
 #include <string>
 
 namespace nlm {
 
-// Agent body state - contains physical properties and internal state
-// This is part of the environment, not the brain
+/**
+ * @brief Agent body state - contains physical properties and internal state
+ * 
+ * This is part of the environment, not the brain. The agent body represents
+ * the physical embodiment of the agent in the simulated world, including
+ * position, orientation, velocity, and internal physiological state.
+ */
 struct AgentBody {
     // Position in world
     float x;
@@ -30,12 +36,18 @@ struct AgentBody {
     bool isTurning;
     float lastActionTime;
     
+    /**
+     * @brief Default constructor initializes agent at origin with full energy
+     */
     AgentBody()
         : x(0.0f), y(0.0f), orientation(0.0f)
         , velocityX(0.0f), velocityY(0.0f), angularVelocity(0.0f)
         , energy(1.0f), health(1.0f), age(0.0f)
         , isMoving(false), isTurning(false), lastActionTime(0.0f) {}
     
+    /**
+     * @brief Reset agent to initial state
+     */
     void reset() {
         x = 0.0f;
         y = 0.0f;
@@ -52,9 +64,14 @@ struct AgentBody {
     }
 };
 
-// Low-level motor commands that the brain can produce
-// These are innate muscle-like signals, not semantic actions
+/**
+ * @brief Low-level motor commands that the brain can produce
+ * 
+ * These are innate muscle-like signals, not semantic actions. They represent
+ * the basic output commands the agent's motor system can generate.
+ */
 enum class MotorCommand {
+public:
     MoveForward = 0,   // Propel forward
     MoveBackward = 1,  // Propel backward  
     TurnLeft = 2,      // Rotate left
@@ -65,7 +82,12 @@ enum class MotorCommand {
     Wait = 7           // No movement
 };
 
-// Action result from the world's perspective
+/**
+ * @brief Action result from the world's perspective
+ * 
+ * This struct captures the outcome of an action taken by the agent,
+ * including the reward received and whether the action was successful.
+ */
 struct ActionResult {
     float reward;
     bool success;
@@ -76,8 +98,15 @@ struct ActionResult {
         : reward(r), success(s), message(m) {}
 };
 
-// Object types in the world (for rendering/debug only, NOT given to brain)
+/**
+ * @brief Object types in the world (for rendering/debug only, NOT given to brain)
+ * 
+ * These enum values define the types of objects that exist in the simulation
+ * world. Note: These types are NOT provided to the brain's sensory input
+ * - they are used only for visualization, debugging, and environment management.
+ */
 enum class WorldObjectType {
+public:
     Empty = 0,
     Resource = 1,      // Positive reward
     Hazard = 2,        // Negative reward
@@ -86,3 +115,5 @@ enum class WorldObjectType {
 };
 
 } // namespace nlm
+
+#endif // AGENT_BODY_HPP
