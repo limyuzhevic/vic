@@ -172,3 +172,7 @@ private:
 };
 
 } // namespace nlm
+
+// Helper functions for memory management (declared in namespace nlm)
+EpisodicMemoryItem compressEpisode(const EpisodicMemoryItem& episode);
+void consolidateEpisodicMemory(float relevanceThreshold);

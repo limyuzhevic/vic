@@ -1,14 +1,50 @@
-#include "Memory.hpp"
 #include <algorithm>
+#include <string>
+#include <sstream>
 
 namespace nlm {
 
 // Working Memory Implementation
 struct WorkingMemory::Impl {
-    std::vector<std::pair<NeuronId, float>> items;
+    struct Item {
+        NeuronId neuron;
+        float value;
+        size_t accessCount; // Track access frequency for eviction priority
+        
+        Item(NeuronId n, float v) : neuron(n), value(v), accessCount(0) {}
+    };
+    
+    std::vector<Item> items;
     size_t capacity;
     
     Impl(size_t cap) : capacity(cap) {}
+    
+    // Find item by neuron ID
+    Item* find(NeuronId neuron) {
+        for (auto& item : items) {
+            if (item.neuron == neuron) {
+                item.accessCount++; // Increment access count on access
+                return &item;
+            }
+        }
+        return nullptr;
+    }
+    
+    // Remove least accessed item
+    void evictLeastAccessed() {
+        if (items.empty()) return;
+        
+        // Find item with minimum access count
+        auto minIt = std::min_element(items.begin(), items.end(),
+            [](const Item& a, const Item& b) {
+                return a.accessCount < b.accessCount;
+            });
+        
+        // Move to end and remove
+        size_t index = std::distance(items.begin(), minIt);
+        std::swap(items[index], items.back());
+        items.pop_back();
+    }
 };
 
 WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
@@ -16,22 +52,25 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
-    for (auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            item.second = value;
-            return;
-        }
+    auto* item = pImpl->find(neuron);
+    if (item) {
+        item->value = value;
+        item->accessCount++; // Update access count
+        return;
     }
-    if (pImpl->items.size() < pImpl->capacity) {
-        pImpl->items.emplace_back(neuron, value);
+    
+    // If at capacity, evict least accessed item
+    if (pImpl->items.size() >= pImpl->capacity) {
+        pImpl->evictLeastAccessed();
     }
+    
+    pImpl->items.emplace_back(neuron, value);
 }
 
 float WorkingMemory::retrieve(NeuronId neuron) const {
     for (const auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            return item.second;
+        if (item.neuron == neuron) {
+            return item.value;
         }
     }
     return 0.0f;
@@ -39,7 +78,7 @@ float WorkingMemory::retrieve(NeuronId neuron) const {
 
 bool WorkingMemory::contains(NeuronId neuron) const {
     for (const auto& item : pImpl->items) {
-        if (item.first == neuron) {
+        if (item.neuron == neuron) {
             return true;
         }
     }
@@ -60,16 +99,35 @@ size_t WorkingMemory::getCurrentSize() const {
 
 void WorkingMemory::decay(float decayRate) {
     for (auto& item : pImpl->items) {
-        item.second *= (1.0f - decayRate);
+        item.value *= (1.0f - decayRate);
     }
 }
 
 // Episodic Memory Implementation
 struct EpisodicMemory::Impl {
     std::vector<EpisodicMemoryItem> episodes;
+    std::vector<EpisodicMemoryItem> consolidatedEpisodes; // High-relevance episodes moved here
     size_t maxEpisodes;
     
     Impl(size_t max) : maxEpisodes(max) {}
+    
+    // Calculate episode relevance based on neurons involved
+    float calculateRelevance(const EpisodicMemoryItem& episode) const {
+        float relevance = 0.0f;
+        // Simple heuristic: more neurons = higher relevance
+        // In a real implementation, this would consider metadata and neural activity
+        relevance += static_cast<float>(episode.neurons.size()) * 0.1f;
+        
+        // Consider metadata relevance
+        if (!episode.metadata.empty()) {
+            // Simple count of important keywords in metadata
+            size_t importantWords = std::count(episode.metadata.begin(), episode.metadata.end(), '!') * 0.5f;
+            relevance += importantWords;
+        }
+        
+        // Normalize to [0, 1]
+        return std::min(relevance, 1.0f);
+    }
 };
 
 EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {}
@@ -77,29 +135,61 @@ EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {}
 EpisodicMemory::~EpisodicMemory() = default;
 
 void EpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
-    if (pImpl->episodes.size() >= pImpl->maxEpisodes) {
-        pImpl->episodes.erase(pImpl->episodes.begin());
+    // Calculate relevance
+    float relevance = pImpl->calculateRelevance(episode);
+    
+    if (relevance >= 0.7f) {
+        // High relevance - consolidate to permanent memory
+        pImpl->consolidatedEpisodes.push_back(episode);
+    } else {
+        // Low relevance - store in working episodic memory
+        if (pImpl->episodes.size() >= pImpl->maxEpisodes) {
+            pImpl->episodes.erase(pImpl->episodes.begin());
+        }
+        pImpl->episodes.push_back(episode);
+        
+        // Optionally compress if episode is less relevant
+        if (relevance < 0.3f) {
+            EpisodicMemoryItem compressed = compressEpisode(episode);
+            // Store compressed version for efficiency
+            if (pImpl->episodes.size() >= pImpl->maxEpisodes) {
+                pImpl->episodes.erase(pImpl->episodes.begin());
+            }
+            pImpl->episodes.push_back(compressed);
+        }
     }
-    pImpl->episodes.push_back(episode);
 }
 
 EpisodicMemoryItem EpisodicMemory::retrieveEpisode(size_t index) const {
     if (index < pImpl->episodes.size()) {
         return pImpl->episodes[index];
+    } else if (index < pImpl->consolidatedEpisodes.size()) {
+        // Try consolidated memory if index out of range in main storage
+        return pImpl->consolidatedEpisodes[index - pImpl->episodes.size()];
     }
     return EpisodicMemoryItem();
 }
 
 size_t EpisodicMemory::getEpisodeCount() const {
-    return pImpl->episodes.size();
+    return pImpl->episodes.size() + pImpl->consolidatedEpisodes.size();
 }
 
 std::vector<EpisodicMemoryItem> EpisodicMemory::getRecentEpisodes(size_t count) const {
     std::vector<EpisodicMemoryItem> result;
-    size_t start = count > pImpl->episodes.size() ? 0 : pImpl->episodes.size() - count;
+    
+    // Get from consolidated first (highest priority)
+    size_t consolidatedCount = std::min(count, pImpl->consolidatedEpisodes.size());
+    for (size_t i = 0; i < consolidatedCount; ++i) {
+        result.push_back(pImpl->consolidatedEpisodes[pImpl->consolidatedEpisodes.size() - 1 - i]);
+    }
+    
+    // Get from recent episodic memory if needed
+    size_t remainingCount = count - consolidatedCount;
+    size_t start = remainingCount > pImpl->episodes.size() ? 0 : pImpl->episodes.size() - remainingCount;
     for (size_t i = start; i < pImpl->episodes.size(); ++i) {
         result.push_back(pImpl->episodes[i]);
     }
+    
     return result;
 }
 
@@ -108,13 +198,67 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Phase 2: Implement episodic memory consolidation
+    // Move high-relevance episodes to permanent memory or make them more accessible
+    
+    // First pass: move episodes above threshold to consolidated storage
+    for (const auto& episode : pImpl->episodes) {
+        if (pImpl->calculateRelevance(episode) >= relevanceThreshold) {
+            pImpl->consolidatedEpisodes.push_back(episode);
+        }
+    }
+    
+    // Clear processed episodes from main storage
+    pImpl->episodes.clear();
+    
+    // Apply compression to consolidated episodes to save space
+    std::vector<EpisodicMemoryItem> compressedConsolidated;
+    for (const auto& episode : pImpl->consolidatedEpisodes) {
+        compressedConsolidated.push_back(compressEpisode(episode));
+    }
+    
+    pImpl->consolidatedEpisodes = compressedConsolidated;
 }
 
-// Semantic Memory Implementation
-struct SemanticMemory::Impl {
-    std::vector<std::pair<std::string, std::string>> facts;
-};
+// Add helper function implementations
+EpisodicMemoryItem compressEpisode(const EpisodicMemoryItem& episode) {
+    EpisodicMemoryItem compressed = episode;
+    
+    // Simplify neuron vector (keep only key neurons)
+    // For now, just reduce size by half (in real implementation, use smarter selection)
+    if (compressed.neurons.size() > 2) {
+        compressed.neurons.resize(std::max(size_t(2), compressed.neurons.size() / 2));
+    }
+    
+    if (compressed.values.size() > 2) {
+        compressed.values.resize(std::max(size_t(2), compressed.values.size() / 2));
+    }
+    
+    // Compress metadata
+    if (!compressed.metadata.empty()) {
+        // Remove excessive punctuation and whitespace
+        std::string compressedMetadata = compressed.metadata;
+        // Simple compression: remove repeated characters and reduce length
+        if (compressedMetadata.length() > 100) {
+            compressedMetadata = compressedMetadata.substr(0, 100) + "...";
+        }
+        compressed.metadata = compressedMetadata;
+    }
+    
+    return compressed;
+}
+
+void consolidateEpisodicMemory(float relevanceThreshold) {
+    // Move high-relevance episodes to consolidated storage
+    // This would typically be called during consolidation
+    
+    // For now, this is a placeholder that can be expanded
+    // In a real implementation, this would:
+    // 1. Iterate through all episodic memory items
+    // 2. Move items with relevance >= threshold to consolidated storage
+    // 3. Remove processed items from main storage to save space
+    // 4. Update metadata or create summaries for consolidated items
+}
 
 SemanticMemory::SemanticMemory() : pImpl(new Impl) {}
 
@@ -266,3 +410,43 @@ void AssociativeMemory::clear() {
 }
 
 } // namespace nlm
+
+// Add helper function implementations
+EpisodicMemoryItem compressEpisode(const EpisodicMemoryItem& episode) {
+    EpisodicMemoryItem compressed = episode;
+    
+    // Simplify neuron vector (keep only key neurons)
+    // For now, just reduce size by half (in real implementation, use smarter selection)
+    if (compressed.neurons.size() > 2) {
+        compressed.neurons.resize(std::max(size_t(2), compressed.neurons.size() / 2));
+    }
+    
+    if (compressed.values.size() > 2) {
+        compressed.values.resize(std::max(size_t(2), compressed.values.size() / 2));
+    }
+    
+    // Compress metadata
+    if (!compressed.metadata.empty()) {
+        // Remove excessive punctuation and whitespace
+        std::string compressedMetadata = compressed.metadata;
+        // Simple compression: remove repeated characters and reduce length
+        if (compressedMetadata.length() > 100) {
+            compressedMetadata = compressedMetadata.substr(0, 100) + "...";
+        }
+        compressed.metadata = compressedMetadata;
+    }
+    
+    return compressed;
+}
+
+void consolidateEpisodicMemory(float relevanceThreshold) {
+    // Move high-relevance episodes to consolidated storage
+    // This would typically be called during consolidation
+    
+    // For now, this is a placeholder that can be expanded
+    // In a real implementation, this would:
+    // 1. Iterate through all episodic memory items
+    // 2. Move items with relevance >= threshold to consolidated storage
+    // 3. Remove processed items from main storage to save space
+    // 4. Update metadata or create summaries for consolidated items
+}
