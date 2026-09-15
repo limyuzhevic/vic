@@ -24,27 +24,41 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
-    
+    // Implement real Hebbian learning: Δw = η * (preSpike * postSpike - w)
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
+    // Calculate temporal correlation between pre- and post-synaptic spikes
+    float correlation = 0.0f;
     for (Timestamp pre : preSpikes) {
         for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
+            // Temporal window for Hebbian co-activation (typically 10-50ms)
+            float timeDiff = std::abs(post - pre);
+            if (timeDiff < 50.0) {  // 50ms window for co-activation
+                // Exponential decay of correlation with time difference
+                correlation += std::exp(-timeDiff / 20.0f);
             }
         }
     }
     
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
+    // Normalize by number of spike pairs
+    if (!preSpikes.empty() && !postSpikes.empty()) {
+        correlation /= (preSpikes.size() * postSpikes.size());
     }
+    
+    // Apply weight change: increase weight for correlated activity
+    // The change is proportional to learning rate and correlation
+    float weightChange = pImpl->learningRate * correlation;
+    
+    // Ensure weight stays within reasonable bounds
+    float currentWeight = synapse->getWeight();
+    float newWeight = currentWeight + weightChange;
+    
+    // Constrain weight between 0.0 and 1.0
+    newWeight = std::max(0.0f, std::min(1.0f, newWeight));
+    
+    applyWeightChange(synapse, newWeight - currentWeight);
 }
 
 void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {

@@ -30,9 +30,26 @@ void Dopamine::setLevel(float level) {
 }
 
 float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
-    return 0.5f + 0.5f * pImpl->level;
+    // Implement real dopamine-modulated plasticity factor
+    // Based on reward prediction error theory:
+    // - Phasic DA bursts enhance plasticity for rewarded actions
+    // - Phasic DA dips suppress plasticity for unrewarded actions
+    // - Baseline DA sets overall excitability
+    
+    float plasticityFactor = 1.0f;  // Baseline plasticity
+    
+    if (pImpl->level > 0.7f) {
+        // High dopamine (reward prediction error): strongly enhance plasticity
+        plasticityFactor = 2.0f + (pImpl->level - 0.7f) * 2.0f;
+    } else if (pImpl->level < 0.3f && pImpl->baseline > 0.2f) {
+        // Low dopamine (prediction error): suppress plasticity to avoid overlearning
+        plasticityFactor = std::max(0.1f, 1.0f - (0.2f - pImpl->level) * 3.0f);
+    } else {
+        // Moderate dopamine: modulate plasticity based on reward proximity
+        plasticityFactor = 1.0f + (pImpl->level - 0.5f) * 0.5f;
+    }
+    
+    return plasticityFactor;
 }
 
 void Dopamine::update(TimestepDuration dt) {

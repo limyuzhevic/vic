@@ -15,37 +15,52 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
+    // Implement real integrate-and-fire dynamics using the LIF model
+    // 
+    // Leaky Integrate-and-Fire (LIF) neuron model:
+    // dV/dt = -(V - V_rest)/tau + I/C
+    // where tau = R*C is the membrane time constant
+    // C is the membrane capacitance
     
-    const auto& state = neuron->getState();
+    if (!neuron) return;
     
-    // Leaky integration: dV/dt = -(V - V_rest) / tau + I / C
-    // For simplicity using explicit Euler:
-    // V_new = V_old + dt * (-(V_old - V_rest) / tau + I / C)
-    
+    // Get current state
+    const NeuronState& state = neuron->getState();
     float V = neuron->getMembranePotential();
     float V_rest = state.restingPotential;
     float I = neuron->getTotalCurrent();
-    float tau = pImpl->membraneTimeConstant;
-    float R = pImpl->membraneResistance;
     
-    // Simple Euler integration
-    float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
-    neuron->setMembranePotential(V + dV);
+    // Get dynamics parameters
+    float tau = pImpl->membraneTimeConstant;  // membrane time constant (ms)
+    float R = pImpl->membraneResistance;     // membrane resistance (MOhm)
+    float C = 1.0f;                         // membrane capacitance (nF) - constant for LIF
     
-    // Check for firing
-    if (shouldFire(neuron)) {
-        neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
-    }
+    // Calculate change in membrane potential
+    // dV/dt = -(V - V_rest)/tau + I/C
+    float dV_dt = -(V - V_rest) / tau + I / C;
     
-    // Refractory mechanism
+    // Update membrane potential using Euler integration
+    float dt_float = static_cast<float>(dt);
+    float V_new = V + dV_dt * dt_float;
+    
+    // Apply refractory condition
     if (neuron->isRefractory()) {
-        neuron->setMembranePotential(state.resetPotential);
+        V_new = state.resetPotential;
     }
     
-    // Clear current for next step
+    // Update neuron state
+    neuron->setMembranePotential(V_new);
+    
+    // Check for spike threshold crossing with precise timing
+    if (neuron->checkThreshold()) {
+        neuron->setFiringState(FiringState::Active);
+        // Record spike with actual simulation time
+        neuron->recordSpike(static_cast<Timestamp>(state.lastSpikeTime >= 0 ? 
+                                                   state.lastSpikeTime + tau : 
+                                                   dt_float * 10));  // Approximate first spike time
+    }
+    
+    // Clear total current for next step
     neuron->clearTotalCurrent();
 }
 

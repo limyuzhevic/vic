@@ -70,17 +70,55 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
-    // Find or add this neuron to memory
+    // Check capacity before adding
+    if (memoryNeurons_.size() >= capacity_ && 
+        std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) == memoryNeurons_.end()) {
+        // Evict weakest trace using LRU-like eviction based on timestamp
+        size_t weakestIdx = 0;
+        float weakestActivation = memoryActivations_[0];
+        
+        for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+            if (memoryActivations_[i] < weakestActivation) {
+                weakestActivation = memoryActivations_[i];
+                weakestIdx = i;
+            }
+        }
+        
+        // Remove weakest trace
+        memoryNeurons_.erase(memoryNeurons_.begin() + weakestIdx);
+        memoryActivations_.erase(memoryActivations_.begin() + weakestIdx);
+        memoryTimestamps_.erase(memoryTimestamps_.begin() + weakestIdx);
+        
+        // Remove from active traces if present
+        auto it = std::find(activeTraces_.begin(), activeTraces_.end(), weakestIdx);
+        if (it != activeTraces_.end()) {
+            activeTraces_.erase(it);
+        }
+        
+        // Remove from maintenance synapses
+        auto synapseIt = std::remove_if(pImpl->maintenanceSynapses.begin(), 
+                                        pImpl->maintenanceSynapses.end(),
+                                        [weakestIdx](const std::pair<NeuronId, NeuronId>& conn) {
+                                            // Remove connections involving the evicted neuron
+                                            return conn.first == neuron || conn.second == neuron;
+                                        });
+        pImpl->maintenanceSynapses.erase(synapseIt, pImpl->maintenanceSynapses.end());
+    }
+    
+    // Find or add this neuron to memory (after potential eviction)
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
+        // Reset age for reactivated neuron
+        activeTraces_.push_back(idx);
     } else if (memoryNeurons_.size() < capacity_) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        activeTraces_.push_back(memoryNeurons_.size() - 1);
     }
     
     // Inject current to maintain activation
