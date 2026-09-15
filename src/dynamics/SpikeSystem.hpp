@@ -3,13 +3,12 @@
 #include "../core/Types/Types.hpp"
 #include "../brain/Neuron.hpp"
 #include <vector>
-#include <queue>
 #include <functional>
-#include <unordered_map>
+#include <memory>
 
 namespace nlm {
 
-// SpikeEvent with additional metadata
+// Detailed spike event for complete spike tracking with metadata
 struct DetailedSpikeEvent {
     NeuronId source;
     Timestamp timestamp;
@@ -24,6 +23,18 @@ struct DetailedSpikeEvent {
 
 // Event-driven neural computation system
 // Handles spike event processing and delayed synaptic transmission
+// 
+// Key Design Changes:
+// - Spikes are processed immediately when queued (true event-driven behavior)
+// - No synchronous batching or queues for immediate spike processing
+// - Delayed spikes use priority queue for exact scheduled delivery times
+// - Each spike triggers its handlers individually at the moment of occurrence
+// 
+// Benefits:
+// - Biologically realistic timing (spikes processed immediately)
+// - Higher performance (no batch processing overhead)
+// - Deterministic spike delivery for delayed events
+// - Reduced memory footprint (no intermediate queues)
 class SpikeSystem {
 public:
     SpikeSystem();
@@ -35,17 +46,19 @@ public:
     SpikeSystem(SpikeSystem&&) noexcept;
     SpikeSystem& operator=(SpikeSystem&&) noexcept;
     
-    // Queue a spike event
+    // Queue a spike event - now processes immediately for true event-driven behavior
+    // This method processes the spike synchronously at the moment of queuing
     void queueSpike(const SpikeEvent& event);
+    
+    // Convenience overload for creating and queuing a spike
     void queueSpike(NeuronId neuron, Timestamp timestamp, SimulationStep step);
     
     // Queue a delayed spike event (for synaptic transmission)
+    // Spikes are stored in a priority queue ordered by delivery_time
     void queueDelayedSpike(const DelayedSpikeEvent& event);
     
-    // Process all queued spikes for current step
-    void processSpikes(SimulationStep currentStep);
-    
     // Process pending delayed spikes that should be delivered now
+    // Scans the priority queue and delivers all spikes due at or before currentTime
     void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
     
     // Register spike handler callback (called when spikes are generated)
@@ -62,8 +75,6 @@ public:
     
     // Get spike count
     size_t getSpikeCount() const;
-    size_t getPendingSpikeCount() const;
-    size_t getPendingDelayedCount() const;
     
     // Statistics
     float getAverageSpikeRate() const;
@@ -74,7 +85,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

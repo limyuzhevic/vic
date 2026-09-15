@@ -155,6 +155,13 @@ struct DelayedSpikeEvent {
     SimulationStep delivery_step;  // Step when spike should be delivered
     bool is_excitatory;  // Cached for quick lookup
     
+    // Comparison operator for priority_queue (min-heap for event-driven delivery)
+    bool operator<(const DelayedSpikeEvent& other) const {
+        // Earlier delivery_time should be "less than" later delivery_time
+        // This creates a min-heap where earliest events are delivered first
+        return delivery_time < other.delivery_time;
+    }
+    
     DelayedSpikeEvent()
         : source_neuron(), destination_neuron(), synapse_id()
         , weight(0.0f), synapse_type(SynapseType::Excitatory)

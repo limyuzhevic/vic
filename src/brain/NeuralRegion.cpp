@@ -13,7 +13,11 @@ struct NeuralRegion::Impl {
     std::unordered_map<NeuronId, std::vector<SynapseId>> incomingSynapses;  // dest -> synapse ids
     SynapseId nextSynapseId;
     
-    explicit Impl(RegionId id) : id(id), nextSynapseId(1) {}
+    // Memory pools for neurons and synapses
+    NeuronPool* neuronPool;
+    SynapsePool* synapsePool;
+    
+    explicit Impl(RegionId id) : id(id), nextSynapseId(1), neuronPool(nullptr), synapsePool(nullptr) {}
 };
 
 NeuralRegion::NeuralRegion(RegionId id) : pImpl(new Impl(id)) {}
@@ -91,18 +95,42 @@ std::vector<NeuralPopulation*> NeuralRegion::getAllPopulations() {
 SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
                                    SynapticWeight weight, Delay delay) {
     SynapseId synId(pImpl->nextSynapseId++);
+    
+    // Try to allocate synapse from pool first
+    if (pImpl->synapsePool) {
+        SynapseId poolId = pImpl->synapsePool->allocate(source, destination);
+        if (poolId.index() != 0) {  // Valid synapse ID
+            synId = poolId;
+            // Store synapse in adjacency lists
+            pImpl->outgoingSynapses[source].push_back(synId);
+            pImpl->incomingSynapses[destination].push_back(synId);
+            return synId;
+        }
+    }
+    
+    // Fallback to original implementation
     auto synapse = std::make_unique<Synapse>(synId, source, destination);
     synapse->setWeight(weight);
     synapse->setDelay(delay);
     
     pImpl->outgoingSynapses[source].push_back(synId);
     pImpl->incomingSynapses[destination].push_back(synId);
-    
     pImpl->synapses.push_back(std::move(synapse));
+    
     return synId;
 }
 
 Synapse* NeuralRegion::getSynapse(SynapseId id) {
+    // First check synapse pool
+    if (pImpl->synapsePool) {
+        auto* weightPtr = pImpl->synapsePool->getState<float>(id.index());
+        if (weightPtr) {
+            // For now, return nullptr as SynapsePool doesn't directly return Synapse objects
+            // TODO: Implement proper SynapsePool to Synapse mapping
+        }
+    }
+    
+    // Fallback to original implementation
     for (auto& syn : pImpl->synapses) {
         if (syn->getId() == id) {
             return syn.get();
@@ -112,15 +140,15 @@ Synapse* NeuralRegion::getSynapse(SynapseId id) {
 }
 
 const Synapse* NeuralRegion::getSynapse(SynapseId id) const {
-    for (auto& syn : pImpl->synapses) {
-        if (syn->getId() == id) {
-            return syn.get();
-        }
-    }
-    return nullptr;
+    // Same as non-const version for consistency
+    return const_cast<NeuralRegion*>(this)->getSynapse(id);
 }
 
 size_t NeuralRegion::getSynapseCount() const {
+    // Return count from synapse pool if available
+    if (pImpl->synapsePool) {
+        return pImpl->synapsePool->size();
+    }
     return pImpl->synapses.size();
 }
 
@@ -130,6 +158,20 @@ const std::vector<std::unique_ptr<Synapse>>& NeuralRegion::getSynapses() const {
 
 std::vector<Synapse*> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
     std::vector<Synapse*> result;
+    
+    // First check synapse pool
+    if (pImpl->synapsePool) {
+        // Get source neurons from pool
+        for (SynapseIndex i = 0; i < pImpl->synapsePool->size(); ++i) {
+            auto* sourcePtr = pImpl->synapsePool->getState<uint64_t>(i);
+            if (sourcePtr && *sourcePtr == neuron.value) {
+                // This is a simplified approach - in reality we'd need better mapping
+                // For now, fall back to original implementation
+            }
+        }
+    }
+    
+    // Fallback to original implementation
     auto it = pImpl->outgoingSynapses.find(neuron);
     if (it != pImpl->outgoingSynapses.end()) {
         for (SynapseId synId : it->second) {
@@ -138,11 +180,14 @@ std::vector<Synapse*> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
             }
         }
     }
+    
     return result;
 }
 
 std::vector<Synapse*> NeuralRegion::getSynapsesTo(NeuronId neuron) {
     std::vector<Synapse*> result;
+    
+    // Same as from() for consistency
     auto it = pImpl->incomingSynapses.find(neuron);
     if (it != pImpl->incomingSynapses.end()) {
         for (SynapseId synId : it->second) {
@@ -151,6 +196,7 @@ std::vector<Synapse*> NeuralRegion::getSynapsesTo(NeuronId neuron) {
             }
         }
     }
+    
     return result;
 }
 
@@ -190,14 +236,14 @@ float NeuralRegion::getAverageFiringRate() const {
 }
 
 float NeuralRegion::getAverageSynapticWeight() const {
-    if (pImpl->synapses.empty()) {
+    if (getSynapseCount() == 0) {
         return 0.0f;
     }
     float sum = 0.0f;
     for (const auto& syn : pImpl->synapses) {
         sum += syn->getWeight();
     }
-    return sum / static_cast<float>(pImpl->synapses.size());
+    return sum / static_cast<float>(getSynapseCount());
 }
 
 float NeuralRegion::getSynapticDensity() const {
@@ -208,7 +254,7 @@ float NeuralRegion::getSynapticDensity() const {
     size_t maxConnections = neuronCount * (neuronCount - 1);
     if (maxConnections == 0) return 0.0f;
     
-    return static_cast<float>(pImpl->synapses.size()) / static_cast<float>(maxConnections);
+    return static_cast<float>(getSynapseCount()) / static_cast<float>(maxConnections);
 }
 
 void NeuralRegion::step(Timestamp currentTime) {
@@ -244,6 +290,8 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
     // Get all neurons
     auto neurons = getAllNeurons();
     size_t neuronCount = neurons.size();
+    
+    if (neuronCount == 0) return;
     
     // Create random connections
     for (size_t i = 0; i < neuronCount; ++i) {
@@ -283,7 +331,7 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
                 weight = meanWeight + rng.normal(0.0f, weightVariance);
             }
             
-            // Add synapse
+            // Add synapse (this will use pool if available)
             SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);
             
             // Initialize random properties
