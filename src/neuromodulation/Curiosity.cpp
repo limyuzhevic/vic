@@ -55,6 +55,11 @@ void Curiosity::setPredictionErrorWeight(float weight) {
     pImpl->predictionErrorWeight = weight;
 }
 
+void Curiosity::setExplorationModulation(float modulation) {
+    // Apply modulation to curiosity level
+    pImpl->level = std::min(1.0f, std::max(0.0f, modulation));
+}
+
 void Curiosity::reset() {
     pImpl->level = 0.0f;
 }

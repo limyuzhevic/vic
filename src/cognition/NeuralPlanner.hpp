@@ -73,6 +73,12 @@ public:
 
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
+    
+    // Set exploration bias (for curiosity-driven exploration)
+    void setExplorationBias(bool bias) { explorationBias_ = bias; }
+    
+    // Is exploration currently biased?
+    bool isExplorationBiased() const { return explorationBias_; }
 
 private:
     // Generate possible action sequences
@@ -81,12 +87,13 @@ private:
     // Evaluate single action from state
     float evaluateAction(ActionType action, const std::vector<float>& state);
 
-    struct Impl;
+struct Impl;
     std::unique_ptr<Impl> pImpl;
-
+    
     Brain* brain_;
     size_t planningDepth_;
     float planningConfidence_;
+    bool explorationBias_;
     
     // Current goal state
     std::vector<float> currentGoal_;

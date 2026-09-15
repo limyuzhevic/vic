@@ -28,6 +28,9 @@ public:
     void setNoveltyWeight(float weight);
     void setPredictionErrorWeight(float weight);
     
+    // Set exploration modulation (derived from curiosity level)
+    void setExplorationModulation(float modulation);
+    
     // Reset
     void reset();
     

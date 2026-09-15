@@ -19,6 +19,8 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class SemanticMemory;
+class ProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
@@ -147,7 +149,13 @@ public:
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
-    
+
+    // Neural semantic memory - knowledge representation
+    SemanticMemory* getSemanticMemory();
+
+    // Neural procedural memory - skills and habits
+    ProceduralMemory* getProceduralMemory();
+
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation

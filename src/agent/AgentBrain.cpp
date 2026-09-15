@@ -19,6 +19,10 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , planningEnabled_(true)
+    , explorationBias_(false)
+    , conceptFormationEnabled_(true)
+    , conceptFormationThreshold_(0.7f)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -68,20 +72,48 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Initialize concept formation with brain reference
+    if (conceptFormationEnabled_ && brain_) {
+        conceptFormation_ = std::make_unique<ConceptFormation>();
+        conceptFormation_->initialize(brain_.get());
+        conceptFormation_->setFormationThreshold(conceptFormationThreshold_);
+        
+        NLM_LOG_INFO("AgentBrain initialized with ConceptFormation");
+    } else if (conceptFormationEnabled_ && !brain_) {
+        NLM_LOG_ERROR("AgentBrain: Cannot initialize ConceptFormation without brain");
+    }
+    
+    // Configure concept formation
+    if (conceptFormationEnabled_) {
+        if (conceptFormation_) {
+            conceptFormation_->setFormationThreshold(conceptFormationThreshold_);
+            NLM_LOG_INFO("AgentBrain: ConceptFormation initialized and configured");
+        }
+    }
+    
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
 }
 
-size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
-}
-
-size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
+void AgentBrain::reset() {
+    dopamineLevel_ = 0.0f;
+    noveltyLevel_ = 0.0f;
+    curiosityLevel_ = 0.0f;
+    predictionError_ = 0.0f;
+    expectedReward_ = 0.0f;
+    developmentalAge_ = 0.0;
+    plasticityModifier_ = 1.0f;
+    
+    // Clear previous vision
+    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset concept formation
+    if (conceptFormationEnabled_ && conceptFormation_) {
+        conceptFormation_->clear();
+        NLM_LOG_INFO("AgentBrain: ConceptFormation reset");
+    }
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
@@ -146,17 +178,34 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+        
+        // Update planning from curiosity if enabled
+        updatePlanningFromCuriosity(curiosityLevel_);
+    }
+    
+    // Get prediction error from prediction system
+    if (predictionSystem_) {
+        float error = predictionSystem_->getPredictionError();
+        updatePlanningFromPredictionError(error);
     }
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
+    MotorCommand decoded;
     
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+    // Use goal-directed planning if planner is available and enabled
+    if (planningEnabled_ && planner_) {
+        decoded = planGoalDirectedAction(getSensoryInputState());
+    } else {
+        // Fall back to traditional decoding
+        decoded = decodeFromMotorNeurons();
+        
+        // Apply curiosity-based exploration
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            decoded = selectWithCuriosity(decoded);
+        }
     }
     
     return decoded;
@@ -235,6 +284,32 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     return defaultCmd;
 }
 
+MotorCommand AgentBrain::planGoalDirectedAction(const std::vector<float>& sensoryState) {
+    // Get current goal if set in planner
+    std::vector<float> goal = (planner_ ? planner_->getCurrentGoal() : std::vector<float>());
+    float targetReward = 0.5f; // Default target reward
+    
+    // Use neural planner to select action
+    if (planner_) {
+        ActionType plannedAction = planner_->planAction(sensoryState, targetReward);
+        
+        // Convert ActionType to MotorCommand
+        switch (plannedAction) {
+            case ActionType::MoveForward: return MotorCommand::MoveForward;
+            case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+            case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+            case ActionType::TurnRight: return MotorCommand::TurnRight;
+            case ActionType::LookLeft: return MotorCommand::LookLeft;
+            case ActionType::LookRight: return MotorCommand::LookRight;
+            case ActionType::Interact: return MotorCommand::Interact;
+            case ActionType::Wait: return MotorCommand::Wait;
+            default: return MotorCommand::Wait;
+        }
+    }
+    
+    return MotorCommand::Wait;
+}
+
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     
@@ -249,6 +324,9 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    
+    // Update planning from prediction error
+    updatePlanningFromPredictionError(predictionError_);
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
@@ -313,38 +391,59 @@ void AgentBrain::updateDevelopment(double timestep) {
     }
 }
 
-DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
-    if (!brain_) return DevelopmentalStage::Initial;
-    return brain_->getDevelopmentalStage();
-}
-
-float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
-}
-
-float AgentBrain::getCuriosityLevel() const {
-    return curiosityLevel_;
-}
-
-float AgentBrain::getNoveltyLevel() const {
-    return noveltyLevel_;
-}
-
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
-}
-
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+std::vector<float> AgentBrain::getSensoryInputState() const {
+    std::vector<float> state;
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    if (brain_) {
+        // Extract vision data
+        if (!sensoryVision_.empty()) {
+            for (Neuron* n : sensoryVision_) {
+                // Extract membrane potential as visual feature
+                if (n) {
+                    state.push_back(n->getState().membranePotential);
+                }
+            }
+        }
+        
+        // Extract touch data
+        if (!sensoryTouch_.empty()) {
+            for (Neuron* n : sensoryTouch_) {
+                if (n) {
+                    state.push_back(n->getState().membranePotential);
+                }
+            }
+        }
+        
+        // Extract internal data
+        if (!sensoryInternal_.empty()) {
+            for (Neuron* n : sensoryInternal_) {
+                if (n) {
+                    state.push_back(n->getState().membranePotential);
+                }
+            }
+        }
+        
+        // Extract proprioception data
+        if (!sensoryProprioception_.empty()) {
+            for (Neuron* n : sensoryProprioception_) {
+                if (n) {
+                    state.push_back(n->getState().membranePotential);
+                }
+            }
+        }
+        
+        // Add neuromodulatory state
+        state.push_back(dopamineLevel_);
+        state.push_back(noveltyLevel_);
+        state.push_back(curiosityLevel_);
+        state.push_back(predictionError_);
+        state.push_back(expectedReward_);
+        
+        // Add developmental state
+        state.push_back(plasticityModifier_);
+    }
+    
+    return state;
 }
 
 } // namespace nlm

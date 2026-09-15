@@ -11,6 +11,7 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/Memory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
@@ -32,6 +33,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -69,14 +72,9 @@ struct Brain::Impl {
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
     
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
-    size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
-    
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    // Prediction integration state
+    float currentPredictionError;
+    float currentPredictionConfidence;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -92,6 +90,8 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , currentPredictionError(0.0f)
+        , currentPredictionConfidence(0.5f)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -108,13 +108,176 @@ struct Brain::Impl {
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
-        // Initialize memory systems
+        // Initialize neural working memory
         workingMemory = std::make_unique<NeuralWorkingMemory>();
+        
+        // Initialize neural episodic memory
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        
+        // Initialize neural associative memory
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        
+        // Initialize semantic memory (NeuralSemanticMemory implementation)
+        semanticMemory = std::make_unique<SemanticMemory>();
+        
+        // Initialize procedural memory (NeuralProceduralMemory implementation)
+        proceduralMemory = std::make_unique<ProceduralMemory>();
+        
+        // Initialize the neural versions that require brain reference
+        episodicMemory->initialize(this);
+        associativeMemory->initialize(this);
+        
+        // SemanticMemory and ProceduralMemory don't need brain reference for basic operation
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
+        
+        // Initialize neural prediction subsystem with brain reference
+        if (predictionSystem) {
+            predictionSystem->initialize(this);
+        }
+        
+        // Initialize cognition systems
+        planner = std::make_unique<NeuralPlanner>();
+        conceptFormation = std::make_unique<ConceptFormation>();
+        attention = std::make_unique<AttentionalSelection>();
+        
+        // Initialize development system
+        developmentSystem = std::make_unique<DevelopmentSystem>();
+        
+        // Initialize neuromodulation systems
+        dopamine = std::make_unique<Dopamine>();
+        curiosity = std::make_unique<Curiosity>();
+        predictionError = std::make_unique<PredictionError>();
+        novelty = std::make_unique<Novelty>();
+        
+        // Configure STDP parameters
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        stdp->configure(ltpWeight, ltdWeight, tau);
+        
+        // Configure structural plasticity
+        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+        structuralPlasticity->setPruningRate(pruningRate);
+        
+        // Get timestep
+        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        
+        // Get integration intervals from config
+        replayInterval = config->getOr<size_t>("replay_interval", 100);
+        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        
+        // Initialize checkpoint manager
+        checkpointManager = std::make_unique<CheckpointManager>();
+    }
+    
+    DevelopmentalStage developmentalStage;
+    RegionId nextRegionId;
+};
+    
+    // ========== INTEGRATED PREDICTION SYSTEM ==========
+    std::unique_ptr<PredictionSystem> predictionSystem;
+    
+    // ========== INTEGRATED COGNITION SYSTEMS ==========
+    std::unique_ptr<NeuralPlanner> planner;
+    std::unique_ptr<ConceptFormation> conceptFormation;
+    std::unique_ptr<AttentionalSelection> attention;
+    
+    // ========== DEVELOPMENT SYSTEM ==========
+    std::unique_ptr<DevelopmentSystem> developmentSystem;
+    
+    // ========== NEUROMODULATION SYSTEMS ==========
+    std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Curiosity> curiosity;
+    std::unique_ptr<PredictionError> predictionError;
+    std::unique_ptr<Novelty> novelty;
+    
+    // Phase 2: Real neural computation components
+    std::unique_ptr<SpikeSystem> spikeSystem;
+    std::unique_ptr<STDP> stdp;
+    std::unique_ptr<Hebbian> hebbian;
+    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    
+    // Simulation parameters
+    TimestepDuration timestep;
+    SimulationStep currentStep;
+    Timestamp currentTime;
+    
+    // Statistics
+    size_t totalSpikesThisStep;
+    size_t totalSpikesTotal;
+    
+    // Sensory neurons for input injection
+    std::vector<Neuron*> sensoryNeurons;
+    std::vector<Neuron*> motorNeurons;
+    
+    // Prediction integration state
+    float currentPredictionError;
+    float currentPredictionConfidence;
+    
+    Impl(std::shared_ptr<Config> cfg)
+        : config(cfg)
+        , rng(nullptr)
+        , developmentalStage(DevelopmentalStage::Initial)
+        , nextRegionId(1)
+        , timestep(0.001)
+        , currentStep(0)
+        , currentTime(0.0)
+        , totalSpikesThisStep(0)
+        , totalSpikesTotal(0)
+        , isResting(false)
+        , stepsSinceLastEpisode(0)
+        , replayInterval(100)      // Replay every 100 steps
+        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , currentPredictionError(0.0f)
+        , currentPredictionConfidence(0.5f)
+    {
+        // Initialize random generator with seed from config
+        uint64_t seed = 42;  // Default seed
+        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
+            seed = *seedOpt;
+        }
+        rng = std::make_unique<RandomGenerator>(seed);
+        
+        // Initialize plasticity systems
+        spikeSystem = std::make_unique<SpikeSystem>();
+        stdp = std::make_unique<STDP>();
+        hebbian = std::make_unique<Hebbian>();
+        structuralPlasticity = std::make_unique<StructuralPlasticity>();
+        
+        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+        
+        // Initialize neural working memory
+        workingMemory = std::make_unique<NeuralWorkingMemory>();
+        
+        // Initialize neural episodic memory
+        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        
+        // Initialize neural associative memory
+        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        
+        // Initialize semantic memory (NeuralSemanticMemory implementation)
+        semanticMemory = std::make_unique<SemanticMemory>();
+        
+        // Initialize procedural memory (NeuralProceduralMemory implementation)
+        proceduralMemory = std::make_unique<ProceduralMemory>();
+        
+        // Initialize the neural versions that require brain reference
+        episodicMemory->initialize(this);
+        associativeMemory->initialize(this);
+        
+        // SemanticMemory and ProceduralMemory don't need brain reference for basic operation
+        
+        // Initialize prediction system
+        predictionSystem = std::make_unique<PredictionSystem>();
+        
+        // Initialize neural prediction subsystem with brain reference
+        if (predictionSystem) {
+            predictionSystem->initialize(this);
+        }
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
@@ -509,10 +672,70 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+    // For now, use a simplified approach to prediction system integration
+    // We'll use the internal signals module to create a simple current state representation
+    InternalSignals currentState;
+    // Use the first few available signals as our current state for prediction
+    // (In a real implementation, this would be properly managed sensory data)
+    for (int i = 0; i < 10 && i < pImpl->sensoryNeurons.size(); ++i) {
+        float signal = pImpl->sensoryNeurons[i]->getState().membranePotential / 10.0f;
+        currentState.addSignal(signal);
+    }
+    // If no signals were set, use default values
+    if (currentState.getData().empty()) {
+        for (int i = 0; i < 10; ++i) {
+            currentState.addSignal(0.5f);
+        }
+    }
+    
+    // Make prediction for next state using neural substrate
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        auto prediction = pImpl->predictionSystem->predictNextState(currentState);
+        
+        // Apply prediction to neural dynamics (if prediction was generated)
+        if (prediction) {
+            // Inject predicted state into sensory-related neurons to create prediction error
+            // This is a simplified implementation for demonstration
+            for (int i = 0; i < std::min(pImpl->sensoryNeurons.size(), size_t(10)); ++i) {
+                const auto& predData = prediction->getData();
+                if (!predData.empty()) {
+                    // Inject a portion of the predicted signal
+                    pImpl->sensoryNeurons[i]->injectCurrent(predData[i % predData.size()] * 0.1f);
+                }
+            }
+        }
+        
+        // Update predictions with actual state for learning
+        if (prediction) {
+            pImpl->predictionSystem->updatePredictions(*prediction, currentState);
+        }
+        
+        // Get prediction error to modulate neural excitability
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float confidence = pImpl->predictionSystem->getConfidence();
+        
+        // Apply neuromodulation based on prediction error
+        // High error -> curiosity-driven exploration
+        // Low error -> exploitation
+        if (predictionError > 0.5f) {
+            // High surprise/error -> increase exploration
+            if (pImpl->curiosity) {
+                float modulation = (predictionError - 0.5f) * 2.0f; // 0 to 1 range
+                pImpl->curiosity->setExplorationModulation(modulation);
+            }
+            
+            // Apply prediction error as neuromodulatory signal
+            if (pImpl->predictionError) {
+                pImpl->predictionError->setError(predictionError);
+                pImpl->predictionError->applyToNeurons(this, predictionError);
+            }
+        } else if (confidence < 0.5f) {
+            // Low confidence -> increase exploration
+            if (pImpl->curiosity) {
+                float modulation = (0.5f - confidence) * 2.0f;
+                pImpl->curiosity->setExplorationModulation(modulation);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -691,27 +914,72 @@ size_t Brain::getPendingSpikeEventCount() const {
 
 std::unique_ptr<class Action> Brain::produceAction() {
     // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Now enhanced with prediction system for better planning
     
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+    // Get current sensory state for planning
+    InternalSignals currentState;
+    for (int i = 0; i < 10; ++i) {
+        currentState.addSignal(0.5f);
+    }
+    
+    ActionType bestAction = ActionType::Wait;
+    float bestActionQuality = 0.0f;
+    
+    // Consider prediction system for action planning if available
+    if (pImpl->predictionSystem) {
+        // Get neural prediction for action consequences
+        NeuralPrediction* neuralPred = pImpl->predictionSystem->getNeuralPrediction();
+        if (neuralPred) {
+            // Try each action type to find the best one
+            // In a real implementation, this would be more sophisticated
+            // For now, use a simple heuristic based on prediction confidence
+            
+            // Check prediction confidence to guide action selection
+            float confidence = pImpl->predictionSystem->getConfidence();
+            
+            if (confidence > 0.7f) {
+                // High confidence - exploit current best action
+                // Find action with highest motor neuron activity
+                for (auto* neuron : pImpl->motorNeurons) {
+                    float activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                    if (activity > bestActionQuality) {
+                        bestActionQuality = activity;
+                        bestAction = ActionType::MoveForward;  // Default to move forward
+                    }
+                }
+            } else {
+                // Low confidence - explore to gain more information
+                // Random or exploratory action
+                bestAction = ActionType::Wait;
+                bestActionQuality = 0.2f;
+            }
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    // If prediction system not used or no prediction available, fall back to simple motor activity-based selection
+    if (bestAction == ActionType::Wait) {
+        // Calculate activity of motor neuron groups
+        size_t firingMotor = 0;
+        for (auto* neuron : pImpl->motorNeurons) {
+            if (neuron->isFiring()) {
+                ++firingMotor;
+            }
+        }
+        
+        // Return a simple action
+        ActionType type = ActionType::Wait;
+        if (firingMotor > 0) {
+            type = ActionType::MoveForward;
+        }
+        
+        bestAction = type;
     }
     
-    auto action = std::make_unique<Action>(type);
+    auto action = std::make_unique<Action>(bestAction);
     
     return action;
 }
@@ -1015,6 +1283,14 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+}
+
+SemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+ProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
