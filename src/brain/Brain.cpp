@@ -403,6 +403,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // Store current sensory patterns in working memory for episodic encoding
+        std::vector<float> sensoryPattern = pImpl->workingMemory->retrieve();
+        
+        // Store patterns from episodic memory if available
+        if (pImpl->episodicMemory && pImpl->episodicMemory->getEpisodeCount() > 0) {
+            auto latestEpisode = pImpl->episodicMemory->getEpisode(pImpl->episodicMemory->getEpisodeCount() - 1);
+            if (latestEpisode) {
+                // Extract neural activation pattern from episode
+                std::vector<float> episodePattern;
+                for (float activation : latestEpisode->neuronActivations) {
+                    episodePattern.push_back(activation);
+                }
+                pImpl->workingMemory->store(episodePattern, 0.5f);
+            }
+        }
+        
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
@@ -477,7 +493,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 7: Update episodic memory ==========
+        // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
@@ -505,14 +521,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Store current sensory patterns in working memory for episodic encoding
+            if (pImpl->workingMemory) {
+                std::vector<float> sensoryPattern = pImpl->workingMemory->retrieve();
+                if (!sensoryPattern.empty()) {
+                    episode.sensoryState = sensoryPattern;
+                }
+            }
+            
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Get current working memory for prediction
+        std::vector<float> currentState = pImpl->workingMemory->retrieve();
+        
+        // Create sensory input for prediction
+        if (!currentState.empty()) {
+            auto sensoryInput = std::make_unique<class SensoryInput>();
+            sensoryInput->setData(currentState);
+            sensoryInput->setTimestamp(currentTime);
+            
+            // Train prediction system with current observation
+            pImpl->predictionSystem->train(*sensoryInput);
+            
+            // Get prediction error and confidence
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float confidence = pImpl->predictionSystem->getConfidence();
+            
+            // Store prediction error for neuromodulation
+            pImpl->predictionError = predictionError;
+            pImpl->predictionErrorConfidence = confidence;
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -1006,20 +1048,32 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
+    if (!pImpl->workingMemory) {
+        NLM_LOG_ERROR("Working memory not initialized");
+    }
     return pImpl->workingMemory.get();
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    if (!pImpl->episodicMemory) {
+        NLM_LOG_ERROR("Episodic memory not initialized");
+    }
     return pImpl->episodicMemory.get();
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    if (!pImpl->associativeMemory) {
+        NLM_LOG_ERROR("Associative memory not initialized");
+    }
     return pImpl->associativeMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
+    if (!pImpl->predictionSystem) {
+        NLM_LOG_ERROR("Prediction system not initialized");
+    }
     return pImpl->predictionSystem.get();
 }
 
