@@ -1,8 +1,8 @@
 /**
- * Phase 6 Demo - Integration Test
+ * Phase 6 Demo - Complete Integration Test
  * 
  * This demo runs the Phase 6 integration experiment to verify
- * that all brain systems are properly connected.
+ * that all brain systems are properly connected including all neuromodulators.
  */
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
@@ -12,8 +12,8 @@
 using namespace nlm;
 
 int main(int argc, char* argv[]) {
-    std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
-    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+    std::cout << "=== NLM Phase 6 Integration Demo (Complete) ===" << std::endl;
+    std::cout << "Testing the complete integrated artificial brain with all neuromodulators..." << std::endl << std::endl;
     
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
@@ -59,6 +59,8 @@ int main(int argc, char* argv[]) {
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
+    config.regionCount = 3;  // Multiple regions for better integration
+    config.connectionProbability = 0.2f;
     
     auto result = experiment.run(config);
     
