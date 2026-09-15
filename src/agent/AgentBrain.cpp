@@ -20,7 +20,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups safely
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {

@@ -11,14 +11,21 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../plasticity/SpikeSystem.hpp"
+#include "../plasticity/STDP.hpp"
+#include "../plasticity/Hebbian.hpp"
+#include "../plasticity/StructuralPlasticity.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <memory>
 
 namespace nlm {
 
@@ -90,10 +97,14 @@ struct Brain::Impl {
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(config->getOr<size_t>("replay_interval", 100))
+        , consolidationInterval(config->getOr<size_t>("consolidation_interval", 1000))
     {
-        // Initialize random generator with seed from config
+        initializeSystems();
+    }
+    
+    void initializeSystems() {
+        // Initialize random generator with seed from config (use config default if available)
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
@@ -105,8 +116,6 @@ struct Brain::Impl {
         stdp = std::make_unique<STDP>();
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
@@ -145,10 +154,6 @@ struct Brain::Impl {
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
         
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
     }
@@ -174,6 +179,7 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
+// Initialize brain with configuration
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
@@ -215,8 +221,8 @@ bool Brain::initialize() {
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
     
@@ -229,9 +235,7 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
-    // Initialize working memory
+    // Initialize memory systems
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
@@ -1058,7 +1062,7 @@ Dopamine* Brain::getDopamine() {
 }
 
 Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
+    return pImpl->curiosity.get();n}
 }
 
 Novelty* Brain::getNovelty() {
@@ -1107,10 +1111,10 @@ void Brain::logStatus() const {
     
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+                     " (" + region->getName() + "): " +
+                     std::to_string(region->getTotalNeuronCount()) + " neurons, " +
+                     std::to_string(region->getSynapseCount()) + " synapses, " +
+                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
 }
 

@@ -287,11 +287,176 @@ print("Agent simulation complete!")
 
 ---
 
+## Advanced Examples (Phase 6 Integration)
+
+### Example 4: Full Integration with All Systems
+
+```python
+import pynlm
+import time
+
+def run_complete_agent_simulation(steps=500):
+    """Run a complete simulation using all NLM Phase 6 systems."""
+    
+    # 1. Create configuration with Phase 6 settings
+    config = pynlm.createDefaultConfig()
+    
+    # 2. Create brain and initialize
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 3. Create agent brain interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 4. Create and configure world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=16, visionHeight=16)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    # 5. Initialize agent with world
+    agent.initialize(world)
+    
+    # 6. Enable all subsystems for Phase 6 integration
+    agent.enableRewardModulation(True)      # Reward-based learning
+    agent.enableStructuralPlasticity(True)  # Growing new connections
+    agent.enableDevelopment(True)           # Brain matures over time
+    agent.enableCuriosity(True)             # Exploration behavior
+    
+    # 7. Run simulation loop
+    for step in range(steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input from world
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input in brain
+        agent.processSensoryInput(percept)
+        
+        # Run brain step
+        brain.step(step)
+        
+        # Decode motor command from brain activity
+        motor_cmd = agent.decodeMotorCommand()
+        
+        # Apply motor command to world
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = world.getEnergy() / world.getMaxEnergy() if world.getMaxEnergy() > 0 else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print progress
+        if step % 50 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+            print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+            print(f"  E/I ratio: {brain.getExcitationInhibitionRatio():.2f}")
+    
+    print("Complete Phase 6 integration simulation finished!")
+    return brain, world, agent
+
+# Run the simulation
+brain, world, agent = run_complete_agent_simulation(500)
+```
+
+### Example 5: Learning in a Dynamic Environment
+
+```python
+import pynlm
+import random
+
+def run_learning_agent_simulation(steps=1000):
+    """Agent learns to navigate and collect resources in a dynamic world."""
+    
+    # Create brain and agent
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    agent = pynlm.createAgentBrain(brain)
+    
+    # Create dynamic world with resources
+    world = pynlm.createSimpleWorld()
+    world.configure(width=30, height=30, visionWidth=12, visionHeight=12)
+    world.reset()
+    world.setAgentStart(5.0, 5.0)
+    
+    # Add some resources in random locations
+    for _ in range(10):
+        x = random.uniform(10.0, 20.0)
+        y = random.uniform(10.0, 20.0)
+        world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
+    
+    agent.initialize(world)
+    
+    # Enable learning and adaptation
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    
+    total_resources_collected = 0
+    
+    for step in range(steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get percept
+        percept = world.getSensoryPercept()
+        
+        # Process in brain
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        
+        # Choose action
+        action = agent.decodeMotorCommand()
+        
+        # Apply action and get result
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Calculate reward
+        reward = 0.0
+        if world.getAgentBody().energy > 90.0:  # High energy = good
+            reward += 1.0
+        if action == pynlm.ActionType.Interact:  # Interacting might collect resources
+            reward += 0.5
+        
+        # Apply reward modulation
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Track resource collection
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Agent at ({world.getAgentBody().x:.1f}, {world.getAgentBody().y:.1f})")
+            print(f"  Energy: {world.getAgentBody().energy:.1f}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+    
+    print(f"Learning simulation complete! Resources collected: {total_resources_collected}")
+    return brain, world, agent
+
+# Run learning simulation
+brain, world, agent = run_learning_agent_simulation(1000)
+```
+
+---
+
 ## Next Steps
 
 When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try the advanced examples above for Phase 6 integration
+5. Check out the source code for more sophisticated usage patterns
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM's Phase 6 integrated artificial brain system.
+
