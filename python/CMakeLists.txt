@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
+cmake_version(0.4)
 project(pynlm_bindings LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
