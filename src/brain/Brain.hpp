@@ -141,17 +141,21 @@ public:
     
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
+    const NeuralWorkingMemory* getWorkingMemory() const;
     
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
+    const NeuralEpisodicMemory* getEpisodicMemory() const;
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    const NeuralAssociativeMemory* getAssociativeMemory() const;
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
+    const PredictionSystem* getPredictionSystem() const;
     
     // ========== COGNITION SYSTEMS ==========
     

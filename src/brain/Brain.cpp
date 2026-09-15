@@ -586,6 +586,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+    
+    // ========== STEP 16: Release working memory traces ==========
+    // Working memory decays over time - this is called by the working memory system
+    if (pImpl->workingMemory) {
+        // The working memory itself handles its own decay
+        // This just provides an opportunity for monitoring or other effects
+    }
+}
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
@@ -1003,9 +1011,11 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
-
 NeuralWorkingMemory* Brain::getWorkingMemory() {
+    return pImpl->workingMemory.get();
+}
+
+const NeuralWorkingMemory* Brain::getWorkingMemory() const {
     return pImpl->workingMemory.get();
 }
 
@@ -1013,13 +1023,25 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
 }
 
+const NeuralEpisodicMemory* Brain::getEpisodicMemory() const {
+    return pImpl->episodicMemory.get();
+}
+
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    return pImpl->associativeMemory.get();
+}
+
+const NeuralAssociativeMemory* Brain::getAssociativeMemory() const {
     return pImpl->associativeMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
+    return pImpl->predictionSystem.get();
+}
+
+const PredictionSystem* Brain::getPredictionSystem() const {
     return pImpl->predictionSystem.get();
 }
 
