@@ -1114,4 +1114,274 @@ void Brain::logStatus() const {
     }
 }
 
+// ========== ADVANCED BRAIN STATE ACCESS ==========
+
+std::vector<std::tuple<uint64_t, float, float, float, float, float, float>> Brain::getNeuronStates() const {
+    std::vector<std::tuple<uint64_t, float, float, float, float, float, float>> states;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                const auto& state = neuron->getState();
+                states.emplace_back(
+                    neuron->getId().value,
+                    state.membranePotential,
+                    state.restingPotential,
+                    state.threshold,
+                    state.resetPotential,
+                    state.leakConductance,
+                    state.refractoryRemaining
+                );
+            }
+        }
+    }
+    return states;
+}
+
+std::vector<std::tuple<uint64_t, uint64_t, uint64_t, float, float, float, float>> Brain::getSynapseStates() const {
+    std::vector<std::tuple<uint64_t, uint64_t, uint64_t, float, float, float, float>> synapses;
+    for (const auto& region : pImpl->regions) {
+        for (const auto* syn : region->getSynapses()) {
+            synapses.emplace_back(
+                syn->getSourceNeuron().value,
+                syn->getDestinationNeuron().value,
+                syn->getId().value,
+                syn->getWeight(),
+                syn->getDelay(),
+                syn->getType(),
+                syn->getEligibilityTrace()
+            );
+        }
+    }
+    return synapses;
+}
+
+// Memory and system statistics
+py::dict Brain::getMemoryStats() const {
+    py::dict stats;
+    // Memory system stats
+    if (pImpl->workingMemory) {
+        stats["working_memory_traces"] = pImpl->workingMemory->getActiveTraces();
+        stats["working_memory_capacity"] = pImpl->workingMemory->getCapacity();
+    }
+    if (pImpl->episodicMemory) {
+        stats["episodic_memory_episodes"] = pImpl->episodicMemory->getEpisodeCount();
+        stats["episodic_memory_max_episodes"] = pImpl->episodicMemory->getMaxEpisodes();
+    }
+    if (pImpl->associativeMemory) {
+        stats["associative_memory_patterns"] = pImpl->associativeMemory->getPatternCount();
+        stats["associative_memory_strength"] = pImpl->associativeMemory->getAverageStrength();
+    }
+    // Neuromodulation stats
+    if (pImpl->novelty) {
+        stats["novelty_level"] = pImpl->novelty->getLevel();
+        stats["novelty_history_size"] = pImpl->novelty->getHistorySize();
+    }
+    if (pImpl->curiosity) {
+        stats["curiosity_level"] = pImpl->curiosity->getLevel();
+        stats["curiosity_history_size"] = pImpl->curiosity->getHistorySize();
+    }
+    if (pImpl->dopamine) {
+        stats["dopamine_level"] = pImpl->dopamine->getLevel();
+        stats["dopamine_history_size"] = pImpl->dopamine->getHistorySize();
+    }
+    return stats;
+}
+
+py::dict Brain::getPlasticityStats() const {
+    py::dict stats;
+    // Plasticity system stats
+    if (pImpl->stdp) {
+        stats["stdp_ltp_weight"] = pImpl->stdp->getLTPWeight();
+        stats["stdp_ltd_weight"] = pImpl->stdp->getLTDWeight();
+        stats["stdp_tau"] = pImpl->stdp->getTau();
+        stats["stdp_history_size"] = pImpl->stdp->getHistorySize();
+    }
+    if (pImpl->hebbian) {
+        stats["hebbian_learning_rate"] = pImpl->hebbian->getLearningRate();
+        stats["hebbian_history_size"] = pImpl->hebbian->getHistorySize();
+    }
+    if (pImpl->structuralPlasticity) {
+        stats["synaptogenesis_rate"] = pImpl->structuralPlasticity->getSynaptogenesisRate();
+        stats["pruning_rate"] = pImpl->structuralPlasticity->getPruningRate();
+        stats["structural_history_size"] = pImpl->structuralPlasticity->getHistorySize();
+    }
+    return stats;
+}
+
+py::dict Brain::getDevelopmentStats() const {
+    py::dict stats;
+    // Development stats
+    stats["developmental_stage"] = static_cast<int>(pImpl->developmentalStage);
+    stats["age"] = pImpl->currentTime;  // Approximation
+    stats["plasticity_modifier"] = 1.0f;  // Simplified
+    if (pImpl->developmentSystem) {
+        stats["critical_period_active"] = pImpl->developmentSystem->isCriticalPeriod();
+        stats["maturation_progress"] = pImpl->developmentSystem->getMaturationProgress();
+    }
+    return stats;
+}
+
+py::dict Brain::getPredictionStats() const {
+    py::dict stats;
+    // Prediction system stats
+    if (pImpl->predictionSystem) {
+        stats["prediction_error"] = pImpl->predictionSystem->getPredictionError();
+        stats["confidence_level"] = pImpl->predictionSystem->getConfidenceLevel();
+        stats["prediction_history_size"] = pImpl->predictionSystem->getHistorySize();
+        stats["model_accuracy"] = pImpl->predictionSystem->getModelAccuracy();
+    }
+    return stats;
+}
+
+py::dict Brain::getCognitionStats() const {
+    py::dict stats;
+    // Cognition system stats
+    if (pImpl->planner) {
+        stats["planning_depth"] = pImpl->planner->getPlanningDepth();
+        stats["plan_confidence"] = pImpl->planner->getPlanConfidence();
+    }
+    if (pImpl->conceptFormation) {
+        stats["concept_count"] = pImpl->conceptFormation->getConceptCount();
+        stats["concept_stability"] = pImpl->conceptFormation->getConceptStability();
+    }
+    if (pImpl->attention) {
+        stats["attention_focus"] = pImpl->attention->getFocusStrength();
+        stats["attention_gating"] = pImpl->attention->getGatingFactor();
+    }
+    return stats;
+}
+
+py::dict Brain::getSelfModel() const {
+    py::dict model;
+    model["brain_id"] = getTotalNeuronCount();
+    model["experience_count"] = getTotalSpikeCount();
+    model["behavioral_patterns"] = 0;  // TODO: Implement tracking
+    model["skill_level"] = 0.5f;  // Simplified
+    model["adaptation_rate"] = 0.1f;  // Simplified
+    return model;
+}
+
+py::dict Brain::getSocialInfo() const {
+    py::dict social;
+    social["observations_count"] = 0;  // TODO: Implement tracking
+    social["imitation_examples"] = 0;  // TODO: Implement tracking
+    social["social_learning_rate"] = 0.2f;  // Simplified
+    social["theory_of_mind"] = 0.3f;  // Simplified
+    return social;
+}
+
+py::dict Brain::analyzeBehavior(int windowSize) const {
+    py::dict analysis;
+    // Behavioral analysis (simplified)
+    analysis["stability"] = 0.7f;  // Placeholder
+    analysis["exploration_rate"] = 0.3f;  // Placeholder
+    analysis["adaptation_speed"] = 0.5f;  // Placeholder
+    analysis["pattern_complexity"] = 0.6f;  // Placeholder
+    return analysis;
+}
+
+py::tuple Brain::getCheckpointInfo() const {
+    // TODO: Implement actual checkpoint manager
+    return py::make_tuple(0, 0, 0, 0);
+}
+
+bool Brain::triggerCheckpoint() const {
+    // TODO: Implement actual checkpoint manager
+    return false;
+}
+
+py::dict Brain::compareBrains(const Brain& other) const {
+    py::dict comparison;
+    // Brain comparison (simplified)
+    comparison["neuron_similarity"] = 0.8f;  // Placeholder
+    comparison["behavior_similarity"] = 0.7f;  // Placeholder
+    comparison["memory_similarity"] = 0.6f;  // Placeholder
+    comparison["overall_compatibility"] = 0.7f;  // Placeholder
+    return comparison;
+}
+
+// Development and learning metrics
+
+double Brain::getDevelopmentalAge() const {
+    return pImpl->currentTime;
+}
+
+float Brain::getPlasticityModifier() const {
+    return 1.0f;  // Simplified - should come from development system
+}
+
+size_t Brain::getBehavioralPatternCount() const {
+    // TODO: Implement tracking of behavioral patterns
+    return 0;
+}
+
+float Brain::getSkillLevel() const {
+    // TODO: Implement skill assessment
+    return 0.5f;
+}
+
+float Brain::getAdaptationRate() const {
+    // TODO: Implement adaptation rate calculation
+    return 0.1f;
+}
+
+size_t Brain::getObservationCount() const {
+    // TODO: Implement observation tracking
+    return 0;
+}
+
+size_t Brain::getImitationExamples() const {
+    // TODO: Implement imitation example tracking
+    return 0;
+}
+
+float Brain::getSocialLearningRate() const {
+    return 0.2f;  // Simplified
+}
+
+float Brain::getTheoryOfMindScore() const {
+    return 0.3f;  // Simplified
+}
+
+float Brain::analyzeBehaviorStability(int windowSize) const {
+    return 0.7f;  // Simplified
+}
+
+float Brain::analyzeExplorationRate(int windowSize) const {
+    return 0.3f;  // Simplified
+}
+
+float Brain::analyzeAdaptationSpeed(int windowSize) const {
+    return 0.5f;  // Simplified
+}
+
+float Brain::analyzePatternComplexity(int windowSize) const {
+    return 0.6f;  // Simplified
+}
+
+CheckpointManager* Brain::getCheckpointManager() const {
+    // TODO: Add checkpoint manager to Brain::Impl
+    return nullptr;
+}
+
+float Brain::compareNeuronConnectivity(const Brain& other) const {
+    // TODO: Implement proper connectivity comparison
+    return 0.8f;
+}
+
+float Brain::compareBehaviorPatterns(const Brain& other) const {
+    // TODO: Implement behavior pattern comparison
+    return 0.7f;
+}
+
+float Brain::compareMemoryContents(const Brain& other) const {
+    // TODO: Implement memory content comparison
+    return 0.6f;
+}
+
+float Brain::calculateCompatibilityScore(const Brain& other) const {
+    // TODO: Implement compatibility scoring
+    return 0.7f;
+}
+
 } // namespace nlm

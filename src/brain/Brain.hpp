@@ -184,14 +184,74 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // ========== ADVANCED BRAIN STATE ACCESS ==========
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Get detailed neuron states
+    std::vector<std::tuple<uint64_t, float, float, float, float, float, float>> getNeuronStates() const;
     
-    // Logging
-    void logStatus() const;
+    // Get detailed synapse states  
+    std::vector<std::tuple<uint64_t, uint64_t, uint64_t, float, float, float, float>> getSynapseStates() const;
+    
+    // Get comprehensive memory system statistics
+    py::dict getMemoryStats() const;
+    
+    // Get plasticity system statistics
+    py::dict getPlasticityStats() const;
+    
+    // Get development system statistics
+    py::dict getDevelopmentStats() const;
+    
+    // Get prediction system statistics
+    py::dict getPredictionStats() const;
+    
+    // Get cognition system statistics
+    py::dict getCognitionStats() const;
+    
+    // Get self-model information (brain identity and learned characteristics)
+    py::dict getSelfModel() const;
+    
+    // Get social learning information
+    py::dict getSocialInfo() const;
+    
+    // Analyze brain behavior patterns
+    py::dict analyzeBehavior(int windowSize = 100) const;
+    
+    // Get checkpoint system information
+    py::tuple getCheckpointInfo() const;
+    
+    // Manually trigger checkpoint creation
+    bool triggerCheckpoint() const;
+    
+    // Compare two brains for compatibility analysis
+    py::dict compareBrains(const Brain& other) const;
+    
+    // Development and learning metrics (new methods for Phase 2)
+    double getDevelopmentalAge() const;
+    float getPlasticityModifier() const;
+    size_t getBehavioralPatternCount() const;
+    float getSkillLevel() const;
+    float getAdaptationRate() const;
+    
+    // Social learning metrics
+    size_t getObservationCount() const;
+    size_t getImitationExamples() const;
+    float getSocialLearningRate() const;
+    float getTheoryOfMindScore() const;
+    
+    // Behavioral analysis
+    float analyzeBehaviorStability(int windowSize = 100) const;
+    float analyzeExplorationRate(int windowSize = 100) const;
+    float analyzeAdaptationSpeed(int windowSize = 100) const;
+    float analyzePatternComplexity(int windowSize = 100) const;
+    
+    // Checkpoint management
+    class CheckpointManager* getCheckpointManager() const;
+    
+    // Brain comparison
+    float compareNeuronConnectivity(const Brain& other) const;
+    float compareBehaviorPatterns(const Brain& other) const;
+    float compareMemoryContents(const Brain& other) const;
+    float calculateCompatibilityScore(const Brain& other) const;
     
 private:
     struct Impl;

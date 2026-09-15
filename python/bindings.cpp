@@ -289,6 +289,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // Enhanced Brain class with more detailed state access
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -342,6 +343,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -351,7 +354,195 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // ===== ENHANCED BRAIN STATE ACCESS =====
+        .def("getNeuronStates", [](const Brain& self) {
+            std::vector<std::tuple<uint64_t, float, float, float, float, float, float>> states;
+            for (const auto& region : self.getRegions()) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        states.emplace_back(
+                            neuron->getId().value,
+                            state.membranePotential,
+                            state.restingPotential,
+                            state.threshold,
+                            state.resetPotential,
+                            state.leakConductance,
+                            state.refractoryRemaining
+                        );
+                    }
+                }
+            }
+            return states;
+        }, "Get detailed neuron states (ID, membrane potential, resting potential, threshold, reset potential, leak conductance, refractory remaining)")
+        .def("getSynapseStates", [](const Brain& self) {
+            std::vector<std::tuple<uint64_t, uint64_t, uint64_t, float, float, float, float>> synapses;
+            for (const auto& region : self.getRegions()) {
+                for (const auto* syn : region->getSynapses()) {
+                    synapses.emplace_back(
+                        syn->getSourceNeuron().value,
+                        syn->getDestinationNeuron().value,
+                        syn->getId().value,
+                        syn->getWeight(),
+                        syn->getDelay(),
+                        syn->getType(),
+                        syn->getEligibilityTrace()
+                    );
+                }
+            }
+            return synapses;
+        }, "Get detailed synapse states (source ID, destination ID, synapse ID, weight, delay, type, eligibility trace)")
+        .def("getMemoryStats", [](Brain& self) {
+            py::dict stats;
+            auto* workingMem = self.getWorkingMemory();
+            if (workingMem) {
+                stats["working_memory_traces"] = workingMem->getActiveTraces();
+                stats["working_memory_capacity"] = workingMem->getCapacity();
+            }
+            auto* episodicMem = self.getEpisodicMemory();
+            if (episodicMem) {
+                stats["episodic_memory_episodes"] = episodicMem->getEpisodeCount();
+                stats["episodic_memory_max_episodes"] = episodicMem->getMaxEpisodes();
+            }
+            auto* assocMem = self.getAssociativeMemory();
+            if (assocMem) {
+                stats["associative_memory_patterns"] = assocMem->getPatternCount();
+                stats["associative_memory_strength"] = assocMem->getAverageStrength();
+            }
+            auto* novelty = self.getNovelty();
+            if (novelty) {
+                stats["novelty_level"] = novelty->getLevel();
+                stats["novelty_history_size"] = novelty->getHistorySize();
+            }
+            auto* curiosity = self.getCuriosity();
+            if (curiosity) {
+                stats["curiosity_level"] = curiosity->getLevel();
+                stats["curiosity_history_size"] = curiosity->getHistorySize();
+            }
+            auto* dopamine = self.getDopamine();
+            if (dopamine) {
+                stats["dopamine_level"] = dopamine->getLevel();
+                stats["dopamine_history_size"] = dopamine->getHistorySize();
+            }
+            return stats;
+        }, "Get comprehensive memory system statistics")
+        .def("getPlasticityStats", [](Brain& self) {
+            py::dict stats;
+            auto* stdp = self.getSTDP();
+            if (stdp) {
+                stats["stdp_ltp_weight"] = stdp->getLTPWeight();
+                stats["stdp_ltd_weight"] = stdp->getLTDWeight();
+                stats["stdp_tau"] = stdp->getTau();
+                stats["stdp_history_size"] = stdp->getHistorySize();
+            }
+            auto* hebbian = self.getHebbian();
+            if (hebbian) {
+                stats["hebbian_learning_rate"] = hebbian->getLearningRate();
+                stats["hebbian_history_size"] = hebbian->getHistorySize();
+            }
+            auto* sp = self.getStructuralPlasticity();
+            if (sp) {
+                stats["synaptogenesis_rate"] = sp->getSynaptogenesisRate();
+                stats["pruning_rate"] = sp->getPruningRate();
+                stats["structural_history_size"] = sp->getHistorySize();
+            }
+            return stats;
+        }, "Get plasticity system statistics")
+        .def("getDevelopmentStats", [](Brain& self) {
+            py::dict stats;
+            stats["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            stats["age"] = self.getDevelopmentalAge();  // Assuming this method exists
+            stats["plasticity_modifier"] = self.getPlasticityModifier();  // Assuming this method exists
+            auto* devSys = self.getDevelopmentSystem();
+            if (devSys) {
+                stats["critical_period_active"] = devSys->isCriticalPeriod();
+                stats["maturation_progress"] = devSys->getMaturationProgress();
+            }
+            return stats;
+        }, "Get development system statistics")
+        .def("getPredictionStats", [](Brain& self) {
+            py::dict stats;
+            auto* predSys = self.getPredictionSystem();
+            if (predSys) {
+                stats["prediction_error"] = predSys->getPredictionError();
+                stats["confidence_level"] = predSys->getConfidenceLevel();
+                stats["prediction_history_size"] = predSys->getHistorySize();
+                stats["model_accuracy"] = predSys->getModelAccuracy();
+            }
+            return stats;
+        }, "Get prediction system statistics")
+        .def("getCognitionStats", [](Brain& self) {
+            py::dict stats;
+            auto* planner = self.getPlanner();
+            if (planner) {
+                stats["planning_depth"] = planner->getPlanningDepth();
+                stats["plan_confidence"] = planner->getPlanConfidence();
+            }
+            auto* concepts = self.getConceptFormation();
+            if (concepts) {
+                stats["concept_count"] = concepts->getConceptCount();
+                stats["concept_stability"] = concepts->getConceptStability();
+            }
+            auto* attention = self.getAttention();
+            if (attention) {
+                stats["attention_focus"] = attention->getFocusStrength();
+                stats["attention_gating"] = attention->getGatingFactor();
+            }
+            return stats;
+        }, "Get cognition system statistics")
+        .def("getSelfModel", [](Brain& self) {
+            py::dict model;
+            model["brain_id"] = self.getTotalNeuronCount();
+            model["experience_count"] = self.getTotalSpikeCount();
+            model["behavioral_patterns"] = self.getBehavioralPatternCount();  // Assuming this method exists
+            model["skill_level"] = self.getSkillLevel();  // Assuming this method exists
+            model["adaptation_rate"] = self.getAdaptationRate();  // Assuming this method exists
+            return model;
+        }, "Get self-model information (brain identity and learned characteristics)")
+        .def("getSocialInfo", [](Brain& self) {
+            py::dict social;
+            social["observations_count"] = self.getObservationCount();  // Assuming this method exists
+            social["imitation_examples"] = self.getImitationExamples();  // Assuming this method exists
+            social["social_learning_rate"] = self.getSocialLearningRate();  // Assuming this method exists
+            social["theory_of_mind"] = self.getTheoryOfMindScore();  // Assuming this method exists
+            return social;
+        }, "Get social learning information")
+        .def("analyzeBehavior", [](Brain& self, int windowSize) {
+            py::dict analysis;
+            analysis["stability"] = self.analyzeBehaviorStability(windowSize);  // Assuming this method exists
+            analysis["exploration_rate"] = self.analyzeExplorationRate(windowSize);  // Assuming this method exists
+            analysis["adaptation_speed"] = self.analyzeAdaptationSpeed(windowSize);  // Assuming this method exists
+            analysis["pattern_complexity"] = self.analyzePatternComplexity(windowSize);  // Assuming this method exists
+            return analysis;
+        }, "Analyze brain behavior patterns")
+        .def("getCheckpointInfo", [](Brain& self) {
+            auto* checkpoint = self.getCheckpointManager();  // Assuming this method exists
+            if (checkpoint) {
+                return py::make_tuple(
+                    checkpoint->getCurrentCheckpointIndex(),
+                    checkpoint->getCheckpointCount(),
+                    checkpoint->getCheckpointSize(),
+                    checkpoint->getCompressionLevel()
+                );
+            }
+            return py::make_tuple(0, 0, 0, 0);
+        }, "Get checkpoint system information")
+        .def("triggerCheckpoint", [](Brain& self) {
+            auto* checkpoint = self.getCheckpointManager();  // Assuming this method exists
+            if (checkpoint) {
+                return checkpoint->createCheckpoint();
+            }
+            return false;
+        }, "Manually trigger checkpoint creation")
+        .def("compareBrains", [](const Brain& self, const Brain& other) {
+            py::dict comparison;
+            comparison["neuron_similarity"] = self.compareNeuronConnectivity(other);
+            comparison["behavior_similarity"] = self.compareBehaviorPatterns(other);
+            comparison["memory_similarity"] = self.compareMemoryContents(other);
+            comparison["overall_compatibility"] = self.calculateCompatibilityScore(other);
+            return comparison;
+        }, "Compare two brains for compatibility analysis")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -400,6 +591,64 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // ===== ADDITIONAL AGENT BRAIN ADVANCED FUNCTIONS =====
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("getBrainStates", [](const Brain& brain) {
+        return brain.getNeuronStates();
+    }, "Get detailed neuron states (ID, membrane potential, resting potential, threshold, reset potential, leak conductance, refractory remaining)")
+
+    m.def("getSynapseStates", [](const Brain& brain) {
+        return brain.getSynapseStates();
+    }, "Get detailed synapse states (source ID, destination ID, synapse ID, weight, delay, type, eligibility trace)")
+
+    m.def("getMemoryStats", [](Brain& brain) {
+        return brain.getMemoryStats();
+    }, "Get comprehensive memory system statistics")
+
+    m.def("getPlasticityStats", [](Brain& brain) {
+        return brain.getPlasticityStats();
+    }, "Get plasticity system statistics")
+
+    m.def("getDevelopmentStats", [](Brain& brain) {
+        return brain.getDevelopmentStats();
+    }, "Get development system statistics")
+
+    m.def("getPredictionStats", [](Brain& brain) {
+        return brain.getPredictionStats();
+    }, "Get prediction system statistics")
+
+    m.def("getCognitionStats", [](Brain& brain) {
+        return brain.getCognitionStats();
+    }, "Get cognition system statistics")
+
+    m.def("getSelfModel", [](Brain& brain) {
+        return brain.getSelfModel();
+    }, "Get self-model information (brain identity and learned characteristics)")
+
+    m.def("getSocialInfo", [](Brain& brain) {
+        return brain.getSocialInfo();
+    }, "Get social learning information")
+
+    m.def("analyzeBehavior", [](Brain& brain, int windowSize) {
+        return brain.analyzeBehavior(windowSize);
+    }, "Analyze brain behavior patterns")
+
+    m.def("getCheckpointInfo", [](Brain& brain) {
+        return brain.getCheckpointInfo();
+    }, "Get checkpoint system information")
+
+    m.def("triggerCheckpoint", [](Brain& brain) {
+        return brain.triggerCheckpoint();
+    }, "Manually trigger checkpoint creation")
+
+    m.def("compareBrains", [](const Brain& brain1, const Brain& brain2) {
+        return brain1.compareBrains(brain2);
+    }, "Compare two brains for compatibility analysis")
+
+    // ===== BASIC BRAIN INTERFACES =====
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -411,10 +660,6 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
