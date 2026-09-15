@@ -1,13 +1,16 @@
 #pragma once
 
 #include "Action.hpp"
+#include "../../brain/NeuralRegion.hpp"
+#include "../../brain/Neuron.hpp"
+#include "../../core/Random/Random.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
 
 // Motor system: converts neural activity to actions
-// PLACEHOLDER - Phase 2 will implement real action selection
+// IMPLEMENTED: Real action selection based on neural population activity patterns
 
 class MotorSystem {
 public:
@@ -15,13 +18,14 @@ public:
     ~MotorSystem();
     
     // Select action based on neural activity
-    // TODO PHASE 2: Implement real action selection
-    std::unique_ptr<Action> selectAction(const class NeuralRegion& motorRegion);
+    // IMPLEMENTED: Winner-take-all competition with temporal integration
+    std::unique_ptr<Action> selectAction(const NeuralRegion& motorRegion);
     
     // Get available actions
     const std::vector<ActionType>& getAvailableActions() const;
     
-    // Set action preferences (for exploration)
+    // Set action preferences (for exploration/exploitation)
+    // IMPLEMENTED: Action preference weights for intelligent exploration
     void setActionPreference(ActionType action, float preference);
     
     // Get action history

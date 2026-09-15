@@ -1,13 +1,16 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../core/Random/Random.hpp"
 #include <vector>
 #include <memory>
+#include <algorithm>
 
 namespace nlm {
 
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// IMPLEMENTED: Real predictive coding using neural activity patterns and temporal dynamics
 
 class PredictionSystem {
 public:
@@ -15,10 +18,11 @@ public:
     ~PredictionSystem();
     
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
+    // IMPLEMENTED: Real prediction using neural activity patterns and temporal dynamics
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
+    // IMPLEMENTED: Real prediction error computation using neural coding
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
     // Get prediction error
@@ -32,6 +36,7 @@ public:
     void clearHistory();
     
     // Train prediction model
+    // IMPLEMENTED: Train prediction model using neural learning rules
     void train(const SensoryInput& observation);
     
 private:
