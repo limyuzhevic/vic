@@ -123,7 +123,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         
         if (activation > 0.1f) {
             // Inject maintenance current
-            brain_->injectCurrent(neuron, activation * 2.0f);
+            if (brain_) {
+                brain_->injectCurrent(neuron, activation * 2.0f);
+            }
             
             // Age the trace
             memoryTimestamps_[i]++;
@@ -137,11 +139,18 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         }
     }
     
-    // Decay weak traces
-    decayWeakTraces();
-    
     // Run competition to select winners
     runCompetition();
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
+    
+    // Update attention based on working memory activity
+    if (brain_) {
+        // Get working memory neurons and apply attention
+        std::vector<NeuronId> competitors = getMemoryNeurons();
+        brain_->getAttention()->processCompetition(competitors);
+    }
 }
 
 void NeuralWorkingMemory::clear() {

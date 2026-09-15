@@ -16,16 +16,21 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // Enhanced working memory storage with competition and decay
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
             return;
         }
     }
-    if (pImpl->items.size() < pImpl->capacity) {
-        pImpl->items.emplace_back(neuron, value);
+    
+    // Implement competitive storage - remove oldest if at capacity
+    if (pImpl->items.size() >= pImpl->capacity) {
+        // Remove the least recently used item (first in vector)
+        pImpl->items.erase(pImpl->items.begin());
     }
+    
+    pImpl->items.emplace_back(neuron, value);
 }
 
 float WorkingMemory::retrieve(NeuronId neuron) const {
@@ -59,9 +64,17 @@ size_t WorkingMemory::getCurrentSize() const {
 }
 
 void WorkingMemory::decay(float decayRate) {
+    // Apply decay with saturation protection - prevent complete decay to zero
     for (auto& item : pImpl->items) {
-        item.second *= (1.0f - decayRate);
+        item.second = std::max(0.01f, item.second * (1.0f - decayRate));
     }
+    
+    // Remove traces that have decayed below threshold
+    pImpl->items.erase(
+        std::remove_if(pImpl->items.begin(), pImpl->items.end(),
+            [](const auto& item) { return item.second < 0.01f; }),
+        pImpl->items.end()
+    );
 }
 
 // Episodic Memory Implementation
@@ -108,7 +121,47 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Enhanced consolidation - strengthen important episodes, remove weak ones
+    std::vector<EpisodicMemoryItem> consolidated;
+    float totalStrength = 0.0f;
+    
+    // Calculate episode strength based on neuron activation and reward
+    for (const auto& episode : pImpl->episodes) {
+        float strength = 0.0f;
+        
+        // Base strength on number of active neurons
+        strength += static_cast<float>(episode.activeNeurons.size()) * 0.1f;
+        
+        // Add weight from neuron activations
+        for (float activation : episode.neuronActivations) {
+            strength += activation * 0.5f;
+        }
+        
+        // Add reward value if dopamine available
+        if (episode.reward > 0.0f) {
+            strength += episode.reward * 2.0f;
+        }
+        
+        totalStrength += strength;
+        
+        if (strength >= relevanceThreshold) {
+            // Strengthen important episodes during consolidation
+            EpisodicMemoryItem consolidatedEpisode = episode;
+            consolidatedEpisode.relevance = std::min(1.0f, strength / 5.0f);
+            consolidated.push_back(consolidatedEpisode);
+        }
+    }
+    
+    // Update episodes
+    pImpl->episodes = consolidated;
+    
+    // Keep only most recent episodes if over limit
+    if (pImpl->episodes.size() > pImpl->maxEpisodes) {
+        size_t keepCount = pImpl->maxEpisodes / 2;  // Keep half for efficiency
+        if (keepCount > 0) {
+            pImpl->episodes.erase(pImpl->episodes.end() - (pImpl->episodes.size() - keepCount), pImpl->episodes.end());
+        }
+    }
 }
 
 // Semantic Memory Implementation
