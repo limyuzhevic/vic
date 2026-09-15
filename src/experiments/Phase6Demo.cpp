@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
     // Initialize logging
-    Logger::getInstance().setLevel(Logger::Level::Info);
+    Logger::getGlobal().setLevel(Logger::Level::Info);
     
     // Create experiment
     Phase6IntegratedExperiment experiment;
