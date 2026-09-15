@@ -4,12 +4,7 @@ project(NLM VERSION 0.1.0 LANGUAGES CXX)
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+set(CMAKE_EXTENSIONS OFF)
 
 # Enable warnings
 if(MSVC)
@@ -85,6 +80,9 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Checkpoint system
+    src/performance/CheckpointSystem.cpp
+    src/performance/CheckpointReader.cpp
 )
 
 target_include_directories(nlm_core PUBLIC

@@ -1,14 +1,16 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include <string>
-#include <vector>
+
+namespace nlm {
+
+#pragma once
+
+#include "../core/Types/Types.hpp"
 
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
-
 class Neuromodulator {
 public:
     virtual ~Neuromodulator() = default;
@@ -21,7 +23,6 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
@@ -31,59 +32,62 @@ protected:
     Neuromodulator() = default;
 };
 
-// Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
-class Dopamine : public Neuromodulator {
-public:
-    Dopamine();
-    ~Dopamine() override;
+// Neuromodulation system headers
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
+#include "../neuromodulation/Reward.hpp"
+
+namespace nlm {
+
+struct Dopamine::Impl {
+    float level;
+    float baseline;
+    float peak;
+    float decayRate;
+    float releaseRate;
     
-    const char* getName() const override;
-    float getLevel() const override;
-    void setLevel(float level) override;
-    float getPlasticityFactor() const override;
-    void update(TimestepDuration dt) override;
-    
-    // Reward signaling
-    void signalReward(float reward);
-    void signalRewardPredictionError(float error);
-    
-private:
-    struct Impl;
-    Impl* pImpl;
+    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
 };
 
-// Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
-class Acetylcholine : public Neuromodulator {
-public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
-};
+Dopamine::Dopamine() : pImpl(new Impl) {}
 
-// Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
-class Norepinephrine : public Neuromodulator {
-public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
-};
+Dopamine::~Dopamine() = default;
 
-// Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
-class Serotonin : public Neuromodulator {
-public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
-};
+const char* Dopamine::getName() const {
+    return "DA";
+}
+
+float Dopamine::getLevel() const {
+    return pImpl->level;
+}
+
+void Dopamine::setLevel(float level) {
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+}
+
+float Dopamine::getPlasticityFactor() const {
+    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
+    // PLACEHOLDER: Higher dopamine increases plasticity
+    return 0.5f + 0.5f * pImpl->level;
+}
+
+void Dopamine::update(TimestepDuration dt) {
+    // TODO PHASE 2: Implement real dopamine dynamics
+    // PLACEHOLDER: Decay towards baseline
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+}
+
+void Dopamine::signalReward(float reward) {
+    // TODO PHASE 2: Implement real reward signaling
+    // PLACEHOLDER: Burst of dopamine on reward
+    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+}
+
+void Dopamine::signalRewardPredictionError(float error) {
+    // TODO PHASE 2: Implement reward prediction error signaling
+    // PLACEHOLDER: Dopamine responds to prediction error
+    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+}
 
 } // namespace nlm

@@ -46,6 +46,24 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // Apply developmental effects to brain - comprehensive integration
+    void applyToBrain(Brain* brain);
+    
+    // Modify neural excitability thresholds
+    void modifyExcitabilityThresholds(Brain* brain, float excitabilityModifier);
+    
+    // Modify membrane properties
+    void modifyMembraneProperties(Brain* brain, float membraneModifier);
+    
+    // Modify neuromodulator levels
+    void modifyNeuromodulatorLevels(Brain* brain, float neuromodulatorModifier);
+    
+    // Modify attention system parameters
+    void modifyAttentionSystem(Brain* brain, float attentionModifier);
+    
+    // Modify learning rates
+    void modifyLearningRates(Brain* brain, float learningModifier);
+    
 private:
     struct Impl;
     Impl* pImpl;

@@ -7,12 +7,17 @@
 namespace nlm {
 
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// Uses NeuralPrediction for actual neural prediction implementation
+
+class Brain;
 
 class PredictionSystem {
 public:
     PredictionSystem();
     ~PredictionSystem();
+    
+    // Initialize with brain reference for integration
+    void initialize(Brain* brain);
     
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction

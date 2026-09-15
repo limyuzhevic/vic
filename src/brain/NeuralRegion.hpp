@@ -69,6 +69,9 @@ public:
     // Reset all neurons and synapses
     void reset();
     
+    // Clear all synapses (used for loading checkpoints)
+    void clearSynapses();
+    
     // Initialize connectivity
     void initializeRandomConnectivity(class RandomGenerator& rng, 
                                       float connectionProbability,
@@ -78,6 +81,10 @@ public:
     // Get all neurons across all populations
     std::vector<Neuron*> getAllNeurons();
     std::vector<const Neuron*> getAllNeurons() const;
+    
+    // Find neuron by ID
+    Neuron* getNeuronById(NeuronId id);
+    const Neuron* getNeuronById(NeuronId id) const;
     
 private:
     struct Impl;

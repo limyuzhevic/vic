@@ -50,8 +50,8 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
     return *this;
 }
 
-void Neuron::setType(NeuronType type) {
-    pImpl->type = type;
+void Neuron::setStateAdaptation(float adaptation) {
+    pImpl->state.adaptationVariable = adaptation;
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {

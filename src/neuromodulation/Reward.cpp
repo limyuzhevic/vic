@@ -1,49 +1,63 @@
 #include "Reward.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
 struct Reward::Impl {
-    float currentValue;
-    float accumulatedReward;
-    std::vector<float> history;
+    class Brain* brain;
+    float level;
+    float baseline;
+    float peak;
+    float decayRate;
+    float releaseRate;
+    float predictionErrorSignal;
     
-    Impl() : currentValue(0.0f), accumulatedReward(0.0f) {}
+    Impl() : brain(nullptr), level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f),
+             predictionErrorSignal(0.0f) {}
 };
 
 Reward::Reward() : pImpl(new Impl) {}
 
 Reward::~Reward() = default;
 
-float Reward::getValue() const {
-    return pImpl->currentValue;
+void Reward::initialize(Brain* brain) {
+    pImpl->brain = brain;
+    NLM_LOG_INFO("Reward system initialized");
 }
 
-void Reward::setValue(float value) {
-    pImpl->currentValue = value;
+const char* Reward::getName() const {
+    return "Reward";
 }
 
-void Reward::add(float delta) {
-    pImpl->accumulatedReward += delta;
-    pImpl->currentValue += delta;
+float Reward::getLevel() const {
+    return pImpl->level;
 }
 
-void Reward::reset() {
-    pImpl->currentValue = 0.0f;
-    pImpl->accumulatedReward = 0.0f;
+void Reward::setLevel(float level) {
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
 }
 
-float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
-    return 0.0f;
+float Reward::getPlasticityFactor() const {
+    // Reward directly modulates plasticity - higher reward = stronger learning
+    return 0.5f + 0.5f * pImpl->level;
 }
 
-const std::vector<float>& Reward::getHistory() const {
-    return pImpl->history;
+void Reward::update(TimestepDuration dt) {
+    // Decay towards baseline
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
-void Reward::clearHistory() {
-    pImpl->history.clear();
+void Reward::signal(float reward, float predictionError) {
+    // Combined reward and prediction error signaling
+    pImpl->predictionErrorSignal = predictionError;
+    float totalSignal = reward + std::abs(predictionError) * 0.5f;
+    pImpl->level = std::min(pImpl->peak, pImpl->level + totalSignal * pImpl->releaseRate);
+}
+
+float Reward::getPredictionErrorSignal() const {
+    return pImpl->predictionErrorSignal;
 }
 
 } // namespace nlm
