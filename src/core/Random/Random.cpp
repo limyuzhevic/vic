@@ -106,14 +106,14 @@ bool RandomGenerator::randomBool() {
 }
 
 uint32_t RandomGenerator::randomBit() {
-    return uniformInt(0, 1);
+    return uniformInt(0U, 1U);
 }
 
 uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
     if (n == 0) {
         throw std::invalid_argument("Cannot pick from zero items");
     }
-    return uniformInt(0, n - 1);
+    return uniformInt(0ULL, n - 1);
 }
 
 void RandomGenerator::fillBytes(void* data, size_t size) {
