@@ -69,49 +69,27 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Direct access to brain neuromodulation systems
+    Dopamine* getBrainDopamine() { return brain_ ? brain_->getDopamine() : nullptr; }
+    Curiosity* getBrainCuriosity() { return brain_ ? brain_->getCuriosity() : nullptr; }
+    Novelty* getBrainNovelty() { return brain_ ? brain_->getNovelty() : nullptr; }
+    PredictionError* getBrainPredictionError() { return brain_ ? brain_->getPredictionErrorSignal() : nullptr; }
+    
+    WorkingMemory* getBrainWorkingMemory() { return brain_ ? brain_->getWorkingMemory() : nullptr; }
+    EpisodicMemory* getBrainEpisodicMemory() { return brain_ ? brain_->getEpisodicMemory() : nullptr; }
+    AssociativeMemory* getBrainAssociativeMemory() { return brain_ ? brain_->getAssociativeMemory() : nullptr; }
+    
+    PredictionSystem* getBrainPredictionSystem() { return brain_ ? brain_->getPredictionSystem() : nullptr; }
+    NeuralPlanner* getBrainPlanner() { return brain_ ? brain_->getPlanner() : nullptr; }
+    ConceptFormation* getBrainConceptFormation() { return brain_ ? brain_->getConceptFormation() : nullptr; }
+    AttentionalSelection* getBrainAttention() { return brain_ ? brain_->getAttention() : nullptr; }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
-    std::shared_ptr<Brain> brain_;
-    
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
-    
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
-    
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
-    
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
-    
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
-    
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
 };
 
 } // namespace nlm

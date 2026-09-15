@@ -34,6 +34,21 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Update prediction system with current prediction error
+    void trackPredictionError(float error);
+    
+    // Adjust exploration based on novelty/prediction error
+    void adjustExploration(float noveltyLevel);
+    
+    // Get exploration level
+    float getExplorationLevel() const;
+    
+    // Update exploration over time
+    void updateExploration(TimestepDuration dt);
+    
+    // Update with timestep (integration)
+    void update(TimestepDuration dt);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

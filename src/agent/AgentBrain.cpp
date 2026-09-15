@@ -245,18 +245,30 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
     // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
+    float dopamineLevel = predictionError_;
+    
+    // Update the brain's actual dopamine system
+    auto* brainDopamine = brain_->getDopamine();
+    if (brainDopamine) {
+        // Use the brain's dopamine system for proper neuromodulation
+        brainDopamine->signalRewardPredictionError(dopamineLevel);
+    }
+    
+    // Also update local agent dopamine for immediate feedback
+    dopamineLevel_ = dopamineLevel;
     
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
     // Apply to all synapses with eligibility traces
+    // This happens automatically through the brain's dopamine system
+    // but we also keep direct synapse modification for backward compatibility
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
+                // Apply reward-modulated weight change using agent dopamine
                 float delta = eligibility * dopamineLevel_ * plasticityModifier_;
                 syn->addToWeight(delta);
                 
@@ -271,7 +283,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
-    // Apply to STDP
+    // Apply to STDP learning rates
     auto* stdp = brain_->getSTDP();
     if (stdp) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
