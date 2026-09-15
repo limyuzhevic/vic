@@ -1,4 +1,4 @@
-#include "Config.hpp"
+#include "core/Logger/Logger.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -19,13 +19,58 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PHASE 2: Implement proper JSON/YAML parser
+    // Improved error handling and file opening
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
+    
+    // TODO PHASE 2: Implement JSON/YAML parser for proper configuration
+    // For now, fall back to simple key=value format with better error reporting
+    std::string line;
+    size_t lineNumber = 0;
+    bool hasContent = false;
+    
+    while (std::getline(file, line)) {
+        lineNumber++;
+        
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        hasContent = true;
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid config line in " + filepath + ":" + 
+                           std::to_string(lineNumber) + " - no '=' found: " + line);
+        }
+    }
+    
+    if (!hasContent) {
+        NLM_LOG_WARNING("Config file " + filepath + " appears to be empty or contain only comments");
+    }
+    
+    return true;
+}
     
     std::string line;
     while (std::getline(file, line)) {
@@ -81,12 +126,28 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to create config file: " + filepath);
         return false;
     }
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write the actual value instead of placeholder
+        std::visit([&file, &entry](auto&& arg) {
+            file << entry.key << " = ";
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
+    }
+    
+    if (!file.good()) {
+        NLM_LOG_ERROR("Failed to write config to file: " + filepath);
+        return false;
     }
     
     return true;

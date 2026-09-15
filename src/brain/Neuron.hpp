@@ -135,7 +135,42 @@ public:
     
     // Update neuron for one simulation step
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // PLACEHOLDER: Current placeholder combines LIF step with state management
+    // 
+    // IMPLEMENTATION NEEDED:
+    // 1. Realistic LIF dynamics:
+    //    - Implement tau * dV/dt = -gL*(V - EL) + I_syn
+    //    - Handle multiple synaptic conductances
+    //    - Add spike initiation mechanism with delta function
+    //    - Implement reset dynamics after spike
+    // 
+    // 2. Refractory period management:
+    //    - Enforce absolute refractory period
+    //    - Allow relative refractory period with reduced excitability
+    //    - Model recovery of excitability over time
+    // 
+    // 3. Spike detection and recording:
+    //    - Detect threshold crossing with hysteresis
+    //    - Record precise spike times for STDP
+    //    - Update firing rate metrics
+    //    - Handle spike latency and jitter
+    // 
+    // 4. Integration with plasticity:
+    //    - Update synaptic efficacy via STDP rules
+    //    - Handle eligibility traces for reward modulation
+    //    - Connect to neuromodulation signals
+    //    - Support structural plasticity events
+    // 
+    // 5. Performance optimizations:
+    //    - Pre-compute synaptic currents
+    //    - Use vectorized operations for parallel updates
+    //    - Implement sparse connectivity handling
+    //    - Add efficient spike history storage
+    
     void step(Timestamp currentTime);
+    
+    // Reset to initial state
+    void reset();
     
     // Reset to initial state
     void reset();

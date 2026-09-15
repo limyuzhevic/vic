@@ -15,7 +15,16 @@ public:
     ~MotorSystem();
     
     // Select action based on neural activity
-    // TODO PHASE 2: Implement real action selection
+    // TODO PHASE 2: Implement real action selection based on neural activity
+// Currently uses simple motor neuron population analysis
+// Future improvements:
+// - Integrate with neuromodulation signals (dopamine, curiosity)
+// - Implement action value learning
+// - Add exploration/exploitation balance
+// - Support complex action sequences
+// - Connect to goal selection from higher cognitive functions
+// - Implement action sequencing and temporal planning
+// - Add action timeout and failure handling
     std::unique_ptr<Action> selectAction(const class NeuralRegion& motorRegion);
     
     // Get available actions
