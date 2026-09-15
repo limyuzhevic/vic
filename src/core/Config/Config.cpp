@@ -19,40 +19,64 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    // Try to parse as JSON first
+    file.clear();
+    file.seekg(0, std::ios::beg);
+    
+    // Simple JSON parser (lightweight, no external dependencies)
+    std::string content((std::istreambuf_iterator<char>(file)), 
+                       std::istreambuf_iterator<char>());
+    file.close();
+    
+    if (content.empty()) {
+        return true; // Empty file is OK
     }
     
-    return true;
+    // Check if it looks like JSON (starts with { or [)
+    bool isJson = false;
+    size_t i = 0;
+    while (i < content.size() && std::isspace(content[i])) i++;
+    if (i < content.size() && (content[i] == '{' || content[i] == '[')) {
+        isJson = true;
+    }
+    
+    if (isJson) {
+        // Parse JSON format
+        return loadFromJson(content);
+    } else {
+        // Parse simple key=value format (backward compatibility)
+        std::istringstream stream(content);
+        std::string line;
+        while (std::getline(stream, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
+        }
+        return true;
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,12 +108,174 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Save in simple key=value format with comments
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Convert value back to string based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
+        file << "\n";
     }
     
     return true;
+}
+
+template<typename T>
+std::optional<T> parseJsonValue(const std::string& jsonStr) {
+    // Simple JSON value parser for basic types
+    // Remove whitespace
+    std::string trimmed = jsonStr;
+    size_t start = trimmed.find_first_not_of(" \t\r\n");
+    size_t end = trimmed.find_last_not_of(" \t\r\n");
+    if (start == std::string::npos || end == std::string::npos) {
+        return std::nullopt;
+    }
+    trimmed = trimmed.substr(start, end - start + 1);
+    
+    try {
+        if constexpr (std::is_same_v<T, std::string>) {
+            if (trimmed.size() >= 2 && trimmed.front() == '"' && trimmed.back() == '"') {
+                return trimmed.substr(1, trimmed.size() - 2);
+            }
+            return trimmed;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            if (trimmed == "true" || trimmed == "1") return true;
+            if (trimmed == "false" || trimmed == "0") return false;
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            size_t pos;
+            int64_t val = std::stoll(trimmed, &pos);
+            if (pos != trimmed.size()) throw std::invalid_argument("Extra characters");
+            return static_cast<T>(val);
+        } else if constexpr (std::is_same_v<T, double>) {
+            size_t pos;
+            double val = std::stod(trimmed, &pos);
+            if (pos != trimmed.size()) throw std::invalid_argument("Extra characters");
+            return val;
+        }
+    } catch (const std::exception&) {
+        // Return nullopt on parse error
+    }
+    return std::nullopt;
+}
+
+bool Config::loadFromJson(const std::string& jsonStr) {
+    // Simple JSON parser for basic structures (objects and arrays)
+    std::istringstream stream(jsonStr);
+    std::string line;
+    std::string currentKey;
+    bool inObject = false;
+    bool inArray = false;
+    
+    clear(); // Start fresh
+    
+    while (std::getline(stream, line)) {
+        // Remove whitespace
+        size_t start = line.find_first_not_of(" \t\r\n");
+        if (start == std::string::npos) continue; // Empty line
+        
+        line = line.substr(start);
+        
+        // Check for opening/closing braces and commas
+        size_t bracePos = line.find('{');
+        size_t bracketPos = line.find('[');
+        size_t closeBracePos = line.find('}');
+        size_t closeBracketPos = line.find(']');
+        
+        if (bracePos != std::string::npos) inObject = true;
+        if (bracketPos != std::string::npos) inArray = true;
+        
+        if (closeBracePos != std::string::npos) inObject = false;
+        if (closeBracketPos != std::string::npos) inArray = false;
+        
+        // Skip if we're inside nested structures
+        if (inObject || inArray) continue;
+        
+        // Skip comments
+        size_t commentPos = line.find("//");
+        if (commentPos != std::string::npos) {
+            line = line.substr(0, commentPos);
+            // Remove trailing whitespace
+            line.erase(line.find_last_not_of(" \t\r\n") + 1);
+        }
+        
+        // Skip braces
+        if (line.empty() || line[0] == '{' || line[0] == '}') continue;
+        
+        // Parse key:value pair
+        size_t colonPos = line.find(':');
+        if (colonPos == std::string::npos) continue;
+        
+        std::string key = trim(line.substr(0, colonPos));
+        std::string valueStr = trim(line.substr(colonPos + 1));
+        
+        // Remove trailing comma if present
+        if (!valueStr.empty() && valueStr.back() == ',') {
+            valueStr.pop_back();
+            valueStr = trim(valueStr);
+        }
+        
+        // Try to determine value type and parse
+        auto intVal = parseJsonValue<int>(valueStr);
+        if (intVal.has_value()) {
+            set(key, *intVal, ConfigSource::File);
+            continue;
+        }
+        
+        auto doubleVal = parseJsonValue<double>(valueStr);
+        if (doubleVal.has_value()) {
+            set(key, *doubleVal, ConfigSource::File);
+            continue;
+        }
+        
+        auto boolVal = parseJsonValue<bool>(valueStr);
+        if (boolVal.has_value()) {
+            set(key, *boolVal, ConfigSource::File);
+            continue;
+        }
+        
+        auto stringVal = parseJsonValue<std::string>(valueStr);
+        if (stringVal.has_value()) {
+            set(key, *stringVal, ConfigSource::File);
+            continue;
+        }
+        
+        // If all parsing failed, store as string
+        set(key, valueStr, ConfigSource::File);
+    }
+    
+    return true;
+}
+
+// Helper function to parse nested JSON structures
+std::string Config::extractStringValue(const std::string& jsonStr) {
+    std::string result;
+    bool inQuotes = false;
+    bool escapeNext = false;
+    
+    for (char c : jsonStr) {
+        if (escapeNext) {
+            result += c;
+            escapeNext = false;
+        } else if (c == '\\') {
+            escapeNext = true;
+        } else if (c == '"') {
+            inQuotes = !inQuotes;
+        } else if (!inQuotes && (c == ' ' || c == '\t' || c == '\n' || c == '\r')) {
+            // Skip whitespace outside quotes
+            continue;
+        } else {
+            result += c;
+        }
+    }
+    return result;
 }
 
 template<typename T>

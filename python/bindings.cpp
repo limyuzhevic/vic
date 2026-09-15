@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -15,6 +16,15 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/StructuralPlasticity.hpp"
+#include "../src/neuromodulation/NeuromodulatorSystem.hpp"
+
+#include "../src/plasticity/StructuralPlasticity.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -220,6 +230,74 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("type", &WorldObject::type)
         .def_readwrite("value", &WorldObject::value)
         .def_readwrite("active", &WorldObject::active);
+
+    // Neuromodulation classes
+    py::class_<Novelty>(m, "Novelty", R"pbdoc(Novelty detection system)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &Novelty::initialize, py::arg("brain"))
+        .def("getLevel", &Novelty::getLevel)
+        .def("setLevel", &Novelty::setLevel, py::arg("level"))
+        .def("detectNovelty", [](Novelty& self, const Observation& obs, const Observation& prev) {
+            self.detectNovelty(obs, prev);
+        }, py::arg("observation"), py::arg("previous_observation"))
+        .def("detectNovelty", [](Novelty& self, const std::vector<float>& curr, const std::vector<float>& prev) {
+            self.detectNovelty(curr, prev);
+        }, py::arg("current_pattern"), py::arg("previous_pattern"))
+        .def("update", &Novelty::update, py::arg("dt"))
+        .def("getHistory", &Novelty::getHistory)
+        .def("clearHistory", &Novelty::clearHistory);
+
+    py::class_<PredictionError>(m, "PredictionError", R"pbdoc(Prediction error system)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &PredictionError::initialize, py::arg("brain"))
+        .def("getError", &PredictionError::getError)
+        .def("computeError", &PredictionError::computeError, py::arg("predicted"), py::arg("actual"))
+        .def("updatePrediction", &PredictionError::updatePrediction, py::arg("new_prediction"))
+        .def("getHistory", &PredictionError::getHistory)
+        .def("clearHistory", &PredictionError::clearHistory)
+        .def("getMagnitude", &PredictionError::getMagnitude);
+
+    // Add Dopamine class with signalReward and signalRewardPredictionError methods
+    py::class_<Dopamine, Neuromodulator>(m, "Dopamine", R"pbdoc(Dopamine neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Dopamine::getName)
+        .def("getLevel", &Dopamine::getLevel)
+        .def("setLevel", &Dopamine::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor)
+        .def("update", &Dopamine::update, py::arg("dt"))
+        .def("signalReward", &Dopamine::signalReward, py::arg("reward"))
+        .def("signalRewardPredictionError", &Dopamine::signalRewardPredictionError, py::arg("error"));
+
+    py::class_<NeuromodulatorSystem>(m, "NeuromodulatorSystem", R"pbdoc(Unified neuromodulator system)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuromodulatorSystem::initialize, py::arg("config"))
+        .def("update", &NeuromodulatorSystem::update, py::arg("dt"), py::arg("brain"))
+        .def("getNeuromodulator", &NeuromodulatorSystem::getNeuromodulator, py::arg("name"))
+        .def("getLevel", &NeuromodulatorSystem::getLevel, py::arg("name"))
+        .def("setLevel", &NeuromodulatorSystem::setLevel, py::arg("name"), py::arg("level"))
+        .def("getPlasticityFactor", &NeuromodulatorSystem::getPlasticityFactor, py::arg("name"))
+        .def("signalReward", &NeuromodulatorSystem::signalReward, py::arg("reward"))
+        .def("signalPredictionError", &NeuromodulatorSystem::signalPredictionError, py::arg("prediction_error"))
+        .def("signalNovelty", &NeuromodulatorSystem::signalNovelty, py::arg("novelty"))
+        .def("signalCuriosity", &NeuromodulatorSystem::signalCuriosity, py::arg("curiosity"))
+        .def("getNeuromodulatorNames", &NeuromodulatorSystem::getNeuromodulatorNames)
+        .def("configureFromConfig", &NeuromodulatorSystem::configureFromConfig, py::arg("config"))
+        .def("getStatistics", &NeuromodulatorSystem::getStatistics)
+        .def("reset", &NeuromodulatorSystem::reset)
+        .def("registerLevelChangeCallback", &NeuromodulatorSystem::registerLevelChangeCallback, py::arg("callback"))
+        .def("clearLevelChangeCallbacks", &NeuromodulatorSystem::clearLevelChangeCallbacks);
+
+    py::class_<StructuralPlasticity>(m, "StructuralPlasticity", R"pbdoc(Structural plasticity system)pbdoc")
+        .def(py::init<>())
+        .def("createSynapse", &StructuralPlasticity::createSynapse, py::arg("brain"), py::arg("source"), py::arg("destination"), py::arg("weight"))
+        .def("removeSynapse", &StructuralPlasticity::removeSynapse, py::arg("brain"), py::arg("synapse"))
+        .def("createNeuron", &StructuralPlasticity::createNeuron, py::arg("brain"), py::arg("type"))
+        .def("removeNeuron", &StructuralPlasticity::removeNeuron, py::arg("brain"), py::arg("neuron"))
+        .def("getSynaptogenesisRate", &StructuralPlasticity::getSynaptogenesisRate)
+        .def("setSynaptogenesisRate", &StructuralPlasticity::setSynaptogenesisRate, py::arg("rate"))
+        .def("getPruningRate", &StructuralPlasticity::getPruningRate)
+        .def("setPruningRate", &StructuralPlasticity::setPruningRate, py::arg("rate"))
+        .def("update", &StructuralPlasticity::update, py::arg("brain"), py::arg("rng"));
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())

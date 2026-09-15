@@ -23,7 +23,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
+            for (const auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
@@ -64,6 +64,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
+    // Initialize previousVision_ with proper size based on world vision dimensions
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
@@ -87,39 +88,34 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+    for (size_t i = 0; i < std::min(sensoryVision_.size(), vision.size()); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            float current = vision[i] * 5.0f;
             sensoryVision_[i]->injectCurrent(current);
         }
     }
     
-    // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
+    for (size_t i = 0; i < std::min(sensoryTouch_.size(), touch.size()); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = touch[i] * 8.0f;
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
     
-    // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+    for (size_t i = 0; i < std::min(sensoryInternal_.size(), intern.size()); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
     
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
+    for (size_t i = 0; i < std::min(sensoryProprioception_.size(), proprio.size()); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
@@ -217,7 +213,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
+            // Random motor command - use all valid MotorCommand enum values
             int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
@@ -227,8 +223,18 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+                case 7: return MotorCommand::Wait;
             }
+        }
+    }
+    
+    return defaultCmd;
+}
+        }
+    }
+    
+    return defaultCmd;
+}
         }
     }
     
