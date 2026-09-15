@@ -338,7 +338,7 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     NLM_LOG_INFO("Brain1 total spikes: " + std::to_string(totalSpikes1));
     
     // Save checkpoint
-    std::string path = "/tmp/nlm_checkpoint_test.bin";
+    std::string path = "./checkpoints/nlm_checkpoint_test.bin";
     if (!brain1->save(path)) {
         NLM_LOG_ERROR("Failed to save checkpoint");
         return false;
