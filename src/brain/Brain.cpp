@@ -1069,9 +1069,19 @@ PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
 
+// ========== ASSOCIATIVE MEMORY ==========
+
+NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    return pImpl->associativeMemory.get();
+}
+
+// ========== CONFIG ACCESS ==========
+
 std::shared_ptr<const Config> Brain::getConfig() const {
     return pImpl->config;
 }
+
+// ========== UTILITY ==========
 
 RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
