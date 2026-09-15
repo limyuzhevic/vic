@@ -41,9 +41,13 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         return result;
     }
     
-    // Create simple world
+    // Create simple world with adaptive grid size based on brain complexity
+    // This allows the world to scale with the brain's neural complexity
+    size_t gridSize = std::max(16, static_cast<int>(brain->getTotalNeuronCount() / 100));
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.initialize(gridSize, gridSize);
+    
+    NLM_LOG_INFO("World initialized with adaptive grid size: " + std::to_string(gridSize) + "x" + std::to_string(gridSize));
     
     // Create agent
     AgentBrain agent(brain);
@@ -338,7 +342,7 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     NLM_LOG_INFO("Brain1 total spikes: " + std::to_string(totalSpikes1));
     
     // Save checkpoint
-    std::string path = "/tmp/nlm_checkpoint_test.bin";
+    std::string path = "nlm_checkpoint_test.bin";
     if (!brain1->save(path)) {
         NLM_LOG_ERROR("Failed to save checkpoint");
         return false;

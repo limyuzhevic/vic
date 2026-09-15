@@ -20,9 +20,9 @@ NLM IS intended to become:
 
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 2: LIF DYNAMICS AND PLASTICITY**
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+Phase 2 focuses on real LIF neuron dynamics and plasticity mechanisms. This phase establishes the fundamental neural and synaptic operations that enable learning.
 
 ### Phase 6 Integration Achievements
 
@@ -75,12 +75,12 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 2 Demo (LIF Dynamics Test)
 ```bash
-./nlm_phase6_demo
+./nlm
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs the Phase 2 demo testing LIF neuron dynamics and plasticity mechanisms.
 
 ## Project Structure
 
@@ -94,21 +94,21 @@ NLM/
 │   ├── ROADMAP.md
 │   ├── EXPERIMENTS.md
 │   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit (reference only)
 ├── src/
 │   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
+│   ├── brain/          # Neural components
 │   ├── dynamics/       # Neural dynamics
 │   ├── plasticity/     # Plasticity rules
 │   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── neuromodulation/ # Neuromodulators
+│   ├── memory/        # Memory systems
+│   ├── prediction/     # Prediction systems
+│   ├── cognition/      # Cognitive mechanisms
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
+│   ├── experiments/   # Experiment framework
 │   └── visualization/  # Visualization
 ├── tests/
 └── configs/
@@ -121,11 +121,12 @@ NLM/
 - Core types and configuration
 - Neural interfaces
 
-### Phase 2 (Complete)
+### Phase 2 (Current Development - LIF DYNAMICS AND PLASTICITY)
 - Real LIF neuron dynamics
 - Event-driven spike propagation
 - STDP and Hebbian plasticity
 - Structural plasticity
+- Neural development integration
 
 ### Phase 3 (Complete)
 - World interaction loop
@@ -152,7 +153,7 @@ NLM/
 - Parallel processing
 - Checkpoint system
 
-### Phase 6 (Complete - Final Integration)
+### Phase 6 (Not Yet Implemented - Next Target)
 - All systems integrated into coherent brain loop
 - Memory systems connected to neural processing
 - Neuromodulation affects plasticity and dynamics
@@ -173,13 +174,13 @@ NLM is a research project investigating computational brain-like systems. We mak
 - No claim of consciousness, intelligence, or human-like cognition
 - Limited to what can be simulated with available computing resources
 
-Phase 6 does NOT claim:
+Phase 6 (not yet implemented) does NOT claim:
 - Human intelligence
 - Consciousness or sentience
 - Human-like reasoning
 - Genuine subjective experience
 
-Phase 6 DOES investigate:
+Phase 6 (not yet implemented) DOES investigate:
 - Whether memory systems can integrate with neural dynamics
 - Whether neuromodulation can affect plasticity in a coordinated way
 - Whether prediction can become a central organizing principle
