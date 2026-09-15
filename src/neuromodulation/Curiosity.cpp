@@ -33,13 +33,16 @@ float Curiosity::getLevel() const {
 
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
     // Curiosity increases with novelty and prediction error
+    // Both signals drive exploration and learning
+    
+    float predictionErrorFactor = predictionError;  // Normalize prediction error to 0-1
     float target = pImpl->noveltyWeight * novelty + 
-                   pImpl->predictionErrorWeight * predictionError;
+                   pImpl->predictionErrorWeight * predictionErrorFactor;
     
-    // Smooth update
-    pImpl->level += (target - pImpl->level) * 0.1f;
+    // Smooth update - curiosity builds gradually
+    pImpl->level += (target - pImpl->level) * 0.05f;
     
-    // Decay
+    // Decay slowly - exploration persists
     pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
