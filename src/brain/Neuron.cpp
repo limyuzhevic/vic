@@ -60,6 +60,8 @@ void Neuron::setMembranePotential(MembranePotential potential) {
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
     pImpl->state.membranePotential += delta;
+    // Clamp to reasonable bounds to prevent instability
+    pImpl->state.membranePotential = std::clamp(pImpl->state.membranePotential, -100.0f, 50.0f);
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
@@ -93,6 +95,16 @@ MembranePotential Neuron::getLeakConductance() const {
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
     pImpl->state.refractoryPeriod = steps;
+    // Ensure biologically plausible refractory periods
+    pImpl->state.refractoryPeriod = std::clamp(pImpl->state.refractoryPeriod, 1u, 100u);
+    
+    // If currently in refractory, update remaining time
+    if (pImpl->state.refractoryRemaining > 0) {
+        pImpl->state.refractoryRemaining = std::min(
+            pImpl->state.refractoryRemaining, 
+            pImpl->state.refractoryPeriod
+        );
+    }
 }
 
 uint32_t Neuron::getRefractoryPeriod() const {
@@ -101,6 +113,8 @@ uint32_t Neuron::getRefractoryPeriod() const {
 
 void Neuron::setRestingPotential(MembranePotential potential) {
     pImpl->state.restingPotential = potential;
+    // Ensure resting potential is biologically plausible
+    pImpl->state.restingPotential = std::clamp(pImpl->state.restingPotential, -90.0f, -50.0f);
 }
 
 MembranePotential Neuron::getRestingPotential() const {
@@ -109,6 +123,8 @@ MembranePotential Neuron::getRestingPotential() const {
 
 void Neuron::setResetPotential(MembranePotential potential) {
     pImpl->state.resetPotential = potential;
+    // Ensure reset potential is biologically plausible
+    pImpl->state.resetPotential = std::clamp(pImpl->state.resetPotential, -80.0f, -60.0f);
 }
 
 bool Neuron::checkThreshold() const {
@@ -141,6 +157,8 @@ void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
     pImpl->synapticInput += current;
+    // Clamp current to reasonable bounds
+    pImpl->synapticInput = std::clamp(pImpl->synapticInput, -100.0f, 100.0f);
 }
 
 void Neuron::clearTotalCurrent() {
@@ -226,10 +244,17 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        // Clamp adaptation to prevent runaway growth
+        pImpl->state.adaptationVariable = std::clamp(pImpl->state.adaptationVariable, 0.0f, 10.0f);
     }
     
     // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
+    
+    // Prevent runaway excitation: if V > threshold, ensure it doesn't get too high
+    if (V > threshold && V > threshold + 10.0f) {
+        V = threshold + 10.0f;
+    }
     
     // Check for spike
     if (V >= threshold) {
@@ -249,6 +274,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
+        // Clamp adaptation to prevent runaway growth
+        pImpl->state.adaptationVariable = std::clamp(pImpl->state.adaptationVariable, 0.0f, 10.0f);
     } else {
         pImpl->state.firingState = FiringState::Active;
     }

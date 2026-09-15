@@ -4,7 +4,7 @@
 namespace nlm {
 
 struct Curiosity::Impl {
-    class Brain* brain;
+    Brain* brain;
     float level;
     float noveltyWeight;
     float predictionErrorWeight;
@@ -36,10 +36,10 @@ void Curiosity::update(float novelty, float predictionError, TimestepDuration dt
     float target = pImpl->noveltyWeight * novelty + 
                    pImpl->predictionErrorWeight * predictionError;
     
-    // Smooth update
+    // Smooth update - prevent overshooting
     pImpl->level += (target - pImpl->level) * 0.1f;
     
-    // Decay
+    // Decay - prevent runaway growth
     pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
