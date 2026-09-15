@@ -125,6 +125,10 @@ public:
     bool isNovel(const std::vector<float>& pattern,
                  float similarityThreshold = 0.7f) const;
 
+    // Update concept formation based on prediction errors and neural activity
+    // This processes prediction errors to form and refine concepts
+    void update(float timestep);
+
     // Get concept for a given pattern
     size_t findConceptForPattern(const std::vector<float>& pattern) const;
 

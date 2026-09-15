@@ -539,9 +539,31 @@ std::vector<std::vector<float>> NeuralAssociativeMemory::spreadActivation(
     return activated;
 }
 
-void NeuralAssociativeMemory::clear() {
-    patternNeurons_.clear();
-    associations_.clear();
+void NeuralAssociativeMemory::update() {
+    // Update associative memory connections based on episodic replay
+    // This connects associative memory to episodic replay for learning
+    
+    if (!brain_) return;
+    
+    // Get episodes from episodic memory that are ready for replay
+    auto episodesToReplay = brain_->getEpisodicMemory()->getEpisodesForReplay(5);
+    
+    // Associate patterns from each replayed episode
+    for (const auto* episode : episodesToReplay) {
+        if (episode) {
+            // Create associations between sensory state and resulting state
+            if (!episode->sensoryState.empty() && !episode->resultingSensoryState.empty()) {
+                associate(episode->sensoryState, episode->resultingSensoryState, 0.6f);
+            }
+            
+            // Also associate action to resulting state
+            if (!episode->sensoryState.empty()) {
+                std::vector<float> actionPattern(episode->sensoryState.size(), 0.0f);
+                actionPattern[0] = static_cast<float>(episode->action) / 10.0f;
+                associate(actionPattern, episode->resultingSensoryState, 0.5f);
+            }
+        }
+    }
 }
 
 NeuronId NeuralAssociativeMemory::findPatternNeuron(const std::vector<float>& pattern) {

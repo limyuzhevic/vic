@@ -11,13 +11,19 @@ struct NeuralPlanner::Impl {
     Impl() : brain(nullptr) {}
 };
 
-NeuralPlanner::NeuralPlanner()
+NeuralPlanner::NeuralPlanner(Brain* brain)
     : pImpl(new Impl)
-    , brain_(nullptr)
+    , brain_(brain)
     , planningDepth_(3)
     , planningConfidence_(0.5f)
 {
+    // Initialize the internal brain reference
+    if (brain_) {
+        pImpl->brain = brain;
+    }
     actionQuality_.resize(10, 0.0f);  // 10 action types
+    
+    NLM_LOG_INFO("NeuralPlanner created and initialized");
 }
 
 NeuralPlanner::~NeuralPlanner() = default;

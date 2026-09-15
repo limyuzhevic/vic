@@ -511,8 +511,67 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory observations
+        // The prediction system uses neural activity patterns to predict next states
+        
+        // Get current sensory input for prediction
+        std::vector<float> sensoryInput;
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Collect activity from sensory neurons as input to prediction system
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                sensoryInput.push_back(neuron->getState().membranePotential);
+            }
+        }
+        
+        // Convert to SensoryInput
+        auto sensorySignal = std::make_unique<InternalSignals>();
+        for (float val : sensoryInput) {
+            sensorySignal->addSignal(val);
+        }
+        
+        // Update prediction system
+        if (pImpl->workingMemory) {
+            // Get working memory content for prediction
+            auto wmMemory = pImpl->workingMemory->retrieve();
+            if (!wmMemory.empty()) {
+                // Use working memory as context for prediction
+                sensorySignal->setData(wmMemory);
+            }
+        }
+        
+        // Make prediction for next state
+        auto predictedState = pImpl->predictionSystem->predictNextState(*sensorySignal);
+        
+        // Update predictions with actual state (self-prediction for training)
+        if (pImpl->predictionSystem) {
+            pImpl->predictionSystem->updatePredictions(*sensorySignal, *sensorySignal);
+        }
+        
+        // Track prediction error for neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Connect prediction error to neuromodulation systems
+        if (pImpl->predictionError) {
+            // Use prediction error as input for the PredictionError neuromodulator
+            pImpl->predictionError->computeError(predictionError, predictionError);
+        }
+        
+        // Update curiosity with prediction error and novelty
+        if (pImpl->curiosity && pImpl->novelty) {
+            // Novelty detection based on prediction error
+            float noveltyLevel = std::abs(predictionError);
+            float curiosityInput = noveltyLevel + predictionError;
+            pImpl->curiosity->update(noveltyLevel, predictionError, pImpl->timestep);
+        }
+        
+        // Store prediction results in working memory for next step
+        if (pImpl->workingMemory && !sensoryInput.empty()) {
+            // Store prediction error as a memory trace
+            pImpl->workingMemory->storeToNeuron(
+                pImpl->sensoryNeurons.empty() ? (pImpl->regions.empty() ? nullptr : pImpl->regions[0]->getNeurons()[0]) : pImpl->sensoryNeurons[0]->getId(),
+                predictionError * 0.1f  // Scale down error for working memory
+            );
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,16 +587,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process prediction errors to form and refine concepts
+        pImpl->conceptFormation->update(pImpl->timestep);
+        
+        // Concept formation connects to prediction errors and attention
+        // It processes prediction errors to form new concepts and refine existing ones
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Update associative memory ==========
+    if (pImpl->associativeMemory) {
+        // Update associative memory connections based on episodic replay
+        // This connects associative memory to episodic replay for learning
+        pImpl->associativeMemory->update();
+    }
+    
+    // ========== STEP 12: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
+    // ========== STEP 13: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);

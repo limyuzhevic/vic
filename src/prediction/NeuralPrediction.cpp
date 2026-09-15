@@ -27,16 +27,22 @@ struct NeuralPrediction::Impl {
     Impl() : brain(nullptr) {}
 };
 
-NeuralPrediction::NeuralPrediction()
+NeuralPrediction::NeuralPrediction(Brain* brain)
     : pImpl(new Impl)
     , sequenceMemorySize_(10)
     , predictionHorizon_(1)
     , temporalPredictionEnabled_(true)
     , actionConsequenceEnabled_(true)
-    , brain_(nullptr)
+    , brain_(brain)
     , predictionError_(0.0f)
     , predictionConfidence_(0.5f)
 {
+    // Initialize the internal brain reference
+    if (brain_) {
+        pImpl->brain = brain;
+    }
+    
+    NLM_LOG_INFO("NeuralPrediction created and initialized");
 }
 
 NeuralPrediction::~NeuralPrediction() = default;

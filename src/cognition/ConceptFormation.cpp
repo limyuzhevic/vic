@@ -296,6 +296,46 @@ void ConceptFormation::clear() {
     nextConceptId_ = 1;
 }
 
+void ConceptFormation::update(float timestep) {
+    // Update concept formation based on prediction errors and neural activity
+    // This processes prediction errors to form and refine concepts
+    
+    if (!brain_ || concepts_.empty()) return;
+    
+    // Get current prediction error from prediction system if available
+    float predictionError = 0.0f;
+    if (brain_->getPredictionSystem()) {
+        predictionError = brain_->getPredictionSystem()->getPredictionError();
+    }
+    
+    // Process prediction error to update concept stability
+    for (auto& concept : concepts_) {
+        // Update concept stability based on prediction error
+        if (predictionError > 0.5f) {
+            // High prediction error -> concepts need updating/reinforcement
+            concept.avgStability *= 0.9f;  // Reduce stability to encourage change
+            // Add new instances based on prediction error patterns
+            for (auto& instance : concept.instances) {
+                if (instance.observationCount < 3) {
+                    // Collect more data for concepts when prediction error is high
+                    instance.stability = std::min(1.0f, instance.stability * 1.2f);
+                }
+            }
+        } else {
+            // Low prediction error -> reinforce existing concepts
+            concept.avgStability = std::min(1.0f, concept.avgStability * 1.05f);
+        }
+        
+        // Update instances based on concept stability
+        for (auto& instance : concept.instances) {
+            // Decay instance stability over time (forgetting)
+            instance.stability *= (1.0f - 0.1f * timestep);
+            
+            // Ensure stability stays within bounds
+            instance.stability = std::clamp(instance.stability, 0.0f, 1.0f);
+        }
+}
+
 // SpatialRepresentation Implementation
 struct SpatialRepresentation::Impl {
     Brain* brain;
