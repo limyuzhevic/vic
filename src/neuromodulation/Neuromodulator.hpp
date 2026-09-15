@@ -54,7 +54,6 @@ private:
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
     const char* getName() const override { return "ACh"; }
@@ -62,10 +61,21 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Effects on attention
+    float getAttentionGain() const { return attentionGain_; }
+    void setAttentionGain(float gain) { attentionGain_ = gain; }
+    
+    // Effects on memory consolidation
+    float getConsolidationBoost() const { return consolidationBoost_; }
+    void setConsolidationBoost(float boost) { consolidationBoost_ = boost; }
+    
+private:
+    float attentionGain_ = 1.0f;
+    float consolidationBoost_ = 1.0f;
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
     const char* getName() const override { return "NE"; }
@@ -73,10 +83,21 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Effects on arousal and vigilance
+    float getArousalLevel() const { return arousalLevel_; }
+    void setArousalLevel(float level) { arousalLevel_ = level; }
+    
+    // Effects on learning rate
+    float getLearningGain() const { return learningGain_; }
+    void setLearningGain(float gain) { learningGain_ = gain; }
+    
+private:
+    float arousalLevel_ = 1.0f;
+    float learningGain_ = 1.0f;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
     const char* getName() const override { return "5-HT"; }
@@ -84,6 +105,18 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Effects on impulsivity
+    float getImpulsivityLevel() const { return impulsivityLevel_; }
+    void setImpulsivityLevel(float level) { impulsivityLevel_ = level; }
+    
+    // Effects on social behavior
+    float getSocialMotivation() const { return socialMotivation_; }
+    void setSocialMotivation(float motivation) { socialMotivation_ = motivation; }
+    
+private:
+    float impulsivityLevel_ = 1.0f;
+    float socialMotivation_ = 1.0f;
 };
 
 } // namespace nlm
