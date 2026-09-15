@@ -6,15 +6,21 @@
 #include <string>
 #include <vector>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/NeuralAssociativeMemory.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Serotonin.hpp"
+#include "../src/neuromodulation/Norepinephrine.hpp"
+#include "../src/neuromodulation/Acetylcholine.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -353,6 +359,142 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // ========== MEMORY SYSTEMS ==========
+    
+    // Working memory - transient active information
+    py::class_<NeuralWorkingMemory>(m, "NeuralWorkingMemory", R"pbdoc(Working memory for transient active information)pbdoc")
+        .def("storeToNeuron", &NeuralWorkingMemory::storeToNeuron, py::arg("neuron"), py::arg("activation"),
+             "Store neuron activation in working memory")
+        .def("update", &NeuralWorkingMemory::update, py::arg("dt"),
+             "Update working memory (maintenance and decay)")
+        .def("getMemoryNeurons", &NeuralWorkingMemory::getMemoryNeurons,
+             "Get neurons currently in working memory")
+        .def("getActiveTraces", &NeuralWorkingMemory::getActiveTraces,
+             "Get number of active memory traces");
+    
+    // Episodic memory - experience storage
+    py::class_<NeuralEpisodicMemory>(m, "NeuralEpisodicMemory", R"pbdoc(Episodic memory for experience storage)pbdoc")
+        .def("storeEpisode", &NeuralEpisodicMemory::storeEpisode, py::arg("episode"),
+             "Store a new episode")
+        .def("getEpisodesForReplay", &NeuralEpisodicMemory::getEpisodesForReplay, py::arg("count"),
+             "Get episodes for replay")
+        .def("replayEpisode", &NeuralEpisodicMemory::replayEpisode, py::arg("episode"),
+             "Replay an episode")
+        .def("consolidate", &NeuralEpisodicMemory::consolidate, py::arg("relevance_threshold"),
+             "Consolidate important memories")
+        .def("getEpisodeCount", &NeuralEpisodicMemory::getEpisodeCount,
+             "Get total number of episodes");
+    
+    // Associative memory - pattern associations
+    py::class_<NeuralAssociativeMemory>(m, "NeuralAssociativeMemory", R"pbdoc(Associative memory for pattern relationships)pbdoc")
+        .def("learnAssociation", &NeuralAssociativeMemory::associate, py::arg("pattern_a"), py::arg("pattern_b"), py::arg("strength") = 1.0f,
+             "Learn association between two patterns")
+        .def("recall", &NeuralAssociativeMemory::retrieve, py::arg("query_pattern"), py::arg("max_results"),
+             "Recall patterns associated with a query");
+    
+    // Prediction system
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(Prediction system for sensory prediction and error computation)pbdoc")
+        .def("update", &PredictionSystem::update, py::arg("dt"),
+             "Update prediction system")
+        .def("getPredictionError", &PredictionSystem::getPredictionError,
+             "Get prediction error")
+        .def("getConfidence", &PredictionSystem::getConfidence,
+             "Get prediction confidence");
+
+    // ========== COGNITION SYSTEMS ==========
+    
+    // Neural planner for action planning
+    py::class_<NeuralPlanner>(m, "NeuralPlanner", R"pbdoc(Neural planner for action planning)pbdoc")
+        .def("plan", &NeuralPlanner::planAction, py::arg("current_state"), py::arg("target_reward") = 0.5f,
+             "Plan next action given current state and goal")
+        .def("execute", &NeuralPlanner::evaluateSequence, py::arg("actions"), py::arg("start_state"),
+             "Evaluate a potential action sequence")
+        .def("getPlan", &NeuralPlanner::getCurrentGoal,
+             "Get current planning goal");
+    
+    // Concept formation for pattern discovery
+    py::class_<ConceptFormation>(m, "ConceptFormation", R"pbdoc(Concept formation for pattern discovery)pbdoc")
+        .def("formConcept", &ConceptFormation::presentExperience, py::arg("pattern"), py::arg("features"), py::arg("reward"), py::arg("current_time"),
+             "Present experience to form/update concepts")
+        .def("getConcepts", &ConceptFormation::getConcepts,
+             "Get all discovered concepts");
+    
+    // Attention for focus selection
+    py::class_<AttentionalSelection>(m, "AttentionalSelection", R"pbdoc(Attentional selection for focus)pbdoc")
+        .def("update", &AttentionalSelection::update, py::arg("dt"),
+             "Update attention dynamics")
+        .def("processCompetition", &AttentionalSelection::processCompetition, py::arg("competitors"), py::arg("global_inhibition") = 0.5f,
+             "Process competing sensory inputs and select winners")
+        .def("getAttentionWeight", &AttentionalSelection::getInhibitionFor, py::arg("neuron"),
+             "Get attention weight for a neuron");
+
+    // ========== NEUROMODULATION ==========
+    
+    // Dopamine - reward and reinforcement
+    py::class_<Dopamine>(m, "Dopamine", R"pbdoc(Dopamine neuromodulator for reward and reinforcement)pbdoc")
+        .def("getLevel", &Dopamine::getLevel,
+             "Get dopamine level")
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor,
+             "Get dopamine plasticity factor");
+    
+    // Curiosity - exploration motivation
+    py::class_<Curiosity>(m, "Curiosity", R"pbdoc(Curiosity neuromodulator for exploration motivation)pbdoc")
+        .def("getLevel", &Curiosity::getLevel,
+             "Get curiosity level")
+        .def("update", &Curiosity::update, py::arg("novelty"), py::arg("prediction_error"), py::arg("dt"),
+             "Update curiosity based on novelty and prediction error");
+    
+    // Novelty - novelty detection
+    py::class_<Novelty>(m, "Novelty", R"pbdoc(Novelty neuromodulator for novelty detection)pbdoc")
+        .def("getLevel", &Novelty::getLevel,
+             "Get novelty level")
+        .def("setLevel", &Novelty::setLevel, py::arg("level"),
+             "Set novelty level")
+        .def("update", &Novelty::update, py::arg("dt"),
+             "Decay novelty over time");
+    
+    // Prediction error
+    py::class_<PredictionError>(m, "PredictionError", R"pbdoc(Prediction error neuromodulator)pbdoc")
+        .def("getError", &PredictionError::getError,
+             "Get prediction error")
+        .def("getMagnitude", &PredictionError::getMagnitude,
+             "Get error magnitude for neuromodulation")
+        .def("update", &PredictionError::computeError, py::arg("predicted"), py::arg("actual"),
+             "Compute prediction error")
+        .def("updatePrediction", &PredictionError::updatePrediction, py::arg("new_prediction"),
+             "Update prediction");
+    
+    // Serotonin, Norepinephrine, Acetylcholine - placeholder neuromodulators
+    py::class_<Serotonin>(m, "Serotonin", R"pbdoc(Serotonin neuromodulator)pbdoc")
+        .def("getLevel", &Serotonin::getLevel,
+             "Get serotonin level");
+    
+    py::class_<Norepinephrine>(m, "Norepinephrine", R"pbdoc(Norepinephrine neuromodulator)pbdoc")
+        .def("getLevel", &Norepinephrine::getLevel,
+             "Get norepinephrine level");
+    
+    py::class_<Acetylcholine>(m, "Acetylcholine", R"pbdoc(Acetylcholine neuromodulator)pbdoc")
+        .def("getLevel", &Acetylcholine::getLevel,
+             "Get acetylcholine level");
+
+    // ========== DEVELOPMENT SYSTEM ==========
+    
+    py::class_<DevelopmentSystem>(m, "DevelopmentSystem", R"pbdoc(Development system)pbdoc")
+        .def("update", py::overload_cast<Brain*, SimulationStep>(&DevelopmentSystem::update), py::arg("brain"), py::arg("current_step"),
+             "Update development system")
+        .def("update", py::overload_cast<Brain*, RandomGenerator&, TimestepDuration>(&DevelopmentSystem::update), py::arg("brain"), py::arg("rng"), py::arg("dt"),
+             "Update development system with full parameters")
+        .def("getDevelopmentalStage", &DevelopmentSystem::getStage,
+             "Get current developmental stage")
+        .def("setDevelopmentalStage", &DevelopmentSystem::setStage, py::arg("stage"),
+             "Set developmental stage")
+        .def("getDevelopmentalAge", &DevelopmentSystem::getDevelopmentalAge,
+             "Get developmental age")
+        .def("updateDevelopment", &DevelopmentSystem::updateDevelopment,
+             "Update development (simple version)")
+        .def("getStageName", &DevelopmentSystem::getStageName,
+             "Get stage name");
+
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -399,6 +541,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
