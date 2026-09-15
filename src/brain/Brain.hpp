@@ -12,6 +12,9 @@
 namespace nlm {
 
 // Forward declarations
+class CheckpointManager;
+
+// Forward declarations
 class Config;
 class RandomGenerator;
 class SimulationClock;
