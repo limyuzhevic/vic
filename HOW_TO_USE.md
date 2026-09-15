@@ -282,6 +282,12 @@ brain.getTotalSynapseCount()      # Total synapses
 brain.getFiringNeuronCount()     # Currently firing
 brain.getAverageFiringRate()      # Average firing rate
 brain.getExcitationInhibitionRatio()  # E/I balance
+brain.getTotalSpikeCount()        # Total spikes (Phase 6 added)
+brain.getActiveNeuronCount()      # Active neurons (Phase 6 added)
+brain.getPendingSpikeEventCount() # Pending spike events (Phase 6 added)
+brain.getNeuromodulationLevel()   # Neuromodulation level (Phase 6 added)
+brain.getDevelopmentalStage()    # Current developmental stage
+brain.getPredictionError()        # Prediction error (Phase 6 added)
 
 # State
 brain.save("checkpoint.bin")       # Save state
@@ -290,6 +296,33 @@ brain.load("checkpoint.bin")       # Load state
 # Regions
 region_id = brain.addRegion("cortex")
 region = brain.getRegion(region_id)
+brain.getRegionCount()             # Number of regions
+brain.getRegionIds()               # All region IDs
+brain.getRegions()                 # All regions
+
+# Integrated systems (Phase 6)
+brain.getWorkingMemory()           # Working memory system
+brain.getEpisodicMemory()          # Episodic memory system
+brain.getAssociativeMemory()       # Associative memory system
+brain.getPredictionSystem()       # Prediction system
+brain.getPlanner()                 # Neural planner
+brain.getConceptFormation()        # Concept formation
+brain.getAttention()               # Attentional selection
+brain.getDevelopmentSystem()       # Development system
+brain.getDopamine()                # Dopamine system
+brain.getCuriosity()               # Curiosity system
+brain.getNovelty()                 # Novelty detection
+brain.getPredictionErrorSignal()   # Prediction error signal
+
+# Plasticity systems (Phase 6)
+brain.getSTDP()                    # Spike-timing dependent plasticity
+brain.getHebbian()                 # Hebbian learning
+brain.getStructuralPlasticity()    # Structural plasticity
+brain.getSpikeSystem()             # Spike system
+brain.getRandomGenerator()         # Random number generator
+
+# Logging
+brain.logStatus()                  # Log brain status
 ```
 
 #### Config Class
@@ -302,6 +335,11 @@ config = pynlm.createDefaultConfig()
 if config.has("brain.neuron_count"):
     keys = config.getKeys()
 
+# Advanced query with defaults
+neuron_count = config.getOr("brain.neuron_count", 1000)        # Returns default if not set
+stdp_rate = config.getOrDouble("stdp.learning_rate", 0.001)
+learning_enabled = config.getOrBool("learning.enabled", True)
+
 # Modify
 config.set("brain.neuron_count", 1000)
 config.set("learning.rate", 0.001)
@@ -309,6 +347,11 @@ config.set("learning.rate", 0.001)
 # File I/O
 config.loadFromFile("config.json")
 config.saveToFile("config.json")
+
+# Management
+config.remove("temp.parameter")     # Remove a parameter
+config.clear()                        # Clear all parameters
+config.summary()                      # Get configuration summary
 ```
 
 #### AgentBrain Class

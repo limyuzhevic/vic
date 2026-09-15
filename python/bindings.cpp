@@ -160,6 +160,74 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // Advanced configuration methods - documented but previously missing
+        .def("getOr", [](Config& self, const std::string& key, const ConfigValue& defaultValue) {
+            // This is a generic getOr that works with any type
+            // Note: Runtime binding limitation - users need to know the expected type
+            auto it = std::find_if(self.pImpl->entries.begin(), self.pImpl->entries.end(),
+                [&key](const ConfigEntry& e) { return e.key == key; });
+            if (it != self.pImpl->entries.end()) {
+                // Return the actual value stored
+                return it->value;
+            }
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a configuration value with default (returns ConfigValue)")
+        
+        // Direct getOr for common types
+        .def("getOrInt", [](Config& self, const std::string& key, int defaultValue) {
+            auto it = std::find_if(self.pImpl->entries.begin(), self.pImpl->entries.end(),
+                [&key](const ConfigEntry& e) { return e.key == key; });
+            if (it != self.pImpl->entries.end()) {
+                try {
+                    return std::get<int>(it->value);
+                } catch (const std::bad_variant_access&) {}
+            }
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get an integer configuration value with default")
+        
+        .def("getOrDouble", [](Config& self, const std::string& key, double defaultValue) {
+            auto it = std::find_if(self.pImpl->entries.begin(), self.pImpl->entries.end(),
+                [&key](const ConfigEntry& e) { return e.key == key; });
+            if (it != self.pImpl->entries.end()) {
+                try {
+                    return std::get<double>(it->value);
+                } catch (const std::bad_variant_access&) {}
+            }
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a double configuration value with default")
+        
+        .def("getOrString", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            auto it = std::find_if(self.pImpl->entries.begin(), self.pImpl->entries.end(),
+                [&key](const ConfigEntry& e) { return e.key == key; });
+            if (it != self.pImpl->entries.end()) {
+                try {
+                    return std::get<std::string>(it->value);
+                } catch (const std::bad_variant_access&) {}
+            }
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a string configuration value with default")
+        
+        .def("getOrBool", [](Config& self, const std::string& key, bool defaultValue) {
+            auto it = std::find_if(self.pImpl->entries.begin(), self.pImpl->entries.end(),
+                [&key](const ConfigEntry& e) { return e.key == key; });
+            if (it != self.pImpl->entries.end()) {
+                try {
+                    return std::get<bool>(it->value);
+                } catch (const std::bad_variant_access&) {}
+            }
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a bool configuration value with default")
+        
+        // Remove configuration key
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
+        
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -387,6 +455,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
+        
+        // Configuration methods
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
@@ -395,10 +465,16 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
              py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        
+        // Configuration query methods
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+             "Check if reward modulation is enabled")
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is enabled")
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development is enabled")
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity is enabled");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

@@ -150,7 +150,17 @@ print("Development stage:", brain.getDevelopmentalStage())
 agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+agent.enableCuriosity(True)              # Explore new things
+
+# Check if features are enabled
+if agent.isRewardModulationEnabled():
+    print("Reward modulation is enabled")
+if agent.isStructuralPlasticityEnabled():
+    print("Structural plasticity is enabled")
+if agent.isDevelopmentEnabled():
+    print("Development is enabled")
+if agent.isCuriosityEnabled():
+    print("Curiosity is enabled")
 ```
 
 ---
