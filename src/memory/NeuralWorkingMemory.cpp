@@ -113,46 +113,7 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
     return 0.0f;
 }
 
-void NeuralWorkingMemory::update(TimestepDuration dt) {
-    if (!brain_) return;
-    
-    // Update maintenance - reinforce active memory neurons
-    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        NeuronId neuron = memoryNeurons_[i];
-        float activation = memoryActivations_[i];
-        
-        if (activation > 0.1f) {
-            // Inject maintenance current
-            brain_->injectCurrent(neuron, activation * 2.0f);
-            
-            // Age the trace
-            memoryTimestamps_[i]++;
-            
-            // Check if trace is too old
-            if (memoryTimestamps_[i] > 1000) {
-                activation *= (1.0f - decayRate_);
-            }
-            
-            memoryActivations_[i] = activation;
-        }
-    }
-    
-    // Decay weak traces
-    decayWeakTraces();
-    
-    // Run competition to select winners
-    runCompetition();
-}
-
-void NeuralWorkingMemory::clear() {
-    memoryNeurons_.clear();
-    memoryActivations_.clear();
-    memoryTimestamps_.clear();
-    activeTraces_.clear();
-    pImpl->maintenanceSynapses.clear();
-}
-
-void NeuralWorkingMemory::strengthenMemory(float factor) {
+void NeuralWorkingMemory::updatePatternStrength(float factor) {
     for (auto& activation : memoryActivations_) {
         activation = std::min(1.0f, activation * factor);
     }
@@ -166,7 +127,7 @@ void NeuralWorkingMemory::runCompetition() {
     // Find neurons with above-threshold activation
     float threshold = 0.3f;
     
-    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
         if (memoryActivations_[i] >= threshold) {
             winners_.push_back(memoryNeurons_[i]);
         }
@@ -183,7 +144,7 @@ void NeuralWorkingMemory::runCompetition() {
     }
 }
 
-bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
+void NeuralWorkingMemory::isWinning(NeuronId neuron) const {
     return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
 }
 
@@ -254,7 +215,7 @@ struct AttentionalSelection::Impl {
 };
 
 AttentionalSelection::AttentionalSelection()
-    : pImpl(new Impl)
+    : pImpl(new Impl())
     , brain_(nullptr)
     , inhibitionStrength_(0.5f)
     , excitationStrength_(1.5f)

@@ -65,6 +65,9 @@ public:
     // Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);
 
+    // Update pattern strength based on prediction error
+    void updatePatternStrength(float factor);
+
     // Competition between memory traces
     void runCompetition();
 

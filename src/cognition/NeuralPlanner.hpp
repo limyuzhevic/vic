@@ -20,21 +20,7 @@ struct PlanningCandidate {
         : expectedReward(0), confidence(0), depth(0) {}
 };
 
-// NeuralPlanner: Uses learned predictions to plan multi-step actions
-// NOT a search engine - planning emerges from predictive neural dynamics
-//
-// Key mechanisms:
-// - Uses action-consequence predictions
-// - Evaluates potential futures through simulation
-// - Selects actions leading to high-value outcomes
-// - Adapts plans based on prediction confidence
-
-class NeuralPlanner {
-public:
-    NeuralPlanner();
-    ~NeuralPlanner();
-
-    // Initialize with brain reference
+// Initialize with brain reference
     void initialize(Brain* brain);
 
     // Plan next action given current state and goal
@@ -46,10 +32,6 @@ public:
     // Returns expected total reward and confidence
     PlanningCandidate evaluateSequence(const std::vector<ActionType>& actions,
                                       const std::vector<float>& startState);
-
-    // Get number of steps to look ahead
-    size_t getPlanningDepth() const { return planningDepth_; }
-    void setPlanningDepth(size_t depth) { planningDepth_ = depth; }
 
     // Get planning confidence
     float getPlanningConfidence() const { return planningConfidence_; }
@@ -74,6 +56,25 @@ public:
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
 
+    // Update planning with current brain state
+    // Integrates with working memory and episodic memory
+    void updatePlanning() {
+        if (brain_ && workingMemory_) {
+            std::vector<float> currentPattern = workingMemory_->retrieve();
+            currentGoal_ = currentPattern;
+            planningConfidence_ = std::min(1.0f, planningConfidence_ * 1.01f);
+        }
+    }
+
+    // Get action from brain's motor neurons
+    ActionType getMotorAction() {
+        if (brain_) {
+            auto action = brain_->produceAction();
+            return action ? action->type : ActionType::Wait;
+        }
+        return ActionType::Wait;
+    }
+
 private:
     // Generate possible action sequences
     std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
@@ -87,15 +88,20 @@ private:
     Brain* brain_;
     size_t planningDepth_;
     float planningConfidence_;
-    
+
     // Current goal state
     std::vector<float> currentGoal_;
-    
+
     // Action quality from experience
     std::vector<float> actionQuality_;
-    
+
     // Recent plan success history
     std::deque<bool> recentPlanSuccess_;
+
+    // Integration pointers for better system coordination
+    std::shared_ptr<NeuralWorkingMemory> workingMemory_;
+    std::shared_ptr<NeuralEpisodicMemory> episodicMemory_;
+    std::shared_ptr<PredictionSystem> predictionSystem_;
 };
 
 // SelfModel: Represents the agent's internal model of itself
