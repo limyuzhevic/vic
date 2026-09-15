@@ -20,14 +20,17 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups with defensive programming
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
+            if (!region) continue;
             for (auto& pop : region->getPopulations()) {
+                if (!pop) continue;
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
+                        if (!n) continue;  // Defensive: skip null neurons
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
@@ -44,6 +47,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
+                        if (!n) continue;  // Defensive: skip null neurons
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
@@ -94,6 +98,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_WARNING("Vision neuron " + std::to_string(i) + " is null, skipping");
         }
     }
     
@@ -103,6 +109,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_WARNING("Touch neuron " + std::to_string(i) + " is null, skipping");
         }
     }
     
@@ -112,6 +120,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_WARNING("Internal neuron " + std::to_string(i) + " is null, skipping");
         }
     }
     
