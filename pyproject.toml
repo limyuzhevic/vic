@@ -2,6 +2,10 @@
 requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
 build-backend = "scikit_build_core.build"
 
+[build-system]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "nlohmann/json>=3.11.0"]
+build-backend = "scikit_build_core.build"
+
 [project]
 name = "pynlm"
 version = "0.1.0"
@@ -28,6 +32,17 @@ classifiers = [
 ]
 
 dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "numpy>=1.20",
+]
+
+[project.urls]
+Homepage = "https://github.com/nlm-project/nlm"
+Documentation = "https://nlm.readthedocs.io"
+Repository = "https://github.com/nlm-project/nlm.git"
 
 [project.optional-dependencies]
 dev = [
