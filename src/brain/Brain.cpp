@@ -9,6 +9,8 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../memory/NeuralSemanticMemory.hpp"
+#include "../memory/NeuralProceduralMemory.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -32,6 +34,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<NeuralSemanticMemory> semanticMemory;
+    std::unique_ptr<NeuralProceduralMemory> proceduralMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -112,6 +116,8 @@ struct Brain::Impl {
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        semanticMemory = std::make_unique<NeuralSemanticMemory>();
+        proceduralMemory = std::make_unique<NeuralProceduralMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -241,6 +247,12 @@ bool Brain::initialize() {
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
+    
+    // Initialize semantic memory
+    pImpl->semanticMemory->initialize(this);
+    
+    // Initialize procedural memory  
+    pImpl->proceduralMemory->initialize(this);
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -421,22 +433,61 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
+        // Apply enhanced dopamine effects on multiple brain systems
         float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // 1. Neural excitability modulation (already implemented)
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
+                    // Enhanced dopamine effects:
+                    // - Direct excitability modulation
                     float excitabilityMod = dopamineLevel * 0.5f;
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
                     }
+                    
+                    // - Memory trace strengthening
+                    if (pImpl->workingMemory && neuron->isFiring()) {
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
+                            std::min(1.0f, pImpl->workingMemory->getNeuronActivation(neuron->getId()) + 
+                                    dopamineLevel * 0.1f));
+                    }
+                    
+                    // - Attention modulation through neuromodulatory feedback
+                    if (pImpl->attention) {
+                        pImpl->attention->applyTopDownBias(neuron->getId(), 
+                            dopamineLevel * 0.2f);
+                    }
                 }
             }
         }
+        
+        // 2. Memory consolidation (dopamine guides memory importance)
+        if (dopamineLevel > 0.3f && pImpl->episodicMemory) {
+            // High dopamine -> prioritize memory storage
+            float importanceWeight = dopamineLevel;
+            pImpl->episodicMemory->consolidate(importanceWeight);
+        }
+        
+        // 3. Concept formation enhancement (dopamine signals reward relevance)
+        if (pImpl->conceptFormation && dopamineLevel > 0.5f) {
+            // Strong dopamine -> reinforce concept formation
+            for (size_t i = 0; i < pImpl->conceptFormation->getConceptCount(); ++i) {
+                pImpl->conceptFormation->updateConceptStrength(i, dopamineLevel * 0.01f);
+            }
+        }
+        
+        // 4. Planning enhancement (dopamine guides goal-directed behavior)
+        if (pImpl->planner && dopamineLevel > 0.2f) {
+            // Moderate dopamine -> enhance planning
+            float goalRelevance = std::clamp(dopamineLevel / 2.0f, 0.0f, 1.0f);
+            pImpl->planner->setCurrentGoal(std::vector<float>(1, goalRelevance));
+        }
+        
+        // 5. Plasticity effects (already implemented but enhanced)
+        // Dopamine modulates STDP and other plasticity rules
+        // The plasticityMod variable below already captures this
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
@@ -511,8 +562,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system - predict next state based on current brain state
+        // Create a sensory-like input from current neural activity patterns
+        SensoryInput predictionInput;
+        
+        // Sample from active neurons to create prediction
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        predictionInput.addData(neuron->getId().index(), neuron->getState().membranePotential);
+                    }
+                }
+            }
+        }
+        
+        // Make prediction for next state
+        if (!predictionInput.getData().empty()) {
+            auto prediction = pImpl->predictionSystem->predictNextState(predictionInput);
+            if (prediction) {
+                // Store prediction for action planning
+                // In a real implementation, this would be stored for planning
+                float predictionConfidence = pImpl->predictionSystem->getConfidence();
+                
+                // Use prediction to guide motor neuron selection
+                for (auto* neuron : pImpl->motorNeurons) {
+                    if (predictionConfidence > 0.5f) {
+                        // Higher prediction confidence modulates motor neuron excitability
+                        neuron->injectCurrent(predictionConfidence * 0.1f);
+                    }
+                }
+            }
+        }
+        
+        // Update prediction system with current state
+        // (In a full implementation, we would also track prediction error)
+        pImpl->predictionSystem->getPredictionError();
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +613,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Update concept formation - extract patterns from neural activity
+        // Create neural activity pattern for concept formation
+        std::vector<float> activityPattern;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    // Normalize activity to [0, 1] range
+                    float activity = (neuron->getState().membranePotential + 75.0f) / 150.0f;
+                    activityPattern.push_back(activity);
+                }
+            }
+        }
+        
+        if (!activityPattern.empty()) {
+            // Update concept formation with current activity patterns
+            // In a full implementation, this would extract abstract concepts
+            // and form associations between them
+            
+            // Update concept confidence based on pattern stability
+            float conceptConfidence = 0.0f;
+            for (float act : activityPattern) {
+                conceptConfidence += act;
+            }
+            conceptConfidence /= activityPattern.size();
+            
+            // If concept confidence is high, reinforce neural connections
+            if (conceptConfidence > 0.3f) {
+                pImpl->conceptFormation->updateConceptStability(conceptConfidence);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1023,18 +1136,12 @@ PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
 
-// ========== COGNITION SYSTEM ACCESSORS ==========
-
-NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
+NeuralSemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
 }
 
-ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
-}
-
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
+NeuralProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
 }
 
 // ========== DEVELOPMENT SYSTEM ==========

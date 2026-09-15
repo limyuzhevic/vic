@@ -291,6 +291,50 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
     return 1.0f - (totalVariance / concept->instances.size());
 }
 
+void ConceptFormation::updateConceptStability(size_t conceptId, float stabilityLevel) {
+    DiscoveredConcept* concept = nullptr;
+    for (auto& c : concepts_) {
+        if (c.id == conceptId) {
+            concept = &c;
+            break;
+        }
+    }
+    
+    if (concept) {
+        // Update concept stability (smoothing over previous stability)
+        concept->avgStability = concept->avgStability * 0.8f + stabilityLevel * 0.2f;
+        
+        // Update all instances' stability
+        for (auto& instance : concept->instances) {
+            instance.stability = std::min(1.0f, instance.stability * 0.9f + stabilityLevel * 0.1f);
+        }
+        
+        NLM_LOG_INFO("ConceptFormation: Updated concept " + std::to_string(conceptId) +
+                     " stability to " + std::to_string(concept->avgStability));
+    }
+}
+    DiscoveredConcept* concept = nullptr;
+    for (auto& c : concepts_) {
+        if (c.id == conceptId) {
+            concept = &c;
+            break;
+        }
+    }
+    
+    if (concept) {
+        // Update concept stability (smoothing over previous stability)
+        concept->avgStability = concept->avgStability * 0.8f + stabilityLevel * 0.2f;
+        
+        // Update all instances' stability
+        for (auto& instance : concept->instances) {
+            instance.stability = std::min(1.0f, instance.stability * 0.9f + stabilityLevel * 0.1f);
+        }
+        
+        NLM_LOG_INFO("ConceptFormation: Updated concept " + std::to_string(conceptId) +
+                     " stability to " + std::to_string(concept->avgStability));
+    }
+}
+
 void ConceptFormation::clear() {
     concepts_.clear();
     nextConceptId_ = 1;
