@@ -7,6 +7,31 @@ name = "pynlm"
 version = "0.1.0"
 description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
 readme = "README.md"
+authors = [
+    {name = "NLM Authors", email = "contact@nlm-project.org"}
+]
+maintainers = [
+    {name = "NLM Development Team", email = "dev@nlm-project.org"}
+]
+license = {text = "MIT", file = "LICENSE"}
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: C++",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows"
+]
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
