@@ -177,6 +177,12 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
+    // Check for null config before accessing
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Brain config is null - initialization failed");
+        return false;
+    }
+    
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
@@ -347,7 +353,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             for (auto* neuron : pop->getNeurons()) {
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
-                bool justFired = (state.firingState == FiringState::Refractory &&
+                bool justFired = (state.firingState == FiringState::Active &&
                                  state.lastSpikeTime >= 0.0f &&
                                  std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
 
@@ -598,7 +604,6 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
-    // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
         // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
