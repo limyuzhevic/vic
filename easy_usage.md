@@ -160,24 +160,39 @@ agent.enableCuriosity(True)             # Explore new things
 ### `pynlm.createBrain(config)`
 Creates a virtual brain with neurons and synapses.
 - `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+- Returns a Brain object that can be initialized and used for simulation
 
 ### `brain.initialize()`
 Starts up the brain. Always call this before using the brain!
+- Allocates memory and initializes neuron states
+- Sets up default connections and parameters
+- Prepares the brain for simulation
 
 ### `brain.step(step_number)`
 Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
+- Simulates LIF neuron dynamics
+- Propagates spikes through synaptic connections
+- Updates synaptic weights based on plasticity rules
+- Records spikes and updates internal state
 
 ### `world.update(time)`
 Updates the virtual world by `time` seconds.
+- Advances the simulation clock
+- Updates agent position and physics
+- Handles object interactions and collisions
+- Generates sensory input for the agent
 
 ### `agent.processSensoryInput(percept)`
 Gives sensory information (vision, touch, etc.) to the brain.
+- Injects sensory signals into appropriate neurons
+- Converts percept data to neural excitation/inhibition
+- Updates internal world model
 
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
+- Analyzes neural activity to determine intended action
+- Maps neural patterns to motor commands
+- Returns an Action object with type and parameters
 
 ---
 

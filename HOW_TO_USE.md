@@ -381,6 +381,172 @@ world.getMaxEnergy()
 world.setMaxEnergy(100.0)
 ```
 
+#### Advanced SimpleWorld Features
+
+```python
+# Advanced configuration with more parameters
+world.configure(
+    width=30, 
+    height=30, 
+    visionWidth=12, 
+    visionHeight=12,
+    cellSize=0.1,          # Size of each world cell in meters
+    maxSpeed=5.0,          # Maximum agent speed (m/s)
+    energyDecayRate=0.01,  # Rate at which energy decays per timestep
+    gravity=9.81,          # Gravitational acceleration (m/s²)
+    friction=0.1           # Friction coefficient (0-1)
+)
+
+# Get detailed world state
+world_state = {
+    'width': world.getWidth(),
+    'height': world.getHeight(),
+    'agent_position': (world.getAgentBody().x, world.getAgentBody().y),
+    'agent_velocity': (world.getAgentBody().velocityX, world.getAgentBody().velocityY),
+    'agent_orientation': world.getAgentBody().orientation,
+    'energy': world.getAgentBody().energy,
+    'health': world.getAgentBody().health,
+    'simulation_time': world.getSimulationTime(),
+    'max_energy': world.getMaxEnergy()
+}
+
+# World object management with validation
+for obj in world.getAllObjects():
+    if world.isValidPosition(obj.x, obj.y):
+        if obj.type == pynlm.WorldObjectType.Resource:
+            # Collect resource
+            print(f"Collected resource with value {obj.value}")
+            world.removeObject(obj.x, obj.y)
+    else:
+        # Handle out-of-bounds objects
+        world.removeObject(obj.x, obj.y)
+
+# World simulation control
+world.pause()                    # Pause simulation
+world.resume()                   # Resume simulation
+world.step(timestep)             # Step by specific timestep
+world.fastForward(duration)      # Fast-forward simulation
+
+# Event callbacks and handlers
+def onObjectCollected(obj):
+    print(f"Object collected at ({obj.x}, {obj.y})")
+
+world.setObjectCollectedHandler(onObjectCollected)
+
+# Environment configuration
+def setupEnvironment(world):
+    # Add walls
+    for x in range(0, world.getWidth(), 2.0):
+        world.addObject(pynlm.WorldObject(x, 0, pynlm.WorldObjectType.Wall, radius=0.5))
+        world.addObject(pynlm.WorldObject(x, world.getHeight(), pynlm.WorldObjectType.Wall, radius=0.5))
+    
+    for y in range(0, world.getHeight(), 2.0):
+        world.addObject(pynlm.WorldObject(0, y, pynlm.WorldObjectType.Wall, radius=0.5))
+        world.addObject(pynlm.WorldObject(world.getWidth(), y, pynlm.WorldObjectType.Wall, radius=0.5))
+    
+    # Add resources (like food)
+    for _ in range(10):
+        x = random.uniform(1.0, world.getWidth() - 1.0)
+        y = random.uniform(1.0, world.getHeight() - 1.0)
+        world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=random.uniform(1.0, 5.0)))
+
+# Multiple agent support (experimental feature)
+def createMultiAgentWorld(agent_count=3):
+    world = pynlm.createSimpleWorld()
+    world.configure(width=50, height=50, visionWidth=10, visionHeight=10)
+    
+    agents = []
+    for i in range(agent_count):
+        agent = pynlm.createAgentBrain(brain)  # Assuming brain is already created
+        agents.append(agent)
+    
+    world.reset()
+    return world, agents
+```
+
+#### Advanced SimpleWorld Features
+
+```python
+# Advanced configuration with more parameters
+world.configure(
+    width=30, 
+    height=30, 
+    visionWidth=12, 
+    visionHeight=12,
+    cellSize=0.1,          # Size of each world cell in meters
+    maxSpeed=5.0,          # Maximum agent speed (m/s)
+    energyDecayRate=0.01,  # Rate at which energy decays per timestep
+    gravity=9.81,          # Gravitational acceleration (m/s²)
+    friction=0.1           # Friction coefficient (0-1)
+)
+
+# Get detailed world state
+world_state = {
+    'width': world.getWidth(),
+    'height': world.getHeight(),
+    'agent_position': (world.getAgentBody().x, world.getAgentBody().y),
+    'agent_velocity': (world.getAgentBody().velocityX, world.getAgentBody().velocityY),
+    'agent_orientation': world.getAgentBody().orientation,
+    'energy': world.getAgentBody().energy,
+    'health': world.getAgentBody().health,
+    'simulation_time': world.getSimulationTime(),
+    'max_energy': world.getMaxEnergy()
+}
+
+# World object management with validation
+for obj in world.getAllObjects():
+    if world.isValidPosition(obj.x, obj.y):
+        if obj.type == pynlm.WorldObjectType.Resource:
+            # Collect resource
+            print(f"Collected resource with value {obj.value}")
+            world.removeObject(obj.x, obj.y)
+    else:
+        # Handle out-of-bounds objects
+        world.removeObject(obj.x, obj.y)
+
+# World simulation control
+world.pause()                    # Pause simulation
+world.resume()                   # Resume simulation
+world.step(timestep)             # Step by specific timestep
+world.fastForward(duration)      # Fast-forward simulation
+
+# Event callbacks and handlers
+def onObjectCollected(obj):
+    print(f"Object collected at ({obj.x}, {obj.y})")
+
+world.setObjectCollectedHandler(onObjectCollected)
+
+# Environment configuration
+def setupEnvironment(world):
+    # Add walls
+    for x in range(0, world.getWidth(), 2.0):
+        world.addObject(pynlm.WorldObject(x, 0, pynlm.WorldObjectType.Wall, radius=0.5))
+        world.addObject(pynlm.WorldObject(x, world.getHeight(), pynlm.WorldObjectType.Wall, radius=0.5))
+    
+    for y in range(0, world.getHeight(), 2.0):
+        world.addObject(pynlm.WorldObject(0, y, pynlm.WorldObjectType.Wall, radius=0.5))
+        world.addObject(pynlm.WorldObject(world.getWidth(), y, pynlm.WorldObjectType.Wall, radius=0.5))
+    
+    # Add resources (like food)
+    for _ in range(10):
+        x = random.uniform(1.0, world.getWidth() - 1.0)
+        y = random.uniform(1.0, world.getHeight() - 1.0)
+        world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=random.uniform(1.0, 5.0)))
+
+# Multiple agent support (experimental feature)
+def createMultiAgentWorld(agent_count=3):
+    world = pynlm.createSimpleWorld()
+    world.configure(width=50, height=50, visionWidth=10, visionHeight=10)
+    
+    agents = []
+    for i in range(agent_count):
+        agent = pynlm.createAgentBrain(brain)  # Assuming brain is already created
+        agents.append(agent)
+    
+    world.reset()
+    return world, agents
+```
+
 ### Enumerations
 
 ```python

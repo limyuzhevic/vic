@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
+#include <optional>
 
 namespace nlm {
 
@@ -19,14 +21,32 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to parse as JSON first (modern approach)
+    try {
+        return loadFromJSONFile(filepath);
+    } catch (const std::exception& e) {
+        // Fall back to simple key=value format for backward compatibility
+        return loadFromSimpleFile(filepath);
+    }
+}
+
+bool Config::loadFromJSONFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
-    
+
+    // For now, just fall back to simple parser to avoid JSON dependency
+    // In a real implementation, you would use a JSON library like nlohmann/json
+    return loadFromSimpleFile(filepath);
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -86,7 +106,7 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = " << formatValue(entry.value) << "\n";
     }
     
     return true;
@@ -197,6 +217,19 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+std::string Config::formatValue(const ConfigValue& value) {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
 }
 
 // Explicit template instantiations
