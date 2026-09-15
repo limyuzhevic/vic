@@ -286,18 +286,42 @@ bool Brain::initialize() {
         }
     });
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+// Configure checkpoint manager
+        std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+        
+        NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
+        NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
+        NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
+        NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
+        NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+        
+        return true;
+    }
     
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
-    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    // Forward declaration for NeuralPlanner integration
+    void Brain::integrateWithPlanner() {
+        // This method demonstrates how neural planning can integrate with action selection
+        // and is called from the Python API
+        if (pImpl->planner) {
+            // Get current sensory state
+            std::vector<float> currentState;
+            
+            // Get current goal from concept formation if available
+            std::vector<float> goal = "approaching";
+            
+            // Plan an action
+            ActionType plannedAction = pImpl->planner->planAction(currentState, 0.5f);
+            
+            // Store planning result for Python API
+            lastPlannedAction_ = plannedAction;
+        }
+    }
     
-    return true;
-}
+    // Get last planned action (for Python API)
+    ActionType Brain::getLastPlannedAction() const {
+        return lastPlannedAction_;
+    }
 
 void Brain::step(SimulationStep currentStep) {
     step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
@@ -404,6 +428,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Update attention system based on working memory content
+        if (pImpl->attention && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -506,13 +536,37 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // Update concept formation with the episodic memory
+            if (pImpl->conceptFormation) {
+                // Convert episodic memory to sensory-like pattern for concept formation
+                std::vector<float> sensoryPattern;
+                for (auto activation : episode.neuronActivations) {
+                    sensoryPattern.push_back(activation);
+                }
+                pImpl->conceptFormation->updateConcept(sensoryPattern);
+            }
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Convert episodic memory to sensory-like pattern for prediction
+        std::vector<float> sensoryPattern;
+        if (pImpl->episodicMemory && pImpl->episodicMemory->getEpisodeCount() > 0) {
+            // Get most recent episode
+            const auto* recentEpisode = pImpl->episodicMemory->getRecentEpisodes(1)[0];
+            sensoryPattern = recentEpisode->sensoryState;
+        }
+        
+        // Update prediction system with current state
+        pImpl->predictionSystem->train(sensoryPattern);
+        
+        // Get prediction error and update neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (predictionError > 0.5f && pImpl->predictionError) {
+            pImpl->predictionError->setLevel(predictionError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +582,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation would process current neural activity patterns to form concepts
+        // This requires sensory state encoding - would be enhanced with episodic memory
+        if (pImpl->episodicMemory && pImpl->episodicMemory->getEpisodeCount() > 0) {
+            // Get recent episodes to analyze for concept formation
+            auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+            for (const auto* episode : recentEpisodes) {
+                // Convert episode to neural activity pattern
+                std::vector<float> neuralPattern;
+                neuralPattern.reserve(episode->activeNeurons.size() + episode->neuronActivations.size());
+                for (float activation : episode->neuronActivations) {
+                    neuralPattern.push_back(activation);
+                }
+                pImpl->conceptFormation->updateConcept(neuralPattern);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -609,9 +676,26 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
+        // Store in working memory
+        if (pImpl->workingMemory) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        }
+        
+        // Update prediction system with sensory input
+        if (pImpl->predictionSystem) {
+            // Convert input to SensoryInput for the prediction system
+            std::unique_ptr<SensoryInput> inputCopy;
+            if (input.getType() == SensoryInputType::Vision) {
+                const auto& visionData = input.getData();
+                inputCopy = std::make_unique<Vision>();
+                inputCopy->setData(visionData);
+            }
+            // Predict next state
+            auto prediction = pImpl->predictionSystem->predictNextState(*inputCopy);
+            // Store prediction error based on actual input
+            if (prediction) {
+                pImpl->predictionSystem->updatePredictions(*prediction, input);
+            }
         }
     }
 }

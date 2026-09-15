@@ -44,9 +44,27 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+// Forward declarations
+class Config;
+class RandomGenerator;
+class SimulationClock;
+class Logger;
+class NeuralWorkingMemory;
+class NeuralEpisodicMemory;
+class NeuralAssociativeMemory;
+class PredictionSystem;
+class NeuralPlanner;
+class ConceptFormation;
+class AttentionalSelection;
+class DevelopmentSystem;
+class Dopamine;
+class Curiosity;
+class Novelty;
+class PredictionError;
+
+namespace nlm {
+// Forward declare ActionType for Brain
+class Action;
 
 class Brain {
 public:
@@ -153,16 +171,9 @@ public:
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
     
-    // ========== COGNITION SYSTEMS ==========
-    
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
-    
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
-    
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // Planning integration
+    ActionType getLastPlannedAction() const;
+    void integrateWithPlanner();
     
     // ========== DEVELOPMENT SYSTEM ==========
     
@@ -199,3 +210,10 @@ private:
 };
 
 } // namespace nlm
+
+// Define ActionType in the same namespace as Brain
+namespace nlm {
+    using ActionType = Action; // Use Action class
+}
+
+// Now Brain can use ActionType without ambiguity
