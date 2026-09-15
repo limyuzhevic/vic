@@ -76,12 +76,12 @@ void AgentBrain::initialize(const SimpleWorld& world) {
 
 size_t AgentBrain::getSensoryInputSize() const {
     // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
+    return sensoryVision_.size() + sensoryTouch_.size() + sensoryInternal_.size() + sensoryProprioception_.size();
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
     // One motor neuron per action
-    return 6;
+    return motorForward_.size() + motorBackward_.size() + motorTurnLeft_.size() + motorTurnRight_.size() + motorInteract_.size() + motorWait_.size();
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
@@ -132,11 +132,15 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             totalDiff += diff;
         }
         
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        // Normalize - ensure we have meaningful normalization based on max possible difference
+        size_t validVisionSize = std::max<size_t>(vision.size(), 1);
+        noveltyLevel_ = totalDiff / validVisionSize;
         
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
+        
+        // Clamp novelty to valid range [0, 1]
+        noveltyLevel_ = std::clamp(noveltyLevel_, 0.0f, 1.0f);
         
         // Store for next time
         previousVision_ = vision;

@@ -193,9 +193,22 @@ public:
     // Logging
     void logStatus() const;
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-} // namespace nlm
+    // ========== STATISTICS AND METRICS ==========
+    
+    // Get attention level
+    float getAttentionLevel() const;
+    
+    // Get prediction error signal
+    float getPredictionError() const;
+    
+    // Get curiosity level
+    float getCuriosityLevel() const;
+    
+    // Get novelty level
+    float getNoveltyLevel() const;
+    
+    // Get development stage
+    DevelopmentalStage getDevelopmentalStage() const;
+    
+    // Get developmental age
+    double getDevelopmentalAge() const;

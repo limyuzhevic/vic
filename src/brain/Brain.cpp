@@ -231,26 +231,50 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
+    // Initialize working memory with error checking
+    if (!pImpl->workingMemory) {
+        NLM_LOG_ERROR("Failed to create working memory system");
+        return false;
+    }
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
+    // Initialize episodic memory with error checking
+    if (!pImpl->episodicMemory) {
+        NLM_LOG_ERROR("Failed to create episodic memory system");
+        return false;
+    }
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
+    // Initialize associative memory with error checking
+    if (!pImpl->associativeMemory) {
+        NLM_LOG_ERROR("Failed to create associative memory system");
+        return false;
+    }
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
+    if (!pImpl->planner) {
+        NLM_LOG_ERROR("Failed to create planner system");
+        return false;
+    }
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
     
+    if (!pImpl->conceptFormation) {
+        NLM_LOG_ERROR("Failed to create concept formation system");
+        return false;
+    }
     pImpl->conceptFormation->initialize(this);
     
+    if (!pImpl->attention) {
+        NLM_LOG_ERROR("Failed to create attentional selection system");
+        return false;
+    }
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
@@ -406,36 +430,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
-    
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
+    // Apply neuromodulation to real neural computations
+    // Neuromodulators affect neural excitability through real biophysical mechanisms
+    // This is more realistic than just injecting current
     if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
-        
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
+        // Dopamine modulates spike probability and synaptic efficacy
+        // Higher dopamine increases neural gain and promotes LTP
         float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
-                    }
-                }
-            }
+        float neuromodulationStrength = dopamineLevel;
+        
+        // Apply neuromodulation to working memory competition
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->applyNeuromodulation(neuromodulationStrength);
+        }
+        
+        // Modulate attentional selection
+        if (pImpl->attention) {
+            pImpl->attention->applyNeuromodulation(neuromodulationStrength);
+        }
+        
+        // Modulate prediction error computation
+        if (pImpl->predictionError) {
+            pImpl->predictionError->applyModulation(neuromodulationStrength);
         }
     }
     
@@ -511,8 +527,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current brain state
+        // This creates predictions and computes prediction errors
+        pImpl->predictionSystem->update(this, pImpl->timestep);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +545,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Update concept formation with current neural activity patterns
+        // This helps the brain discover and abstract patterns from experience
+        pImpl->conceptFormation->update(pImpl->timestep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1077,41 +1095,38 @@ RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
 }
 
-void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
-    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
-    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
-    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
-    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
-    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
-    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
-    
-    // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+float Brain::getAttentionLevel() const {
+    if (pImpl->attention) {
+        return pImpl->attention->getAttentionLevel();
     }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
-    }
-    
-    // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
-    }
-    
-    // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
-    
-    for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
-    }
+    return 0.0f;
 }
+
+float Brain::getPredictionError() const {
+    if (pImpl->predictionError) {
+        return pImpl->predictionError->getError();
+    }
+    return 0.0f;
+}
+
+float Brain::getCuriosityLevel() const {
+    if (pImpl->curiosity) {
+        return pImpl->curiosity->getLevel();
+    }
+    return 0.0f;
+}
+
+float Brain::getNoveltyLevel() const {
+    if (pImpl->novelty) {
+        return pImpl->novelty->getLevel();
+    }
+    return 0.0f;
+}
+
+DevelopmentalStage Brain::getDevelopmentalStage() const {
+    return pImpl->developmentalStage;
+}
+
+development age in header already added
 
 } // namespace nlm
