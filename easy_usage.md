@@ -1,6 +1,9 @@
 # NLM - Easy Usage Guide for Beginners
 
-## What is NLM?
+**Version: 0.1.0**
+**Last Updated: 2026-09-15**
+
+## Quick Summary
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
 
@@ -14,15 +17,7 @@ That's it! NLM simulates all of this.
 
 ---
 
-## The 3 Things You Need to Know
-
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
-
----
-
-## Quick Start (Copy & Paste)
+## ⚡ Quick Start (Copy & Paste)
 
 ### Example 1: Simplest Brain
 
@@ -71,21 +66,7 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
----
-
-## Simple Analogy
-
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
-
-## The Simplest Possible Example
+### Example 3: The Simplest Possible Example
 
 ```python
 import pynlm

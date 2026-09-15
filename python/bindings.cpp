@@ -401,8 +401,104 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+        auto config = std::make_shared<Config>();
+        
+        // === SENSIBLE DEFAULTS FOR BEGINNER USERS ===
+        // These defaults provide a good starting point for most use cases
+        
+        // Brain configuration - balanced settings
+        config->set("brain.neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("brain.synapse_density", 0.1f, ConfigSource::Default);
+        config->set("brain.connection_probability", 0.05f, ConfigSource::Default);
+        config->set("brain.v_thresh", -50.0f, ConfigSource::Default);    // Typical LIF threshold
+        config->set("brain.v_rest", -70.0f, ConfigSource::Default);     // Typical resting potential
+        config->set("brain.v_reset", -75.0f, ConfigSource::Default);    // Typical reset after spike
+        config->set("brain.tau_mem", 20.0f, ConfigSource::Default);     // Typical membrane time constant
+        config->set("brain.tau_ref", 2.0f, ConfigSource::Default);      // Typical refractory period
+        
+        // Plasticity configuration - encourage learning but prevent runaway
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.001f, ConfigSource::Default);
+        config->set("plasticity.stdp.tau_plus", 20.0f, ConfigSource::Default);
+        config->set("plasticity.stdp.tau_minus", 20.0f, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.learning_rate", 0.0005f, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+        
+        // Neuromodulation configuration - enable curiosity and learning
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        
+        // Development configuration - brain matures but not too quickly
+        config->set("development.enable", true, ConfigSource::Default);
+        config->set("development.stage_interval", 100, ConfigSource::Default);
+        config->set("development.plasticity_multiplier", 1.0f, ConfigSource::Default);
+        config->set("development.excitability_multiplier", 1.0f, ConfigSource::Default);
+        
+        // Simulation configuration - reasonable for most tests
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("replay_interval", 100, ConfigSource::Default);
+        config->set("consolidation_interval", 1000, ConfigSource::Default);
+        
+        // Random seed for reproducibility
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        
+        return config;
+    }, "Create a default configuration with sensible defaults for beginners");
+
+    m.def("createValidatedConfig", [](std::map<std::string, std::string> configMap) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Validate and apply configuration values with type conversion
+        for (const auto& pair : configMap) {
+            const std::string& key = pair.first;
+            const std::string& value = pair.second;
+            
+            try {
+                // Try numeric values first
+                if (key.find("neuron_count") != std::string::npos ||
+                    key.find("region_count") != std::string::npos ||
+                    key.find("seed") != std::string::npos ||
+                    key.find("timestep") != std::string::npos) {
+                    // Try int64_t
+                    try {
+                        size_t intValue = std::stoull(value);
+                        config->set(key, static_cast<int64_t>(intValue), ConfigSource::User);
+                    } catch (...) {
+                        try {
+                            int64_t intValue = std::stoll(value);
+                            config->set(key, intValue, ConfigSource::User);
+                        } catch (...) {
+                            throw std::runtime_error("Invalid integer value for key: " + key + ": " + value);
+                        }
+                    }
+                } else if (key.find("rate") != std::string::npos ||
+                          key.find("scale") != std::string::npos ||
+                          key.find("weight") != std::string::npos ||
+                          key.find("threshold") != std::string::npos ||
+                          key.find("potential") != std::string::npos ||
+                          key.find("conductance") != std::string::npos) {
+                    // Try float
+                    try {
+                        float floatValue = std::stof(value);
+                        config->set(key, floatValue, ConfigSource::User);
+                    } catch (...) {
+                        throw std::runtime_error("Invalid float value for key: " + key + ": " + value);
+                    }
+                } else {
+                    // Default to string for complex values
+                    config->set(key, value, ConfigSource::User);
+                }
+            } catch (const std::exception& e) {
+                throw std::runtime_error("Error setting key " + key + ": " + std::string(e.what()));
+            }
+        }
+        
+        return config;
+    }, py::arg("configMap"), "Create a configuration from a map of key-value pairs with validation");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
@@ -415,6 +511,155 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // High-level convenience functions
+    m.def("run_simple_simulation", [](std::shared_ptr<Brain> brain, size_t steps) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        if (!brain->initialize()) throw std::runtime_error("Failed to initialize brain");
+        
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step);
+        }
+        
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("steps"), "Run a simple simulation with statistics");
+
+    m.def("run_brain_world_episode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                      size_t steps) {
+        if (!brain || !world) throw std::runtime_error("Brain or world is null");
+        if (!brain->initialize()) throw std::runtime_error("Failed to initialize brain");
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        for (size_t step = 0; step < steps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return std::make_tuple(brain->getTotalSpikeCount(), brain->getFiringNeuronCount());
+    }, py::arg("brain"), py::arg("world"), py::arg("steps"), 
+       "Run a complete brain-world episode and return spike/firing stats");
+
+    m.def("create_brain_with_pattern", [](const std::string& patternName, size_t neuronCount) {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(neuronCount));
+        
+        if (patternName == "sparse") {
+            config->set("brain.connection_probability", 0.05f);
+        } else if (patternName == "dense") {
+            config->set("brain.connection_probability", 0.15f);
+        } else if (patternName == "small_world") {
+            config->set("brain.connection_probability", 0.1f);
+        }
+        
+        return std::make_shared<Brain>(config);
+    }, py::arg("patternName"), py::arg("neuronCount"), 
+       "Create a brain with a specific connectivity pattern");
+
+    m.def("create_default_agent_config", []() {
+        auto config = std::make_shared<Config>();
+        // Enable all major subsystems by default
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("development.enable", true);
+        config->set("development.stage_interval", 100);
+        return config;
+    }, "Create a configuration with all major subsystems enabled");
+
+    m.def("export_brain_state", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        if (!brain->save(filepath)) {
+            throw std::runtime_error("Failed to save brain state to " + filepath);
+        }
+    }, py::arg("brain"), py::arg("filepath"), 
+       "Save brain state to file with error checking");
+
+    m.def("import_brain_state", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->load(filepath)) {
+            throw std::runtime_error("Failed to load brain state from " + filepath);
+        }
+        return brain;
+    }, py::arg("filepath"), "Load brain state from file and return brain object");
+
+    m.def("simulate_with_sensory", [](std::shared_ptr<Brain> brain, const std::vector<float>& sensoryValues, 
+                                   size_t steps) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        if (!brain->initialize()) throw std::runtime_error("Failed to initialize brain");
+        
+        // Inject sensory input
+        brain->receiveSensoryInput(SensoryInput(sensoryValues));
+        
+        // Run simulation
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step, step * 0.001);
+        }
+        
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("sensoryValues"), py::arg("steps"), 
+       "Run simulation with given sensory input and return spike count");
+
+    m.def("analyze_brain_connectivity", [](std::shared_ptr<Brain> brain) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        
+        size_t totalNeurons = brain->getTotalNeuronCount();
+        size_t totalSynapses = brain->getTotalSynapseCount();
+        size_t firingNeurons = brain->getFiringNeuronCount();
+        size_t activeNeurons = brain->getActiveNeuronCount();
+        float eiRatio = brain->getExcitationInhibitionRatio();
+        
+        std::map<std::string, float> metrics;
+        metrics["total_neurons"] = static_cast<float>(totalNeurons);
+        metrics["total_synapses"] = static_cast<float>(totalSynapses);
+        metrics["firing_neurons"] = static_cast<float>(firingNeurons);
+        metrics["active_neurons"] = static_cast<float>(activeNeurons);
+        metrics["firing_rate"] = totalNeurons > 0 ? 
+            static_cast<float>(firingNeurons) / static_cast<float>(totalNeurons) : 0.0f;
+        metrics["exc_inh_ratio"] = eiRatio;
+        metrics["synapse_density"] = totalNeurons > 0 ? 
+            static_cast<float>(totalSynapses) / static_cast<float>(totalNeurons) : 0.0f;
+        
+        return metrics;
+    }, py::arg("brain"), "Analyze brain connectivity and return metrics");
+
+    m.def("reset_brain_state", [](std::shared_ptr<Brain> brain) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        brain->reset();
+        brain->initialize();
+    }, py::arg("brain"), "Reset brain state and reinitialize");
+
+    m.def("get_brain_info", [](std::shared_ptr<Brain> brain) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        
+        auto config = brain->getConfig();
+        std::string configStr;
+        if (config) {
+            configStr = config->summary();
+        }
+        
+        std::map<std::string, std::string> info;
+        info["neurons"] = std::to_string(brain->getTotalNeuronCount());
+        info["synapses"] = std::to_string(brain->getTotalSynapseCount());
+        info["spikes"] = std::to_string(brain->getTotalSpikeCount());
+        info["firing_neurons"] = std::to_string(brain->getFiringNeuronCount());
+        info["avg_firing_rate"] = std::to_string(brain->getAverageFiringRate());
+        info["ei_ratio"] = std::to_string(brain->getExcitationInhibitionRatio());
+        info["config"] = configStr;
+        
+        return info;
+    }, py::arg("brain"), "Get comprehensive brain information");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
