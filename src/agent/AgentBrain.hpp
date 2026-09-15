@@ -92,26 +92,36 @@ private:
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
     
-    // Neuromodulation state
+    // Neuromodulation state with additional metrics for better tracking
     float dopamineLevel_;
     float noveltyLevel_;
     float curiosityLevel_;
     float predictionError_;
     float expectedReward_;
+    float confidenceLevel_;           // For prediction confidence
+    float explorationBonus_;         // For curiosity-driven exploration
     
-    // Development state
+    // Development state with maturation factors
     double developmentalAge_;
     float plasticityModifier_;
+    float maturationLevel_;           // 0.0 = immature, 1.0 = mature
     
     // Configuration flags
     bool rewardModulationEnabled_;
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool noveltyDetectionEnabled_;
+    bool predictionSystemEnabled_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Advanced tracking
+    size_t totalObservations_;        // Track number of sensory observations
+    size_t totalActionsTaken_;       // Track number of actions taken
+    float averagePredictionAccuracy_;
 };
 
 } // namespace nlm
