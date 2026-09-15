@@ -213,8 +213,9 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     // Enable plasticity on synapses
     if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+        auto& synapses = region->getSynapses();
+        for (size_t i = 0; i < 5 && i < synapses.size(); ++i) {
+            synapses[i]->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
         }
     }
     
@@ -263,7 +264,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     
     // Record initial weights
     std::vector<float> beforeWeights;
-    for (size_t i = 0; i < 5; ++i) {
+    auto& synapses = region->getSynapses();
+    for (size_t i = 0; i < 5 && i < synapses.size(); ++i) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
