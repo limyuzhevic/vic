@@ -23,6 +23,19 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    // Initialize member variables to avoid uninitialized access
+    pImpl->brain = nullptr;
+    pImpl->maintenanceSynapses.clear();
+    pImpl->traceAges.clear();
+    
+    // Initialize memory content vectors
+    memoryNeurons_.clear();
+    memoryActivations_.clear();
+    memoryTimestamps_.clear();
+    activeTraces_.clear();
+    winners_.clear();
+    recurrentConnections_.clear();
+    neuronSalience_.clear();
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;

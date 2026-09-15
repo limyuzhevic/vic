@@ -5,8 +5,31 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <stdexcept>
+#include <string>
 
 namespace nlm {
+
+// Configuration exceptions
+class ConfigException : public std::runtime_error {
+public:
+    explicit ConfigException(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ConfigParseException : public ConfigException {
+public:
+    explicit ConfigParseException(const std::string& message) : ConfigException(message) {}
+};
+
+class ConfigValidationException : public ConfigException {
+public:
+    explicit ConfigValidationException(const std::string& message) : ConfigException(message) {}
+};
+
+class ConfigFileException : public ConfigException {
+public:
+    explicit ConfigFileException(const std::string& message) : ConfigException(message) {}
+};
 
 // Forward declarations
 class Config;

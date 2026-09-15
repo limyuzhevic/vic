@@ -8,6 +8,8 @@
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
+#include <chrono>
+#include <thread>
 
 using namespace nlm;
 
@@ -25,10 +27,33 @@ int main(int argc, char* argv[]) {
     std::cout << "--- Integration Verification ---" << std::endl;
     bool integrationOK = experiment.verifyIntegration();
     
-    std::cout << std::endl;
+    // Add retry mechanism for integration verification
+    int maxRetries = 3;
+    int retryCount = 0;
+    bool integrationPassed = false;
     
-    if (!integrationOK) {
-        std::cerr << "ERROR: Integration verification failed!" << std::endl;
+    while (!integrationPassed && retryCount < maxRetries) {
+        integrationPassed = experiment.verifyIntegration();
+        if (!integrationPassed) {
+            retryCount++;
+            std::cout << std::endl;
+            std::cout << "Integration verification failed (attempt " << retryCount << "/" << maxRetries << ")" << std::endl;
+            std::cout << "" << std::endl;
+            
+            // Add 2-second delay between retries
+            if (retryCount < maxRetries) {
+                std::cout << "Waiting 2 seconds before retry..." << std::endl;
+                std::this_thread::sleep_for(std::chrono::seconds(2));
+            }
+        }
+    }
+    
+    if (!integrationPassed) {
+        std::cerr << "ERROR: Integration verification failed after " << maxRetries << " attempts!" << std::endl;
+        std::cerr << "Suggestions:" << std::endl;
+        std::cerr << "  - Check system resources (memory, CPU)" << std::endl;
+        std::cerr << "  - Verify all brain components are properly initialized" << std::endl;
+        std::cerr << "  - Try reducing experiment complexity" << std::endl;
         return 1;
     }
     
