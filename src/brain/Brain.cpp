@@ -13,7 +13,6 @@
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -31,15 +30,12 @@ struct Brain::Impl {
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -47,7 +43,6 @@ struct Brain::Impl {
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
     std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
     // Phase 2: Real neural computation components
@@ -111,15 +106,12 @@ struct Brain::Impl {
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -127,7 +119,6 @@ struct Brain::Impl {
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
         // Configure STDP parameters
@@ -412,9 +403,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+    // Update curiosity with actual values from integrated systems
+    if (pImpl->curiosity && pImpl->novelty && pImpl->predictionError) {
+        float noveltyVal = pImpl->novelty->getLevel();
+        float predictionErrorVal = pImpl->predictionError->getError();
+        pImpl->curiosity->update(noveltyVal, predictionErrorVal, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -548,6 +541,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+        // Use the correct DevelopmentSystem::update signature that takes brain, rng, and dt
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
         // Development affects plasticity rates
@@ -895,9 +889,18 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - now actually loading from checkpoint
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                if (synapseIdx < synapseData.weight.size()) {
+                    syn->setWeight(synapseData.weight[synapseIdx]);
+                    syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx]);
+                    syn->setDelay(synapseData.delay[synapseIdx]);
+                    synapseIdx++;
+                }
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
