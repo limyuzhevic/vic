@@ -50,16 +50,17 @@ add_library(nlm_core STATIC
     src/development/Maturation.cpp
     # Neuromodulation
     src/neuromodulation/Neuromodulator.cpp
+    src/neuromodulation/Dopamine.cpp
     src/neuromodulation/Reward.cpp
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
+    src/memory/NeuralEpisodicMemory.cpp
+    src/memory/Memory.cpp
+    src/memory/Memory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -78,7 +79,7 @@ add_library(nlm_core STATIC
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
+    
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp

@@ -14,6 +14,7 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../test_lif_stability.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)

@@ -1,3 +1,4 @@
+#include "Memory.hpp"
 #include <algorithm>
 #include <string>
 #include <sstream>

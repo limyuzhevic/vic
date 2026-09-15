@@ -43,6 +43,19 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// JSON parsing namespace
+namespace json {
+    bool isWhitespace(char c);
+    size_t skipWhitespace(const std::string& str, size_t pos);
+    bool parseString(const std::string& str, size_t& pos, std::string& out);
+    bool parseNumber(const std::string& str, size_t& pos, ConfigValue& out);
+    bool parseArray(const std::string& str, size_t& pos, std::vector<std::string>& out);
+    bool parseObject(const std::string& str, size_t& pos, std::unordered_map<std::string, std::string>& out);
+    bool parseJsonObject(const std::string& json, Config& config, size_t& pos);
+    std::string serializeToJson(const ConfigValue& value);
+    std::string escapeString(const std::string& str);
+}
+
 // Main configuration class
 class Config {
 public:
@@ -55,13 +68,16 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format, falls back to simple key=value)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from simple key=value format (backward compatibility)
+    bool loadFromSimple(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -100,6 +116,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON parsing helper (declared here for implementation)
+    static bool parseJsonObject(const std::string& json, Config& config, size_t& pos);
 };
 
 } // namespace nlm

@@ -6,8 +6,12 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <unordered_map>
 
 namespace nlm {
+
+// Forward declarations to avoid circular dependencies
+class Neuron;
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
@@ -76,21 +80,34 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Helper function to distribute neurons into groups
+    void distributeNeuronsToGroups(const std::vector<Neuron*>& neurons, 
+                                  std::vector<std::weak_ptr<Neuron>>& vision,
+                                  std::vector<std::weak_ptr<Neuron>>& touch,
+                                  std::vector<std::weak_ptr<Neuron>>& internal,
+                                  std::vector<std::weak_ptr<Neuron>>& proprioception);
+    
+    // Helper function to validate neuron pointers
+    bool validateNeuron(Neuron* neuron) const;
+    
+    // Helper function to lock weak_ptrs and filter out expired ones
+    std::vector<std::shared_ptr<Neuron>> lockAndFilterNeurons(const std::vector<std::weak_ptr<Neuron>>& weakNeurons) const;
+    
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    // Motor neuron groups - now using weak_ptr to avoid memory ownership issues
+    std::vector<std::weak_ptr<Neuron>> motorForward_;
+    std::vector<std::weak_ptr<Neuron>> motorBackward_;
+    std::vector<std::weak_ptr<Neuron>> motorTurnLeft_;
+    std::vector<std::weak_ptr<Neuron>> motorTurnRight_;
+    std::vector<std::weak_ptr<Neuron>> motorInteract_;
+    std::vector<std::weak_ptr<Neuron>> motorWait_;
     
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    // Sensory neuron groups - now using weak_ptr to avoid memory ownership issues
+    std::vector<std::weak_ptr<Neuron>> sensoryVision_;
+    std::vector<std::weak_ptr<Neuron>> sensoryTouch_;
+    std::vector<std::weak_ptr<Neuron>> sensoryInternal_;
+    std::vector<std::weak_ptr<Neuron>> sensoryProprioception_;
     
     // Neuromodulation state
     float dopamineLevel_;
@@ -112,6 +129,9 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Cache for expired weak_ptrs to avoid repeated locking
+    std::unordered_map<Neuron*, bool> neuronValidityCache_;
 };
 
 } // namespace nlm
