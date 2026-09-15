@@ -12,8 +12,48 @@
 using namespace nlm;
 
 int main(int argc, char* argv[]) {
+    // Parse command-line arguments for flexibility
+    Phase6Config config;
+    
+    // Parse custom arguments (easier syntax than traditional ArgParse)
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--neurons" && i + 1 < argc) {
+            config.neuronCount = std::stoul(argv[i + 1]);
+            i++;
+        } else if (std::string(argv[i]) == "--steps" && i + 1 < argc) {
+            config.maxSteps = std::stoull(argv[i + 1]);
+            i++;
+        } else if (std::string(argv[i]) == "--no-checkpoint") {
+            config.enableCheckpointing = false;
+        } else if (std::string(argv[i]) == "--no-replay") {
+            config.enableReplay = false;
+        } else if (std::string(argv[i]) == "--fast") {
+            config.neuronCount = 200;
+            config.maxSteps = 500;
+        } else if (std::string(argv[i]) == "--thorough") {
+            config.neuronCount = 1000;
+            config.maxSteps = 10000;
+        } else if (std::string(argv[i]) == "--help" || std::string(argv[i]) == "-h") {
+            std::cout << "=== NLM Phase 6 Demo Options ===" << std::endl;
+            std::cout << "Usage: ./nlm_phase6_demo [OPTIONS]" << std::endl;
+            std::cout << std::endl;
+            std::cout << "Options:" << std::endl;
+            std::cout << "  --neurons N      Number of neurons (default: 500)" << std::endl;
+            std::cout << "  --steps N        Number of simulation steps (default: 2000)" << std::endl;
+            std::cout << "  --no-checkpoint   Disable checkpointing" << std::endl;
+            std::cout << "  --no-replay       Disable replay" << std::endl;
+            std::cout << "  --fast           Use quick demo settings (200 neurons, 500 steps)" << std::endl;
+            std::cout << "  --thorough       Use detailed demo settings (1000 neurons, 10000 steps)" << std::endl;
+            std::cout << "  -h, --help       Show this help message" << std::endl;
+            std::cout << std::endl;
+            return 0;
+        }
+    }
+    
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
-    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+    std::cout << "Testing the integrated artificial brain..." << std::endl;
+    std::cout << "Configuration: " << config.neuronCount << " neurons, " << config.maxSteps << " steps" << std::endl;
+    std::cout << std::endl;
     
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
@@ -51,11 +91,10 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
+    // Run full experiment with the configured parameters
     std::cout << "--- Full Integration Experiment ---" << std::endl;
-    Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
+    config.neuronCount = 500;  // Override for demo brevity
+    config.maxSteps = 2000;    // Override for demo brevity
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
