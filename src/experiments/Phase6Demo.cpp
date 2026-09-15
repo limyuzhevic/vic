@@ -18,6 +18,64 @@ int main(int argc, char* argv[]) {
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
     
+    // Parse command line arguments
+    Phase6Config config;
+    config.neuronCount = 500;
+    config.maxSteps = 2000;
+    config.enableCheckpointing = true;
+    config.enableReplay = true;
+    config.enableDevelopment = true;
+    config.checkpointPath = "./checkpoint_test.bin";
+    
+    // Command-line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "NLM Phase 6 Integration Demo Usage:" << std::endl;
+            std::cout << "  ./nlm_phase6_demo [options]" << std::endl;
+            std::cout << "" << std::endl;
+            std::cout << "Options:" << std::endl;
+            std::cout << "  -h, --help              Show this help message" << std::endl;
+            std::cout << "  --neurons N             Number of neurons (default: 500)" << std::endl;
+            std::cout << "  --steps S               Maximum simulation steps (default: 2000)" << std::endl;
+            std::cout << "  --no-checkpointing      Disable checkpointing" << std::endl;
+            std::cout << "  --no-replay             Disable replay system" << std::endl;
+            std::cout << "  --no-development        Disable development" << std::endl;
+            std::cout << "  --checkpoint-path P     Checkpoint file path (default: ./checkpoint_test.bin)" << std::endl;
+            std::cout << "  --checkpoint-dir D      Directory for checkpoints (default: ./checkpoints)" << std::endl;
+            std::cout << "  --seed S                Random seed for reproducibility" << std::endl;
+            std::cout << "" << std::endl;
+            return 0;
+        }
+        
+        if (arg == "--no-checkpointing") {
+            config.enableCheckpointing = false;
+        } else if (arg == "--no-replay") {
+            config.enableReplay = false;
+        } else if (arg == "--no-development") {
+            config.enableDevelopment = false;
+        }
+        
+        if (arg.substr(0, 12) == "--neurons=") {
+            config.neuronCount = std::stoi(arg.substr(12));
+        } else if (arg.substr(0, 8) == "--steps=") {
+            config.maxSteps = std::stoull(arg.substr(8));
+        } else if (arg.substr(0, 19) == "--checkpoint-path=") {
+            config.checkpointPath = arg.substr(19);
+        } else if (arg.substr(0, 17) == "--checkpoint-dir=") {
+            // Extract directory from path
+            std::string dir = arg.substr(17);
+            if (dir.back() != '/') {
+                dir += '/';
+            }
+            config.checkpointPath = dir + "checkpoint_test.bin";
+        } else if (arg.substr(0, 9) == "--seed=") {
+            uint64_t seed = std::stoull(arg.substr(9));
+            config.randomSeed = seed;
+        }
+    }
+    
     // Create experiment
     Phase6IntegratedExperiment experiment;
     
@@ -51,14 +109,16 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
+    // Run full experiment with user-configured settings
     std::cout << "--- Full Integration Experiment ---" << std::endl;
-    Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    std::cout << "Configuration:" << std::endl;
+    std::cout << "  Neurons: " << config.neuronCount << std::endl;
+    std::cout << "  Steps: " << config.maxSteps << std::endl;
+    std::cout << "  Checkpointing: " << (config.enableCheckpointing ? "YES" : "NO") << std::endl;
+    std::cout << "  Replay: " << (config.enableReplay ? "YES" : "NO") << std::endl;
+    std::cout << "  Development: " << (config.enableDevelopment ? "YES" : "NO") << std::endl;
+    std::cout << "  Checkpoint path: " << config.checkpointPath << std::endl;
+    std::cout << std::endl;
     
     auto result = experiment.run(config);
     

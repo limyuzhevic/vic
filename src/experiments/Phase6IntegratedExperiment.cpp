@@ -22,6 +22,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
+    NLM_LOG_INFO("Random seed: " + std::to_string(config.randomSeed));
     
     // Create configuration
     auto cfg = std::make_shared<Config>();
@@ -32,6 +33,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("stdp_ltd_weight", 0.012f);
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
+    cfg->set("random_seed", static_cast<int64_t>(config.randomSeed));
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
@@ -45,15 +47,13 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     SimpleWorld world;
     world.initialize(16, 16);
     
-    // Create agent
-    AgentBrain agent(brain);
-    agent.initialize(world);
-    agent.enableRewardModulation(true);
-    agent.enableStructuralPlasticity(config.enableDevelopment);
-    agent.enableDevelopment(config.enableDevelopment);
-    agent.enableCuriosity(true);
-    
-    NLM_LOG_INFO("Brain and agent initialized successfully");
+    if (brain->initialize()) {
+        NLM_LOG_INFO("Brain and agent initialized successfully");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize brain");
+        result.endTime = time(nullptr);
+        return result;
+    }
     
     // Run simulation
     float totalReward = 0.0f;
@@ -61,8 +61,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get sensory percept from world
+        const SensoryPercept& percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -73,11 +73,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        // Apply motor command to world
+        ActionResult result = world.applyMotorCommand(cmd, step * 0.001);
         
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Compute reward from action result
+        float reward = result.reward;
         totalReward += reward;
         
         // Apply reward modulation

@@ -93,6 +93,9 @@ private:
     // Interact with nearby objects
     ActionResult interact();
     
+    // Generate vision (called automatically)
+    void generateVision();
+    
     // World geometry
     float width_;
     float height_;
