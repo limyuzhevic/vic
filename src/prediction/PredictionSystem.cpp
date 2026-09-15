@@ -53,8 +53,9 @@ void PredictionSystem::clearHistory() {
     pImpl->errorHistory.clear();
 }
 
-void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+void PredictionSystem::initialize(class Brain* brain) {
+    // TODO PHASE 2: Implement predictive coding initialization
+    // Connect prediction system to brain's neural networks
 }
 
 } // namespace nlm

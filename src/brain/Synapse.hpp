@@ -72,6 +72,7 @@ public:
     
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
+    // Real synaptic dynamics implementation (STP + use-dependent modulation)
     void step(Timestamp currentTime);
     
     // Reset to initial state

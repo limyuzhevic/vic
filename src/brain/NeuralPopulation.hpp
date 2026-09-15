@@ -56,6 +56,9 @@ public:
     // Step all neurons
     void step(Timestamp currentTime);
     
+    // Phase 2: Population-level dynamics (e.g., gain control, synchronization)
+    void step(Timestamp currentTime);
+    
     // Reset all neurons
     void reset();
     
@@ -66,10 +69,3 @@ public:
     void recordActivity();  // Record current state for statistics
     float getMeanMembranePotential() const;
     float getVarianceMembranePotential() const;
-    
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-} // namespace nlm

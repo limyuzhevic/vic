@@ -15,6 +15,11 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/dynamics/SpikeSystem.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -28,6 +33,19 @@ PYBIND11_MODULE(pynlm, m) {
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "ValueError");
+    py::register_exception<std::logic_error>(m, "RuntimeError");
+    py::register_exception<std::out_of_range>(m, "IndexError");
+    py::register_exception<std::length_error>(m, "ValueError");
+    
+    // Add more exception types that might be raised
+    py::register_exception<std::domain_error>(m, "ValueError");
+    py::register_exception<std::overflow_error>(m, "RuntimeError");
+    py::register_exception<std::underflow_error>(m, "RuntimeError");
+    
+    // Set module-level error message for better error context
+    m.attr("__version__") = "0.1.0";
+    m.attr("NLM") = m;
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -318,16 +336,27 @@ PYBIND11_MODULE(pynlm, m) {
              "Load brain state from file")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
+.def("getRegion", [](Brain& self, RegionId id) {
+              auto* region = self.getRegion(id);
+              if (!region) {
+                  PyErr_SetString(PyExc_RuntimeError, "Region not found");
+                  throw py::error_already_set();
+              }
+              return region;
+          }, py::arg("id"),
+              py::return_value_policy::copy,
+              "Get a region by ID")
         .def("getRegionCount", &Brain::getRegionCount,
              "Get the number of regions")
         .def("getRegionIds", &Brain::getRegionIds,
              "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
+        .def("getRegions", [](Brain& self) {
+              auto regions = self.getRegions();
+              // Return a copy to avoid issues with internal references
+              return std::vector<const NeuralRegion*>(regions.begin(), regions.end());
+          },
+              py::return_value_policy::copy,
+              "Get all regions")
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
              "Get total neuron count across all regions")
         .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
