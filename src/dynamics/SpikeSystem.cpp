@@ -12,10 +12,15 @@ struct SpikeSystem::Impl {
     std::unordered_map<SimulationStep, std::vector<DelayedSpikeEvent>> delayedSpikes;  // Grouped by delivery step
     size_t maxHistorySize;
     
+    // Neuron lookup cache for efficient delayed spike processing
+    // Maps neuron ID to neuron pointer for O(1) access
+    std::unordered_map<NeuronId, Neuron*> neuronLookupCache;
+    bool cacheNeedsUpdate;
+    
     // Spike counting for statistics
     std::unordered_map<uint64_t, size_t> spikeCountPerNeuron;  // neuron_id -> count
     
-    Impl() : maxHistorySize(10000) {}
+    Impl() : maxHistorySize(10000), cacheNeedsUpdate(true) {}
 };
 
 SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
@@ -46,6 +51,8 @@ void SpikeSystem::queueSpike(NeuronId neuron, Timestamp timestamp, SimulationSte
 void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
     // Store by delivery step for efficient processing
     pImpl->delayedSpikes[event.delivery_step].push_back(event);
+    // Mark cache as needing update
+    pImpl->cacheNeedsUpdate = true;
 }
 
 void SpikeSystem::processSpikes(SimulationStep currentStep) {
