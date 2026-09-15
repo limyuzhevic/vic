@@ -1,0 +1,52 @@
+            pImpl->state.firingState = FiringState::Resting;
+        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.firingState = FiringState::Refractory;
+    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
+    V = std::clamp(V, -100.0f, 50.0f);
+    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    float tau = Impl::TIME_CONSTANT;  // ms
+    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+    pImpl->state.firingState = FiringState::Resting;
+    pImpl->type = NeuronType::Internal;
+    std::vector<SynapseHandle> incomingSynapses;
+    std::vector<SynapseHandle> outgoingSynapses;
+    std::vector<Timestamp> spikeHistory;
+MembranePotential Neuron::getLeakConductance() const {
+MembranePotential Neuron::getRestingPotential() const {
+Neuron& Neuron::operator=(Neuron&& other) noexcept {
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
+Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+Neuron::~Neuron() = default;
+NeuronState& Neuron::getState() {
+PlasticityFlags& Neuron::getPlasticityFlags() {
+bool Neuron::checkThreshold() const {
+bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+float Neuron::getLastSpikeTime() const {
+struct Neuron::Impl {
+uint32_t Neuron::getRefractoryPeriod() const {
+void Neuron::addIncomingSynapse(SynapseHandle handle) {
+void Neuron::addOutgoingSynapse(SynapseHandle handle) {
+void Neuron::addToMembranePotential(MembranePotential delta) {
+void Neuron::clearSpikeHistory() {
+void Neuron::clearTotalCurrent() {
+void Neuron::decrementRefractory() {
+void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
+void Neuron::initializeRandom(RandomGenerator& rng) {
+void Neuron::injectCurrent(MembranePotential current) {
+void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
+void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
+void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
+void Neuron::recordSpike(Timestamp timestamp) {
+void Neuron::reset() {
+void Neuron::setFiringRate(FiringRate rate) {
+void Neuron::setFiringState(FiringState state) {
+void Neuron::setLeakConductance(MembranePotential conductance) {
+void Neuron::setMembranePotential(MembranePotential potential) {
+void Neuron::setPopulationId(PopulationId population) {
+void Neuron::setRefractoryPeriod(uint32_t steps) {
+void Neuron::setRegionId(RegionId region) {
+void Neuron::setResetPotential(MembranePotential potential) {
+void Neuron::setRestingPotential(MembranePotential potential) {
+void Neuron::setThreshold(MembranePotential threshold) {
+void Neuron::setType(NeuronType type) {
+void Neuron::step(Timestamp currentTime) {

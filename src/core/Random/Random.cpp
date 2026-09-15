@@ -111,7 +111,7 @@ uint32_t RandomGenerator::randomBit() {
 
 uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
     if (n == 0) {
-        throw std::invalid_argument("Cannot pick from zero items");
+        throw std::runtime_error("Cannot pick from empty container");
     }
     return uniformInt(0, n - 1);
 }
@@ -122,6 +122,16 @@ void RandomGenerator::fillBytes(void* data, size_t size) {
         bytes[i] = static_cast<uint8_t>(uniformInt(0, 255));
     }
 }
+
+std::mt19937_64& RandomGenerator::engine() {
+    return pImpl->gen;
+}
+
+const std::mt19937_64& RandomGenerator::engine() const {
+    return pImpl->gen;
+}
+
+} // namespace nlm
 
 std::mt19937_64& RandomGenerator::engine() {
     return pImpl->gen;

@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,36 +20,132 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to load as JSON first
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    // Try to parse as JSON
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Convert JSON to config entries
+        pImpl->entries.clear();
+        
+        for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+            std::string key = it.key();
+            ConfigValue value;
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Handle different JSON types
+            if (it->is_number_integer()) {
+                value = it->get<int64_t>();
+            } else if (it->is_number_unsigned()) {
+                value = it->get<uint64_t>();
+            } else if (it->is_number_float()) {
+                value = it->get<double>();
+            } else if (it->is_boolean()) {
+                value = it->get<bool>();
+            } else if (it->is_string()) {
+                value = it->get<std::string>();
+            } else if (it->is_array()) {
+                // Handle arrays
+                if (!it->empty() && it->front().is_number_integer()) {
+                    std::vector<int64_t> intArray;
+                    for (const auto& item : *it) {
+                        intArray.push_back(item.get<int64_t>());
+                    }
+                    value = intArray;
+                } else if (!it->empty() && it->front().is_number_float()) {
+                    std::vector<double> floatArray;
+                    for (const auto& item : *it) {
+                        floatArray.push_back(item.get<double>());
+                    }
+                    value = floatArray;
+                } else if (!it->empty() && it->front().is_string()) {
+                    std::vector<std::string> stringArray;
+                    for (const auto& item : *it) {
+                        stringArray.push_back(item.get<std::string>());
+                    }
+                    value = stringArray;
+                }
             }
             
-            set(key, value, ConfigSource::File);
+            pImpl->entries.emplace_back(key, value, ConfigSource::File, "Loaded from JSON");
+        }
+        
+        return true;
+    } catch (const std::exception&) {
+        // If JSON parsing fails, fall back to simple key=value format
+        file.clear();
+        file.seekg(0);
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string valueStr = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (valueStr.size() >= 2 && 
+                    ((valueStr.front() == '"' && valueStr.back() == '"') ||
+                     (valueStr.front() == '\'' && valueStr.back() == '\''))) {
+                    valueStr = valueStr.substr(1, valueStr.size() - 2);
+                }
+                
+                // Try to convert value to appropriate type
+                ConfigValue value;
+                bool converted = false;
+                
+                // Try int64_t
+                try {
+                    size_t posEnd;
+                    int64_t intVal = std::stoll(valueStr, &posEnd);
+                    if (posEnd == valueStr.size()) {
+                        value = intVal;
+                        converted = true;
+                    }
+                } catch (...) {}
+                
+                // Try double
+                if (!converted) {
+                    try {
+                        size_t posEnd;
+                        double doubleVal = std::stod(valueStr, &posEnd);
+                        if (posEnd == valueStr.size()) {
+                            value = doubleVal;
+                            converted = true;
+                        }
+                    } catch (...) {}
+                }
+                
+                // Try bool
+                if (!converted) {
+                    if (valueStr == "true") {
+                        value = true;
+                        converted = true;
+                    } else if (valueStr == "false") {
+                        value = false;
+                        converted = true;
+                    }
+                }
+                
+                // Fall back to string
+                if (!converted) {
+                    value = valueStr;
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -84,11 +181,22 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Try to save as JSON for better readability
+    nlohmann::json jsonData;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Add description as comment
+        if (!entry.description.empty()) {
+            jsonData[entry.key] = entry.description;
+        } else {
+            // Use std::visit to get the value
+            std::visit([&](const auto& val) {
+                jsonData[entry.key] = val;
+            }, entry.value);
+        }
     }
     
+    file << jsonData.dump(2); // Pretty print with 2-space indentation
     return true;
 }
 
@@ -134,6 +242,10 @@ void Config::set(const std::string& key, int value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
+void Config::set(const std::string& key, int64_t value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
 void Config::set(const std::string& key, double value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
@@ -173,15 +285,50 @@ std::string Config::summary() const {
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        
+        // Use direct type index to avoid nlohmann::json compatibility issues
+        switch (entry.value.index()) {
+            case 0: // int64_t
+                oss << std::get<0>(entry.value);
+                break;
+            case 1: // uint64_t
+                oss << std::get<1>(entry.value);
+                break;
+            case 2: // double
+                oss << std::get<2>(entry.value);
+                break;
+            case 3: // bool
+                oss << (std::get<3>(entry.value) ? "true" : "false");
+                break;
+            case 4: // std::string
+                oss << "\"" << std::get<4>(entry.value) << "\"";
+                break;
+            case 5: // std::vector<int64_t>
+                oss << "[";
+                for (size_t i = 0; i < std::get<5>(entry.value).size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << std::get<5>(entry.value)[i];
+                }
+                oss << "]";
+                break;
+            case 6: // std::vector<double>
+                oss << "[";
+                for (size_t i = 0; i < std::get<6>(entry.value).size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << std::get<6>(entry.value)[i];
+                }
+                oss << "]";
+                break;
+            case 7: // std::vector<std::string>
+                oss << "[";
+                for (size_t i = 0; i < std::get<7>(entry.value).size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << "\"" << std::get<7>(entry.value)[i] << "\"";
+                }
+                oss << "]";
+                break;
+        }
+        oss << "[] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
 }
