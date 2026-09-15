@@ -97,6 +97,15 @@ public:
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
     
+    // Store complete sensory experience with action and consequences
+    std::vector<float> captureSensoryState() const;
+    
+    // Store sensory experience with action and consequences
+    void storeSensoryExperience(const std::vector<float>& sensoryState, ActionType action, std::unique_ptr<Action> actionPtr);
+    
+    // Capture sensory state from external input
+    void captureCurrentSensoryState(const std::vector<float>& input);
+    
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
     
