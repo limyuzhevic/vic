@@ -1,10 +1,3 @@
-/**
- * Phase 6 Demo - Integration Test
- * 
- * This demo runs the Phase 6 integration experiment to verify
- * that all brain systems are properly connected.
- */
-
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
@@ -12,6 +5,21 @@
 using namespace nlm;
 
 int main(int argc, char* argv[]) {
+    // Parse command line arguments for Phase 6 mode
+    Phase6Config config;
+    config.neuronCount = 500;
+    config.maxSteps = 2000;
+    config.enableCheckpointing = true;
+    config.enableReplay = true;
+    config.enableDevelopment = true;
+    config.checkpointPath = "./checkpoint_test.bin";
+    
+    // Parse config file if provided
+    if (argc > 1 && std::string(argv[1]) == "--config") {
+        // In a real implementation, we would load from a config file
+        std::cout << "Config file loading not yet implemented in demo" << std::endl;
+    }
+    
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
@@ -36,29 +44,39 @@ int main(int argc, char* argv[]) {
     
     // Test individual systems
     std::cout << "--- Memory Integration Test ---" << std::endl;
-    experiment.testMemoryIntegration();
+    bool memoryOK = experiment.testMemoryIntegration();
+    if (!memoryOK) {
+        std::cerr << "ERROR: Memory integration test failed!" << std::endl;
+        return 1;
+    }
     std::cout << std::endl;
     
     std::cout << "--- Neuromodulation Integration Test ---" << std::endl;
-    experiment.testNeuromodulationIntegration();
+    bool neuromodulationOK = experiment.testNeuromodulationIntegration();
+    if (!neuromodulationOK) {
+        std::cerr << "ERROR: Neuromodulation integration test failed!" << std::endl;
+        return 1;
+    }
     std::cout << std::endl;
     
     std::cout << "--- Checkpoint Test ---" << std::endl;
-    experiment.testCheckpointing();
+    bool checkpointOK = experiment.testCheckpointing();
+    if (!checkpointOK) {
+        std::cerr << "ERROR: Checkpoint test failed!" << std::endl;
+        return 1;
+    }
     std::cout << std::endl;
     
     std::cout << "--- Replay Test ---" << std::endl;
-    experiment.testReplay();
+    bool replayOK = experiment.testReplay();
+    if (!replayOK) {
+        std::cerr << "ERROR: Replay test failed!" << std::endl;
+        return 1;
+    }
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
+    // Run full experiment with settings from config
     std::cout << "--- Full Integration Experiment ---" << std::endl;
-    Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
     
     auto result = experiment.run(config);
     

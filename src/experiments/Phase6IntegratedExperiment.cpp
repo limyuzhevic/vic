@@ -280,10 +280,9 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
     if (em->getEpisodeCount() > 0) {
         NLM_LOG_INFO("[PASS] Episodic memory has episodes: " + std::to_string(em->getEpisodeCount()));
     } else {
-        NLM_LOG_INFO("[INFO] Episodic memory has no episodes (may be normal for simple simulation)");
+        NLM_LOG_ERROR("[FAIL] Episodic memory has no episodes - integration test fails");
+        return false;
     }
-    
-    return true;
 }
 
 bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
