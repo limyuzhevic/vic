@@ -221,6 +221,180 @@ CHANGED BRAIN
 CHANGED FUTURE BEHAVIOR
 ```
 
+## Configuration File Format
+
+NLM uses a flexible configuration system that supports both INI-style and JSON formats. Configuration files control brain parameters, simulation settings, and system behavior.
+
+### INI Format (Recommended for most users)
+
+Configuration files are simple `key = value` pairs with optional comments:
+
+```ini
+# NLM Brain Configuration
+# ====================
+
+# Core brain parameters
+brain.neuron_count = 1000
+brain.region_count = 1
+brain.connection_probability = 0.1
+
+# Neuron dynamics
+brain.v_thresh = -50.0
+brain.v_rest = -70.0
+brain.v_reset = -75.0
+brain.tau_mem = 20.0
+brain.tau_ref = 2.0
+
+# Simulation settings
+simulation.timestep = 0.001
+random_seed = 42
+
+# Plasticity parameters
+plasticity.stdp.enable = true
+plasticity.stdp.learning_rate = 0.001
+plasticity.hebbian.enable = true
+plasticity.structural.enable = true
+
+# Neuromodulation
+neuromod.dopamine.scale = 1.0
+neuromod.curiosity.enable = true
+neuromod.novelty.enable = true
+
+# Development
+enable_development = true
+development.stage = 2
+```
+
+### JSON Format (Advanced)
+
+For more complex configurations or programmatic access:
+
+```json
+{
+  "brain": {
+    "neuron_count": 1000,
+    "region_count": 1,
+    "connection_probability": 0.1,
+    "v_thresh": -50.0,
+    "v_rest": -70.0,
+    "v_reset": -75.0
+  },
+  "simulation": {
+    "timestep": 0.001,
+    "timestep_units": "ms"
+  },
+  "plasticity": {
+    "stdp": {
+      "enable": true,
+      "learning_rate": 0.001,
+      "tau_plus": 20.0,
+      "tau_minus": 20.0
+    },
+    "hebbian": {
+      "enable": true
+    },
+    "structural": {
+      "enable": true,
+      "synaptogenesis_rate": 0.0001,
+      "pruning_rate": 0.00001
+    }
+  },
+  "neuromodulation": {
+    "dopamine": {
+      "scale": 1.0
+    },
+    "curiosity": {
+      "enable": true,
+      "exploration_strength": 0.5
+    }
+  },
+  "development": {
+    "enable": true,
+    "stage": "critical_period"
+  }
+}
+```
+
+### Configuration File Locations
+
+The configuration loader searches for configuration files in this order:
+
+1. **Command line argument**: `--config /path/to/config.ini`
+2. **Default location**: `configs/default.cfg` in the project directory
+3. **Current directory**: `./config.cfg`
+
+If none are found, default values are used.
+
+### Override via Command Line
+
+Override configuration values from the command line:
+
+```bash
+./nlm --brain.neuron_count=2000 --simulation.timestep=0.0005 --random_seed=123
+```
+
+### Configuration Categories
+
+#### Core Brain Settings
+- `brain.neuron_count`: Total number of neurons (default: 500)
+- `brain.region_count`: Number of brain regions (default: 1)
+- `brain.connection_probability`: Probability of synaptic connections (default: 0.1)
+
+#### Neuron Dynamics
+- `brain.v_thresh`: Firing threshold (mV, default: -50.0)
+- `brain.v_rest`: Resting potential (mV, default: -70.0)
+- `brain.v_reset`: Post-spike reset potential (mV, default: -75.0)
+- `brain.tau_mem`: Membrane time constant (ms, default: 20.0)
+- `brain.tau_ref`: Refractory period (steps, default: 5)
+
+#### Plasticity Settings
+- `plasticity.stdp.enable`: Enable Spike-Timing-Dependent Plasticity
+- `plasticity.stdp.learning_rate`: STDP learning rate (default: 0.001)
+- `plasticity.hebbian.enable`: Enable Hebbian learning
+- `plasticity.structural.enable`: Enable structural plasticity
+
+#### Neuromodulation
+- `neuromod.dopamine.scale`: Dopamine modulation strength (default: 1.0)
+- `neuromod.curiosity.enable`: Enable curiosity-driven exploration
+- `neuromod.novelty.enable`: Enable novelty detection
+
+#### Development
+- `enable_development`: Enable developmental stages (default: true)
+- `development.stage`: Current developmental stage (Initial, CriticalPeriod, Maturation, Adult, Aging)
+
+### Generated Configuration Summary
+
+When NLM starts, it logs the active configuration:
+
+```
+Configuration:
+  brain.neuron_count = 1000
+  brain.region_count = 1
+  brain.connection_probability = 0.1
+  simulation.timestep = 0.001
+  random_seed = 42
+  ... (continues for all configured parameters)
+```
+
+### Example Configuration Files
+
+The `configs/` directory contains example configuration files:
+
+- `default.cfg`: Basic configuration for simple demonstrations
+- `development.cfg`: Configuration optimized for developmental studies
+- `high_plasticity.cfg`: Configuration with enhanced learning capabilities
+
+### Configuration Validation
+
+The configuration system validates values and warns about:
+
+- Invalid parameter names
+- Out-of-range values
+- Conflicting settings
+- Unused configuration keys
+
+All warnings are logged during startup, allowing users to identify configuration issues before running simulations.
+
 ## License
 
 MIT
