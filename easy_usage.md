@@ -106,51 +106,314 @@ print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 
 ## Common Patterns
 
-### Pattern 1: Run a Simulation
+### Pattern 1: Run a Complete Simulation Loop
 
 ```python
 def run_simulation(brain, world, agent, num_steps):
+    """Complete simulation loop with all systems integrated.
+    
+    This is the most common pattern for running a full simulation
+    where the agent interacts with a changing environment.
+    """
     for step in range(num_steps):
-        # 1. Update world
+        # 1. Update world (time passes, objects move, etc.)
         world.update(0.1)
         
-        # 2. Get what the agent sees
+        # 2. Get what the agent sees (sensory input)
         percept = world.getSensoryPercept()
         
-        # 3. Tell the brain
+        # 3. Tell the brain what it senses
         agent.processSensoryInput(percept)
         
-        # 4. Brain thinks
+        # 4. Brain processes and thinks
         brain.step(step)
         
-        # 5. Get action from brain
+        # 5. Brain decides what to do
         action = agent.decodeMotorCommand()
         
-        # 6. Do action in world
+        # 6. Execute action in world
         world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # 7. Apply learning from experience (optional)
+        if agent.isRewardModulationEnabled():
+            # Calculate reward based on action result
+            reward = 0.0f  # Could be based on world feedback
+            agent.applyRewardModulation(reward, 0.0f)
+
+    return {
+        'total_spikes': brain.getTotalSpikeCount(),
+        'firing_neurons': brain.getFiringNeuronCount(),
+        'avg_firing_rate': brain.getAverageFiringRate(),
+        'development_stage': brain.getDevelopmentalStage()
+    }
 
 # Use it like this:
-run_simulation(brain, world, agent, 1000)
+results = run_simulation(brain, world, agent, 1000)
+print(f"Simulation complete: {results['firing_neurons']} neurons firing")
 ```
 
-### Pattern 2: Get Brain Stats
+### Pattern 2: Advanced Brain Monitoring
 
 ```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
+def monitor_brain_performance(brain, step_interval=100):
+    """Monitor and log brain performance metrics."""
+    monitoring_data = {
+        'steps': [],
+        'spikes': [],
+        'firing_rate': [],
+        'excitement_ratio': [],
+        'development_stage': [],
+        'memory_usage': []
+    }
+    
+    for step in range(0, 10000, step_interval):
+        metrics = {
+            'step': step,
+            'total_spikes': brain.getTotalSpikeCount(),
+            'firing_neurons': brain.getFiringNeuronCount(),
+            'avg_firing_rate': brain.getAverageFiringRate(),
+            'excitement_inhibition_ratio': brain.getExcitationInhibitionRatio(),
+            'development_stage': brain.getDevelopmentalStage(),
+            'working_memory_traces': brain.getWorkingMemory() and 
+                                     brain.getWorkingMemory()->getActiveTraces() or 0,
+            'episodic_memory_count': brain.getEpisodicMemory() and 
+                                     brain.getEpisodicMemory()->getEpisodeCount() or 0
+        }
+        
+        monitoring_data['steps'].append(step)
+        monitoring_data['spikes'].append(metrics['total_spikes'])
+        monitoring_data['firing_rate'].append(metrics['avg_firing_rate'])
+        monitoring_data['excitement_ratio'].append(metrics['excitement_inhibition_ratio'])
+        monitoring_data['development_stage'].append(metrics['development_stage'])
+        monitoring_data['memory_usage'].append(metrics['working_memory_traces'])
+        
+        # Optional: Print progress
+        if step % 1000 == 0:
+            print(f"Step {step}: {metrics['firing_neurons']} neurons, "
+                  f"{metrics['avg_firing_rate']:.2f} Hz firing rate")
+    
+    return monitoring_data
+
+# Use it like this:
+# Enable memory systems first
+brain.getWorkingMemory();  # Just access to enable
+brain.getEpisodicMemory();  # Just access to enable
+
+performance = monitor_brain_performance(brain)
+print(f"Monitored {len(performance['steps'])} data points")
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 3: Learning and Development Configuration
 
 ```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+def configure_advanced_learning(brain, agent, config):
+    """Configure advanced learning features for better performance."""
+    
+    # Enable all learning systems
+    agent.enableRewardModulation(config.get('reward_learning', True))
+    agent.enableStructuralPlasticity(config.get('structural_plasticity', True))
+    agent.enableDevelopment(config.get('development_enabled', True))
+    agent.enableCuriosity(config.get('curiosity_enabled', True))
+    
+    # Configure developmental stages
+    if config.get('development_enabled', True):
+        # Set brain to different developmental stages
+        brain.setDevelopmentalStage(DevelopmentalStage::Initial)
+        
+        # Customize development parameters
+        auto* devSystem = brain.getDevelopmentSystem();
+        if (devSystem) {
+            devSystem->setMaturationRate(config.get('maturation_rate', 0.5f));
+            devSystem->setPruningRate(config.get('pruning_rate', 0.01f));
+            devSystem->setSynaptogenesisRate(config.get('synaptogenesis_rate', 0.1f));
+        }
+    
+    # Configure neuromodulation
+    auto* dopamine = brain.getDopamine();
+    if (dopamine) {
+        dopamine->setBaseline(config.get('dopamine_baseline', 0.5f));
+        dopamine->setResponseScaling(config.get('dopamine_response', 1.0f));
+    }
+    
+    auto* curiosity = brain.getCuriosity();
+    if (curiosity) {
+        curiosity->setBaseline(config.get('curiosity_baseline', 0.3f));
+        curiosity->setNoveltyScaling(config.get('curiosity_scaling', 2.0f));
+    }
+    
+    # Configure memory systems
+    auto* workingMem = brain.getWorkingMemory();
+    if (workingMem) {
+        workingMem->setCapacity(config.get('working_memory_capacity', 100));
+        workingMem->setTraceDecay(config.get('working_memory_decay', 0.9f));
+    }
+    
+    auto* episodicMem = brain.getEpisodicMemory();
+    if (episodicMem) {
+        episodicMem->setMaxEpisodes(config.get('episodic_memory_limit', 1000));
+        episodicMem->setConsolidationThreshold(config.get('consolidation_threshold', 10.0f));
+    }
+    
+    return True
+
+# Example configuration
+advanced_config = {
+    'reward_learning': True,
+    'structural_plasticity': True,
+    'development_enabled': True,
+    'curiosity_enabled': True,
+    'maturation_rate': 0.7f,
+    'pruning_rate': 0.02f,
+    'synaptogenesis_rate': 0.15f,
+    'dopamine_baseline': 0.6f,
+    'dopamine_response': 1.2f,
+    'curiosity_baseline': 0.4f,
+    'curiosity_scaling': 2.5f,
+    'working_memory_capacity': 200,
+    'working_memory_decay': 0.95f,
+    'episodic_memory_limit': 2000,
+    'consolidation_threshold': 15.0f
+}
+
+configure_advanced_learning(brain, agent, advanced_config)
+print("Advanced learning configuration applied")
+```
+
+### Pattern 4: Interactive Brain Control
+
+```python
+class InteractiveBrainController:
+    """Advanced controller for interactive brain manipulation."""
+    
+public:
+    InteractiveBrainController(std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent)
+        : brain_(brain), agent_(agent) {}
+    
+    void injectSensoryPattern(const std::string& pattern_type) {
+        """Inject specific sensory patterns for testing."""
+        if (!brain_ || !agent_) return;
+        
+        if (pattern_type == "flash") {
+            // Create a flash pattern for vision
+            Vision flash(visionWidth_, visionHeight_, 3);
+            std::vector<float> data(visionWidth_ * visionHeight_ * 3, 0.0f);
+            
+            // Central bright flash
+            size_t center = (visionWidth_ / 2) * (visionHeight_ / 2) * 3;
+            for (size_t i = center; i < center + 3; ++i) {
+                data[i] = 1.0f;
+            }
+            
+            flash.setData(data);
+            SensoryPercept percept;
+            percept.setVision(flash);
+            agent_->processSensoryInput(percept);
+            
+        } else if (pattern_type == "pattern") {
+            // Create a moving pattern
+            Vision pattern(visionWidth_, visionHeight_, 3);
+            std::vector<float> data(visionWidth_ * visionHeight_ * 3, 0.0f);
+            
+            // Create a simple pattern (e.g., horizontal stripes)
+            for (size_t y = 0; y < visionHeight_; ++y) {
+                for (size_t x = 0; x < visionWidth_; ++x) {
+                    if ((x + y) % 2 == 0) {
+                        size_t idx = (y * visionWidth_ + x) * 3;
+                        data[idx] = 1.0f;     // Red
+                        data[idx + 1] = 0.0f; // Green
+                        data[idx + 2] = 0.0f; // Blue
+                    }
+                }
+            }
+            
+            pattern.setData(data);
+            SensoryPercept percept;
+            percept.setVision(pattern);
+            agent_->processSensoryInput(percept);
+        }
+    }
+    
+    void manipulateSynapses(float weight_factor, float probability) {
+        """Manipulate synaptic weights for testing."""
+        if (!brain_) return;
+        
+        auto* stdp = brain_->getSTDP();
+        if (stdp) {
+            float currentWeight = stdp->getLTPWeight();
+            stdp->setLTPWeight(currentWeight * weight_factor);
+            stdp->setLTDWeight(currentWeight * weight_factor);
+        }
+        
+        // Also modify all synapses
+        for (const auto& region : brain_->getRegions()) {
+            for (auto* syn : region->getSynapses()) {
+                if (rand() % 100 < probability * 100) {
+                    syn->addToWeight(weight_factor - 1.0f);
+                }
+            }
+        }
+    }
+    
+    void setDevelopmentalStage(DevelopmentalStage stage) {
+        """Force brain into a specific developmental stage."""
+        if (brain_) {
+            brain_->setDevelopmentalStage(stage);
+        }
+    }
+    
+    void pauseDevelopment(bool pause) {
+        """Temporarily pause development."""
+        if (agent_) {
+            // This would require an additional API
+            // For now, we can demonstrate the pattern
+            if (pause) {
+                std::cout << "Development paused (manual control)" << std::endl;
+            } else {
+                std::cout << "Development resumed" << std::endl;
+            }
+        }
+    }
+    
+    std::string getBrainStatus() const {
+        """Get comprehensive brain status."""
+        if (!brain_) return "No brain available";
+        
+        std::stringstream status;
+        status << "Brain Status:" << std::endl;
+        status << "  Total neurons: " << brain_->getTotalNeuronCount() << std::endl;
+        status << "  Total synapses: " << brain_->getTotalSynapseCount() << std::endl;
+        status << "  Firing neurons: " << brain_->getFiringNeuronCount() << std::endl;
+        status << "  Total spikes: " << brain_->getTotalSpikeCount() << std::endl;
+        status << "  Avg firing rate: " << brain_->getAverageFiringRate() << std::endl;
+        status << "  Development stage: " << static_cast<int>(brain_->getDevelopmentalStage()) << std::endl;
+        
+        auto* workingMem = brain_->getWorkingMemory();
+        if (workingMem) {
+            status << "  Working memory traces: " << workingMem->getActiveTraces() << std::endl;
+        }
+        
+        auto* episodicMem = brain_->getEpisodicMemory();
+        if (episodicMem) {
+            status << "  Episodic memory episodes: " << episodicMem->getEpisodeCount() << std::endl;
+        }
+        
+        return status.str();
+    }
+    
+private:
+    std::shared_ptr<Brain> brain_;
+    std::shared_ptr<AgentBrain> agent_;
+    size_t visionWidth_ = 256;
+    size_t visionHeight_ = 256;
+};
+
+// Use it like this:
+InteractiveBrainController controller(brain, agent);
+controller.injectSensoryPattern("flash");
+controller.manipulateSynapses(1.5f, 0.1f);  # Increase weights by 50% with 10% probability
+controller.setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
+
+std::cout << controller.getBrainStatus() << std::endl;
 ```
 
 ---
