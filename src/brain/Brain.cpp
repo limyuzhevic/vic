@@ -130,6 +130,11 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
+        // Initialize ACh, NE, 5-HT neuromodulators
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
+        
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
@@ -609,8 +614,8 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
+        // Also store in working memory for persistence
+        if (pImpl->workingMemory && std::abs(normalizedValue) > 0.1f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
     }
@@ -731,8 +736,10 @@ void Brain::updatePlasticity() {
 }
 
 void Brain::develop() {
-    // Development updates structural plasticity
-    pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    // Update development system
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+    }
 }
 
 void Brain::reset() {
@@ -1035,6 +1042,38 @@ ConceptFormation* Brain::getConceptFormation() {
 
 AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
+}
+
+// ========== DEVELOPMENT SYSTEM ==========
+
+DevelopmentSystem* Brain::getDevelopmentSystem() {
+    return pImpl->developmentSystem.get();
+}
+
+DevelopmentalStage Brain::getDevelopmentalStage() const {
+    return pImpl->developmentalStage;
+}
+
+void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
+    pImpl->developmentalStage = stage;
+}
+
+// ========== NEUROMODULATION SYSTEMS ==========
+
+Dopamine* Brain::getDopamine() {
+    return pImpl->dopamine.get();
+}
+
+Curiosity* Brain::getCuriosity() {
+    return pImpl->curiosity.get();
+}
+
+Novelty* Brain::getNovelty() {
+    return pImpl->novelty.get();
+}
+
+PredictionError* Brain::getPredictionErrorSignal() {
+    return pImpl->predictionError.get();
 }
 
 // ========== DEVELOPMENT SYSTEM ==========

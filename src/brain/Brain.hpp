@@ -28,6 +28,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -43,6 +46,11 @@ struct InterRegionConnection {
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
+
+// Neuromodulation systems
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
