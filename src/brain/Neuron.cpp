@@ -1,4 +1,5 @@
 #include "Neuron.hpp"
+#include "../core/Constants.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -207,29 +208,30 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
     
     MembranePotential& V = pImpl->state.membranePotential;
-    MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
+    MembranePotential V_rest = NeuronConstants::V_REST;
+    MembranePotential V_reset = NeuronConstants::V_RESET;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    float tau = pImpl->state.timeConstant;
+    float C = NeuronConstants::MEMBRANE_CAPACITANCE;
     
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // Calculate synaptic contribution using conductance-based model
+    float synapticContribution = pImpl->synapticInput * NeuronConstants::SYNAPTIC_CONDUCTANCE;
     
-    // Leak contribution
+    // Calculate leak contribution (membrane potential naturally decays toward resting)
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Convert dt from seconds to milliseconds for consistent units
+    V = V + dt * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        V -= pImpl->state.adaptationVariable * STDPConstants::ADAPTATION_DECAY;
+        pImpl->state.adaptationVariable *= STDPConstants::ADAPTATION_DECAY;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Clamp membrane potential to prevent instability (biologically reasonable bounds)
+    V = std::clamp(V, NeuronConstants::V_SPIKE_PEAK, NeuronConstants::V_RESET);
     
     // Check for spike
     if (V >= threshold) {
@@ -237,10 +239,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike for plasticity calculations
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential to afterhyperpolarization level
         V = V_reset;
         
         // Enter refractory period
@@ -257,6 +259,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     pImpl->synapticInput = 0.0f;
     
     return fired;
+}
 }
 
 void Neuron::step(Timestamp currentTime) {

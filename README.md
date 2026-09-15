@@ -66,11 +66,46 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### Standard Build
+
 ```bash
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
+```
+
+### Development Build
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-O0 -g"
+make -j4
+```
+
+### Install
+
+```bash
+# After building
+make install
+```
+
+Install location depends on your CMake configuration, typically:
+- `/usr/local/lib` and `/usr/local/include`
+- Or a directory specified during CMake configuration
+
+### Build Options
+
+The following CMake options are available:
+
+```bash
+-DCMAKE_BUILD_TYPE=Release        # Release mode with optimizations
+-DCMAKE_BUILD_TYPE=Debug          # Debug mode with debug symbols
+-DCMAKE_BUILD_TYPE=RelWithDebInfo # Release with debug symbols
+-DCMAKE_CXX_STANDARD=20          # C++ standard (default: 20)
+-DNLM_ENABLE_TESTS=ON            # Enable tests (default: ON)
+-DNLM_ENABLE_EXPERIMENTS=ON      # Enable experiment targets (default: ON)
 ```
 
 ## Running
