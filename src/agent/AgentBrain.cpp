@@ -1,5 +1,6 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -19,6 +20,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , perceptionTime_(0.0)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -67,6 +69,7 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    perceptionTime_ = 0.0;
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -122,6 +125,38 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
         }
+    }
+    
+    // Store current sensory input in working memory
+    if (brain_->getWorkingMemory()) {
+        brain_->getWorkingMemory()->store(vision, 0.8f);
+    }
+    
+    // Store complete experience in episodic memory
+    if (brain_->getEpisodicMemory()) {
+        EpisodicMemoryItem episode;
+        episode.timestamp = perceptionTime_;
+        episode.sensoryState = percept.getAllSignals();
+        episode.reward = 0.0f;  // Will be updated when reward is applied
+        episode.novelty = noveltyLevel_;
+        
+        // Store the episode
+        brain_->getEpisodicMemory()->storeEpisode(episode);
+    }
+    
+    // Update concept formation with new patterns
+    if (brain_->getConceptFormation()) {
+        brain_->getConceptFormation()->presentExperience(
+            vision,
+            percept.getAllSignals(),
+            0.0f,  // Initial reward
+            perceptionTime_
+        );
+    }
+    
+    // Update attention system with new sensory input
+    if (brain_->getAttention()) {
+        brain_->getAttention()->update(0.001);
     }
     
     // Compute novelty (difference from previous vision)
@@ -342,6 +377,7 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    perceptionTime_ = 0.0;
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);

@@ -112,6 +112,9 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Perception timestamp
+    double perceptionTime_;
 };
 
 } // namespace nlm

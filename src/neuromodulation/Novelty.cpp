@@ -41,6 +41,21 @@ void Novelty::detectNovelty(const Observation& observation,
     pImpl->history.push_back(pImpl->level);
 }
 
+void Novelty::signalNovelty(const Observation& current) {
+    // Signal novelty to other systems
+    if (pImpl->brain) {
+        // Notify curiosity system
+        if (pImpl->brain->getCuriosity()) {
+            pImpl->brain->getCuriosity()->updateNovelty(pImpl->level);
+        }
+        
+        // Update prediction error based on novelty
+        if (pImpl->brain->getPredictionErrorSignal()) {
+            pImpl->brain->getPredictionErrorSignal()->updatePredictionError(pImpl->level * 0.5f);
+        }
+    }
+}
+
 void Novelty::detectNovelty(const std::vector<float>& currentPattern,
                             const std::vector<float>& previousPattern) {
     if (currentPattern.empty() || previousPattern.empty()) {

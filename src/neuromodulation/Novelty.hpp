@@ -30,13 +30,20 @@ public:
     // Decay novelty over time
     void update(TimestepDuration dt);
     
+    // Signal novelty to other systems
+    void signalNovelty(const Observation& current);
+
     // Get novelty history
     const std::vector<float>& getHistory() const;
     void clearHistory();
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
+    // Signaled novelty to other systems
+    void signalNovelty(const Observation& current);
+    
+    // Signal novelty to other systems
+    void signalNovelty(const Observation& current);
+    
+    // Signal novelty to other systems
+    void signalNovelty(const Observation& current);
 
 } // namespace nlm

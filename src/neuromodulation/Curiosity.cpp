@@ -43,6 +43,12 @@ void Curiosity::update(float novelty, float predictionError, TimestepDuration dt
     pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
+void Curiosity::updateNovelty(float novelty) {
+    // Update curiosity based on novelty alone
+    float target = pImpl->noveltyWeight * novelty;
+    pImpl->level += (target - pImpl->level) * 0.1f;
+}
+
 float Curiosity::getExplorationDrive() const {
     return pImpl->level;
 }
