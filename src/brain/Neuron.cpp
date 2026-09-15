@@ -33,6 +33,8 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    pImpl->synapticInput = 0.0f;
+    pImpl->plasticityFlags = PlasticityFlags{};
 }
 
 Neuron::~Neuron() = default;
@@ -151,6 +153,15 @@ void Neuron::recordSpike(Timestamp timestamp) {
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    }
+    
+    // Check for spike bursts and adaptation
+    if (!pImpl->spikeHistory.empty()) {
+        Timestamp lastSpike = pImpl->spikeHistory.back();
+        if (lastSpike - timestamp > 0.0f && lastSpike - timestamp < 50.0f) {
+            // Recent spike - increase adaptation variable for spike-frequency adaptation
+            pImpl->state.adaptationVariable += 2.0f;
+        }
     }
 }
 
