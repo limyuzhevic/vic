@@ -419,6 +419,22 @@ int main(int argc, char** argv) {
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
+    NLM_LOG_ERROR("Failed to initialize brain!");
+        return 1;
+    }
+    
+    brain->logStatus();
+    
+    // Run Test 1: Basic connectivity
+    runBasicConnectivityTest(brain);
+    
+    // Reset brain for plasticity experiment
+    brain->reset();
+    brain->initialize();
+    
+    // Run Test 2: Plasticity learning experiment
+    runPlasticityExperiment(brain);
+    
     // Reset and run Test 3: STDP verification
     brain->reset();
     brain->initialize();

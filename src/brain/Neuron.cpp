@@ -180,6 +180,14 @@ void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
     pImpl->plasticityFlags.reward_modulated = rewardModulated;
 }
 
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
+}
+
+PlasticityFlags& Neuron::getPlasticityFlags() {
+    return pImpl->plasticityFlags;
+}
+
 void Neuron::setRegionId(RegionId region) {
     pImpl->regionId = region;
 }
@@ -216,6 +224,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
+    // Add total current contribution
+    if (pImpl->totalCurrent != 0.0f) {
+        synapticContribution += pImpl->totalCurrent / C;
+    }
+    
     // Leak contribution
     float leakContribution = (V_rest - V) / tau;
     
@@ -227,6 +240,9 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         V -= pImpl->state.adaptationVariable * 0.01f;
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
+    
+    // Apply adaptation variable to membrane potential
+    V -= pImpl->state.adaptationVariable * 0.005f;
     
     // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
@@ -257,6 +273,23 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     pImpl->synapticInput = 0.0f;
     
     return fired;
+}
+
+void Neuron::setTotalCurrent(MembranePotential current) {
+    pImpl->totalCurrent = current;
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->totalCurrent;
+}
+
+void Neuron::addToTotalCurrent(MembranePotential delta) {
+    pImpl->totalCurrent += delta;
+}
+
+void Neuron::clearTotalCurrent() {
+    pImpl->totalCurrent = 0.0f;
+}
 }
 
 void Neuron::step(Timestamp currentTime) {
