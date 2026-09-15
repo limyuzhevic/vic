@@ -193,6 +193,44 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== IMPROVEMENTS AND INTEGRATIONS ==========
+    
+    // Enhanced action selection with cognition integration
+    void enhanceActionSelection();
+    void boostMotorBasedOnAttended(const std::vector<NeuronId>& attended);
+    
+    // Better developmental control of cognition
+    void updateDevelopmentEffects();
+    void enableMoreCognition();
+    
+    // Enhanced neuromodulation integration
+    void enhanceDopamineEffects();
+    void adjustMemoryBasedOnDopamine();
+    
+    // More sophisticated replay and consolidation
+    void enhancedReplay();
+    void enhancedConsolidation();
+    
+    // Better checkpoint implementation
+    void saveCheckpoint();
+    
+    // Better memory integration
+    void storeWorkingMemoryFromSensory(SimulationStep currentStep);
+    void improveWorkingMemoryMaintenance();
+    void storeWorkingMemoryFromSensory();
+    void enhanceWorkingMemoryMaintenance();
+    
+    // Enhanced prediction system integration
+    void updatePredictionWithExperience(SimulationStep currentStep);
+    void guideAttentionWithPredictions();
+    void updatePredictionSystem();
+    void guideActionWithPredictions();
+    
+    // Better development
+    void updateDevelopment();
+    void updateDevelopmentEffects();
+    void enableAdvancedCognition();
+    
 private:
     struct Impl;
     Impl* pImpl;
