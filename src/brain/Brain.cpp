@@ -404,46 +404,122 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Integrate working memory with attention selection
+        if (pImpl->attention) {
+            std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            if (!memoryNeurons.empty()) {
+                // Attention selects from working memory based on salience
+                pImpl->attention->processCompetition(memoryNeurons);
+            }
+        }
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
+// ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
+        
+        // Apply novelty effects on learning
+        float noveltyLevel = pImpl->novelty->getNoveltyLevel();
+        if (noveltyLevel > 0.5f) {
+            // High novelty increases plasticity for exploration
+            if (pImpl->stdp) {
+                // Enhance STDP for novel experiences
+                float currentLTP = pImpl->stdp->getLTPWeight();
+                pImpl->stdp->setLTPWeight(currentLTP * (1.0f + noveltyLevel * 0.3f));
+            }
+        }
     }
     
     // Update curiosity
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+        // Apply curiosity effects on exploration
+        float curiosityLevel = pImpl->curiosity->getCuriosityLevel();
+        if (curiosityLevel > 0.7f) {
+            // High curiosity increases spontaneous exploration
+            // Inject some noise to motor neurons
+            for (auto* neuron : pImpl->motorNeurons) {
+                // Add exploration bias
+                neuron->addToMembranePotential(2.0f * curiosityLevel);
+            }
+        }
+    }
+
+    // Update acetylcholine effects on attention
+    if (pImpl->dopamine) {
+        // Acetylcholine would modulate attention strength based on novel experiences
+        // For now, use novelty as a proxy for acetylcholine effects
+        float attentionModulation = 1.0f;
+        if (pImpl->novelty) {
+            float noveltyLevel = pImpl->novelty->getNoveltyLevel();
+            attentionModulation = 1.0f + noveltyLevel * 0.5f;
+        }
+        
+        // Apply attention modulation to working memory
+        if (pImpl->workingMemory) {
+            // Boost working memory capacity based on attention
+            float wmCapacity = pImpl->workingMemory->getCapacity();
+            pImpl->workingMemory->setCapacity(wmCapacity * attentionModulation);
+        }
+    }
+
+    // Update norepinephrine effects on arousal
+    if (pImpl->curiosity) {
+        float arousalLevel = pImpl->curiosity->getLevel() * 0.5f;
+        if (arousalLevel > 0.3f) {
+            // High arousal increases firing thresholds for focus
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (arousalLevel > 0.7f) {
+                            // High arousal increases threshold for selective attention
+                            neuron->addToMembranePotential(-1.0f);  // Increase threshold
+                        }
                     }
                 }
             }
         }
     }
-    
+
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    for (auto& region : pImpl->regions) {
+        for (auto& syn : region->getSynapses()) {
+            // Apply STDP with neuromodulation
+            if (syn->getPlasticityFlags().stdp) {
+                const auto& preSpikes = syn->getPreSpikeHistory();
+                const auto& postSpikes = syn->getPostSpikeHistory();
+                
+                if (!preSpikes.empty() && !postSpikes.empty()) {
+                    // Modify weight change based on dopamine
+                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    float weight = syn->getWeight();
+                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    syn->setWeight(weight);
+                }
+            }
+            
+            // Apply Hebbian learning
+            if (syn->getPlasticityFlags().hebbian) {
+                const auto& preSpikes = syn->getPreSpikeHistory();
+                const auto& postSpikes = syn->getPostSpikeHistory();
+                
+                if (!preSpikes.empty() && !postSpikes.empty()) {
+                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                }
+            }
+            
+            // Update synapse state
+            syn->step(currentTime);
+        }
     }
     
     for (auto& region : pImpl->regions) {
@@ -511,8 +587,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current brain state
+        // This enables predictive coding and temporal processing
+        
+        // Get current sensory activity for prediction
+        std::vector<float> sensoryPattern;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            if (neuron->isFiring()) {
+                sensoryPattern.push_back(1.0f);
+            } else {
+                sensoryPattern.push_back(std::abs(neuron->getState().membranePotential - 
+                                          neuron->getState().restingPotential) / 50.0f);
+            }
+        }
+        
+        // Update prediction system with current pattern
+        if (!sensoryPattern.empty()) {
+            pImpl->predictionSystem->updatePrediction(sensoryPattern);
+            
+            // Calculate prediction error
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // Store prediction error in prediction error signal for neuromodulation
+            if (pImpl->predictionError) {
+                pImpl->predictionError->update(predictionError, currentTime);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -530,14 +630,65 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
+        
+        // Get current neural activity patterns for concept formation
+        std::vector<float> neuralActivity;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Encode neuron activity for concept formation
+                    float activation = neuron->isFiring() ? 1.0f : 
+                        (std::abs(neuron->getState().membranePotential - 
+                                 neuron->getState().restingPotential) / 50.0f);
+                    neuralActivity.push_back(activation);
+                }
+            }
+        }
+        
+        // Update concept formation with current neural patterns
+        if (!neuralActivity.empty() && pImpl->attention) {
+            // Get attention weights to prioritize concept formation
+            std::vector<float> attentionWeights;
+            pImpl->attention->getAttentionWeights(attentionWeights);
+            
+            // Apply concept formation with attentional modulation
+            pImpl->conceptFormation->processPatterns(neuralActivity, attentionWeights);
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Update neural planner ==========
+    if (pImpl->planner) {
+        // Neural planner would evaluate possible actions and select optimal strategies
+        // This requires planning over time with predictive representations
+        
+        // Get current working memory traces for planning
+        std::vector<NeuronId> planningTargets;
+        if (pImpl->workingMemory) {
+            planningTargets = pImpl->workingMemory->getMemoryNeurons();
+        }
+        
+        // Get prediction system output for planning context
+        std::string predictionContext = "";
+        if (pImpl->predictionSystem) {
+            predictionContext = pImpl->predictionSystem->getContextString();
+        }
+        
+        // Update planner with current state and context
+        pImpl->planner->updateState(planningTargets, predictionContext);
+        
+        // Generate action plan
+        std::string actionPlan = pImpl->planner->generatePlan();
+        
+        // Log planning results
+        NLM_LOG_INFO("Planner generated: " + actionPlan);
+    }
+    
+    // ========== STEP 12: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
+    // ========== STEP 13: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
@@ -546,7 +697,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // ========== STEP 14: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -576,13 +727,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // ========== STEP 15: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 16: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
