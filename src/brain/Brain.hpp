@@ -145,8 +145,14 @@ public:
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
     
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    // Semantic memory - conceptual knowledge
+    SemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - learned skills and habits
+    ProceduralMemory* getProceduralMemory();
+    
+    // Associative memory - relationships between representations
+    AssociativeMemory* getAssociativeMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
