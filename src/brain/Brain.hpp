@@ -18,6 +18,8 @@ class SimulationClock;
 class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
+class NeuralSemanticMemory;
+class NeuralProceduralMemory;
 class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
@@ -145,6 +147,12 @@ public:
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
     
+    // Semantic memory - gradually acquired knowledge
+    NeuralSemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - learned skills and habits
+    NeuralProceduralMemory* getProceduralMemory();
+    
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
@@ -187,11 +195,14 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Checkpoint system access
+    CheckpointManager* getCheckpointManager();
     
-    // Logging
-    void logStatus() const;
+    // Checkpoint helper functions for Brain::save/load integration
+    bool saveNeuronsToCheckpointData(NeuronCheckpointData& data) const;
+    bool saveSynapsesToCheckpointData(SynapseCheckpointData& data) const;
+    bool loadNeuronsFromCheckpointData(const NeuronCheckpointData& data);
+    bool loadSynapsesFromCheckpointData(const SynapseCheckpointData& data);
     
 private:
     struct Impl;
