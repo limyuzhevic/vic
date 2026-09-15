@@ -1,4 +1,7 @@
 #include "PredictionSystem.hpp"
+#include "../brain/Brain.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../sensory/SensoryInput.hpp"
 
 namespace nlm {
 
@@ -6,8 +9,11 @@ struct PredictionSystem::Impl {
     float predictionError;
     float confidence;
     std::vector<float> errorHistory;
+    // Integration with brain
+    Brain* brainContext;
+    NeuralWorkingMemory* memoryContext;
     
-    Impl() : predictionError(0.0f), confidence(0.5f) {}
+    Impl() : predictionError(0.0f), confidence(0.5f), brainContext(nullptr), memoryContext(nullptr) {}
 };
 
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
@@ -57,4 +63,30 @@ void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
 }
 
+void PredictionSystem::setInputProvider(SensoryInput* input) {
+    // Store input provider for integration
+    pImpl->inputProvider = input;
+}
+
+void PredictionSystem::setMemoryProvider(void* memory) {
+    // Store memory provider for integration
+    pImpl->memoryProvider = memory;
+}
+
+void PredictionSystem::integrateWithBrain(Brain* brain) {
+    // Connect prediction system with brain's sensory and memory systems
+    pImpl->brainContext = brain;
+    
+    // Get working memory from brain for integration
+    if (brain && brain->getWorkingMemory()) {
+        pImpl->memoryContext = brain->getWorkingMemory();
+    }
+    
+    // Enable prediction system updates during brain simulation
+    if (pImpl->brainContext) {
+        pImpl->brainContext->getPredictionSystem()->setInputProvider(this);
+    }
+}
+
 } // namespace nlm
+

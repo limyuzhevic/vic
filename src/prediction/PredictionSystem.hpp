@@ -33,10 +33,19 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+
+    // Connect prediction system to sensory input and memory
+    void setInputProvider(SensoryInput* input) { inputProvider_ = input; }
+    void setMemoryProvider(void* memory) { memoryProvider_ = memory; }
+    
+    // Helper to integrate with brain
+    void integrateWithBrain(Brain* brain);
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    SensoryInput* inputProvider_;
+    void* memoryProvider_;
 };
 
 } // namespace nlm
