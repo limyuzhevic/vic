@@ -1,5 +1,6 @@
 // Synapse Tests
 #include "brain/Synapse.hpp"
+#include "brain/Neuron.hpp"
 #include "core/Random/Random.hpp"
 #include <cassert>
 #include <iostream>
@@ -174,6 +175,91 @@ void testSynapsePlasticityFlags() {
     std::cout << "    testSynapsePlasticityFlags passed" << std::endl;
 }
 
+void testSynapseBiologicalParameterValidation() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    // Test biological parameter ranges
+    // Weight bounds
+    synapse.setWeight(2.0f);  // Should be clamped to 1.0f
+    assert(synapse.getWeight() <= 1.0f);
+    
+    synapse.setWeight(-2.0f);  // Should be clamped to -1.0f
+    assert(synapse.getWeight() >= -1.0f);
+    
+    // Efficacy bounds
+    synapse.setEfficacy(3.0f);  // Should be clamped to 2.0f
+    assert(synapse.getEfficacy() <= 2.0f);
+    
+    // Test biological constraints
+    synapse.setType(nlm::SynapseType::Excitatory);
+    synapse.initializeRandom(nlm::RandomGenerator(42));
+    
+    // Excitatory synapses should have positive weights
+    assert(synapse.getWeight() >= 0.0f);
+    
+    std::cout << "    testSynapseBiologicalParameterValidation passed" << std::endl;
+}
+
+void testSynapseShortTermPlasticity() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    // Test eligibility trace dynamics
+    synapse.setEligibilityTrace(0.8f);
+    synapse.decayEligibilityTrace(0.1f);
+    assert(synapse.getEligibilityTrace() < 0.8f);
+    assert(synapse.getEligibilityTrace() > 0.0f);
+    
+    // Test multiple decays
+    float trace1 = synapse.getEligibilityTrace();
+    synapse.decayEligibilityTrace(0.2f);
+    float trace2 = synapse.getEligibilityTrace();
+    assert(trace2 < trace1);
+    
+    std::cout << "    testSynapseShortTermPlasticity passed" << std::endl;
+}
+
+void testSynapseIntegrationWithNeurons() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Create neuron with specific properties
+    neuron.setMembranePotential(-65.0f);
+    neuron.setThreshold(-55.0f);
+    neuron.setRefractoryPeriod(10);
+    
+    // Synapse should be able to integrate with neuron
+    // For now, just verify the synapse and neuron can coexist
+    assert(synapse.getId().value == 1);
+    assert(neuron.getId().value == 1);
+    
+    // Test synapse recording with neuron spike
+    neuron.recordSpike(0.5);
+    assert(neuron.getSpikeHistory().size() == 1);
+    
+    std::cout << "    testSynapseIntegrationWithNeurons passed" << std::endl;
+}
+
+void testSynapseParameterInteractions() {
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    
+    // Test parameter interactions
+    // Change type and see how it affects other parameters
+    synapse.setType(nlm::SynapseType::Excitatory);
+    synapse.initializeRandom(nlm::RandomGenerator(42));
+    
+    float weight1 = synapse.getWeight();
+    
+    synapse.setType(nlm::SynapseType::Inhibitory);
+    synapse.initializeRandom(nlm::RandomGenerator(42));
+    
+    float weight2 = synapse.getWeight();
+    
+    // Inhibitory synapses should have negative weights (approximately)
+    assert(weight2 <= 0.0f);
+    
+    std::cout << "    testSynapseParameterInteractions passed" << std::endl;
+}
+
 void runAll() {
     std::cout << "Running Synapse tests..." << std::endl;
     testSynapseCreation();
@@ -187,6 +273,10 @@ void runAll() {
     testSynapseRandomInitialization();
     testSynapseReset();
     testSynapsePlasticityFlags();
+    testSynapseBiologicalParameterValidation();
+    testSynapseShortTermPlasticity();
+    testSynapseIntegrationWithNeurons();
+    testSynapseParameterInteractions();
 }
 
 } // namespace test_synapse

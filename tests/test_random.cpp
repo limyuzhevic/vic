@@ -129,6 +129,118 @@ void testSeed() {
     std::cout << "    testSeed passed" << std::endl;
 }
 
+void testStatisticalDistribution() {
+    nlm::RandomGenerator rng(42);
+    
+    // Chi-square test for uniform distribution
+    const int bins = 10;
+    const int samples = 10000;
+    std::vector<int> histogram(bins, 0);
+    
+    for (int i = 0; i < samples; ++i) {
+        double val = rng.uniformReal(0.0, 1.0);
+        int bin = static_cast<int>(val * bins);
+        if (bin == bins) bin = bins - 1; // Handle edge case
+        histogram[bin]++;
+    }
+    
+    // Expected count per bin
+    double expected = samples / static_cast<double>(bins);
+    double chiSquare = 0.0;
+    
+    for (int count : histogram) {
+        double diff = count - expected;
+        chiSquare += (diff * diff) / expected;
+    }
+    
+    // Chi-square statistic should be reasonable (less than 20 for 9 degrees of freedom)
+    assert(chiSquare < 20.0);
+    
+    std::cout << "    testStatisticalDistribution passed" << std::endl;
+}
+
+void testEdgeCases() {
+    nlm::RandomGenerator rng(42);
+    
+    // Test min/max bounds for various distributions
+    // Uniform int edge cases
+    assert(rng.uniformInt(0, 0) == 0); // Same min and max
+    assert(rng.uniformInt(100, 100) == 100);
+    
+    // Uniform real edge cases
+    assert(rng.uniformReal(0.0, 1.0) >= 0.0 && rng.uniformReal(0.0, 1.0) < 1.0);
+    assert(rng.uniformReal(-5.0, 5.0) >= -5.0 && rng.uniformReal(-5.0, 5.0) < 5.0);
+    
+    // Normal distribution edge cases
+    double val = rng.normal(0.0, 0.0); // Zero stddev
+    assert(val == 0.0);
+    
+    // Poisson distribution edge cases
+    uint32_t poissonVal = rng.poisson(0.0);
+    assert(poissonVal == 0);
+    
+    // Exponential distribution edge cases
+    double expVal = rng.exponential(1.0);
+    assert(expVal >= 0.0);
+    
+    // Test seed with zero
+    nlm::RandomGenerator rng2(0);
+    assert(rng2.getSeed() == 0);
+    
+    std::cout << "    testEdgeCases passed" << std::endl;
+}
+
+void testPerformance() {
+    nlm::RandomGenerator rng(42);
+    
+    // Performance test: generate many random numbers quickly
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    const int samples = 100000;
+    for (int i = 0; i < samples; ++i) {
+        // Mix different distribution types
+        rng.uniformInt(0, 100);
+        rng.uniformReal(0.0, 1.0);
+        rng.normal(0.0, 1.0);
+        rng.bernoulli(0.5);
+        rng.randomBool();
+        rng.pickRandomIndex(10);
+    }
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    
+    // Should complete 600,000 random operations quickly (less than 1 second)
+    assert(duration.count() < 1000);
+    
+    std::cout << "    testPerformance passed (" << duration.count() << "ms)" << std::endl;
+}
+
+void testGeneratorState() {
+    nlm::RandomGenerator rng(12345);
+    
+    // Generate some random numbers
+    std::vector<uint32_t> sequence1;
+    for (int i = 0; i < 10; ++i) {
+        sequence1.push_back(rng.uniformInt(0, 1000));
+    }
+    
+    // Reset and generate again
+    rng.seed(12345);
+    std::vector<uint32_t> sequence2;
+    for (int i = 0; i < 10; ++i) {
+        sequence2.push_back(rng.uniformInt(0, 1000));
+    }
+    
+    // Sequences should be identical
+    assert(sequence1 == sequence2);
+    
+    // After using generator, seed should preserve
+    assert(rng.getSeed() == 12345);
+    
+    std::cout << "    testGeneratorState passed" << std::endl;
+}
+
 void runAll() {
     testRandomGeneratorCreation();
     testUniformInt();
@@ -139,6 +251,10 @@ void runAll() {
     testPickRandomIndex();
     testShuffle();
     testSeed();
+    testStatisticalDistribution();
+    testEdgeCases();
+    testPerformance();
+    testGeneratorState();
 }
 
 } // namespace test_random

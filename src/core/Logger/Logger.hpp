@@ -6,6 +6,11 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <map>
+#include <mutex>
+#include <ctime>
+#include <iomanip>
+#include <algorithm>
 
 namespace nlm {
 
@@ -18,7 +23,28 @@ enum class LogLevel {
     Critical = 4
 };
 
-// Log entry structure
+// Structured log entry for advanced logging
+struct StructuredLogEntry {
+    std::chrono::system_clock::time_point timestamp;
+    LogLevel level;
+    std::string message;
+    std::string file;
+    int line;
+    std::string function;
+    std::map<std::string, std::string> fields;
+    std::string threadId;
+    
+    // Convert to JSON string
+    std::string toJSON() const;
+    
+    // Convert to YAML string
+    std::string toYAML() const;
+    
+    // Convert to human-readable format
+    std::string toHumanReadable() const;
+};
+
+// Log entry structure (backward compatibility)
 struct LogEntry {
     LogLevel level;
     std::string message;
@@ -28,13 +54,42 @@ struct LogEntry {
     std::chrono::system_clock::time_point timestamp;
 };
 
-// Logger interface
+// Logger interface with enhanced features
 class ILogger {
 public:
     virtual ~ILogger() = default;
+    
+    // Core logging methods
     virtual void log(const LogEntry& entry) = 0;
+    virtual void log(const StructuredLogEntry& entry) = 0;
+    
+    // Level control
     virtual void setLevel(LogLevel level) = 0;
     virtual LogLevel getLevel() const = 0;
+    
+    // Formatting options
+    virtual void setFormat(const std::string& format) { }
+    virtual void setTimestampFormat(const std::string& format) { }
+    virtual void setUseColors(bool useColors) { }
+    virtual bool getUseColors() const { return false; }
+    
+    // Output options
+    virtual void setOutputFile(const std::string& filepath) = 0;
+    virtual void closeOutputFile() = 0;
+    virtual bool isFileOutputEnabled() const = 0;
+    
+    // Log rotation
+    virtual void setMaxFileSize(size_t maxSize) { }
+    virtual void setMaxFileCount(size_t maxCount) { }
+    virtual void rotateLog() { }
+    
+    // Filtering
+    virtual void addFilter(std::function<bool(const LogEntry&)>) { }
+    virtual void clearFilters() { }
+    
+    // Special sinks
+    virtual void addPatternSink(const std::string& pattern, std::function<void(const LogEntry&)>) { }
+    virtual void addFieldSink(const std::string& field, std::function<void(const std::string&)>) { }
 };
 
 // Console logger implementation
@@ -44,17 +99,21 @@ public:
     explicit ConsoleLogger(LogLevel level);
     ~ConsoleLogger() override;
     
+    // Core logging interface
     void log(const LogEntry& entry) override;
+    void log(const StructuredLogEntry& entry) override;
+    
     void setLevel(LogLevel level) override;
     LogLevel getLevel() const override;
     
     // Enable/disable colors
-    void setUseColors(bool useColors);
-    bool getUseColors() const;
+    void setUseColors(bool useColors) override;
+    bool getUseColors() const override;
     
     // Set output file (in addition to console)
-    void setOutputFile(const std::string& filepath);
-    void closeOutputFile();
+    void setOutputFile(const std::string& filepath) override;
+    void closeOutputFile() override;
+    bool isFileOutputEnabled() const override;
     
 private:
     struct Impl;
@@ -74,17 +133,8 @@ public:
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
     
-    // Add logger sink
-    void addLogger(std::shared_ptr<ILogger> logger);
-    
-    // Remove all loggers
-    void clearLoggers();
-    
-    // Set minimum level for all loggers
-    void setLevel(LogLevel level);
-    
-    // Global logging functions
-    void log(LogLevel level, const std::string& message, 
+    // Enhanced logging methods
+    void log(LogLevel level, const std::string& message,
              const std::string& file = "", int line = 0, 
              const std::string& function = "");
     
@@ -103,7 +153,16 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
+    // Add logger sink
+    void addLogger(std::shared_ptr<ILogger> logger);
+    
+    // Remove all loggers
+    void clearLoggers();
+    
+    // Set minimum level for all loggers
+    void setLevel(LogLevel level);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

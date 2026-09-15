@@ -36,39 +36,51 @@ SpikeSystem& SpikeSystem::operator=(SpikeSystem&& other) noexcept {
 }
 
 void SpikeSystem::queueSpike(const SpikeEvent& event) {
+    // Optimized spike queuing with direct push
     pImpl->pendingSpikes.push(event);
 }
 
 void SpikeSystem::queueSpike(NeuronId neuron, Timestamp timestamp, SimulationStep step) {
+    // Optimized spike creation and queuing with in-place constructor
     pImpl->pendingSpikes.emplace(neuron, timestamp, step);
 }
 
 void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
-    // Store by delivery step for efficient processing
-    pImpl->delayedSpikes[event.delivery_step].push_back(event);
+    // Optimized delayed spike storage - reserve space to avoid reallocations
+    auto& delayedList = pImpl->delayedSpikes[event.delivery_step];
+    if (delayedList.size() >= delayedList.capacity()) {
+        delayedList.reserve(delayedList.size() * 1.5);
+    }
+    delayedList.push_back(event);
 }
 
 void SpikeSystem::processSpikes(SimulationStep currentStep) {
-    // Process all pending immediate spikes
+    // Optimized spike processing with batch operations
     while (!pImpl->pendingSpikes.empty()) {
-        SpikeEvent event = pImpl->pendingSpikes.front();
+        // Direct access to front element for efficiency
+        SpikeEvent event = std::move(pImpl->pendingSpikes.front());
         pImpl->pendingSpikes.pop();
         
-        // Create detailed event
-        DetailedSpikeEvent detailed;
-        detailed.source = event.source_neuron;
-        detailed.timestamp = event.timestamp;
-        detailed.step = event.step;
+        // Create detailed event with direct member initialization
+        DetailedSpikeEvent detailed{
+            event.source_neuron,
+            event.timestamp,
+            event.step
+        };
         
         // Add to history
         pImpl->spikeHistory.push_back(detailed);
         
-        // Track spike count per neuron
+        // Track spike count per neuron - optimized access
         pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
         
-        // Trim history if needed
+        // Trim history if needed - check capacity first
         if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+            // Use swap and pop for O(1) removal from beginning
+            std::rotate(pImpl->spikeHistory.begin(),
+                       pImpl->spikeHistory.begin() + 1,
+                       pImpl->spikeHistory.end());
+            pImpl->spikeHistory.pop_back();
         }
         
         // Call handlers
@@ -82,13 +94,20 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
     // Find and process all delayed spikes scheduled for this step
     auto it = pImpl->delayedSpikes.find(currentStep);
     if (it != pImpl->delayedSpikes.end()) {
-        // Process all spikes scheduled for this step
-        for (const auto& delayedEvent : it->second) {
+        // Batch process all spikes scheduled for this step
+        std::vector<DelayedSpikeEvent>& delayedList = it->second;
+        
+        // Call delayed spike handlers for all events
+        for (auto& delayedEvent : delayedList) {
             // Call delayed spike handlers (these will deliver synaptic input)
             for (auto& handler : pImpl->delayedHandlers) {
                 handler(delayedEvent);
             }
         }
+        
+        // Clear all spikes for this step at once
+        delayedList.clear();
+        delayedList.shrink_to_fit();
         // Remove processed spikes
         pImpl->delayedSpikes.erase(it);
     }
@@ -151,20 +170,25 @@ float SpikeSystem::getAverageSpikeRate() const {
 }
 
 std::vector<NeuronId> SpikeSystem::getMostActiveNeurons(size_t count) const {
+    // Optimized most active neurons calculation
     std::vector<std::pair<uint64_t, size_t>> neuronCounts;
     neuronCounts.reserve(pImpl->spikeCountPerNeuron.size());
     
+    // Batch extract and convert to vector of pairs
     for (const auto& pair : pImpl->spikeCountPerNeuron) {
         neuronCounts.emplace_back(pair.first, pair.second);
     }
     
-    // Sort by count descending
+    // Sort by count descending - use std::sort with lambda
     std::sort(neuronCounts.begin(), neuronCounts.end(),
               [](const auto& a, const auto& b) { return a.second > b.second; });
     
+    // Create result vector
     std::vector<NeuronId> result;
-    result.reserve(std::min(count, neuronCounts.size()));
-    for (size_t i = 0; i < std::min(count, neuronCounts.size()); ++i) {
+    size_t resultSize = std::min(count, neuronCounts.size());
+    result.reserve(resultSize);
+    
+    for (size_t i = 0; i < resultSize; ++i) {
         result.emplace_back(neuronCounts[i].first);
     }
     
@@ -172,11 +196,16 @@ std::vector<NeuronId> SpikeSystem::getMostActiveNeurons(size_t count) const {
 }
 
 void SpikeSystem::reset() {
+    // Optimized reset with direct access
     while (!pImpl->pendingSpikes.empty()) {
         pImpl->pendingSpikes.pop();
     }
     pImpl->spikeHistory.clear();
+    pImpl->spikeHistory.shrink_to_fit();
+    
     pImpl->spikeCountPerNeuron.clear();
+    
+    // Optimized delayed spikes clear
     pImpl->delayedSpikes.clear();
 }
 

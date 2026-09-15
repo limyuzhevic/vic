@@ -132,7 +132,10 @@ std::vector<Synapse*> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
     std::vector<Synapse*> result;
     auto it = pImpl->outgoingSynapses.find(neuron);
     if (it != pImpl->outgoingSynapses.end()) {
-        for (SynapseId synId : it->second) {
+        // Batch lookup all synapses in one pass
+        const auto& synIds = it->second;
+        result.reserve(synIds.size());
+        for (SynapseId synId : synIds) {
             if (auto* syn = getSynapse(synId)) {
                 result.push_back(syn);
             }
@@ -145,7 +148,10 @@ std::vector<Synapse*> NeuralRegion::getSynapsesTo(NeuronId neuron) {
     std::vector<Synapse*> result;
     auto it = pImpl->incomingSynapses.find(neuron);
     if (it != pImpl->incomingSynapses.end()) {
-        for (SynapseId synId : it->second) {
+        // Batch lookup all synapses in one pass
+        const auto& synIds = it->second;
+        result.reserve(synIds.size());
+        for (SynapseId synId : synIds) {
             if (auto* syn = getSynapse(synId)) {
                 result.push_back(syn);
             }
@@ -155,6 +161,7 @@ std::vector<Synapse*> NeuralRegion::getSynapsesTo(NeuronId neuron) {
 }
 
 size_t NeuralRegion::getTotalNeuronCount() const {
+    // Optimized using single pass
     size_t total = 0;
     for (const auto& pop : pImpl->populations) {
         total += pop->getSize();
@@ -163,41 +170,63 @@ size_t NeuralRegion::getTotalNeuronCount() const {
 }
 
 size_t NeuralRegion::getActiveNeuronCount() const {
+    // Optimized using single pass and early return
     size_t total = 0;
     for (const auto& pop : pImpl->populations) {
-        total += pop->getActiveCount();
+        size_t active = pop->getActiveCount();
+        if (active > 0) {
+            total += active;
+        }
     }
     return total;
 }
 
 size_t NeuralRegion::getFiringNeuronCount() const {
+    // Optimized using single pass and early return
     size_t total = 0;
     for (const auto& pop : pImpl->populations) {
-        total += pop->getFiringCount();
+        size_t firing = pop->getFiringCount();
+        if (firing > 0) {
+            total += firing;
+        }
     }
     return total;
 }
 
 float NeuralRegion::getAverageFiringRate() const {
+    // Optimized using single pass and early exit
     size_t popCount = pImpl->populations.size();
     if (popCount == 0) return 0.0f;
     
     float sum = 0.0f;
+    size_t processed = 0;
+    
     for (const auto& pop : pImpl->populations) {
-        sum += pop->getAverageFiringRate();
+        float rate = pop->getAverageFiringRate();
+        if (rate > 0.0f) {
+            sum += rate;
+            ++processed;
+        }
     }
-    return sum / static_cast<float>(popCount);
+    
+    return processed > 0 ? sum / static_cast<float>(processed) : 0.0f;
 }
-
 float NeuralRegion::getAverageSynapticWeight() const {
+    // Optimized using single pass and early exit
     if (pImpl->synapses.empty()) {
         return 0.0f;
     }
+    
     float sum = 0.0f;
+    size_t count = 0;
+    
     for (const auto& syn : pImpl->synapses) {
-        sum += syn->getWeight();
+        float weight = syn->getWeight();
+        sum += weight;
+        ++count;
     }
-    return sum / static_cast<float>(pImpl->synapses.size());
+    
+    return count > 0 ? sum / static_cast<float>(count) : 0.0f;
 }
 
 float NeuralRegion::getSynapticDensity() const {

@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <sstream>
 
 namespace nlm {
 
@@ -55,14 +56,43 @@ void Neuron::setType(NeuronType type) {
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
+    // Validate membrane potential bounds for biological plausibility
+    if (potential < -100.0f) {
+        // Clamp to reasonable biological lower bound
+        // NeuronError("Membrane potential below biological limit", 
+        //            ErrorCode::MembranePotentialOverflow, createContext(""));
+        // For now, just clamp without throwing exception to maintain stability
+        NLM_LOG_WARNING("Membrane potential " + std::to_string(potential) + 
+                       " below biological limit (-100mV)");
+    } else if (potential > 50.0f) {
+        // Clamp to reasonable biological upper bound
+        // NeuronError("Membrane potential above biological limit",
+        //            ErrorCode::MembranePotentialOverflow, createContext(""));
+        NLM_LOG_WARNING("Membrane potential " + std::to_string(potential) + 
+                       " above biological limit (50mV)");
+    }
     pImpl->state.membranePotential = potential;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
+    // Validate after applying delta
+    MembranePotential newPotential = pImpl->state.membranePotential + delta;
+    if (newPotential < -100.0f || newPotential > 50.0f) {
+        NLM_LOG_WARNING("Membrane potential would exceed biological bounds after delta of " + 
+                       std::to_string(delta) + "mV");
+    }
     pImpl->state.membranePotential += delta;
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
+    // Validate threshold is within reasonable bounds
+    if (threshold < -90.0f) {
+        NLM_LOG_WARNING("Threshold " + std::to_string(threshold) + 
+                       " below typical biological range (-90mV to -30mV)");
+    } else if (threshold > 0.0f) {
+        NLM_LOG_WARNING("Threshold " + std::to_string(threshold) + 
+                       " above typical biological range (max 0mV)");
+    }
     pImpl->state.threshold = threshold;
 }
 
@@ -80,10 +110,30 @@ void Neuron::decrementRefractory() {
 }
 
 void Neuron::setFiringRate(FiringRate rate) {
+    // Validate firing rate is non-negative
+    if (rate < 0.0f) {
+        NLM_LOG_WARNING("Negative firing rate " + std::to_string(rate) + 
+                       " set to 0");
+        pImpl->state.firingRate = 0.0f;
+        return;
+    }
+    if (rate > 1000.0f) {
+        NLM_LOG_WARNING("Extremely high firing rate " + std::to_string(rate) + 
+                       ".Hz");
+    }
     pImpl->state.firingRate = rate;
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
+    // Validate leak conductance is positive
+    if (conductance < 0.0f) {
+        NLM_LOG_WARNING("Negative leak conductance " + std::to_string(conductance) + 
+                       " set to 0.1 nS");
+        pImpl->state.leakConductance = 0.1f;
+    } else if (conductance > 100.0f) {
+        NLM_LOG_WARNING("Extremely high leak conductance " + std::to_string(conductance) + 
+                       " nS");
+    }
     pImpl->state.leakConductance = conductance;
 }
 
@@ -92,6 +142,14 @@ MembranePotential Neuron::getLeakConductance() const {
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
+    // Validate refractory period
+    if (steps > 1000) {
+        NLM_LOG_WARNING("Extremely long refractory period " + std::to_string(steps) + 
+                       " steps (max 1000)");
+        pImpl->state.refractoryPeriod = 1000;
+    } else if (steps == 0) {
+        NLM_LOG_WARNING("Zero refractory period may cause instability");
+    }
     pImpl->state.refractoryPeriod = steps;
 }
 
@@ -100,6 +158,14 @@ uint32_t Neuron::getRefractoryPeriod() const {
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
+    // Validate resting potential is within typical biological range
+    if (potential < -90.0f) {
+        NLM_LOG_WARNING("Resting potential " + std::to_string(potential) + 
+                       " below typical range (-90mV to -50mV)");
+    } else if (potential > -20.0f) {
+        NLM_LOG_WARNING("Resting potential " + std::to_string(potential) + 
+                       " above typical range (min -20mV)");
+    }
     pImpl->state.restingPotential = potential;
 }
 
@@ -108,6 +174,14 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
+    // Validate reset potential
+    if (potential < -100.0f) {
+        NLM_LOG_WARNING("Reset potential " + std::to_string(potential) + 
+                       " below biological limit (-100mV)");
+    } else if (potential > 0.0f) {
+        NLM_LOG_WARNING("Reset potential " + std::to_string(potential) + 
+                       " above biological limit (max 0mV)");
+    }
     pImpl->state.resetPotential = potential;
 }
 
@@ -122,12 +196,20 @@ float Neuron::getLastSpikeTime() const {
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
+    if (amplitude < 0.0f) {
+        NLM_LOG_WARNING("Negative excitatory input amplitude " + std::to_string(amplitude) + 
+                       " - may indicate inhibition or error");
+    }
     pImpl->synapticInput += amplitude;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
+    if (amplitude < 0.0f) {
+        NLM_LOG_WARNING("Negative inhibitory input amplitude " + std::to_string(amplitude) + 
+                       " - may indicate excitatory input or error");
+    }
     pImpl->synapticInput -= amplitude;
 }
 
@@ -140,6 +222,10 @@ void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
+    if (current < -100.0f || current > 100.0f) {
+        NLM_LOG_WARNING("Large current injection " + std::to_string(current) + 
+                       " mV - may indicate error or extreme input");
+    }
     pImpl->synapticInput += current;
 }
 
@@ -148,6 +234,12 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
+    // Validate timestamp is reasonable (not in the future)
+    if (timestamp < 0.0f) {
+        NLM_LOG_WARNING("Negative spike timestamp " + std::to_string(timestamp) + 
+                       " - may indicate initialization issue");
+    }
+    
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());

@@ -18,6 +18,9 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "cli/CLIParser.hpp"
+#include "performance/PerformanceMonitor.hpp"
+#include "cli/ConfigDiff.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,6 +28,13 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <chrono>
+#include <thread>
+#include <sys/sysinfo.h>
+#include <unistd.h>
 
 using namespace nlm;
 
@@ -322,38 +332,80 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Parse command line arguments
+    nlm::CLIParser cliParser;
+    nlm::CLIOptions cliOptions;
+    
+    std::cout << "NLM CLI Version 2.0.0" << std::endl;
+    
+    if (!cliParser.parse(argc, argv, cliOptions)) {
+        std::cerr << "Error: " << cliParser.getError() << std::endl;
+        if (cliOptions.help || cliOptions.version) {
+            // Already displayed by CLIParser
+            return cliOptions.help ? 0 : 1;
+        }
+        return 1;
+    }
+    
+    // Display help if requested
+    if (cliOptions.help) {
+        cliParser.printHelp("nlm");
+        return 0;
+    }
+    
+    // Display version if requested
+    if (cliOptions.version) {
+        cliParser.printVersion();
+        return 0;
+    }
+    
+    // Initialize performance monitor
+    nlm::PerformanceMonitor perfMonitor;
+    perfMonitor.setEnabled(cliOptions.performanceMode > 0);
+    perfMonitor.setMode(cliOptions.performanceMode);
+    perfMonitor.setOutputFormat(cliOptions.outputFormat);
+    
+    // Start main timer
+    perfMonitor.startTimer("main");
+    
+    // Print banner
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    // Initialize logger with CLI options
+    auto logger = std::make_shared<nlm::Logger>();
+    nlm::LogLevel logLevel;
     
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    if (cliOptions.logLevel == "debug") logLevel = nlm::LogLevel::Debug;
+    else if (cliOptions.logLevel == "info") logLevel = nlm::LogLevel::Info;
+    else if (cliOptions.logLevel == "warning") logLevel = nlm::LogLevel::Warning;
+    else if (cliOptions.logLevel == "error") logLevel = nlm::LogLevel::Error;
+    else if (cliOptions.logLevel == "critical") logLevel = nlm::LogLevel::Critical;
+    else logLevel = nlm::LogLevel::Info;
+    
+    auto consoleLogger = std::make_shared<nlm::ConsoleLogger>(logLevel);
+    
+    // Set output file if specified
+    if (!cliOptions.logFile.empty()) {
+        consoleLogger->setOutputFile(cliOptions.logFile);
+    }
+    
     logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
+    nlm::Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    // Initialize performance system
+    if (cliOptions.performanceMode > 0) {
+        std::cout << "Performance monitoring enabled (mode: " << cliOptions.performanceMode << ")" << std::endl;
+    }
+    
+    std::cout << "Initializing NLM Phase 2 Real Neural Computation..." << std::endl;
     
     // Load configuration
-    auto config = std::make_shared<Config>();
+    auto config = std::make_shared<nlm::Config>();
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
+    if (!cliOptions.configFile.empty()) {
+        configFile = cliOptions.configFile;
     }
     
     // Load config from file (ignore if not found)
@@ -361,26 +413,55 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
+        std::string error = config->getLastError();
+        if (!error.empty()) {
+            NLM_LOG_WARNING("Load failed: " + error);
+        }
     }
     
-    // Override with command line args
+    // Override with command line args (including custom args)
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Apply custom args from CLI parser
+    for (const auto& pair : cliOptions.customArgs) {
+        config->set(pair.first, pair.second, nlm::ConfigSource::CommandLine);
+    }
+    
+    // Set default values for Phase 2 (unless overridden)
+    if (!config->has("random_seed")) {
+        config->set("random_seed", static_cast<int64_t>(42), nlm::ConfigSource::Default);
+    }
+    if (!config->has("simulation_timestep")) {
+        config->set("simulation_timestep", 0.001, nlm::ConfigSource::Default);
+    }
+    if (!config->has("neuron_count")) {
+        config->set("neuron_count", static_cast<int64_t>(500), nlm::ConfigSource::Default);  // Smaller for faster test
+    }
+    if (!config->has("region_count")) {
+        config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    }
+    if (!config->has("connection_probability")) {
+        config->set("connection_probability", 0.15f, nlm::ConfigSource::Default);
+    }
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    if (!config->has("stdp_ltp_weight")) {
+        config->set("stdp_ltp_weight", 0.02f, nlm::ConfigSource::Default);
+    }
+    if (!config->has("stdp_ltd_weight")) {
+        config->set("stdp_ltd_weight", 0.015f, nlm::ConfigSource::Default);
+    }
+    if (!config->has("stdp_tau")) {
+        config->set("stdp_tau", 20.0f, nlm::ConfigSource::Default);
+    }
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    if (!config->has("synaptogenesis_rate")) {
+        config->set("synaptogenesis_rate", 0.0001f, nlm::ConfigSource::Default);
+    }
+    if (!config->has("pruning_rate")) {
+        config->set("pruning_rate", 0.00001f, nlm::ConfigSource::Default);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -394,13 +475,13 @@ int main(int argc, char** argv) {
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
+    nlm::SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
     // Initialize brain
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
+    auto brain = std::make_shared<nlm::Brain>(config);
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
@@ -409,14 +490,18 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
+    // Run experiments based on configuration
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Starting Experiments ===");
+    
+    // Test 1: Basic connectivity
     runBasicConnectivityTest(brain);
     
     // Reset brain for plasticity experiment
     brain->reset();
     brain->initialize();
     
-    // Run Test 2: Plasticity learning experiment
+    // Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
     // Reset and run Test 3: STDP verification
@@ -428,6 +513,93 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
+    
+    // Stop main timer and print performance report
+    double mainTime = perfMonitor.stopTimer("main");
+    perfMonitor.printReport();
+    
+    // Format and output final results
+    nlm::OutputFormatter formatter;
+    std::string outputContent;
+    
+    // Build output based on format
+    if (cliOptions.outputFormat == "json") {
+        // Build JSON output
+        nlohmann::json jsonOutput;
+        jsonOutput["experiment_name"] = cliOptions.experimentName;
+        jsonOutput["plugins"] = cliOptions.plugins;
+        jsonOutput["config_file"] = cliOptions.configFile;
+        jsonOutput["log_level"] = cliOptions.logLevel;
+        jsonOutput["debug_mode"] = cliOptions.debug;
+        jsonOutput["verbose"] = cliOptions.verbose;
+        jsonOutput["quiet"] = cliOptions.quiet;
+        jsonOutput["performance_mode"] = cliOptions.performanceMode;
+        jsonOutput["max_memory_mb"] = cliOptions.maxMemory;
+        jsonOutput["timeout_seconds"] = cliOptions.timeout;
+        
+        // Add custom args
+        if (!cliOptions.customArgs.empty()) {
+            jsonOutput["custom_args"] = cliOptions.customArgs;
+        }
+        
+        outputContent = jsonOutput.dump(2);
+    } else if (cliOptions.outputFormat == "yaml") {
+        // Build YAML output (simplified)
+        std::stringstream yamlOutput;
+        yamlOutput << "experiment: " << (cliOptions.experimentName.empty() ? "(default)" : cliOptions.experimentName) << std::endl;
+        yamlOutput << "plugins:" << std::endl;
+        for (const auto& plugin : cliOptions.plugins) {
+            yamlOutput << "  - " << plugin << std::endl;
+        }
+        yamlOutput << "config_file: " << cliOptions.configFile << std::endl;
+        yamlOutput << "log_level: " << cliOptions.logLevel << std::endl;
+        yamlOutput << "debug_mode: " << std::boolalpha << cliOptions.debug << std::endl;
+        yamlOutput << "verbose: " << std::boolalpha << cliOptions.verbose << std::endl;
+        yamlOutput << "quiet: " << std::boolalpha << cliOptions.quiet << std::endl;
+        yamlOutput << "performance_mode: " << cliOptions.performanceMode << std::endl;
+        yamlOutput << "max_memory_mb: " << cliOptions.maxMemory << std::endl;
+        yamlOutput << "timeout_seconds: " << cliOptions.timeout;
+        
+        outputContent = yamlOutput.str();
+    } else {
+        // Human-readable output
+        std::stringstream humanOutput;
+        humanOutput << "=== NLM Execution Summary ===" << std::endl;
+        humanOutput << std::endl;
+        humanOutput << "Experiment: " << (cliOptions.experimentName.empty() ? "(default)" : cliOptions.experimentName) << std::endl;
+        humanOutput << "Config File: " << cliOptions.configFile << std::endl;
+        humanOutput << "Log Level: " << cliOptions.logLevel << std::endl;
+        humanOutput << "Debug Mode: " << (cliOptions.debug ? "Enabled" : "Disabled") << std::endl;
+        humanOutput << "Verbose: " << (cliOptions.verbose ? "Enabled" : "Disabled") << std::endl;
+        humanOutput << "Quiet: " << (cliOptions.quiet ? "Enabled" : "Disabled") << std::endl;
+        humanOutput << "Performance Mode: " << cliOptions.performanceMode << std::endl;
+        humanOutput << "Max Memory: " << cliOptions.maxMemory << " MB" << std::endl;
+        humanOutput << "Timeout: " << cliOptions.timeout << " seconds" << std::endl;
+        
+        if (!cliOptions.plugins.empty()) {
+            humanOutput << std::endl << "Loaded Plugins:" << std::endl;
+            for (const auto& plugin : cliOptions.plugins) {
+                humanOutput << "  • " << plugin << std::endl;
+            }
+        }
+        
+        humanOutput << std::endl << "=== Configuration Summary ===" << std::endl;
+        humanOutput << "See log file for detailed configuration information." << std::endl;
+        
+        outputContent = humanOutput.str();
+    }
+    
+    // Output formatted results
+    formatter.setOutputFormat(cliOptions.outputFormat);
+    std::cout << formatter.formatConsole(outputContent, cliOptions) << std::endl;
+    
+    // Log final status
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Execution Summary ===");
+    NLM_LOG_INFO("Experiment completed successfully.");
+    NLM_LOG_INFO("Main execution time: " + std::to_string(mainTime) + " seconds");
+    NLM_LOG_INFO("Output format: " + cliOptions.outputFormat);
+    NLM_LOG_INFO("Configuration processed and experiments executed.");
     
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Phase 2 Complete ===");
