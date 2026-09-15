@@ -511,8 +511,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state from working memory (sensory input patterns)
+        if (pImpl->workingMemory) {
+            std::vector<float> sensoryPattern = pImpl->workingMemory->retrieve();
+            if (!sensoryPattern.empty()) {
+                // Convert to SensoryInput format
+                SensoryInput sensoryInput;
+                sensoryInput.setData(sensoryPattern);
+                
+                // Update prediction based on current state
+                pImpl->predictionSystem->train(sensoryInput);
+                
+                // Get prediction error to affect neuromodulation
+                float predictionError = pImpl->predictionSystem->getPredictionError();
+                
+                // Apply prediction error to neuromodulators
+                if (pImpl->predictionError) {
+                    pImpl->predictionError->setError(predictionError);
+                }
+                
+                // Update curiosity based on prediction error
+                if (pImpl->curiosity) {
+                    float curiosityLevel = predictionError * 2.0f + (pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f);
+                    pImpl->curiosity->setLevel(std::clamp(curiosityLevel, 0.0f, 1.0f));
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +548,39 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Apply neuromodulation effects on attention
+        if (pImpl->dopamine) {
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            // Dopamine enhances attention to rewarding stimuli
+            // This is a simplified integration
+        }
+        
+        if (pImpl->novelty) {
+            float noveltyLevel = pImpl->novelty->getLevel();
+            // Novelty enhances bottom-up attention
+            pImpl->attention->applyBottomUpSalience(0, noveltyLevel * 2.0f);
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Extract current concept from working memory patterns
+        std::vector<float> currentPattern = pImpl->workingMemory->retrieve();
+        std::vector<float> features;
+        
+        // Create features from working memory activation (simplified)
+        for (float activation : currentPattern) {
+            features.push_back(activation > 0.5f ? 1.0f : 0.0f); // Binary features
+        }
+        
+        // Get reward from neuromodulators
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Present experience to concept formation system
+        if (!features.empty()) {
+            pImpl->conceptFormation->presentExperience(currentPattern, features, reward, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -765,9 +816,34 @@ bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
+        // Use the checkpoint manager from pImpl
+        if (!pImpl->checkpointManager) {
+            NLM_LOG_ERROR("Checkpoint manager not initialized");
+            return false;
+        }
+        
+        // Configure checkpoint manager
+        std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+        
+        // Create checkpoint
+        std::string filename = pImpl->checkpointManager->createCheckpoint("brain");
+        if (filename.empty()) {
+            NLM_LOG_ERROR("Failed to create checkpoint filename");
+            return false;
+        }
+        
+        // If checkpoint manager can write directly, use it
+        // Otherwise, use our implementation
+        if (pImpl->checkpointManager->writeBrainState(*this)) {
+            NLM_LOG_INFO("Brain state saved successfully via checkpoint manager");
+            return true;
+        }
+        
+        // Fallback to original implementation
         CheckpointWriter writer;
-        if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+        if (!writer.create(filename, CompressionLevel::Balanced)) {
+            NLM_LOG_ERROR("Failed to create checkpoint file: " + filename);
             return false;
         }
         
@@ -828,13 +904,21 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write memory states
+        if (pImpl->workingMemory) {
+            // TODO: Write working memory state
+        }
+        if (pImpl->episodicMemory) {
+            // TODO: Write episodic memory state
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
             return false;
         }
         
-        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
+        NLM_LOG_INFO("Brain state saved successfully via fallback implementation (" + std::to_string(writer.getBytesWritten()) + " bytes)");
         return true;
         
     } catch (const std::exception& e) {
@@ -847,6 +931,23 @@ bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
     try {
+        // Use the checkpoint manager from pImpl
+        if (!pImpl->checkpointManager) {
+            NLM_LOG_ERROR("Checkpoint manager not initialized");
+            return false;
+        }
+        
+        // Configure checkpoint manager
+        std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+        
+        // Try to load via checkpoint manager first
+        if (pImpl->checkpointManager->readBrainState(*this)) {
+            NLM_LOG_INFO("Brain state loaded successfully via checkpoint manager");
+            return true;
+        }
+        
+        // Fallback to original implementation
         CheckpointReader reader;
         if (!reader.open(filepath)) {
             NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
@@ -857,6 +958,9 @@ bool Brain::load(const std::string& filepath) {
             NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
             return false;
         }
+        
+        // Reset brain first
+        reset();
         
         // Read neurons
         NeuronCheckpointData neuronData;
@@ -895,9 +999,20 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states
+        idx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                if (idx < synapseData.weight.size()) {
+                    syn->setWeight(synapseData.weight[idx]);
+                    syn->setDelay(synapseData.delay[idx]);
+                    if (idx < synapseData.eligibilityTrace.size()) {
+                        // synapses don't have setEligibilityTrace method, skip
+                    }
+                }
+                idx++;
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
