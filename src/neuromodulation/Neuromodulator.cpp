@@ -37,8 +37,9 @@ float Dopamine::getPlasticityFactor() const {
 
 void Dopamine::update(TimestepDuration dt) {
     // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // PLACEHOLDER: Decay towards baseline with proper time unit conversion
+    // Convert timestep from simulation steps to seconds (assuming 1ms per step)
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt) * 0.001f);
 }
 
 void Dopamine::signalReward(float reward) {

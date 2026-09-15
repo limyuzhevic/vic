@@ -1,6 +1,10 @@
+// Add missing forward declarations and includes
 #include "Neuron.hpp"
+#include "../core/Types/Types.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
+#include <algorithm>
+#include <vector>
 #include <algorithm>
 
 namespace nlm {

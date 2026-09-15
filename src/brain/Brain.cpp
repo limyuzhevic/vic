@@ -49,6 +49,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -80,7 +83,6 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -93,18 +95,16 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
+        // Fix memory leak issue: remove dangling rng(nullptr) initialization
+// Change from: rng(nullptr)
+// To: Remove - std::unique_ptr handles this automatically
+
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
         rng = std::make_unique<RandomGenerator>(seed);
-        
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
@@ -129,6 +129,14 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        // Add missing neuromodulators
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
+        // Add missing neuromodulators
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -259,7 +267,7 @@ bool Brain::initialize() {
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
     
-    // Register spike handlers for event-driven processing
+        // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
         // Count spikes
         ++pImpl->totalSpikesThisStep;
@@ -346,10 +354,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
                 // Check if neuron just fired this step
-                const auto& state = neuron->getState();
-                bool justFired = (state.firingState == FiringState::Refractory &&
+                // Fix: Check if neuron is active (firing state) rather than refractory
+                // Neurons transition from Resting -> Active -> Refractory when they fire
+                bool justFired = (state.firingState == FiringState::Active &&
                                  state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 1.5f);
 
                 if (justFired) {
                     // Neuron fired this step - queue the spike
@@ -955,14 +964,12 @@ void Brain::addInterRegionConnection(RegionId source, RegionId target, float wei
 }
 
 void Brain::removeInterRegionConnection(RegionId source, RegionId target) {
-    pImpl->interRegionConnections.erase(
-        std::remove_if(pImpl->interRegionConnections.begin(),
-                      pImpl->interRegionConnections.end(),
-                      [source, target](const InterRegionConnection& conn) {
-                          return conn.sourceRegion == source && conn.targetRegion == target;
-                      }),
-        pImpl->interRegionConnections.end()
-    );
+    auto newEnd = std::remove_if(pImpl->interRegionConnections.begin(),
+                                 pImpl->interRegionConnections.end(),
+                                 [source, target](const InterRegionConnection& conn) {
+                                     return conn.sourceRegion == source && conn.targetRegion == target;
+                                 });
+    pImpl->interRegionConnections.erase(newEnd, pImpl->interRegionConnections.end());
 }
 
 size_t Brain::getTotalNeuronCount() const {

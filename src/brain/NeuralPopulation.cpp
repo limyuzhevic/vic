@@ -11,7 +11,7 @@ struct NeuralPopulation::Impl {
     NeuronType neuronType;
     std::vector<MembranePotential> membranePotentials;  // for statistics
     
-    Impl(PopulationId id, size_t size) : id(id), size(size), neuronType(NeuronType::Internal) {}
+    Impl(PopulationId id, size_t size) : id(id), size(0), neuronType(NeuronType::Internal) {}
 };
 
 NeuralPopulation::NeuralPopulation(PopulationId id, size_t size) : pImpl(new Impl(id, size)) {}

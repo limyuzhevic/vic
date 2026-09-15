@@ -54,6 +54,9 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->weight = 0.0f;
     pImpl->delay = 1;  // Default: 1 step delay
     pImpl->type = SynapseType::Excitatory;
+    pImpl->plasticityFlags.hebbian = false;
+    pImpl->plasticityFlags.stdp = false;
+    pImpl->plasticityFlags.reward_modulated = false;
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
     pImpl->shortTermDepression = 1.0f;
@@ -162,6 +165,10 @@ void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
     pImpl->plasticityFlags.hebbian = hebbian;
     pImpl->plasticityFlags.stdp = stdp;
     pImpl->plasticityFlags.reward_modulated = rewardModulated;
+}
+
+void Synapse::setPlasticityFlags(const PlasticityFlags& flags) {
+    pImpl->plasticityFlags = flags;
 }
 
 const PlasticityFlags& Synapse::getPlasticityFlags() const {

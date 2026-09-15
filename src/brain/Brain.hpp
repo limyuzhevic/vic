@@ -27,7 +27,43 @@ class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
 class Novelty;
+class Neuromodulator;
 class PredictionError;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+class DetailedSpikeEvent;
+class DelayedSpikeEvent;
+class CheckpointManager;
+class CheckpointWriter;
+class CheckpointReader;
+class Neuron;
+class Synapse;
+class NeuralPopulation;
+class NeuronId;
+class SynapseId;
+class PopulationId;
+class RegionId;
+class SynapticWeight;
+class Delay;
+class SynapseType;
+class PlasticityFlags;
+class FiringState;
+class MembranePotential;
+class SimulationStep;
+class Timestamp;
+class TimestepDuration;
+class DevelopmentalStage;
+class Action;
+class ActionType;
+class SensoryInput;
+class Neuromodulator;
+class NeuronCheckpointData;
+class SynapseCheckpointData;
+class CompressionLevel;
+
+// DetailedSpikeEvent and DelayedSpikeEvent are defined in SpikeSystem.hpp, already included
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
