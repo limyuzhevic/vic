@@ -895,9 +895,38 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states by finding matching synapses in regions
+        // This is complex but necessary for proper checkpoint restoration
+        size_t matchedSynapses = 0;
+        for (size_t i = 0; i < synapseData.weight.size() && i < synapseData.sourceNeuron.size() && 
+                   i < synapseData.destinationNeuron.size() && i < synapseData.isExcitatory.size(); ++i) {
+            NeuronId source = synapseData.sourceNeuron[i];
+            NeuronId destination = synapseData.destinationNeuron[i];
+            SynapticWeight weight = synapseData.weight[i];
+            bool isExcitatory = synapseData.isExcitatory[i];
+            Delay delay = synapseData.delay.size() > i ? synapseData.delay[i] : 1;
+            
+            // Find a matching synapse in regions and update its state
+            bool found = false;
+            for (auto& region : pImpl->regions) {
+                auto synapses = region->getSynapses();
+                for (auto* synapse : synapses) {
+                    if (synapse->getSourceNeuron() == source && 
+                        synapse->getDestinationNeuron() == destination) {
+                        synapse->setWeight(weight);
+                        synapse->setDelay(delay);
+                        // TODO: Update other synapse properties if available
+                        matchedSynapses++;
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) break;
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses, " +
+                    std::to_string(matchedSynapses) + " matched and restored");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
