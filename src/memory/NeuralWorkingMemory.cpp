@@ -44,11 +44,15 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+        auto* region = brain_->getRegion(neuron.getId() / 1000);
+        if (region) {
+            auto neurons = region->getAllNeurons();
+            if (neurons) {
+                for (auto* nn : *neurons) {
+                    if (nn && nn->getId() == neuron) {
+                        nn->injectCurrent(activation * 5.0f);
+                        break;
+                    }
                 }
             }
         }
@@ -65,7 +69,12 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     
     // Create maintenance connections if needed
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+        // Check if both neurons exist before creating connection
+        auto* fromRegion = brain_->getRegion(memoryNeurons_[i-1].getId() / 1000);
+        auto* toRegion = brain_->getRegion(memoryNeurons_[i].getId() / 1000);
+        if (fromRegion && toRegion) {
+            createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+        }
     }
 }
 
