@@ -47,6 +47,12 @@ struct Phase6IntegrationResult {
     float curiosityLevel;
     float dopamineLevel;
     
+    // Prediction system metrics
+    float predictionError;
+    float predictionConfidence;
+    float predictionErrorSignal;
+    size_t workingMemoryActiveTraces;
+    
     // Timestamps
     time_t startTime;
     time_t endTime;
@@ -67,6 +73,10 @@ struct Phase6IntegrationResult {
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
         , dopamineLevel(0.0f)
+        , predictionError(0.0f)
+        , predictionConfidence(0.0f)
+        , predictionErrorSignal(0.0f)
+        , workingMemoryActiveTraces(0)
         , startTime(0)
         , endTime(0)
         , totalWallClockTime(0.0) {}

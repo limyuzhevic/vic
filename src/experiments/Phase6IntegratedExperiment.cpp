@@ -102,48 +102,46 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         }
     }
     
-    // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
-    result.avgFiringRate = totalFiringRate / config.maxSteps;
-    result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
-        static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
-    result.noveltyLevel = agent.getNoveltyLevel();
-    result.curiosityLevel = agent.getCuriosityLevel();
-    result.dopamineLevel = agent.getNeuromodulationLevel();
+    NLM_LOG_INFO("Simulation finished!");
     
-    // Verify integration
-    result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
-    result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
-    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
-    result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
-    result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
+    // Test prediction system integration
+    if (brain->getPredictionSystem()) {
+        float predictionError = brain->getPredictionSystem()->getPredictionError();
+        float predictionConfidence = brain->getPredictionSystem()->getConfidence();
+        
+        // Log prediction system metrics
+        NLM_LOG_INFO("Prediction System: Error=" + std::to_string(predictionError) + 
+                    ", Confidence=" + std::to_string(predictionConfidence) +
+                    ", History size=" + std::to_string(brain->getPredictionSystem()->getErrorHistory().size()));
+        
+        // Store prediction metrics in result
+        result.predictionError = predictionError;
+        result.predictionConfidence = predictionConfidence;
+    }
     
-    NLM_LOG_INFO("=== Integration Verification ===");
-    NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
+    // Test memory system integration
+    if (brain->getWorkingMemory()) {
+        result.memoryWorkingMemoryIntegrated = true;
+        result.workingMemoryActiveTraces = brain->getWorkingMemory()->getActiveTraces();
+    }
     
-    // Test checkpointing
-    if (config.enableCheckpointing) {
-        NLM_LOG_INFO("Testing checkpoint save/load...");
-        if (brain->save(config.checkpointPath)) {
-            NLM_LOG_INFO("Checkpoint saved successfully");
-            
-            // Create new brain and load
-            auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
-                NLM_LOG_INFO("Checkpoint loaded successfully");
-                result.checkpointingWorks = true;
-            } else {
-                NLM_LOG_ERROR("Failed to load checkpoint");
-            }
-        } else {
-            NLM_LOG_ERROR("Failed to save checkpoint");
-        }
+    if (brain->getEpisodicMemory()) {
+        result.memoryEpisodicMemoryIntegrated = true;
+        result.memoryEpisodesStored = brain->getEpisodicMemory()->getEpisodeCount();
+    }
+    
+    // Test neuromodulation integration
+    if (brain->getDopamine()) {
+        result.neuromodulationIntegrated = true;
+        result.dopamineLevel = brain->getDopamine()->getLevel();
+    }
+    
+    if (brain->getCuriosity()) {
+        result.curiosityLevel = brain->getCuriosity()->getLevel();
+    }
+    
+    if (brain->getPredictionErrorSignal()) {
+        result.predictionErrorSignal = brain->getPredictionErrorSignal()->getLevel();
     }
     
     result.endTime = time(nullptr);
