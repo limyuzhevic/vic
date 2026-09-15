@@ -19,16 +19,24 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Check if file exists before attempting to open
+    if (!std::filesystem::exists(filepath)) {
+        NLM_LOG_WARNING("Configuration file not found: " + filepath);
+        return false;
+    }
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
+    int parsedLines = 0;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +49,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key
+            if (key.empty()) {
+                NLM_LOG_WARNING("Empty key found in config file: " + filepath + " at line " + std::to_string(lineNumber));
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -49,10 +63,14 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+            parsedLines++;
+        } else {
+            NLM_LOG_WARNING("Invalid line format in config file: " + filepath + " at line " + std::to_string(lineNumber));
         }
     }
     
-    return true;
+    NLM_LOG_INFO("Configuration loaded from " + filepath + " (" + std::to_string(parsedLines) + " entries parsed)");
+    return !pImpl->entries.empty(); // Return true if at least one entry was parsed
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

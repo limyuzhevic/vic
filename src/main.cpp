@@ -353,6 +353,20 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--enable-performance-logging") {
+            enablePerformanceLogging = true;
+        } else if (arg == "--save-checkpoints") {
+            saveCheckpoints = true;
+        } else if (arg == "--debug-mode") {
+            enableDebugMode = true;
+        } else if (arg.find("--checkpoint-dir=") != std::string::npos) {
+            checkpointDir = arg.substr(arg.find("=") + 1);
+        } else if (arg.find("--checkpoint-interval=") != std::string::npos) {
+            checkpointInterval = std::stoul(arg.substr(arg.find("=") + 1));
+        } else if (arg.find("--random-seed=") != std::string::npos) {
+            config->set("random_seed", std::stoll(arg.substr(arg.find("=") + 1)), ConfigSource::CommandLine);
+        } else if (arg.find("--neuron-count=") != std::string::npos) {
+            config->set("neuron_count", std::stoll(arg.substr(arg.find("=") + 1)), ConfigSource::CommandLine);
         }
     }
     
@@ -392,12 +406,29 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
+    // Check for advanced options
+    bool enablePerformanceLogging = config->getOr<bool>("simulation.performance_logging", false);
+    bool saveCheckpoints = config->getOr<bool>("simulation.save_checkpoints", false);
+    std::string checkpointDir = config->getOr<std::string>("simulation.checkpoint_dir", "checkpoints");
+    size_t checkpointInterval = config->getOr<size_t>("simulation.checkpoint_interval", 1000);
+    bool enableDebugMode = config->getOr<bool>("simulation.debug_mode", false);
+    
+    NLM_LOG_INFO("Advanced Options:");
+    NLM_LOG_INFO("  Performance logging: " + std::string(enablePerformanceLogging ? "Enabled" : "Disabled"));
+    NLM_LOG_INFO("  Checkpoint saving: " + std::string(saveCheckpoints ? "Enabled" : "Disabled"));
+    if (saveCheckpoints) {
+        NLM_LOG_INFO("  Checkpoint directory: " + checkpointDir);
+        NLM_LOG_INFO("  Checkpoint interval: " + std::to_string(checkpointInterval) + " steps");
+    }
+    NLM_LOG_INFO("  Debug mode: " + std::string(enableDebugMode ? "Enabled" : "Disabled"));
+    NLM_LOG_INFO("");
+    
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
+    // Create brain
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
@@ -408,6 +439,24 @@ int main(int argc, char** argv) {
     }
     
     brain->logStatus();
+    
+    // Create checkpoint system for saving brain state
+    if (saveCheckpoints) {
+        // Create directory if it doesn't exist
+        std::filesystem::create_directories(checkpointDir);
+        
+        // Save initial checkpoint
+        std::string checkpointFile = checkpointDir + "/checkpoint_0_initial.bin";
+        if (brain->save(checkpointFile)) {
+            NLM_LOG_INFO("Initial checkpoint saved to: " + checkpointFile);
+        } else {
+            NLM_LOG_WARNING("Failed to save initial checkpoint");
+        }
+    }
+    
+    // Create performance monitor
+    PerformanceMonitor perfMonitor;
+    perfMonitor.start();
     
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);
