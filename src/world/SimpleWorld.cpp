@@ -1,7 +1,4 @@
 #include "SimpleWorld.hpp"
-#include <cmath>
-#include <algorithm>
-#include <iostream>
 
 namespace nlm {
 
@@ -41,9 +38,9 @@ void SimpleWorld::configure(float width, float height, size_t visionWidth, size_
     visionHeight_ = visionHeight;
 }
 
-void SimpleWorld::setRandomSeed(uint64_t seed) {
-    rngSeed_ = seed;
-    rngState_ = seed;
+void SimpleWorld::initialize(float width, float height) {
+    configure(width, height, 16, 16);
+    reset();
 }
 
 void SimpleWorld::reset() {
@@ -392,12 +389,32 @@ void SimpleWorld::generateVision() {
     sensory_.setAudio({});
 }
 
-void SimpleWorld::checkCollisions() {
-    // Passive collision check (for damage when moving into objects)
-    WorldObject* obj = getObjectAt(agent_.x, agent_.y);
-    if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
-        agent_.health -= 0.01f;  // Passive damage
+float SimpleWorld::computeReward() const {
+    float reward = 0.0f;
+    
+    // Reward for energy level (higher is better)
+    reward += agent_.energy / maxEnergy_ * 0.1f;
+    
+    // Penalty for low health
+    reward -= std::max(0.0f, 1.0f - agent_.health) * 0.2f;
+    
+    // Check for objects nearby
+    const float closeRange = 2.0f;
+    for (const auto& obj : objects_) {
+        if (!obj.active) continue;
+        
+        float dx = obj.x - agent_.x;
+        float dy = obj.y - agent_.y;
+        float dist = std::sqrt(dx * dx + dy * dy);
+        
+        if (dist < closeRange + obj.radius) {
+            // Proximity bonus for objects
+            float proximity = 1.0f - dist / (closeRange + obj.radius);
+            reward += obj.value * proximity * 0.5f;  // Scale down object value
+        }
     }
+    
+    return reward;
 }
 
 } // namespace nlm

@@ -15,15 +15,16 @@ enum class ActionType {
     MoveRight,
     TurnLeft,
     TurnRight,
-    Look,
+    LookLeft,
+    LookRight,
     LookUp,
     LookDown,
-    Interact,
     Eat,
     Drink,
     Rest,
-    Wait,
-    Custom
+    Custom,
+    Interact,
+    Wait
 };
 
 // Action representation

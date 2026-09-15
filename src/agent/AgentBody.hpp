@@ -61,8 +61,14 @@ enum class MotorCommand {
     TurnRight = 3,     // Rotate right
     LookLeft = 4,      // Pan sensor left
     LookRight = 5,     // Pan sensor right
-    Interact = 6,      // Interact with nearby object
-    Wait = 7           // No movement
+    LookUp = 6,        // Pan sensor up
+    LookDown = 7,      // Pan sensor down
+    Eat = 8,           // Consume resource
+    Drink = 9,         // Drink water
+    Rest = 10,         // Stay idle
+    Custom = 11,       // Custom action
+    Interact = 12,     // Interact with nearby object
+    Wait = 13          // No movement
 };
 
 // Action result from the world's perspective

@@ -28,18 +28,27 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
+    // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
+                                    motorLookUp_.size() + motorLookDown_.size() +
+                                    motorEat_.size() + motorDrink_.size() +
+                                    motorRest_.size() + motorCustom_.size() +
                                     motorInteract_.size() + motorWait_.size();
                         
-                        switch (idx % 6) {
+                        switch (idx % 12) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
                             case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                            case 4: motorLookUp_.push_back(n); break;
+                            case 5: motorLookDown_.push_back(n); break;
+                            case 6: motorEat_.push_back(n); break;
+                            case 7: motorDrink_.push_back(n); break;
+                            case 8: motorRest_.push_back(n); break;
+                            case 9: motorCustom_.push_back(n); break;
+                            case 10: motorInteract_.push_back(n); break;
+                            case 11: motorWait_.push_back(n); break;
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
@@ -64,7 +73,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    // Pre-allocate vision buffer with known size to avoid reallocations
+    size_t visionSize = world.getVisionWidth() * world.getVisionHeight();
+    previousVision_.reserve(visionSize);
+    previousVision_.clear();
+    previousVision_.resize(visionSize, 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
@@ -75,14 +88,21 @@ void AgentBrain::initialize(const SimpleWorld& world) {
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
+    // Calculate based on brain's configured sensory populations
+    // This reflects the actual sensory processing channels
+    // Using the actual neuron groups rather than hardcoded values
+    return sensoryVision_.size() + sensoryTouch_.size() + 
+           sensoryInternal_.size() + sensoryProprioception_.size();
 }
 
-size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
-}
+    size_t AgentBrain::getMotorOutputSize() const {
+        // Motor output size based on actual motor neuron groups
+        // This reflects the actual motor processing capacity
+        // Mapping to ActionType: MoveForward, MoveBackward, TurnLeft, TurnRight, Interact, Wait
+        return motorForward_.size() + motorBackward_.size() + 
+               motorTurnLeft_.size() + motorTurnRight_.size() +
+               motorInteract_.size() + motorWait_.size();
+    }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
@@ -90,38 +110,46 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+        if (!sensoryVision_[i]) {
+            NLM_LOG_WARN("Vision neuron pointer is null at index " + std::to_string(i));
+            continue;
         }
+        // Inject current proportional to vision intensity
+        float current = vision[i] * 5.0f;  // Scale factor
+        sensoryVision_[i]->injectCurrent(current);
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+        if (!sensoryTouch_[i]) {
+            NLM_LOG_WARN("Touch neuron pointer is null at index " + std::to_string(i));
+            continue;
         }
+        float current = touch[i] * 8.0f;  // Collision signal
+        sensoryTouch_[i]->injectCurrent(current);
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+        if (!sensoryInternal_[i]) {
+            NLM_LOG_WARN("Internal neuron pointer is null at index " + std::to_string(i));
+            continue;
         }
+        float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+        sensoryInternal_[i]->injectCurrent(current);
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+        if (!sensoryProprioception_[i]) {
+            NLM_LOG_WARN("Proprioception neuron pointer is null at index " + std::to_string(i));
+            continue;
         }
+        float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+        sensoryProprioception_[i]->injectCurrent(current);
     }
     
     // Compute novelty (difference from previous vision)
@@ -163,11 +191,23 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
+    // Check if any motor groups are empty
+    if (motorForward_.empty() && motorBackward_.empty() && 
+        motorTurnLeft_.empty() && motorTurnRight_.empty() &&
+        motorInteract_.empty() && motorWait_.empty()) {
+        NLM_LOG_WARN("No motor neuron groups initialized");
+        return MotorCommand::Wait;
+    }
+    
     // Calculate average activity in each motor group
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
+            if (!n) {
+                NLM_LOG_WARN("Neuron pointer is null in motor group");
+                continue;
+            }
             // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
         }
@@ -178,6 +218,12 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     float backwardAct = calcActivity(motorBackward_);
     float leftAct = calcActivity(motorTurnLeft_);
     float rightAct = calcActivity(motorTurnRight_);
+    float lookUpAct = calcActivity(motorLookUp_);
+    float lookDownAct = calcActivity(motorLookDown_);
+    float eatAct = calcActivity(motorEat_);
+    float drinkAct = calcActivity(motorDrink_);
+    float restAct = calcActivity(motorRest_);
+    float customAct = calcActivity(motorCustom_);
     float interactAct = calcActivity(motorInteract_);
     float waitAct = calcActivity(motorWait_);
     
@@ -187,6 +233,12 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         {MotorCommand::MoveBackward, backwardAct},
         {MotorCommand::TurnLeft, leftAct},
         {MotorCommand::TurnRight, rightAct},
+        {MotorCommand::LookUp, lookUpAct},
+        {MotorCommand::LookDown, lookDownAct},
+        {MotorCommand::Eat, eatAct},
+        {MotorCommand::Drink, drinkAct},
+        {MotorCommand::Rest, restAct},
+        {MotorCommand::Custom, customAct},
         {MotorCommand::Interact, interactAct},
         {MotorCommand::Wait, waitAct}
     };
@@ -252,7 +304,15 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
+        if (!region) {
+            NLM_LOG_WARN("Region pointer is null in applyRewardModulation");
+            continue;
+        }
         for (auto* syn : region->getSynapses()) {
+            if (!syn) {
+                NLM_LOG_WARN("Synapse pointer is null in applyRewardModulation");
+                continue;
+            }
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
@@ -319,18 +379,34 @@ DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
 }
 
 float AgentBrain::getNeuromodulationLevel() const {
+    if (!brain_) {
+        NLM_LOG_WARN("Brain pointer is null in getNeuromodulationLevel");
+        return 0.0f;
+    }
     return dopamineLevel_;
 }
 
 float AgentBrain::getCuriosityLevel() const {
+    if (!brain_) {
+        NLM_LOG_WARN("Brain pointer is null in getCuriosityLevel");
+        return 0.0f;
+    }
     return curiosityLevel_;
 }
 
 float AgentBrain::getNoveltyLevel() const {
+    if (!brain_) {
+        NLM_LOG_WARN("Brain pointer is null in getNoveltyLevel");
+        return 0.0f;
+    }
     return noveltyLevel_;
 }
 
 float AgentBrain::getPredictionError() const {
+    if (!brain_) {
+        NLM_LOG_WARN("Brain pointer is null in getPredictionError");
+        return 0.0f;
+    }
     return predictionError_;
 }
 
@@ -343,8 +419,10 @@ void AgentBrain::reset() {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    // Clear previous vision with proper bounds checking
+    if (!previousVision_.empty()) {
+        std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    }
 }
 
 } // namespace nlm

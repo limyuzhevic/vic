@@ -68,38 +68,71 @@ public:
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+// Configuration validation rules
+enum class ValidationRule {
+    Required,        // Value must be present
+    Positive,        // Value must be positive
+    NonNegative,     // Value must be non-negative
+    Range,           // Value must be within a range
+    Choice,          // Value must be one of specified choices
+    Pattern,         // Value must match pattern
+    Callback         // Value must pass custom validation function
+};
+
+// Validation error
+struct ValidationError {
+    std::string key;
+    std::string message;
+    ValidationRule rule;
+    std::string expected;
+    std::string actual;
+};
+
+// Validation condition
+struct ValidationCondition {
+    ValidationRule rule;
+    std::variant<std::string, double, int, std::vector<std::string>> value;
+    std::function<bool(const ConfigValue&)> validator;
+};
+
+// Configuration validation system
+class ConfigValidator {
+public:
+    ConfigValidator();
+    ~ConfigValidator();
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Add validation rule
+    void addRule(const std::string& key, ValidationRule rule, 
+                 const std::string& message = "",
+                 const std::variant<std::string, double, int, std::vector<std::string>>& value = {});
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Add custom validator
+    void addValidator(const std::string& key, 
+                     std::function<bool(const ConfigValue&)> validator,
+                     const std::string& message = "");
     
-    // Remove key
-    void remove(const std::string& key);
+    // Validate configuration
+    std::vector<ValidationError> validate(const Config& config) const;
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Check if configuration is valid
+    bool isValid(const Config& config) const;
     
-    // Clear all
+    // Get all errors for a key
+    std::vector<ValidationError> getErrorsForKey(const Config& config, const std::string& key) const;
+    
+    // Clear all rules
     void clear();
     
-    // Get configuration summary
+    // Load validation rules from config file
+    bool loadFromFile(const std::string& filepath);
+    
+    // Save validation rules to file
+    bool saveToFile(const std::string& filepath) const;
+    
+    // Get validation summary
     std::string summary() const;
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
 };
-
-} // namespace nlm

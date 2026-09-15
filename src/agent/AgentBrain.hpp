@@ -1,14 +1,3 @@
-#pragma once
-
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
-#include <vector>
-
-namespace nlm {
-
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
@@ -83,6 +72,12 @@ private:
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
     std::vector<Neuron*> motorTurnRight_;
+    std::vector<Neuron*> motorLookUp_;
+    std::vector<Neuron*> motorLookDown_;
+    std::vector<Neuron*> motorEat_;
+    std::vector<Neuron*> motorDrink_;
+    std::vector<Neuron*> motorRest_;
+    std::vector<Neuron*> motorCustom_;
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
@@ -113,5 +108,3 @@ private:
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
 };
-
-} // namespace nlm

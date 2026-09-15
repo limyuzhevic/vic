@@ -130,6 +130,12 @@ PYBIND11_MODULE(pynlm, m) {
         .value("TurnRight", MotorCommand::TurnRight)
         .value("LookLeft", MotorCommand::LookLeft)
         .value("LookRight", MotorCommand::LookRight)
+        .value("LookUp", MotorCommand::LookUp)
+        .value("LookDown", MotorCommand::LookDown)
+        .value("Eat", MotorCommand::Eat)
+        .value("Drink", MotorCommand::Drink)
+        .value("Rest", MotorCommand::Rest)
+        .value("Custom", MotorCommand::Custom)
         .value("Interact", MotorCommand::Interact)
         .value("Wait", MotorCommand::Wait)
         .export_values();

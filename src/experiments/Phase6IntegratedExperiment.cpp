@@ -43,8 +43,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create simple world
     SimpleWorld world;
-    world.initialize(16, 16);
-    
+    world.configure(16, 16, 16, 16);
+
     // Create agent
     AgentBrain agent(brain);
     agent.initialize(world);
@@ -52,46 +52,46 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     agent.enableStructuralPlasticity(config.enableDevelopment);
     agent.enableDevelopment(config.enableDevelopment);
     agent.enableCuriosity(true);
-    
+
     NLM_LOG_INFO("Brain and agent initialized successfully");
-    
+
     // Run simulation
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
-    
+
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
-        
+        // Get sensory percept from world
+        const SensoryPercept& percept = world.getSensoryPercept();
+
         // Process sensory input
         agent.processSensoryInput(percept);
-        
+
         // Brain step
         brain->step(step, step * 0.001);
-        
+
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
-        
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
-        
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+
+        // Apply action to world using agent's body
+        ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001f);
+
+        // Compute reward based on agent state and world objects
+        float reward = world.computeReward();
         totalReward += reward;
-        
+
         // Apply reward modulation
         agent.applyRewardModulation(reward, 0.0f);
-        
+
         // Update development
         if (config.enableDevelopment) {
             agent.updateDevelopment(0.001);
         }
-        
+
         // Collect metrics
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
-        
+
         // Periodic status
         if (step % 1000 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 

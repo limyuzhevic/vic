@@ -36,6 +36,9 @@ public:
     // Configuration
     void configure(float width, float height, size_t visionWidth, size_t visionHeight);
     
+    // Initialize world with dimensions
+    void initialize(float width, float height);
+    
     // Reset world to initial state
     void reset();
     
@@ -48,11 +51,20 @@ public:
     // Apply motor command to agent
     ActionResult applyMotorCommand(MotorCommand cmd, double currentTime);
     
-    // Get current sensory percept for the agent
-    const SensoryPercept& getSensoryPercept() const { return sensory_; }
+    // Get current sensory percept for the agent (return by value for safe copying)
+    SensoryPercept getSensoryPercept() const { return sensory_; }
+    
+    // Observe world state
+    SensoryPercept observe() const { return sensory_; }
     
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
+    
+    // Apply action to world (API compatibility wrapper)
+    ActionResult applyAction(MotorCommand cmd, double currentTime) { return applyMotorCommand(cmd, currentTime); }
+    
+    // Compute reward based on agent state and world objects
+    float computeReward() const;
     
     // Add object to world
     void addObject(const WorldObject& obj);
@@ -75,6 +87,7 @@ public:
     void setMaxEnergy(float e) { maxEnergy_ = e; }
     float getEnergyDecayRate() const { return energyDecayRate_; }
     void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
+    float getResourceEnergyGain() const { return resourceEnergyGain_; }
     
     // Time
     double getSimulationTime() const { return simTime_; }
@@ -93,33 +106,21 @@ private:
     // Interact with nearby objects
     ActionResult interact();
     
-    // World geometry
-    float width_;
-    float height_;
+    // Compute reward based on agent state and world objects
+    float computeReward() const;
     
-    // Agent
-    AgentBody agent_;
+private:
+    // Generate vision from current view
+    void generateVision();
     
-    // Objects in world
-    std::vector<WorldObject> objects_;
+    // Check for collisions
+    void checkCollisions();
     
-    // Sensory state
-    SensoryPercept sensory_;
+    // Interact with nearby objects
+    ActionResult interact();
     
-    // Vision configuration
-    size_t visionWidth_;
-    size_t visionHeight_;
-    
-    // Energy system
-    float maxEnergy_;
-    float energyDecayRate_;
-    float resourceEnergyGain_;
-    
-    // Simulation time
-    double simTime_;
-    
-    // Random seed
-    uint64_t rngSeed_;
+    // Compute reward based on agent state and world objects
+    float computeReward() const;
     
     // Simple RNG state
     uint64_t rngState_;
