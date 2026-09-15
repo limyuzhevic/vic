@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_CONFIG_HPP
+#define NLM_CONFIG_HPP
 
 #include <string>
 #include <memory>
@@ -103,3 +104,5 @@ private:
 };
 
 } // namespace nlm
+
+#endif // NLM_CONFIG_HPP

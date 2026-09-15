@@ -1,85 +1,121 @@
-#pragma once
-
-/**
- * Performance Infrastructure
- * 
- * Phase 5 introduces comprehensive performance optimization for large-scale neural simulation:
- * 
- * 1. Memory Pool Allocators
- *    - Pre-allocated neuron and synapse pools
- *    - Reduced allocation overhead
- *    - Better cache locality
- * 
- * 2. Event Queue Optimization
- *    - Lock-free ring buffers for spike events
- *    - Time-bucketed delayed spikes
- *    - Priority queues for time-sensitive events
- * 
- * 3. Structure-of-Arrays (SoA) Data Layout
- *    - Contiguous memory for neuron states
- *    - Better SIMD vectorization
- *    - Improved cache utilization
- * 
- * 4. Sparse Connectivity
- *    - Adjacency lists instead of dense matrices
- *    - Efficient synapse lookup
- *    - Memory-efficient storage for large networks
- * 
- * 5. Multithreading Support
- *    - Parallel neural population updates
- *    - Thread-local neuron processing
- *    - Synchronized spike processing
- * 
- * This infrastructure is designed to scale from 10k to 100M+ neurons.
- */
-
 #ifndef NLM_PERFORMANCE_HPP
 #define NLM_PERFORMANCE_HPP
 
-// Configure performance features based on build settings
-#ifdef NLM_PERFORMANCE_ENABLED
-    #define NLM_USE_MEMORY_POOL 1
-    #define NLM_USE_SOA 1
-    #define NLM_USE_EVENT_QUEUE 1
-    #define NLM_USE_SPARE_CONNECTIVITY 1
-    #define NLM_USE_MULTITHREADING 1
-    #define NLM_USE_SIMD 1
-#else
-    #define NLM_USE_MEMORY_POOL 0
-    #define NLM_USE_SOA 0
-    #define NLM_USE_EVENT_QUEUE 0
-    #define NLM_USE_SPARE_CONNECTIVITY 0
-    #define NLM_USE_MULTITHREADING 0
-    #define NLM_USE_SIMD 0
-#endif
-
-// SIMD configuration
-#ifdef NLM_SIMD_AVX2
-    #define NLM_SIMD_WIDTH 8  // AVX2: 8 float32
-#elif defined(NLM_SIMD_AVX512)
-    #define NLM_SIMD_WIDTH 16 // AVX512: 16 float32
-#elif defined(NLM_SIMD_SSE)
-    #define NLM_SIMD_WIDTH 4  // SSE: 4 float32
-#else
-    #define NLM_SIMD_WIDTH 1  // Scalar
-#endif
-
-// Multithreading configuration
-#ifdef NLM_THREAD_COUNT
-    #define NLM_NUM_THREADS NLM_THREAD_COUNT
-#else
-    #define NLM_NUM_THREADS 1
-#endif
-
-// Memory pool configuration
-#define NLM_MEMORY_POOL_PAGE_SIZE 4096
-#define NLM_MAX_POOL_SIZE (1024 * 1024)  // Max objects per pool
+#include <chrono>
 
 namespace nlm {
 
-// Forward declarations
-class Neuron;
-class Synapse;
+// Performance monitoring and optimization utilities
+class PerformanceMonitor {
+public:
+    PerformanceMonitor();
+    ~PerformanceMonitor();
+    
+    // Disable copying
+    PerformanceMonitor(const PerformanceMonitor&) = delete;
+    PerformanceMonitor& operator=(const PerformanceMonitor&) = delete;
+    
+    // Enable moving
+    PerformanceMonitor(PerformanceMonitor&&) noexcept;
+    PerformanceMonitor& operator=(PerformanceMonitor&&) noexcept;
+    
+    // Start/stop timing for specific operations
+    void startTiming(const std::string& operation);
+    double stopTiming(const std::string& operation);
+    
+    // Get average time for operation
+    double getAverageTime(const std::string& operation) const;
+    
+    // Get number of times operation was timed
+    size_t getOperationCount(const std::string& operation) const;
+    
+    // Reset all statistics
+    void reset();
+    
+    // Print performance report
+    void printReport() const;
+    
+    // Check if performance monitoring is enabled
+    bool isEnabled() const;
+    
+    // Enable/disable performance monitoring
+    void setEnabled(bool enabled);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// SIMD optimization utilities
+class SIMDVectorizer {
+public:
+    SIMDVectorizer();
+    ~SIMDVectorizer();
+    
+    // Disable copying
+    SIMDVectorizer(const SIMDVectorizer&) = delete;
+    SIMDVectorizer& operator=(const SIMDVectorizer&) = delete;
+    
+    // Enable moving
+    SIMDVectorizer(SIMDVectorizer&&) noexcept;
+    SIMDVectorizer& operator=(SIMDVectorizer&&) noexcept;
+    
+    // Check if SIMD is available
+    bool isAvailable() const;
+    
+    // Get SIMD capabilities
+    std::string getCapabilities() const;
+    
+    // Vector operations (when SIMD available)
+    template<typename T>
+    void vectorAdd(const T* a, const T* b, T* result, size_t size);
+    
+    template<typename T>
+    void vectorMultiply(const T* a, const T* b, T* result, size_t size);
+    
+    // Memory operations
+    void prefetch(const void* ptr, int hint);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Parallel processing utilities
+class ParallelProcessor {
+public:
+    ParallelProcessor();
+    ~ParallelProcessor();
+    
+    // Disable copying
+    ParallelProcessor(const ParallelProcessor&) = delete;
+    ParallelProcessor& operator=(const ParallelProcessor&) = delete;
+    
+    // Enable moving
+    ParallelProcessor(ParallelProcessor&&) noexcept;
+    ParallelProcessor& operator=(ParallelProcessor&&) noexcept;
+    
+    // Get number of available threads
+    static size_t getThreadCount();
+    
+    // Set number of threads to use
+    static void setThreadCount(size_t count);
+    
+    // Parallel loop execution
+    template<typename Func>
+    void parallelFor(size_t start, size_t end, size_t grainSize, const Func& func);
+    
+    // Parallel reduction
+    template<typename T, typename BinaryOp>
+    T parallelReduce(const std::vector<T>& values, const BinaryOp& op);
+    
+    // Check if parallel processing is available
+    bool isAvailable() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
 
 } // namespace nlm
 

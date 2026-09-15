@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_PLASTICITY_RULE_HPP
+#define NLM_PLASTICITY_RULE_HPP
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Synapse.hpp"
@@ -84,3 +85,5 @@ public:
 };
 
 } // namespace nlm
+
+#endif // NLM_PLASTICITY_RULE_HPP

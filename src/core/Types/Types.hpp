@@ -1,13 +1,15 @@
-#pragma once
+// Type definitions for NLM (Neural Learning Machine)
+// Strongly-typed identifiers and basic types for the brain simulation
+
+#ifndef NLM_TYPES_HPP
+#define NLM_TYPES_HPP
 
 #include <cstdint>
 #include <type_traits>
 
 namespace nlm {
 
-// Strongly-typed identifiers for safety
-
-// Neuron identifier
+// Neuron identifier - unique across the entire brain
 struct NeuronId {
     uint64_t value;
     
@@ -21,7 +23,7 @@ struct NeuronId {
     constexpr uint64_t index() const { return value; }
 };
 
-// Synapse identifier
+// Synapse identifier - unique across the entire brain
 struct SynapseId {
     uint64_t value;
     
@@ -35,7 +37,7 @@ struct SynapseId {
     constexpr uint64_t index() const { return value; }
 };
 
-// Region identifier
+// Region identifier - represents a brain region
 struct RegionId {
     uint64_t value;
     
@@ -49,7 +51,7 @@ struct RegionId {
     constexpr uint64_t index() const { return value; }
 };
 
-// Population identifier
+// Population identifier - represents a group of neurons
 struct PopulationId {
     uint64_t value;
     
@@ -63,97 +65,91 @@ struct PopulationId {
     constexpr uint64_t index() const { return value; }
 };
 
-// Simulation step counter
+// Simulation step counter - discrete time steps
 using SimulationStep = uint64_t;
 
-// Simulation time in seconds (floating point)
+// Timestamp - continuous simulation time in seconds
 using Timestamp = double;
 
-// Timestep duration in seconds
+// Timestep duration - length of each simulation step
 using TimestepDuration = double;
 
-// Index types for arrays
+// Index types for array access
 using NeuronIndex = uint64_t;
 using SynapseIndex = uint64_t;
 using PopulationIndex = uint64_t;
 using RegionIndex = uint64_t;
 
-// Synaptic weight type
-using SynapticWeight = float;
+// Mathematical types for neural computation
+using SynapticWeight = float;        // Connection strength
+using MembranePotential = float;     // Electrical potential across membrane
+using FiringRate = float;            // Spikes per second
+using Delay = uint32_t;              // Synaptic delay in steps
 
-// Membrane potential type
-using MembranePotential = float;
-
-// Neuron firing rate type
-using FiringRate = float;
-
-// Connection delay in simulation steps
-using Delay = uint32_t;
-
-// Typed enums for neuron types
+// Neuron type classification
 enum class NeuronType : uint8_t {
-    Excitatory,
-    Inhibitory,
-    Modulatory,
-    Sensory,
-    Motor,
-    Internal
+    Excitatory,   // Positive current injection
+    Inhibitory,   // Negative current injection
+    Modulatory,   // Neuromodulatory signals
+    Sensory,      // Sensory input neurons
+    Motor,        // Motor output neurons
+    Internal      // Internal processing neurons
 };
 
-// Typed enums for synapse types
+// Synapse type classification
 enum class SynapseType : uint8_t {
-    Excitatory,
-    Inhibitory,
-    Modulatory,
-    Electrical,
-    GapJunction
+    Excitatory,   // Depolarizing, increases firing probability
+    Inhibitory,   // Hyperpolarizing, decreases firing probability
+    Modulatory,   // Neuromodulatory effects
+    Electrical,   // Gap junction coupling
+    GapJunction   // Direct electrical coupling
 };
 
-// Synaptic plasticity state flags
+// Plasticity flags for tracking synapse properties
 struct PlasticityFlags {
-    bool hebbian : 1;
-    bool stdp : 1;
-    bool reward_modulated : 1;
-    bool structural : 1;
-    bool eligible : 1;
+    bool hebbian : 1;           // Subject to Hebbian learning
+    bool stdp : 1;              // Subject to STDP
+    bool reward_modulated : 1;  // Responsive to reward signals
+    bool structural : 1;        // Can change connectivity
+    bool eligible : 1;          // Currently plastic
     
     constexpr PlasticityFlags() : hebbian(false), stdp(false), 
                                   reward_modulated(false), structural(false), 
                                   eligible(false) {}
 };
 
-// Developmental state
+// Developmental stage of neural circuit
 enum class DevelopmentalStage : uint8_t {
-    Initial,
-    CriticalPeriod,
-    Maturation,
-    Adult,
-    Aging
+    Initial,       // Newborn, high plasticity
+    CriticalPeriod, // Sensitive period for learning
+    Maturation,    // Developing circuits
+    Adult,         // Mature, stable
+    Aging          // Declining function
 };
 
-// Spike event for event-driven computation
+// Spike event for event-driven simulation
 struct SpikeEvent {
     NeuronId source_neuron;
-    Timestamp timestamp;
-    SimulationStep step;
+    Timestamp timestamp;    // When spike occurred
+    SimulationStep step;    // Which simulation step
     
     SpikeEvent() : source_neuron(), timestamp(0.0), step(0) {}
     SpikeEvent(NeuronId nid, Timestamp ts, SimulationStep s)
         : source_neuron(nid), timestamp(ts), step(s) {}
 };
 
-// Delayed spike event for synaptic transmission with delay
+// Delayed spike event for synaptic transmission
 struct DelayedSpikeEvent {
     NeuronId source_neuron;
     NeuronId destination_neuron;
     SynapseId synapse_id;
-    SynapticWeight weight;  // Weight at time of spike (frozen)
+    SynapticWeight weight;      // Synaptic weight at time of spike
     SynapseType synapse_type;
-    Timestamp timestamp;      // When spike occurs
-    Timestamp delivery_time;  // When spike reaches destination (timestamp + delay)
-    SimulationStep step;      // Current simulation step
-    SimulationStep delivery_step;  // Step when spike should be delivered
-    bool is_excitatory;  // Cached for quick lookup
+    Timestamp timestamp;       // When spike originated
+    Timestamp delivery_time;   // When spike should be delivered
+    SimulationStep step;        // Originating step
+    SimulationStep delivery_step; // Delivery step
+    bool is_excitatory;         // Cached for efficiency
     
     DelayedSpikeEvent()
         : source_neuron(), destination_neuron(), synapse_id()
@@ -171,22 +167,24 @@ struct DelayedSpikeEvent {
         , is_excitatory(type == SynapseType::Excitatory) {}
 };
 
-// Action potential state
+// Neuronal membrane state
 enum class FiringState : uint8_t {
-    Resting,
-    Active,
-    Refractory,
-    Inhibited
+    Resting,   // Below threshold, no firing
+    Active,    // Firing action potential
+    Refractory, // Cannot fire after spike
+    Inhibited  // Actively suppressed
 };
 
-// Generic handle types for efficiency
+// Handle types for efficient memory access
 using NeuronHandle = uint64_t;
 using SynapseHandle = uint64_t;
 
-// Invalid ID sentinel
+// Invalid identifier sentinels
 constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
 constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
 constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
 } // namespace nlm
+
+#endif // NLM_TYPES_HPP

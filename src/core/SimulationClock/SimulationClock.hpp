@@ -1,58 +1,43 @@
-#pragma once
+#ifndef NLM_SIMULATION_CLOCK_HPP
+#define NLM_SIMULATION_CLOCK_HPP
 
-#include "Types.hpp"
+#include <chrono>
 
 namespace nlm {
 
-// Simulation clock for managing time in the neural simulation
-// Provides deterministic time tracking separate from wall-clock time
-
 class SimulationClock {
 public:
-    // Create with specific timestep
-    explicit SimulationClock(TimestepDuration timestep = 0.001); // 1ms default
-    
+    SimulationClock(double timestep = 0.001);
     ~SimulationClock();
     
-    // Disable copying, enable moving
+    // Disable copying
     SimulationClock(const SimulationClock&) = delete;
     SimulationClock& operator=(const SimulationClock&) = delete;
+    
+    // Enable moving
     SimulationClock(SimulationClock&&) noexcept;
     SimulationClock& operator=(SimulationClock&&) noexcept;
     
-    // Time operations
+    // Get current time
+    Timestamp getCurrentTime() const;
+    
+    // Get current step
+    SimulationStep getCurrentStep() const;
+    
+    // Step forward
+    void step(SimulationStep steps = 1);
+    
+    // Get timestep
+    double getTimestep() const;
+    
+    // Set timestep
+    void setTimestep(double timestep);
+    
+    // Get wall clock time
+    double getWallClockTime() const;
+    
+    // Reset to zero
     void reset();
-    void advance();
-    
-    // Step counter
-    SimulationStep getStep() const;
-    void setStep(SimulationStep step);
-    
-    // Current simulation time
-    Timestamp getTime() const;
-    void setTime(Timestamp time);
-    
-    // Timestep
-    TimestepDuration getTimestep() const;
-    void setTimestep(TimestepDuration dt);
-    
-    // Convenience queries
-    bool isFirstStep() const;
-    bool isLastStep(SimulationStep totalSteps) const;
-    
-    // Step to time conversion
-    Timestamp stepToTime(SimulationStep step) const;
-    SimulationStep timeToStep(Timestamp time) const;
-    
-    // Advance by multiple steps
-    void advanceBy(SimulationStep steps);
-    
-    // Get time at a future step from now
-    Timestamp timeAtFutureStep(SimulationStep stepsAhead) const;
-    
-    // Real-time wall clock comparison (for real-time mode)
-    double getRealTimeElapsed() const;
-    void setRealTimeStart();
     
 private:
     struct Impl;
@@ -60,3 +45,5 @@ private:
 };
 
 } // namespace nlm
+
+#endif // NLM_SIMULATION_CLOCK_HPP

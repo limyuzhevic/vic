@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_STDP_HPP
+#define NLM_STDP_HPP
 
 #include "PlasticityRule.hpp"
 
@@ -60,3 +61,5 @@ public:
 };
 
 } // namespace nlm
+
+#endif // NLM_STDP_HPP

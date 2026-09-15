@@ -1,8 +1,12 @@
-#pragma once
+#ifndef NLM_RANDOM_HPP
+#define NLM_RANDOM_HPP
 
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <algorithm>
+#include <stdexcept>
+#include <numeric>
 
 namespace nlm {
 
@@ -108,3 +112,5 @@ auto RandomGenerator::pickRandom(const Container& container) -> typename Contain
 }
 
 } // namespace nlm
+
+#endif // NLM_RANDOM_HPP

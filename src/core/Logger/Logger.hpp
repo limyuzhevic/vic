@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_LOGGER_HPP
+#define NLM_LOGGER_HPP
 
 #include <string>
 #include <memory>
@@ -103,7 +104,7 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -128,6 +129,9 @@ public:
         return *this;
     }
     
+    // Get the logged message when stream is destroyed
+    std::string getMessage() const { return oss_.str(); }
+    
 private:
     LogLevel level_;
     std::ostringstream oss_;
@@ -139,3 +143,5 @@ private:
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
 
 } // namespace nlm
+
+#endif // NLM_LOGGER_HPP

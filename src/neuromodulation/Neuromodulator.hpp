@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_NEUROMODULATOR_HPP
+#define NLM_NEUROMODULATOR_HPP
 
 #include "../core/Types/Types.hpp"
 #include <string>
@@ -87,3 +88,5 @@ public:
 };
 
 } // namespace nlm
+
+#endif // NLM_NEUROMODULATOR_HPP

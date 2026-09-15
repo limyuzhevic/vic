@@ -1,49 +1,49 @@
-#pragma once
+#ifndef NLM_STRUCTURAL_PLASTICITY_HPP
+#define NLM_STRUCTURAL_PLASTICITY_HPP
 
 #include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
+#include "PlasticityRule.hpp"
 
 namespace nlm {
 
-// Structural plasticity: creation and removal of synapses and neurons
-// PLACEHOLDER - Phase 2 will implement real structural plasticity
+class Brain;
 
-class StructuralPlasticity {
+class StructuralPlasticity : public PlasticityRule {
 public:
     StructuralPlasticity();
-    ~StructuralPlasticity();
+    ~StructuralPlasticity() override;
     
-    // Create new synapse
-    // TODO PHASE 2: Implement real synapse creation
-    SynapseId createSynapse(Brain* brain, NeuronId source, NeuronId destination,
-                           SynapticWeight weight);
+    void update(Synapse* synapse,
+                 const std::vector<Timestamp>& preSpikes,
+                 const std::vector<Timestamp>& postSpikes,
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
     
-    // Remove synapse
-    // TODO PHASE 2: Implement real synapse removal
-    bool removeSynapse(Brain* brain, SynapseId synapse);
-    
-    // Create new neuron
-    // TODO PHASE 2: Implement real neuron creation
-    NeuronId createNeuron(Brain* brain, NeuronType type);
-    
-    // Remove neuron
-    // TODO PHASE 2: Implement real neuron removal
-    bool removeNeuron(Brain* brain, NeuronId neuron);
-    
-    // Get creation rate
-    float getSynaptogenesisRate() const;
+    // Structural plasticity parameters
     void setSynaptogenesisRate(float rate);
+    float getSynaptogenesisRate() const;
     
-    // Get pruning rate
-    float getPruningRate() const;
     void setPruningRate(float rate);
+    float getPruningRate() const;
     
-    // Update structural plasticity
-    void update(Brain* brain, class RandomGenerator& rng);
+    void setMaxConnections(float max);
+    float getMaxConnections() const;
+    
+    // Update structural connectivity based on activity
+    void updateStructure(Brain* brain, const RandomGenerator& rng);
+    
+    // Check if structural plasticity is enabled
+    bool isEnabled() const override { return enabled_; }
+    void setEnabled(bool enabled) override { enabled_ = enabled; }
     
 private:
     struct Impl;
     Impl* pImpl;
+    
+    bool enabled_;
 };
 
 } // namespace nlm
+
+#endif // NLM_STRUCTURAL_PLASTICITY_HPP

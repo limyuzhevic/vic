@@ -1,174 +1,90 @@
-#pragma once
+#ifndef NLM_MEMORY_HPP
+#define NLM_MEMORY_HPP
 
 #include "../core/Types/Types.hpp"
-#include <vector>
-#include <functional>
 
 namespace nlm {
 
-// Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
-
-class WorkingMemory {
+// Memory system interface
+class Memory {
 public:
-    WorkingMemory();
-    ~WorkingMemory();
+    virtual ~Memory() = default;
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
-    void store(NeuronId neuron, float value);
+    // Clear all memory
+    virtual void clear() = 0;
     
-    // Retrieve item
-    float retrieve(NeuronId neuron) const;
-    
-    // Check if item exists
-    bool contains(NeuronId neuron) const;
-    
-    // Clear all
-    void clear();
-    
-    // Get capacity
-    size_t getCapacity() const;
-    size_t getCurrentSize() const;
-    
-    // Decay all items
-    void decay(float decayRate);
-    
-private:
-    struct Impl;
-    Impl* pImpl;
+    // Get current usage/statistics
+    virtual float getUsage() const = 0;
+    virtual size_t getCapacity() const = 0;
 };
 
-// Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
-
-struct EpisodicMemoryItem {
-    SimulationStep timestamp;
-    std::vector<NeuronId> neurons;
-    std::vector<float> values;
-    std::string metadata;
-    
-    EpisodicMemoryItem() : timestamp(0) {}
-};
-
-class EpisodicMemory {
+// Working memory interface - temporary activation traces
+class WorkingMemory : public Memory {
 public:
-    EpisodicMemory();
-    ~EpisodicMemory();
+    virtual ~WorkingMemory() = default;
     
-    // Store episode
-    void storeEpisode(const EpisodicMemoryItem& episode);
+    // Store a neuron with activation strength
+    virtual void storeToNeuron(NeuronId neuron, float activation) = 0;
     
-    // Retrieve episode
-    EpisodicMemoryItem retrieveEpisode(size_t index) const;
+    // Get active traces
+    virtual size_t getActiveTraces() const = 0;
+    virtual const std::vector<NeuronId>& getMemoryNeurons() const = 0;
+    virtual const std::vector<float>& getActivationValues() const = 0;
     
-    // Get episode count
-    size_t getEpisodeCount() const;
+    // Update working memory (competition, decay)
+    virtual void update(TimestepDuration dt) = 0;
     
-    // Get recent episodes
-    std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
-    
-    // Clear all
-    void clear();
-    
-    // Memory consolidation (move to long-term)
-    void consolidate(float relevanceThreshold);
-    
-private:
-    struct Impl;
-    Impl* pImpl;
+    // Set capacity
+    virtual void setCapacity(size_t capacity) = 0;
 };
 
-// Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
-
-class SemanticMemory {
+// Episodic memory interface - experience storage
+class EpisodicMemory : public Memory {
 public:
-    SemanticMemory();
-    ~SemanticMemory();
+    virtual ~EpisodicMemory() = default;
     
-    // Store fact
-    void storeFact(const std::string& key, const std::string& value);
+    // Store an episode
+    struct EpisodicMemoryItem {
+        Timestamp timestamp;
+        std::vector<NeuronId> activeNeurons;
+        std::vector<float> neuronActivations;
+        float reward;
+        float novelty;
+    };
     
-    // Retrieve fact
-    std::string retrieveFact(const std::string& key) const;
+    virtual void storeEpisode(const EpisodicMemoryItem& episode) = 0;
     
-    // Check if fact exists
-    bool hasFact(const std::string& key) const;
+    // Get episodes
+    virtual size_t getEpisodeCount() const = 0;
+    virtual const EpisodicMemoryItem* getEpisode(size_t index) const = 0;
     
-    // Get all facts
-    std::vector<std::pair<std::string, std::string>> getAllFacts() const;
+    // Replay episodes for consolidation
+    virtual std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t maxCount) const = 0;
     
-    // Clear all
-    void clear();
-    
-private:
-    struct Impl;
-    Impl* pImpl;
+    // Set maximum episodes
+    virtual void setMaxEpisodes(size_t max) = 0;
 };
 
-// Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
-
-struct Skill {
-    std::string name;
-    std::vector<NeuronId> neuralPattern;
-    float proficiency;
-    
-    Skill() : proficiency(0.0f) {}
-};
-
-class ProceduralMemory {
+// Associative memory interface - pattern associations
+class AssociativeMemory : public Memory {
 public:
-    ProceduralMemory();
-    ~ProceduralMemory();
+    virtual ~AssociativeMemory() = default;
     
-    // Learn skill
-    void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
+    // Learn associations
+    virtual void learnAssociation(const std::vector<float>& pattern1,
+                                 const std::vector<float>& pattern2,
+                                 float strength) = 0;
     
-    // Retrieve skill
-    Skill* getSkill(const std::string& name);
+    // Retrieve associations
+    virtual std::vector<std::pair<std::vector<float>, float>> 
+        retrieveAssociations(const std::vector<float>& pattern,
+                            size_t maxResults) const = 0;
     
-    // Get all skills
-    std::vector<Skill*> getAllSkills();
-    
-    // Update proficiency
-    void updateProficiency(const std::string& name, float delta);
-    
-    // Clear all
-    void clear();
-    
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-// Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
-
-class AssociativeMemory {
-public:
-    AssociativeMemory();
-    ~AssociativeMemory();
-    
-    // Create association
-    void associate(NeuronId a, NeuronId b, float strength);
-    
-    // Get associated neurons
-    std::vector<NeuronId> getAssociations(NeuronId neuron) const;
-    
-    // Get association strength
-    float getAssociationStrength(NeuronId a, NeuronId b) const;
-    
-    // Update association
-    void updateAssociation(NeuronId a, NeuronId b, float delta);
-    
-    // Clear all
-    void clear();
-    
-private:
-    struct Impl;
-    Impl* pImpl;
+    // Get association statistics
+    virtual size_t getPatternCount() const = 0;
+    virtual float getAverageStrength() const = 0;
 };
 
 } // namespace nlm
+
+#endif // NLM_MEMORY_HPP

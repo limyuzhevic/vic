@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_HEBBIAN_HPP
+#define NLM_HEBBIAN_HPP
 
 #include "PlasticityRule.hpp"
 
@@ -29,3 +30,5 @@ private:
 };
 
 } // namespace nlm
+
+#endif // NLM_HEBBIAN_HPP

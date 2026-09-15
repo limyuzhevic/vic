@@ -1,87 +1,67 @@
-#pragma once
+#ifndef NLM_NEURAL_REGION_HPP
+#define NLM_NEURAL_REGION_HPP
 
 #include "../core/Types/Types.hpp"
 #include "NeuralPopulation.hpp"
 #include "Synapse.hpp"
-#include <vector>
-#include <memory>
-#include <unordered_map>
 
 namespace nlm {
 
-// NeuralRegion: A brain region containing multiple populations and local connectivity
-// PLACEHOLDER - Phase 2 will implement region-level dynamics
-
 class NeuralRegion {
 public:
-    // Create region with ID
-    explicit NeuralRegion(RegionId id);
-    
-    // Create region with ID and name
     NeuralRegion(RegionId id, const std::string& name);
-    
     ~NeuralRegion();
     
-    // Disable copying, enable moving
+    // Disable copying
     NeuralRegion(const NeuralRegion&) = delete;
     NeuralRegion& operator=(const NeuralRegion&) = delete;
+    
+    // Enable moving
     NeuralRegion(NeuralRegion&&) noexcept;
     NeuralRegion& operator=(NeuralRegion&&) noexcept;
     
-    // Identity
+    // Region identification
     RegionId getId() const;
     const std::string& getName() const;
-    void setName(const std::string& name);
     
     // Population management
-    PopulationId addPopulation(size_t size, NeuronType type = NeuronType::Internal);
+    PopulationId addPopulation(size_t neuronCount, NeuronType type);
+    size_t getPopulationCount() const;
     NeuralPopulation* getPopulation(PopulationId id);
     const NeuralPopulation* getPopulation(PopulationId id) const;
-    size_t getPopulationCount() const;
-    const std::vector<std::unique_ptr<NeuralPopulation>>& getPopulations() const;
-    std::vector<NeuralPopulation*> getAllPopulations();
+    const std::vector<std::unique_ptr<NeuralPopulation>>& getPopulations();
     
-    // Synapse management (local connections within this region)
-    SynapseId addSynapse(NeuronId source, NeuronId destination, 
-                         SynapticWeight weight = 0.0f, Delay delay = 1);
-    Synapse* getSynapse(SynapseId id);
-    const Synapse* getSynapse(SynapseId id) const;
+    // Neuron access
+    NeuronId addNeuron(NeuronType type);
+    size_t getTotalNeuronCount() const;
+    Neuron* getNeuron(NeuronId id);
+    const Neuron* getNeuron(NeuronId id) const;
+    const std::vector<Neuron*>& getAllNeurons();
+    
+    // Synapse management
+    SynapseId addSynapse(NeuronId source, NeuronId target, float weight, Delay delay);
     size_t getSynapseCount() const;
-    const std::vector<std::unique_ptr<Synapse>>& getSynapses() const;
+    const std::vector<Synapse*>& getSynapses();
+    const std::vector<Synapse*>& getSynapsesTo(NeuronId target) const;
+    const std::vector<Synapse*>& getSynapsesFrom(NeuronId source) const;
+    Synapse* getSynapse(SynapseId id);
     
-    // Connectivity queries
-    std::vector<Synapse*> getSynapsesFrom(NeuronId neuron);
-    std::vector<Synapse*> getSynapsesTo(NeuronId neuron);
+    // Connectivity
+    void initializeRandomConnectivity(RandomGenerator& rng, float probability, float excWeight, float inhWeight);
     
     // Statistics
-    size_t getTotalNeuronCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
-    
-    // Local connectivity statistics
     float getAverageSynapticWeight() const;
-    float getSynapticDensity() const;  // fraction of possible connections
+    float getExcitationInhibitionRatio() const;
+    size_t getActiveNeuronCount() const;
     
-    // Step all populations and synapses
-    void step(Timestamp currentTime);
-    
-    // Reset all neurons and synapses
+    // Reset
     void reset();
-    
-    // Initialize connectivity
-    void initializeRandomConnectivity(class RandomGenerator& rng, 
-                                      float connectionProbability,
-                                      float meanWeight,
-                                      float weightVariance);
-    
-    // Get all neurons across all populations
-    std::vector<Neuron*> getAllNeurons();
-    std::vector<const Neuron*> getAllNeurons() const;
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
+
+#endif // NLM_NEURAL_REGION_HPP
