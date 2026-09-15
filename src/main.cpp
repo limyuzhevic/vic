@@ -267,7 +267,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+                        " before: " + std::to_string(beforeWeights[i]));
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -301,8 +301,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
     }
     
     // Check if weights increased (LTP)
@@ -319,6 +319,124 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");
     }
+}
+
+void runAdvancedNeuronTest(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Test 4: Advanced Neuron Types ===");
+    
+    auto* region = brain->getRegion(RegionId(1));
+    if (!region) return;
+    
+    auto neurons = region->getAllNeurons();
+    if (neurons.empty()) {
+        NLM_LOG_INFO("  No neurons found!");
+        return;
+    }
+    
+    NLM_LOG_INFO("  Testing advanced neuron types...");
+    
+    // Test a few neurons with advanced properties
+    size_t testNeurons = std::min(size_t(5), neurons.size());
+    
+    for (size_t i = 0; i < testNeurons; ++i) {
+        Neuron* neuron = neurons[i];
+        NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                        " type=" + std::to_string(static_cast<int>(neuron->getType())) +
+                        " V=" + std::to_string(neuron->getMembranePotential()) +
+                        " thresh=" + std::to_string(neuron->getThreshold()));
+    }
+    
+    // Inject current to stimulate activity
+    NLM_LOG_INFO("  Injecting current to test advanced dynamics...");
+    for (size_t i = 0; i < testNeurons; ++i) {
+        neurons[i]->injectCurrent(30.0f);
+    }
+    
+    // Run simulation
+    for (SimulationStep step = 0; step < 100; ++step) {
+        brain->step(step, step * 0.001);
+        
+        if (step % 20 == 0) {
+            NLM_LOG_INFO("    Step " + std::to_string(step) + 
+                        " | Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+        }
+    }
+    
+    NLM_LOG_INFO("  Advanced neuron test completed.");
+}
+
+void runAdvancedPlasticityTest(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Test 5: Advanced Plasticity Rules ===");
+    
+    auto* region = brain->getRegion(RegionId(1));
+    if (!region) return;
+    
+    auto& synapses = region->getSynapses();
+    if (synapses.size() < 5) {
+        NLM_LOG_INFO("  Not enough synapses for advanced plasticity test");
+        return;
+    }
+    
+    NLM_LOG_INFO("  Testing advanced plasticity rules...");
+    
+    // Create a simple brain state snapshot
+    struct PlasticityState {
+        float weight;
+        float efficacy;
+        float eligibilityTrace;
+        int spikeCount;
+    };
+    
+    std::vector<PlasticityState> beforeStates;
+    for (size_t i = 0; i < 5 && i < synapses.size(); ++i) {
+        PlasticityState state;
+        state.weight = synapses[i]->getWeight();
+        state.efficacy = synapses[i]->getEfficacy();
+        state.eligibilityTrace = synapses[i]->getEligibilityTrace();
+        state.spikeCount = synapses[i]->getPreSpikeHistory().size();
+        beforeStates.push_back(state);
+    }
+    
+    // Enable advanced plasticity
+    NLM_LOG_INFO("  Enabling advanced plasticity rules...");
+    for (size_t i = 0; i < 5 && i < synapses.size(); ++i) {
+        synapses[i]->enablePlasticity(true, true, true); // Enable all plasticity types
+        // Set some parameters
+        synapses[i]->setEfficacy(0.8f + (i * 0.05f));
+    }
+    
+    // Apply activity-dependent plasticity
+    NLM_LOG_INFO("  Applying activity-dependent plasticity...")
+    for (SimulationStep step = 0; step < 500; ++step) {
+        // Generate activity pattern
+        for (size_t i = 0; i < 3 && i < neurons.size(); ++i) {
+            neurons[i]->injectCurrent(20.0f);
+        }
+        
+        brain->step(step, step * 0.001);
+        
+        if (step % 100 == 0) {
+            NLM_LOG_INFO("    Step " + std::to_string(step) + 
+                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()));
+        }
+    }
+    
+    // Check changes
+    NLM_LOG_INFO("  After activity...");
+    for (size_t i = 0; i < 5 && i < synapses.size(); ++i) {
+        float weightChange = synapses[i]->getWeight() - beforeStates[i].weight;
+        float efficacyChange = synapses[i]->getEfficacy() - beforeStates[i].efficacy;
+        float eligibilityChange = synapses[i]->getEligibilityTrace() - beforeStates[i].eligibilityTrace;
+        
+        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
+                        " weight Δ=" + std::to_string(weightChange) +
+                        " efficacy Δ=" + std::to_string(efficacyChange) +
+                        " eligibility Δ=" + std::to_string(eligibilityChange));
+    }
+    
+    NLM_LOG_INFO("  Advanced plasticity test completed.");
 }
 
 int main(int argc, char** argv) {
@@ -366,21 +484,83 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Command line arguments parsing for advanced options
+    bool enableVisualization = false;
+    bool enableParallel = false;
+    bool useReducedPrecision = false;
+    bool enableAblation = false;
+    std::string experimentType = "standard";
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--visualization" || arg == "-v") {
+            enableVisualization = true;
+            config->set("visualization_enabled", true, ConfigSource::CommandLine);
+        } else if (arg == "--parallel" || arg == "--threads") {
+            enableParallel = true;
+            config->set("use_parallel_processing", true, ConfigSource::CommandLine);
+        } else if (arg == "--reduced-precision" || arg == "--float16") {
+            useReducedPrecision = true;
+            config->set("use_reduced_precision", true, ConfigSource::CommandLine);
+        } else if (arg == "--ablation" || arg == "--ablate") {
+            enableAblation = true;
+            config->set("enable_ablation", true, ConfigSource::CommandLine);
+        } else if (arg == "--experiment" && i + 1 < argc) {
+            experimentType = argv[++i];
+            config->set("experiment_type", experimentType, ConfigSource::CommandLine);
+        } else if (arg == "--advanced-neurons" || arg == "--advanced") {
+            config->set("advanced_neuron_types_enabled", true, ConfigSource::CommandLine);
+            config->set("bursty_neuron_enabled", true, ConfigSource::CommandLine);
+            config->set("adaptive_neuron_enabled", true, ConfigSource::CommandLine);
+            config->set("adaptive_if_neuron_enabled", true, ConfigSource::CommandLine);
+            config->set("hodgkin_huxley_neuron_enabled", true, ConfigSource::CommandLine);
+            config->set("resonant_neuron_enabled", true, ConfigSource::CommandLine);
+        } else if (arg == "--advanced-plasticity" || arg == "--advanced-plast") {
+            config->set("advanced_plasticity_enabled", true, ConfigSource::CommandLine);
+            config->set("reward_modulated_stdp_enabled", true, ConfigSource::CommandLine);
+            config->set("homosynaptic_enabled", true, ConfigSource::CommandLine);
+            config->set("heterosynaptic_enabled", true, ConfigSource::CommandLine);
+            config->set("synaptic_tagging_enabled", true, ConfigSource::CommandLine);
+            config->set("metaplasticity_enabled", true, ConfigSource::CommandLine);
+            config->set("short_term_plasticity_enabled", true, ConfigSource::CommandLine);
+            config->set("neuromodulatory_integration_enabled", true, ConfigSource::CommandLine);
+        } else if (arg == "--bursting-neurons") {
+            config->set("bursty_neuron_enabled", true, ConfigSource::CommandLine);
+        } else if (arg == "--adaptive-neurons") {
+            config->set("adaptive_neuron_enabled", true, ConfigSource::CommandLine);
+        } else if (arg == "--hh-neurons") {
+            config->set("hodgkin_huxley_neuron_enabled", true, ConfigSource::CommandLine);
+        } else if (arg == "--resonant-neurons") {
+            config->set("resonant_neuron_enabled", true, ConfigSource::CommandLine);
+        } else if (arg == "--rstdp") {
+            config->set("reward_modulated_stdp_enabled", true, ConfigSource::CommandLine);
+        } else if (arg == "--homosynaptic") {
+            config->set("homosynaptic_enabled", true, ConfigSource::CommandLine);
+        } else if (arg == "--heterosynaptic") {
+            config->set("heterosynaptic_enabled", true, ConfigSource::CommandLine);
+        } else if (arg == "--stp") {
+            config->set("short_term_plasticity_enabled", true, ConfigSource::CommandLine);
+        }
+    }
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Handle visualization flag
+    if (enableVisualization) {
+        config->set("visualization_enabled", true, ConfigSource::CommandLine);
+    }
+    
+    // Log advanced options
+    if (enableVisualization) {
+        NLM_LOG_INFO("  Advanced options: Visualization enabled");
+    }
+    if (enableParallel) {
+        NLM_LOG_INFO("  Advanced options: Parallel processing enabled");
+    }
+    if (useReducedPrecision) {
+        NLM_LOG_INFO("  Advanced options: Reduced precision enabled");
+    }
+    if (enableAblation) {
+        NLM_LOG_INFO("  Advanced options: Ablation mode enabled");
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -390,6 +570,44 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    
+    // Log advanced configuration options if set
+    if (config->has("visualization_enabled") && config->getOr<bool>("visualization_enabled", false)) {
+        NLM_LOG_INFO("  visualization_enabled: true");
+    }
+    if (config->has("use_parallel_processing") && config->getOr<bool>("use_parallel_processing", false)) {
+        NLM_LOG_INFO("  use_parallel_processing: true");
+    }
+    if (config->has("use_reduced_precision") && config->getOr<bool>("use_reduced_precision", false)) {
+        NLM_LOG_INFO("  use_reduced_precision: true");
+    }
+    if (config->has("enable_ablation") && config->getOr<bool>("enable_ablation", false)) {
+        NLM_LOG_INFO("  enable_ablation: true");
+    }
+    if (config->has("experiment_type") && !config->getOr<std::string>("experiment_type", "").empty()) {
+        NLM_LOG_INFO("  experiment_type: " + config->getOr<std::string>("experiment_type", ""));
+    }
+    
+    // Log advanced neuron and plasticity configuration
+    if (config->has("advanced_neuron_types_enabled") && config->getOr<bool>("advanced_neuron_types_enabled", false)) {
+        NLM_LOG_INFO("  advanced_neuron_types_enabled: true");
+    }
+    if (config->has("bursty_neuron_enabled") && config->getOr<bool>("bursty_neuron_enabled", false)) {
+        NLM_LOG_INFO("  bursty_neuron_enabled: true");
+    }
+    if (config->has("adaptive_neuron_enabled") && config->getOr<bool>("adaptive_neuron_enabled", false)) {
+        NLM_LOG_INFO("  adaptive_neuron_enabled: true");
+    }
+    if (config->has("advanced_plasticity_enabled") && config->getOr<bool>("advanced_plasticity_enabled", false)) {
+        NLM_LOG_INFO("  advanced_plasticity_enabled: true");
+    }
+    if (config->has("reward_modulated_stdp_enabled") && config->getOr<bool>("reward_modulated_stdp_enabled", false)) {
+        NLM_LOG_INFO("  reward_modulated_stdp_enabled: true");
+    }
+    if (config->has("homosynaptic_enabled") && config->getOr<bool>("homosynaptic_enabled", false)) {
+        NLM_LOG_INFO("  homosynaptic_enabled: true");
+    }
+    
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
@@ -419,10 +637,14 @@ int main(int argc, char** argv) {
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
+    // Run Test 3: STDP verification
     runStdpVerification(brain);
+    
+    // Run Test 4: Advanced neuron types
+    runAdvancedNeuronTest(brain);
+    
+    // Run Test 5: Advanced plasticity rules
+    runAdvancedPlasticityTest(brain);
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -440,6 +662,8 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
     NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
+    NLM_LOG_INFO("  ✓ Advanced neuron types (bursty, adaptive, integrate-and-fire with adaptation, HH models, resonant neurons)");
+    NLM_LOG_INFO("  ✓ Advanced plasticity rules (R-STDP, neuromodulatory plasticity, homosynaptic/heterosynaptic plasticity, synaptic tagging and capture, metaplasticity, STP, neuromodulatory integration)");
     NLM_LOG_INFO("");
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");

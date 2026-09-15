@@ -78,6 +78,50 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
+void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    // Parse value based on type (simplified type detection)
+    if (value == "true" || value == "false") {
+        set(key, value == "true", source);
+    } else {
+        // Check if it's an integer
+        bool isInteger = true;
+        size_t pos = 0;
+        if (value[0] == '-') pos = 1;
+        for (; pos < value.size(); ++pos) {
+            if (!std::isdigit(value[pos])) {
+                isInteger = false;
+                break;
+            }
+        }
+        if (isInteger) {
+            set(key, std::stoll(value), source);
+        } else {
+            // Check if it's a float
+            bool isFloat = true;
+            size_t decimalPos = value.find('.');
+            if (decimalPos != std::string::npos) {
+                // Check digits after decimal
+                bool hasDigitsAfterDecimal = false;
+                for (size_t i = decimalPos + 1; i < value.size(); ++i) {
+                    if (std::isdigit(value[i])) {
+                        hasDigitsAfterDecimal = true;
+                    } else {
+                        isFloat = false;
+                        break;
+                    }
+                }
+                if (hasDigitsAfterDecimal) {
+                    set(key, std::stod(value), source);
+                } else {
+                    set(key, value, source);
+                }
+            } else {
+                set(key, value, source);
+            }
+        }
+    }
+}
+
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
