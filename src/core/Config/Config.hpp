@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <mutex>
 
 namespace nlm {
 
@@ -55,7 +57,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON or key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -64,30 +66,30 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get values (thread-safe)
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values (thread-safe)
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
+    // Check existence (thread-safe)
     bool has(const std::string& key) const;
     
-    // Remove key
+    // Remove key (thread-safe)
     void remove(const std::string& key);
     
-    // Get all keys
+    // Get all keys (thread-safe)
     std::vector<std::string> getKeys() const;
     
-    // Clear all
+    // Clear all (thread-safe)
     void clear();
     
     // Get configuration summary
@@ -100,6 +102,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Thread safety
+    mutable std::mutex mutex_;
 };
 
 } // namespace nlm
