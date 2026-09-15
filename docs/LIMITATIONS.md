@@ -125,105 +125,29 @@ This document explicitly lists what NLM cannot currently do and where it diverge
 - No proprioception
 - No coordination
 
-## Phase 4 Specific Limitations
+Phase 6 experiments measure:
+- Integration success (how well systems work together)
+- Memory retention over time with connected systems
+- Prediction accuracy improvement through system coordination
+- Continual learning performance when systems interact
+- Developmental progression effects on integrated learning
+- Multi-system interaction effectiveness
 
-### Prediction
-- No generative model or world simulator
-- Limited temporal horizon
-- No probabilistic prediction
-- No uncertainty representation
+## Phase 4 vs. Phase 6 Comparison
 
-### Working Memory
-- Limited capacity compared to biological WM
-- No complex working memory binding
-- No sophisticated maintenance mechanisms
-- Rapid decay compared to biological systems
+Phase 4 was a cognitive phase that **successfully completed** with integrated prediction, memory, and cognition systems. Phase 6 is an **integration phase** that aims to **connect all existing systems** but faces significant challenges due to its disconnected architecture.
 
-### Episodic Memory
-- No detailed temporal ordering
-- No pattern separation/completion mechanisms like dentate gyrus
-- No hippocampal architecture
-- Limited consolidation mechanisms
+### Phase 4 Achievements:
+- Prediction, memory, and cognition systems were fully integrated
+- All cognitive mechanisms worked together as a cohesive whole
+- Phase 4 experiments demonstrated functional cognitive capabilities
+- Strong integration between different system types
 
-### Concept Formation
-- No symbolic representation
-- No hierarchical concepts
-- Limited abstraction capability
-- No language-based concepts (intentional)
-
-### Attention
-- Simple competition model
-- No sophisticated attention control
-- No working memory integration
-- Limited attentional control
-
-### Planning
-- Limited planning depth
-- No tree search or simulation
-- No sophisticated state representation
-- No hierarchical planning
-
-### Self-Model
-- No sophisticated body schema
-- No self-recognition
-- No self-consciousness claims
-- Limited self-awareness
-
-### Social Learning
-- No theory of mind
-- No sophisticated imitation learning
-- No cultural transmission
-- No language-based social learning
-
-## Claims We Do NOT Make
-
-NLM Phase 4 does NOT claim to have:
-1. Human-like intelligence
-2. Consciousness or sentience
-3. Genuine self-awareness
-4. Human-like reasoning
-5. Understanding of concepts like humans do
-6. Real episodic memory like humans
-7. Genuine planning capability
-8. Social cognition like humans
-9. Subjective experience
-
-## What NLM Phase 4 IS
-
-NLM Phase 4 IS:
-1. A computational exploration of developmental learning principles
-2. An investigation of whether prediction can emerge from spiking dynamics
-3. A test of whether concepts can form without predefined labels
-4. A study of whether planning can arise from predictive mechanisms
-5. An exploration of whether self-models can develop through sensorimotor learning
-6. A testbed for neural architecture hypotheses
-7. An educational tool for understanding neural computation
-8. A research platform with explicit approximations
-9. A project that acknowledges its limitations honestly
-
-## Measurement vs. Claims
-
-Phase 4 experiments measure:
-- Prediction error reduction over time
-- Retention accuracy in working memory tasks
-- Recall accuracy for stored episodes
-- Stability of discovered patterns
-- Selectivity in attention tasks
-- Success rate in multi-step tasks
-- Self-prediction accuracy
-- Imitation success rate
-
-Phase 4 does NOT claim:
-- "NLM understands concepts"
-- "NLM has episodic memory like humans"
-- "NLM is conscious"
-- "NLM has self-awareness"
-
-Instead we say:
-- "NLM developed stable representations for recurring patterns"
-- "NLM showed retention of information across delays"
-- "NLM's behavior was influenced by past experiences"
-- "NLM predicted action consequences with X% accuracy"
+### Phase 6 Current State:
+- Many systems are defined but remain disconnected
+- Architecture exists but integration is incomplete (~36% complete)
+- Goal is to connect existing systems, not create new ones
+- Integration challenges are the primary focus
 
 ## Importance of Acknowledgment
 

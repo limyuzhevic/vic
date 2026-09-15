@@ -3,9 +3,9 @@
 
 namespace nlm {
 
-// Working Memory Implementation
+// Working Memory Implementation - delegates to NeuralWorkingMemory
 struct WorkingMemory::Impl {
-    std::vector<std::pair<NeuronId, float>> items;
+    NeuralWorkingMemory neuralWorkingMemory;
     size_t capacity;
     
     Impl(size_t cap) : capacity(cap) {}
@@ -16,109 +16,144 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
-    for (auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            item.second = value;
-            return;
-        }
-    }
-    if (pImpl->items.size() < pImpl->capacity) {
-        pImpl->items.emplace_back(neuron, value);
-    }
+    // Delegate to neural working memory
+    pImpl->neuralWorkingMemory.storeToNeuron(neuron, value);
 }
 
 float WorkingMemory::retrieve(NeuronId neuron) const {
-    for (const auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            return item.second;
-        }
-    }
-    return 0.0f;
+    return pImpl->neuralWorkingMemory.getNeuronActivation(neuron);
 }
 
 bool WorkingMemory::contains(NeuronId neuron) const {
-    for (const auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            return true;
-        }
-    }
-    return false;
+    return pImpl->neuralWorkingMemory.contains(neuron);
 }
 
 void WorkingMemory::clear() {
-    pImpl->items.clear();
+    pImpl->neuralWorkingMemory.clear();
 }
 
 size_t WorkingMemory::getCapacity() const {
-    return pImpl->capacity;
+    return pImpl->neuralWorkingMemory.getCapacity();
 }
 
 size_t WorkingMemory::getCurrentSize() const {
-    return pImpl->items.size();
+    return pImpl->neuralWorkingMemory.getActiveTraces();
 }
 
 void WorkingMemory::decay(float decayRate) {
-    for (auto& item : pImpl->items) {
-        item.second *= (1.0f - decayRate);
-    }
+    // Neural working memory handles decay internally
 }
 
-// Episodic Memory Implementation
+void WorkingMemory::consolidate(float threshold) {
+    // Neural working memory handles consolidation internally
+}
+
+void WorkingMemory::update(SimulationStep timestep) {
+    // Neural working memory updates internally
+}
+
+// Episodic Memory Implementation - delegates to NeuralEpisodicMemory
 struct EpisodicMemory::Impl {
-    std::vector<EpisodicMemoryItem> episodes;
-    size_t maxEpisodes;
+    NeuralEpisodicMemory neuralEpisodicMemory;
     
-    Impl(size_t max) : maxEpisodes(max) {}
+    Impl() {}
 };
 
-EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {}
+EpisodicMemory::EpisodicMemory() : pImpl(new Impl), replayEnabled_(false) {}
 
 EpisodicMemory::~EpisodicMemory() = default;
 
-void EpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
-    if (pImpl->episodes.size() >= pImpl->maxEpisodes) {
-        pImpl->episodes.erase(pImpl->episodes.begin());
-    }
-    pImpl->episodes.push_back(episode);
+void EpisodicMemory::initialize(Brain* brain) {
+    pImpl->neuralEpisodicMemory.initialize(brain);
 }
 
-EpisodicMemoryItem EpisodicMemory::retrieveEpisode(size_t index) const {
-    if (index < pImpl->episodes.size()) {
-        return pImpl->episodes[index];
-    }
-    return EpisodicMemoryItem();
+void EpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
+    pImpl->neuralEpisodicMemory.storeEpisode(episode);
+}
+
+const EpisodicMemoryItem* EpisodicMemory::getEpisode(size_t index) const {
+    return pImpl->neuralEpisodicMemory.getEpisode(index);
 }
 
 size_t EpisodicMemory::getEpisodeCount() const {
-    return pImpl->episodes.size();
+    return pImpl->neuralEpisodicMemory.getEpisodeCount();
 }
 
-std::vector<EpisodicMemoryItem> EpisodicMemory::getRecentEpisodes(size_t count) const {
-    std::vector<EpisodicMemoryItem> result;
-    size_t start = count > pImpl->episodes.size() ? 0 : pImpl->episodes.size() - count;
-    for (size_t i = start; i < pImpl->episodes.size(); ++i) {
-        result.push_back(pImpl->episodes[i]);
-    }
-    return result;
+std::vector<const EpisodicMemoryItem*> EpisodicMemory::getRecentEpisodes(size_t count) const {
+    return pImpl->neuralEpisodicMemory.getRecentEpisodes(count);
+}
+
+std::vector<const EpisodicMemoryItem*> EpisodicMemory::retrieveSimilar(
+    const std::vector<float>& sensoryPattern,
+    size_t maxResults) const {
+    return pImpl->neuralEpisodicMemory.retrieveSimilar(sensoryPattern, maxResults);
+}
+
+std::vector<const EpisodicMemoryItem*> EpisodicMemory::retrieveTemporal(
+    SimulationStep startTime,
+    SimulationStep endTime,
+    size_t maxResults) const {
+    return pImpl->neuralEpisodicMemory.retrieveTemporal(startTime, endTime, maxResults);
+}
+
+std::vector<const EpisodicMemoryItem*> EpisodicMemory::retrieveByLocation(
+    float x, float y, float radius,
+    size_t maxResults) const {
+    return pImpl->neuralEpisodicMemory.retrieveByLocation(x, y, radius, maxResults);
 }
 
 void EpisodicMemory::clear() {
-    pImpl->episodes.clear();
+    pImpl->neuralEpisodicMemory.clear();
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    pImpl->neuralEpisodicMemory.consolidate(relevanceThreshold);
 }
 
-// Semantic Memory Implementation
+void EpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
+    pImpl->neuralEpisodicMemory.replayEpisode(episode);
+}
+
+void EpisodicMemory::updateRelevance(size_t episodeId, float relevanceDelta) {
+    pImpl->neuralEpisodicMemory.updateRelevance(episodeId, relevanceDelta);
+}
+
+std::vector<const EpisodicMemoryItem*> EpisodicMemory::getEpisodesForReplay(size_t count) const {
+    return pImpl->neuralEpisodicMemory.getEpisodesForReplay(count);
+}
+
+void EpisodicMemory::replaySequence(const std::vector<size_t>& episodeIds) {
+    pImpl->neuralEpisodicMemory.replaySequence(episodeIds);
+}
+
+float EpisodicMemory::getAverageReward() const {
+    return pImpl->neuralEpisodicMemory.getAverageReward();
+}
+
+void EpisodicMemory::enableReplay(bool enable) {
+    replayEnabled_ = enable;
+    pImpl->neuralEpisodicMemory.enableReplay(enable);
+}
+
+bool EpisodicMemory::isReplayEnabled() const {
+    return replayEnabled_;
+}
+
+// Semantic Memory Implementation - delegates to Neural Semantic implementation
 struct SemanticMemory::Impl {
     std::vector<std::pair<std::string, std::string>> facts;
+    Brain* brain;
+    
+    Impl() : brain(nullptr) {}
 };
 
 SemanticMemory::SemanticMemory() : pImpl(new Impl) {}
 
 SemanticMemory::~SemanticMemory() = default;
+
+void SemanticMemory::initialize(Brain* brain) {
+    pImpl->brain = brain;
+}
 
 void SemanticMemory::storeFact(const std::string& key, const std::string& value) {
     for (auto& fact : pImpl->facts) {
@@ -128,6 +163,17 @@ void SemanticMemory::storeFact(const std::string& key, const std::string& value)
         }
     }
     pImpl->facts.emplace_back(key, value);
+    
+    // Also create distributed representation
+    if (pImpl->brain) {
+        std::vector<float> pattern;
+        // In real implementation, this would create a distributed pattern
+        // For now, we create a simple pattern based on key length and value hash
+        pattern.push_back(static_cast<float>(key.length()) / 100.0f);
+        pattern.push_back(std::hash<std::string>{}(value) % 1000 / 1000.0f);
+        
+        pImpl->brain->getConceptFormation()->learnConcept(pattern, key);
+    }
 }
 
 std::string SemanticMemory::retrieveFact(const std::string& key) const {
@@ -154,115 +200,168 @@ std::vector<std::pair<std::string, std::string>> SemanticMemory::getAllFacts() c
 
 void SemanticMemory::clear() {
     pImpl->facts.clear();
+    if (pImpl->brain) {
+        pImpl->brain->getConceptFormation()->clearConcepts();
+    }
 }
 
-// Procedural Memory Implementation
+void SemanticMemory::storeConcept(const std::vector<float>& pattern, const std::string& label) {
+    if (pImpl->brain) {
+        pImpl->brain->getConceptFormation()->learnConcept(pattern, label);
+    }
+}
+
+std::string SemanticMemory::retrieveConcept(const std::vector<float>& pattern) const {
+    if (pImpl->brain) {
+        return pImpl->brain->getConceptFormation()->retrieveConcept(pattern);
+    }
+    return "";
+}
+
+float SemanticMemory::getConceptSimilarity(const std::vector<float>& patternA,
+                                           const std::vector<float>& patternB) const {
+    if (pImpl->brain) {
+        return pImpl->brain->getConceptFormation()->getConceptSimilarity(patternA, patternB);
+    }
+    return 0.0f;
+}
+
+void SemanticMemory::updateConcept(const std::vector<float>& pattern, float feedback) {
+    if (pImpl->brain) {
+        pImpl->brain->getConceptFormation()->updateConcept(pattern, feedback);
+    }
+}
+
+// Procedural Memory Implementation - delegates to new ProceduralMemory
 struct ProceduralMemory::Impl {
-    std::vector<Skill> skills;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
+    
+    Impl() : proceduralMemory(std::make_unique<ProceduralMemory>()) {}
 };
 
 ProceduralMemory::ProceduralMemory() : pImpl(new Impl) {}
 
 ProceduralMemory::~ProceduralMemory() = default;
 
+void ProceduralMemory::initialize(Brain* brain) {
+    pImpl->proceduralMemory->setBrain(brain);
+}
+
 void ProceduralMemory::learnSkill(const std::string& name, const std::vector<NeuronId>& pattern) {
-    for (auto& skill : pImpl->skills) {
-        if (skill.name == name) {
-            skill.neuralPattern = pattern;
-            return;
-        }
-    }
-    Skill skill;
-    skill.name = name;
-    skill.neuralPattern = pattern;
-    pImpl->skills.push_back(skill);
+    pImpl->proceduralMemory->learnSkill(name, pattern);
 }
 
-Skill* ProceduralMemory::getSkill(const std::string& name) {
-    for (auto& skill : pImpl->skills) {
-        if (skill.name == name) {
-            return &skill;
-        }
-    }
-    return nullptr;
+const Skill* ProceduralMemory::getSkill(const std::string& name) const {
+    return pImpl->proceduralMemory->getSkill(name);
 }
 
-std::vector<Skill*> ProceduralMemory::getAllSkills() {
-    std::vector<Skill*> result;
-    for (auto& skill : pImpl->skills) {
-        result.push_back(&skill);
-    }
-    return result;
+std::vector<const Skill*> ProceduralMemory::getAllSkills() const {
+    return pImpl->proceduralMemory->getAllSkills();
 }
 
-void ProceduralMemory::updateProficiency(const std::string& name, float delta) {
-    for (auto& skill : pImpl->skills) {
-        if (skill.name == name) {
-            skill.proficiency = std::clamp(skill.proficiency + delta, 0.0f, 1.0f);
-            return;
-        }
-    }
+void ProceduralMemory::updateProficiency(const std::string& name, float delta, bool success) {
+    pImpl->proceduralMemory->updateProficiency(name, delta);
+    
+    // Learn from outcome
+    pImpl->proceduralMemory->learnFromOutcome(name, std::vector<float>(), success);
+}
+
+bool ProceduralMemory::executeSkill(const std::string& name, const std::vector<float>& context) {
+    return pImpl->proceduralMemory->executeSkill(name, context);
 }
 
 void ProceduralMemory::clear() {
-    pImpl->skills.clear();
+    pImpl->proceduralMemory->clear();
 }
 
-// Associative Memory Implementation
+void ProceduralMemory::consolidate() {
+    pImpl->proceduralMemory->consolidate();
+}
+
+std::vector<const Skill*> ProceduralMemory::getAvailableSkills(const std::vector<float>& context) const {
+    return pImpl->proceduralMemory->getAvailableSkills(context);
+}
+
+void ProceduralMemory::setSkillContext(const std::string& skillName, const std::vector<NeuronId>& context) {
+    pImpl->proceduralMemory->setSkillContext(skillName, context);
+}
+
+void ProceduralMemory::clearSkillContext(const std::string& skillName) {
+    pImpl->proceduralMemory->clearSkillContext(skillName);
+}
+
+// Associative Memory Implementation - delegates to NeuralAssociativeMemory
 struct AssociativeMemory::Impl {
-    // Pairs of (a, b) associations with strength
-    std::vector<std::tuple<NeuronId, NeuronId, float>> associations;
+    NeuralAssociativeMemory neuralAssociativeMemory;
+    
+    Impl() {}
 };
 
 AssociativeMemory::AssociativeMemory() : pImpl(new Impl) {}
 
 AssociativeMemory::~AssociativeMemory() = default;
 
+void AssociativeMemory::initialize(Brain* brain) {
+    pImpl->neuralAssociativeMemory.initialize(brain);
+}
+
 void AssociativeMemory::associate(NeuronId a, NeuronId b, float strength) {
-    for (auto& assoc : pImpl->associations) {
-        if ((std::get<0>(assoc) == a && std::get<1>(assoc) == b) ||
-            (std::get<0>(assoc) == b && std::get<1>(assoc) == a)) {
-            std::get<2>(assoc) = strength;
-            return;
-        }
-    }
-    pImpl->associations.emplace_back(a, b, strength);
+    pImpl->neuralAssociativeMemory.associate(
+        std::vector<float>{a.getId() % 1000 / 1000.0f}, 
+        std::vector<float>{b.getId() % 1000 / 1000.0f}, 
+        strength);
 }
 
 std::vector<NeuronId> AssociativeMemory::getAssociations(NeuronId neuron) const {
+    // Convert to pattern, retrieve associations, convert back
+    std::vector<float> pattern{neuron.getId() % 1000 / 1000.0f};
+    
+    std::vector<std::vector<float>> associatedPatterns = 
+        pImpl->neuralAssociativeMemory.retrieve(pattern, 10);
+    
     std::vector<NeuronId> result;
-    for (const auto& assoc : pImpl->associations) {
-        if (std::get<0>(assoc) == neuron) {
-            result.push_back(std::get<1>(assoc));
-        } else if (std::get<1>(assoc) == neuron) {
-            result.push_back(std::get<0>(assoc));
+    for (const auto& pattern : associatedPatterns) {
+        if (!pattern.empty()) {
+            // Convert pattern back to NeuronId (simplified)
+            NeuronId assoc(pattern[0] * 1000);
+            result.push_back(assoc);
         }
     }
     return result;
 }
 
 float AssociativeMemory::getAssociationStrength(NeuronId a, NeuronId b) const {
-    for (const auto& assoc : pImpl->associations) {
-        if ((std::get<0>(assoc) == a && std::get<1>(assoc) == b) ||
-            (std::get<0>(assoc) == b && std::get<1>(assoc) == a)) {
-            return std::get<2>(assoc);
-        }
-    }
-    return 0.0f;
+    std::vector<float> patternA{a.getId() % 1000 / 1000.0f};
+    std::vector<float> patternB{b.getId() % 1000 / 1000.0f};
+    
+    return pImpl->neuralAssociativeMemory.getAssociationStrength(patternA, patternB);
 }
 
 void AssociativeMemory::updateAssociation(NeuronId a, NeuronId b, float delta) {
-    for (auto& assoc : pImpl->associations) {
-        if ((std::get<0>(assoc) == a && std::get<1>(assoc) == b) ||
-            (std::get<0>(assoc) == b && std::get<1>(assoc) == a)) {
-            std::get<2>(assoc) = std::clamp(std::get<2>(assoc) + delta, 0.0f, 1.0f);
-            return;
-        }
-    }
+    std::vector<float> patternA{a.getId() % 1000 / 1000.0f};
+    std::vector<float> patternB{b.getId() % 1000 / 1000.0f};
+    
+    pImpl->neuralAssociativeMemory.updateAssociation(patternA, patternB, delta);
 }
 
 void AssociativeMemory::clear() {
-    pImpl->associations.clear();
+    pImpl->neuralAssociativeMemory.clear();
+}
+
+std::vector<NeuronId> AssociativeMemory::spreadActivation(NeuronId startNeuron, size_t steps) const {
+    std::vector<float> pattern{startNeuron.getId() % 1000 / 1000.0f};
+    
+    std::vector<std::vector<float>> activatedPatterns = 
+        pImpl->neuralAssociativeMemory.spreadActivation(pattern, steps);
+    
+    std::vector<NeuronId> result;
+    for (const auto& pattern : activatedPatterns) {
+        if (!pattern.empty()) {
+            NeuronId neuron(pattern[0] * 1000);
+            result.push_back(neuron);
+        }
+    }
+    return result;
 }
 
 } // namespace nlm

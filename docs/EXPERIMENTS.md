@@ -2,7 +2,7 @@
 
 ## Overview
 
-NLM uses experiments to evaluate its developmental learning capabilities. This document outlines the experimental framework, expected metrics, and Phase 4 cognitive experiments.
+NLM uses experiments to evaluate its developmental learning capabilities. This document outlines the experimental framework, expected metrics, and Phase 4 cognitive experiments. **Phase 6 experiments focus on integration testing** to verify that all existing systems work together as a coherent brain.
 
 ## Phase 3 Experiments
 
@@ -23,251 +23,21 @@ Expected outcomes:
 - Reward signals modify synapses
 - Behavior changes across episodes
 
-## Phase 4 Experiments
+## Phase 6 Experiments
 
-### Phase 4.1: Temporal Prediction Learning
-Tests if NLM can learn that state A predicts state B.
+**Note:** Phase 6 experiments focus on **integration testing** - verifying that all existing systems work together as a coherent brain. This is different from Phase 4 which established cognitive capabilities.
 
-**Procedure:**
-1. Present pattern A repeatedly followed by pattern B
-2. Measure prediction error over time
-3. Track if prediction accuracy improves
+### Phase 6.1: Memory System Integration
+Tests working memory connection to sensory processing, episodic memory integration with experience logging, and associative memory linking to episodic memory.
 
-**Metrics:**
-- Prediction error (initial vs final)
-- Improvement over trials
-- Error history
+### Phase 6.2: Neuromodulation Integration
+Tests dopamine effects on plasticity coordination, novelty-curiosity integration, and prediction error integration with neuromodulation.
 
-**Expected:** Error should decrease as NLM learns the temporal relationship.
+### Phase 6.3: Prediction Integration
+Tests prediction system connection to sensory processing, prediction error signals affect learning, and prediction influence on attention and planning.
 
-### Phase 4.2: Working Memory
-Tests if information can be maintained after the stimulus disappears.
+### Phase 6.4: Full Brain Loop Integration
+Comprehensive integration test to verify all systems work together as unified brain, with developmental effects on integrated systems.
 
-**Procedure:**
-1. Present pattern A
-2. Add delay (maintenance period)
-3. Test if pattern information is still present
-
-**Metrics:**
-- Retention accuracy over time
-- Capacity limits
-- Decay rate
-
-**Expected:** Working memory should show gradual decay, not abrupt forgetting.
-
-### Phase 4.3: Episodic Recall
-Tests if past experiences influence future behavior.
-
-**Procedure:**
-1. Store episodes with associated reward
-2. After delay, retrieve similar episodes
-3. Measure if retrieved information influences behavior
-
-**Metrics:**
-- Recall accuracy
-- Number of episodes stored
-- Influence on behavior
-
-**Expected:** Episodes with high reward should be more retrievable.
-
-### Phase 4.4: Concept Formation
-Tests if recurring patterns form stable representations without predefined labels.
-
-**Procedure:**
-1. Present variations of the same underlying pattern
-2. Track if representations become more stable
-3. Measure generalization to new variations
-
-**Metrics:**
-- Number of concepts formed
-- Stability over time
-- Generalization ability
-
-**Expected:** Similar patterns should converge to stable concept representations.
-
-### Phase 4.5: Attention Selection
-Tests if competing signals produce selective processing.
-
-**Procedure:**
-1. Present multiple competing stimuli
-2. Measure which neural populations win
-3. Track attention dynamics
-
-**Metrics:**
-- Selectivity index
-- Winner consistency
-- Response to distractors
-
-**Expected:** Stronger stimuli should win competition.
-
-### Phase 4.6: Multi-Step Planning
-Tests if NLM can plan multi-step sequences to achieve goals.
-
-**Procedure:**
-1. Set goal state
-2. NLM plans action sequence
-3. Execute and measure success
-
-**Metrics:**
-- Planning accuracy
-- Multi-step success rate
-- Planning confidence
-
-**Expected:** Planning should improve with experience.
-
-### Phase 4.7: Self-Action Prediction
-Tests if NLM learns that its actions cause predictable sensory changes.
-
-**Procedure:**
-1. NLM performs action
-2. Record sensory change
-3. Later, predict consequence before acting
-
-**Metrics:**
-- Self-prediction accuracy
-- Body awareness index
-- Self vs external distinction
-
-**Expected:** Self-generated changes should be more predictable.
-
-### Phase 4.8: Object Permanence
-Tests if hidden objects remain relevant to behavior.
-
-**Procedure:**
-1. Object visible → agent approaches
-2. Object hidden (behind barrier)
-3. Agent continues to search for hidden object
-
-**Metrics:**
-- Search behavior after hiding
-- Continued representation
-
-**Expected:** Agent should maintain object representation.
-
-### Phase 4.9: Social Learning
-Tests if NLM can learn from observing another agent.
-
-**Procedure:**
-1. Another agent performs action
-2. NLM observes action and consequence
-3. NLM attempts to imitate later
-
-**Metrics:**
-- Imitation accuracy
-- Observations needed
-- Transfer to new situations
-
-**Expected:** Socially learned actions should be imitatable.
-
-### Phase 4.10: Continual Learning
-Tests if NLM can learn new tasks without forgetting old ones.
-
-**Procedure:**
-1. Learn Task A to criterion
-2. Learn Task B
-3. Test performance on Task A again
-
-**Metrics:**
-- Performance on each task over time
-- Forgetting rate
-- Transfer between tasks
-
-**Expected:** Some forgetting is normal, but knowledge should transfer.
-
-### Phase 4.11: Generalization
-Tests if learned knowledge transfers to new situations.
-
-**Procedure:**
-1. Learn concept in Context A
-2. Test concept in Context B (with variations)
-3. Measure transfer success
-
-**Metrics:**
-- Generalization ratio
-- Variation tolerance
-- Concept stability
-
-**Expected:** Well-formed concepts should generalize.
-
-### Phase 4.12: Integrated Experiment
-Combines all Phase 4 mechanisms in a complex environment.
-
-**Procedure:**
-1. Run multiple episodes with all systems active
-2. Track all metrics over time
-3. Compare early vs late performance
-
-**Metrics:**
-- Total reward
-- All individual mechanism metrics
-- Behavior improvement
-
-## Running Phase 4 Experiments
-
-```bash
-./nlm_phase4_demo [num_trials]
-```
-
-Example:
-```bash
-./nlm_phase4_demo 100
-```
-
-## Experiment Configuration
-
-Experiments can be configured via command line or config file:
-```cpp
-config->set("neuron_count", size_t(1000));
-config->set("prediction_horizon", size_t(3));
-config->set("working_memory_capacity", size_t(100));
-```
-
-## Standard Metrics
-
-### Neural Activity
-- Firing rate distribution
-- Spike timing statistics
-- Population activity levels
-- Synchrony measures
-
-### Memory
-- Retention accuracy
-- Recall success rate
-- Pattern stability
-- Generalization
-
-### Learning
-- Prediction error over time
-- Concept formation rate
-- Planning success
-- Self-prediction accuracy
-
-### Social
-- Imitation success
-- Observation efficiency
-- Communication signal learning
-
-## Analysis Tools
-
-The RepresentationAnalyzer class provides:
-- Pattern similarity computation
-- Representational stability
-- Clustering measures
-- Selectivity indices
-- Temporal precision
-
-## Anti-Cheating Measures
-
-Phase 4 experiments are designed to prevent shortcuts:
-- No predefined correct answers
-- No hard-coded task solutions
-- No symbolic lookups
-- External experiment code measures, not solves
-
-## Reproducibility
-
-All experiments use:
-- Explicit random seeds
-- Version-controlled code
-- Deterministic simulation
-- Multiple seed runs for statistics
+### Phase 6.5: Sleep/Rest Integration
+Tests memory replay during offline periods, consolidation mechanisms, and replay effects on future behavior.

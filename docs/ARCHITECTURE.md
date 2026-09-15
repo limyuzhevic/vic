@@ -39,10 +39,10 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 │                    └─────────────┘                              │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │              PHASE 4: EMERGING COGNITION                    ││
+│  │              PHASE 6: FINAL INTEGRATION                       ││
 │  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       ││
-│  │  │Attention│  │Planning │  │Self-Model│ │ Social  │       ││
-│  │  │         │  │         │  │         │  │Learning │       ││
+│  │  │Memory  │  │Planner  │  │Concepts │  │Attn-     │       ││
+│  │  │Systems │  │         │  │         │  │Selection │       ││
 │  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘       ││
 │  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
@@ -87,7 +87,7 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **Curiosity**: Exploration motivation
 - **PredictionError**: Error signals
 
-### 7. Memory Layer (Phase 4)
+### 7. Memory Layer (Phase 6 - INTEGRATION PHASE)
 - **NeuralWorkingMemory**: Persistent activity for temporary storage
 - **NeuralEpisodicMemory**: Experience encoding in neural patterns
 - **NeuralAssociativeMemory**: Experience-based associations
@@ -95,12 +95,12 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **SpatialRepresentation**: Learned spatial relationships
 - **TemporalRelation**: Before/after/sequence encoding
 
-### 8. Prediction Layer (Phase 4)
+### 8. Prediction Layer (Phase 6 - INTEGRATION PHASE)
 - **NeuralPrediction**: Temporal sequence learning
 - **ActionConsequencePredictor**: Action effect prediction
 - **PredictionErrorSignal**: Error computation for learning
 
-### 9. Cognitive Layer (Phase 4)
+### 9. Cognitive Layer (Phase 6 - INTEGRATION PHASE)
 - **AttentionalSelection**: Competition-based attention (NOT Transformer QKV)
 - **NeuralPlanner**: Predictive action selection
 - **SelfModel**: Sensorimotor self-awareness

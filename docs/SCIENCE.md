@@ -65,7 +65,7 @@ Neuromodulators (dopamine, acetylcholine, norepinephrine, serotonin) modulate ne
 - Receptor types, receptor distribution, and second-messenger systems not modeled
 - Effects on neural dynamics are simplified
 
-## Phase 4: Emerging Cognition
+## Phase 6: Final Integration
 
 ### Prediction Systems
 
@@ -240,7 +240,7 @@ DEVELOPMENTAL CHANGE
 BEHAVIORAL CHANGE
 ```
 
-### Phase 4: Emerging Cognition
+### Phase 6: Final Integration
 ```
 WORLD
       ↓
