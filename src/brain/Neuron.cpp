@@ -95,20 +95,8 @@ void Neuron::setRefractoryPeriod(uint32_t steps) {
     pImpl->state.refractoryPeriod = steps;
 }
 
-uint32_t Neuron::getRefractoryPeriod() const {
-    return pImpl->state.refractoryPeriod;
-}
-
 void Neuron::setRestingPotential(MembranePotential potential) {
     pImpl->state.restingPotential = potential;
-}
-
-MembranePotential Neuron::getRestingPotential() const {
-    return pImpl->state.restingPotential;
-}
-
-void Neuron::setResetPotential(MembranePotential potential) {
-    pImpl->state.resetPotential = potential;
 }
 
 bool Neuron::checkThreshold() const {
@@ -191,7 +179,7 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
+    // Handle refractory period - decrement remaining steps
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
@@ -221,48 +209,42 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
-    
+
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
-    
+
     // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
-    
+
     // Check for spike
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
-        
+
         // Record spike
         recordSpike(currentTime);
-        
+
         // Reset membrane potential
         V = V_reset;
-        
+
         // Enter refractory period
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
-        
+
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.firingState = FiringState::Resting;
     }
-    
+
     // Clear synaptic input for next step
     pImpl->synapticInput = 0.0f;
-    
-    return fired;
-}
 
-void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    return fired;
 }
 
 void Neuron::reset() {

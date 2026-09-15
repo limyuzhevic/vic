@@ -131,6 +131,93 @@ void testRandomInitialization() {
     std::cout << "    testRandomInitialization passed" << std::endl;
 }
 
+void testNeuronStepLIF() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Initialize with parameters for easy spiking
+    neuron.setRestingPotential(-70.0f);
+    neuron.setThreshold(-60.0f);
+    neuron.setResetPotential(-70.0f);
+    neuron.setLeakConductance(10.0f);
+    neuron.setRefractoryPeriod(5);
+    
+    neuron.initializeRandom(nlm::RandomGenerator(42));
+    
+    // Initially not firing
+    assert(!neuron.isFiring());
+    assert(!neuron.isRefractory());
+    
+    // Inject enough current to reach threshold
+    neuron.injectCurrent(100.0f);
+    
+    // Step - should spike
+    bool fired = neuron.stepLIF(0.0, 0.001);  // 1ms timestep
+    assert(fired == true);
+    assert(neuron.isFiring());
+    assert(neuron.isRefractory());
+    
+    // Check that membrane potential was reset after spike
+    assert(neuron.getMembranePotential() == -70.0f);
+    
+    std::cout << "    testNeuronStepLIF passed" << std::endl;
+}
+
+void testNeuronStep() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Initialize with parameters for easy spiking
+    neuron.setRestingPotential(-70.0f);
+    neuron.setThreshold(-60.0f);
+    neuron.setResetPotential(-70.0f);
+    neuron.setLeakConductance(10.0f);
+    neuron.setRefractoryPeriod(5);
+    
+    neuron.initializeRandom(nlm::RandomGenerator(42));
+    
+    // Inject enough current to reach threshold
+    neuron.injectCurrent(100.0f);
+    
+    // Step using default method
+    neuron.step(0.0);
+    
+    // Should have fired (check by membrane potential being reset)
+    assert(neuron.getMembranePotential() == -70.0f);
+    
+    std::cout << "    testNeuronStep passed" << std::endl;
+}
+
+void testRefractoryPeriod() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Initialize with parameters for easy spiking
+    neuron.setRestingPotential(-70.0f);
+    neuron.setThreshold(-60.0f);
+    neuron.setResetPotential(-70.0f);
+    neuron.setLeakConductance(10.0f);
+    neuron.setRefractoryPeriod(5);
+    
+    neuron.initializeRandom(nlm::RandomGenerator(42));
+    
+    // Inject enough current to reach threshold
+    neuron.injectCurrent(100.0f);
+    
+    // Step - should spike and enter refractory
+    neuron.step(0.0);
+    assert(neuron.isRefractory());
+    
+    // Clear current
+    neuron.clearTotalCurrent();
+    
+    // Try to inject current again while in refractory
+    neuron.injectCurrent(100.0f);
+    
+    // Step should not fire (refractory)
+    neuron.step(1.0);  // 1ms later
+    assert(neuron.isRefractory());
+    
+    std::cout << "    testRefractoryPeriod passed" << std::endl;
+}
+
 void testReset() {
     nlm::Neuron neuron(nlm::NeuronId(1));
     
@@ -158,6 +245,8 @@ void runAll() {
     testSpikeHistory();
     testRandomInitialization();
     testReset();
+    testNeuronStepLIF();
+    testNeuronStep();
+    testRefractoryPeriod();
+    testLIFIntegration();
 }
-
-} // namespace test_neuron
