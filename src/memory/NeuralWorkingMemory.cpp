@@ -144,7 +144,21 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     runCompetition();
 }
 
-void NeuralWorkingMemory::clear() {
+void NeuralWorkingMemory::updateFromSensory(const std::vector<Neuron*>& sensoryNeurons) {
+    // Integrate sensory input into working memory
+    for (size_t i = 0; i < sensoryNeurons.size(); ++i) {
+        Neuron* neuron = sensoryNeurons[i];
+        NeuronId neuronId = neuron->getId();
+        
+        // Get current membrane potential as activation level
+        float activation = neuron->getState().membranePotential;
+        
+        // Store if significant activation
+        if (std::abs(activation) > 0.1f) {
+            storeToNeuron(neuronId, activation);
+        }
+    }
+}
     memoryNeurons_.clear();
     memoryActivations_.clear();
     memoryTimestamps_.clear();

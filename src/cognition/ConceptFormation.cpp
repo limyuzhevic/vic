@@ -291,6 +291,25 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
     return 1.0f - (totalVariance / concept->instances.size());
 }
 
+void ConceptFormation::updateConcepts(const std::vector<float>& pattern, 
+                                          Timestamp currentTime) {
+    if (pattern.empty() || !brain_) return;
+    
+    // Get features - for now, use the pattern itself as features
+    // In a full implementation, this could be extracted from the pattern
+    // or through some feature extraction process
+    std::vector<float> features = pattern;
+    
+    // Get reward from neuromodulators (dopamine)
+    float reward = 0.0f;
+    if (brain_->getDopamine()) {
+        reward = brain_->getDopamine()->getLevel();
+    }
+    
+    // Present experience to update concepts
+    presentExperience(pattern, features, reward, currentTime);
+}
+
 void ConceptFormation::clear() {
     concepts_.clear();
     nextConceptId_ = 1;

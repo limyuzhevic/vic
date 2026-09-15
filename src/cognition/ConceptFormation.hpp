@@ -107,8 +107,14 @@ public:
     // Measure concept stability (0-1)
     float getConceptStability(size_t conceptId) const;
 
+    // Update all concepts with a new sensory pattern
+    void updateConcepts(const std::vector<float>& pattern, Timestamp currentTime);
+
     // Get number of concepts discovered
     size_t getConceptCount() const { return concepts_.size(); }
+
+    // Clear all concepts
+    void clear();
 
     // Merge two concepts (when discovered they are actually the same)
     void mergeConcepts(size_t conceptA, size_t conceptB);

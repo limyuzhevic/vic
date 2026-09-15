@@ -155,8 +155,23 @@ public:
     
     // ========== COGNITION SYSTEMS ==========
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    // Get planned action (for debugging/monitoring)
+    ActionType getPlannedAction() const { return pImpl->plannedAction; }
+    
+    // Set planned action (for testing)
+    void setPlannedAction(ActionType action) { pImpl->plannedAction = action; }
+    
+    // Get steps since last planning
+    size_t getStepsSinceLastPlan() const { return pImpl->stepsSinceLastPlan; }
+    
+    // Set steps since last plan (for testing)
+    void setStepsSinceLastPlan(size_t steps) { pImpl->stepsSinceLastPlan = steps; }
+    
+    // Get planning frequency (how often planner is used)
+    size_t getPlanningFrequency() const { return pImpl->planningFrequency; }
+    
+    // Set planning frequency (for testing)
+    void setPlanningFrequency(size_t freq) { pImpl->planningFrequency = freq; }
     
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();

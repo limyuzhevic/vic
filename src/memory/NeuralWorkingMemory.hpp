@@ -44,6 +44,9 @@ public:
 
     // Update working memory (maintenance and decay)
     void update(TimestepDuration dt);
+    
+    // Update working memory with sensory input
+    void updateFromSensory(const std::vector<Neuron*>& sensoryNeurons);
 
     // Clear working memory
     void clear();
