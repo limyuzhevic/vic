@@ -24,8 +24,9 @@ public:
     // Set action preferences (for exploration)
     void setActionPreference(ActionType action, float preference);
     
-    // Get action history
-    const std::vector<const Action*>& getActionHistory() const;
+    // Get action history - using smart pointers for automatic memory management
+    // Return by value to avoid reference issues with temporary objects
+    std::vector<std::unique_ptr<const Action>> getActionHistoryCopy() const;
     void clearHistory();
     
 private:

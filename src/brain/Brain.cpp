@@ -15,10 +15,8 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include <unordered_map>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -27,6 +25,9 @@ struct Brain::Impl {
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+    
+    // Index for O(1) neuron lookup by ID
+    std::unordered_map<NeuronId, Neuron*> neuronLookup;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -286,9 +287,15 @@ bool Brain::initialize() {
         }
     });
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    // Build neuron lookup map for O(1) access by ID
+    pImpl->neuronLookup.clear();
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                pImpl->neuronLookup[neuron->getId()] = neuron;
+            }
+        }
+    }
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
@@ -617,14 +624,11 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
-    for (auto& region : pImpl->regions) {
-        auto neurons = region->getAllNeurons();
-        for (auto* n : neurons) {
-            if (n->getId() == neuron) {
-                n->injectCurrent(current);
-                return;
-            }
-        }
+    // Use O(1) lookup via neuron index
+    auto it = pImpl->neuronLookup.find(neuron);
+    if (it != pImpl->neuronLookup.end()) {
+        it->second->injectCurrent(current);
+        return;
     }
 }
 
@@ -751,6 +755,9 @@ void Brain::reset() {
     
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
+    
+    // Clear neuron lookup map
+    pImpl->neuronLookup.clear();
     
     // Reset memory systems
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
