@@ -471,7 +471,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
                 }
             }
-            
             // Update synapse state
             syn->step(currentTime);
         }
