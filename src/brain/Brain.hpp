@@ -184,6 +184,11 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
+    // ========== CHECKPOINT SYSTEM ACCESSORS ==========
+    
+    // Get checkpoint manager
+    CheckpointManager* getCheckpointManager();
+    
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     

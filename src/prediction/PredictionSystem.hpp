@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// Implements forward model for sensory prediction and error computation
 
 class PredictionSystem {
 public:
@@ -20,6 +20,9 @@ public:
     
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
+    
+    // Update prediction system with current brain state (for integration)
+    void update(const Brain& brain);
     
     // Get prediction error
     float getPredictionError() const;
