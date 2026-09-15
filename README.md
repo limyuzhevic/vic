@@ -82,6 +82,20 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Phase 3 Demo
+```bash
+./nlm_phase3_demo
+```
+
+This runs the Phase 3 demonstration.
+
+### Phase 4 Demo
+```bash
+./nlm_phase4_demo
+```
+
+This runs the Phase 4 demonstration.
+
 ## Project Structure
 
 ```

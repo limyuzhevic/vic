@@ -173,6 +173,18 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         return false;
     }
     
+    // Ensure all integrated systems are initialized before verification
+    brain->getWorkingMemory();
+    brain->getEpisodicMemory();
+    brain->getPlanner();
+    brain->getConceptFormation();
+    brain->getAttention();
+    brain->getPredictionSystem();
+    brain->getDopamine();
+    brain->getCuriosity();
+    brain->getNovelty();
+    brain->getDevelopmentSystem();
+    
     bool success = true;
     
     // Test 1: Memory systems exist and are connected

@@ -40,14 +40,11 @@ public:
     // Get current developmental stage
     DevelopmentalStage getDevelopmentalStage() const;
     
-    // Get neuromodulation level
-    float getNeuromodulationLevel() const;
+    // Get novelyty level
+    float getNoveltyLevel() const;
     
     // Get curiosity level
     float getCuriosityLevel() const;
-    
-    // Get novelty level
-    float getNoveltyLevel() const;
     
     // Get prediction error
     float getPredictionError() const;
