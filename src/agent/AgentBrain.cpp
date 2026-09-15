@@ -29,9 +29,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                        // Ensure motor neurons get assigned to action groups
+                        // Note: using hash of neuron ID for deterministic distribution
+                        size_t idx = n->getId().index();
                         
                         switch (idx % 6) {
                             case 0: motorForward_.push_back(n); break;
@@ -45,8 +45,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
+                        size_t idx = n->getId().index();
                         
                         switch (idx % 4) {
                             case 0: sensoryVision_.push_back(n); break;
@@ -59,6 +58,31 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
             }
         }
     }
+    
+    // Ensure we have at least one neuron in each motor group for functionality
+    if (motorForward_.empty() && !motorWait_.empty()) {
+        motorForward_.push_back(motorWait_[0]);
+    }
+    if (motorBackward_.empty() && !motorWait_.empty()) {
+        motorBackward_.push_back(motorWait_[0]);
+    }
+    if (motorTurnLeft_.empty() && !motorWait_.empty()) {
+        motorTurnLeft_.push_back(motorWait_[0]);
+    }
+    if (motorTurnRight_.empty() && !motorWait_.empty()) {
+        motorTurnRight_.push_back(motorWait_[0]);
+    }
+    if (motorInteract_.empty() && !motorWait_.empty()) {
+        motorInteract_.push_back(motorWait_[0]);
+    }
+    
+    // Ensure we have at least one vision sensory neuron for basic functionality
+    if (sensoryVision_.empty() && !sensoryTouch_.empty()) {
+        sensoryVision_.push_back(sensoryTouch_[0]);
+    }
+    if (sensoryTouch_.empty() && !sensoryVision_.empty()) {
+        sensoryTouch_.push_back(sensoryVision_[0]);
+    }
 }
 
 AgentBrain::~AgentBrain() = default;
@@ -67,6 +91,12 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Initialize planning system if brain has planner
+    if (brain_ && brain_->getPlanner()) {
+        brain_->getPlanner()->initialize(brain_.get());
+        brain_->getPlanner()->setPlanningDepth(5); // Look ahead 5 steps
+    }
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -121,6 +151,64 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
+        }
+    }
+    
+    // Store sensory experience in episodic memory if brain has episodic memory
+    if (brain_->getEpisodicMemory()) {
+        EpisodicMemoryItem episode;
+        episode.timestamp = static_cast<SimulationStep>(brain_->getTotalSpikeCount());  // Use spike count as proxy for time
+        
+        // Store sensory state
+        episode.sensoryState = vision;
+        if (!touch.empty()) {
+            // Extend vision with touch data for complete sensory representation
+            episode.sensoryState.insert(episode.sensoryState.end(), touch.begin(), touch.end());
+        }
+        if (!intern.empty()) {
+            episode.sensoryState.insert(episode.sensoryState.end(), intern.begin(), intern.end());
+        }
+        if (!proprio.empty()) {
+            episode.sensoryState.insert(episode.sensoryState.end(), proprio.begin(), proprio.end());
+        }
+        
+        // Default position/orientation (will be updated by world)
+        episode.positionX = 0.0f;
+        episode.positionY = 0.0f;
+        episode.orientation = 0.0f;
+        
+        // Action is Wait by default (will be set by agent)
+        episode.action = ActionType::Wait;
+        
+        // Internal state
+        episode.reward = 0.0f; // Will be computed later by world
+        episode.energy = 0.0f;
+        episode.novelty = noveltyLevel_;
+        
+        // Resulting states will be filled by the agent based on action
+        episode.resultingSensoryState = std::vector<float>();
+        episode.resultingReward = 0.0f;
+        
+        // Store neural activity patterns as active neurons
+        for (const auto& region : brain_->getRegions()) {
+            for (const auto& pop : region->getPopulations()) {
+                for (Neuron* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        episode.activeNeurons.push_back(neuron->getId());
+                        episode.neuronActivations.push_back(
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+        }
+        
+        // Store episode in episodic memory
+        brain_->getEpisodicMemory()->storeEpisode(episode);
+        
+        // Also store in working memory for immediate access
+        if (brain_->getWorkingMemory() && !vision.empty()) {
+            brain_->getWorkingMemory()->store(vision, 1.0f);
         }
     }
     

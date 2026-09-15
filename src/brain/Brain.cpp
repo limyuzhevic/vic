@@ -403,6 +403,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // Working memory should update based on the neural activity patterns from this step
+        // The working memory already receives input from neurons that fire during steps 1-3
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
@@ -538,11 +540,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
+    // Implement sleep-like replay during agent processing
+    // This consolidates recently formed memories into more stable representations
+    if (pImpl->episodicMemory) {
+        // Get episodes for replay (based on importance and recency)
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+        if (!episodesToReplay.empty()) {
+            for (const auto* episode : episodesToReplay) {
+                // Replay strengthens synaptic connections associated with the memory
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+            
+            // After replay, we should consolidate the memory
+            // This makes the memory more resistant to interference
+            pImpl->episodicMemory->consolidate(0.3f);  // Consolidate 30% of weakest traces
         }
     }
     
