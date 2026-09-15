@@ -356,11 +356,13 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
+    // Load config from file (with proper error handling)
+    NLM_LOG_INFO("Loading configuration from: " + configFile);
+    if (!config->loadFromFile(configFile)) {
+        NLM_LOG_ERROR("Failed to load configuration from " + configFile + ". Using defaults.");
         NLM_LOG_INFO("Using default configuration.");
+    } else {
+        NLM_LOG_INFO("Successfully loaded configuration from: " + configFile);
     }
     
     // Override with command line args

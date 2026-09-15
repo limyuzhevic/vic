@@ -24,15 +24,15 @@ NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(new Imp
 
 NeuralRegion::~NeuralRegion() = default;
 
-NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(std::move(other.pImpl)) {
+    // other.pImpl is now nullptr in the moved-from object
 }
 
 NeuralRegion& NeuralRegion::operator=(NeuralRegion&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        delete pImpl;  // Delete current implementation
+        pImpl = std::move(other.pImpl);
+        // other.pImpl is now nullptr in the moved-from object
     }
     return *this;
 }
@@ -50,6 +50,10 @@ void NeuralRegion::setName(const std::string& name) {
 }
 
 PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
+    if (size == 0) {
+        return INVALID_POPULATION_ID;
+    }
+    
     PopulationId popId(pImpl->populations.size() + 1);
     auto population = std::make_unique<NeuralPopulation>(popId, size);
     population->setNeuronType(type);
@@ -58,14 +62,18 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
 }
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    // Validate ID: should be in range [1, populations.size() + 1]
+    // where 1 maps to index 0, 2 to index 1, etc.
+    if (id.index() == 0 || id.index() > pImpl->populations.size() + 1) {
         return nullptr;
     }
     return pImpl->populations[id.index() - 1].get();
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    // Validate ID: should be in range [1, populations.size() + 1]
+    // where 1 maps to index 0, 2 to index 1, etc.
+    if (id.index() == 0 || id.index() > pImpl->populations.size() + 1) {
         return nullptr;
     }
     return pImpl->populations[id.index() - 1].get();

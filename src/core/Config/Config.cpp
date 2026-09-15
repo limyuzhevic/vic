@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "../core/JsonParser.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -19,9 +20,20 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Implement proper JSON/YAML parser support
+    // Try to parse as JSON first, fallback to simple key=value format
     
+    // Try JSON parser first
+    std::unordered_map<std::string, nlm::ConfigValue> jsonValues;
+    if (JsonParser::parseFile(filepath, jsonValues) && JsonParser::validate(jsonValues)) {
+        // Convert JSON values to Config entries
+        for (const auto& pair : jsonValues) {
+            set(pair.first, pair.second, ConfigSource::File);
+        }
+        return true;
+    }
+    
+    // Fallback to simple key=value format for backward compatibility
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -187,9 +199,10 @@ std::string Config::summary() const {
 }
 
 std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
+    // Include all whitespace characters for proper trimming
+    size_t start = str.find_first_not_of(" \t\n\r\f\v");
     if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
+    size_t end = str.find_last_not_of(" \t\n\r\f\v");
     return str.substr(start, end - start + 1);
 }
 

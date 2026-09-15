@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <limits>
 
 namespace nlm {
 
@@ -675,10 +676,23 @@ float Brain::getExcitationInhibitionRatio() const {
         }
     }
     
-    if (totalInhibitory > 0.0f) {
+    // Prevent division by zero or very small values
+    const float EPSILON = 1e-8f;
+    if (totalInhibitory > EPSILON) {
         return totalExcitatory / totalInhibitory;
     }
-    return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
+    
+    // Handle edge cases:
+    // - Both zero: ratio is 0 (neutral network)
+    // - Only excitatory: return a large finite number instead of infinity
+    // - Only inhibitory: return small number
+    if (totalExcitatory > EPSILON && totalInhibitory <= EPSILON) {
+        return 1e6f;  // Large but finite value representing excitation dominance
+    } else if (totalInhibitory > EPSILON && totalExcitatory <= EPSILON) {
+        return 1e-6f;  // Small but finite value representing inhibition dominance
+    }
+    
+    return 0.0f;  // Neutral or zero activity
 }
 
 size_t Brain::getTotalSpikeCount() const {
