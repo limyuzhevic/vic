@@ -3,11 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
+#include "../memory/Memory.hpp"
 
 namespace nlm {
 
@@ -19,6 +15,8 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class SemanticMemory;
+class ProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
@@ -139,14 +137,19 @@ public:
     
     // ========== MEMORY SYSTEMS ==========
     
-    // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
-    
+
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
+
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+
+    // Semantic memory - facts and knowledge
+    SemanticMemory* getSemanticMemory();
+
+    // Procedural memory - skills and habits
+    ProceduralMemory* getProceduralMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
@@ -172,17 +175,14 @@ public:
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
     
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

@@ -400,6 +400,302 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Add SemanticMemory bindings
+    py::class_<SemanticMemory>(m, "SemanticMemory", R"pbdoc(Semantic memory for facts and knowledge)pbdoc")
+        .def(py::init<>())
+        .def("storeFact", &SemanticMemory::storeFact, py::arg("key"), py::arg("value"),
+             "Store a fact in semantic memory")
+        .def("retrieveFact", &SemanticMemory::retrieveFact, py::arg("key"),
+             "Retrieve a fact from semantic memory")
+        .def("hasFact", &SemanticMemory::hasFact, py::arg("key"),
+             "Check if a fact exists in semantic memory")
+        .def("getAllFacts", &SemanticMemory::getAllFacts,
+             "Get all facts in semantic memory")
+        .def("clear", &SemanticMemory::clear,
+             "Clear all facts from semantic memory");
+
+    // Add ProceduralMemory bindings
+    py::class_<ProceduralMemory>(m, "ProceduralMemory", R"pbdoc(Procedural memory for skills and habits)pbdoc")
+        .def(py::init<>())
+        .def("learnSkill", &ProceduralMemory::learnSkill, py::arg("name"), py::arg("pattern"),
+             "Learn a new skill")
+        .def("getSkill", &ProceduralMemory::getSkill, py::arg("name"),
+             "Get a skill by name")
+        .def("getAllSkills", &ProceduralMemory::getAllSkills,
+             "Get all learned skills")
+        .def("updateProficiency", &ProceduralMemory::updateProficiency, py::arg("name"), py::arg("delta"),
+             "Update skill proficiency")
+        .def("clear", &ProceduralMemory::clear,
+             "Clear all skills");
+
+    // Add Acetylcholine bindings
+    py::class_<Acetylcholine>(m, "Acetylcholine", R"pbdoc(Acetylcholine neuromodulator for attention and memory)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Acetylcholine::getName,
+             "Get neuromodulator name")
+        .def("getLevel", &Acetylcholine::getLevel,
+             "Get current neuromodulator level")
+        .def("setLevel", &Acetylcholine::setLevel, py::arg("level"),
+             "Set neuromodulator level")
+        .def("getPlasticityFactor", &Acetylcholine::getPlasticityFactor,
+             "Get plasticity modulation factor")
+        .def("update", &Acetylcholine::update, py::arg("dt"),
+             "Update neuromodulator state")
+        .def("enhanceAttention", &Acetylcholine::enhanceAttention, py::arg("strength"),
+             "Enhance attention")
+        .def("modulateMemoryConsolidation", &Acetylcholine::modulateMemoryConsolidation, py::arg("amount"),
+             "Modulate memory consolidation");
+
+    // Add Norepinephrine bindings
+    py::class_<Norepinephrine>(m, "Norepinephrine", R"pbdoc(Norepinephrine neuromodulator for arousal and vigilance)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Norepinephrine::getName,
+             "Get neuromodulator name")
+        .def("getLevel", &Norepinephrine::getLevel,
+             "Get current neuromodulator level")
+        .def("setLevel", &Norepinephrine::setLevel, py::arg("level"),
+             "Set neuromodulator level")
+        .def("getPlasticityFactor", &Norepinephrine::getPlasticityFactor,
+             "Get plasticity modulation factor")
+        .def("update", &Norepinephrine::update, py::arg("dt"),
+             "Update neuromodulator state")
+        .def("increase alertness", &Norepinephrine::increase alertness, py::arg("level"),
+             "Increase alertness")
+        .def("modulateWorkingMemory", &Norepinephrine::modulateWorkingMemory, py::arg("effect"),
+             "Modulate working memory");
+
+        .def("enhanceAttention", &Acetylcholine::enhanceAttention, py::arg("strength"),
+             "Enhance attention")
+        .def("modulateMemoryConsolidation", &Acetylcholine::modulateMemoryConsolidation, py::arg("amount"),
+             "Modulate memory consolidation");
+
+    // Add Norepinephrine bindings
+    py::class_<Norepinephrine>(m, "Norepinephrine", R"pbdoc(Norepinephrine neuromodulator for arousal and vigilance)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Norepinephrine::getName,
+             "Get neuromodulator name")
+        .def("getLevel", &Norepinephrine::getLevel,
+             "Get current neuromodulator level")
+        .def("setLevel", &Norepinephrine::setLevel, py::arg("level"),
+             "Set neuromodulator level")
+        .def("getPlasticityFactor", &Norepinephrine::getPlasticityFactor,
+             "Get plasticity modulation factor")
+        .def("update", &Norepinephrine::update, py::arg("dt"),
+             "Update neuromodulator state")
+        .def("increase alertness", &Norepinephrine::increase alertness, py::arg("level"),
+             "Increase alertness")
+        .def("modulateWorkingMemory", &Norepinephrine::modulateWorkingMemory, py::arg("effect"),
+             "Modulate working memory");
+
+    // Add Serotonin bindings
+    py::class_<Serotonin>(m, "Serotonin", R"pbdoc(Serotonin neuromodulator for mood, impulsivity, and social behavior)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Serotonin::getName,
+             "Get neuromodulator name")
+        .def("getLevel", &Serotonin::getLevel,
+             "Get current neuromodulator level")
+        .def("setLevel", &Serotonin::setLevel, py::arg("level"),
+             "Set neuromodulator level")
+        .def("getPlasticityFactor", &Serotonin::getPlasticityFactor,
+             "Get plasticity modulation factor")
+        .def("update", &Serotonin::update, py::arg("dt"),
+             "Update neuromodulator state")
+        .def("modulateSocialBehavior", &Serotonin::modulateSocialBehavior, py::arg("level"),
+             "Modulate social behavior")
+        .def("reduceImpulsivity", &Serotonin::reduceImpulsivity, py::arg("amount"),
+             "Reduce impulsivity");
+
+        .def("enhanceAttention", &Acetylcholine::enhanceAttention, py::arg("strength"),
+             "Enhance attention")
+        .def("modulateMemoryConsolidation", &Acetylcholine::modulateMemoryConsolidation, py::arg("amount"),
+             "Modulate memory consolidation");
+
+    // Add Norepinephrine bindings
+    py::class_<Norepinephrine>(m, "Norepinephrine", R"pbdoc(Norepinephrine neuromodulator for arousal and vigilance)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Norepinephrine::getName,
+             "Get neuromodulator name")
+        .def("getLevel", &Norepinephrine::getLevel,
+             "Get current neuromodulator level")
+        .def("setLevel", &Norepinephrine::setLevel, py::arg("level"),
+             "Set neuromodulator level")
+        .def("getPlasticityFactor", &Norepinephrine::getPlasticityFactor,
+             "Get plasticity modulation factor")
+        .def("update", &Norepinephrine::update, py::arg("dt"),
+             "Update neuromodulator state")
+        .def("increase alertness", &Norepinephrine::increase alertness, py::arg("level"),
+             "Increase alertness")
+        .def("modulateWorkingMemory", &Norepinephrine::modulateWorkingMemory, py::arg("effect"),
+             "Modulate working memory");
+
+    // Add Serotonin bindings
+    py::class_<Serotonin>(m, "Serotonin", R"pbdoc(Serotonin neuromodulator for mood, impulsivity, and social behavior)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Serotonin::getName,
+             "Get neuromodulator name")
+        .def("getLevel", &Serotonin::getLevel,
+             "Get current neuromodulator level")
+        .def("setLevel", &Serotonin::setLevel, py::arg("level"),
+             "Set neuromodulator level")
+        .def("getPlasticityFactor", &Serotonin::getPlasticityFactor,
+             "Get plasticity modulation factor")
+        .def("update", &Serotonin::update, py::arg("dt"),
+             "Update neuromodulator state")
+        .def("modulateSocialBehavior", &Serotonin::modulateSocialBehavior, py::arg("level"),
+             "Modulate social behavior")
+        .def("reduceImpulsivity", &Serotonin::reduceImpulsivity, py::arg("amount"),
+             "Reduce impulsivity");
+
+    // Add Brain memory system bindings
+    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def("initialize", &Brain::initialize,
+             "Initialize the brain with configuration")
+        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
+             py::arg("currentStep"),
+             "Perform a simulation step")
+        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
+             py::arg("currentStep"), py::arg("currentTime"),
+             "Perform a simulation step with timestamp")
+        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
+             py::arg("input"),
+             "Inject sensory input into the brain")
+        .def("injectCurrent", &Brain::injectCurrent,
+             py::arg("neuron"), py::arg("current"),
+             "Inject current into a specific neuron")
+        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
+             py::arg("type"), py::arg("current"),
+             "Inject current into all neurons of a specific type")
+        .def("produceAction", &Brain::produceAction,
+             "Produce motor action based on neural activity")
+        .def("reset", &Brain::reset,
+             "Reset brain state")
+        .def("save", &Brain::save, py::arg("filepath"),
+             "Save brain state to file")
+        .def("load", &Brain::load, py::arg("filepath"),
+             "Load brain state from file")
+        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
+             "Add a new neural region")
+        .def("getRegion", &Brain::getRegion, py::arg("id"),
+             py::return_value_policy::reference_internal,
+             "Get a region by ID")
+        .def("getRegionCount", &Brain::getRegionCount,
+             "Get the number of regions")
+        .def("getRegionIds", &Brain::getRegionIds,
+             "Get all region IDs")
+        .def("getRegions", &Brain::getRegions,
+             py::return_value_policy::reference_internal,
+             "Get all regions")
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count across all regions")
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count across all regions")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+             "Get count of active neurons")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+             "Get count of currently firing neurons")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate across all neurons")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage")
+        .def("getConfig", &Brain::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get the configuration")
+        .def("logStatus", &Brain::logStatus,
+             "Log brain status")
+        // Add memory system getters
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory")
+        .def("getSemanticMemory", &Brain::getSemanticMemory,
+             py::return_value_policy::reference_internal,
+             "Get semantic memory")
+        .def("getProceduralMemory", &Brain::getProceduralMemory,
+             py::return_value_policy::reference_internal,
+             "Get procedural memory")
+        // Add neuromodulator getters
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulator")
+        .def("getAcetylcholine", &Brain::getAcetylcholine,
+             py::return_value_policy::reference_internal,
+             "Get acetylcholine neuromodulator")
+        .def("getNorepinephrine", &Brain::getNorepinephrine,
+             py::return_value_policy::reference_internal,
+             "Get norepinephrine neuromodulator")
+        .def("getSerotonin", &Brain::getSerotonin,
+             py::return_value_policy::reference_internal,
+             "Get serotonin neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity neuromodulator")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty neuromodulator")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error neuromodulator");
+
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+             "Initialize with world")
+        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+             "Get expected sensory input size")
+        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+             "Get expected motor output size")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput,
+             py::arg("percept"),
+             "Process sensory percept and inject into brain")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+             "Decode brain motor activity into motor command")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predictedReward"),
+             "Apply reward-based neuromodulation")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment,
+             py::arg("timestep"),
+             "Update development system")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             "Get prediction error")
+        .def("reset", &AgentBrain::reset,
+             "Reset agent for new episode")
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain")
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"))
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"))
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+             py::arg("enable"))
+        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"))
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -415,6 +711,14 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
+    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
+    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+}
+
+} // namespace nlm
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
