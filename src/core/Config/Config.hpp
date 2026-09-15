@@ -8,9 +8,6 @@
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-
 // Configuration value types
 using ConfigValue = std::variant<
     int,

@@ -78,15 +78,40 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
+void Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        return;
     }
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Save actual value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, int> || 
+                                 std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, double> || 
+                                 std::is_same_v<T, float>) {
+                // Use formatting to avoid trailing zeros
+                std::ostringstream oss;
+                oss << entry.key << " = " << arg;
+                file << oss.str() << "\n";
+            } else {
+                // For complex types like vectors, just save as string representation
+                std::ostringstream oss;
+                oss << entry.key << " = \"" << arg << "\"\n";
+                file << oss.str();
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
