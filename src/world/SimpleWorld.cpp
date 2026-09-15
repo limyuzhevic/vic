@@ -218,6 +218,7 @@ ActionResult SimpleWorld::interact() {
     ActionResult result;
     result.reward = 0.0f;
     result.success = false;
+    result.message = "";
     
     // Check for objects in interaction range
     const float interactRange = 1.0f;
@@ -242,6 +243,14 @@ ActionResult SimpleWorld::interact() {
                 result.reward = obj.value;  // Negative reward
                 result.success = true;
                 result.message = "hit_hazard";
+            } else if (obj.type == WorldObjectType::Wall) {
+                result.reward = obj.value;  // May be zero, but could be negative for destructible walls
+                result.success = true;
+                result.message = "interacted_with_wall";
+            } else if (obj.type == WorldObjectType::Marker) {
+                result.reward = obj.value;  // Could be used for goal completion
+                result.success = true;
+                result.message = "found_marker";
             }
             
             // Only interact with one object at a time
