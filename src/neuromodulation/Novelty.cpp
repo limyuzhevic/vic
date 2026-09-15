@@ -1,5 +1,11 @@
 #include "Novelty.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../development/DevelopmentSystem.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -13,7 +19,15 @@ struct Novelty::Impl {
     std::vector<float> lastPattern;
     float noveltyThreshold;
     
-    Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
+    // Enhanced novelty effects
+    float memoryConsolidationStrength;
+    float explorationGuidance;
+    float conceptFormationBoost;
+    float developmentTrigger;
+    
+    Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f),
+             memoryConsolidationStrength(0.0f), explorationGuidance(0.0f),
+             conceptFormationBoost(0.0f), developmentTrigger(0.0f) {}
 };
 
 Novelty::Novelty() : pImpl(new Impl) {}
@@ -79,6 +93,54 @@ const std::vector<float>& Novelty::getHistory() const {
 
 void Novelty::clearHistory() {
     pImpl->history.clear();
+}
+
+// Enhanced novelty effects for all systems
+void Novelty::applyMemoryConsolidation(NeuralWorkingMemory* workingMemory, float deltaTime) {
+    if (!workingMemory) return;
+    
+    // Enhance working memory consolidation based on novelty
+    float consolidationStrength = pImpl->level * pImpl->memoryConsolidationStrength;
+    workingMemory->enhanceConsolidation(consolidationStrength);
+    
+    // Boost encoding of novel information
+    workingMemory->boostNovelEncoding(pImpl->level * 0.5f);
+}
+
+void Novelty::applyExplorationGuidance(NeuralPlanner* planner, float deltaTime) {
+    if (!planner) return;
+    
+    // Guide exploration based on novelty level
+    float explorationGuidance = pImpl->level * pImpl->explorationGuidance;
+    planner->guideExploration(explorationGuidance);
+    
+    // Increase exploration entropy based on novelty
+    planner->increaseExplorationEntropy(pImpl->level * 0.3f);
+}
+
+void Novelty::applyConceptFormationEnhancement(ConceptFormation* conceptFormation, float deltaTime) {
+    if (!conceptFormation) return;
+    
+    // Boost concept formation with novel input
+    float conceptBoost = pImpl->level * pImpl->conceptFormationBoost;
+    conceptFormation->enhanceNoveltyProcessing(conceptBoost);
+    
+    // Facilitate pattern separation for novel inputs
+    conceptFormation->facilitatePatternSeparation(pImpl->level * 0.4f);
+}
+
+void Novelty::applyDevelopmentTriggering(DevelopmentSystem* developmentSystem, float deltaTime) {
+    if (!developmentSystem) return;
+    
+    // Trigger developmental processes based on novelty
+    if (pImpl->level > 0.7f) {
+        developmentSystem->triggerNoveltyDrivenDevelopment(pImpl->level * pImpl->developmentTrigger);
+    }
+    
+    // Accumulate developmental pressure from sustained novelty
+    if (pImpl->level > 0.5f) {
+        developmentSystem->accumulateDevelopmentalPressure(pImpl->level * 0.1f);
+    }
 }
 
 } // namespace nlm

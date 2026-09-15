@@ -49,8 +49,36 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
                     break;
-                }
-            }
+    // Inject current to maintain activation
+    if (brain_) {
+        // Use the Brain's injectCurrent method which finds the neuron in regions
+        brain_->injectCurrent(neuron, activation * 5.0f);
+    }
+}
+
+void NeuralWorkingMemory::integrateWithNeuralActivity(Brain& brain, TimestepDuration dt) {
+    // Integrate working memory content with current neural activity
+    // This step ensures working memory actively influences neural computation
+    
+    // 1. Update recurrent connections based on current memory patterns
+    updateRecurrentConnections();
+    
+    // 2. Enhance winner neurons through recurrent amplification
+    enhanceWinnerNeurons();
+    
+    // 3. Apply prediction error-based updating if available
+    if (brain.getPredictionErrorSignal()) {
+        applyPredictionErrorUpdates();
+    }
+    
+    // 4. Update memory based on novelty detection
+    if (brain.getNovelty()) {
+        updateBasedOnNovelty();
+    }
+    
+    // 5. Apply attention modulation to memory traces
+    modulateMemoryByAttention();
+}
         }
         
         // Update stored activation
@@ -81,10 +109,12 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        activeTraces_.push_back(memoryNeurons_.size() - 1);
     }
     
     // Inject current to maintain activation
     if (brain_) {
+        // Use the Brain's injectCurrent method which finds the neuron in regions
         brain_->injectCurrent(neuron, activation * 5.0f);
     }
 }
@@ -423,4 +453,104 @@ void AttentionalSelection::reset() {
     pImpl->inhibitionLevel.clear();
 }
 
-} // namespace nlm
+void NeuralWorkingMemory::enhanceWinnerNeurons() {
+    // Enhance winner neurons through recurrent connections
+    for (const auto& neuronId : winners_) {
+        if (brain_) {
+            // Apply enhanced current to winners
+            brain_->injectCurrent(neuronId, 2.0f);
+        }
+    }
+}
+
+void NeuralWorkingMemory::applyPredictionErrorUpdates() {
+    // Update memory traces based on prediction errors
+    // This helps the system learn from mismatches between predictions and reality
+    float error = getPredictionErrorSignal()->getLevel();
+    
+    if (std::abs(error) > 0.1f) {
+        // Significant prediction error - strengthen or weaken memory traces
+        for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+            float currentActivation = memoryActivations_[i];
+            
+            // Error-based updating: strengthen if positive error, weaken if negative
+            float updateFactor = error * 0.5f;
+            memoryActivations_[i] = std::max(0.0f, currentActivation + updateFactor);
+            
+            // Update neuron activation in brain
+            if (brain_) {
+                brain_->injectCurrent(memoryNeurons_[i], (memoryActivations_[i] - currentActivation) * 10.0f);
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::updateBasedOnNovelty() {
+    // Update memory based on novelty detection
+    float novelty = getNovelty()->getLevel();
+    
+    if (novelty > 0.5f) {
+        // High novelty - create new memory traces or strengthen existing ones
+        for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+            memoryActivations_[i] = std::min(1.0f, memoryActivations_[i] * 1.1f);
+        }
+        
+        // Possibly add new memory traces for novel information
+        if (memoryNeurons_.size() < capacity_) {
+            // Create a placeholder for novel information
+            // In practice, this would be called with actual novel neuron IDs
+            // For now, we just log the potential for new memory formation
+        }
+    }
+}
+
+void NeuralWorkingMemory::modulateMemoryByAttention() {
+    // Modulate memory traces based on attention signals
+    float totalAttention = 0.0f;
+    
+    // Calculate current attention level from winners
+    for (const auto& neuronId : winners_) {
+        totalAttention += getNeuronActivation(neuronId);
+    }
+    
+    if (totalAttention > 0.0f) {
+        // Apply attention modulation to memory traces
+        for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+            NeuronId neuronId = memoryNeurons_[i];
+            float activation = memoryActivations_[i];
+            
+            // Check if neuron is being attended to
+            bool isAttended = std::find(winners_.begin(), winners_.end(), neuronId) != winners_.end();
+            
+            if (isAttended) {
+                // Attended neurons get reinforced
+                activation *= 1.2f;
+                if (brain_) {
+                    brain_->injectCurrent(neuronId, 1.0f);
+                }
+            } else {
+                // Non-attended neurons get inhibited
+                activation *= 0.95f;
+                if (brain_) {
+                    brain_->injectCurrent(neuronId, -0.5f);
+                }
+            }
+            
+            memoryActivations_[i] = std::max(0.0f, activation);
+        }
+    }
+}
+
+float NeuralWorkingMemory::getPredictionErrorSignal() const {
+    if (brain_ && brain_->getPredictionErrorSignal()) {
+        return brain_->getPredictionErrorSignal()->getLevel();
+    }
+    return 0.0f;
+}
+
+float NeuralWorkingMemory::getNovelty() const {
+    if (brain_ && brain_->getNovelty()) {
+        return brain_->getNovelty()->getLevel();
+    }
+    return 0.0f;
+}

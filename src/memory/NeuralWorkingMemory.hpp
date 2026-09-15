@@ -45,6 +45,9 @@ public:
     // Update working memory (maintenance and decay)
     void update(TimestepDuration dt);
 
+    // Integrate working memory content with neural activity
+    void integrateWithNeuralActivity(Brain& brain, TimestepDuration dt);
+
     // Clear working memory
     void clear();
 
@@ -61,6 +64,22 @@ public:
 
     // Get neurons currently in working memory
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
+
+    // Strengthen working memory representation (for rehearsal)
+    void strengthenMemory(float factor);
+
+    // Competition between memory traces
+    void runCompetition();
+
+    // Is this neuron part of the winning population?
+    bool isWinning(NeuronId neuron) const;
+
+    // Get overall memory activity level
+    float getMemoryActivity() const;
+
+    // Additional accessors for checkpointing
+    const std::vector<float>& getMemoryActivations() const { return memoryActivations_; }
+    const std::vector<SimulationStep>& getMemoryTimestamps() const { return memoryTimestamps_; }
 
     // Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);

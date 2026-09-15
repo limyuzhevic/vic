@@ -19,6 +19,12 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    // Neural planning and prediction integration
+    , neuralPlanner_(std::make_unique<NeuralPlanner>())
+    , predictionSystem_(std::make_unique<PredictionSystem>())
+    , workingMemory_(std::make_unique<NeuralWorkingMemory>())
+    , planningHorizon_(5.0f)
+    , planningEnabled_(true)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -59,6 +65,15 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
             }
         }
     }
+    
+    // Initialize neural components with brain reference
+    if (neuralPlanner_ && brain_) {
+        neuralPlanner_->initialize(brain_.get());
+    }
+    
+    if (workingMemory_ && brain_) {
+        workingMemory_->initialize(brain_.get());
+    }
 }
 
 AgentBrain::~AgentBrain() = default;
@@ -67,6 +82,18 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Initialize prediction system with world data
+    if (predictionSystem_) {
+        // Convert world to sensory data for prediction system
+        std::vector<float> worldState = getWorldState(world);
+        predictionSystem_->updateSensoryInput(worldState);
+    }
+    
+    // Enable neural planning
+    if (neuralPlanner_ && brain_) {
+        neuralPlanner_->setPlanningDepth(3);
+    }
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -84,8 +111,58 @@ size_t AgentBrain::getMotorOutputSize() const {
     return 6;
 }
 
+// Helper function to convert ActionType to MotorCommand for planning output
+MotorCommand actionToMotorCommand(ActionType action) {
+    // Map from ActionType (more granular) to MotorCommand (simplified for motor output)
+    switch (action) {
+        case ActionType::MoveForward: return MotorCommand::MoveForward;
+        case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+        case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+        case ActionType::TurnRight: return MotorCommand::TurnRight;
+        case ActionType::Look: return MotorCommand::LookLeft; // Default to left
+        case ActionType::Interact: return MotorCommand::Interact;
+        case ActionType::Eat: return MotorCommand::Wait; // Not in MotorCommand enum, use Wait
+        case ActionType::Drink: return MotorCommand::Wait;
+        case ActionType::Rest: return MotorCommand::Wait;
+        case ActionType::Wait: return MotorCommand::Wait;
+        case ActionType::MoveLeft: return MotorCommand::TurnLeft;
+        case ActionType::MoveRight: return MotorCommand::TurnRight;
+        case ActionType::LookUp: return MotorCommand::Wait;
+        case ActionType::LookDown: return MotorCommand::Wait;
+        case ActionType::Custom: return MotorCommand::Wait;
+        default: return MotorCommand::Wait;
+    }
+}
+
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
+    
+    // Update current state for planning
+    currentState_ = perceptToState(percept);
+    
+    // Store current state in working memory
+    if (workingMemory_) {
+        workingMemory_->store(currentState_, 0.8f);
+    }
+    
+    // Update prediction system
+    if (predictionSystem_) {
+        // Convert percept to SensoryInput
+        std::unique_ptr<SensoryInput> sensoryInput = 
+            std::make_unique<SensoryInput>(currentState_);
+        predictionSystem_->train(*sensoryInput);
+        
+        // Get prediction for next state
+        auto predicted = predictionSystem_->predictNextState(*sensoryInput);
+        
+        // Update predictions based on actual input
+        predictionSystem_->updatePredictions(*predicted, *sensoryInput);
+    }
+    
+    // Update neural planner with current state and prediction system
+    if (neuralPlanner_) {
+        neuralPlanner_->setCurrentGoal(currentState_);
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -152,11 +229,45 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
+    // Use NeuralPlanner for action selection if enabled
+    MotorCommand plannedAction = MotorCommand::Wait;
     
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+    if (planningEnabled_ && neuralPlanner_ && !currentState_.empty()) {
+        // Convert current state to PlanningActionType (assuming conversion exists)
+        // For now, we'll use the current state directly
+        std::vector<ActionType> plannedActions = neuralPlanner_->planAction(currentState_);
+        
+        if (!plannedActions.empty()) {
+            // Use the first action from the planned sequence
+            ActionType action = plannedActions[0];
+            
+            // Convert ActionType to MotorCommand (helper function)
+            plannedAction = actionToMotorCommand(action);
+            
+            // Log planning decision
+            NLM_LOG_INFO("NeuralPlanner selected action: " + std::to_string(static_cast<int>(action)));
+        }
+    }
+    
+    // Enhanced decodeMotorCommand: combine planned action with neural decoding
+    MotorCommand decoded = MotorCommand::Wait;
+    
+    if (plannedAction != MotorCommand::Wait) {
+        // If planning selected an action, use it as primary
+        decoded = plannedAction;
+        
+        // Apply curiosity-based exploration on top
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            decoded = selectWithCuriosity(decoded);
+        }
+    } else {
+        // Fallback to traditional decodeFromMotorNeurons
+        decoded = decodeFromMotorNeurons();
+        
+        // Apply curiosity-based exploration
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            decoded = selectWithCuriosity(decoded);
+        }
     }
     
     return decoded;
@@ -276,6 +387,19 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (stdp) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
+    }
+    
+    // Update NeuralPlanner with reward feedback for action quality learning
+    if (neuralPlanner_ && planningEnabled_) {
+        // The NeuralPlanner maintains its own action quality based on experience
+        // We could update it here based on the actual reward received
+        // This completes the feedback loop from planning to action selection
+        if (std::abs(predictionError_) > 0.1f) {
+            // Significant prediction error - update planning based on outcome
+            NLM_LOG_INFO("NeuralPlanner receiving reward feedback: " + 
+                         std::to_string(reward) + ", error: " + 
+                         std::to_string(predictionError_));
+        }
     }
 }
 

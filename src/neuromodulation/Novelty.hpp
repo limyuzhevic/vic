@@ -4,8 +4,16 @@
 
 namespace nlm {
 
+// Forward declarations
+class Brain;
+class NeuralWorkingMemory;
+class NeuralEpisodicMemory;
+class NeuralAssociativeMemory;
+class NeuralPlanner;
+class ConceptFormation;
+
 // Novelty detection signal
-// Computes novelty from comparison with previous observations
+// Extended with effects on memory consolidation, exploration, concept formation, and development
 
 class Novelty {
 public:
@@ -33,6 +41,12 @@ public:
     // Get novelty history
     const std::vector<float>& getHistory() const;
     void clearHistory();
+    
+    // Enhanced novelty effects on cognitive systems
+    void applyMemoryConsolidation(NeuralWorkingMemory* workingMemory, float deltaTime);
+    void applyExplorationGuidance(NeuralPlanner* planner, float deltaTime);
+    void applyConceptFormationEnhancement(ConceptFormation* conceptFormation, float deltaTime);
+    void applyDevelopmentTriggering(class DevelopmentSystem* developmentSystem, float deltaTime);
     
 private:
     struct Impl;

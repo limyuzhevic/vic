@@ -9,6 +9,17 @@ namespace nlm {
 // Neuromodulator: Abstract base for neuromodulatory signals
 // PLACEHOLDER - Phase 2 will implement real neuromodulation effects
 
+// Forward declarations for cognitive systems
+class Brain;
+class NeuralAttentionalSelection;
+class NeuralWorkingMemory;
+class NeuralEpisodicMemory;
+class PredictionSystem;
+class MotorActionSelection;
+class DevelopmentSystem;
+class NeuralPlanner;
+class ConceptFormation;
+
 class Neuromodulator {
 public:
     virtual ~Neuromodulator() = default;
@@ -26,6 +37,17 @@ public:
     
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
+    
+    // Apply neuromodulatory effects to all integrated cognitive systems
+    // Override in subclasses to implement system-specific effects
+    virtual void applyAttentionEffect(NeuralAttentionalSelection* attention, float deltaTime) {}
+    virtual void applyWorkingMemoryEffect(NeuralWorkingMemory* workingMemory, float deltaTime) {}
+    virtual void applyEpisodicMemoryEffect(NeuralEpisodicMemory* episodicMemory, float deltaTime) {}
+    virtual void applyPredictionSystemEffect(PredictionSystem* predictionSystem, float deltaTime) {}
+    virtual void applyActionSelectionEffect(MotorActionSelection* actionSelection, float deltaTime) {}
+    virtual void applyDevelopmentSystemEffect(DevelopmentSystem* developmentSystem, float deltaTime) {}
+    virtual void applyPlanningDepthEffect(NeuralPlanner* planner, float deltaTime) {}
+    virtual void applyConceptFormationEffect(ConceptFormation* conceptFormation, float deltaTime) {}
     
 protected:
     Neuromodulator() = default;

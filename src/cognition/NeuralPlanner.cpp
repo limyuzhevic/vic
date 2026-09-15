@@ -16,17 +16,13 @@ NeuralPlanner::NeuralPlanner()
     , brain_(nullptr)
     , planningDepth_(3)
     , planningConfidence_(0.5f)
+    , planningHorizon_(5.0f)
+    , planningEnabled_(true)
 {
     actionQuality_.resize(10, 0.0f);  // 10 action types
 }
 
 NeuralPlanner::~NeuralPlanner() = default;
-
-void NeuralPlanner::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("NeuralPlanner initialized");
-}
 
 ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
                                     float targetReward) {

@@ -2,6 +2,8 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
 #include <vector>
 #include <memory>
 #include <functional>
@@ -81,6 +83,29 @@ private:
     // Evaluate single action from state
     float evaluateAction(ActionType action, const std::vector<float>& state);
 
+    // Integration with external systems
+    void integrateWithPredictionSystem(const PredictionSystem& predictionSys);
+    void integrateWithWorkingMemory(const NeuralWorkingMemory& workingMem);
+    void updateFromAgentOutcome(const std::vector<ActionType>& plannedActions,
+                              const std::vector<ActionType>& actualActions,
+                              float reward);
+    void updatePlanningBasedOnGoal(const std::vector<float>& currentState,
+                                 float targetReward);
+
+    // Configuration
+    void enablePlanning(bool enable) { planningEnabled_ = enable; }
+    bool isPlanningEnabled() const { return planningEnabled_; }
+    
+    void setPlanningHorizon(float horizon) { planningHorizon_ = horizon; }
+    float getPlanningHorizon() const { return planningHorizon_; }
+
+private:
+    // Generate possible action sequences
+    std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
+
+    // Evaluate single action from state
+    float evaluateAction(ActionType action, const std::vector<float>& state);
+
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
@@ -96,6 +121,10 @@ private:
     
     // Recent plan success history
     std::deque<bool> recentPlanSuccess_;
+    
+    // Planning configuration
+    float planningHorizon_;
+    bool planningEnabled_;
 };
 
 // SelfModel: Represents the agent's internal model of itself

@@ -4,8 +4,15 @@
 
 namespace nlm {
 
+// Forward declarations
+class Brain;
+class NeuralWorkingMemory;
+class PredictionSystem;
+class NeuralAttentionalSelection;
+class NeuralPlanner;
+
 // Curiosity drive: exploration motivation based on novelty and prediction error
-// Computed as weighted combination of novelty and prediction error
+// Extended with effects on working memory, learning rate, attention, and planning
 
 class Curiosity {
 public:
@@ -30,6 +37,12 @@ public:
     
     // Reset
     void reset();
+    
+    // Enhanced curiosity effects on cognitive systems
+    void applyWorkingMemoryEnhancement(NeuralWorkingMemory* workingMemory, float deltaTime);
+    void applyLearningRateEnhancement(PredictionSystem* predictionSystem, float deltaTime);
+    void applyAttentionGuidance(NeuralAttentionalSelection* attention, float deltaTime);
+    void applyPlanningDepthEnhancement(NeuralPlanner* planner, float deltaTime);
     
 private:
     struct Impl;

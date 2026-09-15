@@ -88,16 +88,6 @@ public:
                             float reward,
                             SimulationStep currentTime);
 
-    // Get the concept that best matches a pattern
-    size_t getMatchingConcept(const std::vector<float>& pattern,
-                              float similarityThreshold = 0.7f) const;
-
-    // Get all concepts
-    const std::vector<DiscoveredConcept>& getConcepts() const { return concepts_; }
-
-    // Get a specific concept
-    const DiscoveredConcept* getConcept(size_t conceptId) const;
-
     // Get concept prototype
     std::vector<float> getConceptPrototype(size_t conceptId) const;
 

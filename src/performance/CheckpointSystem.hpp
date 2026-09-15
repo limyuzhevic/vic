@@ -159,19 +159,48 @@ struct NeuronCheckpointData {
 };
 
 /**
- * Synapse state for checkpointing
+ * Working memory state for checkpointing
  */
-struct SynapseCheckpointData {
-    std::vector<uint64_t> sourceNeuron;
-    std::vector<uint64_t> destinationNeuron;
-    std::vector<float> weight;
-    std::vector<uint32_t> delay;
-    std::vector<uint8_t> synapseType;
-    std::vector<uint8_t> plasticityFlags;
-    std::vector<float> eligibilityTrace;
-    std::vector<float> efficacy;
-    std::vector<float> shortTermDepression;
-    std::vector<float> shortTermFacilitation;
+struct WorkingMemoryCheckpointData {
+    std::vector<NeuronId> traces;
+    std::vector<float> activations;
+    std::vector<SimulationStep> timestamps;
+    std::vector<size_t> activeTraces;
+};
+
+/**
+ * Episodic memory state for checkpointing
+ */
+struct EpisodicMemoryCheckpointData {
+    std::vector<EpisodicMemoryItem> episodes;
+};
+
+/**
+ * Neuromodulation state for checkpointing
+ */
+struct NeuromodulationCheckpointData {
+    float dopamineLevel;
+    float curiosityLevel;
+    float noveltyLevel;
+    float predictionErrorLevel;
+};
+
+/**
+ * Development system state for checkpointing
+ */
+struct DevelopmentCheckpointData {
+    uint8_t developmentalStage;
+    double developmentalAge;
+    float plasticityModifier;
+};
+
+/**
+ * Prediction system state for checkpointing
+ */
+struct PredictionCheckpointData {
+    float predictionError;
+    float confidence;
+    std::vector<float> errorHistory;
 };
 
 /**
@@ -212,6 +241,31 @@ public:
      */
     bool readNeurons(NeuronCheckpointData& data);
     bool readSynapses(SynapseCheckpointData& data);
+    
+    /**
+     * Read working memory data
+     */
+    bool readWorkingMemory(WorkingMemoryCheckpointData& data);
+    
+    /**
+     * Read episodic memory data
+     */
+    bool readEpisodicMemory(EpisodicMemoryCheckpointData& data);
+    
+    /**
+     * Read neuromodulation data
+     */
+    bool readNeuromodulation(NeuromodulationCheckpointData& data);
+    
+    /**
+     * Read development data
+     */
+    bool readDevelopment(DevelopmentCheckpointData& data);
+    
+    /**
+     * Read prediction system data
+     */
+    bool readPrediction(PredictionCheckpointData& data);
     
     /**
      * Read raw section data
@@ -275,13 +329,38 @@ public:
      * Set checkpoint metadata
      */
     void setMetadata(uint64_t neuronCount, uint64_t synapseCount, 
-                   uint64_t regionCount, uint64_t step, double simTime);
+                    uint64_t regionCount, uint64_t step, double simTime);
     
     /**
      * Write checkpoint data
      */
     bool writeNeurons(const NeuronCheckpointData& data);
     bool writeSynapses(const SynapseCheckpointData& data);
+    
+    /**
+     * Write working memory data
+     */
+    bool writeWorkingMemory(const WorkingMemoryCheckpointData& data);
+    
+    /**
+     * Write episodic memory data
+     */
+    bool writeEpisodicMemory(const EpisodicMemoryCheckpointData& data);
+    
+    /**
+     * Write neuromodulation data
+     */
+    bool writeNeuromodulation(const NeuromodulationCheckpointData& data);
+    
+    /**
+     * Write development data
+     */
+    bool writeDevelopment(const DevelopmentCheckpointData& data);
+    
+    /**
+     * Write prediction system data
+     */
+    bool writePrediction(const PredictionCheckpointData& data);
     
     /**
      * Write raw section data
@@ -346,6 +425,41 @@ public:
     }
     
     /**
+     * Set working memory data provider
+     */
+    void setWorkingMemoryProvider(std::function<bool(WorkingMemoryCheckpointData&)> provider) {
+        workingMemoryProvider_ = provider;
+    }
+    
+    /**
+     * Set episodic memory data provider
+     */
+    void setEpisodicMemoryProvider(std::function<bool(EpisodicMemoryCheckpointData&)> provider) {
+        episodicMemoryProvider_ = provider;
+    }
+    
+    /**
+     * Set neuromodulation data provider
+     */
+    void setNeuromodulationProvider(std::function<bool(NeuromodulationCheckpointData&)> provider) {
+        neuromodulationProvider_ = provider;
+    }
+    
+    /**
+     * Set development data provider
+     */
+    void setDevelopmentProvider(std::function<bool(DevelopmentCheckpointData&)> provider) {
+        developmentProvider_ = provider;
+    }
+    
+    /**
+     * Set prediction system data provider
+     */
+    void setPredictionProvider(std::function<bool(PredictionCheckpointData&)> provider) {
+        predictionProvider_ = provider;
+    }
+    
+    /**
      * Update checkpoint state (call each simulation step)
      */
     bool update(uint64_t currentStep, double currentTime);
@@ -394,7 +508,7 @@ public:
      * Check if checkpoint should be saved
      */
     bool shouldSave(uint64_t currentStep) const;
-    
+
 private:
     std::string checkpointDir_;
     uint64_t saveIntervalSteps_;
@@ -405,6 +519,11 @@ private:
     
     std::function<bool(NeuronCheckpointData&)> neuronProvider_;
     std::function<bool(SynapseCheckpointData&)> synapseProvider_;
+    std::function<bool(WorkingMemoryCheckpointData&)> workingMemoryProvider_;
+    std::function<bool(EpisodicMemoryCheckpointData&)> episodicMemoryProvider_;
+    std::function<bool(NeuromodulationCheckpointData&)> neuromodulationProvider_;
+    std::function<bool(DevelopmentCheckpointData&)> developmentProvider_;
+    std::function<bool(PredictionCheckpointData&)> predictionProvider_;
 };
 
 // Checksum implementation

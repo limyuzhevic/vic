@@ -1,8 +1,12 @@
 #include "ConceptFormation.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <numeric>
+#include <unordered_map>
 
 namespace nlm {
 

@@ -4,6 +4,9 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
 #include <memory>
 #include <vector>
 
@@ -112,6 +115,16 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Neural planning and prediction integration
+    std::unique_ptr<NeuralPlanner> neuralPlanner_;
+    std::unique_ptr<PredictionSystem> predictionSystem_;
+    std::unique_ptr<NeuralWorkingMemory> workingMemory_;
+    
+    // Planning cache and feedback
+    std::vector<float> currentState_;
+    float planningHorizon_;
+    bool planningEnabled_;
 };
 
 } // namespace nlm
