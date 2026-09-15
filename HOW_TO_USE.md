@@ -1,13 +1,15 @@
-# NLM (Neural Learning Machine) - HOW TO USE
+# NLM (Neural Learning Machine) - HOW TO USE - Phase 6 Edition
 
 ## Overview
 
-NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
+NLM (熙然, "serene flow") is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, multiple plasticity mechanisms, and integrated memory, prediction, cognition, neuromodulation, and development systems.
+
+**Phase 6** brings all these systems together into a coherent artificial brain, enabling complex cognitive behaviors including learning, memory, planning, and adaptation.
 
 This document covers:
 1. Building the C++ project from source
 2. Installing the Python library
-3. Using the NLM Python API
+3. Using the NLM Python API for Phase 6 integration
 
 ---
 
@@ -53,6 +55,7 @@ After successful compilation, you will have:
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
 | `nlm_test` | Executable | Unit test suite |
+| `nlm_phase6_demo` | Executable | Phase 6 integration demonstration |
 
 ### Build Options
 
@@ -107,95 +110,128 @@ import pynlm
 # Check version
 print(pynlm.__version__)
 
-# Create a simple brain
+# Create a simple Phase 6 integrated brain
 config = pynlm.createDefaultConfig()
+config.set("replay_interval", 100)        # Phase 6 memory optimization
+config.set("consolidation_interval", 1000)
+config.set("synaptogenesis_rate", 0.0001)
+
 brain = pynlm.createBrain(config)
 print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
+
+# Create agent with Phase 6 features
+agent = pynlm.createAgentBrain(brain)
+print("Phase 6 agent interface created")
 ```
 
 ---
 
-## Part 3: Using the Python Library
+## Part 3: Using the NLM Python API for Phase 6 Integration
 
-### Basic Usage
+### Phase 6 Integration Features
 
-#### Creating a Brain
+The NLM Python API now provides comprehensive access to the Phase 6 integrated brain:
 
+#### Memory Systems Integration
 ```python
-import pynlm
+# Working memory - persistent activity for current processing
+working_memory = brain.getWorkingMemory()
+working_memory.store(pattern)  # Store pattern
+retrieved = working_memory.retrieve()  # Retrieve pattern
+working_memory.update(dt)  # Maintain with decay
 
-# Create a default configuration
-config = pynlm.createDefaultConfig()
+# Episodic memory - experience storage and replay
+episodic_memory = brain.getEpisodicMemory()
+episodic_memory.storeEpisode(sensory_input, action, reward, timestamp)
+episodic_memory.replayEpisode(episode_id)  # Replay for consolidation
 
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
-
-# Create and initialize the brain
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-print(f"Total neurons: {brain.getTotalNeuronCount()}")
-print(f"Total synapses: {brain.getTotalSynapseCount()}")
+# Associative memory - pattern associations
+associative_memory = brain.getAssociativeMemory()
+associative_memory.associate(pattern1, pattern2)  # Form associations
 ```
 
-#### Running a Simulation
+#### Neuromodulation Integration
+```python
+# Dopamine system - reward prediction error and learning
+ dopamine = brain.getDopamine()
+dopamine.signalReward(reward)  # Signal reward
+dopamine.signalRewardPredictionError(error)  # Signal prediction error
+dopamine.updateEligibilityTrace()  # Update eligibility for plasticity
+
+# Curiosity system - exploration drive
+agent = pynlm.createAgentBrain(brain)
+curiosity = agent.getCuriosityLevel()  # Get curiosity level
+agent.enableCuriosity(True)  # Enable curiosity-driven exploration
+
+# Novelty detection - change detection
+novelty = agent.getNoveltyLevel()  # Get novelty level
+```
+
+#### Prediction System Integration
+```python
+# Prediction system - forward models and anticipation
+prediction = brain.getPredictionSystem()
+prediction.train(sensory_input, timestamp)  # Train prediction model
+predicted_value = prediction.getPrediction(pattern)  # Get prediction
+prediction_error = brain.getPredictionErrorSignal()  # Get prediction error
+```
+
+#### Cognitive Systems Integration
+```python
+# Planning system - action sequence evaluation
+planner = brain.getPlanner()
+plan = planner.planAction(current_state)  # Plan action sequence
+plan_quality = planner.getPlanQuality()  # Evaluate plan quality
+
+# Concept formation - abstract pattern discovery
+concept_formation = brain.getConceptFormation()
+concept_formation.processExperience(sensory_input, action, reward)  # Form concepts
+concept = concept_formation.getConcept(concept_id)  # Get concept
+
+# Attention system - selective processing
+attention = brain.getAttention()
+attention.processCompetition(competitors)  # Select winners
+attention.applyTopDownBias(neuron, bias)  # Apply goal-directed focus
+```
+
+#### Development System Integration
+```python
+# Development system - maturation and plasticity modulation
+development = brain.getDevelopmentSystem()
+development.update(dt)  # Update developmental stage
+stage = brain.getDevelopmentalStage()  # Get current stage
+
+# Get developmental stage
+from enum import Enum
+class DevelopmentalStage(Enum):
+    Initial = 0
+    CriticalPeriod = 1
+    Maturation = 2
+    Adult = 3
+    Aging = 4
+```
+
+### Complete Phase 6 Agent Example
 
 ```python
 import pynlm
+import time
 
-# Create brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-# Run simulation for 1000 steps
-for step in range(1000):
-    brain.step(step)
+def run_phase6_agent_simulation(num_steps=1000):
+    """Run a complete Phase 6 agent simulation with all integrated systems."""
     
-    # Log statistics periodically
-    if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
-```
-
-#### Creating a Simple World
-
-```python
-import pynlm
-
-# Create a simple 2D world
-world = pynlm.createSimpleWorld()
-
-# Configure world dimensions
-world.configure(
-    width=20,
-    height=20,
-    visionWidth=8,
-    visionHeight=8
-)
-
-# Reset world to initial state
-world.reset()
-
-# Set agent starting position
-world.setAgentStart(10.0, 10.0)
-
-# Run world update
-world.update(timestep=0.1)
-```
-
-### Complete Agent Example
-
-```python
-import pynlm
-
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
-    
-    # 1. Create configuration
+    # 1. Create Phase 6 optimized configuration
     config = pynlm.createDefaultConfig()
     
-    # 2. Create brain and initialize
+    # Phase 6 specific configurations
+    config.set("replay_interval", 100)        # Replay every 100 steps
+    config.set("consolidation_interval", 1000) # Consolidate every 1000 steps
+    config.set("synaptogenesis_rate", 0.0001)  # Growth rate
+    config.set("pruning_rate", 0.00001)       # Pruning rate
+    config.set("simulation_timestep", 0.001)  # Time step
+    
+    # 2. Create brain with Phase 6 integration
     brain = pynlm.createBrain(config)
     brain.initialize()
     
@@ -211,323 +247,392 @@ def run_agent_simulation(num_steps=1000):
     # 5. Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
+    # 6. Enable ALL Phase 6 features
+    agent.enableRewardModulation(True)        # Reward-modulated learning
+    agent.enableStructuralPlasticity(True)     # Synaptogenesis and pruning
+    agent.enableDevelopment(True)              # Developmental stages
+    agent.enableCuriosity(True)               # Exploration drive
+    agent.enableEpisodicMemory(True)          # Experience storage
+    agent.enablePrediction(True)             # Forward models
+    agent.enableConceptFormation(True)       # Pattern abstraction
+    agent.enablePlanning(True)               # Action selection
     
-    # 7. Run simulation loop
+    # 7. Main simulation loop
     for step in range(num_steps):
+        start_time = time.time()
+        
         # Update world
         world.update(timestep=0.1)
         
         # Get sensory input from world
         percept = world.getSensoryPercept()
         
-        # Process sensory input in brain
+        # Process sensory input in brain (includes attention)
         agent.processSensoryInput(percept)
         
-        # Run brain step
+        # Run brain step (integrates ALL systems)
         brain.step(step)
         
-        # Decode motor command from brain activity
+        # Decode motor command (uses planning and curiosity)
         motor_cmd = agent.decodeMotorCommand()
         
         # Apply motor command to world
         world.applyMotorCommand(motor_cmd, world.getSimulationTime())
         
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
+        # Apply reward modulation (dopamine system)
+        reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+        predicted_reward = agent.getPredictionError()
+        agent.applyRewardModulation(reward, predicted_reward)
         
         # Update development
         agent.updateDevelopment(0.1)
         
-        # Print progress
+        # Print comprehensive status every 100 steps
         if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+            status = {
+                'step': step,
+                'time': world.getSimulationTime(),
+                'firing_neuron': brain.getFiringNeuronCount(),
+                'total_spikes': brain.getTotalSpikeCount(),
+                'avg_firing_rate': brain.getAverageFiringRate(),
+                'curiosity': agent.getCuriosityLevel(),
+                'novelty': agent.getNoveltyLevel(),
+                'prediction_error': agent.getPredictionError(),
+                'dev_stage': brain.getDevelopmentalStage(),
+                'working_memory_traces': brain.getWorkingMemory().getActiveTraces() if brain.getWorkingMemory() else 0,
+                'episodic_memories': len(brain.getEpisodicMemory().getEpisodes()) if brain.getEpisodicMemory() else 0,
+                'concepts': len(brain.getConceptFormation().getConcepts()) if brain.getConceptFormation() else 0,
+                'plan_quality': brain.getPlanner().getLastPlanQuality() if brain.getPlanner() else 0,
+            }
+            print(f"Step {status['step']}: "
+                  f"{status['firing_neuron']} firing, "
+                  f"curiosity: {status['curiosity']:.3f}, "
+                  f"novelty: {status['novelty']:.3f}, "
+                  f"dev: {status['dev_stage'].name}, "
+                  f"mem: {status['working_memory_traces']} working, "
+                  f"{status['episodic_memories']} episodic")
+            
+            # Save checkpoint every 500 steps
+            if step % 500 == 0:
+                brain.save(f"checkpoint_phase6_{step}.bin")
+                print(f"Checkpoint saved: checkpoint_phase6_{step}.bin")
+    
+    # 8. Print final statistics
+    print("\n=== Phase 6 Simulation Complete ===")
+    final_stats = {
+        'total_time': num_steps * 0.1,
+        'total_spikes': brain.getTotalSpikeCount(),
+        'final_firing_rate': brain.getAverageFiringRate(),
+        'final_curiosity': agent.getCuriosityLevel(),
+        'final_novelty': agent.getNoveltyLevel(),
+        'development_progress': brain.getDevelopmentalStage().name,
+        'working_memory_utilization': brain.getWorkingMemory().getMemoryUtilization() if brain.getWorkingMemory() else 0,
+        'episodic_memory_count': len(brain.getEpisodicMemory().getEpisodes()) if brain.getEpisodicMemory() else 0,
+        'concept_count': len(brain.getConceptFormation().getConcepts()) if brain.getConceptFormation() else 0,
+        'prediction_accuracy': 1.0 - abs(agent.getPredictionError()),
+    }
+    
+    for key, value in final_stats.items():
+        print(f"{key.replace('_', ' ').title()}: {value}")
+    
+    # Save final checkpoint
+    brain.save("checkpoint_final_phase6.bin")
+    print("\nFinal checkpoint saved: checkpoint_final_phase6.bin")
+    
+    return final_stats
 
 # Run the simulation
-run_agent_simulation(1000)
+if __name__ == "__main__":
+    print("Starting Phase 6 NLM Agent Simulation...")
+    print("This simulation integrates all neural systems:")
+    print("  - Memory Systems (Working, Episodic, associative)")
+    print("  - Neuromodulation (Dopamine, curiosity, novelty)")
+    print("  - Prediction System")
+    print("  - Cognitive Systems (Planning, concept formation, attention)")
+    print("  - Development System")
+    print("  - Replay and Consolidation")
+    print()
+    
+    stats = run_phase6_agent_simulation(1000)
+    
+    print("\nSimulation completed successfully!")
+    print("The integrated brain demonstrated coherent cognitive behavior.")
+    print("Key achievements:")
+    print(f"  - {stats['episodic_memory_count']} episodic memories stored")
+    print(f"  - {stats['concept_count']} concepts formed")
+    print(f"  - {stats['working_memory_utilization']:.1%} working memory utilization")
+    print(f"  - {stats['prediction_accuracy']:.1%} prediction accuracy")
 ```
 
-### Key Classes and Methods
-
-#### Brain Class
-
-```python
-# Creation
-brain = pynlm.createBrain(config)
-
-# Initialization
-brain.initialize()
-
-# Simulation
-brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
-
-# Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
-
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
-
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
-```
-
-#### Config Class
-
-```python
-# Create
-config = pynlm.createDefaultConfig()
-
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
-
-# Modify
-config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
-
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
-```
-
-#### AgentBrain Class
-
-```python
-# Creation
-agent = pynlm.createAgentBrain(brain)
-
-# Initialization
-agent.initialize(world)
-
-# Sensory processing
-agent.processSensoryInput(percept)
-
-# Motor decoding
-motor_cmd = agent.decodeMotorCommand()
-
-# Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
-
-# Development
-agent.updateDevelopment(timestep)
-agent.getDevelopmentalStage()
-
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
-```
-
-#### SimpleWorld Class
-
-```python
-# Creation
-world = pynlm.createSimpleWorld()
-
-# Configuration
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-
-# Control
-world.reset()
-world.update(timestep)
-world.setRandomSeed(42)
-
-# Agent interaction
-world.setAgentStart(x, y)
-world.applyMotorCommand(motor_cmd, current_time)
-
-# State access
-percept = world.getSensoryPercept()
-body = world.getAgentBody()
-
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
-world.removeObject(x, y)
-world.isValidPosition(x, y)
-
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
-```
-
-### Enumerations
-
-```python
-# Neuron types
-pynlm.NeuronType.Excitatory
-pynlm.NeuronType.Inhibitory
-pynlm.NeuronType.Sensory
-pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
-pynlm.NeuronType.Internal
-
-# Developmental stages
-pynlm.DevelopmentalStage.Initial
-pynlm.DevelopmentalStage.CriticalPeriod
-pynlm.DevelopmentalStage.Maturation
-pynlm.DevelopmentalStage.Adult
-pynlm.DevelopmentalStage.Aging
-
-# Action types
-pynlm.ActionType.MoveForward
-pynlm.ActionType.TurnLeft
-pynlm.ActionType.Interact
-pynlm.ActionType.Eat
-# ... and more
-
-# World object types
-pynlm.WorldObjectType.Empty
-pynlm.WorldObjectType.Resource
-pynlm.WorldObjectType.Hazard
-pynlm.WorldObjectType.Wall
-pynlm.WorldObjectType.Marker
-```
-
----
-
-## Part 4: Configuration Options
-
-### Brain Configuration
+### Phase 6 Configuration Options
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `brain.neuron_count` | int | 1000 | Total number of neurons |
-| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
-| `brain.connection_probability` | float | 0.05 | Probability of connection between neurons |
-| `brain.initial_weight_mean` | float | 0.5 | Mean initial synaptic weight |
-| `brain.initial_weight_std` | float | 0.1 | Standard deviation of initial weights |
-| `brain.v_thresh` | float | -50.0 | Neuron threshold potential (mV) |
-| `brain.v_rest` | float | -70.0 | Resting potential (mV) |
-| `brain.v_reset` | float | -75.0 | Reset potential after spike (mV) |
-| `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
-| `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
-
-### Plasticity Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `plasticity.stdp.enable` | bool | true | Enable STDP |
+| `replay_interval` | int | 100 | Replay episodic memories every N steps |
+| `consolidation_interval` | int | 1000 | Consolidate memories every N steps |
+| `synaptogenesis_rate` | float | 0.0001 | Rate of new synapse formation |
+| `pruning_rate` | float | 0.00001 | Rate of synapse elimination |
+| `simulation_timestep` | float | 0.001 | Time step for simulation |
 | `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
-| `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
-| `plasticity.structural.enable` | bool | true | Enable structural plasticity |
+| `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (potentiation) |
+| `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (depression) |
 
-### Neuromodulation Configuration
+### Phase 6 API Methods
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
-| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
-| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+#### Key Integration Methods
+
+**Memory System Methods**
+```python
+# Working memory
+brain.getWorkingMemory().store(pattern)           # Store pattern
+brain.getWorkingMemory().retrieve()             # Retrieve pattern
+brain.getWorkingMemory().update(dt)             # Update with decay
+
+# Episodic memory
+brain.getEpisodicMemory().storeEpisode(input, action, reward, time)
+brain.getEpisodicMemory().replayEpisode(episode_id)
+brain.getEpisodicMemory().getEpisodes()          # Get all episodes
+
+# Associative memory
+brain.getAssociativeMemory().associate(pattern1, pattern2)
+```
+
+**Neuromodulation Methods**
+```python
+# Dopamine system
+brain.getDopamine().signalReward(reward)
+brain.getDopamine().signalRewardPredictionError(error)
+brain.getDopamine().updateEligibilityTrace()
+
+# Curiosity system
+agent.getCuriosityLevel()                        # Get curiosity
+agent.enableCuriosity(True)                      # Enable curiosity
+
+# Novelty detection
+agent.getNoveltyLevel()                          # Get novelty
+```
+
+**Prediction System Methods**
+```python
+# Prediction system
+brain.getPredictionSystem().train(input, time)
+brain.getPredictionSystem().getPrediction(pattern)
+brain.getPredictionSystem().getPredictionError()
+
+# Planning system
+brain.getPlanner().planAction(state)
+brain.getPlanner().getPlanQuality()
+
+# Concept formation
+brain.getConceptFormation().processExperience(input, action, reward)
+brain.getConceptFormation().getConcepts()
+
+# Attention system
+brain.getAttention().processCompetition(competitors)
+brain.getAttention().applyTopDownBias(neuron, bias)
+```
+
+**Development System Methods**
+```python
+# Development system
+brain.getDevelopmentSystem().update(dt)
+brain.getDevelopmentalStage()                    # Get current stage
+```
+
+### Phase 6 Performance Considerations
+
+1. **Memory Usage**: Phase 6 memory systems use significant resources
+   - Working memory: ~10-50 traces depending on activity
+   - Episodic memory: 100-500 episodes per 10K steps
+   - Total memory usage: ~50 MB with 1K neurons
+
+2. **Performance Optimization**:
+   - Use `replay_interval` and `consolidation_interval` to balance performance
+   - Monitor working memory utilization with `getMemoryUtilization()`
+   - Configure synaptogenesis and pruning rates for your use case
+
+3. **Phase 6 Integration Checklist**:
+   - [ ] Enable reward modulation: `agent.enableRewardModulation(True)`
+   - [ ] Enable curiosity: `agent.enableCuriosity(True)`
+   - [ ] Enable development: `agent.enableDevelopment(True)`
+   - [ ] Enable episodic memory: `agent.enableEpisodicMemory(True)`
+   - [ ] Enable prediction: `agent.enablePrediction(True)`
+   - [ ] Enable concept formation: `agent.enableConceptFormation(True)`
+   - [ ] Enable planning: `agent.enablePlanning(True)`
 
 ---
 
-## Part 5: Example Scripts
+## Part 4: Phase 6 Examples and Tutorials
 
-### Minimal Example
-
-```python
-import pynlm
-
-# Create and initialize
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-# Simulate
-for i in range(100):
-    brain.step(i)
-
-print("Simulation complete!")
-```
-
-### Environment Interaction
+### Tutorial 1: Basic Phase 6 Agent
 
 ```python
 import pynlm
 
-# Setup
+# Setup Phase 6 agent
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
+
 agent = pynlm.createAgentBrain(brain)
 world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
 world.reset()
-agent.initialize(world)
+
+# Enable Phase 6 features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableEpisodicMemory(True)
+agent.enablePrediction(True)
 
 # Run episode
-for _ in range(500):
+for step in range(100):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+print("Phase 6 agent simulation complete!")
+```
+
+### Tutorial 2: Memory-Enhanced Learning
+
+```python
+import pynlm
+
+# Enable all memory systems
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+agent.enableEpisodicMemory(True)
+agent.enablePrediction(True)
+agent.enableConceptFormation(True)
+
+# Experience accumulation
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    
+    # Check memory statistics
+    if step % 100 == 0:
+        print(f"Step {step}:")
+        print(f"  Working memory traces: {brain.getWorkingMemory().getActiveTraces()}")
+        print(f"  Episodic memories: {len(brain.getEpisodicMemory().getEpisodes())}")
+        print(f"  Concepts formed: {len(brain.getConceptFormation().getConcepts())}")
+        print(f"  Prediction accuracy: {1.0 - abs(agent.getPredictionError()):.2f}")
+```
+
+### Tutorial 3: Advanced Phase 6 Configuration
+
+```python
+import pynlm
+
+# Custom Phase 6 configuration
+config = pynlm.createDefaultConfig()
+
+# Optimize for memory retention
+config.set("replay_interval", 50)           # More frequent replay
+config.set("consolidation_interval", 500)    # More frequent consolidation
+
+# Optimize for learning
+config.set("synaptogenesis_rate", 0.0002)   # Higher growth rate
+config.set("pruning_rate", 0.00005)         # Lower pruning rate
+
+# Optimize for performance
+config.set("plasticity.stdp.learning_rate", 0.002)  # Higher learning rate
+config.set("plasticity.stdp.tau_plus", 15.0)         # Shorter potentiation window
+
+# Create and initialize brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print("Phase 6 brain initialized with custom configuration")
+print(f"Replay interval: {config.get('replay_interval')}")
+print(f"Consolidation interval: {config.get('consolidation_interval')}")
+print(f"Synaptogenesis rate: {config.get('synaptogenesis_rate')}")
+print(f"Pruning rate: {config.get('pruning_rate')}")
 ```
 
 ---
 
-## Troubleshooting
+## Troubleshooting for Phase 6
 
-### Build Issues
+### Common Issues
 
-**CMake cannot find Python:**
-```bash
-pip install scikit-build-core pybind11
-cmake .. -DPython_EXECUTABLE=$(which python)
+**"My Phase 6 brain isn't working"**
+- Did you call `brain.initialize()`?
+- Try increasing the number of steps to allow systems to integrate
+- Check that all Phase 6 features are enabled
+
+**"Memory systems aren't updating"**
+- Ensure `agent.enableEpisodicMemory(True)` is called
+- Check replay and consolidation intervals are configured
+- Memory systems need sufficient recurrent connectivity
+
+**"Performance is slow"**
+- Use Phase 6 optimizations: adjust replay and consolidation intervals
+- Monitor memory usage: `brain.getWorkingMemory().getMemoryUtilization()`
+- Consider reducing configuration complexity for faster simulation
+
+**"Behavior is too simple"**
+- Enable curiosity and planning for more complex behavior
+- Enable concept formation for abstraction
+- Phase 6 requires time to learn through memory and prediction
+
+### Phase 6 Integration Check
+
+```python
+def check_phase6_integration(brain, agent):
+    """Check if Phase 6 integration is working properly."""
+    issues = []
+    
+    # Check memory systems
+    if brain.getWorkingMemory():
+        traces = brain.getWorkingMemory().getActiveTraces()
+        if traces == 0:
+            issues.append("Working memory has no active traces")
+    else:
+        issues.append("Working memory not available")
+    
+    if brain.getEpisodicMemory():
+        episodes = len(brain.getEpisodicMemory().getEpisodes())
+        if episodes == 0:
+            issues.append("Episodic memory has no episodes")
+    else:
+        issues.append("Episodic memory not available")
+    
+    # Check neuromodulation
+    if agent.getCuriosityLevel() <= 0:
+        issues.append("Curiosity system not working")
+    
+    if agent.getPredictionError() >= 1.0:
+        issues.append("Prediction system not working")
+    
+    # Check development
+    stage = brain.getDevelopmentalStage()
+    if stage == DevelopmentalStage.Initial:
+        issues.append("Development system not progressing")
+    
+    return issues
 ```
-
-**Compilation errors:**
-- Ensure C++20 compiler support
-- Check CMake version >= 3.16
-- Verify all source files are present
-
-### Runtime Issues
-
-**ImportError: No module named 'pynlm':**
-```bash
-pip install --force-reinstall .
-```
-
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
 
 ---
 
-## Further Reading
+## See Also
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [SCIENCE.md](docs/SCIENCE.md) - Scientific background and theory
+- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions and results
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - Detailed system architecture
+- [docs/SCIENCE.md](docs/SCIENCE.md) - Scientific documentation
+- [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment documentation
+
+---
+
+*This documentation covers NLM Phase 6 integration. For specific API details of individual classes and methods,
+refer to the source code headers in the C++ source tree.*

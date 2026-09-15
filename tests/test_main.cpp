@@ -13,6 +13,10 @@ namespace test_config {
     void runAll();
 }
 
+namespace test_config_comprehensive {
+    void runAll();
+}
+
 namespace test_random {
     void runAll();
 }
@@ -37,6 +41,22 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_neuromodulation {
+    void runAll();
+}
+
+namespace test_plasticity {
+    void runAll();
+}
+
+namespace test_memory {
+    void runAll();
+}
+
+namespace test_integration {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -44,8 +64,6 @@ int main() {
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
     std::cout << std::endl;
-    
-    bool allPassed = true;
     
     std::cout << "Running Types tests..." << std::endl;
     try {
@@ -59,6 +77,15 @@ int main() {
     std::cout << "Running Config tests..." << std::endl;
     try {
         test_config::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Comprehensive Config tests..." << std::endl;
+    try {
+        test_config_comprehensive::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
@@ -110,9 +137,36 @@ int main() {
         allPassed = false;
     }
     
-    std::cout << "Running Brain tests..." << std::endl;
+    std::cout << "Running Neuromodulation tests..." << std::endl;
     try {
-        test_brain::runAll();
+        test_neuromodulation::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Plasticity tests..." << std::endl;
+    try {
+        test_plasticity::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Memory tests..." << std::endl;
+    try {
+        test_memory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Integration tests..." << std::endl;
+    try {
+        test_integration::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

@@ -1,426 +1,238 @@
 #include "NeuralWorkingMemory.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../brain/NeuralRegion.hpp"
+#include "../dynamics/NeuralDynamics.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
 #include <algorithm>
 #include <cmath>
+#include <queue>
+#include <unordered_set>
+#include <numeric>
+#include <random>
+#include <thread>
+#include <mutex>
 
 namespace nlm {
 
-struct NeuralWorkingMemory::Impl {
-    Brain* brain;
-    
-    // Maintenance connections (recurrent)
-    std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
-    
-    // Memory trace ages
-    std::vector<SimulationStep> traceAges;
-    
-    Impl() : brain(nullptr) {}
-};
-
-NeuralWorkingMemory::NeuralWorkingMemory()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-    , capacity_(100)
-    , decayRate_(0.01f)
-{
-}
-
-NeuralWorkingMemory::~NeuralWorkingMemory() = default;
-
-void NeuralWorkingMemory::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("NeuralWorkingMemory initialized");
-}
-
-void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
-    if (pattern.empty() || !brain_) return;
-    
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
-    
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
-        
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+// WorkingMemoryManager Implementation
+void WorkingMemoryManager::addEntry(const MemoryEntry& entry) {
+    entries_.push_back(entry);
+    if (compressionEnabled_ && entry.strength > compressionThreshold_) {
+        // Compress if above threshold
+        float compressRatio = 1.0f - compressionThreshold_ / entry.strength;
+        if (entry.isCompressed) {
+            // Further compress existing compressed entry
+            float factor = std::pow(0.5f, compressRatio);
+            for (auto& e : entries_) {
+                if (e.neuronId == entry.neuronId && e.isCompressed) {
+                    e.compressedPattern.clear();
+                    // Additional compression
                 }
             }
         }
-        
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
+    }
+}
+
+const MemoryEntry* WorkingMemoryManager::getEntry(NeuronId neuron) const {
+    for (const auto& entry : entries_) {
+        if (entry.neuronId == neuron) {
+            return &entry;
         }
     }
-    
-    // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
-    }
+    return nullptr;
 }
 
-void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
-    // Find or add this neuron to memory
-    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+void WorkingMemoryManager::update(TimestepDuration dt, float baseDecayRate,
+                                const std::function<float(NeuronId)>& accessImportance,
+                                const std::function<void(NeuronId)>& onConsolidation) {
+    if (entries_.empty()) return;
     
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
-        memoryActivations_[idx] = activation;
-        memoryTimestamps_[idx] = 0;
-    } else if (memoryNeurons_.size() < capacity_) {
-        memoryNeurons_.push_back(neuron);
-        memoryActivations_.push_back(activation);
-        memoryTimestamps_.push_back(0);
-    }
-    
-    // Inject current to maintain activation
-    if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
-    }
-}
-
-std::vector<float> NeuralWorkingMemory::retrieve() const {
-    std::vector<float> result;
-    result.reserve(memoryActivations_.size());
-    
-    for (float activation : memoryActivations_) {
-        result.push_back(activation);
-    }
-    
-    return result;
-}
-
-bool NeuralWorkingMemory::contains(NeuronId neuron) const {
-    return std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) != memoryNeurons_.end();
-}
-
-float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
-    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
-        return memoryActivations_[idx];
-    }
-    return 0.0f;
-}
-
-void NeuralWorkingMemory::update(TimestepDuration dt) {
-    if (!brain_) return;
-    
-    // Update maintenance - reinforce active memory neurons
-    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        NeuronId neuron = memoryNeurons_[i];
-        float activation = memoryActivations_[i];
+    // Apply decay with importance-based modulation
+    for (auto& entry : entries_) {
+        float importanceFactor = accessImportance(entry.neuronId);
+        float decay = baseDecayRate * (1.0f + (1.0f - importanceFactor) * 0.5f);
+        entry.strength *= (1.0f - decay * dt);
         
-        if (activation > 0.1f) {
-            // Inject maintenance current
-            brain_->injectCurrent(neuron, activation * 2.0f);
-            
-            // Age the trace
-            memoryTimestamps_[i]++;
-            
-            // Check if trace is too old
-            if (memoryTimestamps_[i] > 1000) {
-                activation *= (1.0f - decayRate_);
+        if (entry.strength < 0.01f) {
+            entry.strength = 0.0f;
+        }
+        
+        // Update activation based on strength
+        entry.activation = entry.strength * entry.optimalStrength;
+    }
+    
+    // Check for consolidation needs
+    if (consolidationEnabled_) {
+        for (const auto& entry : entries_) {
+            if (entry.importance > consolidationThreshold_ && entry.strength > 0.5f) {
+                onConsolidation(entry.neuronId);
             }
-            
-            memoryActivations_[i] = activation;
         }
     }
     
-    // Decay weak traces
-    decayWeakTraces();
-    
-    // Run competition to select winners
-    runCompetition();
-}
-
-void NeuralWorkingMemory::clear() {
-    memoryNeurons_.clear();
-    memoryActivations_.clear();
-    memoryTimestamps_.clear();
-    activeTraces_.clear();
-    pImpl->maintenanceSynapses.clear();
-}
-
-void NeuralWorkingMemory::strengthenMemory(float factor) {
-    for (auto& activation : memoryActivations_) {
-        activation = std::min(1.0f, activation * factor);
-    }
-}
-
-void NeuralWorkingMemory::runCompetition() {
-    winners_.clear();
-    
-    if (memoryActivations_.empty()) return;
-    
-    // Find neurons with above-threshold activation
-    float threshold = 0.3f;
-    
-    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        if (memoryActivations_[i] >= threshold) {
-            winners_.push_back(memoryNeurons_[i]);
-        }
-    }
-    
-    // Inhibitory competition - suppress non-winners
-    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
-        
-        if (!isWinner && brain_) {
-            // Apply strong inhibition
-            brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
-        }
-    }
-}
-
-bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
-    return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
-}
-
-float NeuralWorkingMemory::getMemoryActivity() const {
-    if (memoryActivations_.empty()) return 0.0f;
-    
-    float total = 0.0f;
-    for (float act : memoryActivations_) {
-        total += act;
-    }
-    return total / memoryActivations_.size();
-}
-
-void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
-    // Check if connection already exists
-    for (const auto& conn : pImpl->maintenanceSynapses) {
-        if (conn.first == from && conn.second == to) return;
-    }
-    
-    pImpl->maintenanceSynapses.emplace_back(from, to);
-}
-
-void NeuralWorkingMemory::updateRecurrentConnections() {
-    // Apply maintenance currents through recurrent connections
-    for (const auto& conn : pImpl->maintenanceSynapses) {
-        float fromActivation = 0.0f;
-        
-        // Find from neuron activation
-        auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), conn.first);
-        if (it != memoryNeurons_.end()) {
-            size_t idx = std::distance(memoryNeurons_.begin(), it);
-            fromActivation = memoryActivations_[idx];
+    // Handle compression if enabled
+    if (compressionEnabled_) {
+        size_t compressedCount = 0;
+        for (const auto& entry : entries_) {
+            if (entry.isCompressed) compressedCount++;
         }
         
-        if (fromActivation > 0.1f && brain_) {
-            // Send maintenance signal
-            brain_->injectCurrent(conn.second, fromActivation * 2.0f);
-        }
-    }
-}
-
-void NeuralWorkingMemory::decayWeakTraces() {
-    std::vector<size_t> toRemove;
-    
-    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
-        memoryActivations_[i] *= (1.0f - decayRate_);
-        
-        if (memoryActivations_[i] < 0.01f) {
-            toRemove.push_back(i);
-        }
-    }
-    
-    // Remove weak traces (in reverse order to maintain indices)
-    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
-        memoryNeurons_.erase(memoryNeurons_.begin() + *it);
-        memoryActivations_.erase(memoryActivations_.begin() + *it);
-        memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
-    }
-}
-
-// AttentionalSelection Implementation
-struct AttentionalSelection::Impl {
-    // Neuron competition state
-    std::vector<float> competitionStrength;
-    std::vector<float> inhibitionLevel;
-    
-    Impl() {}
-};
-
-AttentionalSelection::AttentionalSelection()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-    , inhibitionStrength_(0.5f)
-    , excitationStrength_(1.5f)
-    , competitionThreshold_(0.3f)
-{
-}
-
-AttentionalSelection::~AttentionalSelection() = default;
-
-void AttentionalSelection::initialize(Brain* brain) {
-    pImpl = std::make_unique<Impl>();
-    brain_ = brain;
-    NLM_LOG_INFO("AttentionalSelection initialized");
-}
-
-std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector<NeuronId>& competitors,
-                                                              float globalInhibition) {
-    winners_.clear();
-    
-    if (competitors.empty()) return winners_;
-    
-    // Compute activity levels for competitors
-    std::vector<float> activities(competitors.size(), 0.0f);
-    float totalActivity = 0.0f;
-    
-    for (size_t i = 0; i < competitors.size(); ++i) {
-        NeuronId neuron = competitors[i];
-        
-        // Get current activation from salience and top-down bias (from maps)
-        auto salIt = bottomUpSalience_.find(neuron.value);
-        float salience = (salIt != bottomUpSalience_.end()) ? salIt->second : 0.0f;
-        auto biasIt = topDownBias_.find(neuron.value);
-        float bias = (biasIt != topDownBias_.end()) ? biasIt->second : 0.0f;
-        
-        activities[i] = salience + bias;
-        totalActivity += activities[i];
-    }
-    
-    if (totalActivity < 0.001f) {
-        // No strong competitors - all equal
-        return competitors;
-    }
-    
-    // Competition: neurons inhibit each other based on relative activity
-    for (size_t i = 0; i < competitors.size(); ++i) {
-        for (size_t j = 0; j < competitors.size(); ++j) {
-            if (i == j) continue;
-            
-            float relativeActivity = activities[i] / (activities[j] + 0.001f);
-            
-            if (relativeActivity > 1.5f) {
-                // i is much stronger than j - apply inhibition to j
-                if (brain_) {
-                    brain_->injectCurrent(competitors[j], -globalInhibition * inhibitionStrength_);
+        if (compressedCount < entries_.size() * 0.5f) {
+            // Compress enough entries to reach 50% compression
+            std::vector<size_t> compressibleIndices;
+            for (size_t i = 0; i < entries_.size(); ++i) {
+                if (!entries_[i].isCompressed && entries_[i].strength > compressionThreshold_) {
+                    compressibleIndices.push_back(i);
                 }
-                pImpl->inhibitionLevel.push_back(globalInhibition * inhibitionStrength_);
             }
-        }
-    }
-    
-    // Winners are neurons with above-threshold activity
-    float threshold = competitionThreshold_ * totalActivity / competitors.size();
-    
-    for (size_t i = 0; i < competitors.size(); ++i) {
-        if (activities[i] >= threshold) {
-            winners_.push_back(competitors[i]);
             
-            // Apply excitation to winners
-            if (brain_) {
-                brain_->injectCurrent(competitors[i], excitationStrength_ * 2.0f);
+            size_t targetCompressed = static_cast<size_t>(entries_.size() * 0.5f);
+            if (targetCompressed > compressedCount) {
+                size_t toCompress = std::min(targetCompressed - compressedCount, 
+                                           compressibleIndices.size());
+                for (size_t i = 0; i < toCompress; ++i) {
+                    size_t idx = compressibleIndices[i];
+                    entries_[idx].isCompressed = true;
+                    // Create compressed pattern (simplified PCA-like compression)
+                    entries_[idx].compressedPattern = std::vector<float>(10, 0.0f); // Fixed size compression
+                    for (size_t j = 0; j < 10; ++j) {
+                        entries_[idx].compressedPattern[j] = entries_[idx].activation * 
+                                                             std::sin(j * 0.1f * entries_[idx].strength);
+                    }
+                }
             }
         }
     }
+}
+
+void WorkingMemoryManager::evictMemories(size_t targetSize) {
+    if (entries_.size() <= targetSize) return;
     
-    return winners_;
-}
-
-void AttentionalSelection::focusOnRegion(RegionId region) {
-    if (std::find(attendedRegions_.begin(), attendedRegions_.end(), region) == attendedRegions_.end()) {
-        attendedRegions_.push_back(region);
-    }
-}
-
-void AttentionalSelection::releaseAttention() {
-    attendedRegions_.clear();
-}
-
-std::vector<RegionId> AttentionalSelection::getAttendedRegions() const {
-    return attendedRegions_;
-}
-
-void AttentionalSelection::setInhibitionStrength(float strength) {
-    inhibitionStrength_ = strength;
-}
-
-void AttentionalSelection::setExcitationStrength(float strength) {
-    excitationStrength_ = strength;
-}
-
-void AttentionalSelection::setCompetitionThreshold(float threshold) {
-    competitionThreshold_ = threshold;
-}
-
-float AttentionalSelection::getInhibitionFor(NeuronId neuron) const {
-    auto it = std::find(winners_.begin(), winners_.end(), neuron);
-    if (it != winners_.end()) {
-        return 0.0f;  // Winners don't receive inhibition
-    }
-    return inhibitionStrength_;
-}
-
-float AttentionalSelection::getExcitationFor(NeuronId neuron) const {
-    auto it = std::find(winners_.begin(), winners_.end(), neuron);
-    if (it != winners_.end()) {
-        return excitationStrength_;
-    }
-    return 0.0f;
-}
-
-void AttentionalSelection::update(TimestepDuration dt) {
-    // Decay salience and bias over time
-    for (auto& s : bottomUpSalience_) {
-        s *= 0.95f;
+    // Calculate total importance and access counts for statistics
+    float totalImportance = 0.0f;
+    float totalAccessCount = 0.0f;
+    
+    for (const auto& entry : entries_) {
+        totalImportance += entry.importance;
+        totalAccessCount += entry.accessCount;
     }
     
-    for (auto& b : topDownBias_) {
-        b *= 0.98f;
+    if (totalImportance > 0.0f) {
+        totalImportance = 1.0f / totalImportance;
+        totalAccessCount = 1.0f / totalAccessCount;
     }
     
-    // Decay inhibition
-    for (auto& i : pImpl->inhibitionLevel) {
-        i *= 0.9f;
+    // Score entries for eviction (lower score = better to evict)
+    std::vector<std::pair<float, size_t>> scores;
+    for (size_t i = 0; i < entries_.size(); ++i) {
+        float score = 0.0f;
+        
+        switch (evictionPolicy_) {
+            case EvictionPolicy::LRU:
+                score = static_cast<float>(entries_[i].lastAccess);
+                break;
+            case EvictionPolicy::LFU:
+                score = static_cast<float>(entries_[i].accessCount);
+                break;
+            case EvictionPolicy::Importance:
+                score = entries_[i].importance;
+                break;
+            case EvictionPolicy::Random:
+                static std::mt19937 rng(std::random_device{}());
+                score = static_cast<float>(rng() % 1000) / 1000.0f;
+                break;
+        }
+        
+        scores.push_back({score, i});
+    }
+    
+    // Sort by score (lowest first for eviction)
+    std::sort(scores.begin(), scores.end(), 
+              [](const std::pair<float, size_t>& a, const std::pair<float, size_t>& b) {
+                  return a.first < b.first;
+              });
+    
+    // Evict from highest score to target size
+    size_t toEvict = entries_.size() - targetSize;
+    for (size_t i = 0; i < toEvict; ++i) {
+        size_t idx = scores[i].second;
+        entries_.erase(entries_.begin() + idx);
+        // Update scores after erase
+        for (auto& pair : scores) {
+            if (pair.second > idx) pair.second--;
+        }
     }
 }
 
-bool AttentionalSelection::isAttended(NeuronId neuron) const {
-    return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
-}
-
-void AttentionalSelection::applyTopDownBias(NeuronId neuron, float biasStrength) {
-    // Store bias in map keyed by NeuronId
-    auto it = topDownBias_.find(neuron.value);
-    if (it != topDownBias_.end()) {
-        it->second += biasStrength;
-    } else {
-        topDownBias_[neuron.value] = biasStrength;
+size_t WorkingMemoryManager::getCompressedCount() const {
+    size_t count = 0;
+    for (const auto& entry : entries_) {
+        if (entry.isCompressed) count++;
     }
+    return count;
 }
 
-void AttentionalSelection::applyBottomUpSalience(NeuronId neuron, float salienceStrength) {
-    // Store salience in map keyed by NeuronId
-    auto it = bottomUpSalience_.find(neuron.value);
-    if (it != bottomUpSalience_.end()) {
-        it->second += salienceStrength;
-    } else {
-        bottomUpSalience_[neuron.value] = salienceStrength;
+float WorkingMemoryManager::getAverageImportance() const {
+    if (entries_.empty()) return 0.0f;
+    
+    float sum = 0.0f;
+    for (const auto& entry : entries_) {
+        sum += entry.importance;
     }
+    return sum / entries_.size();
 }
 
-void AttentionalSelection::reset() {
-    winners_.clear();
-    attendedRegions_.clear();
-    neuronSalience_.clear();
-    topDownBias_.clear();
-    bottomUpSalience_.clear();
-    pImpl->inhibitionLevel.clear();
+float WorkingMemoryManager::getCompressionRatio() const {
+    if (entries_.empty()) return 0.0f;
+    
+    size_t compressed = 0;
+    for (const auto& entry : entries_) {
+        if (entry.isCompressed) compressed++;
+    }
+    return static_cast<float>(compressed) / entries_.size();
+}
+
+void WorkingMemoryManager::evictLRU() {
+    if (entries_.empty()) return;
+    
+    auto it = std::min_element(entries_.begin(), entries_.end(),
+        [](const MemoryEntry& a, const MemoryEntry& b) {
+            return a.lastAccess < b.lastAccess;
+        });
+    
+    entries_.erase(it);
+}
+
+void WorkingMemoryManager::evictLFU() {
+    if (entries_.empty()) return;
+    
+    auto it = std::min_element(entries_.begin(), entries_.end(),
+        [](const MemoryEntry& a, const MemoryEntry& b) {
+            return a.accessCount < b.accessCount;
+        });
+    
+    entries_.erase(it);
+}
+
+void WorkingMemoryManager::evictByImportance() {
+    if (entries_.empty()) return;
+    
+    auto it = std::min_element(entries_.begin(), entries_.end(),
+        [](const MemoryEntry& a, const MemoryEntry& b) {
+            return a.importance < b.importance;
+        });
+    
+    entries_.erase(it);
+}
+
+void WorkingMemoryManager::evictRandom() {
+    if (entries_.empty()) return;
+    
+    static std::mt19937 rng(std::random_device{}());
+    std::uniform_int_distribution<size_t> dist(0, entries_.size() - 1);
+    size_t idx = dist(rng);
+    
+    entries_.erase(entries_.begin() + idx);
 }
 
 } // namespace nlm

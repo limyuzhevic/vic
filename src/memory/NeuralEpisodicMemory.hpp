@@ -6,6 +6,11 @@
 #include <memory>
 #include <deque>
 #include <functional>
+#include <unordered_map>
+#include <chrono>
+#include <random>
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
@@ -77,13 +82,13 @@ public:
 
     // Retrieve episodes from a specific time window
     std::vector<const EpisodicMemoryItem*> retrieveTemporal(SimulationStep startTime,
-                                                            SimulationStep endTime,
-                                                            size_t maxResults = 10) const;
+                                                             SimulationStep endTime,
+                                                             size_t maxResults = 10) const;
 
     // Retrieve episodes by location
     std::vector<const EpisodicMemoryItem*> retrieveByLocation(float x, float y,
-                                                             float radius,
-                                                             size_t maxResults = 5) const;
+                                                              float radius,
+                                                              size_t maxResults = 5) const;
 
     // Retrieve episodes following a specific action
     std::vector<const EpisodicMemoryItem*> retrieveAfterAction(ActionType action,
@@ -108,6 +113,9 @@ public:
     // Get average reward from episodes
     float getAverageReward() const;
 
+    // Update all memory dynamics with current brain state
+    void updateMemoryDynamics(TimestepDuration dt);
+
     // Clear old episodes
     void consolidate(float relevanceThreshold);
 
@@ -123,6 +131,18 @@ public:
 
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
+
+    // Update acetylcholine state for attention and encoding
+    void updateAcetylcholineState();
+
+    // Update neuromodulation integration
+    void updateNeuromodulationIntegration();
+
+    // Update development integration
+    void updateDevelopmentIntegration();
+
+    // Update binding mechanisms
+    void updateBindingMechanisms();
 
 private:
     // Compute similarity between query and stored episode
@@ -143,6 +163,22 @@ private:
     std::deque<EpisodicMemoryItem> episodes_;
     size_t maxEpisodes_;
     bool replayEnabled_;
+    
+    // Additional systems consolidation
+    float corticalIntegrationLevel_;
+    std::vector<size_t> hippocampalCorticalLinks_;
+    std::vector<std::vector<float>> corticalRepresentations_;
+    
+    // Synaptic consolidation tracking
+    std::vector<float> memoryStrengths_;
+    std::vector<SimulationStep> encodingTimes_;
+    std::vector<float> proteinLevels_;
+    std::vector<bool> markedForReplay_;
+    std::vector<float> replayProbabilities_;
+    
+    // Statistics
+    float avgMemoryStrength_;
+    float avgReplayPotential_;
 };
 
 // AssociativeMemory: Creates and retrieves relationships between experiences

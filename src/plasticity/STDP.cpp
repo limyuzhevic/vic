@@ -2,18 +2,26 @@
 #include "../../brain/Synapse.hpp"
 #include <cmath>
 #include <algorithm>
+#include <map>
 
 namespace nlm {
 
 struct STDP::Impl {
-    float ltpWeight;      // A+ for potentiation
-    float ltdWeight;      // A- for depression
-    float timeConstant;   // Tau for exponential window (ms)
+    float ltpWeight;      // A+ for potentiation (~10-20ms window)
+    float ltdWeight;      // A- for depression (~30-50ms window)
+    float tauPlus;        // τ+ for potentiation time constant
+    float tauMinus;       // τ- for depression time constant
     float minWeight;      // Minimum synaptic weight
     float maxWeight;      // Maximum synaptic weight
+    float homeostaticFactor; // Homeostatic scaling factor
     
-    Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
+    // Eligibility traces (spike-dependent)
+    std::map<SynapseId, float> eligibilityTraces;  // synapse_id -> trace value
+    
+    Impl() : ltpWeight(0.01f), ltdWeight(0.012f), 
+             tauPlus(20.0f), tauMinus(30.0f),
+             minWeight(-1.0f), maxWeight(1.0f),
+             homeostaticFactor(1.0f) {}
 };
 
 STDP::STDP() : pImpl(new Impl) {}
@@ -24,57 +32,56 @@ void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
-    /*
-     * Real STDP implementation based on spike-timing correlation
-     * 
-     * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
-     * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
-     *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
-     * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
-     * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
-     */
-    
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
     float totalDelta = 0.0f;
-    float tau = pImpl->timeConstant;
     
+    // Process spike pairs for pairwise STDP with biexponential windows
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+            float deltaT = static_cast<float>(postTime - preTime);  // Δt in ms
             
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
+            if (deltaT > 0) {
+                // Pre before post: POTENTIATION with exponential decay
+                // Biological basis: NMDA receptor activation, Ca2+ influx
+                totalDelta += pImpl->ltpWeight * std::exp(-deltaT / pImpl->tauPlus);
+            } else if (deltaT < 0) {
+                // Post before pre: DEPRESSION with exponential decay
+                // Biological basis: backpropagating action potentials, Ca2+ influx
+                totalDelta -= pImpl->ltdWeight * std::exp(deltaT / pImpl->tauMinus);
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+        }
+    }
+    
+    // Apply homeostatic plasticity to prevent runaway excitation
+    float homeostasisFactor = 1.0f;
+    if (synapse->getType() == SynapseType::Excitatory) {
+        // Excitatory synaptic scaling based on overall activity
+        float targetExcLevel = 0.8f;  // Target excitation level (0-1)
+        float currentExc = synapse->getWeight();
+        if (std::abs(currentExc) > 1e-6f) {
+            homeostasisFactor = 1.0f - pImpl->homeostaticFactor * (currentExc - targetExcLevel);
+        }
+    } else if (synapse->getType() == SynapseType::Inhibitory) {
+        // Inhibitory synaptic scaling based on overall activity
+        float targetInhLevel = -0.4f;  // Target inhibition level (negative)
+        float currentInh = synapse->getWeight();
+        if (std::abs(currentInh) > 1e-6f) {
+            homeostasisFactor = 1.0f - pImpl->homeostaticFactor * (currentInh - targetInhLevel);
+        }
+    }
+    
+    totalDelta *= homeostasisFactor;
+    
+    // Apply synaptic normalization to maintain stability
+    float totalDeltasq = totalDelta * totalDelta;
+    if (totalDeltasq > 0.001f) {
+        // Normalize based on existing weight magnitude
+        float weightMagnitude = std::abs(synapse->getWeight());
+        if (weightMagnitude > 0.1f) {
+            totalDelta *= 0.1f / weightMagnitude;  // Limit updates for strong synapses
         }
     }
     
@@ -88,8 +95,7 @@ void STDP::update(Synapse* synapse,
         synapse->addToWeight(totalDelta);
         
         // Update eligibility trace for reward-modulated learning
-        float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
+        updateEligibilityTrace(synapse, totalDelta);
     }
 }
 
@@ -122,18 +128,70 @@ float STDP::getLTDWeight() const {
     return pImpl->ltdWeight;
 }
 
-void STDP::setTimeConstant(float tau) {
-    pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
+void STDP::setTimeConstantPlus(float tau) {
+    pImpl->tauPlus = std::clamp(tau, 5.0f, 50.0f);
 }
 
-float STDP::getTimeConstant() const {
-    return pImpl->timeConstant;
+float STDP::getTimeConstantPlus() const {
+    return pImpl->tauPlus;
 }
 
-void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
+void STDP::setTimeConstantMinus(float tau) {
+    pImpl->tauMinus = std::clamp(tau, 10.0f, 100.0f);
+}
+
+float STDP::getTimeConstantMinus() const {
+    return pImpl->tauMinus;
+}
+
+void STDP::setTauPlus(float tauPlus) {
+    setTimeConstantPlus(tauPlus);
+}
+
+float STDP::getTauPlus() const {
+    return getTimeConstantPlus();
+}
+
+void STDP::setTauMinus(float tauMinus) {
+    setTimeConstantMinus(tauMinus);
+}
+
+float STDP::getTauMinus() const {
+    return getTimeConstantMinus();
+}
+
+void STDP::setHomeostaticFactor(float factor) {
+    pImpl->homeostaticFactor = std::clamp(factor, 0.0f, 0.1f);
+}
+
+float STDP::getHomeostaticFactor() const {
+    return pImpl->homeostaticFactor;
+}
+
+void STDP::configure(float ltpWeight, float ltdWeight, float tauPlus, float tauMinus,
+                     float homeostaticFactor) {
     setLTPWeight(ltpWeight);
     setLTDWeight(ltdWeight);
-    setTimeConstant(tau);
+    setTimeConstantPlus(tauPlus);
+    setTimeConstantMinus(tauMinus);
+    setHomeostaticFactor(homeostaticFactor);
+}
+
+void STDP::updateEligibilityTrace(Synapse* synapse, float delta, float decayRate) {
+    if (!synapse) return;
+    
+    float currentTrace = pImpl->eligibilityTraces[synapse->getId()];
+    currentTrace = currentTrace * (1.0f - decayRate) + delta;
+    pImpl->eligibilityTraces[synapse->getId()] = currentTrace;
+}
+
+float STDP::getTraceValue(const Synapse* synapse) const {
+    if (!synapse) return 0.0f;
+    auto it = pImpl->eligibilityTraces.find(synapse->getId());
+    if (it != pImpl->eligibilityTraces.end()) {
+        return it->second;
+    }
+    return 0.0f;
 }
 
 } // namespace nlm

@@ -6,8 +6,107 @@
 #include <memory>
 #include <functional>
 #include <unordered_map>
+#include <algorithm>
+#include <cmath>
+#include <queue>
+#include <unordered_set>
 
 namespace nlm {
+
+// MemoryEntry: Individual working memory entry with advanced tracking
+struct MemoryEntry {
+    NeuronId neuronId;
+    float activation;
+    SimulationStep timestamp;     // When encoded
+    SimulationStep lastAccess;    // When last accessed (for LRU)
+    SimulationStep accessCount;   // How many times accessed (for LFU)
+    float importance;              // Importance score (0-1)
+    float strength;                // Current trace strength
+    float optimalStrength;         // Target strength for this entry
+    bool isCompressed;             // Whether this memory is stored in compressed form
+    std::vector<float> compressedPattern; // Compressed representation
+    
+    MemoryEntry(NeuronId id, float act) 
+        : neuronId(id), activation(act), timestamp(0), lastAccess(0)
+        , accessCount(0), importance(1.0f), strength(act), optimalStrength(act)
+        , isCompressed(false) {}
+};
+
+// PatternTemplate: Template for pattern completion (e.g., chunking)
+struct PatternTemplate {
+    std::vector<float> pattern;    // The template pattern
+    std::vector<NeuronId> neurons; // Associated neurons
+    float strength;                // Template strength
+    float similarity;              // How similar is this to current pattern
+    bool isActive;                 // Whether template is currently active
+    
+    PatternTemplate() : strength(0.0f), similarity(0.0f), isActive(false) {}
+};
+
+// WorkingMemoryManager: Manages capacity, decay, and advanced features
+class WorkingMemoryManager {
+public:
+    enum class EvictionPolicy { LRU, LFU, Importance, Random };
+    
+    WorkingMemoryManager(size_t capacity, EvictionPolicy policy = EvictionPolicy::LRU)
+        : capacity_(capacity), evictionPolicy_(policy), compressionThreshold_(0.7f)
+        , consolidationThreshold_(0.5f) {}
+    
+    // Add memory entry
+    void addEntry(const MemoryEntry& entry);
+    
+    // Get memory entry by neuron
+    const MemoryEntry* getEntry(NeuronId neuron) const;
+    
+    // Update memory based on decay, activity, and consolidation
+    void update(TimestepDuration dt, float baseDecayRate, 
+                const std::function<float(NeuronId)>& accessImportance,
+                const std::function<void(NeuronId)>& onConsolidation);
+    
+    // Evict memories based on capacity and policy
+    void evictMemories(size_t targetSize);
+    
+    // Get all memory entries
+    const std::vector<MemoryEntry>& getEntries() const { return entries_; }
+    
+    // Get current size
+    size_t getSize() const { return entries_.size(); }
+    
+    // Get capacity
+    size_t getCapacity() const { return capacity_; }
+    
+    // Set capacity
+    void setCapacity(size_t cap) { capacity_ = cap; }
+    
+    // Set eviction policy
+    void setEvictionPolicy(EvictionPolicy policy) { evictionPolicy_ = policy; }
+    
+    // Enable/disable compression
+    void setCompressionEnabled(bool enabled) { compressionEnabled_ = enabled; }
+    
+    // Enable/disable consolidation
+    void setConsolidationEnabled(bool enabled) { consolidationEnabled_ = enabled; }
+    
+    // Get memory statistics
+    size_t getCompressedCount() const;
+    float getAverageImportance() const;
+    float getCompressionRatio() const;
+    
+private:
+    std::vector<MemoryEntry> entries_;
+    size_t capacity_;
+    EvictionPolicy evictionPolicy_;
+    float compressionThreshold_;
+    float consolidationThreshold_;
+    bool compressionEnabled_;
+    bool consolidationEnabled_;
+    
+    // Helper methods for eviction
+    void evictLRU();
+    void evictLFU();
+    void evictByImportance();
+    void evictRandom();
+};
 
 // NeuralWorkingMemory: Implements working memory using neural dynamics
 // NOT a simple storage vector - uses persistent activity and recurrent connections
@@ -17,6 +116,10 @@ namespace nlm {
 // - Recurrent synaptic connections for maintaining information
 // - Activity-dependent short-term plasticity
 // - Neural competition for selective retention
+// - Advanced capacity management with LRU/LFU eviction
+// - Importance-based prioritization and consolidation
+// - Compressed storage and pattern completion (chunking)
+// - Multi-level storage (short-term and long-term buffers)
 
 class NeuralWorkingMemory {
 public:

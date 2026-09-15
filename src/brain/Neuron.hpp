@@ -93,18 +93,27 @@ public:
     void setRestingPotential(MembranePotential potential);
     MembranePotential getRestingPotential() const;
     void setResetPotential(MembranePotential potential);
-    
-    // Spike detection
+
+    // Membrane potential dynamics (integration)
+    void setMembranePotential(MembranePotential potential);
+    MembranePotential getMembranePotential() const;
+    void addToMembranePotential(MembranePotential delta);
+
+    // Spike detection and generation
     bool checkThreshold() const;
     float getLastSpikeTime() const;
-    
+
     // LIF step function - returns true if neuron fired
     bool stepLIF(Timestamp currentTime, TimestepDuration dt);
-    
+
     // Incoming signals (post-synaptic potentials)
     void receiveExcitatoryInput(MembranePotential amplitude);
     void receiveInhibitoryInput(MembranePotential amplitude);
     void receiveModulatoryInput(MembranePotential amplitude);
+
+    // Neuromodulation and adaptation
+    void receiveDopamineInput(MembranePotential amplitude);
+    void updateAdaptation(TimestepDuration dt);
     
     // Current injection (from external sources)
     void injectCurrent(MembranePotential current);
