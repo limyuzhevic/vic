@@ -6,6 +6,9 @@
 #include <memory>
 #include <vector>
 
+// Include error system
+#include "ErrorSystem.hpp"
+
 namespace nlm {
 
 // ExperimentRunner: Runs experiments and collects data
@@ -43,7 +46,7 @@ public:
     void setGlobalSeed(uint64_t seed);
     
     // Save experiment results
-    bool saveResults(const std::string& filepath) const;
+    std::string saveResults(const std::string& filepath) const;
     
 private:
     struct Impl;

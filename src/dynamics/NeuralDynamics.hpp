@@ -46,6 +46,18 @@ public:
     // Parameters
     void setMembraneTimeConstant(float tau);
     float getMembraneTimeConstant() const;
+    void setMembraneCapacitance(float C);
+    float getMembraneCapacitance() const;
+    void setReversalPotentialEx(float E_ex);
+    float getReversalPotentialEx() const;
+    void setReversalPotentialIn(float E_in);
+    float getReversalPotentialIn() const;
+    void setSTPParameters(float U_val, float tau_f_val, float tau_d_val);
+    void getSTPParameters(float& U_val, float& tau_f_val, float& tau_d_val) const;
+    void setRefractoryPeriod(float period);
+    float getRefractoryPeriod() const;
+    void setNoiseLevel(float noise);
+    float getNoiseLevel() const;
     
 private:
     struct Impl;

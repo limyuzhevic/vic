@@ -8,6 +8,9 @@ namespace nlm {
 
 // Forward declarations
 class RandomGenerator;
+class Maturation;
+class Pruning;
+class Synaptogenesis;
 
 // Development system: orchestrates neural development
 // Implements developmental stages, plasticity modulation, and structural changes
@@ -46,10 +49,25 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // Get development system components
+    Maturation* getMaturation() const { return maturation_.get(); }
+    Pruning* getPruning() const { return pruning_.get(); }
+    Synaptogenesis* getSynaptogenesis() const { return synaptogenesis_.get(); }
+    
+    // Set development system components
+    void setMaturation(std::unique_ptr<Maturation> maturation) { maturation_ = std::move(maturation); }
+    void setPruning(std::unique_ptr<Pruning> pruning) { pruning_ = std::move(pruning); }
+    void setSynaptogenesis(std::unique_ptr<Synaptogenesis> synaptogenesis) { synaptogenesis_ = std::move(synaptogenesis); }
+    
 private:
     struct Impl;
     Impl* pImpl;
     double age_;
+    
+    std::unique_ptr<Maturation> maturation_;
+    std::unique_ptr<Pruning> pruning_;
+    std::unique_ptr<Synaptogenesis> synaptogenesis_;
 };
 
 } // namespace nlm
+

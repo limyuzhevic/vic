@@ -1,36 +1,8 @@
 #pragma once
 
-#include <vector>
-#include <string>
-#include <memory>
+#include "SensoryInput.hpp"
 
 namespace nlm {
-
-// Base class for all sensory input
-class SensoryInput {
-public:
-    SensoryInput();
-    virtual ~SensoryInput() = default;
-    
-    // Get input type
-    virtual const char* getType() const = 0;
-    
-    // Get raw data as vector
-    virtual const std::vector<float>& getData() const = 0;
-    
-    // Get dimensionality
-    virtual size_t getDimensions() const = 0;
-    
-    // Get timestamp
-    double getTimestamp() const;
-    void setTimestamp(double timestamp);
-    
-    // Clone
-    virtual std::unique_ptr<SensoryInput> clone() const = 0;
-    
-protected:
-    double timestamp_;
-};
 
 // Vision input placeholder
 class Vision : public SensoryInput {
@@ -96,6 +68,21 @@ public:
     // Add signal
     void addSignal(float value);
     void clearSignals();
+    
+    // Get homeostatic signals
+    const std::vector<float>& getHomeostaticSignals() const;
+    const std::vector<float>& getHungerLevels() const;
+    const std::vector<float>& getThirstLevels() const;
+    const std::vector<float>& getFatigueLevels() const;
+    const std::vector<float>& getMetabolicRates() const;
+    const std::vector<float>& getStressLevels() const;
+    const std::vector<float>& getPredictionErrors() const;
+    
+    // Set homeostatic setpoint
+    void setHomeostaticSetpoint(float setpoint);
+    
+    // Update interoceptive noise level
+    void updateInteroceptiveNoise(float noise);
     
 private:
     struct Impl;

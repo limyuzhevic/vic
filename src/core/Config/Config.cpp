@@ -1,215 +1,382 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <filesystem>
-
-namespace nlm {
-
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
+// Additional ConfigBuilder implementation (fixing duplicate and missing methods)
+struct Config::Builder {
+    bool hasBrain_ = false;
+    size_t neuronCount_ = 1000;
+    size_t regionCount_ = 1;
+    float connectionProbability_ = 0.1f;
+    
+    bool hasDevelopment_ = false;
+    bool developmentEnabled_ = true;
+    bool maturationEnabled_ = true;
+    bool pruningEnabled_ = true;
+    bool synaptogenesisEnabled_ = true;
+    float maturationRate_ = 0.001f;
+    float consolidationRate_ = 0.0001f;
+    float hebbianLearningRate_ = 0.01f;
+    float pruningRate_ = 0.00001f;
+    float pruningActivityThreshold_ = 0.001f;
+    float pruningWeightThreshold_ = 0.01f;
+    float pruningCorrelationThreshold_ = 0.1f;
+    float synaptogenesisRate_ = 0.001f;
+    float synaptogenesisTargetDensity_ = 0.1f;
+    size_t maxSynapsesPerNeuron_ = 100;
+    
+    bool hasNeuromodulation_ = false;
+    bool neuromodulationEnabled_ = true;
+    bool dopamineEnabled_ = true;
+    bool curiosityEnabled_ = true;
+    bool noveltyEnabled_ = true;
+    bool predictionErrorEnabled_ = true;
+    
+    bool hasPlasticity_ = false;
+    bool plasticityEnabled_ = true;
+    bool stdpEnabled_ = true;
+    bool hebbianEnabled_ = true;
+    bool structuralEnabled_ = true;
+    float stdpLtpWeight_ = 0.01f;
+    float stdpLtdWeight_ = 0.012f;
+    float stdpTau_ = 20.0f;
+    
+    bool hasMemory_ = false;
+    bool workingMemoryEnabled_ = true;
+    bool episodicMemoryEnabled_ = true;
+    bool associativeMemoryEnabled_ = true;
+    
+    bool hasPrediction_ = false;
+    bool predictionEnabled_ = true;
+    
+    bool hasCognition_ = false;
+    bool planningEnabled_ = true;
+    bool conceptFormationEnabled_ = true;
+    bool attentionEnabled_ = true;
+    size_t planningDepth_ = 5;
+    float attentionInhibitionStrength_ = 0.5f;
+    float attentionExcitationStrength_ = 1.5f;
+    
+    bool hasSimulation_ = false;
+    double simulationTimestep_ = 0.001;
+    uint64_t randomSeed_ = 42;
+    size_t replayInterval_ = 100;
+    size_t consolidationInterval_ = 1000;
+    
+    bool hasDebug_ = false;
+    bool debugEnabled_ = true;
+    bool debugVerbose_ = false;
+    std::string debugLevel_ = "info";
+    
+    bool hasPerformance_ = false;
+    float targetFPS_ = 30.0f;
+    std::string performanceOptimization_ = "balanced";
+    
+    bool hasAccuracy_ = false;
+    bool accuracyEnabled_ = true;
+    float accuracyTolerance_ = 0.01f;
+    
+    // Builder methods
+    Config::Builder& withBrain(size_t neurons, size_t regions = 1, float connectionProb = 0.1f) {
+        hasBrain_ = true;
+        neuronCount_ = neurons;
+        regionCount_ = regions;
+        connectionProbability_ = connectionProb;
+        return *this;
+    }
+    
+    Config::Builder& withDevelopment(bool enabled = true, bool mat = true, bool prune = true, bool synapt = true) {
+        hasDevelopment_ = true;
+        developmentEnabled_ = enabled;
+        maturationEnabled_ = mat;
+        pruningEnabled_ = prune;
+        synaptogenesisEnabled_ = synapt;
+        return *this;
+    }
+    
+    Config::Builder& withDevelopmentRates(float matRate, float consRate, float hebbRate) {
+        maturationRate_ = matRate;
+        consolidationRate_ = consRate;
+        hebbianLearningRate_ = hebbRate;
+        return *this;
+    }
+    
+    Config::Builder& withPruningRates(float pruneRate, float activityThresh, float weightThresh, float correlationThresh) {
+        pruningRate_ = pruneRate;
+        pruningActivityThreshold_ = activityThresh;
+        pruningWeightThreshold_ = weightThresh;
+        pruningCorrelationThreshold_ = correlationThresh;
+        return *this;
+    }
+    
+    Config::Builder& withSynaptogenesis(float rate, float targetDensity, size_t maxSynapses) {
+        synaptogenesisRate_ = rate;
+        synaptogenesisTargetDensity_ = targetDensity;
+        maxSynapsesPerNeuron_ = maxSynapses;
+        return *this;
+    }
+    
+    Config::Builder& withNeuromodulation(bool enabled = true, bool dop = true, bool cur = true, bool nov = true, bool predErr = true) {
+        hasNeuromodulation_ = true;
+        neuromodulationEnabled_ = enabled;
+        dopamineEnabled_ = dop;
+        curiosityEnabled_ = cur;
+        noveltyEnabled_ = nov;
+        predictionErrorEnabled_ = predErr;
+        return *this;
+    }
+    
+    Config::Builder& withPlasticity(bool enabled = true, bool stdp = true, bool hebb = true, bool structural = true) {
+        hasPlasticity_ = true;
+        plasticityEnabled_ = enabled;
+        stdpEnabled_ = stdp;
+        hebbianEnabled_ = hebb;
+        structuralEnabled_ = structural;
+        return *this;
+    }
+    
+    Config::Builder& withSTDP(float ltpWeight, float ltdWeight, float tau) {
+        stdpLtpWeight_ = ltpWeight;
+        stdpLtdWeight_ = ltdWeight;
+        stdpTau_ = tau;
+        return *this;
+    }
+    
+    Config::Builder& withMemory(bool work = true, bool epi = true, bool assoc = true) {
+        hasMemory_ = true;
+        workingMemoryEnabled_ = work;
+        episodicMemoryEnabled_ = epi;
+        associativeMemoryEnabled_ = assoc;
+        return *this;
+    }
+    
+    Config::Builder& withPrediction(bool enabled = true) {
+        hasPrediction_ = true;
+        predictionEnabled_ = enabled;
+        return *this;
+    }
+    
+    Config::Builder& withCognition(bool planning = true, bool conceptForm = true, bool attention = true) {
+        hasCognition_ = true;
+        planningEnabled_ = planning;
+        conceptFormationEnabled_ = conceptForm;
+        attentionEnabled_ = attention;
+        return *this;
+    }
+    
+    Config::Builder& withPlanningDepth(size_t depth) {
+        planningDepth_ = depth;
+        return *this;
+    }
+    
+    Config::Builder& withAttention(float inhibition, float excitation) {
+        attentionInhibitionStrength_ = inhibition;
+        attentionExcitationStrength_ = excitation;
+        return *this;
+    }
+    
+    Config::Builder& withSimulation(double timestep, uint64_t seed, size_t replay, size_t consolidation) {
+        hasSimulation_ = true;
+        simulationTimestep_ = timestep;
+        randomSeed_ = seed;
+        replayInterval_ = replay;
+        consolidationInterval_ = consolidation;
+        return *this;
+    }
+    
+    Config::Builder& withDebug(bool enabled = true, bool verbose = false, const std::string& level = "info") {
+        hasDebug_ = true;
+        debugEnabled_ = enabled;
+        debugVerbose_ = verbose;
+        debugLevel_ = level;
+        return *this;
+    }
+    
+    Config::Builder& withPerformance(float fps, const std::string& optimization = "balanced") {
+        hasPerformance_ = true;
+        targetFPS_ = fps;
+        performanceOptimization_ = optimization;
+        return *this;
+    }
+    
+    Config::Builder& withAccuracy(bool enabled = true, float tolerance = 0.01f) {
+        hasAccuracy_ = true;
+        accuracyEnabled_ = enabled;
+        accuracyTolerance_ = tolerance;
+        return *this;
+    }
+    
+    Config build() {
+        Config config;
+        
+        if (hasBrain_) {
+            config.set("neuron_count", static_cast<int64_t>(neuronCount_), ConfigSource::Default);
+            config.set("region_count", static_cast<int64_t>(regionCount_), ConfigSource::Default);
+            config.set("connection_probability", connectionProbability_, ConfigSource::Default);
+        }
+        
+        if (hasDevelopment_) {
+            config.set("development.enabled", developmentEnabled_, ConfigSource::Default);
+            if (developmentEnabled_) {
+                config.set("development.maturation.enabled", maturationEnabled_, ConfigSource::Default);
+                config.set("development.pruning.enabled", pruningEnabled_, ConfigSource::Default);
+                config.set("development.synaptogenesis.enabled", synaptogenesisEnabled_, ConfigSource::Default);
+                if (maturationEnabled_) {
+                    config.set("maturation_rate", maturationRate_, ConfigSource::Default);
+                    config.set("consolidation_rate", consolidationRate_, ConfigSource::Default);
+                    config.set("hebbian_learning_rate", hebbianLearningRate_, ConfigSource::Default);
+                }
+                if (pruningEnabled_) {
+                    config.set("pruning_rate", pruningRate_, ConfigSource::Default);
+                    config.set("pruning_activity_threshold", pruningActivityThreshold_, ConfigSource::Default);
+                    config.set("pruning_weight_threshold", pruningWeightThreshold_, ConfigSource::Default);
+                    config.set("pruning_correlation_threshold", pruningCorrelationThreshold_, ConfigSource::Default);
+                }
+                if (synaptogenesisEnabled_) {
+                    config.set("synaptogenesis_rate", synaptogenesisRate_, ConfigSource::Default);
+                    config.set("synaptogenesis_target_density", synaptogenesisTargetDensity_, ConfigSource::Default);
+                    config.set("max_synapses_per_neuron", static_cast<int64_t>(maxSynapsesPerNeuron_), ConfigSource::Default);
+                }
+            }
+        }
+        
+        if (hasNeuromodulation_) {
+            config.set("neuromodulation.enabled", neuromodulationEnabled_, ConfigSource::Default);
+            if (neuromodulationEnabled_) {
+                config.set("neuromodulation.dopamine.enabled", dopamineEnabled_, ConfigSource::Default);
+                config.set("neuromodulation.curiosity.enabled", curiosityEnabled_, ConfigSource::Default);
+                config.set("neuromodulation.novelty.enabled", noveltyEnabled_, ConfigSource::Default);
+                config.set("neuromodulation.prediction_error.enabled", predictionErrorEnabled_, ConfigSource::Default);
+            }
+        }
+        
+        if (hasPlasticity_) {
+            config.set("plasticity.enabled", plasticityEnabled_, ConfigSource::Default);
+            if (plasticityEnabled_) {
+                config.set("plasticity.stdp.enable", stdpEnabled_, ConfigSource::Default);
+                config.set("plasticity.hebbian.enable", hebbianEnabled_, ConfigSource::Default);
+                config.set("plasticity.structural.enable", structuralEnabled_, ConfigSource::Default);
+                if (stdpEnabled_) {
+                    config.set("stdp_ltp_weight", stdpLtpWeight_, ConfigSource::Default);
+                    config.set("stdp_ltd_weight", stdpLtdWeight_, ConfigSource::Default);
+                    config.set("stdp_tau", stdpTau_, ConfigSource::Default);
+                }
+            }
+        }
+        
+        if (hasMemory_) {
+            config.set("memory.working.enabled", workingMemoryEnabled_, ConfigSource::Default);
+            config.set("memory.episodic.enabled", episodicMemoryEnabled_, ConfigSource::Default);
+            config.set("memory.associative.enabled", associativeMemoryEnabled_, ConfigSource::Default);
+        }
+        
+        if (hasPrediction_) {
+            config.set("prediction.enabled", predictionEnabled_, ConfigSource::Default);
+        }
+        
+        if (hasCognition_) {
+            config.set("cognition.planning.enabled", planningEnabled_, ConfigSource::Default);
+            config.set("cognition.concept_formation.enabled", conceptFormationEnabled_, ConfigSource::Default);
+            config.set("cognition.attention.enabled", attentionEnabled_, ConfigSource::Default);
+            if (planningEnabled_) {
+                config.set("planning.depth", static_cast<int64_t>(planningDepth_), ConfigSource::Default);
+            }
+            if (attentionEnabled_) {
+                config.set("attention.inhibition_strength", attentionInhibitionStrength_, ConfigSource::Default);
+                config.set("attention.excitation_strength", attentionExcitationStrength_, ConfigSource::Default);
+            }
+        }
+        
+        if (hasSimulation_) {
+            config.set("simulation_timestep", simulationTimestep_, ConfigSource::Default);
+            config.set("random_seed", static_cast<int64_t>(randomSeed_), ConfigSource::Default);
+            config.set("replay_interval", static_cast<int64_t>(replayInterval_), ConfigSource::Default);
+            config.set("consolidation_interval", static_cast<int64_t>(consolidationInterval_), ConfigSource::Default);
+        }
+        
+        if (hasDebug_) {
+            config.set("debug.enabled", debugEnabled_, ConfigSource::Default);
+            config.set("debug.verbose", debugVerbose_, ConfigSource::Default);
+            config.set("debug.level", debugLevel_, ConfigSource::Default);
+        }
+        
+        if (hasPerformance_) {
+            config.set("performance.target_fps", targetFPS_, ConfigSource::Default);
+            config.set("performance.optimization", performanceOptimization_, ConfigSource::Default);
+        }
+        
+        if (hasAccuracy_) {
+            config.set("accuracy.enabled", accuracyEnabled_, ConfigSource::Default);
+            config.set("accuracy.tolerance", accuracyTolerance_, ConfigSource::Default);
+        }
+        
+        return config;
+    }
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
-
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
+Config::Builder Config::builder() {
+    return Builder();
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
+// Add convenience method to create default config
+Config Config::createDefaultConfig() {
+    return Builder()
+        .withBrain(1000)
+        .withDevelopment(true)
+        .withNeuromodulation(true)
+        .withPlasticity(true)
+        .withMemory(true, true, false)
+        .build();
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
+// Add getDotNotation implementation
+std::optional<ConfigValue> Config::getDotNotation(const std::string& key) const {
+    return pImpl->nestedConfig.get(key);
+}
+
+// Add hasDotNotation implementation
+bool Config::hasDotNotation(const std::string& key) const {
+    return pImpl->nestedConfig.has(key);
+}
+
+// Update toJson to handle nested config
+std::string Config::toJson() const {
+#ifdef HAVE_NLOHMANN_JSON
+    json j;
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
-}
-
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
-    }
-    return keys;
-}
-
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
+        std::visit([&j, &entry](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
+                j[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, int>) {
+                j[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                j[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                j[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                j[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                j[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                j[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                j[entry.key] = arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
-    return oss.str();
+    
+    // Add nested config
+    std::string nestedJson = pImpl->nestedConfig.toJson();
+    if (!nestedJson.empty() && nestedJson != "{}") {
+        try {
+            json nestedJ = json::parse(nestedJson);
+            for (auto it = nestedJ.begin(); it != nestedJ.end(); ++it) {
+                j[it.key()] = *it;
+            }
+        } catch (...) {
+            // Ignore parsing errors
+        }
+    }
+    
+    return j.dump(2);
+#else
+    return "{}";
+#endif
 }
-
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm

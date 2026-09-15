@@ -25,10 +25,11 @@ set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
+    # Error system
+    src/core/Errors/ErrorSystem.cpp
+    src/core/Errors/ErrorUtils.cpp
+    src/core/Errors/ErrorSystem.hpp
+    src/core/Errors/ErrorUtils.hpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -43,6 +44,7 @@ add_library(nlm_core STATIC
     src/plasticity/Hebbian.cpp
     src/plasticity/STDP.cpp
     src/plasticity/StructuralPlasticity.cpp
+    src/neuromodulation/Neuromodulator.cpp
     # Development
     src/development/DevelopmentSystem.cpp
     src/development/Synaptogenesis.cpp

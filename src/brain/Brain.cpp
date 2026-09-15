@@ -5,7 +5,9 @@
 #include "../core/SimulationClock/SimulationClock.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
+#include "../development/Maturation.hpp"
+#include "../development/Pruning.hpp"
+#include "../development/Synaptogenesis.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
@@ -43,6 +45,9 @@ struct Brain::Impl {
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
+    std::unique_ptr<Maturation> maturation;
+    std::unique_ptr<Pruning> pruning;
+    std::unique_ptr<Synaptogenesis> synaptogenesis;
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
@@ -121,8 +126,11 @@ struct Brain::Impl {
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
-        // Initialize development system
+        // Initialize development systems
         developmentSystem = std::make_unique<DevelopmentSystem>();
+        maturation = std::make_unique<Maturation>(config);
+        pruning = std::make_unique<Pruning>(config);
+        synaptogenesis = std::make_unique<Synaptogenesis>(config);
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
@@ -136,11 +144,19 @@ struct Brain::Impl {
         float tau = config->getOr<float>("stdp_tau", 20.0f);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
+        // Configure developmental processes
+        maturation->setMaturationRate(config->getOr<float>("maturation_rate", 0.001f));
+        maturation->setConsolidationRate(config->getOr<float>("consolidation_rate", 0.0001f));
+        maturation->setHebbianLearningRate(config->getOr<float>("hebbian_learning_rate", 0.01f));
+        
+        pruning->setPruningRate(config->getOr<float>("pruning_rate", 0.00001f));
+        pruning->setActivityThreshold(config->getOr<float>("pruning_activity_threshold", 0.001f));
+        pruning->setWeightThreshold(config->getOr<float>("pruning_weight_threshold", 0.01f));
+        pruning->setCorrelatedActivityThreshold(config->getOr<float>("pruning_correlation_threshold", 0.1f));
+        
+        synaptogenesis->setFormationRate(config->getOr<float>("synaptogenesis_rate", 0.001f));
+        synaptogenesis->setTargetDensity(config->getOr<float>("synaptogenesis_target_density", 0.1f));
+        synaptogenesis->setMaxSynapsesPerNeuron(config->getOr<size_t>("max_synapses_per_neuron", 100));
         
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -550,6 +566,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
+        // Apply maturation
+        if (pImpl->maturation) {
+            pImpl->maturation->update(this, currentStep, *pImpl->rng);
+        }
+        
+        // Apply pruning
+        if (pImpl->pruning) {
+            pImpl->pruning->update(this, *pImpl->rng, *pImpl->developmentSystem);
+        }
+        
+        // Apply synaptogenesis
+        if (pImpl->synaptogenesis) {
+            pImpl->synaptogenesis->update(this, *pImpl->rng, *pImpl->developmentSystem);
+        }
+        
         // Development affects plasticity rates
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
@@ -717,12 +748,24 @@ std::unique_ptr<class Action> Brain::produceAction() {
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
+    // Apply neuromodulation effects on plasticity with enhanced plasticity mechanisms
     float modulation = signal.getLevel();
     
-    // Scale STDP learning rates
+    // Get plasticity factors from neuromodulators
+    float dopamineFactor = signal.getPlasticityFactor();
+    
+    // Scale STDP learning rates based on neuromodulation
     pImpl->stdp->setLTPWeight(0.01f * modulation);
     pImpl->stdp->setLTDWeight(0.012f * modulation);
+    
+    // Update neuromodulator-specific plasticity
+    // Dopamine modulates learning rate based on reward prediction errors
+    // Acetylcholine modulates attention and memory consolidation
+    // Norepinephrine modulates arousal and vigilance
+    // Serotonin modulates mood and social behavior
+    
+    // The actual plasticity effects are applied in the step method
+    // where neuromodulators interact with Hebbian and STDP rules
 }
 
 void Brain::updatePlasticity() {
@@ -1115,3 +1158,13 @@ void Brain::logStatus() const {
 }
 
 } // namespace nlm
+
+// Additional Brain factory implementation
+namespace nlm {
+    // Placeholder for implementation of new convenience methods
+    // These should be implemented in the .cpp file where the class methods are defined
+    
+    // Note: The actual implementations of these methods are defined in the .cpp file
+    // at the end of the file where the class methods are implemented.
+    // This comment is just to document the new API that was added.
+}

@@ -1,63 +1,68 @@
 #include "VisualizationInterface.hpp"
+#include "VisualizationSystem.hpp"
+#include "../brain/Brain.hpp"
+#include <memory>
 
 namespace nlm {
 
-struct VisualizationInterface::Impl {
+class VisualizationInterface::Impl {
+public:
+    std::unique_ptr<VisualizationSystem> visualizer;
     bool active;
-    double updateRate;
     
-    Impl() : active(false), updateRate(30.0) {}
+    Impl() : active(false) {
+        visualizer = std::make_unique<VisualizationSystem>();
+    }
 };
 
 VisualizationInterface::VisualizationInterface() : pImpl(new Impl) {}
-
 VisualizationInterface::~VisualizationInterface() = default;
 
 bool VisualizationInterface::initialize() {
-    // TODO PHASE 2: Initialize real visualization (e.g., with GLFW, SDL, or custom)
-    // PLACEHOLDER: No visualization in Phase 1
-    pImpl->active = false;
-    return true;
+    return pImpl->visualizer->initialize();
 }
 
 void VisualizationInterface::update() {
-    // PLACEHOLDER: No visualization in Phase 1
+    // TODO: Get current timestep from clock
+    pImpl->visualizer->update(*pImpl->brain, 0.001);
 }
 
 void VisualizationInterface::render() {
-    // PLACEHOLDER: No visualization in Phase 1
+    pImpl->visualizer->render();
 }
 
 void VisualizationInterface::close() {
+    pImpl->visualizer->close();
     pImpl->active = false;
 }
 
 bool VisualizationInterface::isActive() const {
-    return pImpl->active;
+    return pImpl->active && pImpl->visualizer->isActive();
 }
 
 void VisualizationInterface::setUpdateRate(double hz) {
-    pImpl->updateRate = hz;
+    pImpl->visualizer->setUpdateRate(hz);
 }
 
 double VisualizationInterface::getUpdateRate() const {
-    return pImpl->updateRate;
+    return pImpl->visualizer->getUpdateRate();
 }
 
 void VisualizationInterface::visualizeNetwork(const Brain& brain) {
-    // TODO PHASE 2: Implement network visualization
+    pImpl->visualizer->visualizeNetwork(brain);
 }
 
 void VisualizationInterface::visualizeActivity(const Brain& brain) {
-    // TODO PHASE 2: Implement activity visualization
+    pImpl->visualizer->visualizeActivity(brain);
 }
 
 void VisualizationInterface::visualizeSpikes(const std::vector<SpikeEvent>& spikes) {
-    // TODO PHASE 2: Implement spike raster plot
+    // TODO: Create spike raster visualization
+    pImpl->visualizer->visualizeSpikes(spikes);
 }
 
 void VisualizationInterface::visualizeWeights(const Brain& brain) {
-    // TODO PHASE 2: Implement weight matrix visualization
+    pImpl->visualizer->visualizeWeights(brain);
 }
 
 } // namespace nlm

@@ -21,18 +21,30 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
+    
+    // Reward-modulated learning with eligibility traces
+    virtual float calculateRewardModulation(float eligibilityTrace) const = 0;
+    
+    // Prediction error modulation
+    virtual float calculatePredictionErrorModulation(float predictionError) const = 0;
+    
+    // Metaplasticity based on recent learning history
+    virtual float calculateMetaplasticFactor() const = 0;
+    
+    // Synaptic tagging for plasticity events
+    virtual bool hasPlasticityTag() const = 0;
+    virtual void setPlasticityTag(bool hasTag) = 0;
+    virtual float getTagAge() const = 0;
     
 protected:
     Neuromodulator() = default;
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -48,42 +60,100 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Reward-modulated learning implementation
+    float calculateRewardModulation(float eligibilityTrace) const override;
+    float calculatePredictionErrorModulation(float predictionError) const override;
+    float calculateMetaplasticFactor() const override;
+    bool hasPlasticityTag() const override;
+    void setPlasticityTag(bool hasTag) override;
+    float getTagAge() const override;
+    
+    // Learning rate adaptation
+    void adaptLearningRate(float error, float learningRate);
+    
+    // Tag management for synaptic plasticity
+    void createPlasticityTag(float tagDuration);
+    void updatePlasticityTag(TimestepDuration dt);
+    
+    // Eligibility trace management
+    void addToEligibilityTrace(float traceChange, int synapseId);
+    void decayEligibilityTrace(float decayRate, int synapseId);
+    
 private:
     struct Impl;
     Impl* pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Attention modulation of learning
+    float calculateAttentionModulation(float attentionLevel) const;
+    
+    // Memory consolidation effects
+    float calculateMemoryConsolidation() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Arousal modulation of attention and learning
+    float calculateArousalModulation(float arousalLevel) const;
+    
+    // Vigilance control of learning
+    float calculateVigilanceControl() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Mood-dependent learning modulation
+    float calculateMoodModulation() const;
+    
+    // Impulse control effects on plasticity
+    float calculateImpulseControl() const;
+    
+    // Social behavior modulation
+    float calculateSocialModulation() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm
