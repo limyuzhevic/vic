@@ -157,6 +157,70 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
+// Configuration access helper methods
+// Add helper methods to simplify configuration access
+double Brain::getDevelopmentProgress() const {
+    if (auto stage = pImpl->config->get<double>("development.progress")) {
+        return *stage;
+    }
+    return 0.0;
+}
+
+void Brain::enableVisualization(bool enabled) {
+    pImpl->config->set("visualization.enabled", enabled, ConfigSource::Default);
+}
+
+bool Brain::isVisualizationEnabled() const {
+    return pImpl->config->getOr<bool>("visualization.enabled", false);
+}
+
+void Brain::setMaxMemorySize(size_t sizeMB) {
+    pImpl->config->set("memory.max_size_mb", static_cast<double>(sizeMB), ConfigSource::Default);
+}
+
+void Brain::enableMemoryConsolidation(bool enable) {
+    pImpl->config->set("memory.consolidation.enable", enable, ConfigSource::Default);
+}
+
+void Brain::setCuriosityWeight(float weight) {
+    pImpl->config->set("neuromodulation.curiosity.weight", weight, ConfigSource::Default);
+}
+
+void Brain::enableSocialLearning(bool enable) {
+    pImpl->config->set("social.learning.enable", enable, ConfigSource::Default);
+}
+
+void Brain::setSocialInfluence(float influence) {
+    pImpl->config->set("social.influence", influence, ConfigSource::Default);
+}
+
+void Brain::addDefaultConfigs() {
+    // Add configuration presets for different use cases
+    // Simple mode: minimal neurons, fast simulation
+    config->set("brain.neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+    config->set("brain.synapse_density", 0.05f, ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("visualization.enabled", false, ConfigSource::Default);
+    
+    // Development mode: balanced learning and performance
+    config->set("brain.neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+    config->set("brain.synapse_density", 0.1f, ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("visualization.enabled", false, ConfigSource::Default);
+    config->set("neuromodulation.curiosity.enable", true, ConfigSource::Default);
+    config->set("memory.consolidation.enable", true, ConfigSource::Default);
+    
+    // Research mode: maximum detail, slow simulation
+    config->set("brain.neuron_count", static_cast<int64_t>(5000), ConfigSource::Default);
+    config->set("brain.synapse_density", 0.2f, ConfigSource::Default);
+    config->set("simulation_timestep", 0.0005, ConfigSource::Default);
+    config->set("visualization.enabled", true, ConfigSource::Default);
+    config->set("visualization.update_rate", 10.0, ConfigSource::Default);
+    config->set("memory.max_size_mb", 1024.0, ConfigSource::Default);
+    config->set("social.learning.enable", true, ConfigSource::Default);
+    config->set("neuromodulation.curiosity.weight", 2.0f, ConfigSource::Default);
+}
+
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
 Brain::~Brain() = default;

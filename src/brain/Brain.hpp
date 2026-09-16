@@ -193,6 +193,19 @@ public:
     // Logging
     void logStatus() const;
     
+    // Configuration helper methods
+    double getDevelopmentProgress() const;
+    void enableVisualization(bool enabled);
+    bool isVisualizationEnabled() const;
+    void setMaxMemorySize(size_t sizeMB);
+    void enableMemoryConsolidation(bool enable);
+    void setCuriosityWeight(float weight);
+    void enableSocialLearning(bool enable);
+    void setSocialInfluence(float influence);
+    
+    // Configuration presets
+    void addDefaultConfigs();
+    
 private:
     struct Impl;
     Impl* pImpl;
