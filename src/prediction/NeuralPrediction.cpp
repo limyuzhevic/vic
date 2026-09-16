@@ -457,10 +457,10 @@ PredictionErrorSignal::PredictionErrorSignal()
     errorComponents_.totalError = 0.0f;
 }
 
-PredictionErrorSignal::~PredictionErrorSignal() = default;
-
-float PredictionErrorSignal::computeError(const std::vector<float>& predicted,
-                                         const std::vector<float>& actual) {
+void PredictionErrorSignal::initialize(Brain* brain) {
+    pImpl->brain = brain;
+    NLM_LOG_INFO("PredictionErrorSignal initialized");
+}
     if (predicted.empty() || actual.empty()) {
         lastError_ = 0.0f;
         return 0.0f;

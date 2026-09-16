@@ -161,10 +161,11 @@ private:
 
 // PredictionErrorSignal: Computes and broadcasts prediction error
 // Acts as neuromodulatory signal to enhance learning
-class PredictionErrorSignal {
-public:
-    PredictionErrorSignal();
-    ~PredictionErrorSignal();
+// Initialize with brain reference
+    void initialize(Brain* brain);
+
+    // Initialize with brain reference
+    void initialize(Brain* brain);
 
     // Compute error between predicted and actual
     // Returns magnitude of error for neuromodulation

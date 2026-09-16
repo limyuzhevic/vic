@@ -29,12 +29,28 @@ struct ConceptInstance {
     // Stability: how consistent is this pattern
     float stability;
     
+    // Advanced learning metrics
+    float predictionError;           // Prediction error for learning
+    float noveltyScore;              // How novel this instance is
+    float confidence;                // Confidence in this instance
+    float weight;                    // Instance importance weight
+    float entropy;                   // Pattern entropy (variability)
+    float coherence;                 // Pattern coherence with concept
+    
+    // Multi-scale feature vectors
+    std::vector<std::vector<float>> multiScaleFeatures;
+    
+    // Temporal context
+    SimulationStep timeStep;
+    float temporalContext;
+    
     ConceptInstance()
-        : observationCount(0), lastObserved(0), avgReward(0), stability(0) {}
+        : observationCount(0), lastObserved(0), avgReward(0), stability(0)
+        , predictionError(0.0f), noveltyScore(0.0f), confidence(0.0f)
+        , weight(1.0f), entropy(0.0f), coherence(0.0f), temporalContext(0.0f) {}
 };
 
-// DiscoveredConcept: A concept that emerged from repeated experience
-// NOT a predefined label - created through Hebbian clustering
+// DiscoveredConcept: Enhanced with advanced features
 struct DiscoveredConcept {
     // Unique identifier
     size_t id;
@@ -52,14 +68,55 @@ struct DiscoveredConcept {
     // Associated concepts (through associative memory)
     std::vector<size_t> associatedConceptIds;
     
-    // How many different instances this concept has absorbed
-    size_t totalObservations;
+    // Hierarchy information
+    size_t parentConceptId;           // Parent in specialization hierarchy
+    std::vector<size_t> childConceptIds;  // Children in specialization hierarchy
+    std::string conceptType;          // "abstract", "concrete", "intermediate"
+    
+    // Clustering information
+    size_t clusterId;                 // Which cluster this concept belongs to
+    std::vector<size_t> siblingConceptIds; // Concepts in same cluster
+    
+    // Advanced metrics
+    float abstractionLevel;           // How abstract (0.0 to 1.0)
+    float generalizationAbility;      // Can handle variations
+    float specializationDepth;        // How specific (0.0 to 1.0)
+    float consolidationLevel;         // How consolidated (0.0 to 1.0)
+    float driftRate;                  // How fast concept changes
+    float decayTimer;                 // Time until concept expiration
+    float predictionError;           // Concept-level prediction error
+    float confidence;                 // Overall confidence in concept
+    float uncertainty;                // Uncertainty in concept
+    float entropy;                    // Pattern entropy
+    float noveltySum;                 // Sum of novelty scores
+    float rewardHistory;              // Historical reward
+    float stabilitySum;               // Sum of stabilities
+    
+    // Feature vectors
+    std::vector<float> compressedFeatureVector;
+    std::vector<std::vector<float>> multiScaleFeatureVectors;
+    
+    // Neural patterns and bindings
+    std::vector<float> neuralPattern;   // Neural representation
+    std::vector<size_t> boundFeatures;  // Features bound to this concept
+    
+    // Learning statistics
+    size_t observationCount;         // How many different instances
+    size_t totalObservations;         // Total observations (including repeats)
+    size_t formationTime;             // When concept was formed
+    SimulationStep lastUpdate;        // When last updated
     
     // Average stability of instances
     float avgStability;
     
     DiscoveredConcept() 
-        : id(0), totalObservations(0), avgStability(0) {}
+        : id(0), totalObservations(0), avgStability(0)
+        , parentConceptId(0), clusterId(0), abstractionLevel(0.0f)
+        , generalizationAbility(0.0f), specializationDepth(0.0f)
+        , consolidationLevel(0.0f), driftRate(0.0f), decayTimer(0.0f)
+        , predictionError(0.0f), confidence(0.0f), uncertainty(0.0f)
+        , entropy(0.0f), noveltySum(0.0f), rewardHistory(0.0f), stabilitySum(0.0f)
+        , observationCount(0), formationTime(0), lastUpdate(0) {}
 };
 
 // ConceptFormation: Discovers recurring patterns from experience
@@ -113,46 +170,139 @@ public:
     // Merge two concepts (when discovered they are actually the same)
     void mergeConcepts(size_t conceptA, size_t conceptB);
 
-    // Update concept with new instance
-    void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
-                      const std::vector<float>& features, float reward);
-
-    // Compute similarity between two patterns
-    float computeSimilarity(const std::vector<float>& a,
-                          const std::vector<float>& b) const;
-
-    // Check if pattern is novel (doesn't belong to any existing concept)
-    bool isNovel(const std::vector<float>& pattern,
-                 float similarityThreshold = 0.7f) const;
-
-    // Get concept for a given pattern
-    size_t findConceptForPattern(const std::vector<float>& pattern) const;
-
-    // Clear all concepts
-    void clear();
-
-    // Get generalization ability (can concept handle variations?)
+    // Get concept hierarchy information
+    size_t getParentConcept(size_t conceptId) const;
+    const std::vector<size_t>& getChildConcepts(size_t conceptId) const;
+    
+    // Get concept clustering and grouping
+    size_t getConceptCluster(size_t conceptId) const;
+    const std::vector<size_t>& getClusterConcepts(size_t clusterId) const;
+    
+    // Get abstraction and generalization
+    float getAbstractionLevel(size_t conceptId) const;
     float getGeneralizationAbility(size_t conceptId) const;
-
-    // Set parameters
-    void setFormationThreshold(float t) { formationThreshold_ = t; }
-    void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
-
-private:
-    // Create new concept from pattern
-    size_t createConcept(const std::vector<float>& pattern,
-                        const std::vector<float>& features,
-                        float reward);
-
-    // Update concept prototype using Hebbian averaging
-    void updatePrototype(size_t conceptId, const std::vector<float>& newInstance);
-
-    // Check if concept is stable enough to be considered "discovered"
+    float getSpecializationDepth(size_t conceptId) const;
+    
+    // Get meta-cognitive metrics
+    float getConceptConfidence(size_t conceptId) const;
+    float getConceptUncertainty(size_t conceptId) const;
+    float getConceptNovelty(size_t conceptId) const;
+    float getConceptPredictionError(size_t conceptId) const;
+    
+    // Get consolidation and decay
+    float getConsolidationLevel(size_t conceptId) const;
+    float getConceptDecayTimer(size_t conceptId) const;
+    bool isConceptExpired(size_t conceptId) const;
+    
+    // Get advanced feature representations
+    const std::vector<float>& getCompressedFeatureVector(size_t conceptId) const;
+    const std::vector<std::vector<float>>& getMultiScaleFeatures(size_t conceptId) const;
+    const std::vector<float>& getNeuralPattern(size_t conceptId) const;
+    
+    // Get concept stability over time
+    float getConceptDriftRate(size_t conceptId) const;
     bool isConceptStable(size_t conceptId) const;
-
+    
+    // Get clustering and grouping statistics
+    size_t getTotalClusters() const;
+    size_t getActiveConceptsCount() const;
+    
+    // Set advanced parameters
+    void setAnomalyThreshold(float t) { pImpl->anomalyThreshold_ = t; }
+    void setDriftDetectionThreshold(float t) { pImpl->driftDetectionThreshold_ = t; }
+    void setConceptDecayRate(float r) { pImpl->conceptDecayRate_ = r; }
+    void setPredictionErrorThreshold(float t) { pImpl->predictionErrorThreshold_ = t; }
+    void setNoveltyThreshold(float t) { pImpl->noveltyThreshold_ = t; }
+    void setFeatureNormalizationFactor(float f) { pImpl->featureNormalizationFactor_ = f; }
+    void setMaxClusterSize(size_t s) { pImpl->maxClusterSize_ = s; }
+    void setFeatureHistorySize(size_t s) { pImpl->featureHistorySize_ = s; }
+    
+    // Get current active concepts
+    size_t getActiveConceptsCount() const { return static_cast<size_t>(pImpl->activeConcepts_.size()); }
+    
+    // Get feature importance for a concept
+    const std::vector<float>& getFeatureImportance(size_t conceptId) const {
+        auto it = pImpl->featureImportanceWeights_.find(conceptId);
+        static const std::vector<float> empty;
+        return (it != pImpl->featureImportanceWeights_.end()) ? it->second : empty;
+    }
+    
+    // Get concept associations
+    const std::unordered_map<size_t, float>& getConceptAssociations(size_t conceptId) const {
+        auto it = pImpl->conceptAssociations.find(conceptId);
+        static const std::unordered_map<size_t, float> empty;
+        return (it != pImpl->conceptAssociations.end()) ? it->second : empty;
+    }
+    
+    // Get concept drift history
+    const std::unordered_map<size_t, float>& getConceptDriftHistory() const {
+        return pImpl->conceptDriftHistory;
+    }
+    
+    // Get concept feature vectors
+    const std::unordered_map<size_t, std::vector<float>>& getConceptFeatureVectors() const {
+        return pImpl->featureVectors;
+    }
+    
+    // Advanced learning methods
+    void discoverConceptsThroughAnomaly(const std::vector<float>& pattern);
+    void detectAndAdaptToDrift(size_t conceptId, float newSimilarity);
+    void learnConceptCoOccurrences(const std::vector<float>& pattern1, const std::vector<float>& pattern2);
+    void reinforceConcepts(const std::vector<float>& pattern, float reward);
+    void updateFeatureImportance(const std::vector<float>& features);
+    void bindFeaturesToConcepts(const std::vector<float>& pattern, const std::vector<size_t>& featureIndices);
+    
+    // Meta-cognitive methods
+    void updateConceptConfidence(size_t conceptId, float error);
+    void updateConceptUncertainty(size_t conceptId, float novelty);
+    void decayConcepts();
+    void consolidateConcepts();
+    
+    // Integration with other systems
+    void integrateWithEpisodicMemory(size_t conceptId, const std::vector<float>& experience);
+    void integrateWithWorkingMemory(size_t conceptId, float attention);
+    void integrateWithNeuromodulation(size_t conceptId, float reward);
+    void integrateWithAttention(size_t conceptId, float attentionWeight);
+    
+    // Concept composition and generalization
+    size_t composeConcepts(size_t conceptA, size_t conceptB);
+    size_t generalizeConcept(size_t conceptId, const std::vector<float>& novelPattern);
+    std::vector<size_t> findSimilarConcepts(const std::vector<float>& pattern, float similarityThreshold = 0.7f) const;
+    
+private:
+    // Advanced concept management
+    void organizeConceptHierarchy();
+    void clusterConcepts();
+    void consolidateConceptsOverTime();
+    
+    // Advanced feature extraction and representation
+    std::vector<std::vector<float>> extractMultiScaleFeatures(const std::vector<float>& pattern) const;
+    std::vector<float> normalizeAndCompressFeatures(const std::vector<float>& features) const;
+    void updateFeatureImportanceWeights(const std::vector<float>& features);
+    std::vector<size_t> bindFeaturesWithNeuralPattern(const std::vector<float>& pattern, const std::vector<float>& prototype) const;
+    
+    // Concept retrieval and matching
+    size_t retrieveTemplateBased(const std::vector<float>& pattern) const;
+    size_t retrieveSimilarityBased(const std::vector<float>& pattern, float& bestSimilarity) const;
+    size_t retrieveGeneralized(const std::vector<float>& pattern) const;
+    
+    // Meta-cognitive updates
+    void updateMetaCognitiveMetrics(size_t conceptId, const std::vector<float>& pattern);
+    void updateConceptPredictionError(size_t conceptId, const std::vector<float>& pattern);
+    
+    // Integration updates
+    void updateEpisodicIntegration(size_t conceptId, const std::vector<float>& experience);
+    void updateWorkingMemoryIntegration(size_t conceptId, float attention);
+    void updateNeuromodulationIntegration(size_t conceptId, float reward);
+    
+    // Advanced pattern analysis
+    float computeAnomalousSimilarity(const std::vector<float>& pattern, size_t conceptId) const;
+    std::vector<float> predictConceptPattern(size_t conceptId) const;
+    std::vector<size_t> getConceptAssociations(size_t conceptId) const;
+    
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-
+    
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
@@ -161,7 +311,27 @@ private:
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable
     size_t stabilityWindow_;    // How many observations to consider for stability
-};
+    
+    // Advanced tracking
+    size_t conceptCount_;
+    size_t totalObservationCount_;
+    std::vector<float> lastFeatureVector_;
+    std::vector<std::vector<float>> featureVectorHistory_;
+    
+    // Active concept management
+    std::unordered_set<size_t> activeConcepts_;
+    std::unordered_map<size_t, float> attentionWeights_;
+    std::unordered_map<size_t, std::vector<float>> featureImportanceWeights_;
+    
+    // Clustering and grouping
+    std::unordered_map<size_t, size_t> conceptToCluster_;
+    std::unordered_map<size_t, std::vector<size_t>> clusterToConcepts_;
+    
+    // Hierarchy and ancestry
+    std::unordered_map<size_t, size_t> conceptToParent_;
+    std::unordered_map<size_t, std::vector<size_t>> conceptToChildren_;
+    std::unordered_map<size_t, std::vector<size_t>> ancestryMap_;
+}
 
 // SpatialRepresentation: Learns spatial relationships from experience
 // NOT a map with coordinates - encodes spatial relationships in neural patterns

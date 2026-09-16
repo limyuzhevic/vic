@@ -53,8 +53,10 @@ void PredictionSystem::clearHistory() {
     pImpl->errorHistory.clear();
 }
 
-void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+const std::vector<float>& PredictionSystem::getCurrentPrediction() const {
+    // Return a default prediction state
+    static std::vector<float> currentPrediction(100, 0.1f);
+    return currentPrediction;
 }
 
 } // namespace nlm

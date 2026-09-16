@@ -53,6 +53,7 @@ public:
 
     // Get planning confidence
     float getPlanningConfidence() const { return planningConfidence_; }
+    void setPlanningConfidence(float confidence) { planningConfidence_ = confidence; }
 
     // Update plans based on actual outcome
     void updatePlanQuality(const std::vector<ActionType>& plannedActions,
@@ -73,6 +74,22 @@ public:
 
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
+
+    // Store planned action for execution
+    void storePlannedAction(ActionType action, float confidence) {
+        lastPlannedAction_ = action;
+        lastPlanningConfidence_ = confidence;
+        lastPlannedTimestamp_ = 0; // Would use current time in full implementation
+    }
+
+    // Retrieve last planned action
+    ActionType getLastPlannedAction() const { return lastPlannedAction_; }
+    float getLastPlanningConfidence() const { return lastPlanningConfidence_; }
+    SimulationStep getLastPlannedTimestamp() const { return lastPlannedTimestamp_; }
+
+    // Get planned action sequences for execution
+    const std::vector<ActionType>& getPlannedActionSequence() const { return plannedActionSequence_; }
+    void setPlannedActionSequence(const std::vector<ActionType>& sequence) { plannedActionSequence_ = sequence; }
 
 private:
     // Generate possible action sequences
@@ -96,6 +113,14 @@ private:
     
     // Recent plan success history
     std::deque<bool> recentPlanSuccess_;
+    
+    // Last planned action and metadata
+    ActionType lastPlannedAction_;
+    float lastPlanningConfidence_;
+    SimulationStep lastPlannedTimestamp_;
+    
+    // Full action sequence for execution
+    std::vector<ActionType> plannedActionSequence_;
 };
 
 // SelfModel: Represents the agent's internal model of itself

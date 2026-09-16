@@ -74,7 +74,37 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
-private:
+    // Integrate with attention system
+    void integrateWithAttention(const std::vector<NeuronId>& attendedNeurons);
+
+    // Update based on prediction error
+    void updateWithPredictionError(float predictionError, TimestepDuration dt);
+
+    // Store sensory input when prediction error is high
+    void storeSensoryInputWithError(const std::vector<float>& sensoryInput, float predictionError);
+
+    // Retrieve working memory content with attention modulation
+    std::vector<float> retrieveWithAttention(float attentionLevel) const;
+
+    // Connect working memory content to neuromodulation
+    void connectToNeuromodulation(float neuromodulationLevel);
+
+// Store planned action for execution
+    void storePlanningAction(ActionType action) {
+        plannedAction_ = action;
+        plannedActionTime_ = 0; // Use current time in implementation
+    }
+    
+    // Get last planned action
+    ActionType getPlannedAction() const { return plannedAction_; }
+    
+    // Clear planned action
+    void clearPlanningAction() {
+        plannedAction_ = ActionType::Wait;
+    }
+    
+    // Check if has planned action
+    bool hasPlannedAction() const { return plannedAction_ != ActionType::Wait; }
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
 
@@ -84,26 +114,84 @@ private:
     // Decay weak memory traces
     void decayWeakTraces();
 
+    // Advanced memory management
+    void prioritizeMemory();
+    void compressMemory();
+    void replayStrengthenMemories();
+    void updateMemoryPatterns();
+    void consolidateMemorySleep();
+    void resolveMemoryInterference();
+
+    // Neural mechanisms
+    void updateOscillatoryPatterns();
+    void bindMemoryWithTemporalCoherence();
+    void contextDependentRetrieval();
+    void patternCompletion();
+
+    // Attention integration
+    void applyAttentionGating(const std::vector<NeuronId>& attendedNeurons);
+    void encodeFocusedMemory(const std::vector<float>& pattern, float strength);
+    void decodeFocusedMemory();
+
+    // Neuromodulation enhancements
+    void enhancedNeuromodulation(float neuromodulationLevel);
+
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
     size_t capacity_;
     float decayRate_;
-    
+
     // Memory content
     std::vector<NeuronId> memoryNeurons_;
     std::vector<float> memoryActivations_;
     std::vector<SimulationStep> memoryTimestamps_;
-    
+    std::vector<float> memoryImportance_;  // 0-1 importance score
+    std::vector<MemoryPriority> memoryPriorities_;  // Priority enum
+
     // Active memory traces
     std::vector<size_t> activeTraces_;
-    
+
     // Recurrent connections for maintenance
     std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
-    
+    std::vector<std::vector<float>> memoryPatternCache_;
+
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;
+
+    // Prediction error threshold for memory storage
+    float predictionErrorThreshold_;
+
+    // Advanced memory features
+    SimulationStep memoryReplayCounter_;
+    float consolidationTimer_;
+    std::vector<NeuronId> temporalBindingGroups_;
+    std::vector<MemoryContext> memoryContexts_;
+    std::vector<MemoryPattern> patternLibrary_;
+    float thetaPhase_;
+    float gammaPhase_;
+    std::vector<float> memorySlots_;
+};
+
+// Enums and structs for enhanced functionality
+enum class MemoryPriority {
+    IMPORTANT,
+    RECENT,
+    WEAK
+};
+
+struct MemoryContext {
+    std::vector<NeuronId> involvedNeurons;
+    SimulationStep timestamp;
+    std::vector<float> contextualTags;
+};
+
+struct MemoryPattern {
+    std::vector<float> patternData;
+    std::vector<size_t> patternIndices;
+    float patternStrength;
+    SimulationStep lastReplay;
 };
 
 // AttentionalSelection: Neural attention through competition

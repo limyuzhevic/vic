@@ -6,10 +6,157 @@
 #include <memory>
 #include <deque>
 #include <functional>
+#include <unordered_map>
+#include <unordered_set>
+#include <queue>
+#include <mutex>
+#include <limits>
+#include <random>
+#include <chrono>
 
-namespace nlm {
+class AdvancedMemoryFeatures {
+public:
+    // Systems consolidation (hippocampal-neocortical interaction)
+    static void systemsConsolidation(std::vector<std::vector<NeuronId>>& hippocampalPatterns,
+                                     std::vector<std::vector<NeuronId>>& neocorticalPatterns,
+                                     float consolidationThreshold,
+                                     SimulationStep& consolidationWindowStart);
+    
+    // Memory indexing and search optimization
+    static void buildTemporalIndex(const std::vector<const EpisodicMemoryItem*>& episodes,
+                                  std::unordered_map<std::string, std::vector<size_t>>& temporalIndex);
+    
+    static void buildSpatialIndex(const std::vector<const EpisodicMemoryItem*>& episodes,
+                                 std::unordered_map<float, std::vector<size_t>>& spatialIndex);
+    
+    static void buildRewardIndex(const std::vector<const EpisodicMemoryItem*>& episodes,
+                                std::unordered_map<float, std::vector<size_t>>& rewardIndex);
+    
+    static void buildSchemaIndex(const std::vector<const EpisodicMemoryItem*>& episodes,
+                                const std::vector<MemorySchema>& schemas,
+                                std::unordered_map<std::string, std::vector<size_t>>& schemaIndex);
+    
+    // Memory categorization
+    static void categorizeByTemporal(const std::vector<const EpisodicMemoryItem*>& episodes,
+                                    std::unordered_map<std::string, std::vector<size_t>>& temporalCategory);
+    
+    static void categorizeBySpatial(const std::vector<const EpisodicMemoryItem*>& episodes,
+                                   std::unordered_map<std::string, std::vector<size_t>>& spatialCategory);
+    
+    static void categorizeByReward(const std::vector<const EpisodicMemoryItem*>& episodes,
+                                  std::unordered_map<std::string, std::vector<size_t>>& rewardCategory);
+    
+    // Memory compression
+    static void compressMemory(const std::vector<const EpisodicMemoryItem*>& episodes,
+                              std::vector<std::vector<float>>& compressedPatterns,
+                              float compressionRatio);
+    
+    // Multimodal memory binding
+    static void bindMultimodal(const EpisodicMemoryItem& episode,
+                              std::vector<MemoryBinding>& multimodalBindings,
+                              std::unordered_map<size_t, std::vector<size_t>>& bindingMap);
+    
+    // Memory schema theory
+    static const MemorySchema* getSchemaForEpisode(const EpisodicMemoryItem& episode,
+                                                 const std::vector<MemorySchema>& schemas);
+    
+    // Memory sequencing
+    static void createEventSequences(const std::vector<const EpisodicMemoryItem*>& episodes,
+                                    std::vector<EventSequence>& eventSequences);
+    
+    static void fillMemoryGaps(std::vector<MemoryGap>& memoryGaps,
+                              std::vector<const EpisodicMemoryItem*>& episodes);
+    
+    // Cue-based retrieval with probabilistic inference
+    static std::vector<const EpisodicMemoryItem*> probabilisticRetrieve(
+        const std::vector<float>& queryPattern,
+        const std::vector<const EpisodicMemoryItem*>& episodes,
+        const std::unordered_map<size_t, ProbabilisticInference>& probabilisticRetrievals,
+        float confidenceThreshold = 0.5f);
+    
+    // Pattern completion
+    static std::vector<const EpisodicMemoryItem*> patternComplete(
+        const std::vector<float>& partialPattern,
+        const std::vector<const EpisodicMemoryItem*>& episodes,
+        size_t maxResults = 5);
+    
+    // Temporal sequence reconstruction
+    static std::vector<const EpisodicMemoryItem*> reconstructSequence(
+        SimulationStep startTime,
+        SimulationStep endTime,
+        const std::vector<const EpisodicMemoryItem*>& episodes,
+        size_t minSequenceLength = 3);
+    
+    // Context-sensitive retrieval
+    static std::vector<const EpisodicMemoryItem*> contextSensitiveRetrieve(
+        const std::vector<float>& sensoryQuery,
+        SimulationStep* startTime,
+        SimulationStep* endTime,
+        ActionType* actionQuery,
+        const std::vector<const EpisodicMemoryItem*>& episodes,
+        float contextWeight = 0.5f);
+    
+    // Memory updating and reconsolidation
+    static void updateMemoryWithNewInformation(const EpisodicMemoryItem& originalEpisode,
+                                              const EpisodicMemoryItem& updatedEpisode,
+                                              std::vector<SimulationStep>& reconsolidationTriggers);
+    
+    static void triggerReconsolidation(size_t episodeIndex,
+                                      const std::vector<float>& newInformation,
+                                      std::vector<std::pair<size_t, SimulationStep>>& reconsolidationQueue);
+    
+    // Memory suppression and inhibition
+    static void suppressMemory(size_t episodeIndex,
+                           float suppressionStrength,
+                           std::unordered_map<size_t, float>& suppressionStrengths,
+                           std::vector<size_t>& inhibitedMemories);
+    
+    static void inhibitMemory(size_t episodeIndex,
+                          float inhibitionDuration,
+                          std::vector<size_t>& inhibitedMemories);
+    
+    // Memory interference resolution
+    static void resolveMemoryInterference(size_t episodeIndexA,
+                                        size_t episodeIndexB,
+                                        float interferenceStrength,
+                                        std::vector<std::pair<size_t, size_t>>& interferencePairs,
+                                        std::vector<float>& interferenceWeights);
+    
+    // Meta-memory and monitoring
+    static void updateMetaMemoryMonitoring(size_t episodeIndex,
+                                         float retrievalConfidence,
+                                         float memoryStrength,
+                                         float relevanceScore,
+                                         float agingScore,
+                                         std::unordered_map<size_t, MetaMemoryInfo>& metaMemory);
+    
+    static float getMetaMemoryAverageConfidence(const std::unordered_map<size_t, MetaMemoryInfo>& metaMemory);
+    
+    static float getMetaMemoryAverageStrength(const std::unordered_map<size_t, MetaMemoryInfo>& metaMemory);
+    
+    static std::vector<size_t> getPrioritizedEpisodesForConsolidation(
+        const std::unordered_map<size_t, MetaMemoryInfo>& metaMemory,
+        size_t maxEpisodes = 10);
+    
+    // Integration with other systems
+    static void integrateWithWorkingMemory(const std::vector<float>& workingMemoryPattern,
+                                          std::vector<std::vector<float>>& workingMemoryPatterns);
+    
+    static void integrateWithPredictionSystem(float predictionError,
+                                            const std::vector<float>& predictedPattern,
+                                            std::vector<float>& predictionErrors,
+                                            std::vector<std::vector<float>>& workingMemoryPatterns);
+    
+    static void integrateWithNeuromodulation(float neuromodulationSignal,
+                                            const std::string& modulationType,
+                                            std::vector<float>& neuromodulationSignals);
+    
+    static void integrateWithAttention(const std::vector<NeuronId>& attendedNeurons,
+                                      float attentionLevel,
+                                      std::vector<NeuronId>& attentionGatingNeurons);
+};
 
-// EpisodicMemoryItem: Represents a stored experience
+class NeuralEpisodicMemory {
 // NOT a textual record - stores neural activity patterns and associations
 struct EpisodicMemoryItem {
     SimulationStep timestamp;

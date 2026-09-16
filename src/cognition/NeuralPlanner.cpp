@@ -20,7 +20,10 @@ NeuralPlanner::NeuralPlanner()
     actionQuality_.resize(10, 0.0f);  // 10 action types
 }
 
-NeuralPlanner::~NeuralPlanner() = default;
+void NeuralPlanner::setPlanningDepth(size_t depth) {
+    planningDepth_ = depth;
+    NLM_LOG_INFO("NeuralPlanner planning depth set to " + std::to_string(depth));
+}
 
 void NeuralPlanner::initialize(Brain* brain) {
     pImpl->brain = brain;

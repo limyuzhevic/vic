@@ -23,7 +23,8 @@ enum class ActionType {
     Drink,
     Rest,
     Wait,
-    Custom
+    Custom,
+    None
 };
 
 // Action representation

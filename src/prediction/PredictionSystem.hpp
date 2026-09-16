@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../motor/SensoryInput.hpp"
 #include <vector>
 #include <memory>
 
@@ -33,6 +34,9 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Get current prediction state for planning
+    const std::vector<float>& getCurrentPrediction() const;
     
 private:
     struct Impl;

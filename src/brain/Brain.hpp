@@ -6,8 +6,8 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
+#include "../prediction/ActionConsequencePredictor.hpp"
+#include "../prediction/PredictionErrorSignal.hpp"
 
 namespace nlm {
 
@@ -20,6 +20,12 @@ class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
 class PredictionSystem;
+class NeuralPrediction;
+class ActionConsequencePredictor;
+class PredictionErrorSignal;
+class NeuralPrediction;
+class ActionConsequencePredictor;
+class PredictionErrorSignal;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
