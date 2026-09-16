@@ -54,7 +54,8 @@ void PredictionSystem::clearHistory() {
 }
 
 void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+    // TODO PHASE 2: Train prediction model using neural substrate
+    // PLACEHOLDER: No actual learning
 }
 
 } // namespace nlm

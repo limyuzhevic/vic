@@ -300,6 +300,28 @@ void AgentBrain::updateDevelopment(double timestep) {
         brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
     }
     
+    // Apply development to brain systems
+    brain_->develop();
+    
+    NLM_LOG_INFO("Development updated: age=" + std::to_string(developmentalAge_) +
+                 " stage=" + std::to_string(static_cast<int>(brain_->getDevelopmentalStage())) +
+                 " plasticity=" + std::to_string(plasticityModifier_));
+}
+
+void AgentBrain::updateDevelopmentWithStructuralPlasticity() {
+    // Structural plasticity changes with development
+    if (structuralPlasticityEnabled_) {
+        auto* sp = brain_->getStructuralPlasticity();
+        if (sp) {
+            // Higher synaptogenesis in early development
+            float synRate = 0.0001f * plasticityModifier_;
+            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
+            sp->setSynaptogenesisRate(synRate);
+            sp->setPruningRate(pruneRate);
+        }
+    }
+}
+    
     // Structural plasticity changes with development
     if (structuralPlasticityEnabled_) {
         auto* sp = brain_->getStructuralPlasticity();
@@ -326,7 +348,7 @@ float AgentBrain::getCuriosityLevel() const {
     return curiosityLevel_;
 }
 
-float AgentBrain::getNoveltyLevel() const {
+void AgentBrain::getNoveltyLevel() const {
     return noveltyLevel_;
 }
 

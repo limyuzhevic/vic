@@ -513,6 +513,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        // TODO: Connect prediction system to working memory for prediction errors
+        pImpl->predictionSystem->update(pImpl->timestep);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -530,6 +532,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
+        // For now, update with current neural activity
+        pImpl->conceptFormation->update(pImpl->timestep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -573,6 +577,39 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+        
+        // Development affects neural excitability (not just structural plasticity)
+        // This makes the brain more or less excitable depending on developmental stage
+        float excitabilityMod = 1.0f;
+        switch (pImpl->developmentalStage) {
+            case DevelopmentalStage::Initial:
+                excitabilityMod = 1.2f;  // More excitable in development
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                excitabilityMod = 1.1f;
+                break;
+            case DevelopmentalStage::Maturation:
+                excitabilityMod = 1.0f;
+                break;
+            case DevelopmentalStage::Adult:
+                excitabilityMod = 0.8f;  // Less excitable, more stable
+                break;
+            case DevelopmentalStage::Aging:
+                excitabilityMod = 0.7f;  // Even less excitable
+                break;
+        }
+        
+        // Apply excitability modulation to neurons
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Adjust resting potential based on development
+                    float resting = neuron->getState().restingPotential;
+                    resting *= excitabilityMod;
+                    neuron->setRestingPotential(resting);
+                }
+            }
         }
     }
     

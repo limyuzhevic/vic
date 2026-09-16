@@ -9,38 +9,7 @@
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
-class AgentBrain {
-public:
-    AgentBrain(std::shared_ptr<Brain> brain);
-    ~AgentBrain();
-    
-    // Initialize with world
-    void initialize(const SimpleWorld& world);
-    
-    // Get sensory input size expected by brain
-    size_t getSensoryInputSize() const;
-    
-    // Get motor output size expected
-    size_t getMotorOutputSize() const;
-    
-    // Process sensory percept and inject into brain
-    void processSensoryInput(const SensoryPercept& percept);
-    
-    // Decode brain motor activity into motor command
-    MotorCommand decodeMotorCommand();
-    
-    // Apply neuromodulation based on reward
-    void applyRewardModulation(float reward, float predictedReward);
-    
-    // Update development system
-    void updateDevelopment(double timestep);
-    
-    // Get current developmental stage
-    DevelopmentalStage getDevelopmentalStage() const;
-    
-    // Get neuromodulation level
+// Get neuromodulation level
     float getNeuromodulationLevel() const;
     
     // Get curiosity level
@@ -68,6 +37,9 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Update structural plasticity based on development
+    void updateDevelopmentWithStructuralPlasticity();
     
 private:
     // Motor decoding: convert neural activity to motor command

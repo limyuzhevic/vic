@@ -36,36 +36,60 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
-    
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
-        
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
+    // Get all available neurons in the brain
+    std::vector<NeuronId> allNeurons;
+    for (const auto& region : brain_->getRegions()) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                allNeurons.push_back(neuron->getId());
             }
-        }
-        
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
         }
     }
     
-    // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    if (allNeurons.empty()) return;
+    
+    // Encode pattern into neural tissue (Hebbian-like learning)
+    size_t neuronsNeeded = std::min(pattern.size(), allNeurons.size());
+    
+    for (size_t i = 0; i < neuronsNeeded; ++i) {
+        NeuronId neuron = allNeurons[i];
+        float activation = pattern[i] * strength;
+        
+        // Store pattern in working memory with Hebbian trace
+        storeToNeuron(neuron, activation);
+        
+        // Apply Hebbian-like plasticity to encode pattern
+        if (brain_ && brain_->getHebbian()) {
+            // Strengthen synaptic connections to store pattern
+            brain_->injectCurrent(neuron, activation * 5.0f);
+        }
+        
+        // Apply STDP if available for precise timing-based plasticity
+        if (brain_ && brain_->getSTDP()) {
+            // STDP would strengthen synapses based on spike timing
+            // For now, simulate with current-based activation
+            float stdpFactor = std::min(1.0f, activation * 2.0f);
+            // STDP would modify synapse weights here
+        }
+    }
+    
+    // Create maintenance connections if enough neurons stored
+    for (size_t i = 1; i < std::min(memoryNeurons_.size(), 3U); ++i) {
+        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.3f);
+    }
+    
+    // Trigger attentional selection for pattern competition
+    if (brain_ && brain_->getAttention() && !memoryNeurons_.empty()) {
+        // Only use the first few neurons for attention processing
+        std::vector<NeuronId> patternNeurons;
+        size_t numToUse = std::min(5U, memoryNeurons_.size());
+        
+        for (size_t i = 0; i < numToUse; ++i) {
+            patternNeurons.push_back(memoryNeurons_[i]);
+        }
+        
+        // Apply attention to process competition
+        brain_->getAttention()->processCompetition(patternNeurons, 0.8f);
     }
 }
 
@@ -136,6 +160,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             memoryActivations_[i] = activation;
         }
     }
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
     
     // Decay weak traces
     decayWeakTraces();
