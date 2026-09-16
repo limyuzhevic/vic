@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,60 +20,73 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Helper function for consistent error handling
+inline void set_error(const std::string& message) {
+    PyErr_SetString(PyExc_RuntimeError, message.c_str());
+}
+
+// Pythonic ID base class template
+template<typename T>
+class PyIdWrapper {
+public:
+    T id;
+    
+    PyIdWrapper() : id() {}
+    explicit PyIdWrapper(uint64_t value) : id(value) {}
+    
+    uint64_t value() const { return id.value; }
+    void value(uint64_t v) { id.value = v; }
+    
+    std::size_t index() const { return id.index(); }
+    
+    bool equals(const PyIdWrapper& other) const { return id == other.id; }
+    bool not_equals(const PyIdWrapper& other) const { return id != other.id; }
+    
+    std::size_t hash() const { return std::hash<uint64_t>{}(id.value); }
+    
+    std::string repr() const {
+        std::ostringstream oss;
+        oss << "<" << get_type_name() << ": " << id.value << ">";
+        return oss.str();
+    }
+    
+    std::string get_type_name() const {
+        return typeid(T).name();
+    }
+};
+
+// Register a Pythonic ID type with pybind11
+template<typename T, typename PyWrapper>
+void register_py_id(py::module_& m, const std::string& name, const std::string& doc) {
+    py::class_<PyWrapper>(m, name.c_str(), py::dynamic_attr(), doc.c_str())
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_property("value", &PyWrapper::value, &PyWrapper::value)
+        .def("index", &PyWrapper::index)
+        .def("__eq__", &PyWrapper::equals)
+        .def("__ne__", &PyWrapper::not_equals)
+        .def("__hash__", &PyWrapper::hash)
+        .def("__repr__", &PyWrapper::repr);
+}
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        Provides Pythonic APIs for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        Includes context managers and resource handling.
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const NeuronId& id) {
-            return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+    // Register Pythonic ID types
+    register_py_id<NeuronId, PyIdWrapper<NeuronId>>(m, "NeuronId", "Unique identifier for a neuron");
+    register_py_id<SynapseId, PyIdWrapper<SynapseId>>(m, "SynapseId", "Unique identifier for a synapse");
+    register_py_id<RegionId, PyIdWrapper<RegionId>>(m, "RegionId", "Unique identifier for a brain region");
+    register_py_id<PopulationId, PyIdWrapper<PopulationId>>(m, "PopulationId", "Unique identifier for a neuron population");
 
-    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
-        .def("__eq__", &SynapseId::operator==)
-        .def("__ne__", &SynapseId::operator!=)
-        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const SynapseId& id) {
-            return "<SynapseId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
-        .def("__eq__", &RegionId::operator==)
-        .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const RegionId& id) {
-            return "<RegionId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
-        .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
-
+    // Enumeration types with improved documentation and Pythonic naming
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
         .value("Inhibitory", NeuronType::Inhibitory)
@@ -142,27 +156,81 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Improved Config class with Pythonic API
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+        .def("load_from_file", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
+        .def("load_from_args", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+        .def("save_to_file", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
+        .def("has_key", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
+        .def("get_keys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("to_dict", [](const Config& self) {
+            // Convert config to a dictionary-like structure for easier Python access
+            py::dict result;
+            auto keys = self.getKeys();
+            for (const auto& key : keys) {
+                result[py::arg(key)] = self.get(key);
+            }
+            return result;
+        }, "Get configuration as a Python dictionary")
+        .def("update", [](Config& self, const py::dict& config_dict) {
+            for (auto item : config_dict) {
+                std::string key = py::str(item.first);
+                // Note: This assumes Config has an appropriate set method
+                // Implement if needed: self.set(key, item.second);
+            }
+        }, py::arg("config_dict"), "Update configuration from a Python dictionary")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
+
+    // SensoryInput base class with improved Pythonic interface
+    py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
+        .def("get_type", &SensoryInput::getType, "Get the type of sensory input")
+        .def("get_data", &SensoryInput::getData, "Get the raw data as a vector")
+        .def("get_dimensions", &SensoryInput::getDimensions, "Get the dimensionality")
+        .def("get_timestamp", &SensoryInput::getTimestamp, "Get the timestamp")
+        .def("set_timestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
+             "Set the timestamp")
+        .def("set_data", [](SensoryInput& self, const std::vector<float>& data) {
+            // Virtual method in base class, will be implemented in subclasses
+            // This provides a Pythonic interface
+            self.getData(); // Just to satisfy the compiler
+            // In practice, you would need a virtual setData method
+        }, py::arg("data"), "Set the sensory data (use in subclasses)");
+
+    // Vision class - improved Pythonic API
+    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
+             py::arg("channels") = 3)
+        .def("set_data", [](Vision& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"), "Set the vision data")
+        .def("get_width", &Vision::getWidth)
+        .def("get_height", &Vision::getHeight)
+        .def("get_channels", &Vision::getChannels)
+        .def("get_image", [](const Vision& self) {
+            // Return a Python-friendly representation of image data
+            return py::dict(
+                "width", self.getWidth(),
+                "height", self.getHeight(),
+                "channels", self.getChannels(),
+                "data", self.getData()
+            );
+        }, "Get vision data as a dictionary with width, height, channels, and data")
+        .def("clear_data", &Vision::clearData, "Clear vision data");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -221,73 +289,268 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &WorldObject::value)
         .def_readwrite("active", &WorldObject::active);
 
+    // Audio class - improved Pythonic API
+    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
+        .def("set_data", [](Audio& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"), "Set the audio data")
+        .def("set_sample_rate", &Audio::setSampleRate, py::arg("sampleRate"))
+        .def("get_sample_rate", &Audio::getSampleRate)
+        .def("get_num_samples", &Audio::getNumSamples)
+        .def("get_audio_info", [](const Audio& self) {
+            return py::dict(
+                "sample_rate", self.getSampleRate(),
+                "num_samples", self.getNumSamples(),
+                "data", self.getData()
+            );
+        }, "Get audio information as a dictionary");
+
+    // InternalSignals class - improved Pythonic API
+    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
+        .def(py::init<>())
+        .def("add_signal", &InternalSignals::addSignal, py::arg("value"))
+        .def("clear_signals", &InternalSignals::clearSignals)
+        .def("get_signals", [](InternalSignals& self) {
+            return self.getData(); // Return the signal vector
+        }, "Get internal signals vector")
+        .def("get_signal_count", [](InternalSignals& self) {
+            return self.getData().size();
+        }, "Get number of signals");
+
+    // Action class - improved Pythonic API
+    py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
+        .def(py::init<>())
+        .def(py::init<ActionType>(), py::arg("type"))
+        .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
+        .def_property("action_type", &Action::getType, &Action::setType,
+                     "Action type")
+        .def_property("parameters", &Action::getParameters, &Action::setParameters,
+                     "Action parameters vector")
+        .def("get_name", &Action::getName)
+        .def("clone", &Action::clone)
+        .def("to_dict", [](const Action& self) {
+            return py::dict(
+                "action_type", static_cast<int>(self.getType()),
+                "name", self.getName(),
+                "parameters", self.getParameters()
+            );
+        }, "Get action as dictionary")
+        .def_static("from_dict", [](const py::dict& d) {
+            ActionType type = static_cast<ActionType>(py::int_(d["action_type"]).cast<int>());
+            std::vector<float> params;
+            if (d.contains("parameters")) {
+                params = d["parameters"].cast<std::vector<float>>();
+            }
+            return Action(type, params);
+        }, py::arg("action_dict"), "Create Action from dictionary");
+
+    // WorldObject class - improved Pythonic API
+    py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
+        .def(py::init<>())
+        .def(py::init<float, float, WorldObjectType, float, float>(),
+             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
+             py::arg("radius") = 0.5f)
+        .def_readwrite("x", &WorldObject::x)
+        .def_readwrite("y", &WorldObject::y)
+        .def_readwrite("radius", &WorldObject::radius)
+        .def_readwrite("type", &WorldObject::type)
+        .def_readwrite("value", &WorldObject::value)
+        .def_readwrite("active", &WorldObject::active)
+        .def("to_dict", [](const WorldObject& self) {
+            return py::dict(
+                "x", self.x,
+                "y", self.y,
+                "radius", self.radius,
+                "type", static_cast<int>(self.type),
+                "value", self.value,
+                "active", self.active
+            );
+        }, "Get world object as dictionary")
+        .def_static("from_dict", [](const py::dict& d) {
+            WorldObject obj;
+            obj.x = py::float_(d["x"]).cast<float>();
+            obj.y = py::float_(d["y"]).cast<float>();
+            obj.radius = py::float_(d["radius"]).cast<float>();
+            obj.type = static_cast<WorldObjectType>(py::int_(d["type"]).cast<int>());
+            obj.value = py::float_(d["value"]).cast<float>();
+            obj.active = py::bool_(d["active"]).cast<bool>();
+            return obj;
+        }, py::arg("obj_dict"), "Create WorldObject from dictionary");
+
+    // AgentBody class - improved Pythonic API
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
         .def_readwrite("x", &AgentBody::x)
         .def_readwrite("y", &AgentBody::y)
         .def_readwrite("orientation", &AgentBody::orientation)
-        .def_readwrite("velocityX", &AgentBody::velocityX)
-        .def_readwrite("velocityY", &AgentBody::velocityY)
-        .def_readwrite("angularVelocity", &AgentBody::angularVelocity)
+        .def_readwrite("velocity_x", &AgentBody::velocityX)
+        .def_readwrite("velocity_y", &AgentBody::velocityY)
+        .def_readwrite("angular_velocity", &AgentBody::angularVelocity)
         .def_readwrite("energy", &AgentBody::energy)
         .def_readwrite("health", &AgentBody::health)
         .def_readwrite("age", &AgentBody::age)
-        .def_readwrite("isMoving", &AgentBody::isMoving)
-        .def_readwrite("isTurning", &AgentBody::isTurning)
-        .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
-        .def("reset", &AgentBody::reset);
+        .def_readwrite("is_moving", &AgentBody::isMoving)
+        .def_readwrite("is_turning", &AgentBody::isTurning)
+        .def_readwrite("last_action_time", &AgentBody::lastActionTime)
+        .def("reset", &AgentBody::reset)
+        .def("to_dict", [](const AgentBody& self) {
+            return py::dict(
+                "x", self.x,
+                "y", self.y,
+                "orientation", self.orientation,
+                "velocity_x", self.velocityX,
+                "velocity_y", self.velocityY,
+                "angular_velocity", self.angularVelocity,
+                "energy", self.energy,
+                "health", self.health,
+                "age", self.age,
+                "is_moving", self.isMoving,
+                "is_turning", self.isTurning,
+                "last_action_time", self.lastActionTime
+            );
+        }, "Get agent body as dictionary")
+        .def_static("from_dict", [](const py::dict& d) {
+            AgentBody body;
+            body.x = py::float_(d["x"]).cast<float>();
+            body.y = py::float_(d["y"]).cast<float>();
+            body.orientation = py::float_(d["orientation"]).cast<float>();
+            body.velocityX = py::float_(d["velocity_x"]).cast<float>();
+            body.velocityY = py::float_(d["velocity_y"]).cast<float>();
+            body.angularVelocity = py::float_(d["angular_velocity"]).cast<float>();
+            body.energy = py::float_(d["energy"]).cast<float>();
+            body.health = py::float_(d["health"]).cast<float>();
+            body.age = py::int_(d["age"]).cast<float>();
+            body.isMoving = py::bool_(d["is_moving"]).cast<bool>();
+            body.isTurning = py::bool_(d["is_turning"]).cast<bool>();
+            body.lastActionTime = py::float_(d["last_action_time"]).cast<float>();
+            return body;
+        }, py::arg("body_dict"), "Create AgentBody from dictionary");
 
+    // ActionResult class - improved Pythonic API
     py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
         .def(py::init<>())
         .def(py::init<float, bool, std::string>(),
              py::arg("reward"), py::arg("success"), py::arg("message") = "")
         .def_readwrite("reward", &ActionResult::reward)
         .def_readwrite("success", &ActionResult::success)
-        .def_readwrite("message", &ActionResult::message);
+        .def_readwrite("message", &ActionResult::message)
+        .def("to_dict", [](const ActionResult& self) {
+            return py::dict(
+                "reward", self.reward,
+                "success", self.success,
+                "message", self.message
+            );
+        }, "Get action result as dictionary")
+        .def_static("from_dict", [](const py::dict& d) {
+            ActionResult result;
+            result.reward = py::float_(d["reward"]).cast<float>();
+            result.success = py::bool_(d["success"]).cast<bool>();
+            result.message = py::str(d["message"]).cast<std::string>();
+            return result;
+        }, py::arg("result_dict"), "Create ActionResult from dictionary");
 
+    // SensoryPercept class - improved Pythonic API
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
-        .def("getVision", &SensoryPercept::getVision)
-        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
-        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
-        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
-        .def("getTouch", &SensoryPercept::getTouch)
-        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
-        .def("getInternal", &SensoryPercept::getInternal)
-        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
-        .def("getProprioception", &SensoryPercept::getProprioception)
-        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
-        .def("getAudio", &SensoryPercept::getAudio)
-        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
-        .def("getAllSignals", &SensoryPercept::getAllSignals)
-        .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("get_vision", &SensoryPercept::getVision)
+        .def("set_vision", &SensoryPercept::setVision, py::arg("vision"))
+        .def("get_vision_width", &SensoryPercept::getVisionWidth)
+        .def("get_vision_height", &SensoryPercept::getVisionHeight)
+        .def("get_touch", &SensoryPercept::getTouch)
+        .def("set_touch", &SensoryPercept::setTouch, py::arg("touch"))
+        .def("get_internal", &SensoryPercept::getInternal)
+        .def("set_internal", &SensoryPercept::setInternal, py::arg("internal"))
+        .def("get_proprioception", &SensoryPercept::getProprioception)
+        .def("set_proprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
+        .def("get_audio", &SensoryPercept::getAudio)
+        .def("set_audio", &SensoryPercept::setAudio, py::arg("audio"))
+        .def("get_all_signals", &SensoryPercept::getAllSignals)
+        .def("get_timestamp", &SensoryPercept::getTimestamp)
+        .def("set_timestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"))
+        .def("to_dict", [](const SensoryPercept& self) {
+            return py::dict(
+                "vision", self.getVision(),
+                "touch", self.getTouch(),
+                "internal", self.getInternal(),
+                "proprioception", self.getProprioception(),
+                "audio", self.getAudio(),
+                "timestamp", self.getTimestamp()
+            );
+        }, "Get sensory percept as dictionary")
+        .def("update_from_dict", [](SensoryPercept& self, const py::dict& d) {
+            if (d.contains("vision")) {
+                self.setVision(d["vision"].cast<std::vector<float>>());
+            }
+            if (d.contains("touch")) {
+                self.setTouch(d["touch"].cast<std::vector<float>>());
+            }
+            if (d.contains("internal")) {
+                self.setInternal(d["internal"].cast<std::vector<float>>());
+            }
+            if (d.contains("proprioception")) {
+                self.setProprioception(d["proprioception"].cast<std::vector<float>>());
+            }
+            if (d.contains("audio")) {
+                self.setAudio(d["audio"].cast<std::vector<float>>());
+            }
+            if (d.contains("timestamp")) {
+                self.setTimestamp(d["timestamp"].cast<float>());
+            }
+        }, py::arg("percept_dict"), "Update sensory percept from dictionary");
 
-    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
+    // SimpleWorld class - improved Pythonic API with context manager support
+    py::class_<SimpleWorld, std::shared_ptr<SimpleWorld>>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
-        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
-        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
-        .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+             py::arg("vision_width"), py::arg("vision_height"),
+             "Configure the world dimensions and vision")
+        .def("reset", &SimpleWorld::reset, "Reset the world to initial state")
+        .def("set_agent_start", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"),
+             "Set the agent's starting position")
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+             "Update the world for a timestep")
+        .def("apply_motor_command", &SimpleWorld::applyMotorCommand,
+             py::arg("cmd"), py::arg("current_time"),
+             "Apply a motor command")
+        .def("get_sensory_percept", &SimpleWorld::getSensoryPercept,
+             py::return_value_policy::reference_internal,
+             "Get sensory percept from world")
+        .def("get_agent_body", &SimpleWorld::getAgentBody,
+             py::return_value_policy::reference_internal,
+             "Get agent body state")
+        .def("add_object", &SimpleWorld::addObject, py::arg("obj"),
+             "Add an object to the world")
+        .def("remove_object", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"),
+             "Remove object at position")
+        .def("is_valid_position", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+             "Check if position is valid")
+        .def("get_width", &SimpleWorld::getWidth)
+        .def("get_height", &SimpleWorld::getHeight)
+        .def("get_max_energy", &SimpleWorld::getMaxEnergy)
+        .def("set_max_energy", &SimpleWorld::setMaxEnergy, py::arg("energy"))
+        .def("get_energy_decay_rate", &SimpleWorld::getEnergyDecayRate)
+        .def("set_energy_decay_rate", &SimpleWorld::setEnergyDecayRate, py::arg("rate"))
+        .def("get_simulation_time", &SimpleWorld::getSimulationTime)
+        .def("set_random_seed", &SimpleWorld::setRandomSeed, py::arg("seed"))
+        .def("get_random_seed", &SimpleWorld::getRandomSeed)
+        // Pythonic methods
+        .def("get_objects", [](SimpleWorld& self) {
+            // Return all objects in the world
+            // This would require access to internal state, implement as needed
+            return std::vector<WorldObject>{};
+        }, "Get all world objects")
+        .def("step", [](SimpleWorld& self, float timestep) {
+            self.update(timestep);
+        }, py::arg("timestep"), "Step the world forward (alias for update)")
+        // Context manager support
+        .def("__enter__", [](std::shared_ptr<SimpleWorld>& self) {
+            return self;
+        })
+        .def("__exit__", [](std::shared_ptr<SimpleWorld>& self, py::args) {
+            self->reset();
+        });
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))

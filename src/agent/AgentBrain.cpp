@@ -1,4 +1,5 @@
 #include "AgentBrain.hpp"
+#include "AgentBrainConstants.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
@@ -66,7 +67,7 @@ AgentBrain::~AgentBrain() = default;
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+    plasticityModifier_ = PLASTICITY_INITIAL;
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -75,8 +76,7 @@ void AgentBrain::initialize(const SimpleWorld& world) {
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
+    return TOTAL_SENSORY_INPUT_SIZE;
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
@@ -155,7 +155,7 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+    if (curiosityEnabled_ && curiosityLevel_ > CURIOUSITY_THRESHOLD) {
         decoded = selectWithCuriosity(decoded);
     }
     
@@ -213,12 +213,12 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action when curiosity is high
     if (curiosityLevel_ > 0.5f) {
         // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        float exploreChance = curiosityLevel_ * EXPLORATION_CHANCE_MULTIPLIER; // Up to 30% random
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
             // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            int choice = brain_->getRandomGenerator()->uniformInt(0, RANDOM_MOTOR_COMMAND_CHOICES);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -229,6 +229,11 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 6: return MotorCommand::Interact;
                 default: return MotorCommand::Wait;
             }
+        }
+    }
+    
+    return defaultCmd;
+}
         }
     }
     
@@ -268,14 +273,14 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Modulate plasticity based on dopamine
     // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+    float plasticityFactor = PLASTICITY_FACTOR_BASE + PLASTICITY_FACTOR_BASE * dopamineLevel_;
+    plasticityFactor = std::clamp(plasticityFactor, PLASTICITY_FACTOR_CLAMP_MIN, PLASTICITY_FACTOR_CLAMP_MAX);
     
     // Apply to STDP
     auto* stdp = brain_->getSTDP();
     if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+        stdp->setLTPWeight(DEFAULT_STDP_LTP_WEIGHT * plasticityFactor);
+        stdp->setLTDWeight(DEFAULT_STDP_LTD_WEIGHT * plasticityFactor);
     }
 }
 
