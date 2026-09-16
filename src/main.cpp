@@ -1,12 +1,3 @@
-// NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
-//
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
-
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
@@ -18,6 +9,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "core/Config/Constants.hpp"
 
 #include <iostream>
 #include <memory>
@@ -27,6 +19,13 @@
 #include <numeric>
 
 using namespace nlm;
+
+namespace nlm {
+    constexpr float kNeuronInjectionCurrent = 50.0f;
+    constexpr float kStdpPrePostCurrent = 60.0f;
+    constexpr float kLearningWeightChangeThreshold = 0.01f;
+}
+
 
 void printBanner() {
     std::cout << R"(
@@ -65,9 +64,12 @@ struct LearningExperiment {
         initialWeights.clear();
         
         // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
+        auto* region = brain->getRegion(RegionId(1));
+        if (region) {
             for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+                if (syn) {  // Check for null synapse
+                    initialWeights.push_back(syn->getWeight());
+                }
             }
         }
         
@@ -84,13 +86,20 @@ struct LearningExperiment {
         finalWeights.clear();
         
         // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
+        auto* region = brain->getRegion(RegionId(1));
+        if (region) {
             for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+                if (syn) {  // Check for null synapse
+                    finalWeights.push_back(syn->getWeight());
+                }
             }
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        // Get most active neurons only if spike system exists
+        auto* spikeSystem = brain->getSpikeSystem();
+        if (spikeSystem) {
+            mostActiveNeurons = spikeSystem->getMostActiveNeurons(10);
+        }
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
