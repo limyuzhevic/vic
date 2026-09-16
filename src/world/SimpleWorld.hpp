@@ -70,6 +70,10 @@ public:
     float getWidth() const { return width_; }
     float getHeight() const { return height_; }
     
+    // Vision configuration
+    size_t getVisionWidth() const { return visionWidth_; }
+    size_t getVisionHeight() const { return visionHeight_; }
+    
     // Energy settings
     float getMaxEnergy() const { return maxEnergy_; }
     void setMaxEnergy(float e) { maxEnergy_ = e; }
