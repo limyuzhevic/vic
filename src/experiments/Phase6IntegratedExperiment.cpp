@@ -43,7 +43,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create simple world
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.configure(16, 16, 16, 16);
     
     // Create agent
     AgentBrain agent(brain);
@@ -55,14 +55,29 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
+    // Verify brain has regions before proceeding
+    if (agent.getBrain()->getRegionCount() == 0) {
+        NLM_LOG_ERROR("Brain has no regions!");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
+    // Get first region for world interaction
+    auto* firstRegion = agent.getBrain()->getRegion(agent.getBrain()->getRegionIds()[0]);
+    if (!firstRegion) {
+        NLM_LOG_ERROR("Failed to get first brain region");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
     // Run simulation
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get observation from world
+        SensoryPercept percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -73,11 +88,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
-        
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Apply action to world and get reward
+        ActionResult actionResult = world.applyMotorCommand(cmd, world.getSimulationTime());
+        float reward = actionResult.reward;
         totalReward += reward;
         
         // Apply reward modulation
