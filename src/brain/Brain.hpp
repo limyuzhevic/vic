@@ -1,5 +1,3 @@
-#pragma once
-
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
@@ -8,6 +6,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -194,6 +193,11 @@ public:
     void logStatus() const;
     
 private:
+    // Helper methods for reducing code duplication
+    void forEachNeuron(std::function<void(Neuron*, Timestamp)> callback) const;
+    void forEachSynapse(std::function<void(Synapse*, Timestamp)> callback) const;
+    void forEachRegionPopulationNeuron(std::function<void(NeuralRegion*, NeuralPopulation*, Neuron*)> callback) const;
+    
     struct Impl;
     Impl* pImpl;
 };

@@ -56,6 +56,9 @@ public:
     // Step all neurons
     void step(Timestamp currentTime);
     
+    // Update all neurons (LIF dynamics)
+    void updateNeurons(Timestamp currentTime);
+    
     // Reset all neurons
     void reset();
     

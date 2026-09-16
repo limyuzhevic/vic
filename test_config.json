@@ -1,0 +1,21 @@
+{
+    "server": {
+        "host": "localhost",
+        "port": 8080,
+        "ssl": true
+    },
+    "database": {
+        "name": "testdb",
+        "max_connections": 100,
+        "timeout": 30.5,
+        "enabled": false
+    },
+    "features": [
+        "feature1",
+        "feature2",
+        "feature3"
+    ],
+    "version": 1.2,
+    "debug_mode": true,
+    "max_items": 1000
+}

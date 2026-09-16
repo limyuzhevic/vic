@@ -297,20 +297,33 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
 
 std::vector<Neuron*> NeuralRegion::getAllNeurons() {
     std::vector<Neuron*> result;
-    for (auto& pop : pImpl->populations) {
-        auto popNeurons = pop->getNeurons();
-        result.insert(result.end(), popNeurons.begin(), popNeurons.end());
+    result.reserve(getTotalNeuronCount());
+    
+    for (const auto& pop : pImpl->populations) {
+        auto neurons = pop->getNeurons();
+        result.insert(result.end(), neurons.begin(), neurons.end());
     }
+    
     return result;
 }
 
 std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
     std::vector<const Neuron*> result;
+    result.reserve(getTotalNeuronCount());
+    
     for (const auto& pop : pImpl->populations) {
-        auto popNeurons = pop->getNeurons();
-        result.insert(result.end(), popNeurons.begin(), popNeurons.end());
+        auto neurons = pop->getNeurons();
+        for (const auto* n : neurons) {
+            result.push_back(n);
+        }
     }
+    
     return result;
 }
 
-} // namespace nlm
+// Update all neurons (LIF dynamics)
+void NeuralRegion::updateNeurons(Timestamp currentTime) {
+    for (auto& pop : pImpl->populations) {
+        pop->updateNeurons(currentTime);
+    }
+}

@@ -1,13 +1,3 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 
@@ -20,7 +10,8 @@ using ConfigValue = std::variant<
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<std::string>,
+    std::unordered_map<std::string, ConfigValue>
 >;
 
 // Configuration source
@@ -93,6 +84,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Internal JSON parsing (declarations)
+    bool parseJSON(const std::string& content);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -101,5 +95,3 @@ private:
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
-
-} // namespace nlm

@@ -79,6 +79,9 @@ public:
     std::vector<Neuron*> getAllNeurons();
     std::vector<const Neuron*> getAllNeurons() const;
     
+    // Update all neurons (LIF dynamics)
+    void updateNeurons(Timestamp currentTime);
+    
 private:
     struct Impl;
     Impl* pImpl;
