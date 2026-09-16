@@ -20,49 +20,44 @@ NLM IS intended to become:
 
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 2: Real Neural Computation**
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+Phase 2 implements real spiking neural computation with:
+- Leaky Integrate-and-Fire (LIF) neuron dynamics
+- Event-driven spike propagation with synaptic delays
+- STDP and Hebbian plasticity rules
+- Structural plasticity (synaptogenesis/pruning)
 
-### Phase 6 Integration Achievements
+### Phase 2 Implementation
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+The core NLM Phase 2 implementation provides:
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+#### Neural Computation
+- **Real LIF Neuron Dynamics**: Biologically plausible integrate-and-fire neurons with adaptive properties
+- **Event-Driven Spike Propagation**: Asynchronous spike transmission with synaptic delays
+- **Multiple Plasticity Mechanisms**: STDP, Hebbian learning, and structural plasticity
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+#### Command-Line Interface
+- `--help, -h`: Show help message and exit
+- `--version, -v`: Show version information
+- `--config <file>`: Load configuration from file
+- `--key <value>`: Set configuration values
+- `--key=value`: Set configuration with equals syntax
+- Support for both `--key value` and `--key=value` formats
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+#### Configuration System
+- **Multi-Format Support**: JSON, YAML, and simple key=value formats
+- **Type Safety**: Automatic type inference (int, double, bool, string)
+- **Validation**: Range checking and parameter validation
+- **Command-Line Override**: Runtime configuration via CLI
+- **Persistence**: Save/load configuration to file
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+#### Advanced Features
+- **Memory Systems**: Working memory, episodic memory, associative memory
+- **Neuromodulation**: Dopamine, curiosity, novelty detection
+- **Prediction System**: Forward models and prediction error computation
+- **Cognition**: Planning, concept formation, attentional selection
+- **Development**: Developmental stages, structural changes
 
 ## Building
 
@@ -75,151 +70,123 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Basic Usage
+
 ```bash
-./nlm_phase6_demo
+./nlm [options]
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Examples
+
+```bash
+# Run with default configuration
+./nlm
+
+# Load custom configuration
+./nlm --config custom.cfg
+
+# Override configuration values
+./nlm --neuron_count 1000 --random_seed 123 --stdp_ltp_weight 0.02
+
+# Set multiple values
+./nlm --neuron_count=500 --region_count=2 --connection_probability=0.15
+
+# Show help
+./nlm --help
+
+# Show version
+./nlm --version
+```
+
+### Running the Phase 2 Demo
+
+```bash
+./nlm_phase2_demo
+```
+
+This runs a comprehensive demonstration of:
+- Basic neural connectivity testing
+- Plasticity learning experiments
+- STDP verification
+- Synaptic weight changes through experience
 
 ## Project Structure
 
 ```
 NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
 ├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
+│   ├── core/           # Core utilities (Config, Random, Logger, Clock)
+│   ├── brain/          # Neural components (Neuron, Synapse, Brain)
+│   ├── dynamics/       # Neural dynamics (LIF, SpikeSystem)
+│   ├── plasticity/     # Plasticity rules (STDP, Hebbian, Structural)
 │   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+│   ├── neuromodulation/ # Neuromodulators (Dopamine, Curiosity, etc.)
+│   ├── memory/        # Memory systems
+│   ├── prediction/     # Prediction systems
+│   ├── cognition/      # Cognitive mechanisms
+│   ├── sensory/        # Sensory processing
+│   ├── motor/          # Motor system
+│   ├── environment/    # Environment interface
+│   └── experiments/    # Experiment framework
+├── tests/              # Unit and integration tests
+├── configs/            # Configuration files
+└── docs/              # Documentation
 ```
 
-## Phase Summary
+## Key Features
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+### Real Neural Computation
+- **LIF Neurons**: Biologically realistic integrate-and-fire dynamics
+- **Synaptic Transmission**: Event-driven spikes with realistic delays
+- **Plasticity Rules**: STDP, Hebbian, reward-modulated learning
+- **Structural Changes**: Synapse creation and elimination
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+### Advanced Capabilities
+- **Memory Integration**: Working memory, episodic memory, associative memory
+- **Neuromodulation**: Coordinated dopamine, curiosity, novelty systems
+- **Prediction**: Forward models with error signals
+- **Cognition**: Planning, concept formation, attentional focus
+- **Development**: Age-dependent plasticity and maturation
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
+### User-Friendly Interface
+- **Intuitive CLI**: Simple command-line arguments
+- **Flexible Config**: Multiple file formats with validation
+- **Help System**: Comprehensive documentation
+- **Error Handling**: Clear error messages and recovery
 
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+## Configuration
 
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
+The default configuration is in `configs/default.cfg` and includes:
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+```ini
+# Neural parameters
+neuron_count = 500
+region_count = 1
+connection_probability = 0.15
+random_seed = 42
+simulation_timestep = 0.001
 
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
+# Plasticity parameters
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_tau = 20.0
+synaptogenesis_rate = 0.0001
+pruning_rate = 0.00001
 ```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
-```
+
+Configuration can be overridden via command line or custom config files.
+
+## Scientific Approach
+
+NLM investigates whether computational systems can:
+
+- Evolve from simple developmental states
+- Learn from experience through neural plasticity
+- Integrate multiple brain-like systems
+- Develop adaptive behaviors
+- Show emergent cognitive capabilities
+
+The project makes no claims of biological accuracy or intelligence, but rather serves as a test bed for neural computation research.
 
 ## License
 
@@ -228,3 +195,13 @@ MIT
 ## Authors
 
 Research project — See docs for scientific background.
+
+## Getting Help
+
+For questions about NLM, visit the documentation or check the examples directory for usage patterns.
+
+---
+
+**Version**: 2.0.0 (Phase 2)
+**Status**: Ready for research and experimentation
+**Interface**: Command-line with comprehensive configuration support

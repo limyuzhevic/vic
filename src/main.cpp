@@ -7,6 +7,11 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
+// Command-line argument parsing functions
+void printHelpAndExit();
+void printVersionAndExit();
+void printBanner();
+
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
@@ -25,8 +30,65 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <fstream>
 
 using namespace nlm;
+
+void printHelpAndExit();
+void printVersionAndExit();
+
+void printHelpAndExit() {
+    std::cout << R"(
+NLM Phase 2: Real Neural Computation
+
+Usage: nlm [options]
+
+Options:
+  --help, -h                    Show this help message and exit
+  --version, -v                 Show version information and exit
+  --config <file>               Load configuration from file (default: configs/default.cfg)
+  --key <value>                 Set configuration value (e.g., --neuron_count 500)
+  --key=value                   Set configuration value with equals sign
+
+Common configuration options:
+  --neuron_count <int>          Number of neurons in the network
+  --region_count <int>          Number of brain regions
+  --connection_probability <f>  Probability of connection between neurons
+  --random_seed <int>           Random seed for reproducibility
+  --simulation_timestep <f>     Time step for simulation
+  --stdp_ltp_weight <f>         STDP LTP learning rate
+  --stdp_ltd_weight <f>         STDP LTD learning rate
+  --stdp_tau <f>                STDP time constant
+  --synaptogenesis_rate <f>     Rate of synapse formation
+  --pruning_rate <f>            Rate of synapse removal
+
+Example:
+  ./nlm --config custom.cfg --neuron_count 1000 --random_seed 123
+
+For more information, visit: https://github.com/nlm-project/nlm
+
+Phase 2 Features:
+  ✓ Leaky Integrate-and-Fire (LIF) neuron dynamics
+  ✓ Event-driven spike propagation with synaptic delays
+  ✓ STDP and Hebbian plasticity
+  ✓ Structural plasticity (synaptogenesis/pruning)
+  ✓ Real neural computation capabilities
+
+";) << std::endl;
+    exit(0);
+}
+
+void printVersionAndExit() {
+    std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Version: 2.0.0 (Phase 2)" << std::endl;
+    std::cout << "Build date: " << __DATE__ << " " << __TIME__ << std::endl;
+    std::cout << "Platform: Linux x86_64" << std::endl;
+    std::cout << "Compiler: C++20" << std::endl;
+    std::cout << "Implementation: Real spiking neural dynamics" << std::endl;
+    std::cout << "Features: LIF neurons, event-driven spikes, STDP, structural plasticity" << std::endl;
+    std::cout << "For more information, visit: https://github.com/nlm-project/nlm" << std::endl;
+    exit(0);
+}
 
 void printBanner() {
     std::cout << R"(
@@ -347,10 +409,32 @@ int main(int argc, char** argv) {
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
+        if (arg == "--help" || arg == "-h") {
+            printHelpAndExit();
+        } else if (arg == "--version" || arg == "-v") {
+            printVersionAndExit();
+        } else if (arg.find("=") != std::string::npos && arg.find("--") == 0) {
+            // Parse --key=value format
+            size_t equalsPos = arg.find("=");
+            std::string key = arg.substr(2, equalsPos - 2);
+            std::string value = arg.substr(equalsPos + 1);
+            config->set(key, value, ConfigSource::CommandLine);
+        } else if (arg.find("--") == 0) {
+            // Parse --key value format
+            std::string key = arg.substr(2);
+            if (i + 1 < argc) {
+                std::string value = argv[++i];
+                config->set(key, value, ConfigSource::CommandLine);
+            }
+        } else if (arg.find("-") == 0 && arg.length() > 1 && arg[1] != '-') {
+            // Parse -key value format (short options)
+            std::string key = arg.substr(1);
+            if (i + 1 < argc) {
+                std::string value = argv[++i];
+                config->set(key, value, ConfigSource::CommandLine);
+            }
+        } else if (arg == "--config") {
+            if (i + 1 < argc) {
                 configFile = argv[++i];
             }
         }
