@@ -147,8 +147,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
         
         // Determine if learning occurred
-        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
-                                (strengthened > 0 || weakened > 0);
+        bool learningOccurred = ((std::abs(finalMean - initialMean) > 0.001f) || ((strengthened > 0) || (weakened > 0)));
         
         NLM_LOG_INFO("");
         if (learningOccurred) {
@@ -214,6 +213,8 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     // Enable plasticity on synapses
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto& syn : region->getSynapses()) {
+            // Enable Hebbian and STDP plasticity (reward modulation disabled for this experiment)
+            // Parameters: (hebbian, stdp, rewardModulated)
             syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
         }
     }
