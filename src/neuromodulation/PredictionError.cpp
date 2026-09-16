@@ -19,6 +19,10 @@ PredictionError::PredictionError() : pImpl(new Impl) {}
 PredictionError::~PredictionError() = default;
 
 void PredictionError::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize PredictionError with null brain pointer");
+        return;
+    }
     pImpl->brain = brain;
     NLM_LOG_INFO("PredictionError system initialized");
 }

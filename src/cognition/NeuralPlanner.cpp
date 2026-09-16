@@ -23,6 +23,10 @@ NeuralPlanner::NeuralPlanner()
 NeuralPlanner::~NeuralPlanner() = default;
 
 void NeuralPlanner::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize NeuralPlanner with null brain pointer");
+        return;
+    }
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralPlanner initialized");

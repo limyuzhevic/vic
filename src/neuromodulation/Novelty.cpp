@@ -21,6 +21,10 @@ Novelty::Novelty() : pImpl(new Impl) {}
 Novelty::~Novelty() = default;
 
 void Novelty::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize Novelty with null brain pointer");
+        return;
+    }
     pImpl->brain = brain;
     NLM_LOG_INFO("Novelty detection initialized");
 }
@@ -70,7 +74,9 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
 
 void Novelty::update(TimestepDuration dt) {
     // Decay novelty
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    if (pImpl) {
+        pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    }
 }
 
 const std::vector<float>& Novelty::getHistory() const {

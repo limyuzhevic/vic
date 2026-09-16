@@ -77,6 +77,10 @@ void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
 }
 
 void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDuration dt) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot update DevelopmentSystem with null brain pointer");
+        return;
+    }
     age_ += dt;
     pImpl->stageAge += dt;
     ++pImpl->stepsInCurrentStage;

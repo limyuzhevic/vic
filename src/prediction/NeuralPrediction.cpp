@@ -42,6 +42,10 @@ NeuralPrediction::NeuralPrediction()
 NeuralPrediction::~NeuralPrediction() = default;
 
 void NeuralPrediction::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize NeuralPrediction with null brain pointer");
+        return;
+    }
     pImpl->brain = brain;
     brain_ = brain;
     

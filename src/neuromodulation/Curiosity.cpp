@@ -23,6 +23,10 @@ Curiosity::Curiosity() : pImpl(new Impl) {}
 Curiosity::~Curiosity() = default;
 
 void Curiosity::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize Curiosity with null brain pointer");
+        return;
+    }
     pImpl->brain = brain;
     NLM_LOG_INFO("Curiosity system initialized");
 }
