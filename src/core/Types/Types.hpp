@@ -179,14 +179,151 @@ enum class FiringState : uint8_t {
     Inhibited
 };
 
-// Generic handle types for efficiency
-using NeuronHandle = uint64_t;
-using SynapseHandle = uint64_t;
+// Prediction error information
+struct PredictionErrorEntry {
+    // Predicted sensory state
+    std::vector<float> predictedSensory;
+    
+    // Actual sensory state
+    std::vector<float> actualSensory;
+    
+    // Magnitude of prediction error (0 = perfect prediction)
+    float errorMagnitude;
+    
+    // Simulation step when error occurred
+    SimulationStep timestamp;
+    
+    // Relevance/urgency of this prediction error (0-1)
+    float relevance;
+    
+    PredictionErrorEntry()
+        : errorMagnitude(0.0f), timestamp(0), relevance(0.0f) {}
+};
 
-// Invalid ID sentinel
-constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
-constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
-constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
-constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
+// Structure for storing episode information
+struct EpisodicMemoryItem {
+    SimulationStep timestamp;
+    
+    // Sensory state at time of experience (encoded as activity pattern)
+    std::vector<float> sensoryState;
+    
+    // Location/position information
+    float positionX;
+    float positionY;
+    float orientation;
+    
+    // Action taken (if any)
+    ActionType action;
+    
+    // Internal state (energy, reward, etc.)
+    float reward;
+    float energy;
+    float novelty;
+    
+    // Consequence of action
+    std::vector<float> resultingSensoryState;
+    float resultingReward;
+    
+    // Associated neural activity pattern (who was firing)
+    std::vector<NeuronId> activeNeurons;
+    std::vector<float> neuronActivations;
+    
+    // Time since this episode
+    SimulationStep age;
+    
+    EpisodicMemoryItem()
+        : timestamp(0), positionX(0), positionY(0), orientation(0)
+        , action(ActionType::Wait)
+        , reward(0), energy(0), novelty(0)
+        , resultingReward(0), age(0) {}
+};
 
-} // namespace nlm
+// Neural representation of a concept
+struct DiscoveredConcept {
+    // Unique identifier
+    size_t id;
+    
+    // Central prototype pattern
+    std::vector<float> prototype;
+    
+    // Instances that belong to this concept
+    std::vector<ConceptInstance> instances;
+    
+    // Category label (derived from properties, not predefined)
+    // e.g., "edible", "dangerous", "rewarding"
+    std::string categoryHint;
+    
+    // Associated concepts (through associative memory)
+    std::vector<size_t> associatedConceptIds;
+    
+    // How many different instances this concept has absorbed
+    size_t totalObservations;
+    
+    // Average stability of instances
+    float avgStability;
+    
+    DiscoveredConcept() 
+        : id(0), totalObservations(0), avgStability(0) {}
+};
+
+// Concept instance representation
+struct ConceptInstance {
+    // The neural activity pattern representing this instance
+    std::vector<float> pattern;
+    
+    // Associated sensory features
+    std::vector<float> features;
+    
+    // How many times this instance has been observed
+    size_t observationCount;
+    
+    // Last time this was observed
+    SimulationStep lastObserved;
+    
+    // Average reward when this was observed
+    float avgReward;
+    
+    // Stability: how consistent is this pattern
+    float stability;
+    
+    ConceptInstance()
+        : observationCount(0), lastObserved(0), avgReward(0), stability(0) {}
+};
+
+// Place cell representation for spatial navigation
+struct PlaceCell {
+    NeuronId neuron;
+    float x;
+    float y;
+    float fieldRadius;
+    float activation;
+};
+
+// Sequence link for temporal relationships
+struct SequenceLink {
+    std::vector<float> fromEvent;
+    std::vector<float> toEvent;
+    float strength;
+    size_t observationCount;
+};
+
+// Communication signal for social learning
+struct CommunicationSignal {
+    std::vector<float> pattern;
+    float rewardValue;
+};
+
+// Observation of other agent's action
+struct ObservedEffect {
+    std::vector<float> state;
+    std::vector<float> resultingState;
+    float reward;
+};
+
+// Action effect for self-model
+struct ActionEffect {
+    std::vector<float> beforeState;
+    std::vector<float> afterState;
+    float confidence;
+    size_t observationCount;
+};

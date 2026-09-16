@@ -12,9 +12,9 @@
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
+#include "../cognition/SpatialRepresentation.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -229,21 +229,19 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
+// ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
+    // Initialize memory systems
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -255,9 +253,24 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    // Initialize NEW cognitive systems that were missing
+    pImpl->selfModel = std::make_unique<SelfModel>();
+    pImpl->selfModel->initialize(this);
+    
+    pImpl->socialLearning = std::make_unique<SocialLearning>();
+    pImpl->socialLearning->initialize(this);
+    
+    pImpl->spatialRepresentation = std::make_unique<SpatialRepresentation>();
+    pImpl->spatialRepresentation->initialize(this);
+    
+    // Initialize development system
+    pImpl->developmentSystem = std::make_unique<DevelopmentSystem>();
+    
+    // Initialize neuromodulation systems
+    pImpl->dopamine = std::make_unique<Dopamine>();
+    pImpl->curiosity = std::make_unique<Curiosity>();
+    pImpl->predictionError = std::make_unique<PredictionError>();
+    pImpl->novelty = std::make_unique<Novelty>();
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -401,42 +414,31 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
+    // ========== STEP 4.5: Store sensory prediction error ==========
+    if (pImpl->predictionSystem) {
+        // Connect prediction system to episodic memory
+        // The prediction system should compare its predictions with actual sensory input
+        // and create prediction error signals that can be stored in memory
+        
+        // For now, get current sensory observations from the working memory
+        // The episodic memory can store these predictions and errors for learning
+        if (pImpl->episodicMemory) {
+            // Create a prediction error entry
+            PredictionErrorEntry errorEntry;
+            errorEntry.predictedSensory = currentSensoryPattern;
+            errorEntry.actualSensory = currentSensoryPattern;  // Simplified - should get from world
+            errorEntry.errorMagnitude = 0.0f;  // Would be computed from prediction system
+            errorEntry.timestamp = currentStep;
+            errorEntry.relevance = 0.5f;  // Default relevance
+            
+            // Store prediction error in episodic memory
+            pImpl->episodicMemory->storePredictionError(errorEntry);
+        }
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
+    // Update attention based on prediction errors (novelty detection)
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
-    }
-    
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
-        
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
-                    }
-                }
-            }
-        }
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
