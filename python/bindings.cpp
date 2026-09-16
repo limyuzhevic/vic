@@ -400,21 +400,167 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        if (!brain) {
+            throw py::value_error("Cannot create AgentBrain with null brain pointer");
+        }
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create a new agent brain interface with validation");
+
+    // Add useful utility functions for developers
+    m.def("validateBrainConfiguration", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw py::value_error("Cannot validate null brain");
+        }
+        auto* region = brain->getRegion(RegionId(1));
+        if (!region) {
+            throw py::value_error("Brain has no valid regions");
+        }
+        
+        // Check for neurons
+        size_t totalNeurons = 0;
+        for (const auto& pop : region->getPopulations()) {
+            if (pop) {
+                totalNeurons += pop->getNeurons().size();
+            }
+        }
+        
+        return std::make_tuple(
+            brain->getTotalNeuronCount(),
+            brain->getTotalSynapseCount(),
+            totalNeurons,
+            brain->getFiringNeuronCount()
+        );
+    }, py::arg("brain"), "Validate brain configuration and return key statistics");
+
+    // Add convenience factory functions
+    m.def("createDefaultBrainWithWorld", []() {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize default brain");
+        }
+        return brain;
+    }, "Create a default configured brain with world");
+
+    // Add type checking helpers
+    m.def("isBrainHealthy", [](std::shared_ptr<Brain> brain) {
+        if (!brain) return false;
+        
+        // Check basic health metrics
+        size_t neuronCount = brain->getTotalNeuronCount();
+        size_t synapseCount = brain->getTotalSynapseCount();
+        
+        // Basic sanity checks
+        return neuronCount > 0 && 
+               (synapseCount > 0 || neuronCount == 1) &&  // Single neuron with no synapses is valid
+               brain->getFiringNeuronCount() <= neuronCount;
+    }, py::arg("brain"), "Check if brain is in a healthy state");
+
+    // Add timing utilities
+    m.def("measureBrainStepTime", [](std::shared_ptr<Brain> brain, SimulationStep step, double time, 
+                                    size_t numSteps = 100) {
+        if (!brain) {
+            throw py::value_error("Cannot measure time with null brain");
+        }
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (size_t i = 0; i < numSteps; ++i) {
+            brain->step(i, i * time / numSteps);
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        
+        return duration.count() / 1000.0; // Return milliseconds
+    }, py::arg("brain"), py::arg("step"), py::arg("time"), py::arg("numSteps") = 100,
+        "Measure average brain step time over multiple steps");
+
+    // Add debug and introspection tools
+    m.def("getBrainDebugInfo", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw py::value_error("Cannot get debug info for null brain");
+        }
+        
+        py::dict info;
+        
+        info["neuron_count"] = brain->getTotalNeuronCount();
+        info["synapse_count"] = brain->getTotalSynapseCount();
+        info["firing_neuron_count"] = brain->getFiringNeuronCount();
+        info["total_spike_count"] = brain->getTotalSpikeCount();
+        info["average_firing_rate"] = brain->getAverageFiringRate();
+        info["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        
+        // Add developmental stage
+        info["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        return info;
+    }, py::arg("brain"), "Get comprehensive debug information about the brain");
+
+    // Add error handling wrappers for common operations
+    m.def("safeBrainStep", [](std::shared_ptr<Brain> brain, SimulationStep step, double time) {
+        if (!brain) {
+            throw py::value_error("Cannot step with null brain");
+        }
+        
+        try {
+            brain->step(step, time);
+            return true;
+        } catch (const std::exception& e) {
+            throw py::runtime_error(std::string("Brain step failed: ") + e.what());
+        }
+    }, py::arg("brain"), py::arg("step"), py::arg("time"), 
+        "Safely step the brain with error handling");
+
+    // Add convenience constants for common values
+    m.attr("DEFAULT_BRAIN_NEURONS") = 500;
+    m.attr("DEFAULT_WORLD_WIDTH") = 20;
+    m.attr("DEFAULT_WORLD_HEIGHT") = 20;
+    m.attr("DEFAULT_VISION_SIZE") = 16;
+    m.attr("DEFAULT_MAX_SPIKES_PER_STEP") = 100;
+
+    // Add logging helper
+    m.def("enableBrainLogging", []() {
+        auto logger = std::make_shared<Logger>();
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+        logger->addLogger(consoleLogger);
+        Logger::setGlobal(logger);
+        return true;
+    }, "Enable console logging for brain operations");
+
+    // Add configuration preset functions
+    m.def("createVisualConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+        config->set("connection_probability", 0.2f, ConfigSource::Default);
+        return config;
+    }, "Create a visual simulation configuration");
+
+    m.def("createMemoryIntensiveConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(123), ConfigSource::Default);
+        config->set("simulation_timestep", 0.0005, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(5), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.009f, ConfigSource::Default);
+        return config;
+    }, "Create a memory-intensive configuration with enhanced learning");
+
+    m.def("createFastTestingConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(999), ConfigSource::Default);
+        config->set("simulation_timestep", 0.01, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.3f, ConfigSource::Default);
+        return config;
+    }, "Create a fast testing configuration for quick experiments");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

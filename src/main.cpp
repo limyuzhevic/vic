@@ -25,8 +25,29 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
+#include <functional>
 
 using namespace nlm;
+
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+#include <iomanip>
+#include <numeric>
+#include <chrono>
+#include <functional>
+#include <algorithm>  // Added for std::min, std::max
+#include <stdexcept>  // Added for std::runtime_error
+
+using namespace nlm;
+
+// Forward declarations
+void printBanner();
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain);
+void runPlasticityExperiment(std::shared_ptr<Brain> brain);
+void runStdpVerification(std::shared_ptr<Brain> brain);
 
 void printBanner() {
     std::cout << R"(
@@ -39,12 +60,38 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics            ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     - STDP and Hebbian plasticity rules                        ║
+    ║     - Structural plasticity                                     ║
     ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    ╚═════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+}
+
+void printBanner();
+
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain);
+void runPlasticityExperiment(std::shared_ptr<Brain> brain);
+void runStdpVerification(std::shared_ptr<Brain> brain);
+
+void printBanner() {
+    std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Phase 2: Real Neural Computation                         ║
+    ║                                                               ║
+    ║     An experimental artificial developmental brain.            ║
+    ║     This phase implements:                                    ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics            ║
+    ║     - Event-driven spike propagation                          ║
+    ║     - STDP and Hebbian plasticity rules                        ║
+    ║     - Structural plasticity                                     ║
+    ║                                                               ║
+    ╚═════════════════════════════════════════════════════════════╝
     )" << std::endl;
 }
 
@@ -160,12 +207,23 @@ struct LearningExperiment {
 };
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
+    // Validate brain pointer
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot run connectivity test: null brain pointer");
+        return;
+    }
+    
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Could not get region 1 for connectivity test");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -178,11 +236,17 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
+    size_t neuronsInjected = 0;
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        if (neurons[i]) {
+            neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+            neuronsInjected++;
+        }
     }
+    NLM_LOG_INFO("  Successfully injected current into " + std::to_string(neuronsInjected) + " neurons");
     
     // Run a few steps
+    NLM_LOG_INFO("  Running simulation steps...");
     for (SimulationStep step = 0; step < 50; ++step) {
         brain->step(step, step * 0.001);
     }
@@ -190,14 +254,20 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
     NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
     
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    NLM_LOG_INFO("  Test completed in " + std::to_string(duration.count()) + " ms");
+    
     if (spikes > 0) {
         NLM_LOG_INFO("  ✓ Spikes propagate through network");
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            if (neurons[i]) {
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                            " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                            " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            }
         }
     }
 }
@@ -245,12 +315,21 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
-void runStdpVerification(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
+    // Validate brain pointer
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot run STDP test: null brain pointer");
+        return;
+    }
+    
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Could not get region 1 for STDP test");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
@@ -261,13 +340,24 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     
     NLM_LOG_INFO("  Testing STDP on 5 synapses:");
     
-    // Record initial weights
+    // Record initial weights with validation
     std::vector<float> beforeWeights;
+    size_t synapsesConfigured = 0;
     for (size_t i = 0; i < 5; ++i) {
-        beforeWeights.push_back(synapses[i]->getWeight());
-        synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+        if (synapses[i]) {
+            beforeWeights.push_back(synapses[i]->getWeight());
+            synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
+            NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
+                        " before: " + std::to_string(beforeWeights[i]));
+            synapsesConfigured++;
+        } else {
+            NLM_LOG_WARNING("Null synapse encountered during STDP test");
+        }
+    }
+    
+    if (synapsesConfigured == 0) {
+        NLM_LOG_ERROR("No valid synapses for STDP test");
+        return;
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -281,8 +371,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         
         auto neurons = region->getAllNeurons();
         if (neurons.size() >= 2) {
-            preNeuron = neurons[0];
-            postNeuron = neurons[1];
+            preNeuron = neurons[0].get();
+            postNeuron = neurons[1].get();
         }
         
         if (preNeuron && postNeuron) {
@@ -298,20 +388,25 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     
     // Record after weights
     NLM_LOG_INFO("  After correlated activity:");
-    for (size_t i = 0; i < 5; ++i) {
-        float delta = synapses[i]->getWeight() - beforeWeights[i];
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
-    }
-    
-    // Check if weights increased (LTP)
     float totalDelta = 0.0f;
-    for (size_t i = 0; i < 5; ++i) {
-        totalDelta += synapses[i]->getWeight() - beforeWeights[i];
+    size_t weightsRecorded = 0;
+    for (size_t i = 0; i < beforeWeights.size(); ++i) {
+        if (synapses[i]) {
+            float delta = synapses[i]->getWeight() - beforeWeights[i];
+            NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
+            totalDelta += delta;
+            weightsRecorded++;
+        }
     }
     
     NLM_LOG_INFO("");
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    NLM_LOG_INFO("  Test completed in " + std::to_string(duration.count()) + " ms (recorded " + 
+                 std::to_string(weightsRecorded) + "/5 weights)");
+    
     if (totalDelta > 0.001f) {
         NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
     } else if (totalDelta < -0.001f) {

@@ -70,6 +70,16 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
+    // Helper methods
+    void initializeNeuronGroups();
+    void logInitializationStats() const;
+    void processVisionInput(const std::vector<float>& vision);
+    void processTouchInput(const std::vector<float>& touch);
+    void processInternalInput(const std::vector<float>& intern);
+    void processProprioceptionInput(const std::vector<float>& proprio);
+    void computeNovelty(const std::vector<float>& vision);
+    void updateCuriosity();
+    
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
