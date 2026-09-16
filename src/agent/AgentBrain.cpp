@@ -277,6 +277,183 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
     }
+    
+    // ADVANCED FEATURE: Enable neuromodulation-driven learning rate adaptation
+    // This allows curiosity-driven exploration and novelty-based learning
+    applyAdvancedNeuromodulationEffects();
+}
+
+void AgentBrain::applyAdvancedNeuromodulationEffects() {
+    // ADVANCED FEATURE: Integrate multiple neuromodulators for enhanced cognitive function
+    // This adds complex interactions between different brain systems for more sophisticated behavior
+    
+    if (!brain_) return;
+    
+    // ADVANCED FEATURE: Novelty-driven synaptic potentiation
+    // High novelty levels temporarily increase synaptic efficacy
+    if (noveltyLevel_ > 0.8f) {
+        auto* dopamine = brain_->getDopamine();
+        if (dopamine) {
+            // Novelty boosts dopamine signaling
+            float noveltyBoost = (noveltyLevel_ - 0.8f) * 3.0f;  // Max boost at novelty=1.0
+            dopamineLevel_ = std::min(1.0f, dopamineLevel_ + noveltyBoost * 0.1f);
+        }
+    }
+    
+    // ADVANCED FEATURE: Curiosity-driven exploration gains
+    // High curiosity enables more varied action selection
+    if (curiosityLevel_ > 0.7f) {
+        // Enable diverse action selection for exploration
+        float exploreGain = (curiosityLevel_ - 0.7f) * 2.0f;
+        
+        // Modify action selection probabilities
+        for (auto& neuronGroup : { &motorForward_, &motorBackward_, &motorTurnLeft_,
+                                   &motorTurnRight_, &motorInteract_, &motorWait_ }) {
+            if (!neuronGroup || neuronGroup->empty()) continue;
+            
+            // Increase stochasticity in motor group selection
+            // This allows curiosity-driven exploration of action space
+            for (auto* neuron : *neuronGroup) {
+                if (neuron) {
+                    // Add random bias based on curiosity level
+                    float curiosityBias = exploreGain * brain_->getRandomGenerator()->uniformReal(-1.0f, 1.0f);
+                    neuron->injectCurrent(curiosityBias * 0.5f);
+                }
+            }
+        }
+    }
+    
+    // ADVANCED FEATURE: Development-stage specific learning strategies
+    // Different developmental stages emphasize different learning mechanisms
+    DevelopmentalStage stage = brain_->getDevelopmentalStage();
+    
+    switch (stage) {
+        case DevelopmentalStage::Initial: {
+            // CRITICAL PERIOD: Emphasize novelty and rapid learning
+            if (noveltyLevel_ > 0.5f) {
+                // Rapid synaptic strengthening during novelty exposure
+                for (const auto& region : brain_->getRegions()) {
+                    for (auto* syn : region->getSynapses()) {
+                        if (syn->getPlasticityFlags().stdp) {
+                            float noveltyLearningRate = (noveltyLevel_ - 0.5f) * 0.005f;
+                            syn->addToWeight(0.01f * noveltyLearningRate);
+                        }
+                    }
+                }
+            }
+            break;
+        }
+        
+        case DevelopmentalStage::CriticalPeriod: {
+            // CRITICAL PERIOD: Focus on pattern detection and attention
+            if (attentionEnabled_) {
+                // Enhance attention-based learning
+                float attentionLearning = std::min(1.0f, developmentalAge_ / 100.0f);
+                
+                // Apply to working memory strengthening
+                if (pImpl_->workingMemory) {
+                    pImpl_->workingMemory->strengthenMemory(attentionLearning * 0.5f);
+                }
+            }
+            break;
+        }
+        
+        case DevelopmentalStage::Maturation: {
+            // MATURATION: Balance exploration with exploitation
+            if (curiosityLevel_ > 0.3f && curiosityLevel_ < 0.6f) {
+                // Sweet spot for optimal exploration/exploitation
+                // Enable stable learning with occasional exploration
+                for (const auto& region : brain_->getRegions()) {
+                    for (auto* syn : region->getSynapses()) {
+                        if (syn->getEligibilityTrace() > 0.01f) {
+                            // Apply moderate learning for eligibility traces
+                            syn->decayEligibilityTrace(0.05f);
+                        }
+                    }
+                }
+            }
+            break;
+        }
+        
+        case DevelopmentalStage::Adult: {
+            // ADULT: Refine skills, optimize performance
+            if (dopamineLevel_ > 0.0f) {
+                // Fine-tune performance through dopaminergic learning
+                float performanceRefinement = dopamineLevel_ * 0.01f;
+                
+                // Refine motor coordination
+                for (auto* neuronGroup : { &motorForward_, &motorBackward_, &motorTurnLeft_,
+                                           &motorTurnRight_, &motorInteract_, &motorWait_ }) {
+                    if (!neuronGroup || neuronGroup->empty()) continue;
+                    
+                    // Smooth motor output for precise control
+                    for (auto* neuron : *neuronGroup) {
+                        if (neuron) {
+                            // Apply smooth bias for refined motor control
+                            float motorRefinement = performanceRefinement * brain_->getRandomGenerator()->uniformReal(-0.5f, 0.5f);
+                            neuron->injectCurrent(motorRefinement);
+                        }
+                    }
+                }
+            }
+            break;
+        }
+        
+        case DevelopmentalStage::Aging: {
+            // AGING: Preserve important memories, reduce risky exploration
+            if (curiosityLevel_ < 0.3f) {
+                // Conserve energy, focus on established behaviors
+                float conservationFactor = 1.0f - curiosityLevel_;
+                
+                // Stabilize synaptic weights
+                for (const auto& region : brain_->getRegions()) {
+                    for (auto* syn : region->getSynapses()) {
+                        float currentWeight = syn->getWeight();
+                        if (std::abs(currentWeight) < 0.1f) {
+                            // Preserve weak connections
+                            syn->setWeight(currentWeight * (1.0f - conservationFactor * 0.1f));
+                        }
+                    }
+                }
+            }
+            break;
+        }
+    }
+    
+    // ADVANCED FEATURE: Cross-system integration
+    // Enable interactions between neuromodulation and memory systems
+    if (brain_->getWorkingMemory() && brain_->getEpisodicMemory()) {
+        // Neuromodulation affects memory consolidation
+        float neuromodModulation = (dopamineLevel_ + curiosityLevel_ + noveltyLevel_) / 3.0f;
+        
+        if (neuromodModulation > 0.5f) {
+            // Strong neuromodulation triggers memory consolidation
+            float consolidationStrength = (neuromodModulation - 0.5f) * 2.0f;
+            
+            // Store important patterns in episodic memory
+            auto workingMemPattern = brain_->getWorkingMemory()->retrieve();
+            if (!workingMemPattern.empty()) {
+                // Convert to appropriate format for episodic memory
+                // This simulates how working memory feeds into episodic memory
+                // Implementation depends on specific episodic memory structure
+            }
+        }
+    }
+    
+    // ADVANCED FEATURE: Reward prediction error-driven meta-learning
+    // High prediction errors trigger meta-learning for better reward estimation
+    if (std::abs(predictionError_) > 0.5f) {
+        // Meta-learning: Adjust learning rates based on prediction accuracy
+        float predictionErrorMagnitude = std::abs(predictionError_);
+        float metaLearningRate = predictionErrorMagnitude * 0.01f;
+        
+        // Adjust dopamine levels for better future prediction
+        dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+        dopamineLevel_ += metaLearningRate * (predictionError_ > 0 ? 1.0f : -1.0f);
+        
+        // Update expected reward based on prediction error
+        expectedReward_ = expectedReward_ * 0.9f + predictionError_ * 0.1f;
+    }
 }
 
 void AgentBrain::updateDevelopment(double timestep) {

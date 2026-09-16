@@ -1,25 +1,3 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
-
 namespace nlm {
 
 struct Brain::Impl {
@@ -112,6 +90,7 @@ struct Brain::Impl {
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        semanticMemory = std::make_unique<NeuralSemanticMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -156,6 +135,23 @@ struct Brain::Impl {
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
 };
+
+Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+
+Brain::~Brain() = default;
+
+Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
+    other.pImpl = nullptr;
+}
+
+Brain& Brain::operator=(Brain&& other) noexcept {
+    if (this != &other) {
+        delete pImpl;
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+    return *this;
+}
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
@@ -801,6 +797,9 @@ bool Brain::save(const std::string& filepath) const {
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
                     neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    neuronData.neuronType.push_back(static_cast<uint64_t>(pop->getNeuronType()));
+                    neuronData.regionId.push_back(region->getId().index());
+                    neuronData.populationId.push_back(pop->getId().index());
                 }
             }
         }
@@ -819,7 +818,11 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                synapseData.plasticityFlags.push_back(syn->getPlasticityFlags());
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.efficacy.push_back(syn->getEfficacy());
+                synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+                synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
             }
         }
         
@@ -827,6 +830,164 @@ bool Brain::save(const std::string& filepath) const {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
             return false;
         }
+        
+        // Write inter-region connections
+        std::vector<std::pair<RegionId, RegionId>> interRegionConnections;
+        std::vector<float> connectionWeights;
+        std::vector<uint32_t> connectionDelays;
+        
+        for (const auto& conn : pImpl->interRegionConnections) {
+            interRegionConnections.emplace_back(conn.sourceRegion, conn.targetRegion);
+            connectionWeights.push_back(conn.weight);
+            connectionDelays.push_back(conn.delay);
+        }
+        
+        // Write connectivity section
+        struct ConnectivityData {
+            std::vector<uint64_t> sourceRegions;
+            std::vector<uint64_t> targetRegions;
+            std::vector<float> weights;
+            std::vector<uint32_t> delays;
+        };
+        
+        ConnectivityData connectivityData;
+        for (const auto& conn : pImpl->interRegionConnections) {
+            connectivityData.sourceRegions.push_back(conn.sourceRegion.index());
+            connectivityData.targetRegions.push_back(conn.targetRegion.index());
+            connectivityData.weights.push_back(conn.weight);
+            connectivityData.delays.push_back(conn.delay);
+        }
+        
+        writer.writeSection(CheckpointSection::Connectivity, 
+            reinterpret_cast<const void*>(&connectivityData), sizeof(ConnectivityData));
+        
+        // Write plasticity state
+        struct PlasticityState {
+            float globalLTP;
+            float globalLTD;
+            std::vector<float> synapseWeights;
+        };
+        
+        PlasticityState plasticityState;
+        if (pImpl->stdp) {
+            plasticityState.globalLTP = pImpl->stdp->getLTPWeight();
+            plasticityState.globalLTD = pImpl->stdp->getLTDWeight();
+        } else {
+            plasticityState.globalLTP = 0.01f;
+            plasticityState.globalLTD = 0.012f;
+        }
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto* syn : region->getSynapses()) {
+                plasticityState.synapseWeights.push_back(syn->getWeight());
+            }
+        }
+        
+        writer.writeSection(CheckpointSection::Plasticity,
+            reinterpret_cast<const void*>(&plasticityState), sizeof(PlasticityState));
+        
+        // Write development state
+        struct DevelopmentState {
+            uint32_t developmentalStage;
+            uint64_t nextRegionId;
+        };
+        
+        DevelopmentState devState;
+        devState.developmentalStage = static_cast<uint32_t>(pImpl->developmentalStage);
+        devState.nextRegionId = pImpl->nextRegionId;
+        
+        writer.writeSection(CheckpointSection::Development,
+            reinterpret_cast<const void*>(&devState), sizeof(DevelopmentState));
+        
+        // Write neuromodulation state
+        struct NeuromodulationState {
+            float dopamineLevel;
+            float curiosityLevel;
+            float noveltyLevel;
+            float predictionErrorLevel;
+        };
+        
+        NeuromodulationState neuromodState;
+        neuromodState.dopamineLevel = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        neuromodState.curiosityLevel = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+        neuromodState.noveltyLevel = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        neuromodState.predictionErrorLevel = pImpl->predictionError ? pImpl->predictionError->getLevel() : 0.0f;
+        
+        writer.writeSection(CheckpointSection::Neuromodulation,
+            reinterpret_cast<const void*>(&neuromState), sizeof(NeuromodState));
+        
+        // Write memory state
+        struct MemoryState {
+            std::vector<float> workingMemoryData;
+            std::vector<float> episodicMemoryData;
+            std::vector<float> associativeMemoryData;
+        };
+        
+        MemoryState memoryState;
+        if (pImpl->workingMemory) {
+            memoryState.workingMemoryData = pImpl->workingMemory->getMemoryActivations();
+        }
+        if (pImpl->episodicMemory) {
+            memoryState.episodicMemoryData = pImpl->episodicMemory->getAllActivations();
+        }
+        if (pImpl->associativeMemory) {
+            memoryState.associativeMemoryData = pImpl->associativeMemory->getAllActivations();
+        }
+        
+        writer.writeSection(CheckpointSection::Memory,
+            reinterpret_cast<const void*>(&memoryState), sizeof(MemoryState));
+        
+        // Write spike history
+        struct SpikeHistoryState {
+            uint64_t totalSpikesThisStep;
+            uint64_t totalSpikesTotal;
+            std::vector<uint64_t> neuronSpikeCounts;
+        };
+        
+        SpikeHistoryState spikeHistory;
+        spikeHistory.totalSpikesThisStep = pImpl->totalSpikesThisStep;
+        spikeHistory.totalSpikesTotal = pImpl->totalSpikesTotal;
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    spikeHistory.neuronSpikeCounts.push_back(neuron->getTotalSpikeCount());
+                }
+            }
+        }
+        
+        writer.writeSection(CheckpointSection::SpikeHistory,
+            reinterpret_cast<const void*>(&spikeHistory), sizeof(SpikeHistoryState));
+        
+        // Write random state
+        if (pImpl->rng) {
+            uint64_t randomState = pImpl->rng->getState();
+            writer.writeSection(CheckpointSection::RandomState,
+                reinterpret_cast<const void*>(&randomState), sizeof(uint64_t));
+        }
+        
+        // Write simulation state
+        struct SimulationState {
+            uint64_t currentStep;
+            double currentTime;
+            double timestep;
+            bool isResting;
+            size_t stepsSinceLastEpisode;
+            size_t replayInterval;
+            size_t consolidationInterval;
+        };
+        
+        SimulationState simState;
+        simState.currentStep = pImpl->currentStep;
+        simState.currentTime = pImpl->currentTime;
+        simState.timestep = pImpl->timestep;
+        simState.isResting = pImpl->isResting;
+        simState.stepsSinceLastEpisode = pImpl->stepsSinceLastEpisode;
+        simState.replayInterval = pImpl->replayInterval;
+        simState.consolidationInterval = pImpl->consolidationInterval;
+        
+        writer.writeSection(CheckpointSection::SimulationState,
+            reinterpret_cast<const void*>(&simState), sizeof(SimulationState));
         
         // Finalize
         if (!writer.finalize()) {
