@@ -43,7 +43,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create simple world
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.configure(16, 16, 16, 16);  // width, height, visionWidth, visionHeight
+    world.reset();  // This is required to initialize the world
     
     // Create agent
     AgentBrain agent(brain);
@@ -61,23 +62,24 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Update world time
+        world.update(0.001);
+        
+        // Get sensory perception (use getSensoryPercept() which exists in SimpleWorld)
+        const SensoryPercept& percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
         
         // Brain step
-        brain->step(step, step * 0.001);
+        brain->step(step, world.getSimulationTime());
         
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
-        
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Apply action to world (use applyMotorCommand() which exists in SimpleWorld)
+        ActionResult rewardResult = world.applyMotorCommand(cmd, world.getSimulationTime());
+        float reward = rewardResult.reward;
         totalReward += reward;
         
         // Apply reward modulation
@@ -363,7 +365,7 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     return true;
 }
 
-bool Phase6IntegratedExperiment::testReplay() {
+    bool Phase6IntegratedExperiment::testReplay() {
     NLM_LOG_INFO("=== Testing Replay System ===");
     
     auto cfg = std::make_shared<Config>();
