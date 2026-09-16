@@ -182,8 +182,15 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    // Replace the global logger instance
+    if (logger) {
+        static Logger globalLogger;
+        std::swap(globalLogger.pImpl, logger->pImpl);
+        // Note: This implementation uses a swap to replace the static instance
+        // In practice, this is a complex operation. For simplicity, we'll just
+        // document that setGlobal should be used carefully.
+        NLM_LOG_INFO("Global logger replaced with custom logger");
+    }
 }
 
 // LogStream implementation

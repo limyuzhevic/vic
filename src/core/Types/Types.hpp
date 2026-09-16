@@ -109,18 +109,29 @@ enum class SynapseType : uint8_t {
     GapJunction
 };
 
-// Synaptic plasticity state flags
-struct PlasticityFlags {
-    bool hebbian : 1;
-    bool stdp : 1;
-    bool reward_modulated : 1;
-    bool structural : 1;
-    bool eligible : 1;
-    
-    constexpr PlasticityFlags() : hebbian(false), stdp(false), 
-                                  reward_modulated(false), structural(false), 
-                                  eligible(false) {}
+// Brain type enumeration
+enum class BrainType : uint8_t {
+    Standard,
+    Developmental,
+    Adult
 };
+
+// Brain identifier
+struct BrainId {
+    uint64_t value;
+    
+    constexpr BrainId() : value(0) {}
+    explicit constexpr BrainId(uint64_t v) : value(v) {}
+    
+    constexpr bool operator==(const BrainId& other) const = default;
+    constexpr bool operator!=(const BrainId& other) const = default;
+    constexpr bool operator<(const BrainId& other) const { return value < other.value; }
+    
+    constexpr uint64_t index() const { return value; }
+};
+
+// Invalid ID sentinel
+constexpr BrainId INVALID_BRAIN_ID = BrainId(UINT64_MAX);
 
 // Developmental state
 enum class DevelopmentalStage : uint8_t {
