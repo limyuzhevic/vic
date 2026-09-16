@@ -69,6 +69,13 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Utility functions for neuron group management
+    void clearNeuronGroups();
+    bool isNeuronInGroup(Neuron* neuron) const;
+    size_t getTotalMotorNeurons() const;
+    size_t getTotalSensoryNeurons() const;
+    void logGroupStats() const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
