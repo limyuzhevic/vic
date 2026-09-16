@@ -414,14 +414,20 @@ int main(int argc, char** argv) {
     
     // Reset brain for plasticity experiment
     brain->reset();
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to reinitialize brain for plasticity experiment!");
+        return 1;
+    }
     
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
     // Reset and run Test 3: STDP verification
     brain->reset();
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to reinitialize brain for STDP test!");
+        return 1;
+    }
     runStdpVerification(brain);
     
     // Final brain status
