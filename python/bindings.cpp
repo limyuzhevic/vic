@@ -367,11 +367,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
+              py::arg("reward"), py::arg("predictedReward"),
+              "Apply reward-based neuromodulation")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
+              py::arg("timestep"),
+              "Update development system")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
@@ -388,13 +388,13 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)

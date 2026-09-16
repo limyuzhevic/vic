@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,13 +20,26 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to parse as JSON first
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
+    
+    // Check if file is JSON (starts with { or [
+    file.seekg(0, std::ios::beg);
+    char firstChar;
+    file.get(firstChar);
+    file.seekg(0, std::ios::beg);
+    
+    if (firstChar == '{' || firstChar == '[') {
+        // Parse as JSON
+        return loadFromJson(filepath);
+    }
+    
+    // Try legacy key=value format
+    file.clear();
+    file.seekg(0, std::ios::beg);
     
     std::string line;
     while (std::getline(file, line)) {
@@ -52,6 +66,100 @@ bool Config::loadFromFile(const std::string& filepath) {
         }
     }
     
+    return true;
+}
+
+bool Config::loadFromJson(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Convert JSON to Config entries
+        convertJsonToConfig(jsonData, ConfigSource::File);
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+void Config::convertJsonToConfig(const nlohmann::json& json, ConfigSource source) {
+    if (json.is_object()) {
+        for (const auto& [key, value] : json.items()) {
+            setFromJson(key, value, source);
+        }
+    } else if (json.is_array()) {
+        // Handle array as a single value (for backward compatibility)
+        set("json_array", json.dump(), source);
+    }
+}
+
+void Config::setFromJson(const std::string& key, const nlohmann::json& value, ConfigSource source) {
+    if (value.is_string()) {
+        set(key, value.get<std::string>(), source);
+    } else if (value.is_number_integer()) {
+        set(key, value.get<int64_t>(), source);
+    } else if (value.is_number_float()) {
+        set(key, value.get<double>(), source);
+    } else if (value.is_boolean()) {
+        set(key, value.get<bool>(), source);
+    } else if (value.is_array()) {
+        // Convert array to string representation
+        std::string arrayStr = "[";
+        for (size_t i = 0; i < value.size(); ++i) {
+            if (i > 0) arrayStr += ",";
+            arrayStr += value[i].dump();
+        }
+        arrayStr += "]";
+        set(key, arrayStr, source);
+    } else {
+        // Handle other JSON types (null, object) as string
+        set(key, value.dump(), source);
+    }
+}
+
+bool Config::loadFromYaml(const std::string& filepath) {
+    // For simplicity, read file and treat as JSON if valid JSON,
+    // otherwise treat as simple key=value format
+    return loadFromFile(filepath);
+}
+
+bool Config::saveToJson(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    nlohmann::json jsonData;
+    
+    for (const auto& entry : pImpl->entries) {
+        std::visit([&jsonData, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, int>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                jsonData[entry.key] = arg;
+            }
+        }, entry.value);
+    }
+    
+    file << jsonData.dump(4); // Pretty print with 4-space indentation
     return true;
 }
 
@@ -188,7 +296,7 @@ std::string Config::summary() const {
 
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
+    if (start == std::npos) return "";
     size_t end = str.find_last_not_of(" \t\r\n");
     return str.substr(start, end - start + 1);
 }
