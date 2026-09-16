@@ -65,9 +65,10 @@ struct Brain::Impl {
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
     
+    // Last sensory input for prediction
+    std::unique_ptr<SensoryInput> lastSensoryInput;
+    
     // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
@@ -92,6 +93,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , lastSensoryInput(nullptr)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -511,8 +513,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state from last input (stored in pImpl)
+        if (pImpl->lastSensoryInput) {
+            auto predicted = pImpl->predictionSystem->predictNextState(*pImpl->lastSensoryInput);
+            // Update prediction with actual sensory input
+            pImpl->predictionSystem->updatePredictions(predicted, *pImpl->lastSensoryInput);
+            // Store prediction in working memory for access by attention
+            pImpl->workingMemory->storePrediction(predicted);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,9 +535,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Process current working memory content to form concepts
+        // Convert neural activity to features for concept formation
+        std::vector<float> memoryPattern = pImpl->workingMemory->retrieve();
+        
+        if (!memoryPattern.empty()) {
+            // Extract features from memory pattern
+            std::vector<float> features;
+            features.reserve(memoryPattern.size());
+            
+            // Simple feature extraction: extract patterns of activation
+            float maxActivation = 0.0f;
+            for (float activation : memoryPattern) {
+                features.push_back(activation);
+                maxActivation = std::max(maxActivation, activation);
+            }
+            
+            // Only process if there's significant activity
+            if (maxActivation > 0.1f) {
+                // Get reward from dopamine for concept formation
+                float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                
+                // Present to concept formation system
+                size_t conceptId = pImpl->conceptFormation->presentExperience(
+                    memoryPattern, features, reward, pImpl->currentTime);
+                
+                // Store concept ID in working memory for access by planner
+                if (conceptId > 0) {
+                    pImpl->workingMemory->storeConcept(conceptId);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -589,6 +626,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
+    // Store last sensory input for prediction system
+    pImpl->lastSensoryInput = std::make_unique<SensoryInput>(input);
+    
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     
@@ -690,9 +730,27 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Use NeuralPlanner for intelligent action selection
+    if (pImpl->planner && pImpl->workingMemory) {
+        // Get current working memory as state for planning
+        std::vector<float> currentState = pImpl->workingMemory->retrieve();
+        
+        // Get target reward from dopamine level
+        float targetReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Plan an action
+        ActionType actionType = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Create action
+        auto action = std::make_unique<Action>(actionType);
+        
+        // Let the planner know we took an action (for learning)
+        pImpl->planner->updatePlanQuality({actionType}, {actionType}, targetReward);
+        
+        return action;
+    }
     
+    // Fallback to simple action selection based on motor neuron activity
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
@@ -712,7 +770,6 @@ std::unique_ptr<class Action> Brain::produceAction() {
     }
     
     auto action = std::make_unique<Action>(type);
-    
     return action;
 }
 

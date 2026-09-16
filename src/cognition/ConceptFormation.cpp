@@ -197,15 +197,12 @@ float ConceptFormation::getConceptStability(size_t conceptId) const {
 }
 
 void ConceptFormation::mergeConcepts(size_t conceptA, size_t conceptB) {
-    DiscoveredConcept* a = nullptr;
-    DiscoveredConcept* b = nullptr;
-    
+    DiscoveredConcept* concept = nullptr;
     for (auto& c : concepts_) {
-        if (c.id == conceptA) a = &c;
-        if (c.id == conceptB) b = &c;
+        if (c.id == conceptId) concept = &c;
     }
     
-    if (!a || !b) return;
+    if (!concept) return;
     
     // Merge B into A
     for (const auto& instance : b->instances) {

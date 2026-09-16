@@ -58,35 +58,41 @@ public:
     // Decay rate for memory traces
     float getDecayRate() const { return decayRate_; }
     void setDecayRate(float rate) { decayRate_ = rate; }
-
+    
     // Get neurons currently in working memory
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
-
+    
     // Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);
-
+    
     // Competition between memory traces
     void runCompetition();
-
+    
     // Is this neuron part of the winning population?
     bool isWinning(NeuronId neuron) const;
-
+    
     // Get overall memory activity level
     float getMemoryActivity() const;
-
+    
+    // Store concept ID in working memory for access by higher cognitive systems
+    void storeConcept(size_t conceptId);
+    
+    // Retrieve concept IDs from working memory
+    std::vector<size_t> retrieveConcepts() const;
+    
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
-
+    
     // Update recurrent connections for maintenance
     void updateRecurrentConnections();
-
+    
     // Decay weak memory traces
     void decayWeakTraces();
-
+    
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-
+    
     Brain* brain_;
     size_t capacity_;
     float decayRate_;
@@ -98,6 +104,9 @@ private:
     
     // Active memory traces
     std::vector<size_t> activeTraces_;
+    
+    // Concepts stored in working memory
+    std::vector<size_t> conceptIds_;
     
     // Recurrent connections for maintenance
     std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
