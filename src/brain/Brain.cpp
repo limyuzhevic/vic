@@ -15,6 +15,8 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -40,6 +42,10 @@ struct Brain::Impl {
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    
+    // ========== SELF AND SOCIAL SYSTEMS ==========
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -120,6 +126,10 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        
+        // Initialize self and social systems
+        selfModel = std::make_unique<SelfModel>();
+        socialLearning = std::make_unique<SocialLearning>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -515,7 +525,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // For now, just track prediction error history
     }
     
-    // ========== STEP 9: Update attention system ==========
+    // Update attention system
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -523,6 +533,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+        }
+    }
+
+    // Apply attention to memory systems - select most relevant traces
+    if (pImpl->attention && pImpl->workingMemory) {
+        // Use attention to modulate working memory storage and retrieval
+        std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        if (!memoryNeurons.empty()) {
+            // Attention system selects winners among memory traces
+            pImpl->attention->processMemorySelection(memoryNeurons);
+        }
+    }
+
+    // Update concept formation with attentional focus
+    if (pImpl->conceptFormation) {
+        // Concept formation uses attentional focus to identify patterns
+        if (pImpl->attention) {
+            pImpl->conceptFormation->setAttentionSignal(pImpl->attention->getFocusSignal());
         }
     }
     
@@ -895,9 +923,22 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - find matching synapses and restore their state
+        for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+            // Try to find the synapse with matching source and destination neurons
+            for (auto& region : pImpl->regions) {
+                for (auto* syn : region->getSynapses()) {
+                    if (syn->getSourceNeuron().index() == synapseData.sourceNeuron[i] &&
+                        syn->getDestinationNeuron().index() == synapseData.destinationNeuron[i]) {
+                        // Restore synapse state
+                        syn->setWeight(synapseData.weight[i]);
+                        syn->setDelay(synapseData.delay[i]);
+                        syn->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                        break;
+                    }
+                }
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -1051,22 +1092,14 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;
 }
 
-// ========== NEUROMODULATION SYSTEMS ==========
+// ========== SELF AND SOCIAL SYSTEM ACCESSORS ==========
 
-Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
+SelfModel* Brain::getSelfModel() {
+    return pImpl->selfModel.get();
 }
 
-Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
-}
-
-Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
-}
-
-PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
+SocialLearning* Brain::getSocialLearning() {
+    return pImpl->socialLearning.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
