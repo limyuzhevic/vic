@@ -130,27 +130,77 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
+        // Configure STDP parameters with validation
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
         float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
         
-        // Configure structural plasticity
+        // Validate STDP parameters
+        if (ltpWeight <= 0.0f) {
+            NLM_LOG_WARNING("Invalid STDP LTP weight, using default 0.01f");
+            ltpWeight = 0.01f;
+        }
+        if (ltdWeight <= 0.0f) {
+            NLM_LOG_WARNING("Invalid STDP LTD weight, using default 0.012f");
+            ltdWeight = 0.012f;
+        }
+        if (tau <= 0.0f) {
+            NLM_LOG_WARNING("Invalid STDP tau, using default 20.0f");
+            tau = 20.0f;
+        }
+        
+        stdp->configure(ltpWeight, ltdWeight, tau);
+        NLM_LOG_INFO("Configured STDP with LTP=" + std::to_string(ltpWeight) + 
+                     ", LTD=" + std::to_string(ltdWeight) + 
+                     ", tau=" + std::to_string(tau));
+        
+        // Configure structural plasticity with validation
         float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
         float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        
+        // Validate plasticity rates (should be small positive values)
+        if (synaptogenesisRate < 0.0f || synaptogenesisRate > 0.1f) {
+            NLM_LOG_WARNING("Synaptogenesis rate out of expected range, using default 0.0001f");
+            synaptogenesisRate = 0.0001f;
+        }
+        if (pruningRate < 0.0f || pruningRate > 0.0001f) {
+            NLM_LOG_WARNING("Pruning rate out of expected range, using default 0.00001f");
+            pruningRate = 0.00001f;
+        }
+        
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
+        NLM_LOG_INFO("Configured structural plasticity with rate=" + std::to_string(synaptogenesisRate) + 
+                     ", pruning=" + std::to_string(pruningRate));
         
-        // Get timestep
+        // Get timestep with validation
         timestep = config->getOr<double>("simulation_timestep", 0.001);
+        if (timestep <= 0.0 || timestep > 1.0) {
+            NLM_LOG_ERROR("Invalid timestep, using default 0.001");
+            timestep = 0.001;
+        }
+        NLM_LOG_INFO("Set simulation timestep: " + std::to_string(timestep) + "s");
         
-        // Get integration intervals from config
+        // Get integration intervals from config with validation
         replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        if (replayInterval == 0) replayInterval = 100;
+        NLM_LOG_INFO("Set replay interval: " + std::to_string(replayInterval) + " steps");
         
-        // Initialize checkpoint manager
+        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        if (consolidationInterval == 0) consolidationInterval = 1000;
+        NLM_LOG_INFO("Set consolidation interval: " + std::to_string(consolidationInterval) + " steps");
+        
+        // Configure checkpoint manager with error handling
         checkpointManager = std::make_unique<CheckpointManager>();
+        std::string checkpointDir = config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        if (checkpointManager->configure(checkpointDir, 10000, 5, true)) {
+            NLM_LOG_INFO("Checkpoint manager configured for directory: " + checkpointDir);
+        } else {
+            NLM_LOG_WARNING("Checkpoint manager configuration failed");
+        }
+        
+        NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
+    }
     }
     
     DevelopmentalStage developmentalStage;
@@ -1077,41 +1127,137 @@ RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
 }
 
-void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
-    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
-    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
-    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
-    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
-    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
-    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
+    // ========== MEMORY SYSTEM ACCESSORS ==========
     
-    // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
-    }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    NeuralWorkingMemory* Brain::getWorkingMemory() {
+        return pImpl->workingMemory.get();
     }
     
-    // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+        return pImpl->episodicMemory.get();
     }
     
-    // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
-    
-    for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+    NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+        return pImpl->associativeMemory.get();
     }
-}
-
+    
+    // ========== PREDICTION SYSTEM ACCESSOR ==========
+    
+    PredictionSystem* Brain::getPredictionSystem() {
+        return pImpl->predictionSystem.get();
+    }
+    
+    // ========== COGNITION SYSTEM ACCESSORS ==========
+    
+    NeuralPlanner* Brain::getPlanner() {
+        return pImpl->planner.get();
+    }
+    
+    ConceptFormation* Brain::getConceptFormation() {
+        return pImpl->conceptFormation.get();
+    }
+    
+    AttentionalSelection* Brain::getAttention() {
+        return pImpl->attention.get();
+    }
+    
+    // ========== DEVELOPMENT SYSTEM ==========
+    
+    DevelopmentSystem* Brain::getDevelopmentSystem() {
+        return pImpl->developmentSystem.get();
+    }
+    
+    DevelopmentalStage Brain::getDevelopmentalStage() const {
+        return pImpl->developmentalStage;
+    }
+    
+    void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
+        pImpl->developmentalStage = stage;
+    }
+    
+    // ========== NEUROMODULATION SYSTEMS ==========
+    
+    Dopamine* Brain::getDopamine() {
+        return pImpl->dopamine.get();
+    }
+    
+    Curiosity* Brain::getCuriosity() {
+        return pImpl->curiosity.get();
+    }
+    
+    Novelty* Brain::getNovelty() {
+        return pImpl->novelty.get();
+    }
+    
+    PredictionError* Brain::getPredictionErrorSignal() {
+        return pImpl->predictionError.get();
+    }
+    
+    std::shared_ptr<const Config> Brain::getConfig() const {
+        return pImpl->config;
+    }
+    
+    RandomGenerator* Brain::getRandomGenerator() {
+        return pImpl->rng.get();
+    }
+    
+    void Brain::logStatus() const {
+        NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
+        NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
+        NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
+        NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
+        NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
+        NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
+        NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
+        NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
+        NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
+        NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
+        
+        // Memory system status - CRITICAL FIX: properly integrated
+        if (pImpl->workingMemory) {
+            NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+        }
+        if (pImpl->episodicMemory) {
+            NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+        }
+        if (pImpl->associativeMemory) {
+            NLM_LOG_INFO("Associative memory patterns: " + std::to_string(pImpl->associativeMemory->getPatternCount()));
+        }
+        
+        // Prediction system status
+        if (pImpl->predictionSystem) {
+            NLM_LOG_INFO("Prediction system active: " + std::to_string(pImpl->predictionSystem->getPredictionConfidence()));
+        }
+        
+        // Cognition system status
+        if (pImpl->planner) {
+            NLM_LOG_INFO("Neural planner active: " + std::to_string(pImpl->planner->getActivePlans()));
+        }
+        if (pImpl->conceptFormation) {
+            NLM_LOG_INFO("Concept formation active: " + std::to_string(pImpl->conceptFormation->getConceptCount()));
+        }
+        if (pImpl->attention) {
+            NLM_LOG_INFO("Attention system active: " + std::to_string(pImpl->attention->getAttentionLevel()));
+        }
+        
+        // Development status
+        NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+        
+        // Neuromodulation status
+        if (pImpl->dopamine) {
+            NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+        }
+        if (pImpl->curiosity) {
+            NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+        }
+        
+        for (const auto& region : pImpl->regions) {
+            NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
+                         " (" + region->getName() + "): " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons, " +
+                         std::to_string(region->getSynapseCount()) + " synapses, " +
+                         "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+        }
+    }
+    
 } // namespace nlm
