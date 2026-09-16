@@ -1,0 +1,1 @@
+AI2Verilog is a language translator that converts AI models to Verilog hardware implementations. It uses LLVM-based parsing and optimization to generate efficient Verilog code that can be synthesized into FPGA or ASIC designs.

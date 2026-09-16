@@ -1,6 +1,9 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
@@ -16,6 +19,7 @@ class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
+
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
@@ -28,6 +32,16 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class CheckpointManager;
+
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+
+class SensoryInput;
+class Action;
+class Neuromodulator;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -72,7 +86,7 @@ public:
     
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern
-    void receiveSensoryInput(const class SensoryInput& input);
+    void receiveSensoryInput(const SensoryInput& input);
     
     // Inject current directly into a specific neuron
     void injectCurrent(NeuronId neuron, MembranePotential current);
@@ -95,10 +109,10 @@ public:
     size_t getPendingSpikeEventCount() const;
     
     // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    std::unique_ptr<Action> produceAction();
     
     // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    void applyNeuromodulation(const Neuromodulator& signal);
     
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();
