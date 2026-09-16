@@ -400,21 +400,261 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // PredictionSystem bindings
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(Prediction system for sensory prediction and error computation)pbdoc")
+        .def(py::init<>())
+        .def("predictNextState", &PredictionSystem::predictNextState,
+             "Make prediction for next timestep")
+        .def("updatePredictions", &PredictionSystem::updatePredictions,
+             "Update predictions based on actual observation")
+        .def("getPredictionError", &PredictionSystem::getPredictionError,
+             "Get prediction error")
+        .def("getConfidence", &PredictionSystem::getConfidence,
+             "Get prediction confidence")
+        .def("getErrorHistory", &PredictionSystem::getErrorHistory,
+             "Get prediction error history")
+        .def("clearHistory", &PredictionSystem::clearHistory,
+             "Clear prediction history")
+        .def("train", &PredictionSystem::train,
+             "Train prediction model");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Neuromodulation system bindings
+    py::class_<Neuromodulator>(m, "Neuromodulator", R"pbdoc(Abstract base for neuromodulatory signals)pbdoc")
+        .def("getName", &Neuromodulator::getName,
+             "Get neuromodulator name")
+        .def("getLevel", &Neuromodulator::getLevel,
+             "Get current concentration/level")
+        .def("setLevel", &Neuromodulator::setLevel,
+             "Set current concentration/level")
+        .def("getPlasticityFactor", &Neuromodulator::getPlasticityFactor,
+             "Get neuromodulatory effect on plasticity")
+        .def("update", &Neuromodulator::update,
+             "Update neuromodulator state");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    py::class_<Dopamine, Neuromodulator>(m, "Dopamine", R"pbdoc(Dopamine neuromodulator for reward and reinforcement)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Dopamine::getName)
+        .def("getLevel", &Dopamine::getLevel)
+        .def("setLevel", &Dopamine::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor)
+        .def("update", &Dopamine::update, py::arg("dt"),
+             "Update dopamine dynamics")
+        .def("signalReward", &Dopamine::signalReward,
+             "Signal reward event")
+        .def("signalRewardPredictionError", &Dopamine::signalRewardPredictionError,
+             "Signal reward prediction error");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    py::class_<Curiosity, Neuromodulator>(m, "Curiosity", R"pbdoc(Curiosity drive for exploration motivation)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Curiosity::getName)
+        .def("getLevel", &Curiosity::getLevel)
+        .def("setLevel", &Curiosity::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Curiosity::getPlasticityFactor)
+        .def("update", &Curiosity::update, py::arg("novelty"), py::arg("predictionError"), py::arg("dt"),
+             "Update curiosity based on novelty and prediction error")
+        .def("getExplorationDrive", &Curiosity::getExplorationDrive,
+             "Get exploration drive")
+        .def("setNoveltyWeight", &Curiosity::setNoveltyWeight, py::arg("weight"))
+        .def("setPredictionErrorWeight", &Curiosity::setPredictionErrorWeight, py::arg("weight"))
+        .def("reset", &Curiosity::reset);
+
+    py::class_<Novelty, Neuromodulator>(m, "Novelty", R"pbdoc(Novelty detection signal)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Novelty::getName)
+        .def("getLevel", &Novelty::getLevel)
+        .def("setLevel", &Novelty::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Novelty::getPlasticityFactor)
+        .def("update", &Novelty::update, py::arg("dt"),
+             "Decay novelty over time")
+        .def("getHistory", &Novelty::getHistory,
+             "Get novelty history")
+        .def("clearHistory", &Novelty::clearHistory)
+        .def("detectNovelty", [](Novelty& self, const std::vector<float>& currentPattern,
+                               const std::vector<float>& previousPattern) {
+            self.detectNovelty(currentPattern, previousPattern);
+        }, py::arg("currentPattern"), py::arg("previousPattern"));
+
+    py::class_<PredictionError, Neuromodulator>(m, "PredictionError", R"pbdoc(Prediction error signal for learning)pbdoc")
+        .def(py::init<>())
+        .def("getName", &PredictionError::getName)
+        .def("getLevel", &PredictionError::getLevel)
+        .def("setLevel", &PredictionError::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &PredictionError::getPlasticityFactor)
+        .def("update", &PredictionError::update, py::arg("dt"),
+             "Update prediction error signal")
+        .def("getError", &PredictionError::getError,
+             "Get current error value")
+        .def("computeError", &PredictionError::computeError, py::arg("predicted"), py::arg("actual"),
+             "Compute prediction error")
+        .def("updatePrediction", &PredictionError::updatePrediction, py::arg("newPrediction"),
+             "Update prediction")
+        .def("getHistory", &PredictionError::getHistory,
+             "Get error history")
+        .def("clearHistory", &PredictionError::clearHistory)
+        .def("getMagnitude", &PredictionError::getMagnitude,
+             "Get error magnitude for neuromodulation");
+
+    py::class_<Reward, Neuromodulator>(m, "Reward", R"pbdoc(Reward signal for reinforcement learning)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Reward::getName)
+        .def("getLevel", &Reward::getLevel)
+        .def("setLevel", &Reward::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Reward::getPlasticityFactor)
+        .def("update", &Reward::update, py::arg("dt"),
+             "Update reward signal")
+        .def("getValue", &Reward::getValue,
+             "Get current reward value")
+        .def("setValue", &Reward::setValue, py::arg("value"))
+        .def("add", &Reward::add, py::arg("delta"),
+             "Accumulate reward")
+        .def("reset", &Reward::reset,
+             "Reset accumulated reward")
+        .def("computeReward", [](const Reward& self, const class Observation& observation) {
+            return self.computeReward(observation);
+        }, py::arg("observation"), "Compute reward from observation")
+        .def("getHistory", &Reward::getHistory,
+             "Get reward history")
+        .def("clearHistory", &Reward::clearHistory);
+
+    // Cognition system bindings
+    py::class_<AttentionalSelection>(m, "AttentionalSelection", R"pbdoc(Attentional selection for competitive focus)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &AttentionalSelection::initialize, py::arg("brain"),
+             "Initialize attentional selection with brain reference")
+        .def("processCompetition", &AttentionalSelection::processCompetition,
+             py::arg("competitors"), py::arg("globalInhibition"),
+             "Process competitive selection")
+        .def("focusOnRegion", &AttentionalSelection::focusOnRegion, py::arg("region"))
+        .def("releaseAttention", &AttentionalSelection::releaseAttention)
+        .def("getAttendedRegions", &AttentionalSelection::getAttendedRegions,
+             "Get attended regions")
+        .def("setInhibitionStrength", &AttentionalSelection::setInhibitionStrength, py::arg("strength"))
+        .def("setExcitationStrength", &AttentionalSelection::setExcitationStrength, py::arg("strength"))
+        .def("setCompetitionThreshold", &AttentionalSelection::setCompetitionThreshold, py::arg("threshold"))
+        .def("getInhibitionFor", &AttentionalSelection::getInhibitionFor, py::arg("neuron"))
+        .def("getExcitationFor", &AttentionalSelection::getExcitationFor, py::arg("neuron"))
+        .def("update", &AttentionalSelection::update, py::arg("dt"),
+             "Update attentional state")
+        .def("isAttended", &AttentionalSelection::isAttended, py::arg("neuron"),
+             "Check if neuron is attended")
+        .def("applyTopDownBias", &AttentionalSelection::applyTopDownBias, py::arg("neuron"), py::arg("biasStrength"))
+        .def("applyBottomUpSalience", &AttentionalSelection::applyBottomUpSalience, py::arg("neuron"), py::arg("salienceStrength"))
+        .def("reset", &AttentionalSelection::reset);
+
+    py::class_<NeuralPlanner>(m, "NeuralPlanner", R"pbdoc(Neural planner for action sequence evaluation)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralPlanner::initialize, py::arg("brain"),
+             "Initialize neural planner with brain reference")
+        .def("planAction", &NeuralPlanner::planAction, py::arg("currentState"), py::arg("targetReward"),
+             "Plan next action given current state and goal")
+        .def("evaluateSequence", &NeuralPlanner::evaluateSequence,
+             py::arg("actions"), py::arg("startState"),
+             "Evaluate a potential action sequence")
+        .def("getPlanningDepth", &NeuralPlanner::getPlanningDepth)
+        .def("setPlanningDepth", &NeuralPlanner::setPlanningDepth, py::arg("depth"))
+        .def("getPlanningConfidence", &NeuralPlanner::getPlanningConfidence)
+        .def("updatePlanQuality", &NeuralPlanner::updatePlanQuality,
+             py::arg("plannedActions"), py::arg("actualActions"), py::arg("actualReward"),
+             "Update plans based on actual outcome")
+        .def("clearCache", &NeuralPlanner::clearCache)
+        .def("setActionQuality", &NeuralPlanner::setActionQuality, py::arg("action"), py::arg("quality"))
+        .def("setCurrentGoal", &NeuralPlanner::setCurrentGoal, py::arg("goal"))
+        .def("wasRecentPlanSuccessful", &NeuralPlanner::wasRecentPlanSuccessful,
+             "Has recent planning been successful?")
+        .def("getCurrentGoal", &NeuralPlanner::getCurrentGoal);
+
+    py::class_<ConceptFormation>(m, "ConceptFormation", R"pbdoc(Concept formation for pattern discovery)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &ConceptFormation::initialize, py::arg("brain"),
+             "Initialize concept formation with brain reference")
+        .def("presentExperience", &ConceptFormation::presentExperience,
+             py::arg("pattern"), py::arg("features"), py::arg("reward"), py::arg("currentTime"),
+             "Present a new experience to concept formation system")
+        .def("getMatchingConcept", &ConceptFormation::getMatchingConcept,
+             py::arg("pattern"), py::arg("similarityThreshold") = 0.7f)
+        .def("getConcepts", &ConceptFormation::getConcepts,
+             "Get all discovered concepts")
+        .def("getConcept", &ConceptFormation::getConcept, py::arg("conceptId"),
+             "Get a specific concept")
+        .def("getConceptPrototype", &ConceptFormation::getConceptPrototype, py::arg("conceptId"))
+        .def("getConceptInstances", &ConceptFormation::getConceptInstances, py::arg("conceptId"))
+        .def("getConceptStability", &ConceptFormation::getConceptStability, py::arg("conceptId"))
+        .def("getConceptCount", &ConceptFormation::getConceptCount)
+        .def("mergeConcepts", &ConceptFormation::mergeConcepts, py::arg("conceptA"), py::arg("conceptB"))
+        .def("updateConcept", &ConceptFormation::updateConcept,
+             py::arg("conceptId"), py::arg("newPattern"), py::arg("features"), py::arg("reward"),
+             "Update concept with new instance")
+        .def("computeSimilarity", &ConceptFormation::computeSimilarity, py::arg("a"), py::arg("b"))
+        .def("isNovel", &ConceptFormation::isNovel, py::arg("pattern"), py::arg("similarityThreshold") = 0.7f)
+        .def("findConceptForPattern", &ConceptFormation::findConceptForPattern, py::arg("pattern"))
+        .def("clear", &ConceptFormation::clear)
+        .def("getGeneralizationAbility", &ConceptFormation::getGeneralizationAbility, py::arg("conceptId"))
+        .def("setFormationThreshold", &ConceptFormation::setFormationThreshold, py::arg("threshold"))
+        .def("setStabilityWindow", &ConceptFormation::setStabilityWindow, py::arg("window"));
+
+    py::class_<SelfModel>(m, "SelfModel", R"pbdoc(Self-model for action-effect prediction)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SelfModel::initialize, py::arg("brain"),
+             "Initialize self-model with brain reference")
+        .def("recordSelfAction", &SelfModel::recordSelfAction,
+             py::arg("action"), py::arg("beforeState"), py::arg("afterState"),
+             "Record that taking an action caused a specific sensory change")
+        .def("predictActionConsequence", &SelfModel::predictActionConsequence,
+             py::arg("action"), py::arg("currentState"),
+             "Predict sensory consequence of an action")
+        .def("getSelfModelConfidence", &SelfModel::getSelfModelConfidence, py::arg("action"))
+        .def("computeSelfGeneratedLikeness", &SelfModel::computeSelfGeneratedLikeness,
+             py::arg("beforeState"), py::arg("afterState"), py::arg("action"))
+        .def("getPreferredAction", &SelfModel::getPreferredAction, py::arg("state"),
+             "Get the best action to imitate given current state")
+        .def("updateSelfModel", &SelfModel::updateSelfModel,
+             py::arg("predicted"), py::arg("actual"), py::arg("action"),
+             "Update self-model based on prediction error")
+        .def("getCapabilityLevel", &SelfModel::getCapabilityLevel)
+        .def("getBodyAwareness", &SelfModel::getBodyAwareness)
+        .def("clear", &SelfModel::clear)
+        .def("hasSelfModel", &SelfModel::hasSelfModel);
+
+    py::class_<SocialLearning>(m, "SocialLearning", R"pbdoc(Social learning from observing other agents)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SocialLearning::initialize, py::arg("brain"),
+             "Initialize social learning with brain reference")
+        .def("observeAgentAction", &SocialLearning::observeAgentAction,
+             py::arg("observedAction"), py::arg("observerState"), py::arg("resultingState"),
+             "Record observation of another agent's action and effect")
+        .def("canImitate", &SocialLearning::canImitate, py::arg("observedAction"),
+             "Can I imitate this observed action?")
+        .def("getImitationAction", &SocialLearning::getImitationAction, py::arg("currentState"),
+             "Get the best action to imitate given current state")
+        .def("learnCommunicationSignal", &SocialLearning::learnCommunicationSignal,
+             py::arg("signalPattern"), py::arg("signalReward"),
+             "Learn simple communication signal from another agent")
+        .def("detectSignal", &SocialLearning::detectSignal, py::arg("neuralPattern"),
+             "Detect if another agent is signaling")
+        .def("getSignalPattern", &SocialLearning::getSignalPattern)
+        .def("getSignalMeaning", &SocialLearning::getSignalMeaning)
+        .def("updateSocialKnowledge", &SocialLearning::updateSocialKnowledge, py::arg("interactionReward"))
+        .def("clear", &SocialLearning::clear)
+        .def("hasSocialKnowledge", &SocialLearning::hasSocialKnowledge)
+        .def("getObservationCount", &SocialLearning::getObservationCount);
+
+    // Advanced factory functions for complete agent setup
+    m.def("createAdvancedAgentBrain", [](std::shared_ptr<Brain> brain) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        // Enable all major subsystems
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        return agent;
+    }, py::arg("brain"), "Create advanced agent brain with all subsystems enabled");
+
+    m.def("createCompleteBrain", []() {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create and initialize a complete brain with default configuration");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

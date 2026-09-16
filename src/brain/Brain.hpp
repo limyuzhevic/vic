@@ -1,3 +1,49 @@
+// Brain: The central coordinator of the neural system
+// Implements real spiking neural computation with event-driven dynamics
+// and integrated memory, prediction, cognition, and neuromodulation systems
+//
+// Key features:
+// - Coordinates all brain subsystems (memory, prediction, cognition, neuromodulation)
+// - Manages neural regions and populations
+// - Handles sensory input injection and motor output production
+// - Implements plasticity through integrated STDP, Hebbian, and structural rules
+// - Maintains global brain state (spike count, firing rate, E/I balance)
+// - Supports developmental stages that modulate plasticity rates
+// - Provides checkpoint save/load functionality
+//
+// Subsystem access:
+// - NeuralWorkingMemory: Working memory for transient information
+// - NeuralEpisodicMemory: Episodic memory for experience storage
+// - NeuralAssociativeMemory: Associative memory for pattern relationships
+// - PredictionSystem: Predictive coding and prediction error computation
+// - NeuralPlanner: Action planning and sequence evaluation
+// - ConceptFormation: Pattern discovery and categorization
+// - AttentionalSelection: Competitive selection of neural representations
+// - DevelopmentSystem: Developmental modulation of brain properties
+// - Dopamine: Reward-based neuromodulation
+// - Curiosity: Exploration drive based on novelty and prediction error
+// - Novelty: Novelty detection for curiosity generation
+// - PredictionError: Prediction error signaling for learning
+//
+// Integration architecture:
+// World → SensoryInput → Brain → Action → MotorOutput → World
+//                     ↑          ↑             ↑
+//              Neuromodulation  Prediction    Development
+//                     ↑              ↑             ↑
+//                 Memory        Learning       Plasticity
+//
+// Usage patterns:
+// 1. Create brain with configuration
+// 2. Initialize brain (creates regions, neurons, synapses)
+// 3. Run simulation loop:
+//    - Process sensory input
+//    - Update brain state (LIF dynamics, plasticity)
+//    - Generate motor action
+//    - Apply action to world
+//    - Apply reward/novelty for neuromodulation
+//    - Update development
+// 4. Access statistics and save brain state
+
 #pragma once
 
 #include "../core/Types/Types.hpp"

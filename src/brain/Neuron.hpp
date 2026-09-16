@@ -1,3 +1,40 @@
+// Neuron class representing a single neuron
+// Implements Leaky Integrate-and-Fire (LIF) dynamics
+//
+// Key features:
+// - Leaky Integrate-and-Fire (LIF) neuron dynamics
+// - Event-driven spike propagation with synaptic delays
+// - Refractory period handling
+// - Spike-frequency adaptation through adaptation variable
+// - Synaptic input integration (excitatory, inhibitory, modulatory)
+// - Current injection from external sources
+//
+// Neuron parameters (configurable through brain config):
+// - restingPotential: Typically -70mV
+// - threshold: Typically -55mV
+// - resetPotential: Slightly above resting
+// - leakConductance: Controls membrane time constant
+// - refractoryPeriod: Duration of refractory period in steps
+//
+// State variables:
+// - membranePotential: Current membrane potential (mV)
+// - firingState: Current firing state (Resting, Active, Refractory, Inhibited)
+// - lastSpikeTime: Timestamp of last spike
+// - adaptationVariable: Tracks spike-frequency adaptation
+//
+// Methods:
+// - stepLIF(): Main LIF dynamics update, returns true if neuron fired
+// - step(): Convenience wrapper with standard timestep
+// - receiveExcitatoryInput(): Handle excitatory synaptic input
+// - receiveInhibitoryInput(): Handle inhibitory synaptic input
+// - receiveModulatoryInput(): Handle modulatory input (affects plasticity)
+// - injectCurrent(): Direct current injection
+// - checkThreshold(): Check if membrane potential crosses threshold
+// - recordSpike(): Record spike in history
+// - initializeRandom(): Initialize neuron with biologically plausible parameters
+//
+// TODO: Add Hebbian plasticity, reward-modulated plasticity, structural plasticity
+
 #pragma once
 
 #include "../core/Types/Types.hpp"

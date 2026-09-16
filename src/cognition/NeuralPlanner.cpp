@@ -332,13 +332,6 @@ float SelfModel::getSelfModelConfidence(ActionType action) const {
     for (const auto& e : effects) {
         totalConf += e.confidence;
     }
-    return totalConf / effects.size();
-}
-
-float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeState,
-                                              const std::vector<float>& afterState,
-                                              ActionType action) const {
-    // If we have a good prediction for this action, it's likely self-generated
     auto predicted = findMatchingEffect(action, beforeState);
     
     if (predicted.empty()) return 0.0f;
@@ -370,8 +363,8 @@ ActionType SelfModel::getPreferredAction(const std::vector<float>& state) {
 }
 
 void SelfModel::updateSelfModel(const std::vector<float>& predicted,
-                               const std::vector<float>& actual,
-                               ActionType action) {
+                                const std::vector<float>& actual,
+                                ActionType action) {
     size_t actionIdx = static_cast<size_t>(action);
     if (actionIdx >= actionEffects_.size()) return;
     
@@ -503,7 +496,7 @@ ActionType SocialLearning::getImitationAction(const std::vector<float>& currentS
 }
 
 void SocialLearning::learnCommunicationSignal(const std::vector<float>& signalPattern,
-                                              float signalReward) {
+                                             float signalReward) {
     signalPattern_ = signalPattern;
     signalMeaning_ = signalReward;
 }
@@ -539,7 +532,7 @@ void SocialLearning::clear() {
 }
 
 float SocialLearning::computeSimilarity(const std::vector<float>& a,
-                                       const std::vector<float>& b) const {
+                                        const std::vector<float>& b) const {
     if (a.size() != b.size() || a.empty()) return 0.0f;
     
     float dot = 0.0f, normA = 0.0f, normB = 0.0f;

@@ -541,6 +541,52 @@ float TemporalRelation::getPredictionConfidence(const std::vector<float>& event)
     return std::min(1.0f, static_cast<float>(matchingCount) / 3.0f);
 }
 
+    for (const auto& link : sequences_) {
+        if (link.fromEvent.size() != eventA.size()) continue;
+        
+        float dot = 0.0f, normA = 0.0f, normB = 0.0f;
+        for (size_t i = 0; i < eventA.size(); ++i) {
+            dot += link.fromEvent[i] * eventA[i];
+            normA += link.fromEvent[i] * link.fromEvent[i];
+            normB += eventA[i] * eventA[i];
+        }
+        
+        if (normA > 0.0001f && normB > 0.0001f) {
+            float sim = dot / (std::sqrt(normA) * std::sqrt(normB));
+            if (sim > bestSim) {
+                bestSim = sim;
+                bestPrediction = link.toEvent;
+            }
+        }
+    }
+    
+    return bestPrediction;
+}
+
+float TemporalRelation::getPredictionConfidence(const std::vector<float>& event) const {
+    size_t matchingCount = 0;
+    
+    for (const auto& link : sequences_) {
+        if (link.fromEvent.size() != event.size()) continue;
+        
+        float dot = 0.0f, normA = 0.0f, normB = 0.0f;
+        for (size_t i = 0; i < event.size(); ++i) {
+            dot += link.fromEvent[i] * event[i];
+            normA += link.fromEvent[i] * link.fromEvent[i];
+            normB += event[i] * event[i];
+        }
+        
+        if (normA > 0.0001f && normB > 0.0001f) {
+            float sim = dot / (std::sqrt(normA) * std::sqrt(normB));
+            if (sim > 0.7f) {
+                matchingCount++;
+            }
+        }
+    }
+    
+    return std::min(1.0f, static_cast<float>(matchingCount) / 3.0f);
+}
+
 void TemporalRelation::clear() {
     sequences_.clear();
 }
