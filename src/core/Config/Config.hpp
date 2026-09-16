@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include "ConfigError.hpp"
 
 namespace nlm {
 
@@ -93,6 +94,30 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation
+    void validate(ConfigValidationException::Level level = ConfigValidationException::Level::Full);
+    std::vector<std::string> validate() const;
+    bool isValid() const;
+    
+    // Validation schema
+    void addValidationRule(const ConfigValidationRule& rule);
+    ConfigValidationRule& addValidationRule(const std::string& key, const std::string& name, 
+                                           ConfigValidationType type, bool required = false,
+                                           std::optional<double> minValue = std::nullopt,
+                                           std::optional<double> maxValue = std::nullopt);
+    void removeValidationRule(const std::string& key);
+    
+    // Validation hooks for categories
+    void addValidator(std::unique_ptr<ConfigValidatorBase> validator);
+    
+    // Runtime validation settings
+    void setValidationLevel(ConfigValidationException::Level level);
+    void setValidationEnabled(bool enabled);
+    bool isValidationEnabled() const;
+    
+    // Pre-validation before use (for critical operations)
+    void preValidate() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +125,29 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
-};
+    
+    // Validation state
+    ConfigValidationException::Level validationLevel;
+    bool validationEnabled;
+    std::vector<ConfigValidationRule> validationRules;
+    std::vector<std::unique_ptr<ConfigValidatorBase>> registeredValidators;
+    
+    // Validation methods
+    void validateKeyType(const std::string& key, const ConfigValue& value) const;
+    void validateKeyRange(const std::string& key, const ConfigValue& value) const;
+    void validateDependencies(const std::string& key, const Config& config) const;
+    void validateRequired(const std::string& key, const Config& config) const;
+    void applyCustomValidators(const std::string& key, const ConfigValue& value) const;
+    bool isKeyTypeValid(const std::string& key, const ConfigValue& value) const;
+    double getNumericValue(const ConfigValue& value) const;
+    
+    // Category-specific validation hooks
+    void validateBrainCategory(const Config& config) const;
+    void validatePlasticityCategory(const Config& config) const;
+    void validateNeuromodulationCategory(const Config& config) const;
+    void validateMemoryCategory(const Config& config) const;
+    void validateCognitionCategory(const Config& config) const;
+    void validateDevelopmentCategory(const Config& config) const;
+}; 
 
 } // namespace nlm

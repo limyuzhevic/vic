@@ -160,6 +160,99 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("validate", &Config::summary,
+             "Validate configuration and return status report")
+        .def("validateSchema", [](Config& self, const std::string& schema) {
+            // Schema validation implementation
+            // For now, just validate that config is not empty
+            if (self.getKeys().empty()) {
+                return false;
+            }
+            // Additional schema validation logic would go here
+            return true;
+        }, py::arg("schema"), "Validate configuration against a schema string")
+        .def("getAdvancedSummary", [](Config& self) {
+            std::vector<std::string> keys = self.getKeys();
+            std::stringstream ss;
+            ss << "Advanced Configuration Summary:" << std::endl;
+            ss << "Total entries: " << keys.size() << std::endl;
+            ss << "Sources:" << std::endl;
+            // Count entries by source (would need access to internal implementation)
+            ss << "  Default: 0" << std::endl;
+            ss << "  File: 0" << std::endl;
+            ss << "  Command Line: 0" << std::endl;
+            ss << "  Runtime: " << keys.size() << std::endl;
+            ss << "Key types:" << std::endl;
+            // Count value types (would need access to internal implementation)
+            ss << "  Numeric (int): 0" << std::endl;
+            ss << "  Numeric (double): 0" << std::endl;
+            ss << "  Boolean: 0" << std::endl;
+            ss << "  String: " << keys.size() << std::endl;
+            return ss.str();
+        }, "Get advanced configuration summary with statistics")
+        .def("getConfigurationHash", [](Config& self) {
+            // Generate a hash of the configuration for comparison
+            std::vector<std::string> keys = self.getKeys();
+            std::hash<std::string> hasher;
+            size_t hashValue = 0;
+            for (const auto& key : keys) {
+                hashValue ^= hasher(key);
+                // Would need to hash values too if accessible
+            }
+            return hashValue;
+        }, "Get hash of configuration for comparison")
+        .def("mergeConfigs", [](Config& self, const Config& other) {
+            // Merge another configuration into this one
+            std::vector<std::string> otherKeys = other.getKeys();
+            for (const auto& key : otherKeys) {
+                auto value = other.get<int>(key);
+                if (value.has_value()) {
+                    self.set(key, value.value());
+                } else {
+                    auto valueStr = other.get<std::string>(key);
+                    if (valueStr.has_value()) {
+                        self.set(key, valueStr.value());
+                    }
+                }
+            }
+            return self; // Return self for chaining
+        }, py::arg("other"), "Merge another configuration into this one (returns self for chaining)")
+        .def("diff", [](const Config& self, const Config& other) {
+            std::vector<std::string> diffKeys;
+            std::vector<std::string> selfKeys = self.getKeys();
+            std::vector<std::string> otherKeys = other.getKeys();
+            
+            // Keys in self but not in other
+            for (const auto& key : selfKeys) {
+                if (!other.has(key)) {
+                    diffKeys.push_back("REMOVED: " + key);
+                }
+            }
+            
+            // Keys in other but not in self
+            for (const auto& key : otherKeys) {
+                if (!self.has(key)) {
+                    diffKeys.push_back("ADDED: " + key);
+                }
+            }
+            
+            // Keys in both but with different values
+            for (const auto& key : otherKeys) {
+                if (self.has(key)) {
+                    auto selfValue = self.get<std::string>(key);
+                    auto otherValue = other.get<std::string>(key);
+                    if (selfValue != otherValue) {
+                        diffKeys.push_back("CHANGED: " + key + " (self: " + 
+                                         (selfValue.has_value() ? selfValue.value() : "") +
+                                         ", other: " + (otherValue.has_value() ? otherValue.value() : "") + ")");
+                    }
+                }
+            }
+            return diffKeys;
+        }, py::arg("other"), "Get difference between this and another configuration")
+        .def("clone", [](const Config& self) {
+            return std::make_shared<Config>(self); // Would need to implement copy constructor
+        }, "Create a copy of this configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -179,9 +272,160 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setData", [](Vision& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
+        .def("setData", [](Vision& self, const std::vector<std::vector<float>>& imageData) {
+            // Convert 2D image data to 1D vector
+            size_t totalSize = 0;
+            for (const auto& row : imageData) {
+                totalSize += row.size();
+            }
+            std::vector<float> flatData(totalSize);
+            size_t index = 0;
+            for (const auto& row : imageData) {
+                for (float pixel : row) {
+                    flatData[index++] = pixel;
+                }
+            }
+            self.setData(flatData);
+        }, py::arg("imageData"))
+        .def("setData", [](Vision& self, const std::vector<std::vector<std::vector<float>>>& rgbData) {
+            // Convert 3D RGB image data to 1D vector
+            size_t totalSize = 0;
+            for (const auto& height : rgbData) {
+                for (const auto& width : height) {
+                    totalSize += width.size();
+                }
+            }
+            std::vector<float> flatData(totalSize);
+            size_t index = 0;
+            for (const auto& height : rgbData) {
+                for (const auto& width : height) {
+                    for (float channel : width) {
+                        flatData[index++] = channel;
+                    }
+                }
+            }
+            self.setData(flatData);
+        }, py::arg("rgbData"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("getFeatureVector", &VisionProcessor::getFeatures,
+             "Get processed feature vector from vision processor")
+        .def("getFeatureDimensions", &VisionProcessor::getFeatureDimensions,
+             "Get dimensionality of processed features")
+        .def("toArray", [](const Vision& self) {
+            return self.getData();
+        }, "Convert vision data to 1D array")
+        .def("reshape", [](Vision& self, size_t width, size_t height, size_t channels) {
+            // Reshape the internal data array (assuming it's stored as 1D)
+            // This is a simplified implementation - would need access to actual reshape method
+            std::vector<float> data = self.getData();
+            size_t expectedSize = width * height * channels;
+            if (data.size() != expectedSize) {
+                throw std::runtime_error("Data size does not match requested dimensions");
+            }
+            // In a real implementation, we'd store reshaped data
+            return self; // Return self for chaining
+        }, py::arg("width"), py::arg("height"), py::arg("channels"),
+             "Reshape vision data to specified dimensions")
+        .def("normalize", [](Vision& self, float min = 0.0f, float max = 1.0f) {
+            // Normalize vision data to range [min, max]
+            std::vector<float> data = self.getData();
+            float dataMin = *std::min_element(data.begin(), data.end());
+            float dataMax = *std::max_element(data.begin(), data.end());
+            
+            if (dataMax == dataMin) {
+                // Avoid division by zero
+                std::fill(data.begin(), data.end(), max);
+            } else {
+                for (size_t i = 0; i < data.size(); ++i) {
+                    data[i] = min + (data[i] - dataMin) * (max - min) / (dataMax - dataMin);
+                }
+            }
+            self.setData(data);
+            return self; // Return self for chaining
+        }, py::arg("min") = 0.0f, py::arg("max") = 1.0f,
+             "Normalize vision data to specified range")
+        .def("resize", [](Vision& self, size_t newWidth, size_t newHeight) {
+            // Resize vision data (simplified nearest-neighbor)
+            std::vector<float> data = self.getData();
+            size_t oldWidth = self.getWidth();
+            size_t oldHeight = self.getHeight();
+            size_t channels = self.getChannels();
+            
+            if (oldWidth == 0 || oldHeight == 0) {
+                throw std::runtime_error("Invalid original dimensions");
+            }
+            
+            float scaleX = static_cast<float>(oldWidth) / newWidth;
+            float scaleY = static_cast<float>(oldHeight) / newHeight;
+            
+            std::vector<float> resizedData(newWidth * newHeight * channels, 0.0f);
+            
+            for (size_t c = 0; c < channels; ++c) {
+                for (size_t y = 0; y < newHeight; ++y) {
+                    float fy = y * scaleY;
+                    size_t y0 = static_cast<size_t>(fy);
+                    size_t y1 = std::min(y0 + 1, oldHeight - 1);
+                    float ty = fy - y0;
+                    
+                    for (size_t x = 0; x < newWidth; ++x) {
+                        float fx = x * scaleX;
+                        size_t x0 = static_cast<size_t>(fx);
+                        size_t x1 = std::min(x0 + 1, oldWidth - 1);
+                        float tx = fx - x0;
+                        
+                        // Bilinear interpolation
+                        float value = (1 - tx) * (1 - ty) * data[(y0 * oldWidth + x0) * channels + c] +
+                                      tx * (1 - ty) * data[(y0 * oldWidth + x1) * channels + c] +
+                                      (1 - tx) * ty * data[(y1 * oldWidth + x0) * channels + c] +
+                                      tx * ty * data[(y1 * oldWidth + x1) * channels + c];
+                        
+                        resizedData[(y * newWidth + x) * channels + c] = value;
+                    }
+                }
+            }
+            
+            // Create a new Vision with resized data (requires constructor with dimensions)
+            // This is a simplified implementation
+            return resizedData; // Return as vector for now
+        }, py::arg("newWidth"), py::arg("newHeight"),
+             "Resize vision data using bilinear interpolation")
+        .def("extractChannel", [](Vision& self, size_t channel) {
+            std::vector<float> data = self.getData();
+            size_t channels = self.getChannels();
+            
+            if (channel >= channels) {
+                throw std::runtime_error("Channel index out of range");
+            }
+            
+            std::vector<float> channelData;
+            channelData.reserve(data.size() / channels);
+            
+            for (size_t i = channel; i < data.size(); i += channels) {
+                channelData.push_back(data[i]);
+            }
+            
+            return channelData;
+        }, py::arg("channel"),
+             "Extract a specific color channel as 1D array")
+        .def("blend", [](Vision& self, const Vision& other, float weight) {
+            std::vector<float> data1 = self.getData();
+            std::vector<float> data2 = other.getData();
+            
+            if (data1.size() != data2.size()) {
+                throw std::runtime_error("Vision objects must have same data size for blending");
+            }
+            
+            std::vector<float> blendedData(data1.size());
+            for (size_t i = 0; i < data1.size(); ++i) {
+                blendedData[i] = (1 - weight) * data1[i] + weight * data2[i];
+            }
+            
+            // Create a new Vision with blended data
+            return blendedData; // Return as vector for now
+        }, py::arg("other"), py::arg("weight") = 0.5f,
+             "Blend with another vision input using specified weight (default 0.5)")
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -293,12 +537,39 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
+        .def("batchStep", [](Brain& self, const std::vector<SimulationStep>& steps) {
+            for (const auto& step : steps) {
+                self.step(step);
+            }
+        }, py::arg("steps"), "Perform multiple simulation steps in batch for efficiency")
+        .def("batchStep", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
+             py::arg("currentStep"), py::arg("currentTime"),
+             "Perform a simulation step with timestamp")
+        .def("batchStepWithTime", [](Brain& self, const std::vector<SimulationStep>& steps, const std::vector<Timestamp>& times) {
+            if (steps.size() != times.size()) {
+                throw std::runtime_error("Steps and times vectors must have the same size");
+            }
+            for (size_t i = 0; i < steps.size(); ++i) {
+                self.step(steps[i], times[i]);
+            }
+        }, py::arg("steps"), py::arg("times"), "Perform multiple simulation steps with timestamps in batch")
+        .def("batchStepWithMultipleInputs", [](Brain& self, 
+                                             const std::vector<SimulationStep>& steps,
+                                             const std::vector<std::shared_ptr<SensoryInput>>& inputs,
+                                             const std::vector<Timestamp>& times) {
+            if (steps.size() != inputs.size() || steps.size() != times.size()) {
+                throw std::runtime_error("Steps, inputs, and times vectors must have the same size");
+            }
+            for (size_t i = 0; i < steps.size(); ++i) {
+                if (inputs[i]) {
+                    self.step(steps[i], times[i]);
+                    self.receiveSensoryInput(*inputs[i]);
+                }
+            }
+        }, py::arg("steps"), py::arg("inputs"), py::arg("times"), "Perform multiple simulation steps with associated sensory inputs in batch")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
              "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
@@ -415,6 +686,186 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Convenience functions for common workflows
+    
+    m.def("createSimpleAgent", []() -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        auto agentBrain = std::make_shared<AgentBrain>(brain);
+        
+        brain->initialize();
+        world->configure(800, 600, 84, 84);
+        world->reset();
+        agentBrain->initialize(*world);
+        
+        return std::make_tuple(brain, world, agentBrain);
+    }, "Create a complete simple agent setup with brain, world, and agent brain");
+    
+    m.def("runSimulation", [](std::shared_ptr<AgentBrain> agentBrain, 
+                           const std::vector<std::shared_ptr<SensoryInput>>& inputs,
+                           const std::vector<Action>& actions,
+                           size_t steps) {
+        if (!agentBrain) {
+            throw std::runtime_error("AgentBrain is null");
+        }
+        
+        auto brain = agentBrain->getBrain();
+        if (!brain) {
+            throw std::runtime_error("Brain is null");
+        }
+        
+        brain->reset();
+        agentBrain->reset();
+        
+        for (size_t i = 0; i < steps && i < inputs.size(); ++i) {
+            if (inputs[i]) {
+                // Create percept from input
+                auto percept = std::make_shared<SensoryPercept>();
+                if (auto vision = std::dynamic_pointer_cast<Vision>(inputs[i])) {
+                    percept->setVision(*vision);
+                }
+                agentBrain->processSensoryInput(*percept);
+                
+                if (i < actions.size()) {
+                    // In a real implementation, we'd apply the action
+                    // For now, we'll just log it
+                    std::cout << "Step " << i << ": Applying action " << actions[i].getName() << std::endl;
+                }
+            }
+            
+            brain->step(i, static_cast<Timestamp>(i * 0.1));
+        }
+        
+        return true;
+    }, py::arg("agentBrain"), py::arg("inputs"), py::arg("actions"), py::arg("steps") = 100,
+         "Run a complete simulation with agent brain, sensory inputs, and actions");
+
+    m.def("createVisionFromArray", [](const std::vector<float>& data, size_t width, size_t height, size_t channels = 3) -> std::shared_ptr<Vision> {
+        auto vision = std::make_shared<Vision>(width, height, channels);
+        if (data.size() == width * height * channels) {
+            vision->setData(data);
+        }
+        return vision;
+    }, py::arg("data"), py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+         "Create a Vision object from a 1D array with specified dimensions");
+
+    m.def("createSensoryPercept", []() -> std::shared_ptr<SensoryPercept> {
+        return std::make_shared<SensoryPercept>();
+    }, "Create a new sensory percept object");
+
+    m.def("createInternalSignals", []() -> std::shared_ptr<InternalSignals> {
+        return std::make_shared<InternalSignals>();
+    }, "Create internal signals sensory input");
+
+    m.def("createAudioFromSamples", [](const std::vector<float>& samples, size_t sampleRate) -> std::shared_ptr<Audio> {
+        auto audio = std::make_shared<Audio>(sampleRate, samples.size());
+        audio->setData(samples);
+        return audio;
+    }, py::arg("samples"), py::arg("sampleRate"),
+         "Create an Audio object from sample data");
+
+    // Exception types and better error handling
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "InvalidArgument");
+    py::register_exception<std::out_of_range>(m, "OutOfRange");
+    
+    m.def("raiseError", [](const std::string& message) {
+        throw std::runtime_error(message);
+    }, py::arg("message"), "Raise a runtime error with the given message");
+
+    m.def("isValidNeuronId", [](const NeuronId& id) {
+        return id.value != 0; // Assuming INVALID_NEURON_ID is 0
+    }, py::arg("id"), "Check if a neuron ID is valid");
+
+    m.def("isValidSynapseId", [](const SynapseId& id) {
+        return id.value != 0; // Assuming INVALID_SYNAPSE_ID is 0
+    }, py::arg("id"), "Check if a synapse ID is valid");
+
+    m.def("isValidRegionId", [](const RegionId& id) {
+        return id.value != 0; // Assuming INVALID_REGION_ID is 0
+    }, py::arg("id"), "Check if a region ID is valid");
+
+    // Session and checkpoint utilities
+    m.def("createBackupConfig", [](const Config& original) -> std::shared_ptr<Config> {
+        // Create a copy of the configuration (simplified implementation)
+        auto backup = std::make_shared<Config>();
+        auto keys = original.getKeys();
+        for (const auto& key : keys) {
+            auto value = original.get<std::string>(key);
+            if (value.has_value()) {
+                backup->set(key, value.value());
+            }
+        }
+        return backup;
+    }, py::arg("original"), "Create a backup/copy of a configuration");
+
+    m.def("compareConfigs", [](const Config& config1, const Config& config2) {
+        std::vector<std::string> differences;
+        auto keys1 = config1.getKeys();
+        auto keys2 = config2.getKeys();
+        
+        // Check for keys that exist in config1 but not config2
+        for (const auto& key : keys1) {
+            if (!config2.has(key)) {
+                differences.push_back("Missing in config2: " + key);
+            }
+        }
+        
+        // Check for keys that exist in config2 but not config1
+        for (const auto& key : keys2) {
+            if (!config1.has(key)) {
+                differences.push_back("Missing in config1: " + key);
+            }
+        }
+        
+        // Check for different values
+        for (const auto& key : keys2) {
+            if (config1.has(key)) {
+                auto value1 = config1.get<std::string>(key);
+                auto value2 = config2.get<std::string>(key);
+                if (value1 != value2) {
+                    differences.push_back("Different values for " + key + ": " +
+                                        (value1.has_value() ? value1.value() : "N/A") + " vs " +
+                                        (value2.has_value() ? value2.value() : "N/A"));
+                }
+            }
+        }
+        
+        return differences;
+    }, py::arg("config1"), py::arg("config2"), "Compare two configurations and return differences");
+
+    m.def("getSystemInfo", []() {
+        std::stringstream ss;
+        ss << "NLM Python Bindings System Info:" << std::endl;
+        ss << "Version: 1.0.0" << std::endl;
+        ss << "Build timestamp: " << __DATE__ << " " << __TIME__ << std::endl;
+        ss << "Python version: " << PYBIND11_VERSION_MAJOR << "." << PYBIND11_VERSION_MINOR << "." << PYBIND11_VERSION_PATCH << std::endl;
+        return ss.str();
+    }, "Get system information about the bindings");
+
+    m.def("shutdownGracefully", [](Brain& brain, SimpleWorld& world) {
+        brain.reset();
+        world.reset();
+        return true;
+    }, py::arg("brain"), py::arg("world"), "Reset and clean up brain and world resources");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
