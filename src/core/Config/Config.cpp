@@ -3,11 +3,218 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
+#include <iostream>
+#include <iomanip>
 
 namespace nlm {
 
+// Forward declarations for JSON
+struct json;
+
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+};
+
+// Simple JSON parser implementation for configuration files
+class SimpleJSONParser {
+public:
+    static bool parse(const std::string& content, std::vector<ConfigEntry>& entries) {
+        // Simple JSON key-value parser - handle basic objects and arrays
+        size_t pos = 0;
+        while (pos < content.size()) {
+            skipWhitespaceAndComments(content, pos);
+            
+            if (pos >= content.size()) break;
+            
+            if (content[pos] == '}') break;  // End of object
+            
+            // Parse key
+            std::string key = parseString(content, pos);
+            if (key.empty()) {
+                // Try to parse unquoted key (simple case)
+                key = parseUnquotedKey(content, pos);
+            }
+            
+            skipWhitespaceAndComments(content, pos);
+            
+            if (pos >= content.size() || content[pos] != ':') {
+                return false;  // Invalid format
+            }
+            
+            pos++;  // Skip colon
+            skipWhitespaceAndComments(content, pos);
+            
+            // Parse value
+            ConfigValue value;
+            if (content[pos] == '"' || content[pos] == '\'') {
+                value = parseString(content, pos);
+            } else if (content[pos] == '{') {
+                // Object - skip for now
+                skipObject(content, pos);
+                continue;
+            } else if (content[pos] == '[') {
+                // Array - skip for now
+                skipArray(content, pos);
+                continue;
+            } else if (content[pos] == '-' || std::isdigit(content[pos])) {
+                value = parseNumber(content, pos);
+            } else if (content[pos] == 't' || content[pos] == 'f') {
+                value = parseBool(content, pos);
+            } else if (content[pos] == 'n') {
+                value = parseNull(content, pos);
+            } else {
+                return false;  // Unknown type
+            }
+            
+            // Add entry with default source
+            entries.emplace_back(key, value, ConfigSource::File);
+            
+            skipWhitespaceAndComments(content, pos);
+            
+            if (pos < content.size() && content[pos] == ',') {
+                pos++;  // Skip comma
+            }
+        }
+        
+        return true;
+    }
+    
+private:
+    static void skipWhitespaceAndComments(const std::string& content, size_t& pos) {
+        while (pos < content.size()) {
+            char c = content[pos];
+            if (std::isspace(c)) {
+                pos++;
+            } else if (c == '/' && pos + 1 < content.size() && content[pos + 1] == '/') {
+                // Skip line comment
+                size_t endLine = content.find('\n', pos);
+                pos = (endLine == std::string::npos) ? content.size() : endLine + 1;
+            } else if (c == '/' && pos + 1 < content.size() && content[pos + 1] == '*') {
+                // Skip block comment
+                size_t endComment = content.find("*/", pos);
+                if (endComment == std::string::npos) return;
+                pos = endComment + 2;
+            } else {
+                break;
+            }
+        }
+    }
+    
+    static std::string parseString(const std::string& content, size_t& pos) {
+        char quote = content[pos];
+        pos++;  // Skip opening quote
+        
+        std::string result;
+        while (pos < content.size() && content[pos] != quote) {
+            if (content[pos] == '\\' && pos + 1 < content.size()) {
+                // Handle escape sequences
+                pos++;  // Skip backslash
+                if (pos < content.size()) {
+                    result += content[pos];
+                    pos++;
+                }
+            } else {
+                result += content[pos];
+                pos++;
+            }
+        }
+        
+        if (pos < content.size() && content[pos] == quote) {
+            pos++;  // Skip closing quote
+        }
+        
+        return result;
+    }
+    
+    static std::string parseUnquotedKey(const std::string& content, size_t& pos) {
+        size_t start = pos;
+        while (pos < content.size() && content[pos] != ':' && content[pos] != ',' && content[pos] != '}') {
+            pos++;
+        }
+        
+        return content.substr(start, pos - start);
+    }
+    
+    static ConfigValue parseNumber(const std::string& content, size_t& pos) {
+        size_t start = pos;
+        if (content[pos] == '-') pos++;
+        
+        // Check for decimal point
+        bool hasDecimal = false;
+        while (pos < content.size() && (std::isdigit(content[pos]) || content[pos] == '.')) {
+            if (content[pos] == '.') {
+                if (hasDecimal) break;  // Second decimal point
+                hasDecimal = true;
+            }
+            pos++;
+        }
+        
+        std::string numStr = content.substr(start, pos - start);
+        
+        if (hasDecimal) {
+            double value;
+            try {
+                value = std::stod(numStr);
+                return value;
+            } catch (...) {
+                return 0.0;
+            }
+        } else {
+            // Check if it's an integer (fits in int64_t)
+            try {
+                size_t end;
+                int64_t value = std::stoll(numStr, &end);
+                if (end == numStr.size()) return value;
+            } catch (...) {}
+            
+            try {
+                int value = std::stoi(numStr);
+                return value;
+            } catch (...) {}
+        }
+        
+        return 0.0;
+    }
+    
+    static ConfigValue parseBool(const std::string& content, size_t& pos) {
+        if (content.substr(pos, 4) == "true") {
+            pos += 4;
+            return true;
+        } else if (content.substr(pos, 5) == "false") {
+            pos += 5;
+            return false;
+        }
+        return false;
+    }
+    
+    static ConfigValue parseNull(const std::string& content, size_t& pos) {
+        if (content.substr(pos, 4) == "null") {
+            pos += 4;
+            return std::string();  // Empty string for null
+        }
+        return std::string();
+    }
+    
+    static void skipObject(const std::string& content, size_t& pos) {
+        pos++;  // Skip {
+        int braceCount = 1;
+        while (pos < content.size() && braceCount > 0) {
+            if (content[pos] == '{') braceCount++;
+            else if (content[pos] == '}') braceCount--;
+            pos++;
+        }
+    }
+    
+    static void skipArray(const std::string& content, size_t& pos) {
+        pos++;  // Skip [
+        int bracketCount = 1;
+        while (pos < content.size() && bracketCount > 0) {
+            if (content[pos] == '[') bracketCount++;
+            else if (content[pos] == ']') bracketCount--;
+            pos++;
+        }
+    }
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,39 +226,59 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Try JSON parser first (modern format)
+    pImpl->entries.clear();
+    if (SimpleJSONParser::parse(content, pImpl->entries)) {
+        NLM_LOG_INFO("Successfully parsed config file as JSON: " + filepath);
+        return true;
+    }
+    
+    // Fall back to simple key=value parser (legacy format)
+    pImpl->entries.clear();
+    std::istringstream stream(content);
     std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+    int lineNumber = 0;
+    
+    while (std::getline(stream, line)) {
+        lineNumber++;
+        try {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+                NLM_LOG_INFO("Config entry from " + filepath + ": " + key + " = " + value);
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_WARNING("Error parsing config line " + std::to_string(lineNumber) + " in " + filepath + ": " + e.what());
+            // Continue parsing other lines
         }
     }
     
+    NLM_LOG_INFO("Successfully parsed config file (legacy format): " + filepath);
     return true;
 }
 
@@ -81,15 +308,87 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    file << "{\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        
+        // Write key
+        file << "  \"" << entry.key << "\": ";
+        
+        // Write value based on type
+        std::visit([&](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << val << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (val ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                file << val;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << std::fixed << std::setprecision(6) << val;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t j = 0; j < val.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << val[j];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t j = 0; j < val.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << std::fixed << std::setprecision(6) << val[j];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t j = 0; j < val.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << "\"" << val[j] << "\"";
+                }
+                file << "]";
+            } else {
+                file << "null";
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
     }
     
+    file << "}\n";
+    
+    NLM_LOG_INFO("Config saved to JSON file: " + filepath);
     return true;
+}
+
+std::string Config::formatValue(const ConfigValue& value) const {
+    std::ostringstream oss;
+    
+    std::visit([&oss](const auto& val) {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << val << "\"";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            oss << (val ? "true" : "false");
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            oss << val;
+        } else if constexpr (std::is_same_v<T, double>) {
+            oss << std::fixed << std::setprecision(6) << val;
+        } else {
+            oss << "null";
+        }
+    }, value);
+    
+    return oss.str();
 }
 
 template<typename T>
