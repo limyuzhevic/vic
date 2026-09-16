@@ -349,7 +349,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
                                  state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+                                 state.lastSpikeTime >= 0.0f &&
+                                 (static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 0.5f);
 
                 if (justFired) {
                     // Neuron fired this step - queue the spike

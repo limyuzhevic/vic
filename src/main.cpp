@@ -64,11 +64,14 @@ struct LearningExperiment {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
-        // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
+        // Record initial weights from first region - check if region exists
+        auto* region = brain->getRegion(RegionId(1));
+        if (region) {
             for (const auto& syn : region->getSynapses()) {
                 initialWeights.push_back(syn->getWeight());
             }
+        } else {
+            NLM_LOG_ERROR("Region 1 not found - cannot record initial weights");
         }
         
         NLM_LOG_INFO("Initial state recorded:");
@@ -83,11 +86,14 @@ struct LearningExperiment {
     void recordFinalState() {
         finalWeights.clear();
         
-        // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
+        // Record final weights from first region - check if region exists
+        auto* region = brain->getRegion(RegionId(1));
+        if (region) {
             for (const auto& syn : region->getSynapses()) {
                 finalWeights.push_back(syn->getWeight());
             }
+        } else {
+            NLM_LOG_ERROR("Region 1 not found - cannot record final weights");
         }
         
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);

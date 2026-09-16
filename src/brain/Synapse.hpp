@@ -70,9 +70,15 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
-    // Update synapse for one simulation step
+    // Update synapse for one simulation step with real synaptic dynamics
     // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
+    
+    // Get short-term depression (STP)
+    float getShortTermDepression() const;
+    
+    // Get short-term facilitation (STP)
+    float getShortTermFacilitation() const;
     
     // Reset to initial state
     void reset();

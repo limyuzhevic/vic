@@ -48,9 +48,12 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     auto startTime = std::chrono::high_resolution_clock::now();
     
     for (size_t step = 0; step < steps; ++step) {
-        // Inject some random input
-        for (size_t i = 0; i < std::min(size_t(10), neuronCount / 10); ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+        // Inject some random input - ensure we have at least 1 neuron to inject into
+        size_t neuronsToInject = std::min(size_t(10), neuronCount);
+        if (neuronsToInject > 0) {
+            for (size_t i = 0; i < neuronsToInject; ++i) {
+                brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+            }
         }
         
         brain->step(step, step * 0.001);
