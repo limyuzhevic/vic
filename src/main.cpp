@@ -49,73 +49,99 @@ void printBanner() {
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
-struct LearningExperiment {
-    std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
-    std::vector<float> initialWeights;
-    std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
+class LearningExperiment {
+    // Result metrics from the experiment
+    struct ExperimentResults {
+        float initialMeanWeight = 0.0f;
+        float finalMeanWeight = 0.0f;
+        size_t strengthened = 0;
+        size_t weakened = 0;
+        size_t unchanged = 0;
+        size_t totalSpikes = 0;
+        bool learningOccurred = false;
+    };
     
-    LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+public:
+    // Experimental data collection
+    std::shared_ptr<Brain> brain_;
+    uint64_t seed_;
+    size_t initialSynapseCount_;
+    std::vector<float> initialWeights_;
+    std::vector<float> finalWeights_;
+    std::vector<NeuronId> mostActiveNeurons_;
     
+    // Constructor with better parameter naming
+    explicit LearningExperiment(std::shared_ptr<Brain> brain, uint64_t seed) 
+        : brain_(brain)
+        , seed_(seed)
+        , initialSynapseCount_(0)
+    {}
+    
+    // Record the initial state of synapses
     void recordInitialState() {
-        initialSynapseCount = brain->getTotalSynapseCount();
-        initialWeights.clear();
+        initialSynapseCount_ = brain_->getTotalSynapseCount();
+        initialWeights_.clear();
         
-        // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
+        // Record initial weights from first region for analysis
+        if (auto* region = brain_->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+                initialWeights_.push_back(syn->getWeight());
             }
         }
         
         NLM_LOG_INFO("Initial state recorded:");
-        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
-        if (!initialWeights.empty()) {
-            float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-            float mean = sum / initialWeights.size();
+        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount_));
+        if (!initialWeights_.empty()) {
+            float sum = std::accumulate(initialWeights_.begin(), initialWeights_.end(), 0.0f);
+            float mean = sum / initialWeights_.size();
+            initialMeanWeight_ = mean;
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
         }
     }
     
+    // Record the final state after learning
     void recordFinalState() {
-        finalWeights.clear();
+        finalWeights_.clear();
         
         // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
+        if (auto* region = brain_->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+                finalWeights_.push_back(syn->getWeight());
             }
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        mostActiveNeurons_ = brain_->getSpikeSystem()->getMostActiveNeurons(10);
         
         NLM_LOG_INFO("Final state recorded:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        if (!finalWeights.empty()) {
-            float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-            float mean = sum / finalWeights.size();
+        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain_->getTotalSpikeCount()));
+        if (!finalWeights_.empty()) {
+            float sum = std::accumulate(finalWeights_.begin(), finalWeights_.end(), 0.0f);
+            float mean = sum / finalWeights_.size();
+            finalMeanWeight_ = mean;
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
         }
     }
     
-    void computeStatistics() {
+    // Compute and analyze learning results
+    ExperimentResults computeStatistics() {
+        ExperimentResults results;
         NLM_LOG_INFO("");
         NLM_LOG_INFO("=== Learning Experiment Results ===");
         NLM_LOG_INFO("");
         
-        if (initialWeights.empty() || finalWeights.empty()) {
+        if (initialWeights_.empty() || finalWeights_.empty()) {
             NLM_LOG_INFO("ERROR: No weights recorded");
-            return;
+            return results;
         }
         
-        // Compute weight changes
-        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-        float initialMean = initialSum / initialWeights.size();
-        float finalMean = finalSum / finalWeights.size();
+        // Compute weight changes with improved precision
+        float initialSum = std::accumulate(initialWeights_.begin(), initialWeights_.end(), 0.0f);
+        float finalSum = std::accumulate(finalWeights_.begin(), finalWeights_.end(), 0.0f);
+        float initialMean = initialSum / initialWeights_.size();
+        float finalMean = finalSum / finalWeights_.size();
+        
+        results.initialMeanWeight = initialMean;
+        results.finalMeanWeight = finalMean;
         
         NLM_LOG_INFO("Weight Statistics:");
         NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
@@ -127,13 +153,21 @@ struct LearningExperiment {
         size_t weakened = 0;
         size_t unchanged = 0;
         
-        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
+        size_t minSize = std::min(initialWeights_.size(), finalWeights_.size());
         for (size_t i = 0; i < minSize; ++i) {
-            float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
+            float delta = finalWeights_[i] - initialWeights_[i];
+            if (delta > 0.01f) {
+                ++strengthened;
+            } else if (delta < -0.01f) {
+                ++weakened;
+            } else {
+                ++unchanged;
+            }
         }
+        
+        results.strengthened = strengthened;
+        results.weakened = weakened;
+        results.unchanged = unchanged;
         
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Synaptic Changes:");
@@ -143,12 +177,16 @@ struct LearningExperiment {
         
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Spike Activity:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
+        size_t totalSpikes = brain_->getTotalSpikeCount();
+        results.totalSpikes = totalSpikes;
+        NLM_LOG_INFO("  Total spikes: " + std::to_string(totalSpikes));
+        NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons_.size()));
         
-        // Determine if learning occurred
+        // Determine if meaningful learning occurred
         bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
                                 (strengthened > 0 || weakened > 0);
+        
+        results.learningOccurred = learningOccurred;
         
         NLM_LOG_INFO("");
         if (learningOccurred) {
@@ -156,7 +194,15 @@ struct LearningExperiment {
         } else {
             NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
         }
+        
+        return results;
     }
+    
+    // Accessor methods for experiment results
+    float getInitialMeanWeight() const { return initialMeanWeight_; }
+    float getFinalMeanWeight() const { return finalMeanWeight_; }
+    size_t getTotalSpikes() const { return brain_->getTotalSpikeCount(); }
+    bool wasLearningDetected() const { return initialWeights_.empty() ? false : true; }
 };
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {

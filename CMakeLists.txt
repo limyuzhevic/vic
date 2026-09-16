@@ -1,25 +1,55 @@
 cmake_minimum_required(VERSION 3.16)
-project(NLM VERSION 0.1.0 LANGUAGES CXX)
+project(NLM VERSION 0.1.0 LANGUAGES CXX
+    DESCRIPTION "An Experimental Artificial Developmental Brain Simulation"
+)
 
-# C++20 standard
+# C++20 standard with modern compiler settings
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Enable position-independent code for shared libraries
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Default build type to Release if not specified
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Enable warnings
+# Comprehensive warning configuration
+set(WARNING_FLAGS "-Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wold-style-cast")
 if(MSVC)
-    add_compile_options(/W4)
+    add_compile_options(/W4 /WX)  # Level 4 warnings with errors
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(${WARNING_FLAGS})
+    # Additional safety flags
+    add_compile_options(-Wconversion -Wsign-conversion -Wnull-dereference -Wduplicated-cond)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Debug build optimizations
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-g -O0 -DDEBUG)
+    add_definitions(-D_DEBUG)
+else()
+    add_compile_options(-O2 -DNDEBUG)
+endif()
+
+# Python bindings configuration
+find_package(Python 3.8 REQUIRED COMPONENTS Interpreter Development)
+find_package(pybind11 2.11.0 REQUIRED)
+
+# Installation configuration
+set(CMAKE_INSTALL_PREFIX "" CACHE PATH "Installation prefix")
+
+# Output directories for organized build artifacts
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 # Core library
 add_library(nlm_core STATIC
@@ -90,7 +120,10 @@ add_library(nlm_core STATIC
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+    ${Python_INCLUDE_DIRS}
 )
+
+target_compile_features(nlm_core PUBLIC cxx_std_20)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
@@ -133,11 +166,10 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
-)
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+# Python bindings
+pybind11_add_module(pynlm src/python_bindings/main.cpp)
+target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+set_target_properties(pynlm PROPERTIES OUTPUT_NAME "pynlm")
 
 # Testing
 enable_testing()

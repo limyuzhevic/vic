@@ -246,22 +246,38 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("message", &ActionResult::message);
 
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
+        .def(py::init<>(), R"pbdoc(Default constructor with 16x16 vision)pbdoc")
+        .def(py::init<size_t, size_t>(), py::arg("width"), py::arg("height"),
+             "Constructor with custom vision dimensions",
+             py::arg("width") = 16, py::arg("height") = 16)
+        .def("getVision", &SensoryPercept::getVision, "Get vision data")
+        .def("setVision", &SensoryPercept::setVision, py::arg("vision"),
+             "Set vision data with validation")
+        .def("getVisionWidth", &SensoryPercept::getVisionWidth, "Get vision width")
+        .def("getVisionHeight", &SensoryPercept::getVisionHeight, "Get vision height")
+        .def("getTouch", &SensoryPercept::getTouch, "Get touch sensor data")
+        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"), "Set touch data")
+        .def("getInternal", &SensoryPercept::getInternal, "Get internal sensor data")
+        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"), "Set internal data")
+        .def("getProprioception", &SensoryPercept::getProprioception, "Get proprioception data")
+        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"), "Set proprioception data")
+        .def("getAudio", &SensoryPercept::getAudio, "Get audio sensor data")
+        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"), "Set audio data")
+        .def("getAllSignals", &SensoryPercept::getAllSignals, "Get all sensory signals concatenated")
+        .def("getTimestamp", &SensoryPercept::getTimestamp, "Get sensory timestamp")
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"), "Set timestamp")
+        .def("validate", &SensoryPercept::validate, "Validate sensory percept integrity")
+        .def("to_string", &SensoryPercept::to_string, "Get string representation");
+
+    py::class_<SensoryPercept::Builder>(m, "SensoryPerceptBuilder", R"pbdoc(Builder class for constructing SensoryPercept)pbdoc")
         .def(py::init<>())
-        .def("getVision", &SensoryPercept::getVision)
-        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
-        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
-        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
-        .def("getTouch", &SensoryPercept::getTouch)
-        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
-        .def("getInternal", &SensoryPercept::getInternal)
-        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
-        .def("getProprioception", &SensoryPercept::getProprioception)
-        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
-        .def("getAudio", &SensoryPercept::getAudio)
-        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
-        .def("getAllSignals", &SensoryPercept::getAllSignals)
-        .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("add_vision", &SensoryPercept::Builder::addVision, py::arg("data"), "Add vision data")
+        .def("add_touch", &SensoryPercept::Builder::addTouch, py::arg("data"), "Add touch data")
+        .def("add_internal", &SensoryPercept::Builder::addInternal, py::arg("data"), "Add internal data")
+        .def("add_proprioception", &SensoryPercept::Builder::addProprioception, py::arg("data"), "Add proprioception data")
+        .def("add_audio", &SensoryPercept::Builder::addAudio, py::arg("data"), "Add audio data")
+        .def("set_dimensions", &SensoryPercept::Builder::setDimensions, py::arg("width"), py::arg("height"), "Set vision dimensions")
+        .def("build", &SensoryPercept::Builder::build, "Build the SensoryPercept instance");
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
