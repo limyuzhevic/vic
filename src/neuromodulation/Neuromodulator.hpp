@@ -57,22 +57,63 @@ private:
 // PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Attention modulation
+    void signalAttention(float salience, float predictionError);
+    void signalMemoryEvent(float strength, TimestepDuration dt);
+    void setArousalState(bool isAwake);
+    bool isAwake() const;
+    float getAttentionGain() const;
+    
+    // Integration
+    void updateAttention(Brain& brain);
+    void registerAttentionHandler(void (Brain::*handler)());
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+    
+    float getCurrentTime() const;
 };
 
 // Norepinephrine: Arousal and vigilance
 // PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Vigilance and stress response
+    void signalStress(float stressLevel, float threatLevel);
+    void signalVigilance(float arousal, float novelty);
+    void setHighAlert(bool isHighAlert);
+    bool isHighAlert() const;
+    float getVigilanceGain() const;
+    float getFightFlightReadiness() const;
+    
+    // Integration
+    void updateVigilance(Brain& brain);
+    void registerVigilanceHandler(void (Brain::*handler)());
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+    
+    float getCurrentTime() const;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
