@@ -28,6 +28,13 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
+class TemporalRelation;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -164,6 +171,20 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
+    // ========== ADVANCED COGNITIVE SYSTEMS ==========
+    
+    // Self-model for internal self-representation
+    SelfModel* getSelfModel();
+    
+    // Social learning from observing others
+    SocialLearning* getSocialLearning();
+    
+    // Spatial representation for navigation
+    SpatialRepresentation* getSpatialRepresentation();
+    
+    // Temporal relations for sequence learning
+    TemporalRelation* getTemporalRelation();
+    
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
@@ -174,6 +195,15 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and social behavior
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
