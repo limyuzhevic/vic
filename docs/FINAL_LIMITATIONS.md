@@ -1,8 +1,6 @@
-# NLM/熙然 Phase 6 Final Limitations
 
 ## Current Implementation Status
 
-This document describes the current limitations of NLM/熙然 as of Phase 6.
 
 ### Fully Implemented and Integrated
 
@@ -146,7 +144,6 @@ To properly evaluate NLM, compare:
 
 ## Future Directions
 
-Beyond Phase 6, areas for improvement include:
 
 1. **Better neuron models** (point neurons with more dynamics)
 2. **Full neuromodulator suite** (ACh, NE, 5-HT)

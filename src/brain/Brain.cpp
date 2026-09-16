@@ -107,7 +107,7 @@ struct Brain::Impl {
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
+    
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
@@ -125,10 +125,10 @@ struct Brain::Impl {
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
         // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
+        novelty = std::make_unique<Novelty>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+        dopamine = std::make_unique<Dopamine>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -175,7 +175,6 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 }
 
 bool Brain::initialize() {
-    NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
@@ -290,7 +289,6 @@ bool Brain::initialize() {
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
@@ -1078,7 +1076,7 @@ RandomGenerator* Brain::getRandomGenerator() {
 }
 
 void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
+    NLM_LOG_INFO("=== NLM Brain Status  ===");
     NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));

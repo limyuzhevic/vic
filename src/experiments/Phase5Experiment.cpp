@@ -156,9 +156,7 @@ LifetimeExperimentResult Phase5IntegratedExperiment::run(
         currentStep = phaseEnd;
     }
     
-    // Phase 6: Social Development
     {
-        NLM_LOG_INFO("Phase 6: Social Development");
         uint64_t phaseEnd = currentStep + config.socialDevelopmentSteps;
         auto phaseResult = runPhase(
             brain.get(), "Social Development", currentStep, phaseEnd,

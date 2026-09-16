@@ -39,7 +39,7 @@
  *   - Spatial representation
  *   - Concept formation
  * 
- * Phase 6: Social Development (300k-400k steps)
+ 
  *   - Other agent observation
  *   - Imitation learning
  *   - Simple communication

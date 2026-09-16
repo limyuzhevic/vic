@@ -54,6 +54,44 @@ public:
     double getRealTimeElapsed() const;
     void setRealTimeStart();
     
+    // ===== SIMULATION CONTROL =====
+    
+    // Pause/resume simulation control
+    void pause();
+    void resume();
+    bool isPaused() const;
+    
+    // Get/set current simulation state
+    SimulationStep getStep() const;
+    void setStep(SimulationStep step);
+    
+    Timestamp getTime() const;
+    void setTime(Timestamp time);
+    
+    // Time operations
+    void reset();
+    void advance();
+    
+    // Step management
+    void step();
+    void step(Timestamp timestep);
+    SimulationStep getCurrentStep() const;
+    Timestamp getCurrentTime() const;
+    
+    // ===== TIME CONVERSION UTILITIES =====
+    
+    // Alternate step/time conversion methods
+    Timestamp timeAtStep(SimulationStep step) const;
+    Timestamp stepToTime(SimulationStep step) const;
+    SimulationStep timeToStep(Timestamp time) const;
+    
+    // Future time calculations
+    Timestamp timeAtFutureStep(SimulationStep stepsAhead) const;
+    
+    // Real-time wall clock tracking (duplicate removed)
+    double getRealTimeElapsed() const;
+    void setRealTimeStart();
+    
 private:
     struct Impl;
     Impl* pImpl;

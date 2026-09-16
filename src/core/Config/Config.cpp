@@ -199,17 +199,338 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+    std::optional<int> Config::get<int>(const std::string& key) const {
+        auto val = get<int>(key);
+        return val;
+    }
+    
+    std::optional<int64_t> Config::get<int64_t>(const std::string& key) const {
+        auto val = get<int64_t>(key);
+        return val;
+    }
+    
+    std::optional<double> Config::get<double>(const std::string& key) const {
+        auto val = get<double>(key);
+        return val;
+    }
+    
+    std::optional<bool> Config::get<bool>(const std::string& key) const {
+        auto val = get<bool>(key);
+        return val;
+    }
+    
+    std::optional<std::string> Config::get<std::string>(const std::string& key) const {
+        auto val = get<std::string>(key);
+        return val;
+    }
+    
+    int Config::getOr<int>(const std::string& key, const int& defaultValue) const {
+        auto val = get<int>(key);
+        return val.has_value() ? val.value() : defaultValue;
+    }
+    
+    int64_t Config::getOr<int64_t>(const std::string& key, const int64_t& defaultValue) const {
+        auto val = get<int64_t>(key);
+        return val.has_value() ? val.value() : defaultValue;
+    }
+    
+    double Config::getOr<double>(const std::string& key, const double& defaultValue) const {
+        auto val = get<double>(key);
+        return val.has_value() ? val.value() : defaultValue;
+    }
+    
+    bool Config::getOr<bool>(const std::string& key, const bool& defaultValue) const {
+        auto val = get<bool>(key);
+        return val.has_value() ? val.value() : defaultValue;
+    }
+    
+    std::string Config::getOr<std::string>(const std::string& key, const std::string& defaultValue) const {
+        auto val = get<std::string>(key);
+        return val.has_value() ? val.value() : defaultValue;
+    }
+    
+    // ===== CONVENIENCE METHODS =====
+    
+    int Config::getInt(const std::string& key) const {
+        auto val = get<int>(key);
+        if (!val) throw ConfigurationError("Configuration key not found: " + key);
+        return *val;
+    }
+    
+    int64_t Config::getInt64(const std::string& key) const {
+        auto val = get<int64_t>(key);
+        if (!val) throw ConfigurationError("Configuration key not found: " + key);
+        return *val;
+    }
+    
+    double Config::getDouble(const std::string& key) const {
+        auto val = get<double>(key);
+        if (!val) throw ConfigurationError("Configuration key not found: " + key);
+        return *val;
+    }
+    
+    bool Config::getBool(const std::string& key) const {
+        auto val = get<bool>(key);
+        if (!val) throw ConfigurationError("Configuration key not found: " + key);
+        return *val;
+    }
+    
+    std::string Config::getString(const std::string& key) const {
+        auto val = get<std::string>(key);
+        if (!val) throw ConfigurationError("Configuration key not found: " + key);
+        return *val;
+    }
+    
+    std::vector<int> Config::getIntArray(const std::string& key) const {
+        auto val = get<std::vector<int>>(key);
+        return val ? *val : std::vector<int>();
+    }
+    
+    std::vector<double> Config::getDoubleArray(const std::string& key) const {
+        auto val = get<std::vector<double>>(key);
+        return val ? *val : std::vector<double>();
+    }
+    
+    std::vector<std::string> Config::getStringArray(const std::string& key) const {
+        auto val = get<std::vector<std::string>>(key);
+        return val ? *val : std::vector<std::string>();
+    }
+    
+    // ===== CONVENIENCE SETTERS =====
+    
+    void Config::setInt(const std::string& key, int value, ConfigSource source) {
+        set(key, ConfigValue(value), source);
+    }
+    
+    void Config::setInt64(const std::string& key, int64_t value, ConfigSource source) {
+        set(key, ConfigValue(value), source);
+    }
+    
+    void Config::setDouble(const std::string& key, double value, ConfigSource source) {
+        set(key, ConfigValue(value), source);
+    }
+    
+    void Config::setBool(const std::string& key, bool value, ConfigSource source) {
+        set(key, ConfigValue(value), source);
+    }
+    
+    void Config::setString(const std::string& key, const std::string& value, ConfigSource source) {
+        set(key, ConfigValue(value), source);
+    }
+    
+    void Config::setIntArray(const std::string& key, const std::vector<int>& value, ConfigSource source) {
+        set(key, ConfigValue(value), source);
+    }
+    
+    void Config::setDoubleArray(const std::string& key, const std::vector<double>& value, ConfigSource source) {
+        set(key, ConfigValue(value), source);
+    }
+    
+    void Config::setStringArray(const std::string& key, const std::vector<std::string>& value, ConfigSource source) {
+        set(key, ConfigValue(value), source);
+    }
+    
+    // ===== VALIDATION =====
+    
+    bool Config::validate(const std::string& key, const std::string& type) const {
+        // Simple validation based on type
+        auto val = get<std::string>(key);
+        if (!val) return false;
+        
+        if (type == "int") {
+            try { std::stoi(*val); return true; }
+            catch (...) { return false; }
+        } else if (type == "double") {
+            try { std::stod(*val); return true; }
+            catch (...) { return false; }
+        } else if (type == "bool") {
+            std::string lower = *val;
+            for (char& c : lower) c = std::tolower(c);
+            return lower == "true" || lower == "false" || lower == "1" || lower == "0";
+        }
+        return true;
+    }
+    
+    bool Config::validateInt(const std::string& key) const {
+        auto val = get<std::string>(key);
+        if (!val) return false;
+        try { std::stoi(*val); return true; }
+        catch (...) { return false; }
+    }
+    
+    bool Config::validateDouble(const std::string& key) const {
+        auto val = get<std::string>(key);
+        if (!val) return false;
+        try { std::stod(*val); return true; }
+        catch (...) { return false; }
+    }
+    
+    bool Config::validateBool(const std::string& key) const {
+        auto val = get<std::string>(key);
+        if (!val) return false;
+        std::string lower = *val;
+        for (char& c : lower) c = std::tolower(c);
+        return lower == "true" || lower == "false" || lower == "1" || lower == "0";
+    }
+    
+    bool Config::validateString(const std::string& key) const {
+        return has(key);
+    }
+    
+    bool Config::validateIntArray(const std::string& key) const {
+        auto val = get<std::vector<int>>(key);
+        return val.has_value();
+    }
+    
+    bool Config::validateDoubleArray(const std::string& key) const {
+        auto val = get<std::vector<double>>(key);
+        return val.has_value();
+    }
+    
+    bool Config::validateStringArray(const std::string& key) const {
+        auto val = get<std::vector<std::string>>(key);
+        return val.has_value();
+    }
+    
+    // ===== MERGING AND COMPARISON =====
+    
+    void Config::merge(const Config& other) {
+        auto keys = other.getKeys();
+        for (const auto& key : keys) {
+            auto val = other.get<std::string>(key);
+            if (val) {
+                set(key, ConfigValue(*val), ConfigSource::Runtime);
+            }
+        }
+    }
+    
+    bool Config::equals(const Config& other) const {
+        auto keys1 = getKeys();
+        auto keys2 = other.getKeys();
+        
+        if (keys1.size() != keys2.size()) return false;
+        
+        for (const auto& key : keys1) {
+            if (!other.has(key)) return false;
+            
+            auto val1 = get<std::string>(key);
+            auto val2 = other.get<std::string>(key);
+            
+            if (!val1 || !val2 || *val1 != *val2) return false;
+        }
+        
+        return true;
+    }
+    
+    // ===== EXPORT/IMPORT =====
+    
+    bool Config::exportToJSON(const std::string& filepath) const {
+        return saveToFile(filepath);
+    }
+    
+    bool Config::importFromJSON(const std::string& filepath) {
+        return loadFromFile(filepath);
+    }
+    
+    // ===== STATISTICS =====
+    
+    size_t Config::getEntryCount() const {
+        return pImpl->entries.size();
+    }
+    
+    std::vector<std::string> Config::getKeysBySource(ConfigSource source) const {
+        std::vector<std::string> keys;
+        for (const auto& entry : pImpl->entries) {
+            if (entry.source == source) {
+                keys.push_back(entry.key);
+            }
+        }
+        return keys;
+    }
+    
+    std::string Config::getSourceString(ConfigSource source) {
+        switch (source) {
+            case ConfigSource::Default: return "Default";
+            case ConfigSource::File: return "File";
+            case ConfigSource::CommandLine: return "CommandLine";
+            case ConfigSource::Runtime: return "Runtime";
+            default: return "Unknown";
+        }
+    }
+    
+    // ===== PRESETS =====
+    
+    std::shared_ptr<Config> Config::createDefaultConfig() {
+        return std::make_shared<Config>();
+    }
+    
+    std::shared_ptr<Config> Config::createEfficientConfig() {
+        auto config = std::make_shared<Config>();
+        config->setInt("brain.neuronCount", 10000);
+        config->setDouble("brain.synapticDensity", 0.1);
+        config->setBool("brain.enablePlasticity", true);
+        config->setBool("brain.enableDevelopment", false);
+        config->setDouble("simulation.timeStep", 0.001);
+        config->setInt("simulation.maxSteps", 10000);
+        return config;
+    }
+    
+    std::shared_ptr<Config> Config::createLearningConfig() {
+        auto config = std::make_shared<Config>();
+        config->setInt("brain.neuronCount", 50000);
+        config->setDouble("brain.synapticDensity", 0.2);
+        config->setBool("brain.enablePlasticity", true);
+        config->setBool("brain.enableDevelopment", true);
+        config->setBool("brain.enableCuriosity", true);
+        config->setDouble("simulation.timeStep", 0.001);
+        config->setInt("simulation.maxSteps", 50000);
+        return config;
+    }
+    
+    std::shared_ptr<Config> Config::createExplorationConfig() {
+        auto config = std::make_shared<Config>();
+        config->setInt("brain.neuronCount", 20000);
+        config->setDouble("brain.synapticDensity", 0.15);
+        config->setBool("brain.enablePlasticity", true);
+        config->setBool("brain.enableDevelopment", true);
+        config->setBool("brain.enableCuriosity", true);
+        config->setBool("brain.enableNovelty", true);
+        config->setDouble("simulation.timeStep", 0.002);
+        config->setInt("simulation.maxSteps", 20000);
+        return config;
+    }
+    
+    std::shared_ptr<Config> Config::createMinimalConfig() {
+        auto config = std::make_shared<Config>();
+        config->setInt("brain.neuronCount", 100);
+        config->setDouble("brain.synapticDensity", 0.05);
+        config->setBool("brain.enablePlasticity", false);
+        config->setBool("brain.enableDevelopment", false);
+        config->setDouble("simulation.timeStep", 0.01);
+        config->setInt("simulation.maxSteps", 1000);
+        return config;
+    }
+    
+    std::shared_ptr<Config> Config::createHighPerformanceConfig() {
+        auto config = std::make_shared<Config>();
+        config->setInt("brain.neuronCount", 100000);
+        config->setDouble("brain.synapticDensity", 0.05);
+        config->setBool("brain.enablePlasticity", true);
+        config->setBool("brain.enableDevelopment", true);
+        config->setBool("brain.enableCuriosity", true);
+        config->setBool("brain.enableNovelty", true);
+        config->setBool("brain.enablePrediction", true);
+        config->setDouble("simulation.timeStep", 0.0005);
+        config->setInt("simulation.maxSteps", 100000);
+        config->setBool("simulation.parallelProcessing", true);
+        config->setBool("memory.efficientMode", true);
+        return config;
+    }
+    
+    // ===== HELPER =====
+    
+    std::string Config::getSourceName(ConfigSource source) {
+        return getSourceString(source);
+    }
 
 } // namespace nlm

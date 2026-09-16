@@ -190,6 +190,115 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
+    // ===== SIMULATION CONTROL =====
+    
+    // Pause/resume simulation
+    void pause();
+    void resume();
+    bool isPaused() const;
+    
+    // Step control
+    void step();
+    void step(Timestamp timestep);
+    SimulationStep getCurrentStep() const;
+    Timestamp getCurrentTime() const;
+    
+    // Get simulation clock
+    SimulationClock* getSimulationClock();
+    const SimulationClock* getSimulationClock() const;
+    
+    // ===== METRICS COLLECTION =====
+    
+    // Neural statistics
+    size_t getTotalNeuronCount() const;
+    size_t getTotalSynapseCount() const;
+    size_t getActiveNeuronCount() const;
+    size_t getFiringNeuronCount() const;
+    float getAverageFiringRate() const;
+    float getExcitationInhibitionRatio() const;
+    
+    // Performance metrics
+    double getAverageSpikeInterval() const;
+    double getMaxSpikeFrequency() const;
+    double getAverageResponseTime() const;
+    
+    // Energy and resource tracking
+    float getTotalEnergy() const;
+    float getAverageEnergyConsumption() const;
+    
+    // ===== NEURAL PATTERN MANAGEMENT =====
+    
+    // Pattern utilities
+    std::shared_ptr<NeuralPattern> createPattern(const std::string& name);
+    std::shared_ptr<NeuralPattern> loadPatternFromJSON(const std::string& json);
+    std::string patternToJSON(const std::shared_ptr<NeuralPattern>& pattern) const;
+    void registerPattern(const std::shared_ptr<NeuralPattern>& pattern);
+    std::vector<std::string> getRegisteredPatternNames() const;
+    
+    // ===== PERFORMANCE MONITORING =====
+    
+    // CPU/GPU monitoring
+    double getCPUUsage() const;
+    double getMemoryUsage() const; // in MB
+    double getGPUMemoryUsage() const; // in MB
+    
+    // Simulation performance
+    double getSimulationFPS() const;
+    double getAverageStepTime() const;
+    double getMaxStepTime() const;
+    
+    // ===== SERIALIZATION/DESERIALIZATION =====
+    
+    // Enhanced save/load with compression options
+    bool save(const std::string& filepath, bool compress = false, int compressionLevel = 6) const;
+    bool load(const std::string& filepath, bool compressed = false);
+    std::string saveToString(bool compress = false, int compressionLevel = 6) const;
+    bool loadFromString(const std::string& data, bool compressed = false);
+    
+    // Checkpoint management
+    bool createCheckpoint(const std::string& label = "") const;
+    bool restoreCheckpoint(const std::string& label = "");
+    std::vector<std::string> getAvailableCheckpoints() const;
+    
+    // ===== RANDOM SEED MANAGEMENT =====
+    
+    // Random number generation control
+    uint64_t getRandomSeed() const;
+    void setRandomSeed(uint64_t seed);
+    void seedRandom(uint64_t seed);
+    
+    // Random distribution helpers
+    double getRandomNormal(double mean = 0.0, double stddev = 1.0);
+    double getRandomUniform(double min = 0.0, double max = 1.0);
+    int getRandomInt(int min, int max);
+    
+    // ===== DEBUGGING AND INTROSPECTION =====
+    
+    // Memory and resource inspection
+    size_t getMemoryFootprint() const; // in bytes
+    size_t getRegionCount() const;
+    std::vector<RegionId> getRegionIds() const;
+    
+    // Neural connectivity inspection
+    size_t getIncomingConnections(NeuronId neuron) const;
+    size_t getOutgoingConnections(NeuronId neuron) const;
+    
+    // System diagnostics
+    std::string getDiagnosticsReport() const;
+    std::map<std::string, std::string> getSystemInfo() const;
+    
+    // ===== LOGGING =====
+    
+    // Logging control
+    void enableDebugLogging(bool enable);
+    bool isDebugLoggingEnabled() const;
+    void setLogLevel(LogLevel level);
+    LogLevel getLogLevel() const;
+    
+    // Performance logging
+    void logPerformanceStats() const;
+    void logNeuralStats() const;
+    
     // Logging
     void logStatus() const;
     

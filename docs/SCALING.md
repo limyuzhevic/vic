@@ -356,7 +356,6 @@ auto results = benchmark.run(createBrain, runSimulation, collectMetrics);
 
 ## Future Scaling Directions
 
-### Phase 6+ Ideas
 
 1. **GPU acceleration**: CUDA/HIP for neuron updates
 2. **Distributed simulation**: Multi-machine scaling
