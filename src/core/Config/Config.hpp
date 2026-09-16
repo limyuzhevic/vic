@@ -93,6 +93,23 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Save to file with actual values (not placeholders)
+    bool saveToFile(const std::string& filepath) const;
+    
+    // Internal helpers
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    static std::string escapeString(const std::string& str);
+    
+    // Load from JSON file (Phase 2)
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Load from YAML file (Phase 2)
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Load from TOML file (Phase 2)
+    bool loadFromTOML(const std::string& filepath);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

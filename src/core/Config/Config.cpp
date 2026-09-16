@@ -86,10 +86,57 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Save actual values instead of placeholders
+        std::visit([&file, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Quote strings if they contain spaces
+                if (arg.find(' ') != std::string::npos || arg.find('"') != std::string::npos) {
+                    file << entry.key << " = \"" << escapeString(arg) << "\"\n";
+                } else {
+                    file << entry.key << " = " << arg << "\n";
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<int>> || 
+                                 std::is_same_v<T, std::vector<double>> || 
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                // Save arrays as comma-separated values
+                file << entry.key << " = [";
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                        file << "\"" << escapeString(std::get<std::string>(item)) << "\"";
+                    } else {
+                        file << item;
+                    }
+                    first = false;
+                }
+                file << "]\n";
+            } else {
+                // For simple types (int, int64_t, double, bool)
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
+}
+
+std::string Config::escapeString(const std::string& str) {
+    std::string result;
+    result.reserve(str.size());
+    for (char c : str) {
+        switch (c) {
+            case '\\': result += "\\\\"; break;
+            case '"': result += "\\\""; break;
+            case '\n': result += "\\n"; break;
+            case '\r': result += "\\r"; break;
+            case '\t': result += "\\t"; break;
+            default: result += c; break;
+        }
+    }
+    return result;
 }
 
 template<typename T>
@@ -198,18 +245,18 @@ std::string Config::toLower(const std::string& str) {
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
 }
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm
+std::string Config::escapeString(const std::string& str) {
+    std::string result;
+    result.reserve(str.size());
+    for (char c : str) {
+        switch (c) {
+            case '\\': result += "\\\\"; break;
+            case '"': result += "\\\""; break;
+            case '\n': result += "\\n"; break;
+            case '\r': result += "\\r"; break;
+            case '\t': result += "\\t"; break;
+            default: result += c; break;
+        }
+    }
+    return result;
+}
