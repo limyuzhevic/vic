@@ -149,7 +149,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -162,7 +162,31 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Factory methods for common configurations
+        .def_static("createDefault", []() -> std::shared_ptr<Config> {
+            return std::make_shared<Config>();
+        }, "Create a default configuration")
+        .def_static("fromFile", [](const std::string& filepath) -> std::shared_ptr<Config> {
+            auto config = std::make_shared<Config>();
+            if (config->loadFromFile(filepath)) {
+                return config;
+            }
+            return nullptr;
+        }, py::arg("filepath"),
+            "Create configuration from file, returns None if file not found")
+        .def("get", [](Config& self, const std::string& key, const std::string& defaultValue) -> std::string {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value as string")
+        .def("getInt", [](Config& self, const std::string& key, int defaultValue) -> int {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value as int")
+        .def("getFloat", [](Config& self, const std::string& key, float defaultValue) -> float {
+            return self.getOr<float>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value as float")
+        .def("getBool", [](Config& self, const std::string& key, bool defaultValue) -> bool {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value as bool");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -266,28 +290,53 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
+             py::arg("visionWidth"), py::arg("visionHeight"),
+             "Configure world dimensions")
+        .def("reset", &SimpleWorld::reset, "Reset world to initial state")
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"),
+             "Set agent's starting position")
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+             "Update world by timestep seconds")
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
+             py::arg("cmd"), py::arg("currentTime"),
+             "Apply motor command to world")
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
+             py::return_value_policy::reference_internal,
+             "Get sensory percept from world")
         .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+             py::return_value_policy::reference_internal,
+             "Get agent's body state")
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"),
+             "Add object to world")
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"),
+             "Remove object from world")
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+             "Check if position is valid in world")
+        .def("getWidth", &SimpleWorld::getWidth, "Get world width")
+        .def("getHeight", &SimpleWorld::getHeight, "Get world height")
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy, "Get max energy")
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"),
+             "Set max energy")
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate,
+             "Get energy decay rate")
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"),
+             "Set energy decay rate")
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime,
+             "Get current simulation time")
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"),
+             "Set random seed")
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed, "Get random seed")
+        // Convenience methods
+        .def("createWorld", []() {
+            auto world = std::make_shared<SimpleWorld>();
+            world->initialize(16, 16);
+            return world;
+        }, "Create world with default dimensions")
+        .def("createGridWorld", [](int width, int height) {
+            auto world = std::make_shared<SimpleWorld>();
+            world->initialize(width, height);
+            return world;
+        }, py::arg("width"), py::arg("height"), "Create grid world with specified dimensions");
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
