@@ -133,16 +133,20 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
+// Update neuron for one simulation step
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
-    
+
+    // Neuromodulation effects
+    // Increase neural excitability (e.g., in response to reward prediction error)
+    void boostExcitability(MembranePotential boostAmount);
+
     // Reset to initial state
     void reset();
-    
+
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
-    
+
 private:
     struct Impl;
     Impl* pImpl;

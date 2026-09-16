@@ -259,6 +259,22 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     return fired;
 }
 
+// Increase neural excitability (e.g., in response to reward prediction error)
+void Neuron::boostExcitability(MembranePotential boostAmount) {
+    // Apply excitability boost by lowering threshold temporarily
+    // This simulates neuromodulatory effects on neural excitability
+    pImpl->state.threshold -= boostAmount;
+    
+    // Clamp threshold to reasonable biological range (-50 to -20 mV)
+    pImpl->state.threshold = std::clamp(pImpl->state.threshold, -50.0f, -20.0f);
+    
+    // Log the excitability boost for debugging
+    if (boostAmount > 0.0f) {
+        // In production, would use logger
+        // NLM_LOG_DEBUG("Neuron " + std::to_string(pImpl->id.index()) + " excitability boosted by " + std::to_string(boostAmount) + " mV");
+    }
+}
+
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
     TimestepDuration dt = 0.001;  // 1ms default
