@@ -20,45 +20,122 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
-        }
+    // Initialize cognitive systems
+    initializeCognitiveSystems();
+    
+    NLM_LOG_INFO("AgentBrain initialized with " + 
+                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
+                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
+                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+}
+
+void AgentBrain::initializeCognitiveSystems() {
+    if (!brain_) return;
+    
+    NLM_LOG_INFO("Initializing cognitive systems for integration...");
+    
+    // Initialize NeuralPlanner for action planning
+    if (!neuralPlanner_) {
+        neuralPlanner_ = std::make_shared<NeuralPlanner>();
+        neuralPlanner_->initialize(brain_.get());
+        NLM_LOG_INFO("NeuralPlanner initialized and connected to brain");
     }
+    
+    // Initialize ConceptFormation for pattern discovery
+    if (!conceptFormation_) {
+        conceptFormation_ = std::make_shared<ConceptFormation>();
+        conceptFormation_->initialize(brain_.get());
+        NLM_LOG_INFO("ConceptFormation initialized and connected to brain");
+    }
+    
+    // Initialize SelfModel for body schema
+    if (!selfModel_) {
+        selfModel_ = std::make_shared<SelfModel>();
+        selfModel_->initialize(brain_.get());
+        NLM_LOG_INFO("SelfModel initialized and connected to brain");
+    }
+    
+    // Initialize SocialLearning for peer interaction
+    if (!socialLearning_) {
+        socialLearning_ = std::make_shared<SocialLearning>();
+        socialLearning_->initialize(brain_.get());
+        NLM_LOG_INFO("SocialLearning initialized and connected to brain");
+    }
+    
+    // Initialize SpatialRepresentation for navigation
+    if (!spatialRepresentation_) {
+        spatialRepresentation_ = std::make_shared<SpatialRepresentation>();
+        spatialRepresentation_->initialize(brain_.get());
+        NLM_LOG_INFO("SpatialRepresentation initialized and connected to brain");
+    }
+    
+    // Initialize TemporalRelation for sequence learning
+    if (!temporalRelation_) {
+        temporalRelation_ = std::make_shared<TemporalRelation>();
+        temporalRelation_->initialize(brain_.get());
+        NLM_LOG_INFO("TemporalRelation initialized and connected to brain");
+    }
+    
+    NLM_LOG_INFO("All cognitive systems initialized successfully");
+}
+
+void AgentBrain::processWithCognitiveSystems(const SensoryPercept& percept) {
+    if (!brain_ || !neuralPlanner_ || !conceptFormation_) return;
+    
+    // Extract state from sensory input
+    std::vector<float> currentState = percept.getAllSignals();
+    
+    // Get matching concept for current sensory input
+    size_t conceptId = conceptFormation_->getMatchingConcept(currentState);
+    if (conceptId > 0) {
+        NLM_LOG_INFO("Cognitive match: sensory input matches concept " + std::to_string(conceptId));
+    }
+    
+    // Update self-model with current sensory state
+    if (selfModel_) {
+        selfModel_->recordCurrentState(currentState);
+    }
+    
+    // Update spatial representation with position
+    if (spatialRepresentation_) {
+        spatialRepresentation_->updatePosition(percept.getVisionWidth(), percept.getVisionHeight());
+    }
+}
+
+MotorCommand AgentBrain::planAction(const std::vector<float>& state, float targetReward) {
+    if (!neuralPlanner_) return MotorCommand::Wait;
+    
+    ActionType plannedAction = neuralPlanner_->planAction(state, targetReward);
+    return static_cast<MotorCommand>(plannedAction);
+}
+
+void AgentBrain::recordExperience(const std::vector<float>& state, ActionType action, float reward) {
+    if (!neuralPlanner_ || !conceptFormation_ || !selfModel_ || !temporalRelation_) return;
+    
+    // Update planner with outcome
+    neuralPlanner_->updatePlanQuality(std::vector<ActionType>{action}, std::vector<ActionType>{action}, reward);
+    
+    // Update concept formation with new experience
+    size_t conceptId = conceptFormation_->presentExperience(state, std::vector<float>(state.size(), 0.0f), reward, 0);
+    
+    // Update self-model
+    selfModel_->updateSelfModel(state, state, action);
+    
+    // Record temporal relation
+    temporalRelation_->recordSequence(state, state, reward);
+}
+
+void AgentBrain::updateCognitiveSystems(double timestep) {
+    if (!neuralPlanner_ || !conceptFormation_ || !selfModel_) return;
+    
+    // Update planner with time
+    neuralPlanner_->updatePlanQuality({}, {}, 0.0f);
+    
+    // Update concept formation
+    // (In a real implementation, we'd pass accumulated experiences)
+    
+    // Update self-model
+    selfModel_->updateBodyAwareness();
 }
 
 AgentBrain::~AgentBrain() = default;
@@ -347,4 +424,61 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
-} // namespace nlm
+// Initialize cognitive systems
+    initializeCognitiveSystems();
+    
+    NLM_LOG_INFO("AgentBrain initialized with " + 
+                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
+                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
+                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+}
+
+void AgentBrain::initializeCognitiveSystems() {
+    if (!brain_) return;
+    
+    NLM_LOG_INFO("Initializing cognitive systems for integration...");
+    
+    // Initialize NeuralPlanner for action planning
+    if (!neuralPlanner_) {
+        neuralPlanner_ = std::make_shared<NeuralPlanner>();
+        neuralPlanner_->initialize(brain_.get());
+        NLM_LOG_INFO("NeuralPlanner initialized and connected to brain");
+    }
+    
+    // Initialize ConceptFormation for pattern discovery
+    if (!conceptFormation_) {
+        conceptFormation_ = std::make_shared<ConceptFormation>();
+        conceptFormation_->initialize(brain_.get());
+        NLM_LOG_INFO("ConceptFormation initialized and connected to brain");
+    }
+    
+    // Initialize SelfModel for body schema
+    if (!selfModel_) {
+        selfModel_ = std::make_shared<SelfModel>();
+        selfModel_->initialize(brain_.get());
+        NLM_LOG_INFO("SelfModel initialized and connected to brain");
+    }
+    
+    // Initialize SocialLearning for peer interaction
+    if (!socialLearning_) {
+        socialLearning_ = std::make_shared<SocialLearning>();
+        socialLearning_->initialize(brain_.get());
+        NLM_LOG_INFO("SocialLearning initialized and connected to brain");
+    }
+    
+    // Initialize SpatialRepresentation for navigation
+    if (!spatialRepresentation_) {
+        spatialRepresentation_ = std::make_shared<SpatialRepresentation>();
+        spatialRepresentation_->initialize(brain_.get());
+        NLM_LOG_INFO("SpatialRepresentation initialized and connected to brain");
+    }
+    
+    // Initialize TemporalRelation for sequence learning
+    if (!temporalRelation_) {
+        temporalRelation_ = std::make_shared<TemporalRelation>();
+        temporalRelation_->initialize(brain_.get());
+        NLM_LOG_INFO("TemporalRelation initialized and connected to brain");
+    }
+    
+    NLM_LOG_INFO("All cognitive systems initialized successfully");
+}

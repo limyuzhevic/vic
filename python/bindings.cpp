@@ -9,12 +9,17 @@
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
 #include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/NeuralAssociativeMemory.hpp"
+#include "../src/prediction/NeuralPrediction.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/SelfModel.hpp"
+#include "../src/cognition/SocialLearning.hpp"
+#include "../src/cognition/SpatialRepresentation.hpp"
+#include "../src/cognition/TemporalRelation.hpp"
 
 namespace py = pybind11;
 namespace nlm {

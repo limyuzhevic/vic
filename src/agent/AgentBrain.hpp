@@ -69,6 +69,27 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Motor decoding: convert neural activity to motor command
+    MotorCommand decodeFromMotorNeurons();
+    
+    // Motor command selection with curiosity/exploration
+    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Cognitive system integration
+    void initializeCognitiveSystems();
+    void processWithCognitiveSystems(const SensoryPercept& percept);
+    MotorCommand planAction(const std::vector<float>& state, float targetReward);
+    void recordExperience(const std::vector<float>& state, ActionType action, float reward);
+    void updateCognitiveSystems(double timestep);
+    
+    // Cognitive system accessors
+    NeuralPlanner* getNeuralPlanner() { return neuralPlanner_.get(); }
+    ConceptFormation* getConceptFormation() { return conceptFormation_.get(); }
+    SelfModel* getSelfModel() { return selfModel_.get(); }
+    SocialLearning* getSocialLearning() { return socialLearning_.get(); }
+    SpatialRepresentation* getSpatialRepresentation() { return spatialRepresentation_.get(); }
+    TemporalRelation* getTemporalRelation() { return temporalRelation_.get(); }
+
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -77,6 +98,14 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    
+    // Cognitive system integration
+    std::shared_ptr<NeuralPlanner> neuralPlanner_;
+    std::shared_ptr<ConceptFormation> conceptFormation_;
+    std::shared_ptr<SelfModel> selfModel_;
+    std::shared_ptr<SocialLearning> socialLearning_;
+    std::shared_ptr<SpatialRepresentation> spatialRepresentation_;
+    std::shared_ptr<TemporalRelation> temporalRelation_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
