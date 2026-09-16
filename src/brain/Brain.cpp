@@ -1,3 +1,11 @@
+// Brain.cpp - NLM Phase 6 Integrated Brain Implementation
+// This file implements the complete integrated artificial brain with:
+// - Real-time spiking neural computation
+// - Event-driven dynamics with spike systems
+// - Integrated memory, prediction, cognition, and neuromodulation systems
+// - Structural plasticity for development
+// - Memory consolidation and replay mechanisms
+
 #include "Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
@@ -75,6 +83,13 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // Advanced integration state
+    size_t attentionalFocus;      // Current attentional focus
+    float predictionConfidence;  // Prediction confidence (0-1)
+    float memoryActivationThreshold;  // Threshold for memory activation
+    float curiosityLevel;       // Current curiosity/exploration drive
+    float noveltyLevel;          // Current novelty detection level
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -92,8 +107,13 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , attentionalFocus(0)      // Initial attentional focus
+        , predictionConfidence(1.0f)  // Initial prediction confidence
+        , memoryActivationThreshold(0.5f)  // Initial memory activation threshold
+        , curiosityLevel(0.0f)     // Initial curiosity level
+        , noveltyLevel(0.0f)       // Initial novelty level
     {
-        // Initialize random generator with seed from config
+        // Initialize random number generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
@@ -116,7 +136,7 @@ struct Brain::Impl {
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
         
-        // Initialize cognition systems
+        // Initialize cognitive systems
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
