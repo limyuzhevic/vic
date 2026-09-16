@@ -9,10 +9,7 @@
 #include <fstream>
 #include <sstream>
 
-namespace nlm {
-
-// Main Phase 3 demonstration
-// Shows: experience -> neural activity -> action -> consequence -> learning
+using namespace nlm;
 
 class Phase3Demo {
 public:
@@ -240,9 +237,6 @@ private:
     }
 };
 
-} // namespace nlm
-
-// Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
     int numEpisodes = 5;
     int stepsPerEpisode = 200;

@@ -86,7 +86,27 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Properly serialize the value based on its type
+        if (entry.key == "random_seed") {
+            // Special handling for known config keys for backward compatibility
+            file << entry.key << " = " << std::get<int64_t>(entry.value) << "\n";
+        } else {
+            std::visit([&file](const auto& value) {
+                using T = std::decay_t<decltype(value)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << entry.key << " = \"" << value << "\"\n";
+                } else if constexpr (std::is_same_v<T, int64_t>) {
+                    file << entry.key << " = " << value << "\n";
+                } else if constexpr (std::is_same_v<T, double>) {
+                    file << entry.key << " = " << value << "\n";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << entry.key << " = " << (value ? "true" : "false") << "\n";
+                } else {
+                    file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+                }
+            }, entry.value);
+        }
     }
     
     return true;

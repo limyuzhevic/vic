@@ -170,7 +170,19 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        // Convenience methods for easier Python API usage
+        .def("hasSignals", [](const SensoryInput& self) {
+            return !self.getData().empty();
+        }, "Check if this sensory input has data")
+        .def("to_dict", [](const SensoryInput& self) {
+            std::map<std::string, std::vector<float>> result;
+            auto data = self.getData();
+            if (!data.empty()) {
+                result["data"] = data;
+            }
+            return result;
+        }, "Convert sensory input to Python dictionary");
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -181,7 +193,28 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        // Additional convenience methods
+        .def("getNormalizedData", [](const Vision& self) {
+            std::vector<float> data = self.getData();
+            float maxVal = *std::max_element(data.begin(), data.end());
+            if (maxVal > 0) {
+                for (auto& val : data) val /= maxVal;
+            }
+            return data;
+        }, "Get normalized pixel data (0-1)")
+        .def("getMeanIntensity", [](const Vision& self) {
+            std::vector<float> data = self.getData();
+            if (data.empty()) return 0.0f;
+            float sum = std::accumulate(data.begin(), data.end(), 0.0f);
+            return sum / data.size();
+        }, "Calculate mean intensity of vision data")
+        .def("getCenterPixel", [](const Vision& self) {
+            std::vector<float> data = self.getData();
+            if (data.empty()) return std::vector<float>{0, 0, 0};
+            size_t center = data.size() / 2;
+            return std::vector<float>(data.begin() + center, data.begin() + center + 3);
+        }, "Get center pixel RGB values");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -191,12 +224,19 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
-
-    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
-        .def(py::init<>())
-        .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+        .def("getNumSamples", &Audio::getNumSamples)
+        // Audio-specific convenience methods
+        .def("getEnergy", [](const Audio& self) {
+            std::vector<float> data = self.getData();
+            float energy = 0.0f;
+            for (float val : data) energy += val * val;
+            return std::sqrt(energy);
+        }, "Calculate audio signal energy")
+        .def("getSpectralPeak", [](const Audio& self) {
+            std::vector<float> data = self.getData();
+            if (data.empty()) return 0.0f;
+            return *std::max_element(data.begin(), data.end());
+        }, "Find maximum amplitude in audio data");
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
