@@ -318,14 +318,21 @@ private:
     std::vector<uint8_t> compressBuffer_;
 };
 
-/**
- * Checkpoint manager for automated checkpointing
- */
+// CheckpointManager.h
+#pragma once
+
+#include "../core/Types/Types.hpp"
+#include "BrainCheckpoint.hpp"
+#include <functional>
+#include <memory>
+
+namespace nlm {
+
 class CheckpointManager {
 public:
     CheckpointManager();
     ~CheckpointManager();
-    
+
     /**
      * Configure checkpoint manager
      */
@@ -333,33 +340,40 @@ public:
                    uint64_t saveIntervalSteps = 10000,
                    size_t maxCheckpoints = 10,
                    bool compress = true);
-    
+
     /**
      * Set checkpoint data providers
      */
     void setNeuronProvider(std::function<bool(NeuronCheckpointData&)> provider) {
-        neuronProvider_ = provider;
+        neuronProvider_ = std::move(provider);
     }
-    
+
     void setSynapseProvider(std::function<bool(SynapseCheckpointData&)> provider) {
-        synapseProvider_ = provider;
+        synapseProvider_ = std::move(provider);
     }
     
+    /**
+     * Set brain state provider for comprehensive checkpointing
+     */
+    void setBrainProvider(std::function<bool(BrainCheckpointData&)> provider) {
+        brainProvider_ = std::move(provider);
+    }
+
     /**
      * Update checkpoint state (call each simulation step)
      */
     bool update(uint64_t currentStep, double currentTime);
-    
+
     /**
      * Save checkpoint immediately
      */
     bool saveImmediately(const std::string& name = "");
-    
+
     /**
      * Load checkpoint
      */
     bool load(const std::string& name);
-    
+
     /**
      * List available checkpoints
      */
@@ -372,29 +386,29 @@ public:
         uint64_t fileSize;
         time_t timestamp;
     };
-    
+
     std::vector<CheckpointInfo> listCheckpoints() const;
-    
+
     /**
      * Delete old checkpoints (keep most recent N)
      */
     void pruneOldCheckpoints(size_t keepCount);
-    
+
     /**
      * Get checkpoint directory
      */
     const std::string& getCheckpointDir() const { return checkpointDir_; }
-    
+
     /**
      * Get last checkpoint path
      */
     std::string getLastCheckpointPath() const;
-    
+
     /**
      * Check if checkpoint should be saved
      */
     bool shouldSave(uint64_t currentStep) const;
-    
+
 private:
     std::string checkpointDir_;
     uint64_t saveIntervalSteps_;
@@ -402,10 +416,13 @@ private:
     bool compress_;
     uint64_t lastSaveStep_;
     std::string lastCheckpointPath_;
-    
+
     std::function<bool(NeuronCheckpointData&)> neuronProvider_;
     std::function<bool(SynapseCheckpointData&)> synapseProvider_;
+    std::function<bool(BrainCheckpointData&)> brainProvider_;
 };
+
+} // namespace nlm
 
 // Checksum implementation
 

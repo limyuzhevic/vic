@@ -75,6 +75,12 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // Rest cycle parameters
+    size_t restInterval;          // Steps between rest periods
+    size_t restDuration;          // Duration of rest periods
+    size_t stepsSinceLastRest;
+    size_t stepsInRest;
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -148,6 +154,12 @@ struct Brain::Impl {
         // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        
+        // Get rest cycle parameters from config
+        restInterval = config->getOr<size_t>("rest_interval", 1000);      // Rest every 1000 steps
+        restDuration = config->getOr<size_t>("rest_duration", 100);       // Rest for 100 steps
+        stepsSinceLastRest = 0;
+        stepsInRest = 0;
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -506,6 +518,44 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
+        }
+    }
+    
+    // ========== STEP 8a: SLEEP/REST CYCLE ==========
+    // Check if time to enter rest mode
+    if (!pImpl->isResting && pImpl->stepsSinceLastRest >= pImpl->restInterval) {
+        // Enter rest mode
+        pImpl->isResting = true;
+        pImpl->stepsInRest = pImpl->restDuration;
+        pImpl->stepsSinceLastRest = 0;
+        NLM_LOG_INFO("Entering REST mode for " + std::to_string(pImpl->restDuration) + " steps");
+    }
+    
+    // Update rest cycle counter
+    if (!pImpl->isResting) {
+        pImpl->stepsSinceLastRest++;
+    }
+    
+    // During rest, perform enhanced memory consolidation and replay
+    if (pImpl->isResting && pImpl->episodicMemory) {
+        // Perform enhanced consolidation during rest
+        pImpl->episodicMemory->consolidate(0.7f);  // Higher consolidation during rest
+        
+        // Enhanced replay during rest (more frequent, more episodes)
+        if (pImpl->stepsInRest % 10 == 0) {  // Replay every 10 steps during rest
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);  // More episodes during rest
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+        }
+        
+        // Count down rest duration
+        pImpl->stepsInRest--;
+        
+        // Exit rest mode when duration is complete
+        if (pImpl->stepsInRest <= 0) {
+            pImpl->isResting = false;
+            NLM_LOG_INFO("Exiting REST mode - consolidation complete");
         }
     }
     

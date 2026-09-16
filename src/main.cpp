@@ -18,6 +18,11 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "command/CommandSystem.hpp"
+#include "command/BatchProcessingCommands.hpp"
+#include "command/CheckpointCommands.hpp"
+#include "command/PerformanceCommands.hpp"
+#include "command/ScriptingCommands.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,6 +30,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
 
 using namespace nlm;
 
@@ -324,8 +330,6 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
-    
     // Initialize logger
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
@@ -366,6 +370,119 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
+    // Check for advanced commands
+    bool isAdvancedCommand = false;
+    std::string advancedCommand;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--advanced-commands" || arg == "--advanced" || 
+            arg == "--power-user" || arg == "--advanced-mode") {
+            isAdvancedCommand = true;
+        } else if (isAdvancedCommand && (arg == "run-batch" || arg == "run-until" || 
+                                         arg == "parallel-run" || arg == "save-checkpoint" ||
+                                         arg == "load-checkpoint" || arg == "list-checkpoints" ||
+                                         arg == "delete-checkpoint" || arg == "checkpoint-info" ||
+                                         arg == "monitor-start" || arg == "monitor-stop" ||
+                                         arg == "performance-stats" || arg == "save-config" ||
+                                         arg == "load-config" || arg == "register-plugin" ||
+                                         arg == "list-plugins")) {
+            // Skip the command itself from further processing
+            continue;
+        }
+    }
+    
+    // Initialize checkpoint manager
+    auto checkpointManager = std::make_shared<CheckpointManager>();
+    
+    // Configure checkpoint manager
+    checkpointManager->configure("./checkpoints", 10000, 10, true);
+    
+    // Set up checkpoint providers (placeholders)
+    checkpointManager->setNeuronProvider(
+        [](NeuronCheckpointData& data) -> bool {
+            // In real implementation, would get neuron data from brain
+            return true;
+        });
+    
+    checkpointManager->setSynapseProvider(
+        [](SynapseCheckpointData& data) -> bool {
+            // In real implementation, would get synapse data from brain
+            return true;
+        });
+    
+    checkpointManager->setBrainProvider(
+        [](BrainCheckpointData& data) -> bool {
+            // In real implementation, would get brain data from brain
+            return true;
+        });
+    
+    // Initialize advanced command system
+    auto commandManager = std::make_shared<CommandManager>(nullptr, checkpointManager, config, logger);
+    
+    // Register batch processing commands
+    commandManager->registerCommand(std::make_unique<RunBatchCommand>(nullptr, checkpointManager, logger));
+    commandManager->registerCommand(std::make_unique<RunUntilCommand>(nullptr, logger));
+    commandManager->registerCommand(std::make_unique<ParallelRunCommand>(nullptr, logger));
+    
+    // Register checkpoint commands
+    commandManager->registerCommand(std::make_unique<SaveCheckpointCommand>(nullptr, checkpointManager, logger));
+    commandManager->registerCommand(std::make_unique<LoadCheckpointCommand>(nullptr, checkpointManager, logger));
+    commandManager->registerCommand(std::make_unique<ListCheckpointsCommand>(checkpointManager, logger));
+    commandManager->registerCommand(std::make_unique<DeleteCheckpointCommand>(checkpointManager, logger));
+    commandManager->registerCommand(std::make_unique<CheckpointInfoCommand>(checkpointManager, logger));
+    
+    // Register performance monitoring commands
+    commandManager->registerCommand(std::make_unique<MonitorStartCommand>(nullptr, checkpointManager, logger));
+    commandManager->registerCommand(std::make_unique<MonitorStopCommand>(logger));
+    commandManager->registerCommand(std::make_unique<PerformanceStatsCommand>(nullptr, logger));
+    
+    // Register configuration management commands
+    commandManager->registerCommand(ConfigCommands::createSaveConfigCommand(config, logger));
+    commandManager->registerCommand(ConfigCommands::createLoadConfigCommand(config, logger));
+    
+    // Register plugin extension commands
+    commandManager->registerCommand(PluginCommands::createRegisterPluginCommand(logger));
+    commandManager->registerCommand(PluginCommands::createListPluginsCommand(logger));
+    
+    // Check if we should run an advanced command
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (isAdvancedCommand && (arg == "run-batch" || arg == "run-until" || 
+                                   arg == "parallel-run" || arg == "save-checkpoint" ||
+                                   arg == "load-checkpoint" || arg == "list-checkpoints" ||
+                                   arg == "delete-checkpoint" || arg == "checkpoint-info" ||
+                                   arg == "monitor-start" || arg == "monitor-stop" ||
+                                   arg == "performance-stats" || arg == "save-config" ||
+                                   arg == "load-config" || arg == "register-plugin" ||
+                                   arg == "list-plugins")) {
+            
+            // Collect command arguments
+            std::vector<std::string> commandArgs;
+            i++; // Skip command name
+            while (i < argc && argv[i][0] != '-') {
+                commandArgs.push_back(argv[i]);
+                i++;
+            }
+            i--; // Back up one to account for the increment at the end of the loop
+            
+            // Execute advanced command
+            NLM_LOG_INFO("Executing advanced command: " + arg);
+            CommandResult result = commandManager->executeCommand(arg, commandArgs);
+            
+            if (result.success) {
+                std::cout << result.output << std::endl;
+                NLM_LOG_INFO("Advanced command completed successfully");
+                return 0;
+            } else {
+                std::cerr << "Command failed: " << result.errorMessage << std::endl;
+                NLM_LOG_ERROR("Advanced command failed: " + result.errorMessage);
+                return 1;
+            }
+        }
+    }
+    
+    // Continue with normal execution if no advanced commands specified
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);

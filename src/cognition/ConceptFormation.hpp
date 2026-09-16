@@ -138,6 +138,30 @@ public:
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
 
+    // ========== BRAIN INTEGRATION HELPERS ==========
+
+    // Extract current neural activity pattern from active neurons
+    std::vector<float> getCurrentPattern() const;
+
+    // Extract relevant features from working memory or current input
+    std::vector<float> getCurrentFeatures() const;
+
+    // Get reward from neuromodulation (dopamine level)
+    float getCurrentReward() const;
+
+    // Present current sensory experience to concept formation
+    // Convenience method that combines pattern, features, and reward
+    size_t presentSensoryExperience(const std::vector<float>& pattern,
+                                    const std::vector<float>& features,
+                                    float reward);
+
+    // Present current brain state to concept formation
+    // Automatically extracts pattern, features, and reward from brain
+    size_t presentCurrentState();
+
+    // Store a concept as an episode in episodic memory
+    void storeConceptAsEpisode(size_t conceptId);
+
 private:
     // Create new concept from pattern
     size_t createConcept(const std::vector<float>& pattern,

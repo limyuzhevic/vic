@@ -1,5 +1,6 @@
 #include "NeuralPlanner.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -57,6 +58,37 @@ ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
         if (recentPlanSuccess_.size() > 10) {
             recentPlanSuccess_.pop_front();
         }
+        
+        // Store planning experience in episodic memory for learning
+        if (!brain_ || !brain_->getEpisodicMemory()) {
+            return best.actions[0];
+        }
+        
+        // Create an episodic memory entry for the planning experience
+        EpisodicMemoryItem planningEpisode;
+        planningEpisode.timestamp = brain_->getTotalSpikeCount(); // Use spike count as time proxy
+        planningEpisode.episodeId = static_cast<size_t>(brain_->getEpisodicMemory()->getEpisodeCount());
+        planningEpisode.action = best.actions.empty() ? ActionType::Wait : best.actions[0];
+        planningEpisode.reward = best.expectedReward;
+        planningEpisode.targetReward = targetReward;
+        
+        // Store the current state (what the planner considered)
+        planningEpisode.sensoryState = currentState;
+        
+        // Store the planned sequence
+        planningEpisode.resultingSensoryState = std::vector<float>(best.predictedStates.size() * currentState.size(), 0.0f);
+        size_t idx = 0;
+        for (size_t i = 0; i < best.predictedStates.size(); ++i) {
+            for (size_t j = 0; j < currentState.size() && j < best.predictedStates[i].size(); ++j) {
+                planningEpisode.resultingSensoryState[idx++] = best.predictedStates[i][j];
+            }
+        }
+        
+        // Calculate planning success
+        planningEpisode.novelty = std::abs(best.expectedReward - targetReward) / std::max(targetReward, 0.1f);
+        
+        // Store in episodic memory
+        brain_->getEpisodicMemory()->storeEpisode(planningEpisode);
         
         return best.actions[0];
     }

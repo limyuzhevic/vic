@@ -23,11 +23,12 @@ class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
 class Novelty;
-class PredictionError;
+    class PredictionError;
+    class Reward;
+    class Acetylcholine;
+    class Norepinephrine;
+    class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -181,15 +182,23 @@ public:
     // Novelty - novelty detection
     Novelty* getNovelty();
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
-    
-    // Get current configuration
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
     std::shared_ptr<const Config> getConfig() const;
-    
+
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
+    // Rest cycle state access
+    bool isResting() const;
+    size_t getStepsSinceLastRest() const;
+    size_t getStepsInRest() const;
+    size_t getRestInterval() const;
+    size_t getRestDuration() const;
+
     // Logging
     void logStatus() const;
     

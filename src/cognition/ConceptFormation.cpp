@@ -4,6 +4,9 @@
 #include <cmath>
 #include <numeric>
 
+// Include the required types
+#include "../core/Types/Types.hpp"
+
 namespace nlm {
 
 struct ConceptFormation::Impl {
@@ -294,6 +297,97 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
 void ConceptFormation::clear() {
     concepts_.clear();
     nextConceptId_ = 1;
+}
+
+// ========== BRAIN INTEGRATION HELPERS ==========
+
+std::vector<float> ConceptFormation::getCurrentPattern() const {
+    if (!brain_) return {};
+    
+    // Collect all neuron activity into a pattern
+    std::vector<float> pattern;
+    for (const auto& region : brain_->getRegions()) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                const auto& state = neuron->getState();
+                float activation = std::abs(state.membranePotential - state.restingPotential);
+                // Normalize activation to [0, 1]
+                activation = std::min(1.0f, activation / 20.0f);
+                pattern.push_back(activation);
+            }
+        }
+    }
+    return pattern;
+}
+
+std::vector<float> ConceptFormation::getCurrentFeatures() const {
+    if (!brain_ || !brain_->getWorkingMemory()) return {};
+    
+    // Get working memory content as features
+    std::vector<float> features = brain_->getWorkingMemory()->retrieve();
+    
+    // Get episodic memory context for additional features
+    if (brain_->getEpisodicMemory()) {
+        auto recentEpisodes = brain_->getEpisodicMemory()->getRecentEpisodes(3);
+        for (const auto* episode : recentEpisodes) {
+            if (episode && !episode->sensoryState.empty() && features.size() == episode->sensoryState.size()) {
+                // Blend episode features into current features
+                for (size_t i = 0; i < features.size() && i < episode->sensoryState.size(); ++i) {
+                    features[i] = (features[i] + episode->sensoryState[i]) * 0.5f;
+                }
+            }
+        }
+    }
+    
+    return features;
+}
+
+float ConceptFormation::getCurrentReward() const {
+    if (!brain_ || !brain_->getDopamine()) {
+        return 0.0f;
+    }
+    return brain_->getDopamine()->getLevel();
+}
+
+size_t ConceptFormation::presentSensoryExperience(const std::vector<float>& pattern,
+                                                  const std::vector<float>& features,
+                                                  float reward) {
+    if (!brain_) return 0;
+    return presentExperience(pattern, features, reward, 0); // TODO: get from brain
+}
+
+size_t ConceptFormation::presentCurrentState() {
+    if (!brain_) return 0;
+    
+    std::vector<float> pattern = getCurrentPattern();
+    std::vector<float> features = getCurrentFeatures();
+    float reward = getCurrentReward();
+    
+    return presentExperience(pattern, features, reward, 0); // TODO: get actual step/time
+}
+
+void ConceptFormation::storeConceptAsEpisode(size_t conceptId) {
+    const DiscoveredConcept* concept = getConcept(conceptId);
+    if (!concept || !brain_ || !brain_->getEpisodicMemory()) return;
+    
+    // Create an episodic memory item from the concept
+    EpisodicMemoryItem episode;
+    
+    // Use concept prototype as the sensory state
+    episode.sensoryState = concept->prototype;
+    
+    // Use average stability as novelty
+    episode.novelty = 1.0f - concept->avgStability;
+    
+    // Use average reward from instances as the episode reward
+    float totalReward = 0.0f;
+    for (const auto& instance : concept->instances) {
+        totalReward += instance.avgReward;
+    }
+    episode.reward = totalReward / concept->instances.size();
+    
+    // Store the episode
+    brain_->getEpisodicMemory()->storeEpisode(episode);
 }
 
 // SpatialRepresentation Implementation

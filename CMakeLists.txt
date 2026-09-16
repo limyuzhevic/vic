@@ -107,19 +107,23 @@ add_library(nlm_world STATIC
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-# Phase 3 experiments
-add_library(nlm_phase3 STATIC
-    src/experiments/Phase3Experiment.cpp
+# Command system
+add_library(nlm_commands STATIC
+    src/command/CommandSystem.cpp
+    src/command/BatchProcessingCommands.cpp
+    src/command/CheckpointCommands.cpp
+    src/command/PerformanceCommands.cpp
+    src/command/ScriptingCommands.cpp
 )
-target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+target_include_directories(nlm_commands PUBLIC src)
+target_link_libraries(nlm_commands PUBLIC nlm_core nlm_agent nlm_world)
 
-# Phase 4 experiments
-add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
+# Advanced command system
+add_library(nlm_advanced_commands STATIC
+    src/command/AdvancedCommandManager.cpp
 )
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_include_directories(nlm_advanced_commands PUBLIC src)
+target_link_libraries(nlm_advanced_commands PUBLIC nlm_commands)
 
 # Main executable
 add_executable(nlm
