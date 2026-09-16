@@ -138,6 +138,33 @@ public:
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
 
+    // Connect concept formation to attention system
+    void connectToAttention(AttentionalSelection* attention) {
+        attention_ = attention;
+    }
+    
+    // Connect concept formation to neural planner
+    void connectToPlanner(NeuralPlanner* planner) {
+        planner_ = planner;
+    }
+    
+    // Retrieve best concept for planning
+    size_t getBestConceptForPlanning(const std::vector<float>& currentState) const;
+    
+    // Store concept in episodic memory
+    void storeConceptInEpisodicMemory(size_t conceptId, const std::vector<float>& pattern,
+                                     const std::vector<float>& features, float reward);
+    
+    // Update attentional selection based on formed concepts
+    void updateAttentionalSelection();
+    
+    // Update planning based on formed concepts
+    void updatePlanning(const std::vector<float>& currentState);
+
+private:
+    AttentionalSelection* attention_;
+    NeuralPlanner* planner_;
+
 private:
     // Create new concept from pattern
     size_t createConcept(const std::vector<float>& pattern,

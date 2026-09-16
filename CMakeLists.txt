@@ -4,12 +4,7 @@ project(NLM VERSION 0.1.0 LANGUAGES CXX)
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+set(CMAKE_EXTENSIONS OFF)
 
 # Enable warnings
 if(MSVC)
@@ -20,6 +15,9 @@ endif()
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Find nlohmann_json package
+find_package(nlohmann_json REQUIRED)
 
 # Core library
 add_library(nlm_core STATIC
@@ -85,6 +83,12 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+)
+
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${nlohmann_json_INCLUDE_DIRS}>
 )
 
 target_include_directories(nlm_core PUBLIC

@@ -287,9 +287,26 @@ brain.getExcitationInhibitionRatio()  # E/I balance
 brain.save("checkpoint.bin")       # Save state
 brain.load("checkpoint.bin")       # Load state
 
+# State
+brain.save("checkpoint.bin")       # Save state
+brain.load("checkpoint.bin")       # Load state
+
 # Regions
 region_id = brain.addRegion("cortex")
 region = brain.getRegion(region_id)
+
+# Integrated systems
+brain.getWorkingMemory()          # Get working memory system
+brain.getEpisodicMemory()         # Get episodic memory system
+brain.getDopamine()              # Get dopamine neuromodulator
+brain.getCuriosity()             # Get curiosity system
+brain.getPredictionSystem()      # Get prediction system
+brain.getPredictionError()       # Get prediction error
+brain.getPlanner()               # Get neural planner
+brain.getConceptFormation()      # Get concept formation
+brain.getAttention()             # Get attention system
+brain.getDevelopmentSystem()     # Get development system
+brain.getDevelopmentalStage()    # Get current developmental stage
 ```
 
 #### Config Class

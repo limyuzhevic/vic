@@ -42,6 +42,13 @@ size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
     if (matchingConcept > 0) {
         // Update existing concept
         updateConcept(matchingConcept, pattern, features, reward);
+        
+        // Log concept usage for debugging
+        NLM_LOG_DEBUG("ConceptFormation: Pattern matched existing concept " + 
+                     std::to_string(matchingConcept) + 
+                     " (similarity: " + std::to_string(computeSimilarity(pattern, 
+                     getConceptPrototype(matchingConcept))) + ")");
+        
         return matchingConcept;
     }
     
@@ -49,9 +56,23 @@ size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
     if (isNovel(pattern, formationThreshold_)) {
         // But wait - we need a few observations before committing to a concept
         // This prevents forming concepts from noise
+        // Allow concept formation after several similar observations
         
-        // For now, create concept if sufficiently different from all others
-        return createConcept(pattern, features, reward);
+        // Check if we've seen similar patterns before
+        std::vector<size_t> matchingConcepts;
+        for (const auto& concept : concepts_) {
+            float sim = computeSimilarity(pattern, concept.prototype);
+            if (sim > formationThreshold_) {
+                matchingConcepts.push_back(concept.id);
+            }
+        }
+        
+        if (!matchingConcepts.empty()) {
+            // We have similar but not identical patterns - form a new concept
+            return createConcept(pattern, features, reward);
+        }
+        
+        return 0;  // Not yet classifiable
     }
     
     return 0;  // Not yet classifiable
@@ -91,6 +112,174 @@ size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
                  " (category: " + concept.categoryHint + ")");
     
     return concept.id;
+}
+
+// Implement concept formation from working memory neural activity
+void ConceptFormation::processWorkingMemoryPatterns() {
+    if (!brain_ || !brain_->getWorkingMemory()) return;
+    
+    // Get current working memory state
+    std::vector<float> workingMemoryPattern = brain_->getWorkingMemory()->retrieve();
+    
+    if (workingMemoryPattern.empty()) return;
+    
+    // Get current reward from dopamine system
+    float reward = 0.0f;
+    if (brain_->getDopamine()) {
+        reward = brain_->getDopamine()->getLevel();
+    }
+    
+    // Present this pattern to concept formation system
+    size_t conceptId = presentExperience(workingMemoryPattern, workingMemoryPattern, reward, brain_->getCurrentStep());
+    
+    if (conceptId > 0) {
+        // Store concept in episodic memory for later use
+        storeConceptInEpisodicMemory(conceptId, workingMemoryPattern, workingMemoryPattern, reward);
+    }
+}
+
+// Connect concept formation to attention system
+void ConceptFormation::updateAttentionalSelection() {
+    if (!attention_ || concepts_.empty()) return;
+    
+    // Find the most stable, generalizable concept
+    size_t bestConceptId = 0;
+    float bestStability = 0.0f;
+    float bestGeneralization = 0.0f;
+    
+    for (const auto& concept : concepts_) {
+        float stability = getConceptStability(concept.id);
+        float generalization = getGeneralizationAbility(concept.id);
+        
+        // Choose concept that balances stability and generalization
+        float score = stability * 0.6f + generalization * 0.4f;
+        
+        if (score > bestStability) {
+            bestStability = stability;
+            bestGeneralization = generalization;
+            bestConceptId = concept.id;
+        }
+    }
+    
+    if (bestConceptId > 0) {
+        // Get concept prototype as attentional focus
+        std::vector<float> conceptPattern = getConceptPrototype(bestConceptId);
+        
+        // Find neurons that match this pattern
+        std::vector<NeuronId> targetNeurons;
+        
+        for (auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Check if neuron's activity matches concept
+                    float similarity = computeSimilarity(conceptPattern, brain_->getWorkingMemory()->retrieve());
+                    if (similarity > 0.7f) {
+                        targetNeurons.push_back(neuron->getId());
+                        
+                        // Boost activation of neurons matching the concept
+                        brain_->injectCurrent(neuron->getId(), similarity * 2.0f);
+                    }
+                }
+            }
+        }
+        
+        // Process competition with attentional system
+        if (!targetNeurons.empty() && brain_->getAttention()) {
+            std::vector<NeuronId> attended = brain_->getAttention()->processCompetition(targetNeurons);
+            
+            // Store attentional focus in working memory
+            if (!attended.empty()) {
+                brain_->getWorkingMemory()->store("concept_focus", 1.0f);
+            }
+        }
+    }
+}
+
+// Connect concept formation to neural planner
+void ConceptFormation::updatePlanning(const std::vector<float>& currentState) {
+    if (!planner_ || concepts_.empty()) return;
+    
+    // Get the best concept for planning
+    size_t bestConceptId = getBestConceptForPlanning(currentState);
+    
+    if (bestConceptId > 0) {
+        const DiscoveredConcept* concept = getConcept(bestConceptId);
+        if (concept) {
+            // Use concept category hint to guide planning
+            std::string category = concept->categoryHint;
+            
+            // Plan action based on concept category
+            if (category == "rewarding") {
+                // Focus on rewarding actions
+                if (brain_->getPlanningSystem()) {
+                    brain_->getPlanningSystem()->setGoalPriority("reward", 1.0f);
+                }
+            } else if (category == "harmful") {
+                // Avoid harmful actions
+                if (brain_->getPlanningSystem()) {
+                    brain_->getPlanningSystem()->setGoalPriority("avoid_harm", 1.0f);
+                }
+            }
+            
+            // Store concept information in working memory for planner
+            brain_->getWorkingMemory()->store("concept_id", static_cast<float>(bestConceptId));
+            brain_->getWorkingMemory()->store("concept_category", category);
+            
+            NLM_LOG_INFO("ConceptFormation: Concept " + std::to_string(bestConceptId) + 
+                         " guiding planning (category: " + category + ")");
+        }
+    }
+}
+
+// Retrieve best concept for planning
+size_t ConceptFormation::getBestConceptForPlanning(const std::vector<float>& currentState) const {
+    size_t bestConceptId = 0;
+    float bestScore = 0.0f;
+    
+    for (const auto& concept : concepts_) {
+        // Calculate how well this concept matches current state
+        float similarity = computeSimilarity(currentState, concept.prototype);
+        float stability = getConceptStability(concept.id);
+        
+        // Score based on relevance to current state and stability
+        float score = similarity * 0.7f + stability * 0.3f;
+        
+        if (score > bestScore) {
+            bestScore = score;
+            bestConceptId = concept.id;
+        }
+    }
+    
+    return bestConceptId;
+}
+
+// Store concept in episodic memory
+void ConceptFormation::storeConceptInEpisodicMemory(size_t conceptId, const std::vector<float>& pattern,
+                                                    const std::vector<float>& features, float reward) {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
+    
+    // Get concept information
+    const DiscoveredConcept* concept = getConcept(conceptId);
+    if (!concept) return;
+    
+    // Create episodic memory item for this concept
+    EpisodicMemoryItem conceptItem;
+    conceptItem.timestamp = brain_->getCurrentStep();
+    conceptItem.sensoryState = pattern;
+    conceptItem.reward = reward;
+    conceptItem.action = ActionType::Wait;  // Concept formation itself is not an action
+    conceptItem.energy = 0.0f;
+    conceptItem.novelty = 1.0f - concept->avgStability;
+    
+    // Store neural activity pattern for this concept
+    conceptItem.activeNeurons.clear();
+    conceptItem.neuronActivations.clear();
+    
+    // Store in episodic memory with metadata
+    brain_->getEpisodicMemory()->storeEpisode(conceptItem);
+    
+    NLM_LOG_INFO("ConceptFormation: Stored concept " + std::to_string(conceptId) + 
+                 " in episodic memory (stability: " + std::to_string(concept->avgStability) + ")");
 }
 
 void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>& newPattern,

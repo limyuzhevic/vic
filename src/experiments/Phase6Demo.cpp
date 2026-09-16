@@ -5,15 +5,19 @@
  * that all brain systems are properly connected.
  */
 
+#include "experiments/Phase6Demo.hpp"
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
 
 using namespace nlm;
 
-int main(int argc, char* argv[]) {
-    std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
-    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+Phase6Demo::Phase6Demo() {}
+Phase6Demo::~Phase6Demo() {}
+
+bool Phase6Demo::runQuickTests() {
+    std::cout << "=== QUICK PHASE 6 INTEGRATION DEMO ===" << std::endl;
+    std::cout << "Running essential integration verification..." << std::endl << std::endl;
     
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
@@ -29,7 +33,32 @@ int main(int argc, char* argv[]) {
     
     if (!integrationOK) {
         std::cerr << "ERROR: Integration verification failed!" << std::endl;
-        return 1;
+        return false;
+    }
+    
+    std::cout << "Integration verification passed!" << std::endl << std::endl;
+    return true;
+}
+
+bool Phase6Demo::runComprehensiveTests() {
+    std::cout << "=== FULL PHASE 6 INTEGRATION DEMO ===" << std::endl;
+    std::cout << "Running comprehensive integration and tests..." << std::endl << std::endl;
+    
+    // Initialize logging
+    Logger::getInstance().setLevel(Logger::Level::Info);
+    
+    // Create experiment
+    Phase6IntegratedExperiment experiment;
+    
+    // First, run the quick integration verification
+    std::cout << "--- Integration Verification ---" << std::endl;
+    bool integrationOK = experiment.verifyIntegration();
+    
+    std::cout << std::endl;
+    
+    if (!integrationOK) {
+        std::cerr << "ERROR: Integration verification failed!" << std::endl;
+        return false;
     }
     
     std::cout << "Integration verification passed!" << std::endl << std::endl;
@@ -81,5 +110,6 @@ int main(int argc, char* argv[]) {
     
     std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
     
-    return 0;
+    std::cout << "=== COMPREHENSIVE TESTS COMPLETED SUCCESSFULLY ===" << std::endl;
+    return true;
 }

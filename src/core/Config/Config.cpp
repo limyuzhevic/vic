@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,40 +20,26 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+            const std::string& key = it.key();
+            const nlohmann::json& value = it.value();
+            
+            setFromJson(key, value, ConfigSource::File);
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+        return true;
+    } catch (const std::exception& e) {
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,12 +71,72 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    nlohmann::json jsonData;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        jsonData[entry.key] = toJson(entry.value);
     }
     
+    file << jsonData.dump(4);
+    
     return true;
+}
+
+void Config::setFromJson(const std::string& key, const nlohmann::json& jsonValue, ConfigSource source) {
+    ConfigValue configValue;
+    
+    if (jsonValue.is_string()) {
+        configValue = jsonValue.get<std::string>();
+    } else if (jsonValue.is_boolean()) {
+        configValue = jsonValue.get<bool>();
+    } else if (jsonValue.is_number_integer()) {
+        configValue = jsonValue.get<int>();
+    } else if (jsonValue.is_number()) {
+        configValue = jsonValue.get<double>();
+    } else if (jsonValue.is_array()) {
+        if (!jsonValue.empty()) {
+            if (jsonValue[0].is_number_integer()) {
+                std::vector<int> vec = jsonValue.get<std::vector<int>>();
+                configValue = vec;
+            } else if (jsonValue[0].is_number()) {
+                std::vector<double> vec = jsonValue.get<std::vector<double>>();
+                configValue = vec;
+            } else if (jsonValue[0].is_string()) {
+                std::vector<std::string> vec = jsonValue.get<std::vector<std::string>>();
+                configValue = vec;
+            }
+        }
+    }
+    
+    set(key, configValue, source);
+}
+
+nlohmann::json Config::toJson(const ConfigValue& value) const {
+    nlohmann::json jsonValue;
+    
+    std::visit([&jsonValue](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        
+        if constexpr (std::is_same_v<T, int>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            jsonValue = arg;
+        }
+    }, value);
+    
+    return jsonValue;
 }
 
 template<typename T>
@@ -177,6 +224,27 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << "\"" << arg[i] << "\"";
+                }
+                oss << "]";
             } else {
                 oss << arg;
             }
