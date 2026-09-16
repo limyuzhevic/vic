@@ -3,11 +3,15 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
+#include <unordered_map>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::string filepath;  // For round-trip preservation
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,13 +23,131 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    pImpl->filepath = filepath;
     
+    // Determine file format from extension
+    std::string ext = filepath.substr(filepath.find_last_of('.') + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == "json") {
+        return loadFromJSON(filepath);
+    } else if (ext == "yaml" || ext == "yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Default to simple key=value format for backward compatibility
+        return loadFromSimple(filepath);
+    }
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Recursive function to convert JSON to Config entries
+        std::function<void(const nlohmann::json&, std::string)> convertJSON = 
+            [&](const nlohmann::json& json, const std::string& prefix) {
+                if (json.is_object()) {
+                    for (auto it = json.begin(); it != json.end(); ++it) {
+                        std::string key = prefix + "." + it.key();
+                        convertJSON(it.value(), key);
+                    }
+                } else if (json.is_array()) {
+                    for (size_t i = 0; i < json.size(); ++i) {
+                        std::string key = prefix + "[" + std::to_string(i) + "]";
+                        convertJSON(json[i], key);
+                    }
+                } else {
+                    std::string valueStr;
+                    ConfigSource source = ConfigSource::File;
+                    
+                    if (json.is_string()) {
+                        valueStr = json.get<std::string>();
+                    } else if (json.is_number_integer()) {
+                        int64_t val = json.get<int64_t>();
+                        set(prefix, val, source);
+                        return;
+                    } else if (json.is_number_unsigned()) {
+                        uint64_t val = json.get<uint64_t>();
+                        set(prefix, static_cast<int64_t>(val), source);
+                        return;
+                    } else if (json.is_number_float()) {
+                        double val = json.get<double>();
+                        set(prefix, val, source);
+                        return;
+                    } else if (json.is_boolean()) {
+                        valueStr = json.get<bool>() ? "true" : "false";
+                    } else if (json.is_null()) {
+                        valueStr = "null";
+                    }
+                    
+                    set(prefix, valueStr, source);
+                }
+            };
+        
+        convertJSON(jsonData, "");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to parse JSON file " + filepath + ": " + e.what());
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    try {
+        YAML::Node yamlData = YAML::LoadFile(filepath);
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Recursive function to convert YAML to Config entries
+        std::function<void(const YAML::Node&, std::string)> convertYAML = 
+            [&](const YAML::Node& node, const std::string& prefix) {
+                if (node.IsMap()) {
+                    for (auto it = node.begin(); it != node.end(); ++it) {
+                        std::string key = prefix + "." + it->first.as<std::string>();
+                        convertYAML(*it, key);
+                    }
+                } else if (node.IsSequence()) {
+                    for (size_t i = 0; i < node.size(); ++i) {
+                        std::string key = prefix + "[" + std::to_string(i) + "]";
+                        convertYAML(node[i], key);
+                    }
+                } else {
+                    ConfigSource source = ConfigSource::File;
+                    
+                    if (node.IsScalar()) {
+                        std::string value = node.as<std::string>();
+                        set(prefix, value, source);
+                    }
+                }
+            };
+        
+        convertYAML(yamlData, "");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to parse YAML file " + filepath + ": " + e.what());
+        return false;
+    }
+}
+
+bool Config::loadFromSimple(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
+    
+    pImpl->entries.clear();
     
     std::string line;
     while (std::getline(file, line)) {
@@ -79,6 +201,88 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    pImpl->filepath = filepath;
+    
+    // Determine file format from extension
+    std::string ext = filepath.substr(filepath.find_last_of('.') + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == "json") {
+        return saveToJSON(filepath);
+    } else if (ext == "yaml" || ext == "yml") {
+        return saveToYAML(filepath);
+    } else {
+        // Default to simple key=value format for backward compatibility
+        return saveToSimple(filepath);
+    }
+}
+
+bool Config::saveToJSON(const std::string& filepath) const {
+    try {
+        nlohmann::json jsonData;
+        
+        // Convert Config entries to JSON
+        for (const auto& entry : pImpl->entries) {
+            setJSONEntry(jsonData, entry.key, entry.value);
+        }
+        
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // Pretty print JSON
+        file << std::setw(2) << jsonData;
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to write JSON file " + filepath + ": " + e.what());
+        return false;
+    }
+}
+
+bool Config::saveToYAML(const std::string& filepath) const {
+    try {
+        YAML::Emitter emitter;
+        
+        // Convert Config entries to YAML
+        bool first = true;
+        for (const auto& entry : pImpl->entries) {
+            if (!first) emitter << YAML::Key << entry.key;
+            else first = false;
+            
+            // Convert ConfigValue to YAML scalar
+            std::visit([&emitter](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    emitter << YAML::Value << arg;
+                } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                    emitter << YAML::Value << static_cast<int64_t>(arg);
+                } else if constexpr (std::is_same_v<T, double>) {
+                    emitter << YAML::Value << arg;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    emitter << YAML::Value << arg;
+                }
+            }, entry.value);
+        }
+        
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        file << emitter.c_str();
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to write YAML file " + filepath + ": " + e.what());
+        return false;
+    }
+}
+
+bool Config::saveToSimple(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -86,130 +290,64 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Convert ConfigValue to string
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+void Config::setJSONEntry(nlohmann::json& json, const std::string& key, const ConfigValue& value) const {
+    // Split key by dots for nested structure
+    size_t dotPos = key.find('.');
+    if (dotPos == std::string::npos) {
+        // Leaf node
+        setJSONLeaf(json, key, value);
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        std::string prefix = key.substr(0, dotPos);
+        std::string suffix = key.substr(dotPos + 1);
+        
+        if (!json.contains(prefix)) {
+            json[prefix] = nlohmann::json::object();
+        }
+        
+        setJSONEntry(json[prefix], suffix, value);
     }
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::setJSONLeaf(nlohmann::json& json, const std::string& key, const ConfigValue& value) const {
+    std::visit([&json, &key](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            json[key] = arg;
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            json[key] = static_cast<int64_t>(arg);
+        } else if constexpr (std::is_same_v<T, double>) {
+            json[key] = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            json[key] = arg;
+        }
+    }, value);
 }
 
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+std::string Config::getFilepath() const {
+    return pImpl->filepath;
 }
 
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+void Config::setDescription(const std::string& key, const std::string& description) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });n    
+    if (it != pImpl->entries.end()) {
+        it->description = description;
     }
-    return keys;
 }
-
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
-    }
-    return oss.str();
-}
-
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm

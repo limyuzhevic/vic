@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -55,13 +57,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON, YAML, and simple key=value formats)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (maintains original format when possible)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,13 +95,33 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // File operations
+    std::string getFilepath() const;
+    void setDescription(const std::string& key, const std::string& description);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
+    // Internal file format loaders
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool loadFromSimple(const std::string& filepath);
+    
+    // Internal file format savers
+    bool saveToJSON(const std::string& filepath) const;
+    bool saveToYAML(const std::string& filepath) const;
+    bool saveToSimple(const std::string& filepath) const;
+    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML conversion helpers
+    void setJSONEntry(nlohmann::json& json, const std::string& key, const ConfigValue& value) const;
+    void setJSONLeaf(nlohmann::json& json, const std::string& key, const ConfigValue& value) const;
+    
+    friend class Dopamine;
 };
 
 } // namespace nlm
