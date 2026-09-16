@@ -80,20 +80,7 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
-        , developmentalStage(DevelopmentalStage::Initial)
-        , nextRegionId(1)
-        , timestep(0.001)
-        , currentStep(0)
-        , currentTime(0.0)
-        , totalSpikesThisStep(0)
-        , totalSpikesTotal(0)
-        , isResting(false)
-        , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
-    {
-        // Initialize random generator with seed from config
+        , // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
@@ -142,9 +129,6 @@ struct Brain::Impl {
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
         // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
@@ -159,12 +143,21 @@ struct Brain::Impl {
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
-Brain::~Brain() = default;
-
+/**
+ * @brief Construct a new Brain object from an existing one
+ * 
+ * @param other The existing Brain object to move from
+ */
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
 }
 
+/**
+ * @brief Move assignment operator
+ * 
+ * @param other The existing Brain object to move from
+ * @return Brain& Reference to this object
+ */
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
         delete pImpl;
@@ -174,6 +167,11 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
+/**
+ * @brief Initialize the brain with configuration parameters
+ * 
+ * @return true if initialization was successful, false otherwise
+ */
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
@@ -511,8 +509,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
+        // TODO: Implement proper prediction system updates
         // For now, just track prediction error history
+        // Should process sensory input and predict next state
+        // Compute prediction error and update learning
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -1020,7 +1020,10 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
+    if (pImpl && pImpl->predictionSystem) {
+        return pImpl->predictionSystem.get();
+    }
+    return nullptr;
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
