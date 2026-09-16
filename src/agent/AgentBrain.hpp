@@ -9,6 +9,24 @@
 
 namespace nlm {
 
+// Configuration constants for AgentBrain
+const float VISION_SCALE_FACTOR = 5.0f;
+const float TOUCH_SCALE_FACTOR = 8.0f;
+const float INTERNAL_SCALE_FACTOR = 5.0f;
+const float PROPRIOCEPTION_SCALE_FACTOR = 3.0f;
+const float SENSORY_NOVELTY_DECAY = 0.99f;
+const float EXPLORATION_CHANCE = 0.3f;
+const float MIN_MEANINGFUL_ACTIVITY = 0.5f;
+const float MIN_NOVELTY_THRESHOLD = 0.3f;
+const float NEUROMODULATION_CLAMP_MIN = -1.0f;
+const float NEUROMODULATION_CLAMP_MAX = 1.0f;
+const float STDP_LTP_WEIGHT_BASE = 0.01f;
+const float STDP_LTD_WEIGHT_BASE = 0.012f;
+const float SYNAPTONGENESIS_RATE_BASE = 0.0001f;
+const float PRUNING_RATE_BASE = 0.00001f;
+const float EXPECTED_REWARD_ALPHA = 0.95f;
+const float EXPECTED_REWARD_BETA = 0.05f;
+
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
@@ -83,6 +101,8 @@ private:
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
     std::vector<Neuron*> motorTurnRight_;
+    std::vector<Neuron*> motorLookLeft_;
+    std::vector<Neuron*> motorLookRight_;
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
