@@ -34,21 +34,33 @@ int main(int argc, char* argv[]) {
     
     std::cout << "Integration verification passed!" << std::endl << std::endl;
     
-    // Test individual systems
+    // Test individual systems with validation
     std::cout << "--- Memory Integration Test ---" << std::endl;
-    experiment.testMemoryIntegration();
+    bool memoryTest = experiment.testMemoryIntegration();
+    if (!memoryTest) {
+        std::cerr << "WARNING: Memory integration test reported issues!" << std::endl;
+    }
     std::cout << std::endl;
     
     std::cout << "--- Neuromodulation Integration Test ---" << std::endl;
-    experiment.testNeuromodulationIntegration();
+    bool neuromodTest = experiment.testNeuromodulationIntegration();
+    if (!neuromodTest) {
+        std::cerr << "WARNING: Neuromodulation integration test reported issues!" << std::endl;
+    }
     std::cout << std::endl;
     
     std::cout << "--- Checkpoint Test ---" << std::endl;
-    experiment.testCheckpointing();
+    bool checkpointTest = experiment.testCheckpointing();
+    if (!checkpointTest) {
+        std::cerr << "WARNING: Checkpoint test reported issues!" << std::endl;
+    }
     std::cout << std::endl;
     
     std::cout << "--- Replay Test ---" << std::endl;
-    experiment.testReplay();
+    bool replayTest = experiment.testReplay();
+    if (!replayTest) {
+        std::cerr << "WARNING: Replay test reported issues!" << std::endl;
+    }
     std::cout << std::endl;
     
     // Run full experiment with smaller settings for demo

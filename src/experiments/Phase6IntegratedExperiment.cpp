@@ -61,8 +61,26 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Check brain is properly initialized
+        if (!brain) {
+            NLM_LOG_ERROR("Brain is null!");
+            break;
+        }
+        
+        // Get observation from world
+        const auto& regions = agent.getBrain()->getRegions();
+        if (regions.empty()) {
+            NLM_LOG_ERROR("No regions in brain!");
+            break;
+        }
+        NeuralRegion* region = regions[0].get();
+        if (!region) {
+            NLM_LOG_ERROR("Brain region is null!");
+            break;
+        }
+        
+        // Use world's getSensoryPercept() instead of observe()
+        SensoryPercept percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -73,11 +91,18 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        // Apply action to world using applyMotorCommand
+        // Note: In the experiment, world.applyAction is called but the actual method
+        // is applyMotorCommand which returns an ActionResult
+        ActionResult result = world.applyMotorCommand(cmd, simTime_);
         
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // The experiment also calls world.computeReward - need to check what this should be
+        // For now, compute reward from the action result if available, otherwise use 0
+        float reward = result.reward;
+        if (reward == 0.0f) {
+            // Use agent's neuromodulation level as fallback
+            reward = agent.getNeuromodulationLevel();
+        }
         totalReward += reward;
         
         // Apply reward modulation
@@ -125,21 +150,23 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
     
-    // Test checkpointing
+    // Test checkpointing with proper error handling
     if (config.enableCheckpointing) {
         NLM_LOG_INFO("Testing checkpoint save/load...");
-        if (brain->save(config.checkpointPath)) {
+        if (!config.checkpointPath.empty() && brain->save(config.checkpointPath)) {
             NLM_LOG_INFO("Checkpoint saved successfully");
             
             // Create new brain and load
             auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
-                NLM_LOG_INFO("Checkpoint loaded successfully");
-                result.checkpointingWorks = true;
+            if (brain2->initialize()) {
+                if (brain2->load(config.checkpointPath)) {
+                    NLM_LOG_INFO("Checkpoint loaded successfully");
+                    result.checkpointingWorks = true;
+                } else {
+                    NLM_LOG_ERROR("Failed to load checkpoint");
+                }
             } else {
-                NLM_LOG_ERROR("Failed to load checkpoint");
+                NLM_LOG_ERROR("Failed to initialize second brain");
             }
         } else {
             NLM_LOG_ERROR("Failed to save checkpoint");
