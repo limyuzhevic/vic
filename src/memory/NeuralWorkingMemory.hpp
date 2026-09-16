@@ -51,6 +51,12 @@ public:
     // Get number of active memory traces
     size_t getActiveTraces() const { return activeTraces_.size(); }
 
+    // Get neuron activation levels
+    const std::vector<float>& getMemoryActivations() const { return memoryActivations_; }
+
+    // Get memory timestamps
+    const std::vector<SimulationStep>& getMemoryTimestamps() const { return memoryTimestamps_; }
+
     // Get capacity
     size_t getCapacity() const { return capacity_; }
     void setCapacity(size_t cap) { capacity_ = cap; }
