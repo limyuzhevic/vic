@@ -162,7 +162,7 @@ Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 Brain::~Brain() = default;
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+    std::swap(other.pImpl, pImpl);
 }
 
 Brain& Brain::operator=(Brain&& other) noexcept {
@@ -177,13 +177,30 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain pImpl is null in initialize()");
+        return false;
+    }
+    
     // Get configuration values
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Brain config is null in initialize()");
+        return false;
+    }
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
+    
+    NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
+                 std::to_string(regionCount) + " regions");
+    
+    if (!pImpl->rng) {
+        NLM_LOG_ERROR("Brain rng is null in initialize()");
+        return false;
+    }
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
@@ -332,7 +349,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
-    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -399,7 +415,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->processSpikes(currentStep);
+    }
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {

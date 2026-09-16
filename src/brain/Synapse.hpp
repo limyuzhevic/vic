@@ -69,10 +69,17 @@ public:
     // Synaptic efficacy (use-dependent modulation)
     float getEfficacy() const;
     void setEfficacy(float efficacy);
+    void updateEfficacyFromWeight();
     
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
+    
+    // Tsodyks-Markram short-term plasticity update
+    void updateSTP(float currentTime);
+    
+    // Update eligibility trace for reward-modulated learning
+    void updateEligibilityTrace(float reward, float dt);
     
     // Reset to initial state
     void reset();
