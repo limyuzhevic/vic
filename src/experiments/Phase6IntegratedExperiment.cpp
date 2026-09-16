@@ -30,8 +30,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("connection_probability", config.connectionProbability);
     cfg->set("stdp_ltp_weight", 0.01f);
     cfg->set("stdp_ltd_weight", 0.012f);
+    cfg->set("stdp_tau", 20.0f);
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
+    cfg->set("random_seed", 42);
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
@@ -43,7 +45,15 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create simple world
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.configure(16, 16, 8, 8);
+    
+    // Create agent
+    AgentBrain agent(brain);
+    agent.initialize(world);
+    agent.enableRewardModulation(true);
+    agent.enableStructuralPlasticity(config.enableDevelopment);
+    agent.enableDevelopment(config.enableDevelopment);
+    agent.enableCuriosity(true);
     
     // Create agent
     AgentBrain agent(brain);
@@ -61,8 +71,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get observation - world.observe doesn't exist, should be getSensoryPercept()
+        // The agent's getSensoryInputSize() defines expected size: 256 (vision) + 8 (touch) + 4 (internal) + 6 (proprioception)
+        const SensoryPercept& percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -73,11 +84,27 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        // Apply action to world - should be applyMotorCommand()
+        world.applyMotorCommand(cmd, world.getSimulationTime());
         
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Compute reward - implement based on world objects and agent state
+        float reward = 0.0f;
+        
+        // Check for resource consumption at agent position
+        const AgentBody& agentBody = world.getAgentBody();
+        WorldObject* obj = world.getObjectAt(agentBody.x, agentBody.y);
+        if (obj && obj->type == WorldObjectType::Resource) {
+            reward += obj->value;
+        } else if (obj && obj->type == WorldObjectType::Hazard) {
+            reward += obj->value;  // Negative reward for hazards
+        }
+        
+        // Energy-based reward
+        reward += agentBody.energy * 0.01f;  // Small positive reward for maintaining energy
+        
+        // Novelty-based reward (encourage exploration)
+        reward += agent.getNoveltyLevel() * 0.1f;
+        
         totalReward += reward;
         
         // Apply reward modulation

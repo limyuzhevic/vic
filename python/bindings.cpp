@@ -416,6 +416,123 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Convenience factory methods
+    m.def("createMinimalBrain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 100);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a minimal brain for quick testing");
+
+    m.def("createTrainingBrain", [](size_t neurons = 1000) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neurons);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.05f);
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        config->set("synaptogenesis_rate", 0.0001f);
+        config->set("pruning_rate", 0.00001f);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("neurons") = 1000, "Create a brain configured for learning");
+
+    m.def("createResearchBrain", [](const std::string& config_file) {
+        auto config = std::make_shared<Config>();
+        if (config->loadFromFile(config_file)) {
+            return std::make_shared<Brain>(config);
+        } else {
+            // Fallback to research configuration
+            config->set("neuron_count", 5000);
+            config->set("region_count", 2);
+            config->set("connection_probability", 0.02f);
+            config->set("stdp_ltp_weight", 0.005f);
+            config->set("stdp_ltd_weight", 0.006f);
+            config->set("stdp_tau", 30.0f);
+            config->set("synaptogenesis_rate", 0.00001f);
+            config->set("pruning_rate", 0.000001f);
+            config->set("random_seed", 12345ULL);
+            return std::make_shared<Brain>(config);
+        }
+    }, py::arg("config_file"), "Create a brain from configuration file or research defaults");
+
+    // Enhanced AgentBrain convenience methods
+    m.def("createAgentWithDefaults", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        return agent;
+    }, py::arg("brain"), py::arg("world"), "Create an agent brain with all learning systems enabled");
+
+    // Visualization and analysis helpers
+    m.def("getBrainStatistics", [](std::shared_ptr<Brain> brain) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        
+        std::map<std::string, double> stats;
+        stats["total_neurons"] = static_cast<double>(brain->getTotalNeuronCount());
+        stats["total_synapses"] = static_cast<double>(brain->getTotalSynapseCount());
+        stats["firing_rate"] = brain->getAverageFiringRate();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spikes"] = static_cast<double>(brain->getTotalSpikeCount());
+        
+        auto stage = brain->getDevelopmentalStage();
+        stats["developmental_stage"] = static_cast<double>(static_cast<int>(stage));
+        
+        return stats;
+    }, "Get comprehensive brain statistics");
+
+    m.def("runQuickTest", [](std::shared_ptr<Brain> brain, size_t steps = 100) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        
+        float initial_rate = brain->getAverageFiringRate();
+        size_t initial_spikes = brain->getTotalSpikeCount();
+        
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        
+        float final_rate = brain->getAverageFiringRate();
+        size_t final_spikes = brain->getTotalSpikeCount();
+        
+        std::map<std::string, double> results;
+        results["initial_firing_rate"] = initial_rate;
+        results["final_firing_rate"] = final_rate;
+        results["firing_rate_change"] = final_rate - initial_rate;
+        results["initial_spikes"] = static_cast<double>(initial_spikes);
+        results["spikes_generated"] = static_cast<double>(final_spikes - initial_spikes);
+        
+        return results;
+    }, py::arg("brain"), py::arg("steps") = 100, "Run a quick simulation and return metrics");
+
+    m.def("createTrainingScenario", []() {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto brain = std::make_shared<Brain>(std::make_shared<Config>());
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        
+        std::map<std::string, std::shared_ptr<void>> scenario;
+        scenario["world"] = world;
+        scenario["brain"] = brain;
+        scenario["agent"] = agent;
+        
+        return scenario;
+    }, "Create a complete training scenario with world, brain, and agent");
+
+    // Error handling constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
