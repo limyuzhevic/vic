@@ -2,8 +2,11 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <random>
 
 namespace nlm {
+
+// Neuron implementation with enhanced LIF dynamics and plasticity
 
 struct Neuron::Impl {
     NeuronId id;
@@ -18,13 +21,43 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
+    // Enhanced LIF parameters
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
+    // Advanced biophysical parameters
+    float inputResistance;        // Mohms
+    float membraneTimeConstant;   // ms
+    float thresholdDynamics;     // Threshold adaptation factor
+    float adaptationStrength;     // Spike-frequency adaptation strength
+    float noiseLevel;            // Membrane noise level
+    float thermalNoise;          // Thermal noise (mV/sqrt(ms))
+    
+    // Plasticity state
+    float eligibilityTrace;      // For reward-modulated plasticity
+    float dopamineModulation;    // Neuromodulatory influence
+    
+    // Homeostatic mechanisms
+    float homeostaticSetpoint;   // Target firing rate
+    float homeostaticStrength;  // Homeostatic plasticity strength
+    float synapticScaling;       // Activity-dependent scaling
+    
+    // Random number generator for this neuron
+    std::mt19937_64 rng;
+    uint32_t randomSeed;
+    
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             inputResistance(100.0f), membraneTimeConstant(TIME_CONSTANT),
+             thresholdDynamics(0.0f), adaptationStrength(1.0f),
+             noiseLevel(0.5f), thermalNoise(2.0f),
+             eligibilityTrace(0.0f), dopamineModulation(0.0f),
+             homeostaticSetpoint(-65.0f), homeostaticStrength(0.001f),
+             synapticScaling(1.0f), randomSeed(0) {
+        std::random_device rd;
+        rng.seed(randomSeed);
+    }
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -123,24 +156,40 @@ void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
     pImpl->synapticInput += amplitude;
+    
+    // Update eligibility trace for reward-modulated plasticity
+    if (pImpl->plasticityFlags.reward_modulated) {
+        pImpl->eligibilityTrace += amplitude * 0.01f;
+    }
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
     pImpl->synapticInput -= amplitude;
+    
+    // Update eligibility trace for reward-modulated plasticity
+    if (pImpl->plasticityFlags.reward_modulated) {
+        pImpl->eligibilityTrace -= amplitude * 0.01f;
+    }
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
     // Modulatory input affects plasticity but not directly integrated
     // Used for neuromodulation (e.g., dopamine, acetylcholine)
     pImpl->state.adaptationVariable += amplitude * 0.1f;
+    pImpl->dopamineModulation += amplitude * 0.05f;
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
     pImpl->synapticInput += current;
+    
+    // Update eligibility trace for reward-modulated plasticity
+    if (pImpl->plasticityFlags.reward_modulated) {
+        pImpl->eligibilityTrace += current * 0.02f;
+    }
 }
 
 void Neuron::clearTotalCurrent() {
@@ -202,37 +251,58 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
-    
+    // Enhanced LIF dynamics with thermal noise
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    
+    // Add thermal noise to membrane potential (biologically realistic)
+    float noise = pImpl->thermalNoise * std::sqrt(static_cast<float>(dt)) * 
+                  (pImpl->rng.uniformReal(-1.0f, 1.0f));
+    V += noise;
+    
+    // LIF dynamics: Leaky Integrate-and-Fire
+    // dV/dt = (V_rest - V)/tau + I/C + noise
+    // Discrete approximation with adaptive time constant
+    
+    float tau = pImpl->membraneTimeConstant;  // Adaptive time constant
+    float C = pImpl->inputResistance;  // Input resistance in Mohms
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
+    // Leak contribution with adaptation
     float leakContribution = (V_rest - V) / tau;
+    
+    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        float adaptationCurrent = pImpl->state.adaptationVariable * pImpl->adaptationStrength;
+        leakContribution -= adaptationCurrent;
+        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    }
     
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    // Apply homeostatic plasticity (activity-dependent scaling)
+    float currentFiringRate = getFiringRate();
+    float homeostaticError = pImpl->homeostaticSetpoint - currentFiringRate;
+    if (std::abs(homeostaticError) > 0.1f) {
+        float scaling = 1.0f + pImpl->homeostaticStrength * homeostaticError * dt;
+        V *= scaling;
+        pImpl->synapticScaling *= scaling;
     }
     
     // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
     
-    // Check for spike
-    if (V >= threshold) {
+    // Dynamic threshold adjustment based on neuromodulation
+    float thresholdAdjustment = pImpl->dopamineModulation * 5.0f;
+    float effectiveThreshold = threshold + thresholdAdjustment;
+    
+    // Check for spike with dynamic threshold
+    if (V >= effectiveThreshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
@@ -243,12 +313,25 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Reset membrane potential
         V = V_reset;
         
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        // Enter refractory period with adaptive duration
+        uint32_t refractoryDuration = pImpl->state.refractoryPeriod;
+        // Modify refractory period based on neuromodulation
+        if (pImpl->dopamineModulation > 0.0f) {
+            refractoryDuration = static_cast<uint32_t>(refractoryDuration * 0.8f);  // Shorter with positive dopamine
+        } else if (pImpl->dopamineModulation < 0.0f) {
+            refractoryDuration = static_cast<uint32_t>(refractoryDuration * 1.2f);  // Longer with negative dopamine
+        }
+        
+        pImpl->state.refractoryRemaining = refractoryDuration;
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        pImpl->state.adaptationVariable += 1.0f * pImpl->adaptationStrength;
+        
+        // Update eligibility trace for reward-modulated plasticity
+        if (pImpl->plasticityFlags.reward_modulated) {
+            pImpl->eligibilityTrace *= 0.5f;  // Decay eligibility trace after spike
+        }
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
@@ -260,8 +343,16 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
+    // Enhanced LIF step with adaptive timestep based on neuron state
     TimestepDuration dt = 0.001;  // 1ms default
+    
+    // Adjust timestep based on neuron dynamics
+    if (pImpl->state.adaptationVariable > 5.0f) {
+        dt = 0.0005f;  // Slower for high adaptation
+    } else if (pImpl->state.adaptationVariable < 0.5f) {
+        dt = 0.002f;  // Faster for low adaptation
+    }
+    
     stepLIF(currentTime, dt);
 }
 
@@ -269,6 +360,12 @@ void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    
+    // Reset enhanced parameters
+    pImpl->thresholdDynamics = 0.0f;
+    pImpl->dopamineModulation = 0.0f;
+    pImpl->eligibilityTrace = 0.0f;
+    pImpl->synapticScaling = 1.0f;
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
@@ -297,6 +394,18 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    
+    // Initialize enhanced biophysical parameters
+    pImpl->inputResistance = rng.uniformReal(50.0f, 150.0f);
+    pImpl->membraneTimeConstant = rng.uniformReal(10.0f, 30.0f);
+    pImpl->adaptationStrength = rng.uniformReal(0.5f, 2.0f);
+    pImpl->noiseLevel = rng.uniformReal(0.2f, 1.0f);
+    pImpl->thermalNoise = rng.uniformReal(1.0f, 4.0f);
+    
+    // Set homeostatic parameters
+    pImpl->homeostaticSetpoint = -65.0f + rng.uniformReal(-5.0f, 5.0f);
+    pImpl->homeostaticStrength = rng.uniformReal(0.0005f, 0.002f);
+    pImpl->synapticScaling = 1.0f;
 }
 
 } // namespace nlm
