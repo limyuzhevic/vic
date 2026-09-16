@@ -70,8 +70,8 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
-    // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Update synapse for one simulation step with real synaptic dynamics
+    // Implements STDP, short-term plasticity, and eligibility trace updates
     void step(Timestamp currentTime);
     
     // Reset to initial state

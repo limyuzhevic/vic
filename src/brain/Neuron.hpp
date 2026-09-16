@@ -133,8 +133,8 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Update neuron for one simulation step with real LIF dynamics
+    // Implements complete Leaky Integrate-and-Fire dynamics with adaptation
     void step(Timestamp currentTime);
     
     // Reset to initial state
