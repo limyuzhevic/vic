@@ -19,6 +19,29 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
+// Configuration constants
+const int BRAIN_SEED = 42;
+const double SIMULATION_TIMESTEP = 0.001;
+const int NEURON_COUNT = 500;
+const int REGION_COUNT = 1;
+const float CONNECTION_PROBABILITY = 0.15f;
+const float STDP_LTP_WEIGHT = 0.02f;
+const float STDP_LTD_WEIGHT = 0.015f;
+const float STDP_TAU = 20.0f;
+const float SYNAPTOGENESIS_RATE = 0.0001f;
+const float PRUNING_RATE = 0.00001f;
+const int PLASTICITY_INPUT_COUNT = 20;
+const int CONNECTIVITY_TEST_STEPS = 50;
+const int CONNECTIVITY_TEST_NEURONS = 10;
+const int CONNECTIVITY_CHECK_NEURONS = 3;
+const int STDP_TEST_NEURONS = 2;
+const int STDP_TRIALS = 50;
+const int SYNAPTIC_STRENGTH_CHANGE_THRESHOLD = 10;
+const float WEIGHT_STRENGTH_THRESHOLD = 0.01f;
+const float WEIGHT_CHANGE_THRESHOLD = 0.001f;
+const float SYNAPTIC_THRESHOLD = 0.001f;
+const int NEURON_ID_FOR_WEIGHTS = 1;
+
 #include <iostream>
 #include <memory>
 #include <string>
