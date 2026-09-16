@@ -1,33 +1,22 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
-
-namespace nlm {
-
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+#include "../memory/WorkingMemory.hpp"
+#include "../memory/EpisodicMemory.hpp"
+#include "../memory/SemanticMemory.hpp"
+#include "../memory/ProceduralMemory.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../performance/CheckpointSystem.hpp"
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -140,13 +129,22 @@ public:
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    WorkingMemory* getWorkingMemory();
+    NeuralWorkingMemory* getNeuralWorkingMemory();
     
     // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    EpisodicMemory* getEpisodicMemory();
+    NeuralEpisodicMemory* getNeuralEpisodicMemory();
+    
+    // Semantic memory - knowledge representation
+    SemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - learned skills
+    ProceduralMemory* getProceduralMemory();
     
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    AssociativeMemory* getAssociativeMemory();
+    NeuralAssociativeMemory* getNeuralAssociativeMemory();
     
     // ========== PREDICTION SYSTEM ==========
     

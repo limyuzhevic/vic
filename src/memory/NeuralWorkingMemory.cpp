@@ -22,6 +22,12 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , memoryNeurons_()
+    , memoryActivations_()
+    , memoryTimestamps_()
+    , activeTraces_()
+    , recurrentConnections_()
+    , winners_()
 {
 }
 
@@ -259,6 +265,11 @@ AttentionalSelection::AttentionalSelection()
     , inhibitionStrength_(0.5f)
     , excitationStrength_(1.5f)
     , competitionThreshold_(0.3f)
+    , attendedRegions_()
+    , winners_()
+    , neuronSalience_()
+    , topDownBias_()
+    , bottomUpSalience_()
 {
 }
 
@@ -271,7 +282,7 @@ void AttentionalSelection::initialize(Brain* brain) {
 }
 
 std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector<NeuronId>& competitors,
-                                                              float globalInhibition) {
+                                                               float globalInhibition) {
     winners_.clear();
     
     if (competitors.empty()) return winners_;

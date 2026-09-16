@@ -29,9 +29,13 @@ struct Brain::Impl {
     std::vector<InterRegionConnection> interRegionConnections;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<WorkingMemory> workingMemory;
+    std::unique_ptr<EpisodicMemory> episodicMemory;
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
+    std::unique_ptr<NeuralWorkingMemory> neuralWorkingMemory;
+    std::unique_ptr<NeuralEpisodicMemory> neuralEpisodicMemory;
+    std::unique_ptr<NeuralAssociativeMemory> neuralAssociativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -120,6 +124,9 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        planner->initialize(this);
+        conceptFormation->initialize(this);
+        attention->initialize(this);
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -233,14 +240,23 @@ bool Brain::initialize() {
     
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
+    pImpl->neuralWorkingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
+    pImpl->neuralEpisodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
+    
+    // Initialize semantic memory
+    pImpl->semanticMemory->initialize(this);
+    
+    // Initialize procedural memory
+    pImpl->proceduralMemory->initialize(this);
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
+    pImpl->neuralAssociativeMemory->initialize(this);
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -511,8 +527,75 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get sensory observation (simplified - would normally come from actual sensory input)
+        std::vector<float> sensoryObservation;
+        // In a real system, this would capture current neural activity patterns
+        // For now, use current spike statistics as a proxy
+        for (size_t i = 0; i < pImpl->regions.size(); ++i) {
+            const auto& region = pImpl->regions[i];
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        sensoryObservation.push_back(neuron->getState().membranePotential);
+                    }
+                }
+            }
+        }
+        
+        if (!sensoryObservation.empty()) {
+            // Create prediction system input (simplified)
+            std::vector<float> predictedState;
+            if (sensoryObservation.size() > 0) {
+                predictedState = sensoryObservation;
+                // Add some temporal dynamics
+                for (size_t i = 0; i < predictedState.size(); ++i) {
+                    predictedState[i] = predictedState[i] * 0.9f;
+                    if (i > 0 && i < predictedState.size()) {
+                        predictedState[i] += sensoryObservation[i-1] * 0.1f;
+                    }
+                }
+            }
+            
+            // Update prediction system
+            pImpl->predictionSystem->updatePredictions(predictedState, sensoryObservation);
+        }
+        
+        // Use prediction error for learning modulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float confidence = pImpl->predictionSystem->getConfidence();
+        
+        // Modulate plasticity based on prediction error
+        if (predictionError > 0.0f) {
+            // High prediction error increases plasticity for learning
+            float plasticityMod = 1.0f + predictionError * 2.0f;
+            
+            // Apply to STDP
+            if (pImpl->stdp) {
+                // Temporarily increase STDP learning rate
+                float originalLTP = pImpl->stdp->getLTPWeight();
+                float originalLTD = pImpl->stdp->getLTDWeight();
+                pImpl->stdp->setLTPWeight(originalLTP * plasticityMod);
+                pImpl->stdp->setLTDWeight(originalLTD * plasticityMod);
+                
+                // Restore after processing step
+                std::swap(originalLTP, originalLTD);
+            }
+            
+            // Apply to Hebbian
+            if (pImpl->hebbian) {
+                float originalHebbianRate = pImpl->hebbian->getLearningRate();
+                pImpl->hebbian->setLearningRate(originalHebbianRate * plasticityMod);
+            }
+            
+            // Restore normal rates after processing
+            if (pImpl->stdp) {
+                pImpl->stdp->setLTPWeight(originalLTP);
+                pImpl->stdp->setLTDWeight(originalLTD);
+            }
+            if (pImpl->hebbian) {
+                pImpl->hebbian->setLearningRate(originalHebbianRate);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -754,8 +837,13 @@ void Brain::reset() {
     
     // Reset memory systems
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
+    if (pImpl->neuralWorkingMemory) pImpl->neuralWorkingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
+    if (pImpl->neuralEpisodicMemory) pImpl->neuralEpisodicMemory->clear();
+    if (pImpl->semanticMemory) pImpl->semanticMemory->clear();
+    if (pImpl->proceduralMemory) pImpl->proceduralMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+    if (pImpl->neuralAssociativeMemory) pImpl->neuralAssociativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
     
     NLM_LOG_INFO("NLM Brain reset complete");
