@@ -123,16 +123,31 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Custom", ActionType::Custom)
         .export_values();
 
-    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
-        .value("MoveForward", MotorCommand::MoveForward)
-        .value("MoveBackward", MotorCommand::MoveBackward)
-        .value("TurnLeft", MotorCommand::TurnLeft)
-        .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
-        .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
-        .export_values();
+py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
+    .value("MoveForward", MotorCommand::MoveForward)
+    .value("MoveBackward", MotorCommand::MoveBackward)
+    .value("TurnLeft", MotorCommand::TurnLeft)
+    .value("TurnRight", MotorCommand::TurnRight)
+    .value("LookLeft", MotorCommand::LookLeft)
+    .value("LookRight", MotorCommand::LookRight)
+    .value("Interact", MotorCommand::Interact)
+    .value("Wait", MotorCommand::Wait)
+    .export_values();
+
+    // Add convenience functions for MotorCommand
+    m.def("getMotorCommandName", [](MotorCommand cmd) {
+        switch (cmd) {
+            case MotorCommand::MoveForward: return "MoveForward";
+            case MotorCommand::MoveBackward: return "MoveBackward";
+            case MotorCommand::TurnLeft: return "TurnLeft";
+            case MotorCommand::TurnRight: return "TurnRight";
+            case MotorCommand::LookLeft: return "LookLeft";
+            case MotorCommand::LookRight: return "LookRight";
+            case MotorCommand::Interact: return "Interact";
+            case MotorCommand::Wait: return "Wait";
+            default: return "Unknown";
+        }
+    });
 
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
         .value("Empty", WorldObjectType::Empty)
@@ -397,8 +412,25 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+    .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+    .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+    .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+    .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled);
+
+    // Add convenience methods to get agent brain status as a dictionary
+    m.def("getAgentBrainStatus", [](std::shared_ptr<AgentBrain> agent) {
+        py::dict status;
+        status["neuromodulationLevel"] = agent->getNeuromodulationLevel();
+        status["curiosityLevel"] = agent->getCuriosityLevel();
+        status["noveltyLevel"] = agent->getNoveltyLevel();
+        status["predictionError"] = agent->getPredictionError();
+        status["developmentStage"] = agent->getDevelopmentalStage();
+        status["developmentEnabled"] = agent->isDevelopmentEnabled();
+        status["curiosityEnabled"] = agent->isCuriosityEnabled();
+        status["rewardModulationEnabled"] = agent->isRewardModulationEnabled();
+        status["structuralPlasticityEnabled"] = agent->isStructuralPlasticityEnabled();
+        return status;
+    });
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
