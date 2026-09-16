@@ -53,7 +53,8 @@ public:
     // Create brain with configuration
     explicit Brain(std::shared_ptr<Config> config);
     
-    ~Brain();
+    // Virtual destructor for proper cleanup of pImpl
+    virtual ~Brain() = default;
     
     // Disable copying, enable moving
     Brain(const Brain&) = delete;
