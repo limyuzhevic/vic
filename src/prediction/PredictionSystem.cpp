@@ -57,4 +57,39 @@ void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
 }
 
+// Add updatePrediction method to PredictionSystem
+void PredictionSystem::updatePrediction(const std::vector<float>& input) {
+    // Simple prediction model: next state is current state with some noise
+    // TODO: Replace with more sophisticated predictive model using neural substrate
+    
+    if (input.empty()) return;
+    
+    // For now: prediction = current input with some noise
+    // This will be replaced by actual neural prediction in Phase 2
+    pImpl->predictionError = 0.1f; // Placeholder error value
+    
+    // Update confidence based on input variability
+    float inputVariance = 0.0f;
+    float sum = 0.0f;
+    for (float val : input) {
+        sum += val;
+    }
+    float mean = sum / input.size();
+    for (float val : input) {
+        inputVariance += (val - mean) * (val - mean);
+    }
+    inputVariance /= input.size();
+    
+    // Higher confidence for consistent input
+    pImpl->confidence = std::clamp(1.0f - inputVariance, 0.1f, 1.0f);
+    
+    // Store error in history
+    pImpl->errorHistory.push_back(pImpl->predictionError);
+    
+    // Keep history bounded
+    if (pImpl->errorHistory.size() > 1000) {
+        pImpl->errorHistory.erase(pImpl->errorHistory.begin());
+    }
+}
+
 } // namespace nlm

@@ -34,6 +34,9 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Update prediction system with neural input
+    void updatePrediction(const std::vector<float>& input);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
