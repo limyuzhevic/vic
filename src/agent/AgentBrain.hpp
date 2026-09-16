@@ -77,6 +77,7 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    std::shared_ptr<MotorSystem> motorSystem_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;

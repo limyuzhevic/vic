@@ -1,26 +1,18 @@
 #include "AgentBrain.hpp"
+#include "../motor/MotorSystem.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
-    , dopamineLevel_(0.0f)
-    , noveltyLevel_(0.0f)
-    , curiosityLevel_(0.0f)
-    , predictionError_(0.0f)
-    , expectedReward_(0.0f)
-    , developmentalAge_(0.0)
-    , plasticityModifier_(1.0f)
-    , rewardModulationEnabled_(true)
-    , structuralPlasticityEnabled_(true)
-    , developmentEnabled_(true)
-    , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
+    , motorSystem_(std::make_shared<MotorSystem>())
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups for backward compatibility
+    // These are now handled primarily by MotorSystem, but kept for legacy code
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
@@ -80,8 +72,8 @@ size_t AgentBrain::getSensoryInputSize() const {
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
+    // One motor neuron per action (now using MotorSystem)
+    return motorSystem_->getAvailableActions().size();
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
@@ -152,7 +144,34 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
+    // Get motor region from brain
+    auto* motorRegion = brain_->getRegion(RegionId(1)); // Assuming motor region is at index 1
+    if (!motorRegion) return MotorCommand::Wait;
+    
+    // Use MotorSystem to select action from neural activity
+    auto action = motorSystem_->selectAction(*motorRegion);
+    
+    // Convert Action to MotorCommand
+    // This is a simple mapping - in a full implementation, we'd have a more sophisticated mapping
+    MotorCommand decoded = MotorCommand::Wait;
+    
+    switch (action->getType()) {
+        case ActionType::MoveForward: decoded = MotorCommand::MoveForward; break;
+        case ActionType::MoveBackward: decoded = MotorCommand::MoveBackward; break;
+        case ActionType::MoveLeft: decoded = MotorCommand::TurnLeft; break;
+        case ActionType::MoveRight: decoded = MotorCommand::TurnRight; break;
+        case ActionType::TurnLeft: decoded = MotorCommand::TurnLeft; break;
+        case ActionType::TurnRight: decoded = MotorCommand::TurnRight; break;
+        case ActionType::Look: decoded = MotorCommand::Wait; break; // Look doesn't have direct MotorCommand equivalent
+        case ActionType::LookUp: decoded = MotorCommand::Wait; break;
+        case ActionType::LookDown: decoded = MotorCommand::Wait; break;
+        case ActionType::Interact: decoded = MotorCommand::Interact; break;
+        case ActionType::Eat: decoded = MotorCommand::Wait; break;
+        case ActionType::Drink: decoded = MotorCommand::Wait; break;
+        case ActionType::Rest: decoded = MotorCommand::Wait; break;
+        case ActionType::Wait: decoded = MotorCommand::Wait; break;
+        case ActionType::Custom: decoded = MotorCommand::Wait; break;
+    }
     
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
