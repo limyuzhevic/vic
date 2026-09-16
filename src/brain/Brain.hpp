@@ -122,19 +122,6 @@ public:
     size_t getRegionCount() const;
     std::vector<RegionId> getRegionIds() const;
     
-    // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
-    
-    // Inter-region connection management
-    void addInterRegionConnection(RegionId source, RegionId target, 
-                                  float weight = 0.0f, Delay delay = 1);
-    void removeInterRegionConnection(RegionId source, RegionId target);
-    
-    // Global statistics
-    size_t getTotalNeuronCount() const;
-    size_t getTotalSynapseCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
     // ========== MEMORY SYSTEMS ==========

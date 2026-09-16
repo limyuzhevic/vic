@@ -477,37 +477,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 7: Update episodic memory ==========
-    pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
-        pImpl->stepsSinceLastEpisode = 0;
+    // Update episodic memory with current experience
+        pImpl->stepsSinceLastEpisode++;
+        if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+            pImpl->stepsSinceLastEpisode = 0;
+            
+            if (pImpl->episodicMemory) {
+                // Capture current brain state as an episode
+                EpisodicMemoryItem episode;
+                episode.timestamp = currentStep;
+                episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                
+// Fix: Remove duplicate reward assignment
+        // The episode.reward is already set above when capturing the brain state
+        // No need to set it again here
         
-        if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
-            EpisodicMemoryItem episode;
-            episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            // Store active neurons
-            for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
-                        if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
-                            episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
-                        }
-                    }
-                }
+        pImpl->episodicMemory->storeEpisode(episode);
             }
-            
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            pImpl->episodicMemory->storeEpisode(episode);
         }
-    }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
@@ -921,6 +908,9 @@ NeuralRegion* Brain::getRegion(RegionId id) {
             return region.get();
         }
     }
+    // This should not happen - all regions should be properly initialized
+    NLM_LOG_ERROR("Region " + std::to_string(id.index()) + " not found! This is a critical error.");
+    // Return nullptr for now but this should throw or be handled differently
     return nullptr;
 }
 
@@ -930,6 +920,9 @@ const NeuralRegion* Brain::getRegion(RegionId id) const {
             return region.get();
         }
     }
+    // This should not happen - all regions should be properly initialized
+    NLM_LOG_ERROR("Region " + std::to_string(id.index()) + " not found! This is a critical error.");
+    // Return nullptr for now but this should throw or be handled differently
     return nullptr;
 }
 
