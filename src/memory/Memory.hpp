@@ -2,173 +2,216 @@
 
 #include "../core/Types/Types.hpp"
 #include <vector>
+#include <memory>
 #include <functional>
+#include <unordered_map>
+#include <algorithm>
 
 namespace nlm {
 
+// Forward declaration to avoid circular dependency
+class Brain;
+
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Based on neural dynamics with persistent activity and recurrent connections
+//
+// Key mechanisms:
+// - Persistent neural activity (reverberating activity)
+// - Recurrent synaptic connections for maintaining information
+// - Activity-dependent short-term plasticity
+// - Neural competition for selective retention
+// - Integration with attention and prediction systems
 
 class WorkingMemory {
 public:
     WorkingMemory();
     ~WorkingMemory();
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
-    void store(NeuronId neuron, float value);
+    // Initialize with brain reference
+    void initialize(Brain* brain);
     
-    // Retrieve item
-    float retrieve(NeuronId neuron) const;
+    // Store information in working memory
+    // The information is encoded as neural activity pattern
+    void store(const std::vector<float>& pattern, float strength = 1.0f);
     
-    // Check if item exists
+    // Store specific neuron activation (used by Brain during sensory processing)
+    void storeToNeuron(NeuronId neuron, float activation);
+    
+    // Store prediction error for learning
+    void storePredictionError(float error, SimulationStep step);
+    
+    // Retrieve current working memory content as activity levels
+    std::vector<float> retrieve() const;
+    
+    // Check if specific neuron is part of working memory
     bool contains(NeuronId neuron) const;
     
-    // Clear all
+    // Get activation level of a specific neuron in working memory
+    float getNeuronActivation(NeuronId neuron) const;
+    
+    // Update working memory (maintenance and decay)
+    void update(TimestepDuration dt);
+    
+    // Clear working memory
     void clear();
+    
+    // Get number of active memory traces
+    size_t getActiveTraces() const { return activeTraces_.size(); }
     
     // Get capacity
-    size_t getCapacity() const;
-    size_t getCurrentSize() const;
+    size_t getCapacity() const { return capacity_; }
+    void setCapacity(size_t cap) { capacity_ = cap; }
     
-    // Decay all items
-    void decay(float decayRate);
+    // Decay rate for memory traces
+    float getDecayRate() const { return decayRate_; }
+    void setDecayRate(float rate) { decayRate_ = rate; }
+    
+    // Get neurons currently in working memory
+    const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
+    
+    // Strengthen working memory representation (for rehearsal)
+    void strengthenMemory(float factor);
+    
+    // Enhance memory based on novelty
+    void noveltyBoost(float factor);
+    
+    // Competition between memory traces
+    void runCompetition();
+    
+    // Is this neuron part of the winning population?
+    bool isWinning(NeuronId neuron) const;
+    
+    // Get overall memory activity level
+    float getMemoryActivity() const;
+    
+    // Get attention focus (neuron being attended)
+    NeuronId getAttentionFocus() const { return attentionFocus_; }
+    void setAttentionFocus(NeuronId focus) { attentionFocus_ = focus; }
+    
+    // Enhance specific neuron in memory
+    void enhanceNeuron(NeuronId neuron, float factor);
+    
+    // Store pattern in prediction system
+    void storePattern(Brain* brain, const std::vector<float>& pattern, SimulationStep step);
     
 private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-// Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
-
-struct EpisodicMemoryItem {
-    SimulationStep timestamp;
-    std::vector<NeuronId> neurons;
-    std::vector<float> values;
-    std::string metadata;
+    // Create recurrent connection for maintenance
+    void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
     
-    EpisodicMemoryItem() : timestamp(0) {}
+    // Update recurrent connections for maintenance
+    void updateRecurrentConnections();
+    
+    // Decay weak memory traces
+    void decayWeakTraces();
+    
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
+    Brain* brain_;
+    size_t capacity_;
+    float decayRate_;
+    
+    // Memory content
+    std::vector<NeuronId> memoryNeurons_;
+    std::vector<float> memoryActivations_;
+    std::vector<SimulationStep> memoryTimestamps_;
+    
+    // Active memory traces (neurons with activation > threshold)
+    std::vector<size_t> activeTraces_;
+    
+    // Recurrent connections for maintenance
+    std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
+    
+    // Winner neurons (for competition)
+    std::vector<NeuronId> winners_;
+    
+    // Attention focus
+    NeuronId attentionFocus_;
+    
+    // Prediction error history for learning
+    std::vector<std::pair<float, SimulationStep>> predictionErrors_;
 };
 
-class EpisodicMemory {
+// AttentionalSelection: Neural attention through competition
+// NOT Transformer attention - uses lateral inhibition and gain modulation
+//
+// Mechanisms:
+// - Competition between neural populations
+// - Salience-based selection
+// - Recurrent amplification of winners
+// - Inhibitory surround suppression
+// - Integration with working memory and concept formation
+
+class AttentionalSelection {
 public:
-    EpisodicMemory();
-    ~EpisodicMemory();
+    AttentionalSelection();
+    ~AttentionalSelection();
     
-    // Store episode
-    void storeEpisode(const EpisodicMemoryItem& episode);
+    // Initialize with brain reference
+    void initialize(Brain* brain);
     
-    // Retrieve episode
-    EpisodicMemoryItem retrieveEpisode(size_t index) const;
+    // Process competing sensory inputs and select winners
+    // Returns IDs of winning neural populations
+    std::vector<NeuronId> processCompetition(const std::vector<NeuronId>& competitors,
+                                              float globalInhibition = 0.5f);
     
-    // Get episode count
-    size_t getEpisodeCount() const;
+    // Apply attention to a specific region (focus processing there)
+    void focusOnRegion(RegionId region);
     
-    // Get recent episodes
-    std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
+    // Release attention (allow all regions equal processing)
+    void releaseAttention();
     
-    // Clear all
-    void clear();
+    // Get current attention focus
+    std::vector<RegionId> getAttendedRegions() const;
     
-    // Memory consolidation (move to long-term)
-    void consolidate(float relevanceThreshold);
+    // Set attention parameters
+    void setInhibitionStrength(float strength);
+    void setExcitationStrength(float strength);
+    void setCompetitionThreshold(float threshold);
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-// Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
-
-class SemanticMemory {
-public:
-    SemanticMemory();
-    ~SemanticMemory();
+    // Get inhibition level for a neuron
+    float getInhibitionFor(NeuronId neuron) const;
     
-    // Store fact
-    void storeFact(const std::string& key, const std::string& value);
+    // Get excitation level for a neuron
+    float getExcitationFor(NeuronId neuron) const;
     
-    // Retrieve fact
-    std::string retrieveFact(const std::string& key) const;
+    // Update attention dynamics
+    void update(TimestepDuration dt);
     
-    // Check if fact exists
-    bool hasFact(const std::string& key) const;
+    // Is this neuron currently attended?
+    bool isAttended(NeuronId neuron) const;
     
-    // Get all facts
-    std::vector<std::pair<std::string, std::string>> getAllFacts() const;
+    // Get attention winners
+    const std::vector<NeuronId>& getWinners() const { return winners_; }
     
-    // Clear all
-    void clear();
+    // Get focused neuron (single winner if exists)
+    NeuronId getFocusedNeuron() const;
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-// Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
-
-struct Skill {
-    std::string name;
-    std::vector<NeuronId> neuralPattern;
-    float proficiency;
+    // Top-down attention (goal-directed)
+    void applyTopDownBias(NeuronId neuron, float biasStrength);
     
-    Skill() : proficiency(0.0f) {}
-};
-
-class ProceduralMemory {
-public:
-    ProceduralMemory();
-    ~ProceduralMemory();
+    // Bottom-up attention (stimulus-driven)
+    void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
     
-    // Learn skill
-    void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
-    
-    // Retrieve skill
-    Skill* getSkill(const std::string& name);
-    
-    // Get all skills
-    std::vector<Skill*> getAllSkills();
-    
-    // Update proficiency
-    void updateProficiency(const std::string& name, float delta);
-    
-    // Clear all
-    void clear();
+    // Reset attention
+    void reset();
     
 private:
     struct Impl;
-    Impl* pImpl;
-};
-
-// Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
-
-class AssociativeMemory {
-public:
-    AssociativeMemory();
-    ~AssociativeMemory();
+    std::unique_ptr<Impl> pImpl;
     
-    // Create association
-    void associate(NeuronId a, NeuronId b, float strength);
+    Brain* brain_;
+    float inhibitionStrength_;
+    float excitationStrength_;
+    float competitionThreshold_;
     
-    // Get associated neurons
-    std::vector<NeuronId> getAssociations(NeuronId neuron) const;
+    std::vector<RegionId> attendedRegions_;
+    std::vector<NeuronId> winners_;
+    std::vector<float> neuronSalience_;
     
-    // Get association strength
-    float getAssociationStrength(NeuronId a, NeuronId b) const;
-    
-    // Update association
-    void updateAssociation(NeuronId a, NeuronId b, float delta);
-    
-    // Clear all
-    void clear();
-    
-private:
-    struct Impl;
-    Impl* pImpl;
+    // Biases/salience stored by NeuronId for correct lookup in processCompetition
+    std::unordered_map<uint64_t, float> topDownBias_;
+    std::unordered_map<uint64_t, float> bottomUpSalience_;
 };
 
 } // namespace nlm
