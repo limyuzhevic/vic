@@ -392,6 +392,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     if (pImpl->workingMemory) {
                         pImpl->workingMemory->storeToNeuron(neuron->getId(), 
                             std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                        
+                        // Enhance working memory with novelty/curiosity modulation
+                        if (pImpl->novelty) {
+                            float novelty = pImpl->novelty->getLevel();
+                            if (novelty > 0.5f) {
+                                pImpl->workingMemory->strengthenMemory(1.0f + novelty * 0.5f);
+                            }
+                        }
+                    }
+                    
+                    // Update prediction system based on firing neuron
+                    if (pImpl->predictionSystem) {
+                        // Create prediction error signal from neuron firing
+                        PredictionError predictionError;
+                        float magnitude = std::abs(state.membranePotential - state.restingPotential);
+                        predictionError.setLevel(magnitude * 0.1f);
+                        pImpl->predictionSystem->getPredictionErrorSignal()->setLevel(predictionError.getLevel());
                     }
                 }
             }
@@ -404,6 +421,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+    }
+    
+    // ========== STEP 4.5: Integrate curiosity neuromodulation ==========
+    if (pImpl->curiosity) {
+        // Get curiosity level from agent brain if available
+        // Curiosity would be updated based on prediction error and novelty
+        // This creates a feedback loop: brain updates curiosity based on agent's experience
+        float novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        float predictionError = pImpl->predictionError ? pImpl->predictionError->getLevel() : 0.0f;
+        
+        pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -510,9 +538,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->predictionError) {
+        // Create prediction from current sensory state
+        SensoryInput currentState;
+        currentState.clear();
+        currentState.resize(256, 0.0f);  // Vision input
+        
+        // Add sensory input contributions
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 256; ++i) {
+            if (pImpl->sensoryNeurons[i]) {
+                const auto& state = pImpl->sensoryNeurons[i]->getState();
+                currentState[i] = static_cast<float>(state.membranePotential - state.restingPotential);
+            }
+        }
+        
+        // Make prediction for next state
+        auto predicted = pImpl->predictionSystem->predictNextState(currentState);
+        
+        // Update predictions based on actual sensory state
+        if (predicted) {
+            // Use prediction error from neuromodulation
+            pImpl->predictionSystem->updatePredictions(*predicted, currentState);
+        }
+        
+        // Integrate prediction error with attention and learning
+        float predictionError = pImpl->predictionError->getLevel();
+        if (predictionError > 0.0f) {
+            // Increase attention on novel/unpredicted inputs
+            if (pImpl->attention) {
+                pImpl->attention->processCompetition(pImpl->sensoryNeurons, predictionError * 10.0f);
+            }
+            
+            // Update neuromodulation based on prediction error
+            pImpl->dopamine->signalRewardPredictionError(predictionError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,15 +583,73 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Integrate attention with prediction system
+        if (pImpl->predictionSystem) {
+            // Use attention winners to reinforce prediction learning
+            auto winners = pImpl->attention->getWinners();
+            if (!winners.empty() && pImpl->workingMemory) {
+                for (NeuronId winner : winners) {
+                    pImpl->workingMemory->storeToNeuron(winner, 0.5f);
+                }
+            }
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation from current neural activity patterns
+        // This requires building concept representations from sensory experiences
+        
+        // Get current neural activity patterns
+        std::vector<float> activityPattern;
+        size_t patternSize = 100;  // Typical concept dimension
+        activityPattern.reserve(patternSize);
+        
+        size_t count = 0;
+        for (auto& region : pImpl->regions) {
+            if (count >= patternSize) break;
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (count >= patternSize) break;
+                    const auto& state = neuron->getState();
+                    float activation = std::abs(state.membranePotential - state.restingPotential);
+                    activityPattern.push_back(activation);
+                    count++;
+                }
+            }
+        }
+        
+        if (activityPattern.size() >= patternSize * 0.8f) {
+            pImpl->conceptFormation->update(activityPattern);
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Update motor planning with neural planner ==========
+    if (pImpl->planner && pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+        // Use neural planner for action planning based on working memory content
+        // Get current working memory patterns for planning
+        std::vector<float> memoryPattern;
+        for (NeuronId neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+            // Extract neuron activation
+            float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+            memoryPattern.push_back(activation);
+        }
+        
+        // Generate plan based on memory patterns
+        if (!memoryPattern.empty()) {
+            // Simple planning: if working memory has strong activation, plan to act
+            auto plannedAction = pImpl->planner->planAction(memoryPattern);
+            
+            // Apply planned action to motor system
+            if (plannedAction && plannedAction->getType() != ActionType::Wait) {
+                // The planner would ideally select which motor neurons to activate
+                // For now, just use the existing action selection
+            }
+        }
+    }
+    
+    // ========== STEP 12: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
