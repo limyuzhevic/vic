@@ -137,3 +137,4 @@ void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
 }
 
 } // namespace nlm
+
