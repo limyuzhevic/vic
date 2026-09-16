@@ -303,7 +303,7 @@ void Brain::step(SimulationStep currentStep) {
     step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
 }
 
-void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
+    void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     /*
      * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
      * 
@@ -328,6 +328,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
+    
+    // Store last step's sensory state for episodic memory
+    pImpl->lastSensoryState.clear();
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
@@ -488,7 +491,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store active neurons from all sources
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,7 +505,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
+            // Also include working memory content for context
+            if (pImpl->workingMemory) {
+                const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+                const auto& memoryActivations = pImpl->workingMemory->retrieve();
+                
+                for (size_t i = 0; i < memoryNeurons.size() && i < memoryActivations.size(); ++i) {
+                    // Check if already included
+                    bool alreadyIn = false;
+                    for (const auto& neuronId : episode.activeNeurons) {
+                        if (neuronId.value == memoryNeurons[i].value) {
+                            alreadyIn = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!alreadyIn) {
+                        episode.activeNeurons.push_back(memoryNeurons[i]);
+                        episode.neuronActivations.push_back(memoryActivations[i]);
+                    }
+                }
+            }
+            
+            // Store reward in episode (do it after we have the activation values)
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
