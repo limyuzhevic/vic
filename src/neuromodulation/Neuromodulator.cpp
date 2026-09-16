@@ -53,4 +53,16 @@ void Dopamine::signalRewardPredictionError(float error) {
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 
+void Dopamine::signalCuriosity(float curiosity) {
+    // TODO PHASE 2: Implement curiosity signaling
+    // PLACEHOLDER: Dopamine responds to novelty
+    pImpl->level = std::min(pImpl->peak, pImpl->level + curiosity * pImpl->releaseRate * 0.5f);
+}
+
+void Dopamine::signalNovelty(float novelty) {
+    // TODO PHASE 2: Implement novelty signaling
+    // PLACEHOLDER: Dopamine responds to novelty
+    pImpl->level = std::min(pImpl->peak, pImpl->level + novelty * pImpl->releaseRate * 0.3f);
+}
+
 } // namespace nlm

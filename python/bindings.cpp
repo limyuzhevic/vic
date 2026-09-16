@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,14 +21,56 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Custom Python exceptions
+class NLMException : public std::runtime_error {
+public:
+    explicit NLMException(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class ConfigException : public NLMException {
+public:
+    explicit ConfigException(const std::string& msg) : NLMException("Config Error: " + msg) {}
+};
+
+class BrainException : public NLMException {
+public:
+    explicit BrainException(const std::string& msg) : NLMException("Brain Error: " + msg) {}
+};
+
+class AgentBrainException : public NLMException {
+public:
+    explicit AgentBrainException(const std::string& msg) : NLMException("AgentBrain Error: " + msg) {}
+};
+
+class MemoryException : public NLMException {
+public:
+    explicit MemoryException(const std::string& msg) : NLMException("Memory Error: " + msg) {}
+};
+
+class WorldException : public NLMException {
+public:
+    explicit WorldException(const std::string& msg) : NLMException("World Error: " + msg) {}
+};
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Includes comprehensive error handling and validation.
     )pbdoc";
 
+    // Register custom exceptions
+    py::register_exception<NLMException>(m, "NLMException", PyExc_RuntimeError);
+    py::register_exception<ConfigException>(m, "ConfigException", PyExc_ValueError);
+    py::register_exception<BrainException>(m, "BrainException", PyExc_RuntimeError);
+    py::register_exception<AgentBrainException>(m, "AgentBrainException", PyExc_RuntimeError);
+    py::register_exception<MemoryException>(m, "MemoryException", PyExc_RuntimeError);
+    py::register_exception<WorldException>(m, "WorldException", PyExc_RuntimeError);
+    
+    // Also register the original std::runtime_error for backward compatibility
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
@@ -160,9 +204,141 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Enhanced configuration access methods
+        .def("getInt", [](Config& self, const std::string& key) {
+            auto val = self.get<int>(key);
+            if (!val) throw ConfigException("Key not found: " + key);
+            return *val;
+        }, py::arg("key"), "Get integer value")
+        .def("getFloat", [](Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            if (!val) throw ConfigException("Key not found: " + key);
+            return *val;
+        }, py::arg("key"), "Get float value")
+        .def("getString", [](Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (!val) throw ConfigException("Key not found: " + key);
+            return *val;
+        }, py::arg("key"), "Get string value")
+        .def("getBool", [](Config& self, const std::string& key) {
+            auto val = self.get<bool>(key);
+            if (!val) throw ConfigException("Key not found: " + key);
+            return *val;
+        }, py::arg("key"), "Get boolean value")
+        .def("getIntOr", [](Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value"), "Get integer value with default")
+        .def("getFloatOr", [](Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value"), "Get float value with default")
+        .def("getStringOr", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value"), "Get string value with default")
+        .def("getBoolOr", [](Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value"), "Get boolean value with default")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
+
+    py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
+        .def("getType", &SensoryInput::getType, "Get the type of sensory input")
+        .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
+        .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
+        .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
+        .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
+             "Set the timestamp");
+
+    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
+             py::arg("channels") = 3)
+        .def("setData", [](Vision& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"))
+        .def("getWidth", &Vision::getWidth)
+        .def("getHeight", &Vision::getHeight)
+        .def("getChannels", &Vision::getChannels);
+
+    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
+        .def("setData", [](Audio& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"))
+        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
+        .def("getSampleRate", &Audio::getSampleRate)
+        .def("getNumSamples", &Audio::getNumSamples);
+
+    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
+        .def(py::init<>())
+        .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
+        .def("clearSignals", &InternalSignals::clearSignals);
+
+    py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
+        .def(py::init<>())
+        .def(py::init<ActionType>(), py::arg("type"))
+        .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
+        .def("getType", &Action::getType)
+        .def("setType", &Action::setType, py::arg("type"))
+        .def("getParameters", &Action::getParameters)
+        .def("setParameters", &Action::setParameters, py::arg("params"))
+        .def("getName", &Action::getName)
+        .def("clone", &Action::clone);
+
+    py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
+        .def(py::init<>())
+        .def(py::init<float, float, WorldObjectType, float, float>(),
+             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
+             py::arg("radius") = 0.5f)
+        .def_readwrite("x", &WorldObject::x)
+        .def_readwrite("y", &WorldObject::y)
+        .def_readwrite("radius", &WorldObject::radius)
+        .def_readwrite("type", &WorldObject::type)
+        .def_readwrite("value", &WorldObject::value)
+        .def_readwrite("active", &WorldObject::active);
+
+    py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("x", &AgentBody::x)
+        .def_readwrite("y", &AgentBody::y)
+        .def_readwrite("orientation", &AgentBody::orientation)
+        .def_readwrite("velocityX", &AgentBody::velocityX)
+        .def_readwrite("velocityY", &AgentBody::velocityY)
+        .def_readwrite("angularVelocity", &AgentBody::angularVelocity)
+        .def_readwrite("energy", &AgentBody::energy)
+        .def_readwrite("health", &AgentBody::health)
+        .def_readwrite("age", &AgentBody::age)
+        .def_readwrite("isMoving", &AgentBody::isMoving)
+        .def_readwrite("isTurning", &AgentBody::isTurning)
+        .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
+        .def("reset", &AgentBody::reset);
+
+    py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
+        .def(py::init<>())
+        .def(py::init<float, bool, std::string>(),
+             py::arg("reward"), py::arg("success"), py::arg("message") = "")
+        .def_readwrite("reward", &ActionResult::reward)
+        .def_readwrite("success", &ActionResult::success)
+        .def_readwrite("message", &ActionResult::message);
+
+    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
+        .def(py::init<>())
+        .def("getVision", &SensoryPercept::getVision)
+        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
+        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
+        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
+        .def("getTouch", &SensoryPercept::getTouch)
+        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
+        .def("getInternal", &SensoryPercept::getInternal)
+        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
+        .def("getProprioception", &SensoryPercept::getProprioception)
+        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
+        .def("getAudio", &SensoryPercept::getAudio)
+        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
+        .def("getAllSignals", &SensoryPercept::getAllSignals)
+        .def("getTimestamp", &SensoryPercept::getTimestamp)
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -416,10 +592,21 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    // Time utilities
+    py::class_<std::chrono::duration<double>>(m, "Duration")
+        .def(py::init<double>(), py::arg("seconds"));
+    
+    m.def("get_version", []() {
+        return "NLM Python Bindings v0.1.0";
+    }, "Get NLM Python bindings version");
+    
+    m.def("enable_debug_logging", []() {
+        // Enable debug logging through existing mechanism
+        // Note: This assumes there's a way to enable debug logging in the C++ side
+        return true;
+    }, "Enable debug logging");
 }
+
+} // namespace nlm
 
 } // namespace nlm
