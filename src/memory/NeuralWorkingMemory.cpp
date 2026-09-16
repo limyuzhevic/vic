@@ -423,4 +423,84 @@ void AttentionalSelection::reset() {
     pImpl->inhibitionLevel.clear();
 }
 
-} // namespace nlm
+if (it != bottomUpSalience_.end()) {
+        it->second += salienceStrength;
+    } else {
+        bottomUpSalience_[neuron.value] = salienceStrength;
+    }
+}
+
+// Add processWorkingMemory method for attention integration
+void NeuralWorkingMemory::processWorkingMemory(AttentionalSelection* attention) {
+    if (!attention) return;
+    
+    // Apply attention to memory traces
+    std::vector<NeuronId> memoryNeurons = getMemoryNeurons();
+    if (memoryNeurons.empty()) return;
+    
+    // Focus attention on the strongest memory traces
+    attention->focusOnRegion(RegionId(1));  // Focus on first region for now
+    
+    // Create top-down bias based on memory importance
+    for (size_t i = 0; i < std::min(size_t(5), memoryNeurons.size()); ++i) {
+        attention->applyTopDownBias(memoryNeurons[i], 1.0f / (i + 1));
+    }
+}
+
+// Add consolidate method for memory management
+void NeuralWorkingMemory::consolidate() {
+    if (memoryNeurons_.empty()) return;
+    
+    // Decays weak memory traces
+    std::vector<NeuronId> toRemove;
+    
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        // Remove very weak traces
+        if (std::abs(memoryActivations_[i]) < 0.01f) {
+            toRemove.push_back(i);
+        }
+        
+        // Reduce activations over time
+        memoryActivations_[i] *= 0.98f;
+    }
+    
+    // Remove weak traces in reverse order
+    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+        size_t idx = *it;
+        if (idx < memoryNeurons_.size()) {
+            memoryNeurons_.erase(memoryNeurons_.begin() + idx);
+            memoryActivations_.erase(memoryActivations_.begin() + idx);
+            memoryTimestamps_.erase(memoryTimestamps_.begin() + idx);
+        }
+    }
+    
+    // Create stronger recurrent connections for important traces
+    if (memoryNeurons_.size() > 1) {
+        for (size_t i = 1; i < std::min(memoryNeurons_.size(), static_cast<size_t>(3)); ++i) {
+            createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], 0.3f);
+        }
+    }
+}
+
+// Add getCurrentPattern method
+std::vector<float> NeuralWorkingMemory::getCurrentPattern() const {
+    std::vector<float> pattern;
+    pattern.reserve(memoryNeurons_.size());
+    
+    for (float activation : memoryActivations_) {
+        pattern.push_back(activation);
+    }
+    
+    return pattern;
+}
+
+// Fill in the missing newPattern_ member in the private section of the class
+private:
+    // ... other private members ...
+    
+    // Last pattern for comparison (for novelty detection)
+    std::vector<float> lastPattern_;
+    
+    // Tracking for attention and competition
+    bool isActive_;
+}

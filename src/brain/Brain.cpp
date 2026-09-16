@@ -402,19 +402,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processSpikes(currentStep);
     
     // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
+    if (pImpl->workingMemory && pImpl->sensoryNeurons.size() > 0) {
+        // Working memory is the brain's "working memory" - stores active patterns
+        // Encode sensory patterns for temporary storage and rapid access
+        
+        // Get current sensory neural activities as patterns
+        std::vector<float> currentPattern;
+        currentPattern.reserve(pImpl->sensoryNeurons.size());
+        
+        for (Neuron* neuron : pImpl->sensoryNeurons) {
+            // Normalize membrane potential to [0, 1] for pattern encoding
+            float normalizedValue = std::clamp(neuron->getState().membranePotential / 100.0f, 0.0f, 1.0f);
+            currentPattern.push_back(normalizedValue);
+        }
+        
+        if (!currentPattern.empty()) {
+            // Store pattern in working memory
+            pImpl->workingMemory->store(currentPattern);
+            
+            // Use working memory for attention selection
+            if (pImpl->attention) {
+                pImpl->attention->processWorkingMemory(pImpl->workingMemory.get());
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
+        // Get current sensory pattern for novelty detection
+        if (pImpl->sensoryNeurons.size() > 0) {
+            std::vector<float> currentPattern;
+            currentPattern.reserve(pImpl->sensoryNeurons.size());
+            
+            for (Neuron* neuron : pImpl->sensoryNeurons) {
+                currentPattern.push_back(neuron->getState().membranePotential);
+            }
+            
+            // Compare with last pattern for novelty detection
+            if (!pImpl->novelty->getLastPattern().empty()) {
+                pImpl->novelty->detectNovelty(currentPattern, pImpl->novelty->getLastPattern());
+            }
+            
+            pImpl->novelty->update(pImpl->timestep);
+        }
     }
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        float novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        float predictionError = pImpl->predictionSystem ? pImpl->predictionSystem->getPredictionError() : 0.0f;
+        pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -510,12 +548,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->sensoryNeurons.size() > 0) {
+        // Update prediction system with current sensory observations
+        // Collect sensory neuron activities for prediction
+        std::vector<float> sensoryPattern;
+        sensoryPattern.reserve(pImpl->sensoryNeurons.size());
+        
+        for (Neuron* neuron : pImpl->sensoryNeurons) {
+            sensoryPattern.push_back(neuron->getState().membranePotential);
+        }
+        
+        if (!sensoryPattern.empty()) {
+            // Create a simple sensory input from the pattern
+            // For now, use first 256 values as vision-like input
+            size_t maxSize = std::min(sensoryPattern.size(), static_cast<size_t>(256));
+            std::vector<float> inputData(maxSize);
+            for (size_t i = 0; i < maxSize; ++i) {
+                // Normalize to [0, 1]
+                inputData[i] = (sensoryPattern[i] + 100.0f) / 200.0f;
+                inputData[i] = std::clamp(inputData[i], 0.0f, 1.0f);
+            }
+            
+            // Predict next state
+            auto predicted = pImpl->predictionSystem->predictNextState(SensoryInput(inputData));
+            
+            // Update predictions with actual observed state
+            pImpl->predictionSystem->updatePredictions(predicted, SensoryInput(inputData));
+        }
     }
     
-    // ========== STEP 9: Update attention system ==========
+// ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -524,17 +586,90 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Update attention based on prediction error for novel stimuli
+        if (pImpl->predictionSystem) {
+            float error = pImpl->predictionSystem->getPredictionError();
+            if (error > 0.1f) {  // High prediction error = novel stimulus
+                pImpl->attention->enhanceFocus();  // Boost attention for novel events
+            }
+        }
+    }
+        
+        // Update attention based on prediction error for novel stimuli
+        if (pImpl->predictionSystem) {
+            float error = pImpl->predictionSystem->getPredictionError();
+            if (error > 0.1f) {  // High prediction error = novel stimulus
+                pImpl->attention->enhanceFocus();  // Boost attention for novel events
+            }
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Process current working memory patterns to form concepts
+        std::vector<float> currentPattern = pImpl->workingMemory->retrieve();
+        if (!currentPattern.empty()) {
+            pImpl->conceptFormation->processPattern(currentPattern);
+            
+            // Store new concept in episodic memory
+            if (pImpl->episodicMemory && pImpl->predictionSystem) {
+                float confidence = pImpl->predictionSystem->getConfidence();
+                if (confidence > 0.7f) {
+                    Concept c;
+                    c.pattern = currentPattern;
+                    c.confidence = confidence;
+                    c.age = 0;
+                    pImpl->conceptFormation->storeConcept(c);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
+        
+        // Update development system and adjust plasticity parameters
+        if (pImpl->developmentSystem) {
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 100);
+            
+            // Adjust plasticity rates based on developmental stage
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            float plasticityMod = 1.0f;
+            
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    plasticityMod = 1.0f;  // High plasticity
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    plasticityMod = 0.8f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    plasticityMod = 0.5f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    plasticityMod = 0.2f;  // Stable
+                    break;
+            }
+            
+            // Apply to all plasticity systems
+            if (pImpl->stdp) {
+                float baseLTP = 0.02f;
+                float baseLTD = 0.015f;
+                pImpl->stdp->setLTPWeight(baseLTP * plasticityMod);
+                pImpl->stdp->setLTDWeight(baseLTD * plasticityMod);
+            }
+            
+            if (pImpl->hebbian) {
+                pImpl->hebbian->setLearningRate(0.01f * plasticityMod);
+            }
+            
+            if (pImpl->structuralPlasticity) {
+                pImpl->structuralPlasticity->setSynaptogenesisRate(0.0001f * plasticityMod);
+                pImpl->structuralPlasticity->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            }
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========
@@ -580,6 +715,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
+        
+        // Also consolidate working memory
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->consolidate();
+        }
+    }
+    
+    // Apply neuromodulation effects based on prediction error and reward
+    if (pImpl->predictionSystem && pImpl->dopamine) {
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float errorLevel = std::clamp(predictionError / 10.0f, 0.0f, 1.0f);
+        
+        // Update dopamine level based on prediction error (prediction error learning)
+        pImpl->dopamine->setLevel(errorLevel);
+        
+        // Apply dopamine effects on synaptic plasticity
+        if (errorLevel > 0.1f) {
+            // High prediction error -> enhanced learning
+            if (pImpl->stdp) {
+                // Temporarily boost STDP learning rates
+                float originalLTP = pImpl->stdp->getLTPWeight();
+                float originalLTD = pImpl->stdp->getLTDWeight();
+                pImpl->stdp->setLTPWeight(originalLTP * 2.0f);
+                pImpl->stdp->setLTDWeight(originalLTD * 2.0f);
+                
+                // Restore after effect
+                if (currentStep % 50 == 0) {
+                    pImpl->stdp->setLTPWeight(originalLTP);
+                    pImpl->stdp->setLTDWeight(originalLTD);
+                }
+            }
+        }
     }
     
     // ========== STEP 15: Checkpoint management ==========
