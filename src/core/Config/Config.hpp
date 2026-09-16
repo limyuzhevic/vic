@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
 
 namespace nlm {
 
@@ -15,11 +16,15 @@ class Config;
 using ConfigValue = std::variant<
     int,
     int64_t,
+    uint64_t,
     double,
     bool,
     std::string,
     std::vector<int>,
+    std::vector<int64_t>,
+    std::vector<uint64_t>,
     std::vector<double>,
+    std::vector<bool>,
     std::vector<std::string>
 >;
 
@@ -55,7 +60,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -63,6 +68,7 @@ public:
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
+    bool saveToFile(const std::string& filepath, const std::string& format) const;
     
     // Get values
     template<typename T>
@@ -93,6 +99,20 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    static bool validateJsonSchema(const nlohmann::json& jsonConfig);
+    static bool validateYamlSchema(const YAML::Node& yamlConfig);
+    
+    // File type detection
+    static bool isJsonFile(const std::string& filepath);
+    static bool isYamlFile(const std::string& filepath);
+    
+    // Version and profile support
+    bool loadProfile(const std::string& profileName);
+    bool saveProfile(const std::string& profileName) const;
+    std::vector<std::string> getProfiles() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +120,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Serialization helpers (private implementation)
+    static ConfigValue jsonToConfigValue(const nlohmann::json& j);
+    static nlohmann::json configValueToJson(const ConfigValue& value);
+    static ConfigValue yamlToConfigValue(const YAML::Node& node);
+    static YAML::Node configValueToYaml(const ConfigValue& value);
 };
 
 } // namespace nlm

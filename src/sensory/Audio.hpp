@@ -12,6 +12,9 @@ public:
     AudioProcessor();
     ~AudioProcessor();
     
+    // Initialize with brain reference and configuration
+    void initialize(Brain* brain, std::shared_ptr<Config> config);
+    
     // Process audio input
     void process(const Audio& input);
     
@@ -20,6 +23,9 @@ public:
     
     // Get feature dimensionality
     size_t getFeatureDimensions() const;
+    
+    // Reset processing state
+    void reset();
     
 private:
     struct Impl;
