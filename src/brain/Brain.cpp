@@ -80,7 +80,7 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
+        , rng(std::make_unique<RandomGenerator>(42))  // Initialize with default seed
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -98,7 +98,10 @@ struct Brain::Impl {
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
-        rng = std::make_unique<RandomGenerator>(seed);
+        // Re-initialize with config seed if different from default
+        if (seed != 42) {
+            rng = std::make_unique<RandomGenerator>(seed);
+        }
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
@@ -1005,16 +1008,8 @@ float Brain::getAverageFiringRate() const {
 
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
-NeuralWorkingMemory* Brain::getWorkingMemory() {
+NeuralWorkingMemory* Brain::getWorkingMemory() const {
     return pImpl->workingMemory.get();
-}
-
-NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
-}
-
-NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
