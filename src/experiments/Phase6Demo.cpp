@@ -1,12 +1,5 @@
-/**
- * Phase 6 Demo - Integration Test
- * 
- * This demo runs the Phase 6 integration experiment to verify
- * that all brain systems are properly connected.
- */
-
-#include "experiments/Phase6IntegratedExperiment.hpp"
-#include "core/Logger/Logger.hpp"
+#include "Phase6Demo.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <iostream>
 
 using namespace nlm;
