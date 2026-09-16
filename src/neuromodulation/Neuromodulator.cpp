@@ -53,4 +53,70 @@ void Dopamine::signalRewardPredictionError(float error) {
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 
-} // namespace nlm
+const char* Neuromodulator::getName() const {
+    return "NM";
+}
+
+void Neuromodulator::update(TimestepDuration dt) {
+    // Default implementation: update all neuromodulators
+    // This is a placeholder - real implementation would coordinate interactions
+    dopamine->update(dt);
+    curiosity->update(dt);
+    predictionError->update(dt);
+    novelty->update(dt);
+}
+
+float Neuromodulator::getTotalModulation() const {
+    float total = 0.0f;
+    total += dopamine ? dopamine->getLevel() : 0.0f;
+    total += curiosity ? curiosity->getLevel() : 0.0f;
+    total += predictionError ? predictionError->getLevel() : 0.0f;
+    total += novelty ? novelty->getLevel() : 0.0f;
+    return total / 4.0f;  // Average
+}
+
+Neuromodulator::Neuromodulator()
+    : dopamine(new Dopamine())
+    , curiosity(new Curiosity())
+    , predictionError(new PredictionError())
+    , novelty(new Novelty())
+    , brain_(nullptr)
+{
+}
+
+Neuromodulator::~Neuromodulator() = default;
+
+void Neuromodulator::initialize(Brain* brain) {
+    brain_ = brain;
+    dopamine->setLevel(0.0f);
+    curiosity->setLevel(0.0f);
+    predictionError->setLevel(0.0f);
+    novelty->setLevel(0.0f);
+}
+
+float Neuromodulator::getNeuromodulationLevel() const {
+    return getTotalModulation();
+}
+
+Dopamine* Neuromodulator::getDopamine() const {
+    return dopamine.get();
+}
+
+Curiosity* Neuromodulator::getCuriosity() const {
+    return curiosity.get();
+}
+
+PredictionError* Neuromodulator::getPredictionError() const {
+    return predictionError.get();
+}
+
+Novelty* Neuromodulator::getNovelty() const {
+    return novelty.get();
+}
+
+void Neuromodulator::reset() {
+    if (dopamine) dopamine->setLevel(0.0f);
+    if (curiosity) curiosity->setLevel(0.0f);
+    if (predictionError) predictionError->setLevel(0.0f);
+    if (novelty) novelty->setLevel(0.0f);
+}

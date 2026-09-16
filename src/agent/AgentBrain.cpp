@@ -87,12 +87,18 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
+    // Validate percept
+    if (!percept.getVision().empty() && percept.getVision().size() != 16 * 16) {
+        NLM_LOG_WARNING("Vision size mismatch: expected 256, got " + 
+                       std::to_string(percept.getVision().size()));
+    }
+    
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            // Validate input value
+            float current = std::max(-10.0f, std::min(10.0f, vision[i] * 5.0f));  // Clamp to reasonable range
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -101,7 +107,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = std::max(-5.0f, std::min(5.0f, touch[i] * 8.0f));  // Clamp
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -110,7 +116,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            float current = std::clamp((intern[i] * 2.0f - 1.0f) * 5.0f, -10.0f, 10.0f);  // Center and scale, then clamp
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
@@ -119,7 +125,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            float current = std::clamp((proprio[i] * 2.0f - 1.0f) * 3.0f, -5.0f, 5.0f);  // Center and scale, then clamp
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
