@@ -267,11 +267,18 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
              py::arg("visionWidth"), py::arg("visionHeight"))
+        .def("initialize", &SimpleWorld::initialize, py::arg("visionWidth"), py::arg("visionHeight"),
+             "Initialize with neural input capability")
         .def("reset", &SimpleWorld::reset)
         .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
         .def("update", &SimpleWorld::update, py::arg("timestep"))
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
              py::arg("cmd"), py::arg("currentTime"))
+        .def("observe", &SimpleWorld::observe, py::arg("region"), "Observe world from neural region")
+        .def("applyAction", &SimpleWorld::applyAction, py::arg("region"), py::arg("cmd"),
+             "Apply neural action to world")
+        .def("computeReward", &SimpleWorld::computeReward, py::arg("region"),
+             "Compute reward based on neural context")
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
              py::return_value_policy::reference_internal)
         .def("getAgentBody", &SimpleWorld::getAgentBody,
@@ -289,31 +296,36 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
-        .def("reset", &Brain::reset,
-             "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
+    // SimpleWorldPy bindings - Python-specific additions
+    py::class_<SimpleWorldPy>(m, "SimpleWorldPy", R"pbdoc(Python wrapper for SimpleWorld)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SimpleWorldPy::initialize, py::arg("visionWidth"), py::arg("visionHeight"),
+             "Initialize with neural input capability")
+        .def("observe", &SimpleWorldPy::observe, py::arg("region"), "Observe world from neural region")
+        .def("apply_action", &SimpleWorldPy::applyAction, py::arg("region"), py::arg("cmd"),
+             "Apply neural action to world (Python-friendly name)")
+        .def("compute_reward", &SimpleWorldPy::computeReward, py::arg("region"),
+             "Compute reward based on neural context (Python-friendly name)")
+        .def("get_sensory_percept", &SimpleWorldPy::getSensoryPercept,
+             py::return_value_policy::reference_internal, "Get current sensory percept")
+        .def("get_agent_body", &SimpleWorldPy::getAgentBody,
+             py::return_value_policy::reference_internal, "Get agent body state")
+        .def("get_state", &SimpleWorldPy::getState,
+             py::return_value_policy::reference_internal, "Get full world state")
+        .def("reset_to", &SimpleWorldPy::resetTo, py::arg("x"), py::arg("y"), "Reset to specific position")
+        .def("add_resource", &SimpleWorldPy::addResource, py::arg("x"), py::arg("y"), "Add a resource object")
+        .def("add_hazard", &SimpleWorldPy::addHazard, py::arg("x"), py::arg("y"), "Add a hazard object")
+        .def("apply_neural_action", &SimpleWorldPy::applyNeuralAction, py::arg("cmd"), py::arg("region"),
+             "Apply neural action using region's predictions")
+        .def("get_prediction_error", &SimpleWorldPy::getPredictionError, py::arg("region"),
+             "Get prediction error from neural region")
+        .def("has_object_at", &SimpleWorldPy::hasObjectAt, py::arg("x"), py::arg("y"), "Check if object at position")
+        .def("get_all_objects", &SimpleWorldPy::getAllObjects,
+             py::return_value_policy::reference_internal, "Get all objects in world")
+        .def("generate_vision_field", &SimpleWorldPy::generateVisionField, "Generate vision field for neural processing")
+        .def("generate_touch_sensors", &SimpleWorldPy::generateTouchSensors, "Generate touch sensor readings")
+        .def("generate_internal_signals", &SimpleWorldPy::generateInternalSignals, "Generate internal state signals")
+        .def("generate_proprioception", &SimpleWorldPy::generateProprioception, "Generate proprioceptive signals");
         .def("load", &Brain::load, py::arg("filepath"),
              "Load brain state from file")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",

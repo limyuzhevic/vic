@@ -1,13 +1,18 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Advanced Configuration and Command-Line Interface
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// Enhanced with comprehensive configuration system supporting:
+// - JSON/YAML configuration file formats with syntax highlighting
+// - Advanced configuration templates for all phases
+// - Batch mode and interactive mode options
+// - Real-time logging configuration
+// - Profiling and debugging flags
+// - Configuration validation and export
+// - Parallel execution for multiple simulations
+// - Configuration inheritance and overrides
 
 #include "core/Config/Config.hpp"
+#include "core/Config/AdvancedConfig.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
@@ -25,27 +30,186 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
+#include <thread>
 
 using namespace nlm;
 
-void printBanner() {
+void printBanner(bool advanced = false) {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
+    )";
+    
+    if (advanced) {
+        std::cout << R"(
+    ║     Advanced Configuration System                            ║
+    ║                                                               ║
+    ║     Enhanced CLI with Templates & Validation                 ║
+    )";
+    } else {
+        std::cout << R"(
     ║     Phase 2: Real Neural Computation                         ║
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
     ║     - Real LIF neuron dynamics                                ║
+    )";
+    }
+    
+    std::cout << R"(
     ║     - Event-driven spike propagation                          ║
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    ╚═════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printAdvancedUsage() {
+    std::cout << R"(
+=== Advanced NLM Configuration and CLI Usage ===
+
+=== Configuration Files ===
+--config=file.cfg              Load configuration from file (JSON/YAML/key=value)
+--template=<phase>             Load template configuration (phase1-phase6)
+
+=== Configuration Override ===
+--<key>=<value>                Override configuration value (e.g., --neuron_count=500)
+--<key> <value>                Override with space separator
+
+=== Advanced Options ===
+--batch <file1> <file2> ...     Process multiple configuration files in batch mode
+--interactive                   Start interactive configuration setup
+--validate <output.json>       Validate configuration and export to JSON
+--export <output.json>          Export current configuration to JSON file
+--parallel <file1> <file2> ... Run multiple simulations in parallel
+
+=== Logging Configuration ===
+--log_level=<level>            Set logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+--log_file=<filename>          Set log file name
+--console_log=<true/false>     Enable/disable console logging
+--file_log=<true/false>        Enable/disable file logging
+--log_append=<true/false>      Append to log file instead of overwriting
+
+=== Debug and Profiling ===
+--debug                        Enable debug mode
+--profile                      Enable profiling
+--breakpoints                  Enable breakpoints
+--validate_only                Only validate configuration (don't run simulation)
+--verbose                       Enable verbose output
+--profile_output=<file>        Set profiling output file
+--time_limit=<seconds>         Set time limit for simulation
+
+=== Phase Selection ===
+--phase=<phase>                Set phase (2, 3, 4, 5, 6)
+--run_demo                     Run phase demo mode
+
+=== Experimental ===
+--experiment=<name>            Run specific experiment
+--metrics=<file>               Export metrics to file
+
+=== Help ===
+--help                          Show this help message
+--advanced_help                 Show advanced help with all options
+
+=== Configuration Templates ===
+Available templates:
+- phase1_basic                  Basic configuration for Phase 1
+- phase2_neural                Neural computation focused for Phase 2
+- phase3_interaction           Agent-world interaction for Phase 3
+- phase4_cognitive             Cognitive development for Phase 4
+- phase5_performance           Performance optimization for Phase 5
+- phase6_integration           Full integration for Phase 6
+
+Example configurations:
+--template=phase2_neural --neuron_count=1000 --log_level=DEBUG
+";
+}
+
+AdvancedConfig::TemplateType stringToTemplateType(const std::string& str) {
+    std::string lower = str;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    
+    if (lower == "phase1" || lower == "phase1_basic") return AdvancedConfig::TemplateType::PHASE1_BASIC;
+    if (lower == "phase2" || lower == "phase2_neural") return AdvancedConfig::TemplateType::PHASE2_NEURAL_COMPUTATION;
+    if (lower == "phase3" || lower == "phase3_interaction") return AdvancedConfig::TemplateType::PHASE3_AGENT_WORLD_INTERACTION;
+    if (lower == "phase4" || lower == "phase4_cognitive") return AdvancedConfig::TemplateType::PHASE4_COGNITIVE_DEVELOPMENT;
+    if (lower == "phase5" || lower == "phase5_performance") return AdvancedConfig::TemplateType::PHASE5_PERFORMANCE_OPTIMIZATION;
+    if (lower == "phase6" || lower == "phase6_integration") return AdvancedConfig::TemplateType::PHASE6_FULL_INTEGRATION;
+    
+    return AdvancedConfig::TemplateType::PHASE2_NEURAL_COMPUTATION;
+}
+
+bool parseAdvancedArguments(int argc, char** argv,
+                           std::string& configFile,
+                           std::vector<std::string>& batchFiles,
+                           bool& interactive,
+                           bool& validateOnly,
+                           bool& runDemo,
+                           int& phase,
+                           AdvancedConfig::TemplateType& templateType,
+                           AdvancedConfig::LoggingConfig& loggingConfig,
+                           AdvancedConfig::DebugConfig& debugConfig) {
+    bool advancedHelp = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--advanced_help") {
+            advancedHelp = true;
+        } else if (arg == "--help") {
+            printBanner();
+            return false;
+        } else if (arg.substr(0, 9) == "--config=") {
+            configFile = arg.substr(9);
+        } else if (arg == "--batch" && i + 1 < argc) {
+            for (int j = i + 1; j < argc && argv[j][0] != '-'; ++j) {
+                batchFiles.push_back(argv[j]);
+            }
+            break;
+        } else if (arg == "--template=" && i + 1 < argc) {
+            templateType = stringToTemplateType(argv[++i]);
+        } else if (arg == "--interactive") {
+            interactive = true;
+        } else if (arg == "--validate_only") {
+            validateOnly = true;
+        } else if (arg == "--run_demo") {
+            runDemo = true;
+        } else if (arg.substr(0, 7) == "--phase=") {
+            phase = std::stoi(arg.substr(7));
+        } else if (arg.substr(0, 10) == "--log_level=") {
+            loggingConfig.level = arg.substr(10);
+        } else if (arg.substr(0, 12) == "--log_file=") {
+            loggingConfig.filename = arg.substr(12);
+        } else if (arg.substr(0, 15) == "--console_log=") {
+            loggingConfig.console = (arg.substr(15) == "true" || arg.substr(15) == "1");
+        } else if (arg.substr(0, 13) == "--file_log=") {
+            loggingConfig.file = (arg.substr(13) == "true" || arg.substr(13) == "1");
+        } else if (arg.substr(0, 13) == "--log_append=") {
+            loggingConfig.append = (arg.substr(13) == "true" || arg.substr(13) == "1");
+        } else if (arg == "--debug") {
+            debugConfig.enabled = true;
+        } else if (arg == "--profile") {
+            debugConfig.profile = true;
+        } else if (arg == "--breakpoints") {
+            debugConfig.breakpoints = true;
+        } else if (arg.substr(0, 16) == "--profile_output=") {
+            debugConfig.profileOutput = arg.substr(16);
+        } else if (arg.substr(0, 15) == "--time_limit=") {
+            debugConfig.timeLimit = std::stod(arg.substr(15));
+        }
+    }
+    
+    if (advancedHelp) {
+        printAdvancedUsage();
+        return false;
+    }
+    
+    return true;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience

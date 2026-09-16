@@ -83,6 +83,9 @@ private:
 
     // Decay weak memory traces
     void decayWeakTraces();
+    
+    // Create maintenance connections between memory neurons for persistent activity
+    void createMaintenanceConnections();
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;

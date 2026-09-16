@@ -40,20 +40,12 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
+        // Get neuron ID from memory buffer
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
-        
-        // Update stored activation
+        // FIXED: Store activation directly - no complex region lookup needed
+        // The memory system tracks neuron IDs directly, not through regions
         if (i < memoryActivations_.size()) {
             memoryActivations_[i] = activation;
         } else {
@@ -61,6 +53,9 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
             memoryTimestamps_.push_back(0);
             memoryNeurons_.push_back(neuron);
         }
+        
+        // Inject current into the neuron via brain interface
+        brain_->injectCurrent(neuron, activation * 5.0f);
     }
     
     // Create maintenance connections if needed
@@ -113,35 +108,28 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
     return 0.0f;
 }
 
-void NeuralWorkingMemory::update(TimestepDuration dt) {
-    if (!brain_) return;
-    
-    // Update maintenance - reinforce active memory neurons
-    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        NeuronId neuron = memoryNeurons_[i];
-        float activation = memoryActivations_[i];
-        
-        if (activation > 0.1f) {
-            // Inject maintenance current
-            brain_->injectCurrent(neuron, activation * 2.0f);
-            
-            // Age the trace
-            memoryTimestamps_[i]++;
-            
-            // Check if trace is too old
-            if (memoryTimestamps_[i] > 1000) {
-                activation *= (1.0f - decayRate_);
-            }
-            
-            memoryActivations_[i] = activation;
+    // Track active memory traces for influence on neural dynamics
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (memoryActivations_[i] > 0.1f) {
+            activeTraces_.push_back(i);
         }
     }
     
-    // Decay weak traces
-    decayWeakTraces();
+    // Apply working memory influence on neural excitability
+    // Active memory traces modulate neuron excitability through neuromodulation
+    for (size_t traceIdx : activeTraces_) {
+        if (traceIdx < memoryNeurons_.size()) {
+            NeuronId neuronId = memoryNeurons_[traceIdx];
+            float activation = memoryActivations_[traceIdx];
+            
+            // Working memory traces boost neural excitability based on activation level
+            // This allows maintained information to influence ongoing neural processing
+            brain_->injectCurrent(neuronId, activation * 0.5f);
+        }
+    }
     
-    // Run competition to select winners
-    runCompetition();
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
 }
 
 void NeuralWorkingMemory::clear() {
@@ -206,6 +194,26 @@ void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, 
     pImpl->maintenanceSynapses.emplace_back(from, to);
 }
 
+void NeuralWorkingMemory::createMaintenanceConnections() {
+    // Create recurrent connections between memory neurons for stable maintenance
+    // This establishes the working memory's influence on neural activity patterns
+    
+    // Clear existing maintenance connections
+    pImpl->maintenanceSynapses.clear();
+    
+    // Create connections between consecutive neurons in memory buffer
+    // This forms a chain of recurrent connections that maintain activity
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        NeuronId from = memoryNeurons_[i];
+        
+        // Connect to the next neuron (wrapping around for circular chain)
+        NeuronId to = memoryNeurons_[(i + 1) % memoryNeurons_.size()];
+        
+        // Create recurrent connection with default strength
+        createRecurrentConnection(from, to, 0.5f);
+    }
+}
+
 void NeuralWorkingMemory::updateRecurrentConnections() {
     // Apply maintenance currents through recurrent connections
     for (const auto& conn : pImpl->maintenanceSynapses) {
@@ -242,6 +250,29 @@ void NeuralWorkingMemory::decayWeakTraces() {
         memoryActivations_.erase(memoryActivations_.begin() + *it);
         memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
     }
+}
+
+void NeuralWorkingMemory::createMaintenanceConnections() {
+    // Create recurrent connections between all memory neurons for persistent activity
+    // This allows working memory to maintain information through neural dynamics
+    if (memoryNeurons_.size() < 2) return;
+    
+    // Connect neurons in a circular pattern for maintenance
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        size_t nextIdx = (i + 1) % memoryNeurons_.size();
+        createRecurrentConnection(memoryNeurons_[i], memoryNeurons_[nextIdx], 0.5f);
+    }
+    
+    // Also create bidirectional connections for stronger maintenance
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        for (size_t j = i + 1; j < memoryNeurons_.size(); ++j) {
+            createRecurrentConnection(memoryNeurons_[i], memoryNeurons_[j], 0.2f);
+            createRecurrentConnection(memoryNeurons_[j], memoryNeurons_[i], 0.2f);
+        }
+    }
+    
+    NLM_LOG_INFO("Created " + std::to_string(recurrentConnections_.size()) + 
+                 " maintenance connections for working memory");
 }
 
 // AttentionalSelection Implementation

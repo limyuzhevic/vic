@@ -37,6 +37,9 @@ struct Phase6IntegrationResult {
     bool developmentIntegrated;
     bool checkpointingWorks;
     bool replayWorks;
+    bool plannerIntegrated;
+    bool conceptFormationIntegrated;
+    bool attentionIntegrated;
     
     // Metrics
     float totalReward;
@@ -60,6 +63,9 @@ struct Phase6IntegrationResult {
         , developmentIntegrated(false)
         , checkpointingWorks(false)
         , replayWorks(false)
+        , plannerIntegrated(false)
+        , conceptFormationIntegrated(false)
+        , attentionIntegrated(false)
         , totalReward(0.0f)
         , avgFiringRate(0.0f)
         , avgSynapticWeight(0.0f)

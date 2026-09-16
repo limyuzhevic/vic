@@ -1,0 +1,99 @@
+{
+  "version": "1.0.0",
+  "description": "NLM Neural Simulation Configuration Schema",
+  "components": {
+    "simulation": {
+      "type": "object",
+      "properties": {
+        "random_seed": {"type": "integer", "min": 0, "description": "Random seed for reproducible experiments"},
+        "simulation_timestep": {"type": "number", "min": 1e-9, "max": 1.0, "description": "Simulation timestep in seconds"},
+        "max_simulation_steps": {"type": "integer", "min": 1, "description": "Maximum simulation steps"},
+        "simulation_time_limit": {"type": "number", "min": 0, "description": "Simulation time limit in seconds"}
+      },
+      "required": ["random_seed", "simulation_timestep", "max_simulation_steps"]
+    },
+    "neural": {
+      "type": "object",
+      "properties": {
+        "neuron_count": {"type": "integer", "min": 1, "description": "Number of neurons in the brain"},
+        "region_count": {"type": "integer", "min": 1, "description": "Number of brain regions"},
+        "connection_probability": {"type": "number", "min": 0, "max": 1, "description": "Connection probability for random connectivity"},
+        "neuron_type": {"type": "string", "enum": ["LIF", "HH", "Izhikevich"], "description": "Neuron model type"}
+      }
+    },
+    "plasticity": {
+      "type": "object",
+      "properties": {
+        "plasticity_learning_rate": {"type": "number", "min": 0, "max": 1, "description": "Plasticity learning rate"},
+        "stdp_ltp_weight": {"type": "number", "min": 0, "description": "STDP LTP weight"},
+        "stdp_ltd_weight": {"type": "number", "min": 0, "description": "STDP LTD weight"},
+        "stdp_time_constant": {"type": "number", "min": 0, "description": "STDP time constant"},
+        "stdp_tau": {"type": "number", "min": 0, "description": "STDP time constant (alternative name)"}
+      }
+    },
+    "development": {
+      "type": "object",
+      "properties": {
+        "development_synaptogenesis_rate": {"type": "number", "min": 0, "max": 1, "description": "Synaptogenesis rate"},
+        "development_pruning_rate": {"type": "number", "min": 0, "max": 1, "description": "Pruning rate"},
+        "maturation_rate": {"type": "number", "min": 0, "max": 1, "description": "Maturation rate"}
+      }
+    },
+    "neuromodulation": {
+      "type": "object",
+      "properties": {
+        "dopamine_baseline": {"type": "number", "description": "Dopamine baseline level"},
+        "curiosity_baseline": {"type": "number", "description": "Curiosity baseline level"},
+        "novelty_threshold": {"type": "number", "min": 0, "max": 1, "description": "Novelty detection threshold"}
+      }
+    },
+    "reward": {
+      "type": "object",
+      "properties": {
+        "reward_discount_factor": {"type": "number", "min": 0, "max": 1, "description": "Reward discount factor"},
+        "reward_scale": {"type": "number", "min": 0, "description": "Reward scaling factor"}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "environment_name": {"type": "string", "description": "Environment name"},
+        "environment_width": {"type": "integer", "min": 1, "description": "Environment width"},
+        "environment_height": {"type": "integer", "min": 1, "description": "Environment height"},
+        "world_bounds_x": {"type": "number", "description": "World bounds X coordinate"},
+        "world_bounds_y": {"type": "number", "description": "World bounds Y coordinate"}
+      }
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "log_level": {"type": "string", "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], "description": "Logging level"},
+        "log_to_file": {"type": "boolean", "description": "Log to file"},
+        "log_filename": {"type": "string", "description": "Log filename"},
+        "log_file_append": {"type": "boolean", "description": "Append to log file"},
+        "log_max_size": {"type": "integer", "min": 1024, "description": "Maximum log file size in bytes"}
+      }
+    },
+    "visualization": {
+      "type": "object",
+      "properties": {
+        "visualization_enabled": {"type": "boolean", "description": "Enable visualization"},
+        "visualization_update_rate": {"type": "number", "min": 1, "description": "Visualization update rate in Hz"},
+        "visualization_window_width": {"type": "integer", "min": 100, "description": "Visualization window width"},
+        "visualization_window_height": {"type": "integer", "min": 100, "description": "Visualization window height"}
+      }
+    }
+  },
+  "global_settings": {
+    "inherit": true,
+    "extend": "base",
+    "validation": {
+      "required_sections": ["simulation", "neural", "plasticity"],
+      "cross_validation": [
+        {"check": "neuron_count > 0", "message": "Neuron count must be positive"},
+        {"check": "connection_probability >= 0 && connection_probability <= 1", "message": "Connection probability must be between 0 and 1"},
+        {"check": "if simulation_time_limit > 0 then max_simulation_steps > 0", "message": "Max simulation steps must be positive when time limit is set"}
+      ]
+    }
+  }
+}

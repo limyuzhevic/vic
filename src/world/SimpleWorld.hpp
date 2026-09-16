@@ -2,6 +2,7 @@
 
 #include "../agent/AgentBody.hpp"
 #include "../agent/SensoryPercept.hpp"
+#include "../brain/NeuralRegion.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -35,6 +36,9 @@ public:
     
     // Configuration
     void configure(float width, float height, size_t visionWidth, size_t visionHeight);
+    
+    // Initialize with neural input capability (for integration)
+    void initialize(size_t visionWidth, size_t visionHeight);
     
     // Reset world to initial state
     void reset();
@@ -83,15 +87,15 @@ public:
     void setRandomSeed(uint64_t seed);
     uint64_t getRandomSeed() const { return rngSeed_; }
     
-private:
-    // Generate vision from current view
-    void generateVision();
+    // Neural integration interface
+    // Observe world from neural region and return sensory percept
+    SensoryPercept observe(const NeuralRegion* region);
     
-    // Check for collisions
-    void checkCollisions();
+    // Apply neural action to world
+    ActionResult applyAction(const NeuralRegion* region, MotorCommand cmd);
     
-    // Interact with nearby objects
-    ActionResult interact();
+    // Compute reward based on neural context
+    float computeReward(const NeuralRegion* region);
     
     // World geometry
     float width_;

@@ -29,6 +29,12 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+class ConceptFormation;
+
+// Forward declaration for attention system
+class AttentionalSelection;
+class NeuralWorkingMemory;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -152,6 +158,16 @@ public:
     
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
+    
+    // Set prediction system (for initialization)
+    void setPredictionSystem(PredictionSystem* system);
+    
+    // Update prediction system with sensory state (called during step)
+    void updatePredictionSystem(const std::vector<float>& sensoryState,
+                              SimulationStep currentStep);
+    
+    // Apply prediction error to neural activity
+    void applyPredictionErrorToNeurons(float predictionError);
     
     // ========== COGNITION SYSTEMS ==========
     

@@ -238,14 +238,34 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     
-    // Compute prediction error
-    predictionError_ = reward - predictedReward;
+    // Get prediction error from the brain's prediction system
+    float predictionError = 0.0f;
+    if (brain_->getPredictionSystem()) {
+        predictionError = brain_->getPredictionSystem()->getPredictionError();
+    } else {
+        // Fallback to simple prediction error
+        predictionError = reward - predictedReward;
+    }
+    
+    // Update prediction-based reward prediction
+    // Combine environmental prediction error with reward prediction error
+    float combinedPredictionError = predictionError;
+    if (std::abs(predictionError - (reward - predictedReward)) > 0.1f) {
+        // If prediction system is providing different prediction, use it
+        combinedPredictionError = predictionError;
+    } else {
+        // Use simpler prediction error
+        combinedPredictionError = reward - predictedReward;
+    }
+    
+    // Update prediction error state
+    predictionError_ = combinedPredictionError;
     
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
+    // Dopamine-like signal based on prediction error
+    dopamineLevel_ = combinedPredictionError;
     
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
@@ -256,8 +276,10 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                // Apply prediction-modulated weight change
+                // Higher prediction error = stronger modulation
+                float predictionModulation = 1.0f + std::abs(combinedPredictionError) * 2.0f;
+                float delta = eligibility * dopamineLevel_ * predictionModulation * plasticityModifier_;
                 syn->addToWeight(delta);
                 
                 // Decay eligibility trace
@@ -266,9 +288,9 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
+    // Apply neuromodulation based on prediction error
+    // Positive prediction error (better than expected) increases plasticity
+    float plasticityFactor = 0.5f + 0.5f * combinedPredictionError;
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
     // Apply to STDP
@@ -277,6 +299,14 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
     }
+    
+    // Modulate curiosity based on prediction error
+    if (curiosityEnabled_) {
+        curiosityLevel_ = std::min(1.0f, curiosityLevel_ + std::abs(combinedPredictionError) * 0.1f);
+    }
+    
+    // Update novelty sensitivity based on prediction error
+    noveltyLevel_ = std::min(1.0f, noveltyLevel_ + std::min(0.5f, combinedPredictionError) * 0.05f);
 }
 
 void AgentBrain::updateDevelopment(double timestep) {

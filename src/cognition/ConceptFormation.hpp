@@ -115,7 +115,33 @@ public:
 
     // Update concept with new instance
     void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
-                      const std::vector<float>& features, float reward);
+                      const std::vector<float>& features, float reward,
+                      const std::vector<float>& brainContext = {});
+
+    // INTEGRATION 1: Connect concept formation to brain for neural pattern analysis
+    // Get current brain context for concept formation
+    std::vector<float> getBrainContext() const;
+
+    // Combine patterns with brain context for enhanced analysis
+    std::vector<float> combinePatterns(const std::vector<float>& pattern,
+                                       const std::vector<float>& context) const;
+
+    // INTEGRATION 2: Integrate concept formation with attention system
+    // Get concept based on attentional focus
+    size_t getConceptBasedOnAttention() const;
+
+    // Apply attentional selection to concepts
+    void applyAttentionToConcept(size_t conceptId);
+
+    // INTEGRATION 3: Link concept formation to working memory for concept storage and retrieval
+    // Store concept in working memory for quick access
+    void storeConceptInWorkingMemory(size_t conceptId);
+
+    // Retrieve concept from working memory
+    size_t retrieveConceptFromWorkingMemory(const std::vector<float>& pattern) const;
+
+    // Get all concepts currently in working memory
+    std::vector<size_t> getConceptsInWorkingMemory() const;
 
     // Compute similarity between two patterns
     float computeSimilarity(const std::vector<float>& a,

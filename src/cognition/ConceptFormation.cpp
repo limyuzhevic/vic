@@ -9,7 +9,11 @@ namespace nlm {
 struct ConceptFormation::Impl {
     Brain* brain;
     
-    Impl() : brain(nullptr) {}
+    // Additional integration with other brain systems
+    AttentionalSelection* attention;
+    NeuralWorkingMemory* workingMemory;
+    
+    Impl() : brain(nullptr), attention(nullptr), workingMemory(nullptr) {}
 };
 
 ConceptFormation::ConceptFormation()
@@ -24,34 +28,35 @@ ConceptFormation::ConceptFormation()
 
 ConceptFormation::~ConceptFormation() = default;
 
-void ConceptFormation::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("ConceptFormation initialized");
-}
-
-size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
-                                          const std::vector<float>& features,
-                                          float reward,
-                                          SimulationStep currentTime) {
+void ConceptFormation::presentExperience(const std::vector<float>& pattern,
+                                           const std::vector<float>& features,
+                                           float reward,
+                                           SimulationStep currentTime) {
     if (pattern.empty()) return 0;
     
+    // INTEGRATION 1: Connect concept formation to brain for neural pattern analysis
+    // Analyze current brain state for context
+    std::vector<float> brainContext = getBrainContext();
+    
+    // Combine experience with brain context
+    std::vector<float> combinedPattern = combinePatterns(pattern, brainContext);
+    
     // Check if this pattern matches any existing concept
-    size_t matchingConcept = findConceptForPattern(pattern);
+    size_t matchingConcept = findConceptForPattern(combinedPattern);
     
     if (matchingConcept > 0) {
-        // Update existing concept
-        updateConcept(matchingConcept, pattern, features, reward);
+        // Update existing concept with brain context
+        updateConcept(matchingConcept, combinedPattern, features, reward, brainContext);
         return matchingConcept;
     }
     
     // Check if this is novel enough to form a new concept
-    if (isNovel(pattern, formationThreshold_)) {
+    if (isNovel(combinedPattern, formationThreshold_)) {
         // But wait - we need a few observations before committing to a concept
         // This prevents forming concepts from noise
         
         // For now, create concept if sufficiently different from all others
-        return createConcept(pattern, features, reward);
+        return createConcept(combinedPattern, features, reward);
     }
     
     return 0;  // Not yet classifiable
@@ -60,6 +65,7 @@ size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
 size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
                                        const std::vector<float>& features,
                                        float reward) {
+    // INTEGRATION 3: Link concept formation to working memory for concept storage and retrieval
     DiscoveredConcept concept;
     concept.id = nextConceptId_++;
     concept.prototype = pattern;
@@ -93,15 +99,16 @@ size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
     return concept.id;
 }
 
+// INTEGRATION 1: Connect concept formation to brain for neural pattern analysis
 void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>& newPattern,
-                                    const std::vector<float>& features, float reward) {
+                                     const std::vector<float>& features, float reward,
+                                     const std::vector<float>& brainContext) {
     DiscoveredConcept* concept = nullptr;
     for (auto& c : concepts_) {
         if (c.id == conceptId) {
             concept = &c;
             break;
         }
-    }
     
     if (!concept) return;
     
@@ -139,6 +146,157 @@ void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>&
     concept->instances.back().stability = newStability;
 }
 
+// INTEGRATION 1: Connect concept formation to brain for neural pattern analysis
+std::vector<float> ConceptFormation::getBrainContext() const {
+    if (!brain_ || !brain_->getWorkingMemory()) return {};
+    
+    // Get neural activity patterns from working memory as brain context
+    std::vector<float> context;
+    const auto& memoryNeurons = brain_->getWorkingMemory()->getMemoryNeurons();
+    
+    for (size_t i = 0; i < memoryNeurons.size() && i < 256; ++i) {
+        context.push_back(brain_->getWorkingMemory()->getNeuronActivation(memoryNeurons[i]));
+    }
+    
+    // Fill with zeros if not enough data
+    while (context.size() < 256) {
+        context.push_back(0.0f);
+    }
+    
+    return context;
+}
+
+// INTEGRATION 1: Connect concept formation to brain for neural pattern analysis
+std::vector<float> ConceptFormation::combinePatterns(const std::vector<float>& pattern,
+                                                     const std::vector<float>& context) const {
+    if (pattern.empty() || context.empty()) return pattern;
+    
+    // Simple combination: weighted average
+    std::vector<float> combined;
+    combined.reserve(std::min(pattern.size(), context.size()));
+    
+    size_t minSize = std::min(pattern.size(), context.size());
+    for (size_t i = 0; i < minSize; ++i) {
+        // Combine with 70% pattern, 30% context for enrichment
+        combined.push_back(pattern[i] * 0.7f + context[i] * 0.3f);
+    }
+    
+    return combined;
+}
+
+// INTEGRATION 2: Integrate concept formation with attention system for concept-based selection
+size_t ConceptFormation::getConceptBasedOnAttention() const {
+    if (!pImpl->brain || !pImpl->attention) return 0;
+    
+    // Get attended neurons from attention system
+    const auto& winners = pImpl->attention->getWinners();
+    
+    if (winners.empty()) return 0;
+    
+    // Find concept with highest similarity to attended neurons' activation patterns
+    size_t bestConcept = 0;
+    float bestScore = 0.0f;
+    
+    for (const auto& concept : concepts_) {
+        float score = 0.0f;
+        
+        // For each concept instance, check similarity to attended neurons
+        for (const auto& instance : concept.instances) {
+            // Simple heuristic: if concept prototype overlaps with attended neurons
+            for (size_t i = 0; i < std::min(instance.pattern.size(), 10); ++i) {
+                if (instance.pattern[i] > 0.5f) {
+                    score += 0.1f;
+                }
+        
+        if (score > bestScore) {
+            bestScore = score;
+            bestConcept = concept.id;
+        }
+    
+    return bestConcept;
+}
+
+// INTEGRATION 2: Integrate concept formation with attention system for concept-based selection
+void ConceptFormation::applyAttentionToConcept(size_t conceptId) {
+    if (!pImpl->brain || !pImpl->attention || conceptId == 0) return;
+    
+    const auto* concept = getConcept(conceptId);
+    if (!concept) return;
+    
+    // Apply attention bias to neurons in the concept's prototype
+    for (size_t i = 0; i < concept->prototype.size() && i < 10; ++i) {
+        if (concept->prototype[i] > 0.5f) {
+            // Create a virtual neuron ID for concept index
+            NeuronId virtualNeuron(conceptId * 1000 + i);
+            // Apply top-down bias
+            pImpl->attention->applyTopDownBias(virtualNeuron, 1.0f);
+        }
+
+// INTEGRATION 3: Link concept formation to working memory for concept storage and retrieval
+void ConceptFormation::storeConceptInWorkingMemory(size_t conceptId) {
+    if (!pImpl->brain || !pImpl->workingMemory || conceptId == 0) return;
+    
+    const auto* concept = getConcept(conceptId);
+    if (!concept) return;
+    
+    // Store concept prototype in working memory
+    std::vector<float> conceptPattern = concept->prototype;
+    
+    // Add category hint as an additional feature
+    conceptPattern.push_back(static_cast<float>(concept->categoryHint == "rewarding" ? 1.0f :
+                                               concept->categoryHint == "harmful" ? -1.0f : 0.0f));
+    
+    // Store with appropriate strength based on stability
+    pImpl->workingMemory->store(conceptPattern, concept->avgStability);
+}
+
+// INTEGRATION 3: Link concept formation to working memory for concept storage and retrieval
+size_t ConceptFormation::retrieveConceptFromWorkingMemory(const std::vector<float>& pattern) const {
+    if (!pImpl->brain || !pImpl->workingMemory || pattern.empty()) return 0;
+    
+    // Get current working memory content
+    std::vector<float> memoryContent = pImpl->workingMemory->retrieve();
+    
+    // Find stored concept that best matches pattern
+    float bestSimilarity = 0.0f;
+    size_t bestConcept = 0;
+    
+    // This is a simplified approach - in reality, you'd need to track which patterns
+    // correspond to which concept IDs in working memory
+    for (size_t i = 0; i < memoryContent.size() && i < concepts_.size(); ++i) {
+        const auto& concept = concepts_[i];
+        float similarity = computeSimilarity(pattern, concept.prototype);
+        
+        if (similarity > bestSimilarity) {
+            bestSimilarity = similarity;
+            bestConcept = concept.id;
+        }
+    
+    return bestConcept;
+}
+
+// INTEGRATION 3: Link concept formation to working memory for concept storage and retrieval
+std::vector<size_t> ConceptFormation::getConceptsInWorkingMemory() const {
+    std::vector<size_t> conceptIds;
+    
+    if (!pImpl->brain || !pImpl->workingMemory) return conceptIds;
+    
+    // Get memory content to infer which concepts are active
+    std::vector<float> memoryContent = pImpl->workingMemory->retrieve();
+    
+    // Match memory patterns to known concepts
+    for (const auto& concept : concepts_) {
+        // Check if any of the concept's prototypes are present in memory
+        for (const auto& instance : concept.instances) {
+            float similarity = computeSimilarity(instance.pattern, memoryContent);
+            if (similarity > 0.3f) { // Threshold for considering concept "in memory"
+                conceptIds.push_back(concept.id);
+                break;
+            }
+    
+    return conceptIds;
+}
+
 void ConceptFormation::updatePrototype(size_t conceptId, const std::vector<float>& newInstance) {
     for (auto& concept : concepts_) {
         if (concept.id == conceptId) {
@@ -150,11 +308,8 @@ void ConceptFormation::updatePrototype(size_t conceptId, const std::vector<float
                     concept.prototype[i] = concept.prototype[i] * (1.0f - alpha) + 
                                           newInstance[i] * alpha;
                 }
-            }
             break;
         }
-    }
-}
 
 size_t ConceptFormation::getMatchingConcept(const std::vector<float>& pattern,
                                            float similarityThreshold) const {
@@ -166,7 +321,6 @@ const DiscoveredConcept* ConceptFormation::getConcept(size_t conceptId) const {
         if (concept.id == conceptId) {
             return &concept;
         }
-    }
     return nullptr;
 }
 
@@ -246,7 +400,6 @@ size_t ConceptFormation::findConceptForPattern(const std::vector<float>& pattern
             bestSimilarity = sim;
             bestConcept = concept.id;
         }
-    }
     
     return bestConcept;
 }
@@ -334,7 +487,6 @@ void SpatialRepresentation::recordPosition(float x, float y, const std::vector<f
             hasNearbyCell = true;
             break;
         }
-    }
     
     // Create new place cell if needed
     if (!hasNearbyCell && brain_) {
@@ -350,7 +502,6 @@ void SpatialRepresentation::recordPosition(float x, float y, const std::vector<f
         // Inject current to activate this neuron
         brain_->injectCurrent(newCell.neuron, 5.0f);
     }
-}
 
 std::pair<float, float> SpatialRepresentation::getPredictedPosition() const {
     return {currentX_, currentY_};
@@ -374,7 +525,6 @@ float SpatialRepresentation::getPositionActivation(float x, float y) const {
             float activation = std::exp(-dist * dist / (2.0f * pc.fieldRadius * pc.fieldRadius));
             totalActivation += activation * pc.activation;
         }
-    }
     
     return totalActivation;
 }
@@ -388,7 +538,6 @@ std::vector<NeuronId> SpatialRepresentation::getPlaceNeuronsNear(float x, float 
         if (std::sqrt(dx * dx + dy * dy) < radius) {
             result.push_back(pc.neuron);
         }
-    }
     
     return result;
 }
@@ -445,7 +594,6 @@ void TemporalRelation::recordSequence(const std::vector<float>& eventA,
             if (normB > 0.0001f) {
                 simB = dotB / normB;
             }
-        }
         
         if (simA > 0.8f && simB > 0.8f) {
             // Update existing link
@@ -453,7 +601,6 @@ void TemporalRelation::recordSequence(const std::vector<float>& eventA,
             link.observationCount++;
             return;
         }
-    }
     
     // Create new link
     SequenceLink newLink;
@@ -485,8 +632,6 @@ std::vector<float> TemporalRelation::predictNext(const std::vector<float>& event
                 bestSim = sim;
                 bestPrediction = link.toEvent;
             }
-        }
-    }
     
     return bestPrediction;
 }
@@ -511,8 +656,6 @@ std::vector<float> TemporalRelation::predictPrevious(const std::vector<float>& e
                 bestSim = sim;
                 bestPrediction = link.fromEvent;
             }
-        }
-    }
     
     return bestPrediction;
 }
@@ -535,8 +678,6 @@ float TemporalRelation::getPredictionConfidence(const std::vector<float>& event)
             if (sim > 0.7f) {
                 matchingCount++;
             }
-        }
-    }
     
     return std::min(1.0f, static_cast<float>(matchingCount) / 3.0f);
 }
