@@ -9,6 +9,66 @@
 #include <memory>
 #include <string>
 
+#pragma once
+
+#include "../core/Types/Types.hpp"
+#include "NeuralRegion.hpp"
+#include "../dynamics/SpikeSystem.hpp"
+#include "../plasticity/STDP.hpp"
+#include "../plasticity/Hebbian.hpp"
+#include "../plasticity/StructuralPlasticity.hpp"
+#include "BrainInitialization.hpp"
+#include "BrainSimulation.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../motor/Action.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../performance/CheckpointSystem.hpp"
+#include <memory>
+#include <string>
+
+#pragma once
+
+#include "../core/Types/Types.hpp"
+#include "NeuralRegion.hpp"
+#include "../dynamics/SpikeSystem.hpp"
+#include "../plasticity/STDP.hpp"
+#include "../plasticity/Hebbian.hpp"
+#include "../plasticity/StructuralPlasticity.hpp"
+#include "BrainInitialization.hpp"
+#include "BrainSimulation.hpp"
+#include "BrainSensory.hpp"
+#include "BrainMotor.hpp"
+#include "BrainPlasticity.hpp"
+#include "BrainMemory.hpp"
+#include "BrainStats.hpp"
+#include "BrainIO.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../motor/Action.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../performance/CheckpointSystem.hpp"
+#include <memory>
+#include <string>
+
 namespace nlm {
 
 // Forward declarations
@@ -194,8 +254,9 @@ public:
     void logStatus() const;
     
 private:
-    struct Impl;
-    Impl* pImpl;
+    // Forward declaration for internal structure
+    class BrainImpl;
+    std::unique_ptr<BrainImpl> pImpl;
 };
 
 } // namespace nlm
