@@ -5,17 +5,18 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) - A comprehensive neural simulation framework"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "neuroscience", "AI"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,20 +26,60 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
-dependencies = []
+# Core dependencies
+dependencies = [
+    "numpy>=1.20",
+    "scipy>=1.7",
+    "matplotlib>=3.5; extra == 'visualization'",
+]
 
 [project.optional-dependencies]
+# Development dependencies
 dev = [
     "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "coverage>=7.0",
+    "black>=23.0",
+    "isort>=5.12",
+    "flake8>=6.0",
+    "mypy>=1.0",
+    "pre-commit>=3.0",
     "numpy>=1.20",
+    "scipy>=1.7",
+    "matplotlib>=3.5",
+]
+
+# Science visualization
+visualization = [
+    "matplotlib>=3.5",
+    "plotly>=5.0;",
+]
+
+# Performance analysis
+analysis = [
+    "numba>=0.56",
+    "cupy-cuda12x>=12.0; platform_system == 'Linux'",
+]
+
+# Documentation
+docs = [
+    "sphinx>=6.0",
+    "sphinx-rtd-theme>=2.0",
+    "sphinx-autodoc-typehints>=1.18",
+    "nbsphinx>=0.9",
+    "ipython>=8.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Issue Tracker" = "https://github.com/nlm-project/nlm/issues"
+"Discussions" = "https://github.com/nlm-project/nlm/discussions"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +88,77 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DNLM_ENABLE_TESTS=ON",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
 
+# Additional CMake options for different build types
+[tool.scikit-build.cmake.define.build-type]
+description = "Build type: Debug, Release, RelWithDebInfo, MinSizeRel, Coverage"
+default = "Release"
+
+# Performance optimization
+[tool.cibuildwheel]
+build = "cp39-* cp310-* cp311-* cp312-*"
+skip = ["pp*]"
+
+# Testing configuration
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["pynlm"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+# Code quality
+[tool.black]
+line-length = 88
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+include = "\.pyi?$"
+
+[tool.isort]
+profile = "black"
+line_length = 88
+target_version = "py38"
+
+[tool.flake8]
+max-line-length = 88
+extend-exclude = "tests/, .git/, .tox/, dist/, build/"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+# Performance benchmarking
+[tool.benchmark]
+name = "pynlm-benchmarks"
+directory = "benchmarks"
+
+# Version pinning for reproducibility
+[tool.scikit-build.cmake.options]
+CMAKE_POSITION_INDEPENDENT_CODE = true
+CMAKE_BUILD_WITH_INSTALL_RPATH = true
+CMAKE_INSTALL_RPATH = "${CMAKE_INSTALL_PREFIX}/lib"

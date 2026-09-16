@@ -53,4 +53,154 @@ void Dopamine::signalRewardPredictionError(float error) {
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 
+struct Serotonin::Impl {
+    float level;
+    float baseline;
+    float peak;
+    float decayRate;
+    float releaseRate;
+    
+    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.15f), releaseRate(1.0f) {}
+};
+
+Serotonin::Serotonin() : pImpl(new Impl) {}
+
+Serotonin::~Serotonin() = default;
+
+const char* Serotonin::getName() const {
+    return "5-HT";
+}
+
+float Serotonin::getLevel() const {
+    return pImpl->level;
+}
+
+void Serotonin::setLevel(float level) {
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+}
+
+float Serotonin::getPlasticityFactor() const {
+    // TODO PHASE 2: Implement real serotonin-modulated plasticity factor
+    // PLACEHOLDER: Higher serotonin decreases plasticity (learning inhibition)
+    return 0.8f - 0.6f * pImpl->level;
+}
+
+void Serotonin::update(TimestepDuration dt) {
+    // TODO PHASE 2: Implement real serotonin dynamics
+    // PLACEHOLDER: Decay towards baseline
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+}
+
+void Serotonin::signalPunishment(float punishment) {
+    // TODO PHASE 2: Implement punishment signaling
+    // PLACEHOLDER: Serotonin increases on punishment (learning inhibition)
+    pImpl->level = std::min(pImpl->peak, pImpl->level + punishment * pImpl->releaseRate);
+}
+
+void Serotonin::signalAvoidance(float avoidance) {
+    // TODO PHASE 2: Implement avoidance signaling
+    // PLACEHOLDER: Serotonin increases on avoidance learning
+    pImpl->level = std::min(pImpl->peak, pImpl->level + avoidance * pImpl->releaseRate * 0.5f);
+}
+
+struct Norepinephrine::Impl {
+    float level;
+    float baseline;
+    float peak;
+    float decayRate;
+    float releaseRate;
+    
+    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
+};
+
+Norepinephrine::Norepinephrine() : pImpl(new Impl) {}
+
+Norepinephrine::~Norepinephrine() = default;
+
+const char* Norepinephrine::getName() const {
+    return "NE";
+}
+
+float Norepinephrine::getLevel() const {
+    return pImpl->level;
+}
+
+void Norepinephrine::setLevel(float level) {
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+}
+
+float Norepinephrine::getPlasticityFactor() const {
+    // TODO PHASE 2: Implement real norepinephrine-modulated plasticity factor
+    // PLACEHOLDER: Higher norepinephrine increases plasticity (arousal)
+    return 0.6f + 0.4f * pImpl->level;
+}
+
+void Norepinephrine::update(TimestepDuration dt) {
+    // TODO PHASE 2: Implement real norepinephrine dynamics
+    // PLACEHOLDER: Decay towards baseline
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+}
+
+void Norepinephrine::signalArousal(float arousal) {
+    // TODO PHASE 2: Implement arousal signaling
+    // PLACEHOLDER: Norepinephrine increases on arousal
+    pImpl->level = std::min(pImpl->peak, pImpl->level + arousal * pImpl->releaseRate);
+}
+
+void Norepinephrine::signalVigilance(float vigilance) {
+    // TODO PHASE 2: Implement vigilance signaling
+    // PLACEHOLDER: Norepinephrine increases on vigilance
+    pImpl->level = std::min(pImpl->peak, pImpl->level + vigilance * pImpl->releaseRate * 0.7f);
+}
+
+struct Acetylcholine::Impl {
+    float level;
+    float baseline;
+    float peak;
+    float decayRate;
+    float releaseRate;
+    
+    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.12f), releaseRate(1.0f) {}
+};
+
+Acetylcholine::Acetylcholine() : pImpl(new Impl) {}
+
+Acetylcholine::~Acetylcholine() = default;
+
+const char* Acetylcholine::getName() const {
+    return "ACh";
+}
+
+float Acetylcholine::getLevel() const {
+    return pImpl->level;
+}
+
+void Acetylcholine::setLevel(float level) {
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+}
+
+float Acetylcholine::getPlasticityFactor() const {
+    // TODO PHASE 2: Implement real acetylcholine-modulated plasticity factor
+    // PLACEHOLDER: Higher acetylcholine increases plasticity (memory encoding)
+    return 0.7f + 0.3f * pImpl->level;
+}
+
+void Acetylcholine::update(TimestepDuration dt) {
+    // TODO PHASE 2: Implement real acetylcholine dynamics
+    // PLACEHOLDER: Decay towards baseline
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+}
+
+void Acetylcholine::signalAttention(float attention) {
+    // TODO PHASE 2: Implement attention signaling
+    // PLACEHOLDER: Acetylcholine increases on attention
+    pImpl->level = std::min(pImpl->peak, pImpl->level + attention * pImpl->releaseRate);
+}
+
+void Acetylcholine::signalMemoryEncoding(float encoding) {
+    // TODO PHASE 2: Implement memory encoding signaling
+    // PLACEHOLDER: Acetylcholine increases on memory encoding
+    pImpl->level = std::min(pImpl->peak, pImpl->level + encoding * pImpl->releaseRate * 1.2f);
+}
+
 } // namespace nlm

@@ -137,7 +137,8 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
+    // Get active neurons for memory/cognition integration
+    std::vector<NeuronId> getActiveNeurons() const;
     
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
