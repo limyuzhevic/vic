@@ -49,38 +49,60 @@ void NeuralPrediction::initialize(Brain* brain) {
 }
 
 void NeuralPrediction::recordSensoryState(const std::vector<float>& sensoryState, 
-                                         SimulationStep currentStep) {
+                                          SimulationStep currentStep) {
+    // Record sensory state for prediction learning
+    // 
+    // Algorithm:
+    // 1. Store sensory state with timestamp
+    // 2. Limit history size to prevent memory bloat
+    // 3. Learn temporal sequences when sufficient history exists
+    // 4. Update pattern representation when state changes significantly
+    // 5. Maintain sequence memory for predictive coding
+    
     if (!temporalPredictionEnabled_) return;
     
+    // Store the state
     recentSensoryStates_.push_back(sensoryState);
     stateTimestamps_.push_back(currentStep);
     
-    // Keep only recent states
+    // Limit history to prevent memory issues
     if (recentSensoryStates_.size() > sequenceMemorySize_) {
         recentSensoryStates_.erase(recentSensoryStates_.begin());
         stateTimestamps_.erase(stateTimestamps_.begin());
     }
     
-    // Learn sequence if we have at least 2 states
+    // Learn sequences when we have sufficient history
     if (recentSensoryStates_.size() >= 2) {
-        learnTemporalSequence(recentSensoryStates_[recentSensoryStates_.size() - 2],
-                            recentSensoryStates_.back(),
+        // Extract most recent sequence pair
+        size_t currentIdx = recentSensoryStates_.size() - 1;
+        
+        // Learn temporal sequence relationship
+        learnTemporalSequence(recentSensoryStates_[currentIdx - 1],
+                            recentSensoryStates_[currentIdx],
                             currentStep);
     }
 }
 
 std::vector<float> NeuralPrediction::generatePrediction(SimulationStep currentStep) {
+    // Generate prediction using neural sequence learning
+    // 
+    // Algorithm:
+    // 1. Find the current sensory state in learned sequences
+    // 2. If found, predict the next state in the sequence
+    // 3. If not found, generate prediction based on temporal dynamics
+    // 4. Return predicted state as neural activity pattern
+    
     if (!temporalPredictionEnabled_ || recentSensoryStates_.empty()) {
         return std::vector<float>();
     }
     
-    // Find best matching learned sequence
     const auto& currentState = recentSensoryStates_.back();
     
-    // Find most similar pattern we've seen
+    // Find the best matching learned sequence
     NeuronId bestMatch = INVALID_NEURON_ID;
     float bestSimilarity = 0.0f;
     
+    // Search through all learned pattern representations
     for (size_t i = 0; i < pImpl->patternRepresentations.size(); ++i) {
         float sim = computeSimilarity(currentState, pImpl->patternRepresentations[i]);
         if (sim > bestSimilarity) {
@@ -89,14 +111,15 @@ std::vector<float> NeuralPrediction::generatePrediction(SimulationStep currentSt
         }
     }
     
-    // If we have a good match, predict what comes next
+    // If we have a good match, predict next state
     if (bestSimilarity > 0.7f && bestMatch != INVALID_NEURON_ID) {
-        // Find what we associate with this pattern
+        // Find the associated sequence
         for (const auto& assoc : pImpl->sequenceAssociations) {
             if (assoc.first == bestMatch) {
-                // Found association - return the associated pattern
+                // Found association - find the target neuron
                 for (size_t i = 0; i < pImpl->patternNeurons.size(); ++i) {
                     if (pImpl->patternNeurons[i] == assoc.second) {
+                        // Found target pattern - return its representation
                         predictionConfidence_ = bestSimilarity;
                         return pImpl->patternRepresentations[i];
                     }
@@ -105,66 +128,84 @@ std::vector<float> NeuralPrediction::generatePrediction(SimulationStep currentSt
         }
     }
     
-    // No good prediction - return current state as baseline
+    // If no good match, return current state as baseline prediction
     predictionConfidence_ = 0.0f;
     return currentState;
 }
 
 float NeuralPrediction::updateWithObservation(const std::vector<float>& actualState,
                                              SimulationStep currentStep) {
-    // Generate prediction first
+    // Update prediction based on actual observation
+    // 
+    // Algorithm:
+    // 1. Generate prediction from current learned sequences
+    // 2. Compute prediction error using similarity measure
+    // 3. Update error history and statistics
+    // 4. Learn from prediction error using neural mechanisms
+    // 5. Modulate synapses based on prediction outcomes
+    
+    // Generate prediction from current state
     auto predicted = generatePrediction(currentStep);
     
-    // Compute error
+    // Compute prediction error
     if (predicted.empty()) {
         predictionError_ = 0.0f;
     } else {
+        // Error measured as distance between predicted and actual
         predictionError_ = computeSimilarity(predicted, actualState);
         predictionError_ = 1.0f - predictionError_;  // Convert to error
     }
     
+    // Record error for analysis and monitoring
     errorHistory_.push_back(predictionError_);
     if (errorHistory_.size() > 1000) {
-        errorHistory_.erase(errorHistory_.begin());
+        errorHistory_.pop_front();
     }
     
-    // Record the actual state for future learning
+    // Store actual state for future learning
     recordSensoryState(actualState, currentStep);
     
-    // Modulate learning based on error
+    // Compute reward based on prediction quality
     float reward = 1.0f - predictionError_;
+    
+    // Update neural synapses based on prediction outcome
     modulatePredictionSynapses(predictionError_, reward);
     
     return predictionError_;
 }
 
 std::vector<float> NeuralPrediction::predictActionConsequence(ActionType action,
-                                                               const std::vector<float>& currentState) {
+                                                                const std::vector<float>& currentState) {
     if (!actionConsequenceEnabled_) {
-        return currentState;  // No change predicted
+        return currentState;  // No prediction without action learning
     }
     
-    // Find experiences with same action and similar state
+    // Find the best matching action-consequence
     float bestMatch = 0.0f;
     std::vector<float> bestConsequence;
     
-    for (size_t i = 0; i < recentActions_.size(); ++i) {
-        if (recentActions_[i].first == action) {
-            float sim = computeSimilarity(currentState, recentActions_[i].second);
-            if (sim > bestMatch) {
-                bestMatch = sim;
-                if (i < pImpl->actionConsequences.size()) {
-                    bestConsequence = pImpl->actionConsequences[i].second;
-                }
-            }
+    // Search through all recorded action-consequence pairs
+    for (size_t i = 0; i < pImpl->actionConsequences.size(); ++i) {
+        const auto& record = pImpl->actionConsequences[i];
+        const auto& recordedState = record.first;
+        const auto& recordedConsequence = record.second;
+        
+        // Compute state similarity
+        float similarity = computeSimilarity(currentState, recordedState);
+        
+        if (similarity > bestMatch) {
+            bestMatch = similarity;
+            bestConsequence = recordedConsequence;
         }
     }
     
-    if (bestMatch > 0.5f && !bestConsequence.empty()) {
+    // If we found a good match, return predicted consequence
+    if (bestMatch > 0.6f) {
         return bestConsequence;
     }
     
-    return currentState;  // Default: no change
+    // No good match found - return current state
+    return currentState;
 }
 
 std::vector<std::vector<float>> NeuralPrediction::predictMultipleSteps(SimulationStep currentStep,

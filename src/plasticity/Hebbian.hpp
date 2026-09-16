@@ -23,9 +23,14 @@ public:
     void setMaxWeight(float maxWeight);
     float getMaxWeight() const;
     
+    float getTrace() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
 };
+
+// Alias for backward compatibility
+using HebbianRule = Hebbian;
 
 } // namespace nlm
