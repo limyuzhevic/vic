@@ -162,7 +162,49 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Convenience methods for common configuration tasks
+        .def("set", &Config::set, py::arg("key"), py::arg("value"),
+             "Set a configuration value with validation")
+        .def("get", py::overload_cast<const std::string&, const T&>(&Config::get, py::const), py::arg("key"), py::arg("default"))
+        .def("getAs", [](const Config& self, const std::string& key) {
+            auto result = self.getAs<std::string>(key);
+            return py::make_tuple(result.first, result.second);
+        }, py::arg("key"))
+        .def("loadFromConfigString", [](Config& self, const std::string& json) {
+            // Create a temporary file and load from it for convenience
+            std::string tempPath = "/tmp/nlm_config_" + std::to_string(std::time(nullptr)) + ".json";
+            std::ofstream file(tempPath);
+            file << json;
+            file.close();
+            bool success = self.loadFromFile(tempPath);
+            std::remove(tempPath.c_str());
+            return success;
+        }, py::arg("json"), "Load configuration from a JSON string")
+        .def("toDict", [](const Config& self) {
+            py::dict result;
+            auto keys = self.getKeys();
+            for (const auto& key : keys) {
+                // Get the value - try different types based on what's stored
+                bool has_int = self.has(key);
+                if (has_int) {
+                    result[key.c_str()] = self.getOr<int64_t>(key, 0);
+                } else {
+                    result[key.c_str()] = "<unknown>";
+                }
+            }
+            return result;
+        }, "Export configuration as Python dictionary")
+        .def("validate", [](const Config& self, const std::string& pattern) {
+            py::list validKeys;
+            auto keys = self.getKeys();
+            for (const auto& key : keys) {
+                if (key.find(pattern) != std::string::npos) {
+                    validKeys.append(key);
+                }
+            }
+            return validKeys;
+        }, py::arg("pattern"), "Find configuration keys matching pattern");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -400,26 +442,413 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Factory functions with presets
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("createConfig", [](const py::dict& configDict) {
+        auto config = std::make_shared<Config>();
+        for (auto item : configDict) {
+            std::string key = py::str(item.first);
+            // Try to parse as different types
+            try {
+                int64_t intVal = py::cast<int64_t>(item.second);
+                config->set(key, intVal, ConfigSource::Python);
+            } catch (...) {
+                try {
+                    double floatVal = py::cast<double>(item.second);
+                    config->set(key, floatVal, ConfigSource::Python);
+                } catch (...) {
+                    try {
+                        bool boolVal = py::cast<bool>(item.second);
+                        config->set(key, boolVal, ConfigSource::Python);
+                    } catch (...) {
+                        std::string strVal = py::cast<std::string>(item.second);
+                        config->set(key, strVal, ConfigSource::Python);
+                    }
+                }
+            }
+        }
+        return config;
+    }, py::arg("configDict"), "Create a configuration from a Python dictionary");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("createConfigFromJSON", [](const std::string& json) {
+        auto config = std::make_shared<Config>();
+        std::string tempPath = "/tmp/nlm_config_" + std::to_string(std::time(nullptr)) + ".json";
+        std::ofstream file(tempPath);
+        file << json;
+        file.close();
+        config->loadFromFile(tempPath);
+        std::remove(tempPath.c_str());
+        return config;
+    }, py::arg("json"), "Create a configuration from a JSON string");
+
+    m.def("createOptimizedBrain", [](std::shared_ptr<Config> config) {
+        auto brain = std::make_shared<Brain>(config);
+        
+        // Apply optimizations based on config
+        if (config->has("optimization.enable_vectorization") && 
+            config->getOr<bool>("optimization.enable_vectorization", false)) {
+            // Enable SIMD optimizations if available
+            brain->getConfig()->set("optimization.simd_level", 3, ConfigSource::Default);
+        }
+        
+        if (config->has("optimization.enable_memory_pools") &&
+            config->getOr<bool>("optimization.enable_memory_pools", false)) {
+            // Enable memory pools for better performance
+            brain->getConfig()->set("memory.pool_size", 1024 * 1024, ConfigSource::Default);
+        }
+        
+        return brain;
+    }, py::arg("config"), "Create an optimized brain with performance enhancements");
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createAgentSystem", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"), "Create and initialize a complete agent system");
 
-} // namespace nlm
+    // Utility and helper functions
+    m.def("validateBrainConfig", [](const std::shared_ptr<Config>& config) {
+        py::dict issues;
+        
+        if (!config->has("brain.neuron_count")) {
+            issues["missing_neuron_count"] = "brain.neuron_count is required";
+        } else {
+            int64_t neuronCount = config->getOr<int64_t>("brain.neuron_count", 0);
+            if (neuronCount <= 0 || neuronCount > 1000000) {
+                issues["invalid_neuron_count"] = "brain.neuron_count must be between 1 and 1,000,000";
+            }
+        }
+        
+        if (!config->has("brain.connection_probability")) {
+            issues["missing_connection_probability"] = "brain.connection_probability is recommended";
+        }
+        
+        return issues;
+    }, py::arg("config"), "Validate brain configuration and return any issues");
+
+    // Advanced brain creation with development presets
+    m.def("createDevelopmentalBrain", [](int stage, int neuronCount) {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", neuronCount, ConfigSource::Default);
+        config->set("development.stage", static_cast<int>(stage), ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("stage") = 0, py::arg("neuronCount") = 1000,
+       "Create a brain with specified developmental stage");
+
+    // Brain analysis and debugging utilities
+    m.def("analyzeBrainDynamics", [](const std::shared_ptr<Brain>& brain) {
+        py::dict analysis;
+        
+        analysis["total_neurons"] = brain->getTotalNeuronCount();
+        analysis["total_synapses"] = brain->getTotalSynapseCount();
+        analysis["firing_neurons"] = brain->getFiringNeuronCount();
+        analysis["total_spikes"] = brain->getTotalSpikeCount();
+        analysis["avg_firing_rate"] = brain->getAverageFiringRate();
+        analysis["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        analysis["development_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        // Analyze neuron type distribution
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            auto neurons = region->getAllNeurons();
+            int excitatory = 0, inhibitory = 0, sensory = 0, motor = 0, internal = 0;
+            
+            for (const auto& neuron : neurons) {
+                switch (neuron->getType()) {
+                    case NeuronType::Excitatory: excitatory++; break;
+                    case NeuronType::Inhibitory: inhibitory++; break;
+                    case NeuronType::Sensory: sensory++; break;
+                    case NeuronType::Motor: motor++; break;
+                    case NeuronType::Internal: internal++; break;
+                }
+            }
+            
+            analysis["neuron_type_distribution"] = py::make_tuple(
+                excitatory, inhibitory, sensory, motor, internal);
+        }
+        
+        // Analyze synaptic connectivity
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            auto synapses = region->getSynapses();
+            int excitatory = 0, inhibitory = 0;
+            
+            for (const auto& synapse : synapses) {
+                switch (synapse->getType()) {
+                    case SynapseType::Excitatory: excitatory++; break;
+                    case SynapseType::Inhibitory: inhibitory++; break;
+                    default: break;
+                }
+            }
+            
+            analysis["synapse_type_distribution"] = py::make_tuple(excitatory, inhibitory);
+        }
+        
+        return analysis;
+    }, py::arg("brain"), "Analyze brain dynamics and return comprehensive statistics");
+
+    // Simulation utilities
+    m.def("runControlledSimulation", [](std::shared_ptr<Brain> brain, int steps, 
+                                         std::shared_ptr<SimpleWorld> world = nullptr,
+                                         std::shared_ptr<AgentBrain> agent = nullptr) {
+        py::list statistics;
+        
+        for (int step = 0; step < steps; ++step) {
+            // Update world if provided
+            if (world) {
+                world->update(0.1);
+                auto percept = world->getSensoryPercept();
+                
+                if (agent) {
+                    agent->processSensoryInput(percept);
+                    auto action = agent->decodeMotorCommand();
+                    world->applyMotorCommand(action, world->getSimulationTime());
+                }
+            }
+            
+            // Brain step
+            brain->step(step);
+            
+            // Record statistics every 100 steps
+            if (step % 100 == 0) {
+                py::dict stats;
+                stats["step"] = step;
+                stats["firing_neurons"] = brain->getFiringNeuronCount();
+                stats["total_spikes"] = brain->getTotalSpikeCount();
+                stats["avg_firing_rate"] = brain->getAverageFiringRate();
+                stats["development_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+                statistics.append(stats);
+            }
+        }
+        
+        return statistics;
+    }, py::arg("brain"), py::arg("steps"), py::arg("world") = nullptr, py::arg("agent") = nullptr,
+       "Run a controlled simulation with optional world and agent integration");
+
+    // Configuration templates
+    m.def("getDefaultProfiles", []() {
+        py::dict profiles;
+        
+        // Performance profile
+        {
+            py::dict perfProfile;
+            perfProfile["brain.neuron_count"] = 5000;
+            perfProfile["brain.connection_probability"] = 0.05;
+            perfProfile["optimization.enable_vectorization"] = true;
+            perfProfile["optimization.enable_memory_pools"] = true;
+            perfProfile["plasticity.stdp.enable"] = true;
+            perfProfile["plasticity.hebbian.enable"] = true;
+            perfProfiles["performance"] = perfProfile;
+        }
+        
+        // Learning profile
+        {
+            py::dict learnProfile;
+            learnProfile["brain.neuron_count"] = 10000;
+            learnProfile["brain.connection_probability"] = 0.1;
+            learnProfile["plasticity.stdp.enable"] = true;
+            learnProfile["plasticity.hebbian.enable"] = true;
+            learnProfile["plasticity.structural.enable"] = true;
+            learnProfile["neuromod.dopamine.scale"] = 1.2;
+            learnProfile["neuromod.curiosity.enable"] = true;
+            learnProfile["neuromod.novelty.enable"] = true;
+            perfProfiles["learning"] = learnProfile;
+        }
+        
+        // Development profile
+        {
+            py::dict devProfile;
+            devProfile["brain.neuron_count"] = 8000;
+            devProfile["development.stage"] = 2;  // CriticalPeriod
+            devProfile["brain.connection_probability"] = 0.08;
+            devProfile["plasticity.structural.enable"] = true;
+            devProfile["neuromod.curiosity.enable"] = true;
+            perfProfiles["development"] = devProfile;
+        }
+        
+        // Exploration profile
+        {
+            py::dict exploreProfile;
+            exploreProfile["brain.neuron_count"] = 3000;
+            exploreProfile["brain.connection_probability"] = 0.15;  // Higher connectivity
+            exploreProfile["neuromod.curiosity.enable"] = true;
+            exploreProfile["neuromod.novelty.enable"] = true;
+            exploreProfile["plasticity.stdp.enable"] = true;
+            exploreProfile["plasticity.stdp.tau_plus"] = 40.0;
+            exploreProfile["plasticity.stdp.tau_minus"] = 40.0;
+            perfProfiles["exploration"] = exploreProfile;
+        }
+        
+        return perfProfiles;
+    }, "Get predefined configuration profiles for different use cases");
+
+    // Validation and error checking utilities
+    m.def("validateSimulationSetup", [](std::shared_ptr<Brain> brain, 
+                                         std::shared_ptr<SimpleWorld> world = nullptr,
+                                         std::shared_ptr<AgentBrain> agent = nullptr) {
+        py::dict validation;
+        bool isValid = true;
+        
+        // Validate brain
+        if (!brain->getConfig()) {
+            validation["brain_config"] = "Brain has no configuration";
+            isValid = false;
+        }
+        
+        auto config = brain->getConfig();
+        if (config) {
+            int64_t neuronCount = config->getOr<int64_t>("brain.neuron_count", 0);
+            if (neuronCount <= 0 || neuronCount > 1000000) {
+                validation["brain_config"] = "Invalid neuron count: " + std::to_string(neuronCount);
+                isValid = false;
+            }
+        }
+        
+        // Validate world if provided
+        if (world) {
+            int width = world->getWidth();
+            int height = world->getHeight();
+            if (width <= 0 || height <= 0) {
+                validation["world_config"] = "Invalid world dimensions";
+                isValid = false;
+            }
+        }
+        
+        // Validate agent if provided
+        if (agent) {
+            if (!agent->getBrain()) {
+                validation["agent_config"] = "Agent has no brain";
+                isValid = false;
+            }
+        }
+        
+        validation["overall_valid"] = isValid;
+        return validation;
+    }, py::arg("brain"), py::arg("world") = nullptr, py::arg("agent") = nullptr,
+       "Validate simulation setup and return any issues");
+
+    // Performance benchmarking utilities
+    m.def("benchmarkWorldInteraction", [](std::shared_ptr<AgentBrain> agent,
+                                          std::shared_ptr<SimpleWorld> world,
+                                          int iterations = 100) {
+        std::vector<double> times;
+        std::vector<int> spikeCounts;
+        
+        for (int i = 0; i < iterations; ++i) {
+            auto start = std::chrono::high_resolution_clock::now();
+            
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            auto end = std::chrono::high_resolution_clock::now();
+            double elapsed = std::chrono::duration<double, std::milli>(end - start).count();
+            times.push_back(elapsed);
+            
+            if (i % 10 == 0) {
+                spikeCounts.push_back(agent->getBrain()->getFiringNeuronCount());
+            }
+        }
+        
+        double avgTime = std::accumulate(times.begin(), times.end(), 0.0) / times.size();
+        double minTime = *std::min_element(times.begin(), times.end());
+        double maxTime = *std::max_element(times.begin(), times.end());
+        
+        return py::make_tuple(avgTime, minTime, maxTime, spikeCounts);
+    }, py::arg("agent"), py::arg("world"), py::arg("iterations") = 100,
+       "Benchmark world interaction performance with detailed statistics");
+
+    // Memory management utilities
+    m.def("optimizeMemoryUsage", [](std::shared_ptr<Brain> brain) {
+        auto config = brain->getConfig();
+        
+        // Enable memory pooling if available
+        config->set("memory.enable_pools", true, ConfigSource::Default);
+        config->set("memory.pool_size", 1024 * 1024, ConfigSource::Default);  // 1MB
+        
+        // Enable garbage collection friendly structures
+        config->set("memory.gc_threshold", 0.8, ConfigSource::Default);
+        
+        // Optimize for specific use case
+        config->set("optimization.strategic_gc", true, ConfigSource::Default);
+        
+        return "Memory optimization enabled. Recommended to restart brain for full effect.";
+    }, py::arg("brain"), "Enable memory optimization settings for better performance");
+
+    // Debugging and monitoring utilities
+    m.def("enableBrainMonitoring", [](std::shared_ptr<Brain> brain, bool continuous = false) {
+        auto config = brain->getConfig();
+        
+        config->set("debug.enable_monitoring", true, ConfigSource::Default);
+        config->set("debug.monitoring_interval", 1.0, ConfigSource::Default);  // 1 second
+        
+        if (continuous) {
+            config->set("debug.continuous_monitoring", true, ConfigSource::Default);
+        }
+        
+        brain->logStatus();
+        return "Brain monitoring enabled.";
+    }, py::arg("brain"), py::arg("continuous") = false,
+       "Enable brain monitoring and logging for debugging and analysis");
+
+    // Export utility functions
+    m.def("exportBrainState", [](const std::shared_ptr<Brain>& brain, const std::string& filename) {
+        try {
+            brain->save(filename);
+            return true;
+        } catch (const std::exception& e) {
+            std::cerr << "Error saving brain state: " << e.what() << std::endl;
+            return false;
+        }
+    }, py::arg("brain"), py::arg("filename"), "Save brain state to file");
+
+    m.def("importBrainState", [](const std::string& filename) -> std::shared_ptr<Brain> {
+        try {
+            auto config = std::make_shared<Config>();
+            auto brain = std::make_shared<Brain>(config);
+            brain->load(filename);
+            return brain;
+        } catch (const std::exception& e) {
+            std::cerr << "Error loading brain state: " << e.what() << std::endl;
+            return nullptr;
+        }
+    }, py::arg("filename"), "Load brain state from file");
+
+    // Performance optimization utilities
+    m.def("optimizeBrainPerformance", [](std::shared_ptr<Brain> brain, const std::string& profile = "auto") {
+        auto config = brain->getConfig();
+        
+        if (profile == "performance") {
+            config->set("optimization.enable_vectorization", true, ConfigSource::Default);
+            config->set("optimization.enable_memory_pools", true, ConfigSource::Default);
+            config->set("optimization.simd_level", 3, ConfigSource::Default);
+        } else if (profile == "learning") {
+            config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+            config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+            config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+            config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        } else if (profile == "balanced") {
+            config->set("optimization.enable_vectorization", true, ConfigSource::Default);
+            config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+            config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        } else {  // auto
+            int64_t neuronCount = config->getOr<int64_t>("brain.neuron_count", 1000);
+            if (neuronCount > 5000) {
+                config->set("optimization.enable_vectorization", true, ConfigSource::Default);
+                config->set("optimization.enable_memory_pools", true, ConfigSource::Default);
+            }
+            config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        }
+        
+        return "Brain performance optimization applied with profile: " + profile;
+    }, py::arg("brain"), py::arg("profile") = "auto", "Apply performance optimizations based on profile");
