@@ -5,6 +5,11 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <stdexcept>
+#include <functional>
+#include <unordered_map>
+#include <chrono>
+#include <limits>
 
 namespace nlm {
 
@@ -29,6 +34,75 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Validation mode
+enum class ValidationMode {
+    Strict,
+    Lenient,
+    None
+};
+
+// Validation error types
+class ValidationError : public std::runtime_error {
+public:
+    ValidationError(const std::string& message, 
+                   const std::string& key = "",
+                   const std::string& value = "")
+        : std::runtime_error(message), key_(key), value_(value) {}
+    
+    const std::string& key() const { return key_; }
+    const std::string& value() const { return value_; }
+    
+private:
+    std::string key_;
+    std::string value_;
+};
+
+// Type validation result
+enum class ValidationResult {
+    Valid,
+    TypeMismatch,
+    ValueOutOfRange,
+    KeyFormatInvalid,
+    EnumValueInvalid,
+    PathInvalid,
+    DefaultInvalid
+};
+
+// Value bounds for numeric types
+struct NumericBounds {
+    double min = std::numeric_limits<double>::lowest();
+    double max = std::numeric_limits<double>::max();
+    bool has_min = false;
+    bool has_max = false;
+};
+
+// Validation callback signature
+using ValidationCallback = std::function<ValidationResult(
+    const std::string& key,
+    const ConfigValue& value,
+    const std::string& operation
+)>;
+
+// Key validation rules
+struct KeyValidationRules {
+    bool allow_empty = false;
+    size_t max_length = 0; // 0 means no limit
+    std::string allowed_pattern;
+    bool allow_special_chars = true;
+    std::vector<std::string> reserved_prefixes;
+};
+
+// Value validation rules
+struct ValueValidationRules {
+    bool require_non_empty_string = false;
+    bool allow_negative_numbers = true;
+    bool allow_zero = true;
+    std::unordered_map<std::string, NumericBounds> numeric_bounds;
+    std::unordered_map<std::string, std::vector<std::string>> allowed_enums;
+    bool validate_file_paths = false;
+    bool validate_array_non_empty = false;
 };
 
 // Configuration entry
@@ -93,13 +167,38 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+public:
+    // Validation settings
+    void setValidationMode(ValidationMode mode);
+    ValidationMode getValidationMode() const;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Key validation rules
+    void setKeyValidationRules(const std::string& key, const KeyValidationRules& rules);
+    
+    // Value validation rules
+    void setValueValidationRules(const std::string& key, const ValueValidationRules& rules);
+    
+    // Validation callbacks
+    void addValidationCallback(const std::string& key, const ValidationCallback& callback);
+    
+    // Strict validation control
+    void setStrictValidation(bool strict);
+    bool hasStrictValidation() const;
+    
+    // Deprecated validation methods (keeping for backward compatibility)
+    // Use setKeyValidationRules/setValueValidationRules for new code
+    ValidationResult validate(const std::string& key, const ConfigValue& value) const;
+    ValidationResult validate(const std::string& key, const std::string& value) const;
+    ValidationResult validate(const std::string& key, int value) const;
+    ValidationResult validate(const std::string& key, double value) const;
+    ValidationResult validate(const std::string& key, bool value) const;
+    
+private:
+    // Internal validation helpers
+    ValidationResult validateKey(const std::string& key) const;
+    ValidationResult validateValue(const std::string& key, const ConfigValue& value) const;
+    ValidationResult validateValueInternal(const std::string& key, const ConfigValue& value, const ValueValidationRules& rules) const;
+    bool isValidFilePath(const std::string& path) const;
 };
 
 } // namespace nlm

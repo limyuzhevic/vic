@@ -51,14 +51,60 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
-    std::cout << "--- Full Integration Experiment ---" << std::endl;
-    Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    // Enhanced parameter validation
+    std::cout << "--- Parameter Validation ---" << std::endl;
+    
+    // Validate neuronCount
+    if (config.neuronCount == 0) {
+        std::cerr << "ERROR: Invalid neuronCount: must be positive (got " << config.neuronCount << ")" << std::endl;
+        return 1;
+    }
+    if (config.neuronCount > 100000) {
+        std::cerr << "WARNING: Very large neuronCount may impact performance (got " << config.neuronCount << ")" << std::endl;
+    }
+    std::cout << "✓ neuronCount validated: " << config.neuronCount << std::endl;
+    
+    // Validate maxSteps
+    if (config.maxSteps == 0) {
+        std::cerr << "ERROR: Invalid maxSteps: must be positive (got " << config.maxSteps << ")" << std::endl;
+        return 1;
+    }
+    if (config.maxSteps > 1000000) {
+        std::cerr << "WARNING: Very large maxSteps may impact performance (got " << config.maxSteps << ")" << std::endl;
+    }
+    std::cout << "✓ maxSteps validated: " << config.maxSteps << std::endl;
+    
+    // Validate regionCount
+    if (config.regionCount == 0) {
+        std::cerr << "ERROR: Invalid regionCount: must be positive (got " << config.regionCount << ")" << std::endl;
+        return 1;
+    }
+    std::cout << "✓ regionCount validated: " << config.regionCount << std::endl;
+    
+    // Validate connectionProbability
+    if (config.connectionProbability < 0.0f || config.connectionProbability > 1.0f) {
+        std::cerr << "ERROR: Invalid connectionProbability: must be between 0 and 1 (got " << config.connectionProbability << ")" << std::endl;
+        return 1;
+    }
+    std::cout << "✓ connectionProbability validated: " << config.connectionProbability << std::endl;
+    
+    // Validate checkpointPath is not empty if checkpointing is enabled
+    if (config.enableCheckpointing && config.checkpointPath.empty()) {
+        std::cerr << "ERROR: checkpointPath cannot be empty when enableCheckpointing is true" << std::endl;
+        return 1;
+    }
+    std::cout << "✓ checkpointPath validated: " << config.checkpointPath << std::endl;
+    
+    // Validate demo-specific constraints
+    if (config.neuronCount > 5000) {
+        std::cout << "WARNING: Large neural network for demo mode may impact performance" << std::endl;
+    }
+    
+    if (config.maxSteps > 10000) {
+        std::cout << "WARNING: Long simulation duration for demo mode" << std::endl;
+    }
+    
+    std::cout << "Parameter validation complete!" << std::endl << std::endl;
     
     auto result = experiment.run(config);
     

@@ -1,8 +1,5 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
+#include "../core/Error/Error.hpp"
+#include "../core/Error/ErrorRecovery.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
@@ -177,10 +174,48 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
-    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
-    size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    try {
+        // Get configuration values
+        auto neuronCountOpt = pImpl->config->get<size_t>("neuron_count");
+        auto regionCountOpt = pImpl->config->get<size_t>("region_count");
+        auto connectionProbabilityOpt = pImpl->config->get<float>("connection_probability");
+        
+        size_t neuronCount = neuronCountOpt.has_value() ? neuronCountOpt.value() : 1000;
+        size_t regionCount = regionCountOpt.has_value() ? regionCountOpt.value() : 1;
+        float connectionProbability = connectionProbabilityOpt.has_value() ? connectionProbabilityOpt.value() : 0.1f;
+        
+        if (neuronCount == 0) {
+            nlm::ErrorContext errorCtx("Neuron count cannot be zero", __FILE__, __LINE__, __func__,
+                                      nlm::ErrorSeverity::Error, nlm::ErrorCategory::Config, 
+                                      nlm::ErrorCode::ERROR_CONFIG_VALIDATION_FAILED);
+            nlm::getErrorReporter().report(errorCtx);
+            nlm::logErrorToLogger(errorCtx);
+            NLM_LOG_ERROR("Neuron count validation failed: cannot be zero");
+            return false;
+        }
+        
+        if (regionCount == 0) {
+            nlm::ErrorContext errorCtx("Region count cannot be zero", __FILE__, __LINE__, __func__,
+                                      nlm::ErrorSeverity::Error, nlm::ErrorCategory::Config,
+                                      nlm::ErrorCode::ERROR_CONFIG_VALIDATION_FAILED);
+            nlm::getErrorReporter().report(errorCtx);
+            nlm::logErrorToLogger(errorCtx);
+            NLM_LOG_ERROR("Region count validation failed: cannot be zero");
+            return false;
+        }
+        
+        if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+            nlm::ErrorContext errorCtx("Connection probability must be between 0 and 1", __FILE__, __LINE__, __func__,
+                                      nlm::ErrorSeverity::Error, nlm::ErrorCategory::Config,
+                                      nlm::ErrorCode::ERROR_CONFIG_VALIDATION_FAILED);
+            nlm::getErrorReporter().report(errorCtx);
+            nlm::logErrorToLogger(errorCtx);
+            NLM_LOG_ERROR("Connection probability validation failed: must be between 0 and 1");
+            return false;
+        }
+        
+        NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
+                     std::to_string(regionCount) + " regions");
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
