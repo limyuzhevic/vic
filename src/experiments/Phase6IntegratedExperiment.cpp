@@ -46,7 +46,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     world.initialize(16, 16);
     
     // Create agent
-    AgentBrain agent(brain);
+    AgentBrain::Config agentConfig;
+    AgentBrain agent(brain, agentConfig);
     agent.initialize(world);
     agent.enableRewardModulation(true);
     agent.enableStructuralPlasticity(config.enableDevelopment);

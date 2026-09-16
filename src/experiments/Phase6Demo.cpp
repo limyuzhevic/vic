@@ -1,10 +1,3 @@
-/**
- * Phase 6 Demo - Integration Test
- * 
- * This demo runs the Phase 6 integration experiment to verify
- * that all brain systems are properly connected.
- */
-
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
@@ -56,9 +49,12 @@ int main(int argc, char* argv[]) {
     Phase6Config config;
     config.neuronCount = 500;
     config.maxSteps = 2000;
+    config.regionCount = 1;
+    config.connectionProbability = 0.1f;
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
+    config.checkpointPath = "/tmp/nlm_checkpoint_test.bin";
     
     auto result = experiment.run(config);
     
