@@ -50,18 +50,15 @@ add_library(nlm_core STATIC
     src/development/Maturation.cpp
     # Neuromodulation
     src/neuromodulation/Neuromodulator.cpp
-    src/neuromodulation/Reward.cpp
+    src/neuromodulation/Dopamine.cpp
+    src/neuromodulation/Curiosity.cpp
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    # Memory Systems
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
+    src/memory/NeuralAssociativeMemory.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
@@ -73,12 +70,15 @@ add_library(nlm_core STATIC
     # Prediction
     src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
     # Environment
     src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
+    # Motor
+    src/motor/MotorSystem.cpp
+    # Agent
+    src/agent/AgentBrain.cpp
+    src/agent/SensoryPercept.cpp
+    # World
+    src/world/SimpleWorld.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
