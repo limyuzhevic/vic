@@ -121,6 +121,14 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Phase 6 experiments (integration demo)
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegrationDemo.cpp
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
 # Main executable
 add_executable(nlm
     src/main.cpp

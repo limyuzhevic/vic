@@ -239,11 +239,20 @@ bool Brain::initialize() {
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
-    
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // Integrate prediction system with sensory input and spike system
+    // The prediction system needs to receive actual sensory observations,
+    // not just train on spike patterns
+    if (pImpl->predictionSystem && !pImpl->sensoryNeurons.empty()) {
+        // Create prediction from current sensory state
+        // Use neural activity patterns from sensory neurons as prediction targets
+        std::vector<float> sensoryObservation;
+        for (size_t i = 0; i < std::min(pImpl->sensoryNeurons.size(), static_cast<size_t>(256)); ++i) {
+            sensoryObservation.push_back(pImpl->sensoryNeurons[i]->getState().membranePotential);
+        }
+        
+        // Present sensory observation to prediction system
+        pImpl->predictionSystem->train(sensoryObservation);
+    }
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -301,6 +310,16 @@ bool Brain::initialize() {
 
 void Brain::step(SimulationStep currentStep) {
     step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
+}
+
+void Brain::sleep(TimestepDuration duration) {
+    // Enter resting state for memory consolidation and replay
+    pImpl->isResting = true;
+    pImpl->stepsSinceLastEpisode = 0;
+    
+    // Disable normal processing during sleep
+    // In a real implementation, this would reduce energy consumption
+    // and focus on memory consolidation processes
 }
 
 void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
@@ -477,42 +496,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 7: Update episodic memory ==========
-    pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
-        pImpl->stepsSinceLastEpisode = 0;
-        
-        if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
-            EpisodicMemoryItem episode;
-            episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            // Store active neurons
-            for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
-                        if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
-                            episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
-                        }
-                    }
-                }
-            }
-            
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            pImpl->episodicMemory->storeEpisode(episode);
-        }
-    }
-    
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        // In a full implementation, this would integrate with sensory input
+        // and provide predictions to neuromodulation systems
+        pImpl->predictionSystem->clearHistory();
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +518,81 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This requires sensory state encoding - use sensory neuron activity
+        std::vector<float> sensoryPattern;
+        for (size_t i = 0; i < std::min(pImpl->sensoryNeurons.size(), static_cast<size_t>(256)); ++i) {
+            float activation = pImpl->sensoryNeurons[i]->getState().membranePotential;
+            sensoryPattern.push_back(activation);
+        }
+        
+        // Get prediction error to inform concept formation
+        float predictionError = 0.0f;
+        if (pImpl->predictionSystem) {
+            predictionError = pImpl->predictionSystem->getPredictionError();
+        }
+        
+        // Get attention winners to focus concept formation on attended areas
+        std::vector<NeuronId> attendedNeurons;
+        if (pImpl->attention) {
+            attendedNeurons = pImpl->attention->getWinners();
+        }
+        
+        // Determine features based on prediction error and attended areas
+        std::vector<float> features;
+        if (!attendedNeurons.empty() && !sensoryPattern.empty()) {
+            // Use attended neuron activations as features for concept formation
+            size_t featuresCount = std::min(attendedNeurons.size(), sensoryPattern.size());
+            for (size_t i = 0; i < featuresCount; ++i) {
+                // Get index of attended neuron in sensoryNeurons
+                size_t attendedIndex = 0;
+                for (size_t j = 0; j < pImpl->sensoryNeurons.size(); ++j) {
+                    if (pImpl->sensoryNeurons[j]->getId() == attendedNeurons[i]) {
+                        attendedIndex = j;
+                        break;
+                    }
+                }
+                
+                // Modulate feature based on prediction error
+                float featureValue = sensoryPattern[attendedIndex];
+                if (predictionError > 0.5f) {
+                    // High prediction error - emphasize this feature for concept formation
+                    featureValue *= 1.5f;
+                }
+                features.push_back(featureValue);
+            }
+        } else {
+            // Fallback: use all sensory neurons as features
+            features = sensoryPattern;
+        }
+        
+        // Get reward signal from neuromodulation systems
+        float reward = 0.0f;
+        if (pImpl->dopamine) {
+            reward = pImpl->dopamine->getLevel();
+        }
+        
+        // Present to concept formation with prediction error and attention context
+        pImpl->conceptFormation->presentExperience(sensoryPattern, features, reward, currentStep);
+        
+        // Store concept prototypes in working memory for immediate access
+        size_t conceptCount = pImpl->conceptFormation->getConceptCount();
+        for (size_t i = 0; i < conceptCount; ++i) {
+            // Get concept prototype
+            std::vector<float> prototype = pImpl->conceptFormation->getConceptPrototype(i);
+            
+            // Store in working memory if it's the most stable concept
+            float stability = pImpl->conceptFormation->getConceptStability(i);
+            if (stability > 0.7f) {
+                // Convert concept prototype to neuron activations
+                for (size_t j = 0; j < std::min(prototype.size(), static_cast<size_t>(10)); ++j) {
+                    // Store the prototype pattern in working memory
+                    // The neuron ID would be concept ID + 1000 to avoid conflicts
+                    NeuronId conceptNeuron(static_cast<uint64_t>(i + 1000));
+                    pImpl->workingMemory->storeToNeuron(conceptNeuron, prototype[j]);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -573,6 +636,86 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+        
+        // Development affects neural excitability
+        DevelopmentalStage devStage = pImpl->developmentalStage;
+        float excitabilityMod = 1.0f;
+        switch (devStage) {
+            case DevelopmentalStage::Initial:
+                excitabilityMod = 1.5f;  // More excitable
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                excitabilityMod = 1.2f;
+                break;
+            case DevelopmentalStage::Maturation:
+                excitabilityMod = 1.0f;
+                break;
+            case DevelopmentalStage::Adult:
+                excitabilityMod = 0.8f;  // Less excitable
+                break;
+        }
+        
+        // Apply excitability changes to all neurons
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Development modulates excitability threshold
+                    float currentThreshold = neuron->getState().threshold;
+                    neuron->setThreshold(currentThreshold * excitabilityMod);
+                }
+            }
+        }
+        
+        // Development affects memory consolidation
+        float consolidationMod = 1.0f;
+        switch (devStage) {
+            case DevelopmentalStage::Initial:
+                consolidationMod = 1.2f;  // Stronger consolidation
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                consolidationMod = 1.0f;
+                break;
+            case DevelopmentalStage::Maturation:
+                consolidationMod = 0.8f;
+                break;
+            case DevelopmentalStage::Adult:
+                consolidationMod = 0.6f;  // Weaker consolidation
+                break;
+        }
+        
+        // Development affects prediction system sensitivity
+        if (pImpl->predictionSystem) {
+            // Can be modified later based on developmental stage
+        }
+        
+        // Development affects attention system parameters
+        if (pImpl->attention) {
+            // Can be modified based on developmental stage
+            float inhibitionStrength = 0.5f;
+            float excitationStrength = 1.5f;
+            
+            switch (devStage) {
+                case DevelopmentalStage::Initial:
+                    inhibitionStrength = 0.3f;  // Less inhibition, more exploration
+                    excitationStrength = 2.0f;
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    inhibitionStrength = 0.4f;
+                    excitationStrength = 1.8f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    inhibitionStrength = 0.5f;
+                    excitationStrength = 1.5f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    inhibitionStrength = 0.6f;  // More inhibition, more selective attention
+                    excitationStrength = 1.2f;
+                    break;
+            }
+            
+            pImpl->attention->setInhibitionStrength(inhibitionStrength);
+            pImpl->attention->setExcitationStrength(excitationStrength);
         }
     }
     
