@@ -106,9 +106,23 @@ struct LearningExperiment {
         NLM_LOG_INFO("=== Learning Experiment Results ===");
         NLM_LOG_INFO("");
         
-        if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
+        if (initialWeights.empty()) {
+            NLM_LOG_INFO("ERROR: No initial weights recorded");
+            NLM_LOG_INFO("This may indicate the brain has no synapses in the first region or region sampling failed.");
             return;
+        }
+        
+        if (finalWeights.empty()) {
+            NLM_LOG_INFO("ERROR: No final weights recorded");
+            NLM_LOG_INFO("This may indicate the brain lost synapses during the experiment or region sampling failed.");
+            return;
+        }
+        
+        if (initialWeights.size() != finalWeights.size()) {
+            NLM_LOG_INFO("WARNING: Weight vector sizes differ!");
+            NLM_LOG_INFO("Initial weights: " + std::to_string(initialWeights.size()) + " synapses");
+            NLM_LOG_INFO("Final weights: " + std::to_string(finalWeights.size()) + " synapses");
+            NLM_LOG_INFO("Will compute statistics on minimum common size.");
         }
         
         // Compute weight changes
