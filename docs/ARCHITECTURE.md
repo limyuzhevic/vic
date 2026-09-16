@@ -216,6 +216,99 @@ PLASTICITY
 SOCIAL LEARNING (observation/imitation)
 ```
 
+### Phase 4: Emerging Cognition
+```
+WORLD (SimpleWorld)
+      ↓
+SENSORY PERCEPT
+      ↓
+ATTENTION (competitive selection)
+      ↓
+NEURAL PROCESSING
+      ↓
+PREDICTION (temporal sequence learning)
+      ↓
+WORKING MEMORY (persistent activity)
+      ↓
+EPISODIC MEMORY (experience storage)
+      ↓
+CONCEPT FORMATION (pattern discovery)
+      ↓
+PLANNING (multi-step prediction)
+      ↓
+SELF-MODEL (sensorimotor learning)
+      ↓
+MOTOR ACTION
+      ↓
+WORLD.applyMotorCommand()
+      ↓
+ACTION RESULT
+      ↓
+REWARD / ERROR
+      ↓
+NEUROMODULATION
+      ↓
+PLASTICITY
+      ↓
+SOCIAL LEARNING (observation/imitation)
+```
+
+## Phase 6 Integration
+
+Phase 6 represents the culmination of the NLM development, integrating all previous phases into a single coherent loop. The architecture follows a closed-loop design where neural activity, plasticity, memory, neuromodulation, and behavior continuously influence each other.
+
+### Brain Loop Architecture
+
+The main simulation loop (`Brain::step()`) implements the complete brain simulation:
+
+```cpp
+void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
+    // 1. Process pending delayed spikes (deliver synaptic input)
+    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    
+    // 2. Update all neurons (LIF dynamics)
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                neuron->stepLIF(currentTime, pImpl->timestep);
+            }
+        }
+    }
+    
+    // 3. Detect spikes and schedule spike events
+    // ... spike detection and scheduling ...
+    
+    // 4. Update working memory
+    pImpl->workingMemory->update(pImpl->timestep);
+    
+    // 5. Apply neuromodulation effects
+    // - Dopamine affects neural excitability
+    // - Novelty detection updates
+    // - Curiosity computation
+    
+    // 6. Apply plasticity rules (STDP and Hebbian)
+    // with neuromodulation modulation
+    
+    // 7. Update episodic memory with current experience
+    
+    // 8. Update prediction system
+    
+    // 9. Update attention system
+    
+    // 10. Update concept formation
+    
+    // 11. Apply structural plasticity (synaptogenesis/pruning)
+    
+    // 12. Replay important memories
+    
+    // 13. Apply development effects
+    
+    // 14. Memory consolidation
+    
+    // 15. Checkpoint management
+}
+```
+
 ## Agent-Brain Interface
 
 Phase 3/4 introduces the AgentBrain class that connects the NLM brain to the world:

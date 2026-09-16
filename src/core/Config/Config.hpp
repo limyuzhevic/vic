@@ -90,8 +90,44 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Validate configuration parameters
+    bool validateParameters() const;
+    
+    // Get the type of a configuration parameter as string
+    std::string getParameterType(const std::string& key) const;
+    
+    // Set a configuration parameter with type checking
+    template<typename T>
+    void setParameterWithType(const std::string& key, const T& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Set a configuration parameter with validation
+    template<typename T>
+    void setParameter(const std::string& key, const T& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Get parameter value with type validation
+    template<typename T>
+    std::optional<T> getValidated(const std::string& key) const;
+    
+    // Check if a configuration parameter is valid for a type
+    bool isValidParameterType(const std::string& key, const std::type_info& typeInfo) const;
+    
+    // Get all configuration entries with detailed information
+    std::vector<ConfigEntry> getAllEntries() const;
+    
+    // Import configuration from another config (merge)
+    void importFrom(const Config& other);
+    
+    // Get configuration statistics
+    struct ConfigStats {
+        size_t totalEntries;
+        size_t entriesBySource[4]; // Default, File, CommandLine, Runtime
+        std::unordered_map<std::string, size_t> typeCounts;
+    };
+    
+    ConfigStats getStats() const;
+    
+    // Generate configuration report
+    std::string generateReport() const;
     
 private:
     struct Impl;

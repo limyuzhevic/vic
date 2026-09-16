@@ -25,8 +25,349 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <algorithm>
+#include <map>
+#include <set>
+#include <sstream>
+#include <cctype>
 
 using namespace nlm;
+
+// Command line parser implementation
+class CommandLineParser {
+public:
+    struct Option {
+        std::string name;
+        char shortName;
+        std::string description;
+        std::string defaultValue;
+        std::string type;
+        bool required;
+        bool hasValue;
+    };
+    
+    CommandLineParser(int argc, char** argv) : argc(argc), argv(argv) {
+        addOption("--help", '-', 'h', "Show help information and exit", "", "flag", false);
+        addOption("--version", '-', 'v', "Show version information and exit", "", "flag", false);
+        
+        // Environment setup options
+        addOption("--config", '-', 'c', "Configuration file path", "configs/default.cfg", "string", false);
+        addOption("--log-level", '-', 'l', "Log level (trace, debug, info, warn, error, fatal)", "info", "string", false);
+        addOption("--log-file", '-', 'f', "Log file path for output", "", "string", false);
+        
+        // File path handling
+        addOption("--workspace", '-', 'w', "Working directory for simulation", ".", "string", false);
+        
+        // Simulation control options
+        addOption("--timestep", '-', 't', "Simulation timestep in seconds", "0.001", "double", false);
+        addOption("--max-time", '-', 'm', "Maximum simulation time in seconds", "1.0", "double", false);
+        addOption("--seed", '-', 's', "Random seed for reproducible results", "42", "int64", false);
+        addOption("--neuron-count", '-', 'n', "Number of neurons in the network", "500", "int64", false);
+        addOption("--region-count", '-', 'r', "Number of neural regions", "1", "int64", false);
+        
+        // Connection probability
+        addOption("--connection-prob", '-', 'p', "Probability of connections between neurons", "0.15", "float", false);
+        
+        // STDP parameters
+        addOption("--stdp-ltp", '-', 'a', "STDP LTP weight", "0.02", "float", false);
+        addOption("--stdp-ltd", '-', 'd', "STDP LTD weight", "0.015", "float", false);
+        addOption("--stdp-tau", '-', 'u', "STDP time constant (ms)", "20.0", "float", false);
+        
+        // Structural plasticity
+        addOption("--synaptogenesis", '-', 'g', "Synaptogenesis rate", "0.0001", "float", false);
+        addOption("--pruning", '-', 'o', "Pruning rate", "0.00001", "float", false);
+        
+        // Debug and development options
+        addOption("--debug-mode", '-', 'b', "Enable debug mode with verbose output", "", "flag", false);
+        addOption("--demo-mode", '-', 'e', "Enable demo mode with simplified test scenarios", "", "flag", false);
+        addOption("--benchmark", '-', 'B', "Run benchmark tests and output performance metrics", "", "flag", false);
+        addOption("--no-visualization", '-', 'V', "Disable visualization components", "", "flag", false);
+        addOption("--save-brain", '-', 'S', "Save brain state to file after simulation", "", "flag", false);
+        addOption("--load-brain", '-', 'L', "Load brain state from file before simulation", "", "flag", false);
+        
+        // Experiment controls
+        addOption("--experiment-phase", '-', 'x', "Specific experiment phase to run (1, 2, 3, 4, 5, 6)", "2", "int", false);
+        addOption("--test-mode", '-', 'y', "Test mode - run connectivity and plasticity tests", "", "flag", false);
+    }
+    
+    void addOption(const std::string& longName, char shortPrefix, char shortName, 
+                   const std::string& description, const std::string& defaultValue,
+                   const std::string& type, bool required) {
+        Option opt;
+        opt.name = longName;
+        opt.shortName = shortName;
+        opt.description = description;
+        opt.defaultValue = defaultValue;
+        opt.type = type;
+        opt.required = required;
+        opt.hasValue = (type != "flag");
+        options.push_back(opt);
+    }
+    
+    bool parse() {
+        parsedArgs.clear();
+        unrecognizedArgs.clear();
+        
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            
+            // Handle --key=value format
+            if (arg.find("--") == 0) {
+                size_t eqPos = arg.find('=');
+                if (eqPos != std::string::npos) {
+                    std::string key = arg.substr(2, eqPos - 2);
+                    std::string value = arg.substr(eqPos + 1);
+                    parsedArgs[key] = value;
+                    usedArgs[key] = true;
+                } else {
+                    unrecognizedArgs.push_back(arg);
+                }
+            }
+            // Handle -key value format or short options
+            else if (arg.find("-") == 0 && arg.size() > 1) {
+                if (arg.size() == 2 && arg[1] != '-' && isalpha(arg[1])) {
+                    // Short option like -h
+                    char shortOpt = arg[1];
+                    Option* opt = findOptionByShort(shortOpt);
+                    if (opt) {
+                        if (opt->hasValue) {
+                            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                                parsedArgs[opt->name] = argv[++i];
+                                usedArgs[opt->name] = true;
+                            } else {
+                                std::cerr << "Error: Option " << arg << " requires a value" << std::endl;
+                                return false;
+                            }
+                        } else {
+                            parsedArgs[opt->name] = "true";
+                            usedArgs[opt->name] = true;
+                        }
+                    } else {
+                        unrecognizedArgs.push_back(arg);
+                    }
+                } else {
+                    // Long option without =, like --help
+                    std::string key = arg.substr(2);
+                    if (findOption(key) != nullptr) {
+                        parsedArgs[key] = "true";
+                        usedArgs[key] = true;
+                    } else {
+                        unrecognizedArgs.push_back(arg);
+                    }
+                }
+            } else {
+                unrecognizedArgs.push_back(arg);
+            }
+        }
+        
+        return validate();
+    }
+    
+    Option* findOption(const std::string& name) {
+        for (auto& opt : options) {
+            if (opt.name == name) return &opt;
+        }
+        return nullptr;
+    }
+    
+    Option* findOptionByShort(char shortName) {
+        for (auto& opt : options) {
+            if (opt.shortName == shortName) return &opt;
+        }
+        return nullptr;
+    }
+    
+    bool has(const std::string& name) const {
+        return parsedArgs.find(name) != parsedArgs.end();
+    }
+    
+    std::string get(const std::string& name) const {
+        auto it = parsedArgs.find(name);
+        return it != parsedArgs.end() ? it->second : "";
+    }
+    
+    bool getBool(const std::string& name) const {
+        std::string value = get(name);
+        std::transform(value.begin(), value.end(), value.begin(), ::tolower);
+        return value == "true" || value == "1" || value == "yes" || value == "on";
+    }
+    
+    double getDouble(const std::string& name, double defaultValue = 0.0) const {
+        std::string value = get(name);
+        if (value.empty()) return defaultValue;
+        try {
+            return std::stod(value);
+        } catch (...) {
+            return defaultValue;
+        }
+    }
+    
+    int64_t getInt64(const std::string& name, int64_t defaultValue = 0) const {
+        std::string value = get(name);
+        if (value.empty()) return defaultValue;
+        try {
+            return std::stoll(value);
+        } catch (...) {
+            return defaultValue;
+        }
+    }
+    
+    float getFloat(const std::string& name, float defaultValue = 0.0f) const {
+        std::string value = get(name);
+        if (value.empty()) return defaultValue;
+        try {
+            return std::stof(value);
+        } catch (...) {
+            return defaultValue;
+        }
+    }
+    
+    bool validate() {
+        // Check required arguments
+        for (const auto& opt : options) {
+            if (opt.required && !has(opt.name)) {
+                std::cerr << "Error: Required option " << opt.name << " is missing" << std::endl;
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    void printHelp(const std::string& programName) {
+        std::cout << "NLM - Neural Learning Machine - Phase 2" << std::endl;
+        std::cout << "=====================================" << std::endl;
+        std::cout << std::endl;
+        
+        std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+        std::cout << std::endl;
+        
+        std::cout << "Core Options:" << std::endl;
+        std::cout << "  -h, --help                    Show this help information and exit" << std::endl;
+        std::cout << "  -v, --version                 Show version information and exit" << std::endl;
+        std::cout << std::endl;
+        
+        std::cout << "Environment Setup:" << std::endl;
+        std::cout << "  -c, --config <path>           Configuration file path (default: configs/default.cfg)" << std::endl;
+        std::cout << "  -l, --log-level <level>       Log level: trace, debug, info, warn, error, fatal (default: info)" << std::endl;
+        std::cout << "  -f, --log-file <path>         Log file path for output" << std::endl;
+        std::cout << "  -w, --workspace <dir>          Working directory for simulation (default: .)" << std::endl;
+        std::cout << std::endl;
+        
+        std::cout << "Simulation Control:" << std::endl;
+        std::cout << "  -t, --timestep <sec>          Simulation timestep in seconds (default: 0.001)" << std::endl;
+        std::cout << "  -m, --max-time <sec>          Maximum simulation time in seconds (default: 1.0)" << std::endl;
+        std::cout << "  -s, --seed <num>             Random seed for reproducible results (default: 42)" << std::endl;
+        std::cout << "  -n, --neuron-count <num>      Number of neurons in the network (default: 500)" << std::endl;
+        std::cout << "  -r, --region-count <num>      Number of neural regions (default: 1)" << std::endl;
+        std::cout << "  -p, --connection-prob <p>     Probability of connections between neurons (default: 0.15)" << std::endl;
+        std::cout << std::endl;
+        
+        std::cout << "Plasticity Parameters:" << std::endl;
+        std::cout << "  -a, --stdp-ltp <weight>       STDP LTP weight (default: 0.02)" << std::endl;
+        std::cout << "  -d, --stdp-ltd <weight>       STDP LTD weight (default: 0.015)" << std::endl;
+        std::cout << "  -u, --stdp-tau <ms>           STDP time constant in milliseconds (default: 20.0)" << std::endl;
+        std::cout << "  -g, --synaptogenesis <rate>   Synaptogenesis rate (default: 0.0001)" << std::endl;
+        std::cout << "  -o, --pruning <rate>          Pruning rate (default: 0.00001)" << std::endl;
+        std::cout << std::endl;
+        
+        std::cout << "Debug and Development:" << std::endl;
+        std::cout << "  -b, --debug-mode              Enable debug mode with verbose output" << std::endl;
+        std::cout << "  -e, --demo-mode              Enable demo mode with simplified test scenarios" << std::endl;
+        std::cout << "  -B, --benchmark              Run benchmark tests and output performance metrics" << std::endl;
+        std::cout << "  -V, --no-visualization        Disable visualization components" << std::endl;
+        std::cout << "  -S, --save-brain             Save brain state to file after simulation" << std::endl;
+        std::cout << "  -L, --load-brain <path>      Load brain state from file before simulation" << std::endl;
+        std::cout << std::endl;
+        
+        std::cout << "Experiment Controls:" << std::endl;
+        std::cout << "  -x, --experiment-phase <num>  Specific experiment phase to run (1-6, default: 2)" << std::endl;
+        std::cout << "  -y, --test-mode              Test mode - run connectivity and plasticity tests" << std::endl;
+        std::cout << std::endl;
+        
+        std::cout << "Usage Examples:" << std::endl;
+        std::cout << "  " << programName << " --help                               # Show help" << std::endl;
+        std::cout << "  " << programName << " --neuron-count 1000 --timestep 0.0005" << std::endl;
+        std::cout << "  " << programName << " -s 123 -t 0.001 -m 5.0 --benchmark" << std::endl;
+        std::cout << "  " << programName << " --config myconfig.cfg --log-level debug --demo-mode" << std::endl;
+        std::cout << "  " << programName << " --experiment-phase 3 --test-mode" << std::endl;
+        std::cout << std::endl;
+        
+        if (!unrecognizedArgs.empty()) {
+            std::cout << "Warnings:" << std::endl;
+            for (const auto& arg : unrecognizedArgs) {
+                std::cout << "  Unknown argument: " << arg << std::endl;
+            }
+            std::cout << std::endl;
+        }
+    }
+    
+    void printVersion() {
+        std::cout << "NLM - Neural Learning Machine" << std::endl;
+        std::cout << "Version: 0.1.0 - Phase 2" << std::endl;
+        std::cout << "Build: Real Neural Computation" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Features:" << std::endl;
+        std::cout << "  - Leaky Integrate-and-Fire (LIF) neuron dynamics" << std::endl;
+        std::cout << "  - Event-driven spike propagation with delays" << std::endl;
+        std::cout << "  - STDP and Hebbian plasticity rules" << std::endl;
+        std::cout << "  - Structural plasticity (synaptogenesis/pruning)" << std::endl;
+        std::cout << "  - Learning experiments with measurable synaptic changes" << std::endl;
+    }
+    
+    std::vector<std::string> getUnrecognizedArgs() const { return unrecognizedArgs; }
+    
+private:
+    int argc;
+    char** argv;
+    std::vector<Option> options;
+    std::map<std::string, std::string> parsedArgs;
+    std::map<std::string, bool> usedArgs;
+    std::vector<std::string> unrecognizedArgs;
+};
+
+// Function to convert string to appropriate type and set config value
+void setConfigValueFromString(std::shared_ptr<Config> config, const std::string& key, const std::string& value) {
+    // Convert string value to appropriate type based on key
+    if (key == "timestep" || key == "max-time" || key == "simulation_timestep" || key == "stdp_tau") {
+        try {
+            double val = std::stod(value);
+            config->set(key, val, ConfigSource::CommandLine);
+        } catch (...) {
+            config->set(key, 0.0, ConfigSource::CommandLine);
+        }
+    } else if (key == "seed" || key == "neuron-count" || key == "region-count" || key == "neuron_count" || key == "region_count") {
+        try {
+            int64_t val = std::stoll(value);
+            config->set(key, val, ConfigSource::CommandLine);
+        } catch (...) {
+            config->set(key, 0LL, ConfigSource::CommandLine);
+        }
+    } else if (key == "connection-prob" || key == "connection_probability" || key == "stdp_ltp" || key == "stdp_ltd" || key == "stdp_ltp_weight" || key == "stdp_ltd_weight" || key == "synaptogenesis" || key == "synaptogenesis_rate" || key == "pruning" || key == "pruning_rate") {
+        try {
+            float val = std::stof(value);
+            config->set(key, val, ConfigSource::CommandLine);
+        } catch (...) {
+            config->set(key, 0.0f, ConfigSource::CommandLine);
+        }
+    } else if (key == "log-level" || key == "log_level" || key == "workspace" || key == "config" || key == "log_file" || key == "save_brain_file" || key == "load_brain_file") {
+        config->set(key, value, ConfigSource::CommandLine);
+    } else if (key == "debug-mode" || key == "debug_mode" || key == "demo-mode" || key == "demo_mode" || key == "benchmark" || key == "no_visualization" || key == "no_visualization" || key == "save-brain" || key == "save_brain" || key == "load-brain" || key == "load_brain" || key == "test-mode" || key == "test_mode") {
+        config->set(key, true, ConfigSource::CommandLine);
+    } else if (key == "experiment-phase" || key == "experiment_phase") {
+        try {
+            int val = std::stoi(value);
+            config->set(key, val, ConfigSource::CommandLine);
+        } catch (...) {
+            config->set(key, 0, ConfigSource::CommandLine);
+        }
+    }
+}
+
+void overrideConfigFromArgs(std::shared_ptr<Config> config, const std::map<std::string, std::string>& parsedArgs) {
+    for (const auto& pair : parsedArgs) {
+        setConfigValueFromString(config, pair.first, pair.second);
+    }
+}
 
 void printBanner() {
     std::cout << R"(
@@ -345,15 +686,10 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
+    if (parsedArgs.find("config") != parsedArgs.end()) {
+        configFile = parsedArgs["config"];
+    } else if (parsedArgs.find("c") != parsedArgs.end()) {
+        configFile = parsedArgs["c"];
     }
     
     // Load config from file (ignore if not found)
@@ -363,8 +699,23 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Override with command line args (convert bool flags to true)
+    // Convert parsedArgs to format expected by loadFromArgs
+    for (const auto& pair : parsedArgs) {
+        // Skip config-related args as they're handled above
+        if (pair.first == "config" || pair.first == "c") continue;
+        
+        // Create argv-style argument
+        std::string arg = "--" + pair.first;
+        if (pair.second != "true" && pair.second != "1" && pair.second != "yes" && pair.second != "on") {
+            arg += "=" + pair.second;
+        }
+        
+        // Temporarily add to argv for loadFromArgs
+        // This is a hack since we don't want to re-parse
+        // Instead, set config values directly
+        setConfigValueFromString(config, pair.first, pair.second);
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -382,6 +733,9 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Override with parsed args
+    overrideConfigFromArgs(config, parsedArgs);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -392,34 +746,86 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
-    
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
-    
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
-        return 1;
+    // Show unrecognized arguments as warnings
+    if (!unrecognizedArgs.empty()) {
+        NLM_LOG_WARN("Unrecognized command-line arguments:");
+        for (const auto& arg : unrecognizedArgs) {
+            NLM_LOG_WARN("  " + arg);
+        }
     }
     
-    brain->logStatus();
+    // Final configuration summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("Running with parsed arguments...");
     
-    // Run Test 1: Basic connectivity
+    if (parsedArgs.find("test-mode") != parsedArgs.end()) {
+        NLM_LOG_INFO("Test mode enabled - running connectivity tests");
+        
+        // Run Test 1: Basic connectivity
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
+        
+        auto* region = brain->getRegion(RegionId(1));
+        if (!region) {
+            NLM_LOG_ERROR("No regions found!");
+            return 1;
+        }
+        
+        auto neurons = region->getAllNeurons();
+        if (neurons.empty()) {
+            NLM_LOG_ERROR("No neurons found!");
+            return 1;
+        }
+        
+        size_t initialSpikes = brain->getTotalSpikeCount();
+        
+        NLM_LOG_INFO("  Injecting current into 10 neurons...");
+        for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
+            neurons[i]->injectCurrent(50.0f);
+        }
+        
+        for (SimulationStep step = 0; step < 50; ++step) {
+            brain->step(step, step * 0.001);
+        }
+        
+        size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
+        NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
+        
+        if (spikes > 0) {
+            NLM_LOG_INFO("  ✓ Spikes propagate through network");
+        } else {
+            NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
+            for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                             " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                             " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            }
+        }
+        
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Test 1 Complete ===");
+        
+        return 0;
+    }
+    
+    // Default behavior: run basic connectivity test and plasticity experiment
+    auto learningExp = std::make_shared<LearningExperiment>(brain, 42);
+    
+    // Record initial state
+    learningExp->recordInitialState();
+    
+    // Run basic connectivity test
     runBasicConnectivityTest(brain);
     
     // Reset brain for plasticity experiment
     brain->reset();
     brain->initialize();
     
-    // Run Test 2: Plasticity learning experiment
+    // Run plasticity experiment
     runPlasticityExperiment(brain);
     
-    // Reset and run Test 3: STDP verification
+    // Reset and run STDP verification
     brain->reset();
     brain->initialize();
     runStdpVerification(brain);

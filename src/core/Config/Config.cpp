@@ -199,17 +199,305 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+    bool valid = true;
+    std::ostringstream oss;
+    
+    oss << "Configuration Validation Report\n";
+    oss << "==============================\n\n";
+    
+    // Check for duplicate keys (should not happen, but checking for safety)
+    std::unordered_map<std::string, int> keyCount;
+    for (const auto& entry : pImpl->entries) {
+        keyCount[entry.key]++;
+        if (keyCount[entry.key] > 1) {
+            oss << "WARNING: Duplicate key \"" << entry.key << "\" found\n";
+        }
+    }
+    
+    // Validate value types based on key patterns
+    for (const auto& entry : pImpl->entries) {
+        bool typeOk = true;
+        std::string typeInfo;
+        
+        // Basic type validation based on key patterns
+        if (entry.key.find("simulation.") == 0) {
+            if (entry.key == "simulation.dt") {
+                if (!std::holds_alternative<double>(entry.value) && 
+                    !std::holds_alternative<int>(entry.value)) {
+                    typeOk = false;
+                    typeInfo = "Expected numeric type for simulation.dt";
+                }
+            } else if (entry.key == "simulation.maxTime") {
+                if (!std::holds_alternative<double>(entry.value)) {
+                    typeOk = false;
+                    typeInfo = "Expected double type for simulation.maxTime";
+                }
+            } else if (entry.key == "simulation.vision.enabled" || 
+                       entry.key == "simulation.audio.enabled" ||
+                       entry.key == "simulation.internal.enabled") {
+                if (!std::holds_alternative<bool>(entry.value)) {
+                    typeOk = false;
+                    typeInfo = "Expected boolean type for simulation.* enabled flags";
+                }
+            }
+        } else if (entry.key.find("brain.neurons.") == 0) {
+            if (!std::holds_alternative<int>(entry.value)) {
+                typeOk = false;
+                typeInfo = "Expected integer type for brain.neurons.* counts";
+            }
+        } else if (entry.key.find("brain.connections.") == 0) {
+            if (!std::holds_alternative<bool>(entry.value)) {
+                typeOk = false;
+                typeInfo = "Expected boolean type for brain.connections.* enabled flags";
+            }
+        } else if (entry.key.find("brain.") == 0) {
+            if (!std::holds_alternative<bool>(entry.value)) {
+                typeOk = false;
+                typeInfo = "Expected boolean type for brain.* enabled flags";
+            }
+        }
+        
+        if (!typeOk) {
+            valid = false;
+            oss << "ERROR: Invalid type for key \"" << entry.key << "\": " << typeInfo << "\n";
+        }
+    }
+    
+    oss << "Validation " << (valid ? "PASSED" : "FAILED") << "\n";
+    return oss.str();
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Get the type of a configuration parameter as string
+std::string Config::getParameterType(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return "not_found";
+    }
+    
+    if (std::holds_alternative<int>(it->value)) {
+        return "int";
+    } else if (std::holds_alternative<int64_t>(it->value)) {
+        return "int64_t";
+    } else if (std::holds_alternative<double>(it->value)) {
+        return "double";
+    } else if (std::holds_alternative<bool>(it->value)) {
+        return "bool";
+    } else if (std::holds_alternative<std::string>(it->value)) {
+        return "string";
+    } else if (std::holds_alternative<std::vector<int>>(it->value)) {
+        return "std::vector<int>";
+    } else if (std::holds_alternative<std::vector<double>>(it->value)) {
+        return "std::vector<double>";
+    } else if (std::holds_alternative<std::vector<std::string>>(it->value)) {
+        return "std::vector<std::string>";
+    }
+    
+    return "unknown";
+}
+
+// Set a configuration parameter with type checking
+template<typename T>
+void Config::setParameterWithType(const std::string& key, const T& value, ConfigSource source) {
+    // Validate that the key is not empty
+    if (key.empty()) {
+        throw std::invalid_argument("Configuration key cannot be empty");
+    }
+    
+    // Set the value with type checking
+    set(key, ConfigValue(value), source);
+}
+
+// Set a configuration parameter with validation
+template<typename T>
+void Config::setParameter(const std::string& key, const T& value, ConfigSource source) {
+    // Validate the key and value
+    if (key.empty()) {
+        throw std::invalid_argument("Configuration key cannot be empty");
+    }
+    
+    // For specific parameter validation
+    if (key == "simulation.dt" && value < 0.0) {
+        throw std::invalid_argument("Simulation time step (dt) cannot be negative");
+    }
+    if (key == "simulation.maxTime" && value < 0.0) {
+        throw std::invalid_argument("Maximum simulation time cannot be negative");
+    }
+    if (key == "brain.neurons.excitatory" && value < 0) {
+        throw std::invalid_argument("Number of excitatory neurons cannot be negative");
+    }
+    if (key == "brain.neurons.inhibitory" && value < 0) {
+        throw std::invalid_argument("Number of inhibitory neurons cannot be negative");
+    }
+    
+    set(key, ConfigValue(value), source);
+}
+
+// Get parameter value with type validation
+template<typename T>
+std::optional<T> Config::getValidated(const std::string& key) const {
+    auto value = get<T>(key);
+    if (!value.has_value()) {
+        return std::nullopt;
+    }
+    
+    // Additional validation based on key
+    if (key == "simulation.dt" && *value <= 0.0) {
+        throw std::out_of_range("Invalid simulation time step value: " + std::to_string(*value));
+    }
+    if (key == "simulation.maxTime" && *value < 0.0) {
+        throw std::out_of_range("Invalid maximum simulation time value: " + std::to_string(*value));
+    }
+    
+    return value;
+}
+
+// Check if a configuration parameter is valid for a type
+bool Config::isValidParameterType(const std::string& key, const std::type_info& typeInfo) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return false; // Key not found
+    }
+    
+    if (typeInfo == typeid(int) && std::holds_alternative<int>(it->value)) {
+        return true;
+    } else if (typeInfo == typeid(int64_t) && std::holds_alternative<int64_t>(it->value)) {
+        return true;
+    } else if (typeInfo == typeid(double) && std::holds_alternative<double>(it->value)) {
+        return true;
+    } else if (typeInfo == typeid(bool) && std::holds_alternative<bool>(it->value)) {
+        return true;
+    } else if (typeInfo == typeid(std::string) && std::holds_alternative<std::string>(it->value)) {
+        return true;
+    } else if (typeInfo == typeid(std::vector<int>) && std::holds_alternative<std::vector<int>>(it->value)) {
+        return true;
+    } else if (typeInfo == typeid(std::vector<double>) && std::holds_alternative<std::vector<double>>(it->value)) {
+        return true;
+    } else if (typeInfo == typeid(std::vector<std::string>) && std::holds_alternative<std::vector<std::string>>(it->value)) {
+        return true;
+    }
+    
+    return false;
+}
+
+// Get all configuration entries with detailed information
+std::vector<ConfigEntry> Config::getAllEntries() const {
+    return pImpl->entries;
+}
+
+// Import configuration from another config (merge)
+void Config::importFrom(const Config& other) {
+    for (const auto& entry : other.getAllEntries()) {
+        // If key already exists, update it with the new source (overwrites)
+        set(entry.key, entry.value, entry.source);
+    }
+}
+
+// Get configuration statistics
+ConfigStats Config::getStats() const {
+    ConfigStats stats;
+    stats.totalEntries = pImpl->entries.size();
+    
+    // Count by source
+    for (const auto& entry : pImpl->entries) {
+        int sourceIndex = static_cast<int>(entry.source);
+        if (sourceIndex >= 0 && sourceIndex < 4) {
+            stats.entriesBySource[sourceIndex]++;
+        }
+    }
+    
+    // Count by type
+    for (const auto& entry : pImpl->entries) {
+        std::string type;
+        if (std::holds_alternative<int>(entry.value)) {
+            type = "int";
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            type = "int64_t";
+        } else if (std::holds_alternative<double>(entry.value)) {
+            type = "double";
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            type = "bool";
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            type = "string";
+        } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+            type = "std::vector<int>";
+        } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+            type = "std::vector<double>";
+        } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+            type = "std::vector<std::string>";
+        } else {
+            type = "unknown";
+        }
+        stats.typeCounts[type]++;
+    }
+    
+    return stats;
+}
+
+// Generate configuration report
+std::string Config::generateReport() const {
+    std::ostringstream oss;
+    oss << "Configuration Report\n";
+    oss << "===================\n\n";
+    
+    oss << "Total entries: " << pImpl->entries.size() << "\n\n";
+    
+    // Summary by source
+    std::unordered_map<ConfigSource, size_t> sourceCounts;
+    for (const auto& entry : pImpl->entries) {
+        sourceCounts[entry.source]++;
+    }
+    
+    oss << "Entries by source:\n";
+    for (const auto& pair : sourceCounts) {
+        oss << "  " << static_cast<int>(pair.first) << ": " << pair.second << " entries\n";
+    }
+    oss << "\n";
+    
+    // Entries sorted by key
+    std::vector<ConfigEntry> sortedEntries = pImpl->entries;
+    std::sort(sortedEntries.begin(), sortedEntries.end(),
+              [](const ConfigEntry& a, const ConfigEntry& b) { return a.key < b.key; });
+    
+    oss << "Configuration entries:\n";
+    for (const auto& entry : sortedEntries) {
+        oss << "  " << entry.key << " = ";
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << "\"" << arg[i] << "\"";
+                }
+                oss << "]";
+            } else {
+                oss << arg;
+            }
+        }, entry.value);
+        oss << " (" << static_cast<int>(entry.source) << ")\n";
+    }
+    
+    return oss.str();
+}
 
 } // namespace nlm
