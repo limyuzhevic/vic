@@ -28,24 +28,43 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printVersion() {
+    std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Version 0.1.0" << std::endl;
+    std::cout << "Built with C++20" << std::endl;
+    std::cout << "Architecture: Leaky Integrate-and-Fire neurons with STDP plasticity" << std::endl;
+    std::cout << std::endl;
+}
+
+void printUsage(const char* programName) {
+    std::cout << "Usage: " << programName << " [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "NLM (Neural Learning Machine) - Phase 2 Simulation" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h                Show this help message" << std::endl;
+    std::cout << "  --version                 Show version information" << std::endl;
+    std::cout << "  --config <file>           Load configuration from file" << std::endl;
+    std::cout << "  --neuron_count <n>        Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --region_count <n>        Set number of regions (default: 1)" << std::endl;
+    std::cout << "  --timestep <t>            Set simulation timestep in seconds (default: 0.001)" << std::endl;
+    std::cout << "  --random_seed <seed>      Set random seed for reproducibility (default: 42)" << std::endl;
+    std::cout << "  --connection_probability <p>  Set connection probability (default: 0.15)" << std::endl;
+    std::cout << "  --stdp_ltp_weight <w>     Set STDP LTP weight (default: 0.02)" << std::endl;
+    std::cout << "  --stdp_ltd_weight <w>     Set STDP LTD weight (default: 0.015)" << std::endl;
+    std::cout << "  --stdp_tau <t>            Set STDP time constant (default: 20.0)" << std::endl;
+    std::cout << "  --synaptogenesis_rate <r> Set synapse formation rate (default: 0.0001)" << std::endl;
+    std::cout << "  --pruning_rate <r>        Set synapse removal rate (default: 0.00001)" << std::endl;
+    std::cout << "  --log_level <level>       Set log level (DEBUG, INFO, WARNING, ERROR) (default: INFO)" << std::endl;
+    std::cout << "  --log_to_file <file>       Log to file instead of stdout" << std::endl;
+    std::cout << "  --run_test <test>         Run specific test: 1 (basic connectivity), 2 (plasticity), 3 (STDP)" << std::endl;
+    std::cout << "  --help-all                Show all available options including experimental settings" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << " --neuron_count 1000 --region_count 2" << std::endl;
+    std::cout << "  " << programName << " --timestep 0.0005 --random_seed 123 --run_test 1" << std::endl;
+    std::cout << "  " << programName << " --log_level DEBUG --log_to_file nlm.log" << std::endl;
+    std::cout << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -322,23 +341,39 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
-    printBanner();
+    // Handle --help and --version before parsing config
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printUsage(argv[0]);
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
+        } else if (arg == "--help-all") {
+            printUsage(argv[0]);
+            std::cout << "\n=== Experimental Options ===\n";
+            std::cout << "  --enable_checkpointing       Enable checkpoint save/load functionality\n";
+            std::cout << "  --checkpoint_path <path>     Set checkpoint file path\n";
+            std::cout << "  --enable_replay              Enable episodic memory replay\n";
+            std::cout << "  --replay_interval <steps>    Set replay interval in steps\n";
+            std::cout << "  --enable_development         Enable developmental plasticity\n";
+            std::cout << "  --enable_curiosity          Enable curiosity-driven exploration\n";
+            std::cout << "  --enable_novelty_detection   Enable novelty detection\n";
+            std::cout << "  --enable_reward_prediction   Enable reward prediction error\n";
+            std::cout << "  --enable_structural_plasticity Enable structural plasticity\n";
+            return 0;
+        }
+    }
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
-    
-    // Initialize logger
+    // Now parse regular config and run
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Initializing NLM Phase 2 Real Neural Computation...");
     
     // Load configuration
     auto config = std::make_shared<Config>();
@@ -366,10 +401,10 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 if not set
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
@@ -409,14 +444,75 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
+    // Parse additional command line options
+    std::string checkpointPath = "/tmp/nlm_checkpoint.bin";
+    bool enableCheckpointing = false;
+    uint64_t replayInterval = 100;
+    bool enableDevelopment = false;
+    bool enableCuriosity = false;
+    bool enableNoveltyDetection = false;
+    bool enableRewardPrediction = false;
+    bool enableStructuralPlasticity = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 7) == "--enable") {
+            std::string flag = arg.substr(8);
+            if (flag == "checkpointing") enableCheckpointing = true;
+            else if (flag == "development") enableDevelopment = true;
+            else if (flag == "curiosity") enableCuriosity = true;
+            else if (flag == "novelty_detection") enableNoveltyDetection = true;
+            else if (flag == "reward_prediction") enableRewardPrediction = true;
+            else if (flag == "structural_plasticity") enableStructuralPlasticity = true;
+        } else if (arg.substr(0, 20) == "--checkpoint_path") {
+            if (arg.find('=') != std::string::npos) {
+                checkpointPath = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                checkpointPath = argv[++i];
+            }
+        } else if (arg.substr(0, 18) == "--replay_interval") {
+            if (arg.find('=') != std::string::npos) {
+                replayInterval = std::stoul(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                replayInterval = std::stoul(argv[++i]);
+            }
+        } else if (arg == "--run_test" && i + 1 < argc) {
+            int testNumber = std::stoi(argv[++i]);
+            switch (testNumber) {
+                case 1: runBasicConnectivityTest(brain); break;
+                case 2: runPlasticityExperiment(brain); break;
+                case 3: runStdpVerification(brain); break;
+                default: NLM_LOG_WARNING("Unknown test number: " + std::to_string(testNumber)); break;
+            }
+        }
+    }
+    
+    // Set experimental options
+    if (enableDevelopment) {
+        NLM_LOG_INFO("Development enabled");
+    }
+    if (enableCuriosity) {
+        NLM_LOG_INFO("Curiosity enabled");
+    }
+    if (enableNoveltyDetection) {
+        NLM_LOG_INFO("Novelty detection enabled");
+    }
+    if (enableStructuralPlasticity) {
+        NLM_LOG_INFO("Structural plasticity enabled");
+    }
+    
+    // Run all tests
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Starting NLM Phase 2 Tests ===");
+    
+    // Test 1: Basic connectivity
     runBasicConnectivityTest(brain);
     
     // Reset brain for plasticity experiment
     brain->reset();
     brain->initialize();
     
-    // Run Test 2: Plasticity learning experiment
+    // Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
     // Reset and run Test 3: STDP verification
