@@ -2,7 +2,8 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
-#include <functional>
+#include <vector>
+#include <memory>
 
 namespace nlm {
 
@@ -46,10 +47,43 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // Development control methods
+    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
+    bool isDevelopmentEnabled() const { return developmentEnabled_; }
+    
+    // Structural plasticity control
+    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
+    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
+    
+    // Synaptogenesis control
+    void enableSynaptogenesis(bool enable) { synaptogenesisEnabled_ = enable; }
+    bool isSynaptogenesisEnabled() const { return synaptogenesisEnabled_; }
+    
+    // Pruning control
+    void enablePruning(bool enable) { pruningEnabled_ = enable; }
+    bool isPruningEnabled() const { return pruningEnabled_; }
+    
+    // Maturation control
+    void enableMaturation(bool enable) { maturationEnabled_ = enable; }
+    bool isMaturationEnabled() const { return maturationEnabled_; }
+    
+    // Development statistics
+    size_t getTotalNeuronsAdded() const { return totalNeuronsAdded_; }
+    size_t getTotalSynapsesAdded() const { return totalSynapsesAdded_; }
+    size_t getTotalSynapsesRemoved() const { return totalSynapsesRemoved_; }
+    
 private:
     struct Impl;
     Impl* pImpl;
     double age_;
+    bool developmentEnabled_;
+    bool structuralPlasticityEnabled_;
+    bool synaptogenesisEnabled_;
+    bool pruningEnabled_;
+    bool maturationEnabled_;
+    size_t totalNeuronsAdded_;
+    size_t totalSynapsesAdded_;
+    size_t totalSynapsesRemoved_;
 };
 
 } // namespace nlm

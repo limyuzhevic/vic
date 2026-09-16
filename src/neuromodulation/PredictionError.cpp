@@ -10,8 +10,11 @@ struct PredictionError::Impl {
     float predictedValue;
     float actualValue;
     std::vector<float> history;
+    float lastError;
+    SimulationStep lastStep;
     
-    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
+    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f), 
+             lastError(0.0f), lastStep(0) {}
 };
 
 PredictionError::PredictionError() : pImpl(new Impl) {}
@@ -32,10 +35,13 @@ void PredictionError::computeError(float predicted, float actual) {
     pImpl->actualValue = actual;
     pImpl->error = actual - predicted;
     pImpl->history.push_back(pImpl->error);
+    pImpl->lastError = pImpl->error;
+    pImpl->lastStep = 0; // Would need access to simulation clock
 }
 
 void PredictionError::updatePrediction(float newPrediction) {
     pImpl->predictedValue = newPrediction;
+    pImpl->error = pImpl->actualValue - pImpl->predictedValue;
 }
 
 const std::vector<float>& PredictionError::getHistory() const {
@@ -48,6 +54,11 @@ void PredictionError::clearHistory() {
 
 float PredictionError::getMagnitude() const {
     return std::abs(pImpl->error);
+}
+
+void PredictionError::update(TimestepDuration dt) {
+    // Decay error over time
+    pImpl->error *= (1.0f - 0.1f * static_cast<float>(dt));
 }
 
 } // namespace nlm

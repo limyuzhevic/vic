@@ -15,6 +15,12 @@ struct SpikeSystem::Impl {
     // Spike counting for statistics
     std::unordered_map<uint64_t, size_t> spikeCountPerNeuron;  // neuron_id -> count
     
+    // Efficient event delivery - store neuron IDs for quick access
+    std::unordered_set<uint64_t> activeNeuronIds;
+    
+    // Cache for frequently accessed spikes
+    std::vector<uint64_t> spikeCache;  // Cached neuron IDs for batch processing
+    
     Impl() : maxHistorySize(10000) {}
 };
 

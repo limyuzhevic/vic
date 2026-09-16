@@ -3,54 +3,75 @@
 
 namespace nlm {
 
-struct Dopamine::Impl {
-    float level;
-    float baseline;
-    float peak;
-    float decayRate;
-    float releaseRate;
+// Neuromodulator: Central controller for all neuromodulatory systems
+// Coordinates dopamine, curiosity, novelty, reward prediction error
+// Provides integrated signal to brain systems
+
+struct Neuromodulator::Impl {
+    class Dopamine* dopamine;
+    class Curiosity* curiosity;
+    class Novelty* novelty;
+    class RewardPredictionError* predictionError;
     
-    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
+    Impl() : dopamine(nullptr), curiosity(nullptr), novelty(nullptr), predictionError(nullptr) {}
 };
 
-Dopamine::Dopamine() : pImpl(new Impl) {}
+Neuromodulator::Neuromodulator() : pImpl(new Impl) {}
 
-Dopamine::~Dopamine() = default;
+Neuromodulator::~Neuromodulator() = default;
 
-const char* Dopamine::getName() const {
-    return "DA";
+void Neuromodulator::initialize(Brain* brain) {
+    pImpl->dopamine = new Dopamine();
+    pImpl->curiosity = new Curiosity();
+    pImpl->novelty = new Novelty();
+    pImpl->predictionError = new PredictionError();
+    
+    pImpl->dopamine->initialize(brain);
+    pImpl->curiosity->initialize(brain);
+    pImpl->novelty->initialize(brain);
+    pImpl->predictionError->initialize(brain);
+    
+    NLM_LOG_INFO("Neuromodulator system initialized");
 }
 
-float Dopamine::getLevel() const {
-    return pImpl->level;
+void Neuromodulator::update(Brain* brain, TimestepDuration dt, 
+                           float novelty, float predictionError,
+                           float reward, float predictedReward) {
+    if (!brain) return;
+    
+    // Update all neuromodulators
+    if (pImpl->dopamine) {
+        pImpl->dopamine->update(dt);
+        if (reward > 0.0f || predictedReward > 0.0f) {
+            pImpl->dopamine->signalReward(reward);
+        }
+        pImpl->dopamine->signalRewardPredictionError(predictionError);
+    }
+    
+    if (pImpl->curiosity) {
+        pImpl->curiosity->update(novelty, predictionError, dt);
+    }
+    
+    if (pImpl->novelty) {
+        pImpl->novelty->update(dt);
+    }
+    
+    if (pImpl->predictionError) {
+        pImpl->predictionError->update(dt);
+    }
 }
 
-void Dopamine::setLevel(float level) {
-    pImpl->level = std::clamp(level, 0.0f, 1.0f);
-}
+// Neuromodulator accessor methods
+Dopamine* Neuromodulator::getDopamine() const { return pImpl->dopamine; }
+Curiosity* Neuromodulator::getCuriosity() const { return pImpl->curiosity; }
+Novelty* Neuromodulator::getNovelty() const { return pImpl->novelty; }
+RewardPredictionError* Neuromodulator::getPredictionError() const { return pImpl->predictionError; }
 
-float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
-    return 0.5f + 0.5f * pImpl->level;
-}
-
-void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
-}
-
-void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
-}
-
-void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+void Neuromodulator::reset() {
+    if (pImpl->dopamine) pImpl->dopamine->reset();
+    if (pImpl->curiosity) pImpl->curiosity->reset();
+    if (pImpl->novelty) pImpl->novelty->reset();
+    if (pImpl->predictionError) pImpl->predictionError->reset();
 }
 
 } // namespace nlm

@@ -53,21 +53,31 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
+    // More sophisticated: use actual spike counts and firing rates for better learning
+    float preRate = static_cast<float>(preSpikes.size()) / dt;
+    float postRate = static_cast<float>(postSpikes.size()) / dt;
+    
+    // Calculate covariance between pre and post activities
+    float covariance = 0.0f;
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
+            // Perfect correlation when pre fires immediately before post
             float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
-            }
+            // Weight by timing (earlier is more correlated)
+            float correlation = std::exp(-std::abs(dt) / 10.0f);  // 10ms time constant
+            covariance += correlation;
         }
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    // Normalize by number of spike pairs
+    size_t totalPairs = preSpikes.size() * postSpikes.size();
+    if (totalPairs > 0) {
+        covariance /= static_cast<float>(totalPairs);
+    }
+    
+    // Apply covariance rule with mean activity subtraction
+    float meanActivity = (preRate + postRate) * 0.5f;
+    float delta = pImpl->learningRate * (covariance - meanActivity * 0.1f);
     
     // Apply with bounds
     if (std::abs(delta) > 1e-6f) {

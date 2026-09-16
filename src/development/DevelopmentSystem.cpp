@@ -10,7 +10,22 @@ struct DevelopmentSystem::Impl {
     SimulationStep stepsInCurrentStage;
     double stageAge;  // Age since entering current stage
     
-    Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
+    // Development control
+    bool developmentEnabled;
+    bool structuralPlasticityEnabled;
+    bool synaptogenesisEnabled;
+    bool pruningEnabled;
+    bool maturationEnabled;
+    
+    // Statistics
+    size_t totalNeuronsAdded;
+    size_t totalSynapsesAdded;
+    size_t totalSynapsesRemoved;
+    
+    Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0),
+             developmentEnabled(true), structuralPlasticityEnabled(true), synaptogenesisEnabled(true),
+             pruningEnabled(true), maturationEnabled(true),
+             totalNeuronsAdded(0), totalSynapsesAdded(0), totalSynapsesRemoved(0) {}
 };
 
 DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
@@ -61,6 +76,8 @@ const char* DevelopmentSystem::getStageName() const {
 }
 
 void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
+    if (!pImpl->developmentEnabled || !brain) return;
+    
     ++pImpl->stepsInCurrentStage;
     age_ += 0.001;  // Approximate timestep
     pImpl->stageAge += 0.001;
@@ -77,6 +94,8 @@ void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
 }
 
 void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDuration dt) {
+    if (!pImpl->developmentEnabled || !brain) return;
+    
     age_ += dt;
     pImpl->stageAge += dt;
     ++pImpl->stepsInCurrentStage;

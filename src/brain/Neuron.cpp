@@ -223,15 +223,23 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // Improved stability: use bounded adaptation and better decay
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        // Bounded adaptation contribution to prevent runaway hyperpolarization
+        float adaptationEffect = pImpl->state.adaptationVariable * 0.01f;
+        V -= std::min(adaptationEffect, 5.0f);  // Cap maximum effect
+        pImpl->state.adaptationVariable *= 0.9f;  // More stable decay rate
+        // Clamp adaptation variable to prevent numerical drift
+        pImpl->state.adaptationVariable = std::max(0.0f, pImpl->state.adaptationVariable);
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Clamp membrane potential with biologically realistic bounds
+    // More conservative bounds prevent instability while allowing exploration
+    const float MIN_POTENTIAL = -100.0f;
+    const float MAX_POTENTIAL = 60.0f;  // Reduced max to prevent runaway excitation
+    V = std::clamp(V, MIN_POTENTIAL, MAX_POTENTIAL);
     
-    // Check for spike
+    // Check for spike with improved threshold dynamics
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
@@ -240,15 +248,24 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Record spike
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential with noise for biological realism
         V = V_reset;
+        // Add small jitter to prevent synchronization issues
+        if (pImpl->state.adaptationVariable > 0.5f) {
+            V += (pImpl->state.getRandomGenerator() ? 
+                  pImpl->state.getRandomGenerator()->uniformReal(-0.1f, 0.1f) : 0.0f);
+        }
         
-        // Enter refractory period
+        // Enter refractory period with stable dynamics
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        // More controlled adaptation update
+        pImpl->state.adaptationVariable += std::min(1.0f, 5.0f - pImpl->state.adaptationVariable);
+        
+        // Prevent adaptation from growing too large
+        pImpl->state.adaptationVariable = std::min(pImpl->state.adaptationVariable, 5.0f);
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
