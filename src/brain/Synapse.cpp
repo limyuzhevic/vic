@@ -191,6 +191,38 @@ void Synapse::setEfficacy(float efficacy) {
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
+float Synapse::getShortTermDepression() const {
+    return pImpl->shortTermDepression;
+}
+
+void Synapse::setShortTermDepression(float depression) {
+    pImpl->shortTermDepression = std::clamp(depression, 0.0f, 1.0f);
+}
+
+float Synapse::getShortTermFacilitation() const {
+    return pImpl->shortTermFacilitation;
+}
+
+void Synapse::setShortTermFacilitation(float facilitation) {
+    pImpl->shortTermFacilitation = std::clamp(facilitation, 0.0f, 1.0f);
+}
+
+float Synapse::getLastPreSpikeTime() const {
+    return pImpl->lastPreSpikeTime;
+}
+
+void Synapse::setLastPreSpikeTime(float time) {
+    pImpl->lastPreSpikeTime = time;
+}
+
+float Synapse::getLastPostSpikeTime() const {
+    return pImpl->lastPostSpikeTime;
+}
+
+void Synapse::setLastPostSpikeTime(float time) {
+    pImpl->lastPostSpikeTime = time;
+}
+
 void Synapse::step(Timestamp currentTime) {
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state

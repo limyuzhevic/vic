@@ -416,6 +416,79 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Add missing Python bindings for AgentBrain methods
+    m.def("getSensoryInputSize", [](const AgentBrain& agent) -> size_t {
+        return agent.getSensoryInputSize();
+    }, "Get expected sensory input size");
+
+    m.def("getMotorOutputSize", [](const AgentBrain& agent) -> size_t {
+        return agent.getMotorOutputSize();
+    }, "Get expected motor output size");
+
+    m.def("getNeuromodulationLevel", [](const AgentBrain& agent) -> float {
+        return agent.getNeuromodulationLevel();
+    }, "Get current neuromodulation level");
+
+    m.def("getCuriosityLevel", [](const AgentBrain& agent) -> float {
+        return agent.getCuriosityLevel();
+    }, "Get curiosity level");
+
+    m.def("getNoveltyLevel", [](const AgentBrain& agent) -> float {
+        return agent.getNoveltyLevel();
+    }, "Get novelty level");
+
+    m.def("getPredictionError", [](const AgentBrain& agent) -> float {
+        return agent.getPredictionError();
+    }, "Get prediction error");
+
+    m.def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+          py::arg("enable"), "Enable/disable reward modulation");
+
+    m.def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+          py::arg("enable"), "Enable/disable structural plasticity");
+
+    m.def("enableDevelopment", &AgentBrain::enableDevelopment,
+          py::arg("enable"), "Enable/disable development");
+
+    m.def("enableCuriosity", &AgentBrain::enableCuriosity,
+          py::arg("enable"), "Enable/disable curiosity");
+
+    m.def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+          "Check if reward modulation is enabled");
+
+    m.def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+          "Check if structural plasticity is enabled");
+
+    m.def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+          "Check if development is enabled");
+
+    m.def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+          "Check if curiosity is enabled");
+
+    m.def("getDevelopmentalStage", [](const AgentBrain& agent) -> DevelopmentalStage {
+        return agent.getDevelopmentalStage();
+    }, "Get current developmental stage");
+
+    m.def("getBrain", [](const AgentBrain& agent) -> std::shared_ptr<Brain> {
+        return agent.getBrain();
+    }, "Get the underlying brain pointer");
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

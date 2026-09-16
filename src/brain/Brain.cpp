@@ -758,90 +758,100 @@ void Brain::reset() {
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
     
-    NLM_LOG_INFO("NLM Brain reset complete");
-}
+        NLM_LOG_INFO("NLM Brain reset complete");
+    }
 
-bool Brain::save(const std::string& filepath) const {
-    NLM_LOG_INFO("Saving brain state to " + filepath);
-    
-    try {
-        CheckpointWriter writer;
-        if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
-            return false;
-        }
+    bool Brain::save(const std::string& filepath) const {
+        NLM_LOG_INFO("Saving brain state to " + filepath);
         
-        // Set metadata
-        writer.setMetadata(
-            getTotalNeuronCount(),
-            getTotalSynapseCount(),
-            getRegionCount(),
-            pImpl->currentStep,
-            pImpl->currentTime
-        );
-        
-        // Write neurons
-        NeuronCheckpointData neuronData;
-        neuronData.membranePotential.reserve(getTotalNeuronCount());
-        neuronData.restingPotential.reserve(getTotalNeuronCount());
-        neuronData.threshold.reserve(getTotalNeuronCount());
-        neuronData.resetPotential.reserve(getTotalNeuronCount());
-        neuronData.leakConductance.reserve(getTotalNeuronCount());
-        
-        for (const auto& region : pImpl->regions) {
-            for (const auto& pop : region->getPopulations()) {
-                for (const auto* neuron : pop->getNeurons()) {
-                    const auto& state = neuron->getState();
-                    neuronData.membranePotential.push_back(state.membranePotential);
-                    neuronData.restingPotential.push_back(state.restingPotential);
-                    neuronData.threshold.push_back(state.threshold);
-                    neuronData.resetPotential.push_back(state.resetPotential);
-                    neuronData.leakConductance.push_back(state.leakConductance);
-                    neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
-                    neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
-                    neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
-                    neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+        try {
+            CheckpointWriter writer;
+            if (!writer.create(filepath, CompressionLevel::Balanced)) {
+                NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+                return false;
+            }
+            
+            // Set metadata
+            writer.setMetadata(
+                getTotalNeuronCount(),
+                getTotalSynapseCount(),
+                getRegionCount(),
+                pImpl->currentStep,
+                pImpl->currentTime
+            );
+            
+            NLM_LOG_INFO("Checkpoint metadata set successfully");
+            
+            // Write neurons
+            NeuronCheckpointData neuronData;
+            neuronData.membranePotential.reserve(getTotalNeuronCount());
+            neuronData.restingPotential.reserve(getTotalNeuronCount());
+            neuronData.threshold.reserve(getTotalNeuronCount());
+            neuronData.resetPotential.reserve(getTotalNeuronCount());
+            neuronData.leakConductance.reserve(getTotalNeuronCount());
+            
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        neuronData.membranePotential.push_back(state.membranePotential);
+                        neuronData.restingPotential.push_back(state.restingPotential);
+                        neuronData.threshold.push_back(state.threshold);
+                        neuronData.resetPotential.push_back(state.resetPotential);
+                        neuronData.leakConductance.push_back(state.leakConductance);
+                        neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                        neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
+                        neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
+                        neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    }
                 }
             }
-        }
-        
-        if (!writer.writeNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to write neurons to checkpoint");
-            return false;
-        }
-        
-        // Write synapses
-        SynapseCheckpointData synapseData;
-        for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+            
+            if (!writer.writeNeurons(neuronData)) {
+                NLM_LOG_ERROR("Failed to write neurons to checkpoint");
+                return false;
             }
-        }
-        
-        if (!writer.writeSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+            
+            NLM_LOG_INFO("Neurons saved successfully");
+            
+            // Write synapses
+            SynapseCheckpointData synapseData;
+            for (const auto& region : pImpl->regions) {
+                for (const auto* syn : region->getSynapses()) {
+                    synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                    synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                    synapseData.weight.push_back(syn->getWeight());
+                    synapseData.delay.push_back(syn->getDelay());
+                    synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                    synapseData.plasticityFlags.push_back(syn->getPlasticityFlags());
+                    synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                    synapseData.efficacy.push_back(syn->getEfficacy());
+                    synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+                    synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
+                }
+            }
+            
+            if (!writer.writeSynapses(synapseData)) {
+                NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+                return false;
+            }
+            
+            NLM_LOG_INFO("Synapses saved successfully");
+            
+            // Finalize
+            if (!writer.finalize()) {
+                NLM_LOG_ERROR("Failed to finalize checkpoint");
+                return false;
+            }
+            
+            NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
+            return true;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
             return false;
         }
-        
-        // Finalize
-        if (!writer.finalize()) {
-            NLM_LOG_ERROR("Failed to finalize checkpoint");
-            return false;
-        }
-        
-        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
-        return true;
-        
-    } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
-        return false;
     }
-}
 
 bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);

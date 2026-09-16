@@ -66,12 +66,21 @@ public:
     void setEligibilityTrace(float trace);
     void decayEligibilityTrace(float decayRate);
     
+    // Short-term plasticity (Tsodyks-Markram model)
+    float getShortTermDepression() const;
+    void setShortTermDepression(float depression);
+    float getShortTermFacilitation() const;
+    void setShortTermFacilitation(float facilitation);
+    float getLastPreSpikeTime() const;
+    void setLastPreSpikeTime(float time);
+    float getLastPostSpikeTime() const;
+    void setLastPostSpikeTime(float time);
+    
     // Synaptic efficacy (use-dependent modulation)
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state

@@ -139,6 +139,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         noveltyLevel_ *= sensoryNoveltyDecay_;
         
         // Store for next time
+        if (previousVision_.size() < vision.size()) {
+            previousVision_.resize(vision.size(), 0.0f);
+        }
         previousVision_ = vision;
     }
     
@@ -219,14 +222,14 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         if (r < exploreChance) {
             // Random motor command
             int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
+            switch (static_cast<MotorCommand>(choice)) {
+                case MotorCommand::MoveForward: return MotorCommand::MoveForward;
+                case MotorCommand::MoveBackward: return MotorCommand::MoveBackward;
+                case MotorCommand::TurnLeft: return MotorCommand::TurnLeft;
+                case MotorCommand::TurnRight: return MotorCommand::TurnRight;
+                case MotorCommand::LookLeft: return MotorCommand::LookLeft;
+                case MotorCommand::LookRight: return MotorCommand::LookRight;
+                case MotorCommand::Interact: return MotorCommand::Interact;
                 default: return MotorCommand::Wait;
             }
         }
