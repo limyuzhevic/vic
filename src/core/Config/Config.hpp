@@ -1,3 +1,4 @@
+// Config.h - Fixed version with proper declaration
 #pragma once
 
 #include <string>
@@ -55,7 +56,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -100,6 +101,22 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper function to parse key=value lines
+    bool parseLine(const std::string& line);
+    
+    // JSON/YAML parsing helpers
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromYAMLFile(const std::string& filepath);
+    void parseJSON(const nlohmann::json& json, const std::string& prefix);
+    void parseJSONArray(const nlohmann::json& array, const std::string& key);
+    void setValueFromJSON(const std::string& jsonKey, const nlohmann::json& value, const std::string& fullKey, ConfigSource source);
+    
+    void parseYAML(const YAML::Node& yaml, const std::string& prefix);
+    void parseYAMLSequence(const YAML::Node& sequence, const std::string& key);
+    void setValueFromYAML(const std::string& yamlKey, const YAML::Node& value, const std::string& fullKey, ConfigSource source);
+    
+    bool loadFromLegacyFormatFile(const std::string& filepath);
 };
 
 } // namespace nlm

@@ -15,8 +15,18 @@ endif()
 if(MSVC)
     add_compile_options(/W4)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
+
+# Find required packages for advanced configuration parsing
+find_package(nlohmann_json REQUIRED)
+find_package(yaml-cpp REQUIRED)
+
+# Define configuration parsing macros
+add_definitions(
+    -DHAS_JSON
+    -DHAS_YAML
+)
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
