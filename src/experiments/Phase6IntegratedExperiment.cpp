@@ -25,13 +25,23 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create configuration
     auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", config.neuronCount);
-    cfg->set("region_count", config.regionCount);
+    cfg->set("neuron_count", static_cast<int64_t>(config.neuronCount));
+    cfg->set("region_count", static_cast<int64_t>(config.regionCount));
     cfg->set("connection_probability", config.connectionProbability);
+    cfg->set("plasticity_learning_rate", 0.001f); // Added Phase 6 parameter
     cfg->set("stdp_ltp_weight", 0.01f);
     cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    cfg->set("stdp_time_constant", 20.0f); // Added Phase 6 parameter
+    cfg->set("development_synaptogenesis_rate", 0.0001f);
+    cfg->set("development_pruning_rate", 0.00001f);
+    
+    // Add Phase 6 configuration parameters
+    cfg->set("neuromod_dopamine_scale", 1.0f);
+    cfg->set("neuromod_curiosity_enable", true);
+    cfg->set("neuromod_novelty_enable", true);
+    
+    // Log configuration for debugging
+    NLM_LOG_INFO("Phase 6 config summary: " + cfg->summary());
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
