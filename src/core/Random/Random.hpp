@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <stdexcept>
 
 namespace nlm {
 
