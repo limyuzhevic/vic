@@ -128,6 +128,10 @@ public:
     // Get concept for a given pattern
     size_t findConceptForPattern(const std::vector<float>& pattern) const;
 
+    // Process working memory content for concept formation
+    // Analyzes patterns from working memory to detect recurring patterns
+    void processWorkingMemoryContent(const std::vector<float>& workingMemoryPattern, TimestepDuration dt);
+
     // Clear all concepts
     void clear();
 

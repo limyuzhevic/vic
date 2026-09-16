@@ -403,7 +403,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
+        // Store current neural activity patterns in working memory
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    float activation = 0.0f;
+                    const auto& state = neuron->getState();
+                    activation = std::abs(state.membranePotential - state.restingPotential) / 10.0f;
+                    // Only store if neuron is active
+                    if (activation > 0.1f) {
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), activation);
+                    }
+                }
+            }
+        }
+        
+        // Run competition for winner-take-all
+        pImpl->workingMemory->runCompetition();
+        
+        // Apply neuromodulation effects to working memory
+        if (pImpl->dopamine) {
+            // Dopamine enhances working memory encoding
+            pImpl->workingMemory->strengthenMemory(pImpl->dopamine->getLevel() * 0.5f);
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -527,19 +549,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
-    }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Process current neural activity patterns to form concepts
+        // Use working memory content as experience input
+        auto currentWorkingMemory = pImpl->workingMemory->retrieve();
+        
+        // Only process if we have working memory activity
+        if (!currentWorkingMemory.empty() && std::any_of(currentWorkingMemory.begin(), currentWorkingMemory.end(),
+                                                         [](float val) { return val > 0.0f; })) {
+            // Concept formation would process these patterns to detect regularities
+            // This is a placeholder for the actual concept formation logic
+            pImpl->conceptFormation->processWorkingMemoryContent(currentWorkingMemory, pImpl->timestep);
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
+        // Get episodes for replay - prioritize those with high reward or novelty
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
             pImpl->episodicMemory->replayEpisode(episode);
