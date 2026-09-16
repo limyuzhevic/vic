@@ -108,8 +108,54 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
-}
+        // Implement real consolidation - remove low-relevance episodes
+        if (pImpl->episodes.empty()) return;
+        
+        // Calculate relevance scores for each episode
+        // This is a simplified relevance model - in a real system this would be much more sophisticated
+        std::vector<std::pair<size_t, float>> relevanceScores;
+        for (size_t i = 0; i < pImpl->episodes.size(); ++i) {
+            const auto& episode = pImpl->episodes[i];
+            
+            // Relevance factors:
+            // 1. Recent - newer episodes are more relevant
+            float ageFactor = 1.0f - (static_cast<float>(i) / pImpl->episodes.size());
+            
+            // 2. Reward - episodes with higher reward are more relevant
+            float rewardFactor = std::clamp(episode.reward / 10.0f, 0.0f, 1.0f);
+            
+            // 3. Length - longer episodes (more neural activity) might be more significant
+            float lengthFactor = std::min(static_cast<float>(episode.activeNeurons.size()) / 100.0f, 1.0f);
+            
+            // 4. Activation strength - average activation strength
+            float activationSum = std::accumulate(episode.neuronActivations.begin(), 
+                                                episode.neuronActivations.end(), 0.0f);
+            float activationFactor = std::clamp(activationSum / static_cast<float>(episode.neuronActivations.size()) / 10.0f, 0.0f, 1.0f);
+            
+            // Combined relevance score
+            float relevance = (ageFactor * 0.3f) + (rewardFactor * 0.3f) + 
+                            (lengthFactor * 0.2f) + (activationFactor * 0.2f);
+            
+            relevanceScores.push_back(std::make_pair(i, relevance));
+        }
+        
+        // Sort by relevance (highest first)
+        std::sort(relevanceScores.begin(), relevanceScores.end(),
+                  [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b) {
+                      return a.second > b.second;
+                  });
+        
+        // Keep only episodes above threshold, compacting the vector
+        std::vector<EpisodicMemoryItem> keptEpisodes;
+        for (const auto& score : relevanceScores) {
+            if (score.second >= relevanceThreshold) {
+                keptEpisodes.push_back(pImpl->episodes[score.first]);
+            }
+        }
+        
+        // Replace old episodes with consolidated ones
+        pImpl->episodes = keptEpisodes;
+    }
 
 // Semantic Memory Implementation
 struct SemanticMemory::Impl {
