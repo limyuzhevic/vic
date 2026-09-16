@@ -400,6 +400,49 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+             "Get expected sensory input size")
+        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+             "Get expected motor output size")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput,
+             py::arg("percept"),
+             "Process sensory percept and inject into brain")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+             "Decode brain motor activity into motor command")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predictedReward"),
+             "Apply reward-based neuromodulation")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment,
+             py::arg("timestep"),
+             "Update development system")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             "Get prediction error")
+        .def("reset", &AgentBrain::reset,
+             "Reset agent for new episode")
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain")
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"))
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"))
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+             py::arg("enable"))
+        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"))
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,10 +459,173 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createPhase6Demo", []() {
+        // Helper function to create a complete Phase 6 demo setup
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500, ConfigSource::Default);
+        config->set("region_count", 1, ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        return std::make_tuple(config, brain, world, agent);
+    }, "Create a complete Phase 6 demo setup");
+
+    m.def("runSimulationLoop", [](std::shared_ptr<Brain> brain, 
+                                 std::shared_ptr<SimpleWorld> world,
+                                 std::shared_ptr<AgentBrain> agent,
+                                 size_t numSteps) {
+        // Run a complete simulation loop
+        for (size_t step = 0; step < numSteps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            
+            // Process input
+            agent->processSensoryInput(percept);
+            
+            // Brain thinks
+            brain->step(step);
+            
+            // Get action
+            auto action = agent->decodeMotorCommand();
+            
+            // Apply action
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Optional: Apply reward modulation
+            float reward = 0.0f;
+            float predicted = 0.0f;
+            if (agent->isRewardModulationEnabled()) {
+                agent->applyRewardModulation(reward, predicted);
+            }
+        }
+        
+        return std::make_tuple(brain->getTotalSpikeCount(),
+                              brain->getFiringNeuronCount(),
+                              world->getAgentBody()->energy);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+        "Run a complete simulation loop");
+
+    m.def("enableAllFeatures", [](std::shared_ptr<AgentBrain> agent) {
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        return "All features enabled";
+    }, py::arg("agent"), "Enable all advanced features for the agent");
+
+    m.def("createDevelopmentConfig", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Set developmental parameters
+        config->set("neuron_count", 1000, ConfigSource::Default);
+        config->set("region_count", 2, ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        
+        // Developmental stage configuration
+        config->set("developmental_stage", 1, ConfigSource::Default); // Initial
+        config->set("plasticity_modulation", 1.0f, ConfigSource::Default);
+        
+        // Neuromodulation configuration
+        config->set("dopamine_level", 0.5f, ConfigSource::Default);
+        config->set("curiosity_threshold", 0.3f, ConfigSource::Default);
+        
+        // Memory configuration
+        config->set("working_memory_capacity", 100, ConfigSource::Default);
+        config->set("episodic_memory_max_episodes", 1000, ConfigSource::Default);
+        
+        // Learning configuration
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+        
+        return config;
+    }, "Create a development-oriented configuration");
+
+    m.def("createExplorationConfig", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Exploration-focused configuration
+        config->set("neuron_count", 500, ConfigSource::Default);
+        config->set("region_count", 1, ConfigSource::Default);
+        config->set("connection_probability", 0.2f, ConfigSource::Default);
+        
+        // Curiosity and novelty detection
+        config->set("novelty_threshold", 0.5f, ConfigSource::Default);
+        config->set("curiosity_decay", 0.01f, ConfigSource::Default);
+        
+        // Reward prediction for exploration
+        config->set("prediction_error_threshold", 0.3f, ConfigSource::Default);
+        config->set("exploration_bonus", 1.0f, ConfigSource::Default);
+        
+        // High plasticity for learning
+        config->set("stdp_ltp_weight", 0.05f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.04f, ConfigSource::Default);
+        
+        return config;
+    }, "Create an exploration-focused configuration");
+
+    m.def("createStableConfig", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Stable, consolidated configuration
+        config->set("neuron_count", 2000, ConfigSource::Default);
+        config->set("region_count", 3, ConfigSource::Default);
+        config->set("connection_probability", 0.05f, ConfigSource::Default);
+        
+        // Stable developmental stage
+        config->set("developmental_stage", 4, ConfigSource::Default); // Adult
+        config->set("plasticity_modulation", 0.2f, ConfigSource::Default);
+        
+        // Low novelty detection (stable behavior)
+        config->set("novelty_threshold", 2.0f, ConfigSource::Default);
+        
+        // Consolidation-focused
+        config->set("replay_interval", 500, ConfigSource::Default);
+        config->set("consolidation_interval", 5000, ConfigSource::Default);
+        
+        return config;
+    }, "Create a stable, consolidated configuration");
+
+    m.def("getVersionInfo", []() {
+        return "NLM Phase 6 - Integrated Artificial Brain v0.1.0";
+    }, "Get NLM version information");
+
+    m.def("getSystemInfo", []() {
+        return "NLM (熙然) - Neural Learning Machine\n"
+               "Phase 6: Integrated Artificial Brain\n"
+               "Implemented: Real spiking neural computation with LIF neurons,\n"
+               "event-driven spike propagation, STDP/Hebbian plasticity,\n"
+               "structural plasticity, memory systems, prediction, cognition,\n"
+               "neuromodulation, and development integration.";
+    }, "Get detailed system information");
+
+    // Expose constants for easier use
+    m.attr("VERSION_MAJOR") = 0;
+    m.attr("VERSION_MINOR") = 1;
+    m.attr("VERSION_PATCH") = 0;
+    
+    m.attr("DEFAULT_NEURON_COUNT") = 1000;
+    m.attr("DEFAULT_REGION_COUNT") = 1;
+    m.attr("DEFAULT_CONNECTION_PROBABILITY") = 0.1f;
+    
+    m.attr("MIN_NEURON_COUNT") = 10;
+    m.attr("MAX_NEURON_COUNT") = 10000;
+    
+    m.attr("MIN_REGION_COUNT") = 1;
+    m.attr("MAX_REGION_COUNT") = 10;
+
+    m.attr("MIN_CONNECTION_PROBABILITY") = 0.0f;
+    m.attr("MAX_CONNECTION_PROBABILITY") = 1.0f;
 
 } // namespace nlm
