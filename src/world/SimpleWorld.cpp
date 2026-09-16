@@ -265,12 +265,27 @@ bool SimpleWorld::isValidPosition(float x, float y) const {
 }
 
 WorldObject* SimpleWorld::getObjectAt(float x, float y) {
+    // Check for null/invalid inputs
+    if (std::isnan(x) || std::isnan(y)) {
+        return nullptr;
+    }
+    
     for (auto& obj : objects_) {
         if (!obj.active) continue;
+        
+        // Check for NaN in object position
+        if (std::isnan(obj.x) || std::isnan(obj.y) || std::isnan(obj.radius)) {
+            continue;
+        }
         
         float dx = obj.x - x;
         float dy = obj.y - y;
         float dist = std::sqrt(dx * dx + dy * dy);
+        
+        // Prevent division by zero or invalid comparisons
+        if (std::isnan(dist) || dist < 0) {
+            continue;
+        }
         
         if (dist < obj.radius) {
             return &obj;
@@ -284,12 +299,27 @@ void SimpleWorld::addObject(const WorldObject& obj) {
 }
 
 void SimpleWorld::removeObject(float x, float y) {
+    // Check for null/invalid inputs
+    if (std::isnan(x) || std::isnan(y)) {
+        return;
+    }
+    
     for (auto& obj : objects_) {
         if (!obj.active) continue;
+        
+        // Check for NaN in object position
+        if (std::isnan(obj.x) || std::isnan(obj.y) || std::isnan(obj.radius)) {
+            continue;
+        }
         
         float dx = obj.x - x;
         float dy = obj.y - y;
         float dist = std::sqrt(dx * dx + dy * dy);
+        
+        // Prevent division by zero or invalid comparisons
+        if (std::isnan(dist) || dist < 0) {
+            continue;
+        }
         
         if (dist < obj.radius) {
             obj.active = false;
