@@ -57,33 +57,66 @@ private:
 // PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
+    Acetylcholine() : level_(0.0f), baseline_(0.0f), peak_(1.0f), decayRate_(0.1f), releaseRate_(1.0f) {}
+    
     const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
+    float getLevel() const override { return level_; }
+    void setLevel(float level) override { level_ = std::clamp(level, 0.0f, 1.0f); }
     float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    void update(TimestepDuration dt) override { level_ = std::max(baseline_, level_ - decayRate_ * static_cast<float>(dt)); }
+    
+    void signalAttention(float signal) { level_ = std::min(peak_, level_ + signal * releaseRate_); }
+    
+private:
+    float level_;
+    float baseline_;
+    float peak_;
+    float decayRate_;
+    float releaseRate_;
 };
 
 // Norepinephrine: Arousal and vigilance
 // PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
+    Norepinephrine() : level_(0.0f), baseline_(0.1f), peak_(1.0f), decayRate_(0.05f), releaseRate_(1.2f) {}
+    
     const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    float getLevel() const override { return level_; }
+    void setLevel(float level) override { level_ = std::clamp(level, 0.0f, 1.0f); }
+    float getPlasticityFactor() const override { return 0.8f + 0.4f * level_; }
+    void update(TimestepDuration dt) override { level_ = std::max(baseline_, level_ - decayRate_ * static_cast<float>(dt)); }
+    
+    void signalArousal(float signal) { level_ = std::min(peak_, level_ + signal * releaseRate_); }
+    
+private:
+    float level_;
+    float baseline_;
+    float peak_;
+    float decayRate_;
+    float releaseRate_;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
 // PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
+    Serotonin() : level_(0.0f), baseline_(0.0f), peak_(1.0f), decayRate_(0.08f), releaseRate_(0.8f) {}
+    
     const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
+    float getLevel() const override { return level_; }
+    void setLevel(float level) override { level_ = std::clamp(level, 0.0f, 1.0f); }
     float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    void update(TimestepDuration dt) override { level_ = std::max(baseline_, level_ - decayRate_ * static_cast<float>(dt)); }
+    
+    void signalMood(float signal) { level_ = std::min(peak_, level_ + signal * releaseRate_); }
+    
+private:
+    float level_;
+    float baseline_;
+    float peak_;
+    float decayRate_;
+    float releaseRate_;
 };
 
 } // namespace nlm

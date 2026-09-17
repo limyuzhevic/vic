@@ -109,6 +109,54 @@ void EpisodicMemory::clear() {
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
     // TODO PHASE 2: Implement real consolidation
+    
+    // Current implementation: simple relevance-based pruning
+    // In a real implementation, this would include:
+    // 1. Systems consolidation - transfer of memory representations to cortical networks
+    // 2. Reconsolidation - memory modification upon retrieval
+    // 3. Synaptic consolidation - strengthening of connections via replay
+    // 4. Memory integration - binding multiple related episodes
+    // 5. Sleep-dependent consolidation - replay during rest periods
+    
+    // For now, implement a biologically inspired consolidation algorithm:
+    // Episodes below relevance threshold are removed, others are strengthened
+    
+    std::vector<EpisodicMemoryItem> consolidated;
+    consolidated.reserve(pImpl->episodes.size());
+    
+    for (const auto& episode : pImpl->episodes) {
+        // Compute relevance based on multiple factors
+        float relevance = 0.0f;
+        
+        // Factor 1: Recency (exponential decay)
+        float recencyFactor = std::exp(-0.01f * episode.timestamp);
+        
+        // Factor 2: Reward magnitude (dopamine-inspired)
+        float rewardFactor = std::min(1.0f, episode.reward * 2.0f);
+        
+        // Factor 3: Pattern distinctiveness (von Restorff effect)
+        float distinctiveness = computeDistinctiveness(episode);
+        
+        // Factor 4: Integration with existing memories
+        float integrationFactor = computeIntegrationValue(episode);
+        
+        // Combined relevance
+        relevance = (recencyFactor * 0.3f) + (rewardFactor * 0.3f) + 
+                   (distinctiveness * 0.2f) + (integrationFactor * 0.2f);
+        
+        if (relevance >= relevanceThreshold) {
+            // Keep the episode, apply strengthening
+            EpisodicMemoryItem strengthened = episode;
+            strengthened.relevance = relevance * 1.05f;  // Strengthen by 5%
+            strengthened.integrationScore = integrationFactor;
+            
+            consolidated.push_back(strengthened);
+        }
+        
+        // Log consolidation decisions for debugging
+    }
+    
+    pImpl->episodes = consolidated;
 }
 
 // Semantic Memory Implementation

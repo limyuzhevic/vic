@@ -1,11 +1,11 @@
-// NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Real Integration of all Brain Systems
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This phase implements the final integration of all previously developed components:
+// - Complete integration of memory, neuromodulation, and cognition systems
+// - Developmental stages affecting plasticity rates
+// - Checkpoint save/load functionality
+// - Replay and consolidation mechanisms
+// - Agent-based interaction with the environment
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -18,13 +18,14 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
-
 #include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
+#include <unordered_map>
 
 using namespace nlm;
 
@@ -35,14 +36,11 @@ void printBanner() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     Phase 6: Final Integration                                ║
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     Phase 6 integrates all brain systems into a coherent      ║
+    ║     artificial brain that learns from experience.               ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
