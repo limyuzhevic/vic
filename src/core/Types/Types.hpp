@@ -2,66 +2,11 @@
 
 #include <cstdint>
 #include <type_traits>
+#include "nlm_ids.hpp"
 
 namespace nlm {
 
-// Strongly-typed identifiers for safety
-
-// Neuron identifier
-struct NeuronId {
-    uint64_t value;
-    
-    constexpr NeuronId() : value(0) {}
-    explicit constexpr NeuronId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const NeuronId& other) const = default;
-    constexpr bool operator!=(const NeuronId& other) const = default;
-    constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
-};
-
-// Synapse identifier
-struct SynapseId {
-    uint64_t value;
-    
-    constexpr SynapseId() : value(0) {}
-    explicit constexpr SynapseId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const SynapseId& other) const = default;
-    constexpr bool operator!=(const SynapseId& other) const = default;
-    constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
-};
-
-// Region identifier
-struct RegionId {
-    uint64_t value;
-    
-    constexpr RegionId() : value(0) {}
-    explicit constexpr RegionId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const RegionId& other) const = default;
-    constexpr bool operator!=(const RegionId& other) const = default;
-    constexpr bool operator<(const RegionId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
-};
-
-// Population identifier
-struct PopulationId {
-    uint64_t value;
-    
-    constexpr PopulationId() : value(0) {}
-    explicit constexpr PopulationId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const PopulationId& other) const = default;
-    constexpr bool operator!=(const PopulationId& other) const = default;
-    constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
-};
+// Strongly-typed identifiers for safety are now defined in nlm_ids.hpp using templates
 
 // Simulation step counter
 using SimulationStep = uint64_t;
