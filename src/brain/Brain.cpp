@@ -142,6 +142,35 @@ struct Brain::Impl {
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
+        // Configure memory systems
+        pImpl->workingMemory->setCapacity(config->getOr<size_t>("working_memory_capacity", 1000));
+        pImpl->workingMemory->setDecayRate(config->getOr<float>("working_memory_decay", 0.1f));
+        pImpl->episodicMemory->setMaxEpisodes(config->getOr<size_t>("episodic_memory_max_episodes", 1000));
+        pImpl->episodicMemory->setConsolidationThreshold(config->getOr<float>("episodic_memory_consolidation_threshold", 0.5f));
+        pImpl->associativeMemory->setLearningRate(config->getOr<float>("associative_memory_learning_rate", 0.1f));
+        
+        // Configure prediction system
+        if (pImpl->predictionSystem) {
+            pImpl->predictionSystem->setPredictionHorizon(config->getOr<size_t>("prediction_horizon", 100));
+            pImpl->predictionSystem->setPredictionAccuracy(config->getOr<float>("prediction_accuracy", 0.8f));
+        }
+        
+        // Configure cognition systems
+        pImpl->planner->setPlanningDepth(config->getOr<size_t>("planning_depth", 5));
+        pImpl->planner->setPlanningConfidence(config->getOr<float>("planning_confidence", 0.5f));
+        pImpl->conceptFormation->setConceptStability(config->getOr<float>("concept_stability", 0.7f));
+        pImpl->attention->setInhibitionStrength(config->getOr<float>("attention_inhibition", 0.5f));
+        pImpl->attention->setExcitationStrength(config->getOr<float>("attention_excitation", 1.5f));
+        pImpl->attention->setAttentionThreshold(config->getOr<float>("attention_threshold", 0.3f));
+        
+        // Configure neuromodulation systems
+        pImpl->dopamine->setBaseline(config->getOr<float>("dopamine_baseline", 0.1f));
+        pImpl->dopamine->setPeak(config->getOr<float>("dopamine_peak", 1.0f));
+        pImpl->curiosity->setCuriosityRate(config->getOr<float>("curiosity_rate", 0.2f));
+        pImpl->curiosity->setExplorationThreshold(config->getOr<float>("curiosity_threshold", 0.3f));
+        pImpl->novelty->setNoveltySensitivity(config->getOr<float>("novelty_sensitivity", 0.8f));
+        pImpl->predictionError->setErrorScaling(config->getOr<float>("prediction_error_scaling", 0.5f));
+        
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
         
@@ -511,8 +540,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Use prediction system to anticipate next states
+        // Prediction error drives attention and learning
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // High prediction error increases neuromodulation
+        if (predictionError > 0.1f) {
+            pImpl->predictionError->signalPredictionError(predictionError);
+        }
+        
+        // Store prediction in working memory
+        pImpl->workingMemory->storeConcept("prediction_error", predictionError);
+        
+        // Update attention based on prediction uncertainty
+        if (predictionError > pImpl->config->getOr<float>("attention_threshold", 0.3f)) {
+            if (pImpl->attention) {
+                // Focus attention on prediction-relevant regions
+                focusAttentionOnPredictionRegions();
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -547,7 +593,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+    if (currentStep % pImpl->config->getOr<size_t>("development_update_interval", 1000) == 0) {
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
         // Development affects plasticity rates
@@ -571,15 +617,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     break;
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            sp->setSynaptogenesisRate(pImpl->config->getOr<float>("base_synaptogenesis_rate", 0.0001f) * plasticityMod);
+            sp->setPruningRate(pImpl->config->getOr<float>("base_pruning_rate", 0.00001f) * (2.0f - plasticityMod));
         }
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+    if (currentStep % pImpl->config->getOr<size_t>("consolidation_interval", 1000) == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        float consolidationThreshold = pImpl->config->getOr<float>("consolidation_threshold", 0.3f);
+        pImpl->episodicMemory->consolidate(consolidationThreshold);
     }
     
     // ========== STEP 15: Checkpoint management ==========
