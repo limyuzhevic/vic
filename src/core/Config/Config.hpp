@@ -55,13 +55,19 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML or key=value format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from YAML format
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Load from JSON format
+    bool loadFromJSON(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (key=value format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -70,6 +76,9 @@ public:
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
+    
+    // Get formatted value string
+    std::string getFormattedValue(const std::string& key) const;
     
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
@@ -93,6 +102,12 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validate configuration
+    bool validate() const;
+    
+    // Get configuration file version
+    std::string getVersion() const { return "1.0"; }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +115,19 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File format detection and parsing
+    static bool isJSONFormat(const std::string& line);
+    static bool isYAMLFormat(const std::string& line);
+    static bool isKeyValueFormat(const std::string& line);
+    
+    static bool parseJSONKeyValue(const std::string& line, std::string& key, std::string& value);
+    static bool parseYAMLKeyValue(const std::string& line, std::string& key, std::string& value);
+    static bool parseKeyValueFormat(const std::string& line, std::string& key, std::string& value);
+    
+    static std::string parseJSONString(const std::string& value);
+    static ConfigValue stringToConfigValue(const std::string& str);
+    static std::string configValueToString(const ConfigValue& value);
 };
 
 } // namespace nlm
