@@ -6,8 +6,9 @@ struct PredictionSystem::Impl {
     float predictionError;
     float confidence;
     std::vector<float> errorHistory;
+    std::unique_ptr<SensoryInput> lastObservation;
     
-    Impl() : predictionError(0.0f), confidence(0.5f) {}
+    Impl() : predictionError(0.0f), confidence(0.5f), lastObservation(nullptr) {}
 };
 
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
@@ -16,7 +17,8 @@ PredictionSystem::~PredictionSystem() = default;
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
-    // PLACEHOLDER: Just return a copy of current state
+    // For Phase 6: Use neural substrate to generate predictions
+    // For now: return a copy of current state as placeholder
     return currentState.clone();
 }
 
@@ -54,7 +56,52 @@ void PredictionSystem::clearHistory() {
 }
 
 void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+    // TODO PHASE 2: Train prediction model using neural substrate
+    // For Phase 6: Use neural substrate to generate predictions
+    // For now: store observation as potential future state
+    pImpl->lastObservation = observation.clone();
+}
+
+const SensoryInput* PredictionSystem::getLastObservation() const {
+    return pImpl->lastObservation.get();
+}
+
+void PredictionSystem::applyPredictionToAttention() {
+    // TODO PHASE 6: Apply predictions to attentional selection
+    // Prediction error should bias attention toward unexpected sensory input
+    // Current placeholder
+}
+
+void PredictionSystem::updatePrediction(const SensoryInput& sensoryInput) {
+    // TODO PHASE 6: Integrate prediction with neural processing
+    // This method updates the prediction system based on actual sensory input
+    // Current placeholder
+}
+
+void PredictionSystem::generateActionPredictions(const std::vector<float>& internalState) {
+    // TODO PHASE 6: Generate action predictions using neural substrate
+    // Current placeholder
+}
+
+float PredictionSystem::getPredictionUncertainty() const {
+    // Simple uncertainty estimate based on prediction error
+    return std::min(1.0f, std::max(0.0f, pImpl->predictionError / 10.0f));
+}
+
+const SensoryInput* PredictionSystem::getExpectedInput() const {
+    // TODO PHASE 6: Store and return expected input
+    // Currently returns last observation as placeholder
+    return pImpl->lastObservation.get();
+}
+
+void PredictionSystem::setExpectedInput(std::unique_ptr<SensoryInput> expected) {
+    pImpl->lastObservation = std::move(expected);
+}
+
+void PredictionSystem::clearPredictionCache() {
+    pImpl->lastObservation.reset();
+    pImpl->errorHistory.clear();
+    pImpl->predictionError = 0.0f;
 }
 
 } // namespace nlm
