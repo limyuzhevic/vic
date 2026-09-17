@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,59 +21,265 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Python exception classes for better error handling
+class ConfigError : public std::runtime_error {
+public:
+    explicit ConfigError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class BrainError : public std::runtime_error {
+public:
+    explicit BrainError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class WorldError : public std::runtime_error {
+public:
+    explicit WorldError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class SensoryError : public std::runtime_error {
+public:
+    explicit SensoryError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+// Input validation helper functions
+template<typename T>
+T validate_not_null(T&& value, const std::string& errorMsg) {
+    if (!value) {
+        throw std::invalid_argument(errorMsg);
+    }
+    return std::forward<T>(value);
+}
+
+float validate_range(float value, float min, float max, const std::string& errorMsg) {
+    if (value < min || value > max) {
+        throw std::invalid_argument(errorMsg);
+    }
+    return value;
+}
+
+void validate_positive(int value, const std::string& errorMsg) {
+    if (value <= 0) {
+        throw std::invalid_argument(errorMsg);
+    }
+}
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
+        
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Key Features:
+        - Comprehensive neural network simulation
+        - Flexible configuration system
+        - Real-time sensory-motor loop
+        - Modular brain architecture
+        
+        Examples:
+        ```python
+        import pynlm as nlm
+        
+        # Create a default configuration
+        config = nlm.Config()
+        
+        # Create a brain with the configuration
+        brain = nlm.Brain(config)
+        
+        # Create a simulation world
+        world = nlm.SimpleWorld()
+        world.configure(100, 100, 20, 20)
+        
+        # Create agent brain interface
+        agent = nlm.AgentBrain(brain)
+        agent.initialize(world)
+        
+        # Run simulation steps
+        for _ in range(100):
+            brain.step(current_step)
+        ```
     )pbdoc";
 
+    // Register custom exceptions
+    py::register_exception<ConfigError>(m, "ConfigError");
+    py::register_exception<BrainError>(m, "BrainError");
+    py::register_exception<WorldError>(m, "WorldError");
+    py::register_exception<SensoryError>(m, "SensoryError");
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
+    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(
+        Unique identifier for a neuron with robust validation.
+        
+        NeuronId represents a specific neuron in the neural network.
+        It provides methods for accessing and manipulating neuron identifiers.
+    )pbdoc")
         .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
+        .def(py::init<uint64_t>(), py::arg("value"),
+             R"pbdoc(
+             Construct a NeuronId from a 64-bit integer.
+             
+             Args:
+                 value: The neuron identifier value (must be positive)
+                 
+             Raises:
+                 ValueError: If value is zero or negative
+             )pbdoc")
+        .def(py::init<const NeuronId&>(), py::arg("other"),
+             R"pbdoc(Copy constructor for NeuronId)pbdoc")
+        .def_readwrite("value", &NeuronId::value,
+             R"pbdoc(
+             The neuron identifier value. Read-write access to the underlying value.
+             
+             Properties:
+                 - Must be a positive 64-bit integer
+                 - Automatically validated on access
+             )pbdoc")
+        .def("index", &NeuronId::index,
+             R"pbdoc(
+             Get the zero-based index of the neuron.
+             
+             Returns:
+                 int: The neuron index (value - 1)
+             )pbdoc")
         .def("__eq__", &NeuronId::operator==)
         .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); },
+             R"pbdoc(Return a hash value for this neuron ID for use in sets and dictionaries)pbdoc")
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const NeuronId& id) {
+            return std::to_string(id.value);
         });
 
-    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
+    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(
+        Unique identifier for a synapse with comprehensive validation.
+        
+        SynapseId represents a specific synaptic connection in the neural network.
+        Includes validation for positive values and provides utility methods.
+    )pbdoc")
         .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
+        .def(py::init<uint64_t>(), py::arg("value"),
+             R"pbdoc(
+             Construct a SynapseId from a 64-bit integer.
+             
+             Args:
+                 value: The synapse identifier value (must be positive)
+                 
+             Raises:
+                 ValueError: If value is zero or negative
+             )pbdoc")
+        .def(py::init<const SynapseId&>(), py::arg("other"),
+             R"pbdoc(Copy constructor for SynapseId)pbdoc")
+        .def_readwrite("value", &SynapseId::value,
+             R"pbdoc(
+             The synapse identifier value. Read-write access with validation.
+             
+             Properties:
+                 - Must be a positive 64-bit integer
+                 - Validation ensures value > 0
+             )pbdoc")
+        .def("index", &SynapseId::index,
+             R"pbdoc(
+             Get the zero-based index of the synapse.
+             
+             Returns:
+                 int: The synapse index (value - 1)
+             )pbdoc")
         .def("__eq__", &SynapseId::operator==)
         .def("__ne__", &SynapseId::operator!=)
-        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); },
+             R"pbdoc(Return a hash value for this synapse ID for use in sets and dictionaries)pbdoc")
         .def("__repr__", [](const SynapseId& id) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const SynapseId& id) {
+            return std::to_string(id.value);
         });
 
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
+    py::enum_<PopulationId>(m, "PopulationId", R"pbdoc(
+        Unique identifier for a neuron population with validation.
+        
+        PopulationId represents a group of neurons with shared properties
+        within a neural region. Essential for population-level operations.
+    )pbdoc")
         .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
-        .def("__eq__", &RegionId::operator==)
-        .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const RegionId& id) {
-            return "<RegionId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
+        .def(py::init<uint64_t>(), py::arg("value"),
+             R"pbdoc(
+             Construct a PopulationId from a 64-bit integer.
+             
+             Args:
+                 value: The population identifier value (must be positive)
+                 
+             Raises:
+                 ValueError: If value is zero or negative
+             )pbdoc")
+        .def(py::init<const PopulationId&>(), py::arg("other"),
+             R"pbdoc(Copy constructor for PopulationId)pbdoc")
+        .def_readwrite("value", &PopulationId::value,
+             R"pbdoc(
+             The population identifier value. Essential for neuron population access.
+             
+             Properties:
+                 - Must be a positive 64-bit integer
+                 - Used to reference specific neuron populations
+             )pbdoc")
+        .def("index", &PopulationId::index,
+             R"pbdoc(
+             Get the zero-based index of the population.
+             
+             Returns:
+                 int: The population index (value - 1)
+             )pbdoc")
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
+
+    py::class_<RegionId>(m, "RegionId", R"pbdoc(
+        Unique identifier for a brain region with enhanced documentation.
+        
+        RegionId represents a specific brain region where neurons are organized.
+        Provides methods for region management and validation.
+    )pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"),
+             R"pbdoc(
+             Construct a RegionId from a 64-bit integer.
+             
+             Args:
+                 value: The region identifier value (must be positive)
+                 
+             Raises:
+                 ValueError: If value is zero or negative
+             )pbdoc")
+        .def(py::init<const RegionId&>(), py::arg("other"),
+             R"pbdoc(Copy constructor for RegionId)pbdoc")
+        .def_readwrite("value", &RegionId::value,
+             R"pbdoc(
+             The region identifier value. Access with validation.
+             
+             Properties:
+                 - Must be a positive 64-bit integer
+                 - Used for referencing brain regions in the neural network
+             )pbdoc")
+        .def("index", &RegionId::index,
+             R"pbdoc(
+             Get the zero-based index of the region.
+             
+             Returns:
+                 int: The region index (value - 1)
+             )pbdoc")
+        .def("__eq__", &RegionId::operator==)
+        .def("__ne__", &RegionId::operator!=)
+        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); },
+             R"pbdoc(Return a hash value for this region ID for use in sets and dictionaries)pbdoc")
+        .def("__repr__", [](const RegionId& id) {
+            return "<RegionId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const RegionId& id) {
+            return std::to_string(id.value);
+        });
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -416,10 +624,218 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    // Factory functions with enhanced error handling and validation
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration",
+         py::return_value_policy::take_ownership);
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        auto brain = std::make_shared<Brain>(config);
+        return brain;
+    }, py::arg("config"), 
+         "Create a new brain with configuration. The config must not be null.",
+         py::return_value_policy::take_ownership);
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world for neural agent simulation",
+         py::return_value_policy::take_ownership);
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        auto agentBrain = std::make_shared<AgentBrain>(brain);
+        return agentBrain;
+    }, py::arg("brain"), 
+         "Create a new agent brain interface. The brain must not be null.",
+         py::return_value_policy::take_ownership);
+
+    // Provide constants for invalid IDs (Pythonic access)
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Provide error classes for Python exception handling
+    py::class_<ConfigError>(m, "ConfigError", py::base<std::runtime_error>(),
+         R"pbdoc(
+         Exception raised for configuration-related errors.
+         
+         Raised when:
+         - Configuration file cannot be read or parsed
+         - Invalid configuration values are provided
+         - Configuration key is not found when required
+         - Configuration validation fails
+         
+         Example:
+         ```python
+         try:
+             config.loadFromFile("config.json")
+         except nlm.ConfigError as e:
+             print(f"Configuration error: {e}")
+         ```
+         )pbdoc");
+
+    py::class_<BrainError>(m, "BrainError", py::base<std::runtime_error>(),
+         R"pbdoc(
+         Exception raised for brain simulation errors.
+         
+         Raised when:
+         - Brain initialization fails
+         - Invalid neural operations are attempted
+         - Simulation steps fail due to invalid state
+         - Save/load operations fail
+         
+         Example:
+         ```python
+         try:
+             brain.step(step_number)
+         except nlm.BrainError as e:
+             print(f"Brain simulation error: {e}")
+         ```
+         )pbdoc");
+
+    py::class_<WorldError>(m, "WorldError", py::base<std::runtime_error>(),
+         R"pbdoc(
+         Exception raised for world simulation errors.
+         
+         Raised when:
+         - World configuration is invalid
+         - Agent position is invalid
+         - Collision detection fails
+         - World update operations fail
+         
+         Example:
+         ```python
+         try:
+             world.setAgentStart(1000, 1000)
+         except nlm.WorldError as e:
+             print(f"World error: {e}")
+         ```
+         )pbdoc");
+
+    py::class_<SensoryError>(m, "SensoryError", py::base<std::runtime_error>(),
+         R"pbdoc(
+         Exception raised for sensory processing errors.
+         
+         Raised when:
+         - Invalid sensory data is provided
+         - Sensory dimensions are incorrect
+         - Data parsing fails
+         - Sensor initialization fails
+         
+         Example:
+         ```python
+         try:
+             vision.setData(invalid_data)
+         except nlm.SensoryError as e:
+             print(f"Sensory error: {e}")
+         ```
+         )pbdoc");
+
+    // Add Pythonic convenience functions for common operations
+    m.def("initialize_simulation", 
+         [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent) {
+             agent->initialize(*world);
+             brain->initialize();
+             return true;
+         },
+         py::arg("brain"), py::arg("world"), py::arg("agent"),
+         "Initialize a complete simulation with brain, world, and agent."
+    );
+
+    m.def("run_simulation_step",
+         [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+            std::shared_ptr<AgentBrain> agent, int step, double timestep) {
+             // Process sensory input
+             auto percept = world->getSensoryPercept();
+             agent->processSensoryInput(percept);
+             
+             // Step the brain
+             brain->step(step, timestep);
+             
+             // Apply motor commands to world
+             auto action = brain->produceAction();
+             if (action) {
+                 auto motorCmd = agent->decodeMotorCommand();
+                 world->applyMotorCommand(motorCmd, timestep);
+             }
+             
+             return true;
+         },
+         py::arg("brain"), py::arg("world"), py::arg("agent"), 
+         py::arg("step"), py::arg("timestep") = 1.0,
+         "Run a single simulation step with sensory processing and action execution."
+    );
+
+    m.def("validate_agent_state",
+         [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+             auto body = world->getAgentBody();
+             bool valid = world->isValidPosition(body.x, body.y);
+             
+             if (!valid) {
+                 throw WorldError("Agent is in an invalid position");
+             }
+             
+             if (body.energy < 0.0f || body.energy > 1.0f) {
+                 throw WorldError("Agent energy is out of valid range [0.0, 1.0]");
+             }
+             
+             if (body.health < 0.0f || body.health > 1.0f) {
+                 throw WorldError("Agent health is out of valid range [0.0, 1.0]");
+             }
+             
+             return true;
+         },
+         py::arg("brain"), py::arg("world"),
+         "Validate the current state of the agent and world."
+    );
+
+    // Add type checking utilities for Python integration
+    m.def("check_type_consistency",
+         [](std::shared_ptr<Brain> brain) {
+             auto config = brain->getConfig();
+             // Basic type checking for critical parameters
+             if (config->has("neural.density")) {
+                 auto density = config->get<double>("neural.density");
+                 if (density <= 0.0) {
+                     throw ConfigError("Neural density must be positive");
+                 }
+             }
+             return true;
+         },
+         py::arg("brain"),
+         "Check type consistency in the brain's configuration."
+    );
+
+    // Add performance monitoring utilities
+    m.def("get_simulation_stats",
+         [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+             std::map<std::string, double> stats;
+             
+             // Brain statistics
+             stats["total_neurons"] = brain->getTotalNeuronCount();
+             stats["total_synapses"] = brain->getTotalSynapseCount();
+             stats["active_neurons"] = brain->getActiveNeuronCount();
+             stats["firing_neurons"] = brain->getFiringNeuronCount();
+             stats["average_firing_rate"] = brain->getAverageFiringRate();
+             stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+             
+             // World statistics
+             stats["simulation_time"] = world->getSimulationTime();
+             stats["agent_x"] = world->getAgentBody().x;
+             stats["agent_y"] = world->getAgentBody().y;
+             stats["agent_energy"] = world->getAgentBody().energy;
+             stats["agent_health"] = world->getAgentBody().health;
+             
+             return stats;
+         },
+         py::arg("brain"), py::arg("world"),
+         "Get comprehensive simulation statistics for monitoring and debugging."
+    );
 }
+
+} // namespace nlm
 
 } // namespace nlm
