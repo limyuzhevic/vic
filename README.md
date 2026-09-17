@@ -66,21 +66,236 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### Using CMake (Recommended for Development)
+
 ```bash
-mkdir build
+# Create build directory
+mkdir -p build
 cd build
+
+# Configure with CMake (Release build for best performance)
 cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+
+# Build all targets
+make -j$(nproc)
+
+# Run tests (if built)
+ctest --output-on-failure
+```
+
+### Using Python Package (for users needing Python bindings)
+
+```bash
+# Install build dependencies
+pip install pybind11 scikit-build-core pytest numpy
+
+# Build and install Python module
+pip install .
+
+# Or install in development mode
+pip install -e .
 ```
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 6 Integration Demo (Comprehensive Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Phase 2 Basic Demo (Real Neural Computation)
+
+```bash
+./nlm
+```
+
+This demonstrates the core Phase 2 neural computation capabilities.
+
+### Phase 4 Cognitive Demo (Advanced Cognition)
+
+```bash
+./nlm_phase4_demo
+```
+
+This demonstrates advanced cognitive capabilities.
+
+## Quick Start Examples
+
+### Example 1: Minimal Neural Simulation
+
+```cpp
+#include <nlm/Brain.hpp>
+#include <nlm/Config.hpp>
+#include <iostream>
+
+int main() {
+    // Create configuration
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", 100);
+    config->set("region_count", 1);
+    config->set("random_seed", 42);
+    
+    // Create and initialize brain
+    auto brain = std::make_shared<nlm::Brain>(config);
+    if (!brain->initialize()) {
+        std::cerr << "Failed to initialize brain!" << std::endl;
+        return 1;
+    }
+    
+    // Run simulation
+    for (int step = 0; step < 1000; ++step) {
+        brain->step(step);
+        if (step % 100 == 0) {
+            std::cout << "Step " << step << ": " 
+                      << brain->getFiringNeuronCount() << " firing neurons" << std::endl;
+        }
+    }
+    
+    std::cout << "Simulation complete!" << std::endl;
+    std::cout << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+    std::cout << "Average firing rate: " << brain->getAverageFiringRate() << " Hz" << std::endl;
+    
+    return 0;
+}
+```
+
+### Example 2: Complete Agent System
+
+```cpp
+#include <nlm/Brain.hpp>
+#include <nlm/Config.hpp>
+#include <nlm/agent/AgentBrain.hpp>
+#include <nlm/environment/SimpleWorld.hpp>
+#include <iostream>
+
+int main() {
+    // Setup configuration
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", 1000);
+    config->set("region_count", 2);
+    config->set("random_seed", 42);
+    
+    // Create brain
+    auto brain = std::make_shared<nlm::Brain>(config);
+    brain->initialize();
+    
+    // Create agent interface
+    auto agent = std::make_shared<nlm::AgentBrain>(brain);
+    
+    // Create and configure world
+    auto world = std::make_shared<nlm::SimpleWorld>();
+    world->configure(20, 20, 8, 8);
+    world->reset();
+    world->setAgentStart(10.0, 10.0);
+    
+    // Initialize agent with world
+    agent->initialize(world);
+    
+    // Enable learning subsystems
+    agent->enableRewardModulation(true);
+    agent->enableStructuralPlasticity(true);
+    agent->enableDevelopment(true);
+    agent->enableCuriosity(true);
+    
+    // Run agent simulation
+    for (int step = 0; step < 500; ++step) {
+        // Update world
+        world->update(0.1);
+        
+        // Get sensory input
+        auto percept = world->getSensoryPercept();
+        
+        // Process input and think
+        agent->processSensoryInput(percept);
+        brain->step(step);
+        
+        // Get action and act
+        auto action = agent->decodeMotorCommand();
+        world->applyMotorCommand(action, world->getSimulationTime());
+        
+        // Apply reward modulation
+        float reward = 0.0f;
+        auto internalPercept = percept->getInternal();
+        if (!internalPercept.empty()) {
+            reward = internalPercept[0];
+        }
+        agent->applyRewardModulation(reward, 0.0f);
+        
+        // Update development
+        agent->updateDevelopment(0.1);
+        
+        // Log progress
+        if (step % 50 == 0) {
+            std::cout << "Step " << step << ": "
+                      << brain->getFiringNeuronCount() << " neurons firing, "
+                      << "curiosity: " << agent->getCuriosityLevel() << std::endl;
+        }
+    }
+    
+    std::cout << "Agent simulation complete!" << std::endl;
+    std::cout << "Final development stage: " << brain->getDevelopmentalStage() << std::endl;
+    
+    return 0;
+}
+```
+
+### Example 3: Python API Usage (if Python bindings are installed)
+
+```python
+import pynlm
+
+# Create default brain configuration
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simple simulation
+for i in range(100):
+    brain.step(i)
+    if i % 20 == 0:
+        print(f"Step {i}: {brain.getFiringNeuronCount()} neurons firing")
+
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+```
+
+## Running Tests
+
+After building, run the test suite:
+
+```bash
+# Run all tests
+ctest --output-on-failure
+
+# Or run specific test executables
+./nlm_test
+```
+
+## Project Structure
+
+```
+NLM/
+├── src/                    # C++ source code
+│   ├── core/              # Core utilities (config, random, logger)
+│   ├── brain/             # Neural components
+│   ├── memory/            # Integrated memory systems
+│   ├── prediction/        # Prediction systems
+│   ├── cognition/         # Cognitive mechanisms
+│   ├── neuromodulation/    # Neuromodulators
+│   ├── development/        # Developmental system
+│   ├── sensory/           # Sensory processing
+│   ├── motor/             # Motor system
+│   ├── environment/       # Environment interface
+│   └── experiments/       # Experiment framework
+├── tests/                 # Test suite
+├── configs/               # Configuration files
+├── docs/                 # Documentation
+├── python/               # Python bindings (if applicable)
+└── build/                # Build directory (created during build)
+```
 
 ## Project Structure
 
