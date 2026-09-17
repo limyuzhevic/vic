@@ -106,29 +106,62 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+// ========== INITIALIZE INTEGRATED SYSTEMS ==========
+
+    // Initialize memory systems
+    workingMemory = std::make_unique<NeuralWorkingMemory>();
+    if (workingMemory) {
+        workingMemory->initialize(this);
+        workingMemory->setCapacity(neuronCount / 10);
+    }
+    
+    episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+    if (episodicMemory) {
+        episodicMemory->initialize(this);
+        episodicMemory->setMaxEpisodes(1000);
+    }
+    
+    associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+    if (associativeMemory) {
+        associativeMemory->initialize(this);
+    }
+    
+    // Initialize prediction system
+    predictionSystem = std::make_unique<PredictionSystem>();
+    
+    // Initialize cognition systems
+    planner = std::make_unique<NeuralPlanner>();
+    if (planner) {
+        planner->initialize(this);
+        planner->setPlanningDepth(5);
+    }
+    
+    conceptFormation = std::make_unique<ConceptFormation>();
+    if (conceptFormation) {
+        conceptFormation->initialize(this);
+    }
+    
+    attention = std::make_unique<AttentionalSelection>();
+    if (attention) {
+        attention->initialize(this);
+        attention->setInhibitionStrength(0.5f);
+        attention->setExcitationStrength(1.5f);
+    }
+    
+    // Initialize development system
+    developmentSystem = std::make_unique<DevelopmentSystem>();
+    
+    // Initialize neuromodulation systems
+    dopamine = std::make_unique<Dopamine>();
+    curiosity = std::make_unique<Curiosity>();
+    predictionError = std::make_unique<PredictionError>();
+    novelty = std::make_unique<Novelty>();
+    
+    // Initialize neuromodulators that need the brain reference
+    if (dopamine) dopamine->initialize(this);
+    if (curiosity) curiosity->initialize(this);
+    if (predictionError) predictionError->initialize(this);
+    if (novelty) novelty->initialize(this);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -486,8 +519,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Capture current brain state as an episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Store active neurons
             // Store active neurons
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
@@ -507,6 +540,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
+    }
     }
     
     // ========== STEP 8: Update prediction system ==========
