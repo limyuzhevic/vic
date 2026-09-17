@@ -19,10 +19,16 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class NeuralSemanticMemory;
+class NeuralProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
+class SelfModel;
+class SocialLearning;
 class AttentionalSelection;
+class SpatialRepresentation;
+class TemporalRelation;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
@@ -147,6 +153,12 @@ public:
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+
+    // Semantic memory - abstract knowledge
+    NeuralSemanticMemory* getSemanticMemory();
+
+    // Procedural memory - skills and habits
+    NeuralProceduralMemory* getProceduralMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
@@ -155,12 +167,24 @@ public:
     
     // ========== COGNITION SYSTEMS ==========
     
-    // Neural planner for action planning
+// Neural planner for action planning
     NeuralPlanner* getPlanner();
-    
+
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
-    
+
+    // Self-model for self-awareness
+    SelfModel* getSelfModel();
+
+    // Social learning for observation
+    SocialLearning* getSocialLearning();
+
+    // Spatial representation for space
+    SpatialRepresentation* getSpatialRepresentation();
+
+    // Temporal relations for sequence understanding
+    TemporalRelation* getTemporalRelation();
+
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
@@ -190,8 +214,9 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
-    void logStatus() const;
+    // Visualization interface for debugging and analysis
+    VisualizationInterface* getVisualization();
+    const VisualizationInterface* getVisualization() const;
     
 private:
     struct Impl;
