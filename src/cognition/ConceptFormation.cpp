@@ -20,6 +20,9 @@ ConceptFormation::ConceptFormation()
     , stabilityThreshold_(0.7f)
     , stabilityWindow_(5)
 {
+    // Initialize the discovered concepts structure
+    concepts_.reserve(100);
+    NLM_LOG_INFO("ConceptFormation: Created with default parameters");
 }
 
 ConceptFormation::~ConceptFormation() = default;

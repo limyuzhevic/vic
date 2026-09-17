@@ -152,6 +152,29 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // Get current brain state for planning
+    std::vector<float> currentState;
+    if (brain_->getWorkingMemory()) {
+        currentState = brain_->getWorkingMemory()->retrieve();
+    }
+    
+    // Get current goal from brain or self-model
+    std::vector<float> goal = getCurrentGoal();
+    
+    // Use neural planner to select best action
+    MotorCommand plannedAction = MotorCommand::Wait;
+    if (brain_->getPlanner()) {
+        // Use NeuralPlanner for action selection
+        plannedAction = brain_->getPlanner()->planAction(currentState, 0.5f);
+        
+        // If planner suggests an action, use it (overrides simple decoding)
+        if (plannedAction != MotorCommand::Wait) {
+            NLM_LOG_INFO("Planner selected action: " + std::to_string(static_cast<int>(plannedAction)));
+            return plannedAction;
+        }
+    }
+    
+    // Fallback to simple neural decoding if planner not available or suggests wait
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
