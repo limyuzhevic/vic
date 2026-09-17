@@ -61,6 +61,7 @@ void STDP::update(Synapse* synapse,
     
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
+            // Calculate Δt = t_post - t_pre (time between post and pre spikes)
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
             
             if (dt > 0) {
@@ -71,6 +72,7 @@ void STDP::update(Synapse* synapse,
             } else if (dt < 0) {
                 // Post before pre: DEPRESSION
                 // "Anti-Hebbian" - connection weakens if post fires without pre
+                // Since dt is negative, exp(dt/tau) gives correct exponential decay
                 float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
                 totalDelta += delta;
             }

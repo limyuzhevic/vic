@@ -24,7 +24,21 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f) {
+        // Initialize state properly
+        state.membranePotential = -70.0f;
+        state.restingPotential = -70.0f;
+        state.threshold = -55.0f;
+        state.resetPotential = -70.0f;
+        state.leakConductance = 10.0f;
+        state.synapseConductance = 0.0f;
+        state.firingRate = 0.0f;
+        state.firingState = FiringState::Resting;
+        state.refractoryRemaining = 0;
+        state.refractoryPeriod = 5;
+        state.adaptationVariable = 0.0f;
+        state.lastSpikeTime = -1.0f;
+    }
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -220,7 +234,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // FIX: dt is in milliseconds, no need to multiply by 1000.0f
+    V = V + static_cast<float>(dt) * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
