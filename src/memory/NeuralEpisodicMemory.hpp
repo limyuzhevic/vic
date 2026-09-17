@@ -35,8 +35,8 @@ struct EpisodicMemoryItem {
     float resultingReward;
     
     // Associated neural activity pattern (who was firing)
-    std::vector<NeuronId> activeNeurons;
-    std::vector<float> neuronActivations;
+    std::vector<NeuronId> neurons;
+    std::vector<float> values;
     
     // Time since this episode
     SimulationStep age;

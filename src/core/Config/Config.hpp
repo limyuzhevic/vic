@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -20,7 +22,8 @@ using ConfigValue = std::variant<
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<std::string>,
+    std::map<std::string, std::string>  // For nested structures
 >;
 
 // Configuration source
@@ -41,6 +44,15 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// JSON/YAML parser options
+struct ParserOptions {
+    bool allowComments;
+    bool allowTrailingComma;
+    bool preserveOrder;
+    
+    ParserOptions() : allowComments(false), allowTrailingComma(false), preserveOrder(true) {}
 };
 
 // Main configuration class
@@ -100,6 +112,21 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML parsing functions (implementation in Config.cpp)
+    bool loadFromJSON(const std::string& jsonString, ConfigSource source, const ParserOptions& options = ParserOptions());
+    bool loadFromYAML(const std::string& yamlString, ConfigSource source, const ParserOptions& options = ParserOptions());
+    void flattenAndLoadJSON(const nlohmann::json& json, ConfigSource source, const ParserOptions& options);
+    std::string flattenKey(const std::string& key, const nlohmann::json& parent) const;
+    void setFromJSONValue(const std::string& key, const nlohmann::json& value, ConfigSource source);
+    nlohmann::json buildJSONConfig() const;
+    bool validateJSON(const nlohmann::json& config, std::vector<std::string>& errors);
+    bool jsonToConfigValue(const nlohmann::json& jsonValue, ConfigValue& configValue);
+    nlohmann::json configValueToJSON(const ConfigValue& configValue);
+
+    // File format detection
+    static bool isJSONFile(const std::string& filepath);
+    static bool isYAMLFile(const std::string& filepath);
 };
 
 } // namespace nlm
