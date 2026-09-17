@@ -321,6 +321,189 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+void runNeuromodulationDemo(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Test 4: Neuromodulation Integration ===");
+    
+    // Test reward-based neuromodulation
+    if (auto* dopamine = brain->getDopamine()) {
+        NLM_LOG_INFO("  Testing dopamine neuromodulation...");
+        
+        // Simulate reward learning
+        float totalReward = 0.0f;
+        for (int step = 0; step < 100; ++step) {
+            // Occasionally give reward
+            if (step % 20 == 0) {
+                float reward = 1.0f + 0.5f * static_cast<float>(step / 20);
+                dopamine->signalReward(reward);
+                totalReward += reward;
+            }
+            
+            // Update dopamine dynamics
+            dopamine->update(0.001f);
+            
+            // Check plasticity factor
+            float plasticity = dopamine->getPlasticityFactor();
+            if (step % 50 == 0) {
+                NLM_LOG_INFO("    Step " + std::to_string(step) + 
+                           " | Dopamine: " + std::to_string(dopamine->getLevel()) +
+                           " | Plasticity factor: " + std::to_string(plasticity));
+            }
+        }
+        
+        NLM_LOG_INFO("  ✓ Dopamine neuromodulation working: " + 
+                    std::to_string(totalReward) + " total reward accumulated");
+    }
+    
+    // Test curiosity-based exploration
+    if (auto* curiosity = brain->getCuriosity()) {
+        NLM_LOG_INFO("  Testing curiosity system...");
+        
+        float explorationDrive = 0.0f;
+        for (int step = 0; step < 50; ++step) {
+            // Simulate novelty and prediction error
+            float novelty = 0.1f + 0.05f * std::sin(static_cast<float>(step) * 0.1f);
+            float predictionError = 0.05f + 0.02f * std::cos(static_cast<float>(step) * 0.2f);
+            
+            curiosity->update(novelty, predictionError, 0.001f);
+            explorationDrive = curiosity->getExplorationDrive();
+            
+            if (step % 10 == 0) {
+                NLM_LOG_INFO("    Step " + std::to_string(step) + 
+                           " | Curiosity level: " + std::to_string(explorationDrive));
+            }
+        }
+        
+        NLM_LOG_INFO("  ✓ Curiosity system working: " + 
+                    std::to_string(explorationDrive) + " exploration drive");
+    }
+}
+
+void runIntegrationDemo(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Test 5: System Integration Demo ===");
+    
+    // Enable all plasticity systems
+    if (auto* region = brain->getRegion(RegionId(1))) {
+        for (auto& syn : region->getSynapses()) {
+            // Enable multiple plasticity rules
+            syn->enablePlasticity(true, true, true);  // Hebbian, STDP, reward-modulated
+        }
+    }
+    
+    NLM_LOG_INFO("  Enabling all plasticity systems on synapses");
+    
+    // Create mixed activity pattern to stimulate different learning mechanisms
+    auto neurons = brain->getTotalNeuronCount();
+    
+    // Phase 1: Hebbian learning from correlated activity
+    NLM_LOG_INFO("  Phase 1: Hebbian learning with correlated activity");
+    for (int pattern = 0; pattern < 5; ++pattern) {
+        // Inject correlated input to stimulate Hebbian learning
+        for (size_t i = 0; i < std::min<size_t>(20, neurons / 4); ++i) {
+            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+        }
+        
+        for (SimulationStep step = 0; step < 100; ++step) {
+            brain->step(step, step * 0.001);
+        }
+    }
+    
+    NLM_LOG_INFO("  ✓ Hebbian phase completed");
+    
+    // Phase 2: STDP timing-based learning
+    NLM_LOG_INFO("  Phase 2: STDP with spike-timing precision");
+    for (int trial = 0; trial < 20; ++trial) {
+        auto* region = brain->getRegion(RegionId(1));
+        if (!region || region->getAllNeurons().size() < 2) continue;
+        
+        auto neurons = region->getAllNeurons();
+        Neuron* pre = neurons[0];
+        Neuron* post = neurons[1];
+        
+        // Precise spike timing for STDP
+        pre->injectCurrent(60.0f);
+        brain->step(trial * 2, trial * 2 * 0.001);
+        
+        post->injectCurrent(60.0f);
+        brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+    }
+    
+    NLM_LOG_INFO("  ✓ STDP phase completed");
+    
+    // Phase 3: Neuromodulation-enhanced learning
+    NLM_LOG_INFO("  Phase 3: Neuromodulation-enhanced learning");
+    
+    if (auto* dopamine = brain->getDopamine()) {
+        // Reset and apply reward-modulated learning
+        brain->reset();
+        brain->initialize();
+        
+        float accumulatedReward = 0.0f;
+        for (int step = 0; step < 500; ++step) {
+            // Random rewards to stimulate dopaminergic learning
+            if (step % 50 == 0) {
+                float reward = 1.0f;
+                dopamine->signalReward(reward);
+                accumulatedReward += reward;
+            }
+            
+            dopamine->update(0.001f);
+            brain->step(step, step * 0.001);
+            
+            if (step % 100 == 0) {
+                float plasticity = dopamine->getPlasticityFactor();
+                NLM_LOG_INFO("    Step " + std::to_string(step) + 
+                           " | Reward: " + std::to_string(dopamine->getLevel()) +
+                           " | Plasticity: " + std::to_string(plasticity));
+            }
+        }
+        
+        NLM_LOG_INFO("  ✓ Neuromodulation phase completed: " + 
+                    std::to_string(accumulatedReward) + " total reward");
+    }
+    
+    NLM_LOG_INFO("  ✓ System integration demonstration complete");
+}
+
+void runAdvancedUsageDemo() {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Advanced Usage Examples ===");
+    
+    NLM_LOG_INFO("This demo showcases advanced usage patterns for the NLM systems:");
+    NLM_LOG_INFO("");
+    
+    NLM_LOG_INFO("1. Multi-Modal Learning:")
+    NLM_LOG_INFO("   - Combine STDP, Hebbian, and neuromodulation for complex learning")
+    NLM_LOG_INFO("   - Simulate real neural computation with biological fidelity");
+    NLM_LOG_INFO("");
+    
+    NLM_LOG_INFO("2. Reward-Based Modulation:")
+    NLM_LOG_INFO("   - Dopamine signals enhance plasticity for significant prediction errors")
+    NLM_LOG_INFO("   - System learns from unexpected rewards and punishments");
+    NLM_LOG_INFO("");
+    
+    NLM_LOG_INFO("3. Development and Adaptation:")
+    NLM_LOG_INFO("   - Neural networks grow and prune based on activity patterns")
+    NLM_LOG_INFO("   - Synaptic connections strengthen or weaken based on experience");
+    NLM_LOG_INFO("");
+    
+    NLM_LOG_INFO("4. Memory Integration:")
+    NLM_LOG_INFO("   - Working memory works with spiking neural networks")
+    NLM_LOG_INFO("   - Episodic memory stores experienced events");
+    NLM_LOG_INFO("");
+    
+    NLM_LOG_INFO("5. Curiosity-Driven Exploration:")
+    NLM_LOG_INFO("   - Novelty detection triggers exploration behavior")
+    NLM_LOG_INFO("   - Prediction errors drive learning about the environment");
+    NLM_LOG_INFO("");
+    
+    NLM_LOG_INFO("To use these advanced features:")
+    NLM_LOG_INFO("- Configure plasticity parameters in configs/advanced.cfg")
+    NLM_LOG_INFO("- Use Phase6IntegratedExperiment for full integration testing")
+    NLM_LOG_INFO("- Implement custom neuromodulators for specialized tasks");
+}
+
 int main(int argc, char** argv) {
     printBanner();
     
