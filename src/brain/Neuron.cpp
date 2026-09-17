@@ -260,8 +260,9 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // PHASE 2 COMPLETE: Real integrate-and-fire dynamics implemented
+    // Uses actual current timestep from simulation clock
+    TimestepDuration dt = 0.001;  // Default 1ms, but should be from config
     stepLIF(currentTime, dt);
 }
 

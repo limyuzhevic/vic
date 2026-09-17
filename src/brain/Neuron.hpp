@@ -134,7 +134,7 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // PHASE 2 COMPLETE: Real integrate-and-fire dynamics implemented
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -142,6 +142,39 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
+    
+    // Get spike history for plasticity
+    const std::vector<Timestamp>& getSpikeHistory() const;
+    
+    // Check if neuron is active/firing
+    bool isFiring() const;
+    
+    // Get neuron statistics
+    float getFiringRate() const;
+    
+    // Get synaptic input
+    MembranePotential getTotalCurrent() const;
+    
+    // Inject current (for testing/easier API)
+    void injectCurrent(MembranePotential current);
+    
+    // Get current membrane potential
+    MembranePotential getMembranePotential() const;
+    
+    // Get neuron ID
+    NeuronId getId() const;
+    
+    // Get region and population membership
+    RegionId getRegionId() const;
+    PopulationId getPopulationId() const;
+    
+    // Get neuron type
+    NeuronType getType() const;
+    
+    // Set neuron parameters (for easy API)
+    void configure(float vRest = -70.0f, float threshold = -55.0f, 
+                   float vReset = -70.0f, float tau = 20.0f, float C = 1.0f,
+                   float leakConductance = 10.0f, uint32_t refPeriod = 5);
     
 private:
     struct Impl;
