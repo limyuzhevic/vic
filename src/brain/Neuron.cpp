@@ -266,9 +266,21 @@ void Neuron::step(Timestamp currentTime) {
 }
 
 void Neuron::reset() {
+    // Safe reset with proper cleanup
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    pImpl->incomingSynapses.clear();
+    pImpl->outgoingSynapses.clear();
+    // Reset adaptation variable
+    pImpl->state.adaptationVariable = 0.0f;
+}
+
+void Neuron::finalize() {
+    // Final cleanup before destruction
+    pImpl->spikeHistory.shrink_to_fit();
+    pImpl->incomingSynapses.shrink_to_fit();
+    pImpl->outgoingSynapses.shrink_to_fit();
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
