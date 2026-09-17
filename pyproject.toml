@@ -12,10 +12,12 @@ requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "artificial-intelligence", "cognitive-systems"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,33 +27,126 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
-dependencies = []
+dependencies = [
+    # Core dependencies for Python users
+    "numpy>=1.20; python_version >= '3.8'",
+    "scipy>=1.6.0; python_version >= '3.8'",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "pytest-cov>=2.12",
     "numpy>=1.20",
+    "scipy>=1.6.0",
+    "black>=22.0",
+    "ruff>=0.1.0",
+    "mypy>=0.991",
+    "pre-commit>=3.0",
+]
+
+[project.optional-dependencies]
+docs = [
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=1.0",
+    "myst-parser>=0.19",
+    "nbsphinx>=0.9",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+Issues = "https://github.com/nlm-project/nlm/issues"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
 cmake.build-type = "Release"
-cmake.args = [
-    "-DCMAKE_CXX_STANDARD=20",
-    "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
-    "-DPYTHON_EXECUTABLE={python}",
-]
+build-type = "开发版本"
+allow-building-private-repositories = false
+ncubuild = false
+verbose = false
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+ENABLE_TESTS = ON
+ENABLE_EXPERIMENTS = ON
+BUILD_PHASE6_DEMOS = ON
+
+[tool.scikit-build.cmake.args]
+defaults = [
+    "-DCMAKE_CXX_STANDARD=20",
+    "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
+    "-DPYTHON_EXECUTABLE={python}",
+    "-DENABLE_OPENMP=ON",
+    "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
+python_files = ["test_*.py", "*_test.py"]
+testdirs = ["."]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--cov=pynlm",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+]
+
+[tool.pytest.ini_options.filterwarnings]
+default-action = "ignore"
+ignore = [
+    "DeprecationWarning:.*",
+    "FutureWarning:.*",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+select = ["E", "F", "W", "I", "N", "UP"]
+ignore = ["E501", "W503", "F401"]
+
+[tool.ruff.per-file-ignores]
+"tests/*.py" = ["S101"]
+"*/__init__.py" = ["F401"]
+
+[tool.black]
+line-length = 100
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+include = "\.pyi?$"
+ext-exclude = '''(
+    /(
+        \.eggs
+        | \.git
+        | \.hg
+        | \.mypy_cache
+        | \.nox
+        | \.pants.d
+        | \.pycache
+        | \.pytest_cache
+        | \.ruff_cache
+        | \.svn
+        | \.tox
+        | \.venv
+        | \.vscode
+        | venv
+        | __pycache__
+        | _build
+        | buck-out
+        | build
+        | dist
+    )/
+'''
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = ['build/', 'dist/', 'tests/', '.venv/']
+

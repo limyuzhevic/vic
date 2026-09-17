@@ -1,0 +1,325 @@
+Configuration Options for NLM Phase 6 Integration
+==================================================
+
+Phase 6 implements an integrated artificial brain with the following key configuration areas:
+
+## 1. Basic Brain Configuration
+
+```yaml
+# Neuron and network configuration
+brain:
+  neuron_count: 1000          # Total number of neurons
+  region_count: 1             # Number of brain regions
+  connection_probability: 0.1 # Synapse formation probability
+
+  # Neuron parameters
+  neuron:
+    v_thresh: -50.0    # Threshold potential (mV)
+    v_rest: -70.0       # Resting potential (mV)
+    v_reset: -75.0      # Reset potential after spike (mV)
+    tau_mem: 20.0       # Membrane time constant (ms)
+    tau_ref: 2.0        # Refractory period (ms)
+
+  # Initial conditions
+  initial:
+    weight_mean: 0.5    # Mean synaptic weight
+    weight_std: 0.1     # Weight standard deviation
+```
+
+## 2. Plasticity Configuration
+
+```yaml
+# Neural plasticity mechanisms
+plasticity:
+  # STDP (Spike-Timing-Dependent Plasticity)
+  stdp:
+    enable: true          # Enable STDP
+    ltp_weight: 0.01      # Long-term potentiation weight
+    ltd_weight: 0.012     # Long-term depression weight
+    tau: 20.0             # Time constant (ms)
+
+  # Hebbian learning
+  hebbian:
+    enable: true
+    learning_rate: 0.001
+
+  # Structural plasticity
+  structural:
+    enable: true
+    synaptogenesis_rate: 0.0001  # New synapse formation rate
+    pruning_rate: 0.00001       # Synapse elimination rate
+```
+
+## 3. Neuromodulation Configuration
+
+```yaml
+# Neuromodulators that affect learning and behavior
+neuromod:
+  # Reward processing
+  dopamine:
+    scale: 1.0           # Dopamine modulation strength
+    plasticity_factor: 1.0 # Effect on plasticity
+
+  # Exploration
+  curiosity:
+    enable: true
+    novelty_threshold: 0.1
+
+  # Novelty detection
+  novelty:
+    enable: true
+    sensitivity: 0.5
+
+  # Prediction errors
+  prediction_error:
+    enable: true
+    learning_rate: 0.1
+```
+
+## 4. Memory System Configuration
+
+```yaml
+# Memory systems for experience storage
+memory:
+  # Working memory (short-term)
+  working:
+    capacity: 100        # Number of active traces
+    decay_rate: 0.01     # Trace decay rate
+
+  # Episodic memory (experiences)
+  episodic:
+    max_episodes: 1000   # Maximum number of episodes
+    storage_threshold: 0.5 # When to store episode
+
+  # Associative memory (patterns)
+  associative:
+    strength_threshold: 0.8
+    recall_window: 10    # Time window for recall
+```
+
+## 5. Cognitive Systems Configuration
+
+```yaml
+# Higher-level cognitive functions
+cognition:
+  # Attention system
+  attention:
+    inhibition_strength: 0.5  # Competition strength
+    excitation_strength: 1.5
+    selection_window: 100    # Selection window (ms)
+
+  # Planning system
+  planner:
+    planning_depth: 5       # Look-ahead depth
+    evaluation_function: "reward_prediction"
+
+  # Self-model
+  self_model:
+    update_interval: 100    # Body schema update rate
+    confidence_threshold: 0.7
+```
+
+## 6. Development Configuration
+
+```yaml
+# Developmental stages and their effects
+development:
+  # Stage 1: Critical period
+  critical_period:
+    stage: 1
+    plasticity_multiplier: 2.0  # High learning rate
+    synaptogenesis_boost: 1.5
+
+  # Stage 2: Maturation
+  maturation:
+    stage: 2
+    plasticity_multiplier: 1.0
+    specialization_factor: 0.8
+
+  # Stage 3: Adult
+  adult:
+    stage: 3
+    plasticity_multiplier: 0.5  # Reduced learning
+    stability_factor: 0.9
+```
+
+## 7. Performance Configuration
+
+```yaml
+# Performance and optimization settings
+performance:
+  # Checkpointing
+  checkpoint:
+    enable: true
+    path: "./checkpoints"  # Default path
+    interval: 1000          # Save every N steps
+    compression: "balanced"
+    max_saves: 100
+
+  # Replay intervals
+  replay:
+    interval: 100          # Replay every 100 steps
+    consolidation_interval: 1000  # Consolidation every 1000s
+
+  # Development timing
+  development:
+    stage1_duration: 1000  # Critical period (steps)
+    stage2_duration: 10000 # Maturation
+    stage3_duration: 0     # Adult (indefinite)
+```
+
+## 8. Agent-Brain Configuration
+
+```yaml
+# Integration between brain and world
+agent:
+  # Reward processing
+  reward:
+    scale: 1.0
+    delay: 10           # Reward delay (steps)
+    prediction_enabled: true
+
+  # Curiosity-driven exploration
+  curiosity:
+    exploration_rate: 0.3
+    novelty_decay: 0.99
+
+  # Structural development
+  development:
+    enable: true
+    age_factor: 0.1     # Effect of age on development
+```
+
+## 9. Example Configuration File
+
+```yaml
+# Complete example configuration
+nlm:
+  version: "6.0"
+
+brain:
+  neuron_count: 500
+  region_count: 1
+  connection_probability: 0.15
+
+plasticity:
+  stdp:
+    enable: true
+    ltp_weight: 0.02
+    ltd_weight: 0.015
+    tau: 20.0
+  structural:
+    enable: true
+    synaptogenesis_rate: 0.0001
+    pruning_rate: 0.00001
+
+neuromod:
+  dopamine:
+    scale: 1.0
+  curiosity:
+    enable: true
+    sensitivity: 0.8
+  novelty:
+    enable: true
+    threshold: 0.2
+
+memory:
+  working:
+    capacity: 50
+    decay_rate: 0.02
+  episodic:
+    max_episodes: 500
+
+performance:
+  checkpoint:
+    enable: true
+    interval: 500
+  replay:
+    interval: 50
+
+agent:
+  reward:
+    scale: 1.0
+    prediction_enabled: true
+  development:
+    enable: true
+```
+
+## 10. Advanced Configuration Options
+
+```yaml
+# For advanced users and experimentation
+experiment:
+  # Learning rate annealing
+  learning_rate_schedule:
+    initial: 0.01
+    final: 0.001
+    decay_steps: 5000
+
+  # Temperature for exploration
+  exploration_temperature:
+    initial: 1.0
+    final: 0.1
+    decay_rate: 0.01
+
+  # Neural noise
+  neural_noise:
+    weight_jitter: 0.01
+    firing_noise: 0.05
+    input_noise: 0.1
+
+  # Social learning
+  social:
+    enable: false
+    observation_window: 100
+    imitation_threshold: 0.8
+```
+
+## Usage
+
+### Loading Configuration
+
+```python
+import pynlm
+
+# Create default configuration
+config = pynlm.createDefaultConfig()
+
+# Load from file
+config.loadFromFile("my_config.json")
+
+# Modify settings
+config.set("brain.neuron_count", 2000)
+config.set("plasticity.stdp.ltp_weight", 0.05)
+
+# Create brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+### Configuration Validation
+
+```python
+# Check if configuration has all required keys
+required_keys = [
+    "brain.neuron_count",
+    "brain.region_count", 
+    "plasticity.stdp.enable",
+    "neuromod.dopamine.scale"
+]
+
+for key in required_keys:
+    if config.has(key):
+        print(f"✓ {key}: {config.get(key)}")
+    else:
+        print(f"✗ Missing: {key}")
+```
+
+### Configuration Help
+
+```python
+# Get all available configuration options
+config_keys = config.getKeys()
+for key in sorted(config_keys):
+    print(f"{key}")
+```
