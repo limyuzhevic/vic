@@ -1,6 +1,7 @@
 #include "StructuralPlasticity.hpp"
 #include "../../brain/Brain.hpp"
 #include "../../brain/NeuralRegion.hpp"
+#include "../../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -44,6 +45,16 @@ SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source,
         return INVALID_SYNAPSE_ID;
     }
     
+    // Early validation checks
+    if (source == INVALID_NEURON_ID || destination == INVALID_NEURON_ID) {
+        return INVALID_SYNAPSE_ID;
+    }
+    
+    // Ensure weight is within reasonable bounds
+    if (weight < -1.0f || weight > 1.0f) {
+        return INVALID_SYNAPSE_ID;
+    }
+    
     // Find the region containing the destination neuron
     for (auto& region : brain->getRegions()) {
         auto synapsesTo = region->getSynapsesTo(destination);
@@ -57,7 +68,7 @@ SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source,
         
         // Check max synapses limit
         if (region->getSynapseCount() >= pImpl->maxTotalSynapses) {
-            return INVALID_SYNAPSE_ID;
+            continue; // Try next region
         }
         
         // Count outgoing synapses from source in this region
@@ -98,6 +109,10 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
 }
 
 NeuronId StructuralPlasticity::createNeuron(Brain* brain, NeuronType type) {
+    if (!brain) {
+        return INVALID_NEURON_ID;
+    }
+    
     // Neuron creation would require adding to a population
     // For Phase 2, we focus on synaptic structural plasticity
     // and don't implement neuronal creation
@@ -105,9 +120,25 @@ NeuronId StructuralPlasticity::createNeuron(Brain* brain, NeuronType type) {
 }
 
 bool StructuralPlasticity::removeNeuron(Brain* brain, NeuronId neuron) {
-    // Neuron removal would require removing all synapses and the neuron itself
-    // For Phase 2, we focus on synaptic structural plasticity
-    return false;
+    if (!brain || neuron == INVALID_NEURON_ID) {
+        return false;
+    }
+    
+    // Remove all synapses connected to this neuron
+    bool hasSynapses = false;
+    for (auto& region : brain->getRegions()) {
+        auto synapses = region->getAllSynapses();
+        for (auto* syn : synapses) {
+            if (syn->getSourceNeuron() == neuron || syn->getDestinationNeuron() == neuron) {
+                syn->setWeight(0.0f);
+                hasSynapses = true;
+            }
+        }
+    }
+    
+    // Actual neuron removal would require modifying the brain's neuron storage
+    // For Phase 2, we return success only if synapses were found to mark
+    return hasSynapses;
 }
 
 float StructuralPlasticity::getSynaptogenesisRate() const {
@@ -124,6 +155,14 @@ float StructuralPlasticity::getPruningRate() const {
 
 void StructuralPlasticity::setPruningRate(float rate) {
     pImpl->pruningRate = std::clamp(rate, 0.0f, 0.01f);
+}
+
+size_t StructuralPlasticity::getTotalSynapsesCreated() const {
+    return pImpl->totalSynapsesCreated;
+}
+
+size_t StructuralPlasticity::getTotalSynapsesPruned() const {
+    return pImpl->totalSynapsesPruned;
 }
 
 void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {

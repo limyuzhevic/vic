@@ -342,54 +342,58 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
+    // Identify neurons that just fired this timestep by checking their firing state
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
-                // Check if neuron just fired this step
                 const auto& state = neuron->getState();
+                // A neuron fires when it transitions to refractory state after having a spike time
                 bool justFired = (state.firingState == FiringState::Refractory &&
                                  state.lastSpikeTime >= 0.0f &&
                                  std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
 
                 if (justFired) {
-                    // Neuron fired this step - queue the spike
+                    // Neuron has fired - create immediate spike event for current processing
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
                     pImpl->spikeSystem->queueSpike(event);
 
-                    // Record post-synaptic spike for incoming synapses (plasticity)
+                    // Record post-synaptic spike in all incoming synapses for STDP
                     auto incomingSynapses = region->getSynapsesTo(neuron->getId());
                     for (Synapse* syn : incomingSynapses) {
                         syn->recordPostSpike(currentTime);
                     }
 
-                    // Get outgoing synapses and schedule delayed spike events
+                    // Get all outgoing synapses and schedule delayed spike delivery
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
-                        // Create delayed spike event
+                        // Create delayed spike event with proper timing for delivery
                         Delay delay = syn->getDelay();
                         SimulationStep deliveryStep = currentStep + delay;
                         Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
 
+                        // Construct delayed spike event containing all necessary delivery information
                         DelayedSpikeEvent delayedEvent(
-                            neuron->getId(),
-                            syn->getDestinationNeuron(),
-                            syn->getId(),
-                            syn->getWeight(),
-                            syn->getType(),
-                            currentTime,
-                            deliveryTime,
-                            currentStep,
-                            deliveryStep
+                            neuron->getId(),                    // Source neuron that fired
+                            syn->getDestinationNeuron(),        // Target neuron to receive input
+                            syn->getId(),                        // Synapse ID for plasticity tracking
+                            syn->getWeight(),                    // Synaptic weight as current multiplier
+                            syn->getType(),                      // Excitatory or inhibitory type
+                            currentTime,                        // Time spike occurred
+                            deliveryTime,                       // When to deliver to target
+                            currentStep,                        // Current simulation step
+                            deliveryStep                        // Future step for delayed delivery
                         );
 
+                        // Queue the delayed spike event for future synaptic delivery
                         pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
 
-                        // Record pre-synaptic spike for plasticity
+                        // Record pre-synaptic spike for Hebbian and STDP plasticity
                         syn->recordPreSpike(currentTime);
                     }
                     
-                    // Store to working memory - neurons that fire become part of working memory
+                    // Store firing neuron to working memory if active
                     if (pImpl->workingMemory) {
+                        // Store neuron activity level as working memory trace
                         pImpl->workingMemory->storeToNeuron(neuron->getId(), 
                             std::abs(state.membranePotential - state.restingPotential) / 10.0f);
                     }
@@ -1006,15 +1010,27 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
+    if (pImpl->workingMemory) {
+        return pImpl->workingMemory.get();
+    }
+    NLM_LOG_ERROR("Working memory not initialized");
+    return nullptr;
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
+    if (pImpl->episodicMemory) {
+        return pImpl->episodicMemory.get();
+    }
+    NLM_LOG_ERROR("Episodic memory not initialized");
+    return nullptr;
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
+    if (pImpl->associativeMemory) {
+        return pImpl->associativeMemory.get();
+    }
+    NLM_LOG_ERROR("Associative memory not initialized");
+    return nullptr;
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
@@ -1054,19 +1070,35 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 // ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
+    if (pImpl->dopamine) {
+        return pImpl->dopamine.get();
+    }
+    NLM_LOG_ERROR("Dopamine system not initialized");
+    return nullptr;
 }
 
 Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
+    if (pImpl->curiosity) {
+        return pImpl->curiosity.get();
+    }
+    NLM_LOG_ERROR("Curiosity system not initialized");
+    return nullptr;
 }
 
 Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
+    if (pImpl->novelty) {
+        return pImpl->novelty.get();
+    }
+    NLM_LOG_ERROR("Novelty system not initialized");
+    return nullptr;
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
+    if (pImpl->predictionError) {
+        return pImpl->predictionError.get();
+    }
+    NLM_LOG_ERROR("PredictionError system not initialized");
+    return nullptr;
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {

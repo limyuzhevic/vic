@@ -127,28 +127,14 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **Metrics**: Data analysis
 - **Phase4Experiment**: Phase 4 cognitive experiments
 
-## Data Flow
+## Integration Flow
 
-### Phase 2: Neural Computation
-```
-Sensory Input (test signals)
-      ↓
-Brain.receiveSensoryInput()
-      ↓
-Neural Computation (LIF dynamics)
-      ↓
-Spike Processing (event-driven)
-      ↓
-Plasticity (STDP, Hebbian)
-      ↓
-Structural Plasticity (synaptogenesis/pruning)
-```
+### Brain-Loop Integration (Phase 6)
 
-### Phase 3: World Interaction
+The Phase 6 architecture integrates all components into a unified brain loop:
+
 ```
-WORLD (SimpleWorld)
-      ↓
-SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
+SENSORY INPUT (Vision, Touch, Internal, Proprioception)
       ↓
 AgentBrain.processSensoryInput()
       ↓
@@ -158,74 +144,97 @@ Neural Computation (LIF dynamics)
       ↓
 Spike Processing (event-driven)
       ↓
+Working Memory Update (persistent activity)
+      ↓
+Episodic Memory Storage (experience encoding)
+      ↓
+Prediction System Update (temporal learning)
+      ↓
+Attention System Update (competitive selection)
+      ↓
+Concept Formation (pattern discovery)
+      ↓
+Planning (action sequence evaluation)
+      ↓
+Self-Model Update (sensorimotor learning)
+      ↓
 Motor Decoding → MotorCommand
       ↓
-AgentBrain.decodeMotorCommand()
+Motor System → Action
       ↓
-WORLD.applyMotorCommand()
+World.applyMotorCommand()
       ↓
 ACTION RESULT (reward, success)
       ↓
 Reward Prediction Error
       ↓
-Neuromodulation (dopamine-like signal)
+Neuromodulation (dopamine, curiosity)
       ↓
 Eligibility Trace Update
       ↓
 Plasticity (STDP, Hebbian, Reward-Modulated)
       ↓
-Structural Plasticity (synaptogenesis/pruning)
+Structural Plasticity (synaptogenesis, pruning)
       ↓
 Development System (stage progression)
+      ↓
+Memory Consolidation & Replay
+      ↓
+CHANGED BRAIN STATE
 ```
 
-### Phase 4: Emerging Cognition
-```
-WORLD (SimpleWorld)
-      ↓
-SENSORY PERCEPT
-      ↓
-ATTENTION (competitive selection)
-      ↓
-NEURAL PROCESSING
-      ↓
-PREDICTION (temporal sequence learning)
-      ↓
-WORKING MEMORY (persistent activity)
-      ↓
-EPISODIC MEMORY (experience storage)
-      ↓
-CONCEPT FORMATION (pattern discovery)
-      ↓
-PLANNING (multi-step prediction)
-      ↓
-SELF-MODEL (sensorimotor learning)
-      ↓
-MOTOR ACTION
-      ↓
-WORLD.applyMotorCommand()
-      ↓
-ACTION RESULT
-      ↓
-REWARD / ERROR
-      ↓
-NEUROMODULATION
-      ↓
-PLASTICITY
-      ↓
-SOCIAL LEARNING (observation/imitation)
-```
+### Memory System Integration
 
-## Agent-Brain Interface
+#### Working Memory Integration
+- **Storage**: Active neural patterns stored in working memory during processing
+- **Competition**: Lateral inhibition selects dominant representations
+- **Maintenance**: Persistent activity through recurrent connections
+- **Access**: Attention selects memories for use
 
-Phase 3/4 introduces the AgentBrain class that connects the NLM brain to the world:
+#### Episodic Memory Integration
+- **Encoding**: Experiences stored as neural activity patterns
+- **Indexing**: Temporal and spatial indexing for retrieval
+- **Replay**: Memory consolidation during rest cycles
+- **Completion**: Pattern completion from partial cues
 
-- **SensoryTransduction**: Converts world percepts to neural input
-- **MotorDecoding**: Converts neural activity to motor commands
-- **Neuromodulation**: Applies reward signals to plasticity
-- **Development**: Updates developmental stage
-- **Attention**: Selective processing through competition
-- **Planning**: Uses predictions to select actions
+### Neuromodulation Integration
+
+#### Dopamine Effects
+- **Learning**: Modulates plasticity rule strength based on reward prediction error
+- **Excitability**: Increases neural excitability, lowering firing thresholds
+- **Memory**: Influences memory consolidation and strengthening
+
+#### Curiosity Integration
+- **Exploration**: Driven by novelty prediction error
+- **Attention**: Biases attention toward novel stimuli
+- **Memory**: Encourages storage of new experiences
+
+#### Novelty Detection
+- **Sensory**: Detects changes in sensory input
+- **Prediction**: Compares input to expected patterns
+- **Memory**: Signals new experience for storage
+
+### Prediction System Integration
+
+#### Forward Models
+- **Learning**: Builds predictive models of sensory consequences
+- **Error**: Computation of prediction errors
+- **Planning**: Uses predictions to simulate futures
+- **Selection**: Chooses actions with expected positive outcomes
+
+### Cognitive System Integration
+
+#### Attention Mechanism
+- **Selection**: Competitive selection of neural representations
+- **Integration**: Combines bottom-up and top-down signals
+- **Gate**: Controls information flow to higher systems
+- **Stability**: Maintains focus on relevant representations
+
+#### Planning Integration
+- **Evaluation**: Uses prediction system to assess action outcomes
+- **Sequencing**: Creates and evaluates action sequences
+- **Selection**: Chooses actions based on expected value
+- **Adaptation**: Updates plans based on feedback
 
 ## Key Design Principles
 
@@ -238,52 +247,76 @@ Phase 3/4 introduces the AgentBrain class that connects the NLM brain to the wor
 7. **Extensibility**: Clear patterns for adding new components
 8. **No Predefined Knowledge**: All learning from experience
 
-## Phase 4 Key Innovations
+## Phase 4 Integration
 
-### Prediction System
-- Learns temporal sequences from experience
-- Predicts action consequences
-- Multi-step prediction capability
-- Error signals modulate learning
+Phase 4 introduced cognitive systems that must be integrated with the core brain loop:
 
-### Working Memory
-- Persistent neural activity
-- Recurrent connections for maintenance
-- Competition for selective retention
-- Neural-grounded (not a vector store)
+### Required Integration Steps
 
-### Episodic Memory
-- Experience encoded as neural patterns
-- Pattern completion retrieval
-- Temporal and spatial indexing
-- Replay during consolidation
+1. **Sensory → Working Memory**: Convert sensory input to working memory traces
+2. **Working Memory → Attention**: Feed working memory contents to attention system
+3. **Attention → Concept Formation**: Pass attended content to concept formation
+4. **Concept Formation → Planning**: Use concepts in action planning
+5. **Planning → Motor System**: Convert plans to motor commands
+6. **Motor → Self-Model**: Update self-model based on actions
+7. **Action → Episodic Memory**: Store experiences with outcomes
+8. **Episodic → Prediction**: Use episodes to train prediction system
 
-### Concept Formation
-- Discovers patterns without labels
-- Prototype formation through averaging
-- Stability measurement
-- Category hints from properties
+### Integration Targets
 
-### Attention
-- Lateral inhibition competition
-- Winner-take-more dynamics
-- Top-down and bottom-up bias
-- NOT Transformer QKV attention
+- **WorkingMemory**: Connected to sensory processing, attention, and motor systems
+- **EpisodicMemory**: Updated with experiences, replayed during consolidation
+- **PredictionSystem**: Trained on sensory sequences and action outcomes
+- **NeuralPlanner**: Uses predictions for action selection
+- **ConceptFormation**: Processes working memory contents to form stable representations
+- **SelfModel**: Learns body schema and action consequences
+- **SocialLearning**: Observes other agents for imitation learning
+- **SpatialRepresentation**: Builds metric representations of environment
 
-### Planning
-- Uses learned predictions
-- Evaluates potential futures
-- Selects actions leading to goals
-- Adapts based on outcomes
+## Performance Considerations
 
-### Self-Model
-- Learns body schema
-- Predicts action consequences
-- Self vs external distinction
-- Capability representation
+### Memory Efficiency
+- Working memory uses sparse coding (active neurons only)
+- Episodic memory stores compressed neural patterns
+- Efficient retrieval through pattern completion
 
-### Social Learning
-- Observes other agents
-- Learns action effects
-- Imitation capability
-- Simple communication signals
+### Computational Efficiency
+- Event-driven processing (spike events only)
+- Sparse connectivity (probabilistic synapses)
+- Parallel processing of independent regions
+
+### Scalability
+- Modular architecture allows adding regions
+- Hierarchical organization (populations → regions → brain)
+- Configurable population sizes
+
+## Future Integration Directions
+
+### Advanced Integration
+1. **Sleep Cycles**: Consolidated memory replay during rest
+2. **Development Effects**: Age-dependent changes in all systems
+3. **Social Integration**: Multi-agent interaction and learning
+4. **Energy Efficiency**: Metabolic constraints on neural activity
+
+### Research Applications
+- **Memory Studies**: Testing memory consolidation mechanisms
+- **Learning Studies**: Investigating developmental trajectories
+- **Attention Studies**: Studying competition and selection dynamics
+- **Decision Making**: Understanding action selection processes
+
+## System Status Summary
+
+| Component | Status | Integration |
+|-----------|--------|-------------|
+| Neural Core | ✅ Working | Fully operational |
+| Working Memory | ✅ Implemented | ❌ Not connected |
+| Episodic Memory | ✅ Implemented | ❌ Not connected |
+| Prediction System | ✅ Implemented | ❌ Not connected |
+| Neuromodulation | ⚠️ Partial | Partial integration |
+| Attention | ✅ Implemented | ❌ Not connected |
+| Planning | ✅ Implemented | ❌ Not connected |
+| Concept Formation | ✅ Implemented | ❌ Not connected |
+| Self-Model | ✅ Implemented | ❌ Not connected |
+| Social Learning | ✅ Implemented | ❌ Not connected |
+
+**Phase 6 Goal**: Connect all disconnected systems into a coherent brain loop.

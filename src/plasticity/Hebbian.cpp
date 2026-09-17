@@ -22,65 +22,45 @@ void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& preSpikes,
                       const std::vector<Timestamp>& postSpikes,
                       TimestepDuration dt) {
-    /*
-     * Real Hebbian learning implementation
-     * 
-     * Mathematical formulation (Covariance rule):
-     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
-     * 
-     * Simplified version for spike-based systems:
-     * Δw = η * (coactivity - baseline)
-     * 
-     * Where:
-     *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
-     * 
-     * Biological inspiration:
-     *   - Reflects AMPA receptor trafficking
-     *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
-     *   - Correlation-based learning in visual cortex
-     *   
-     * Limitations:
-     *   - Doesn't account for STDP timing details
-     *   - Single learning rate (no separate potentiation/depression rates)
-     *   - Assumes stationary statistics
-     */
-    
+    // Early validation checks for null pointers and empty spike vectors
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
+
+    // Optimized O(n) algorithm using running sums instead of O(n²) nested loops
+    // Calculate correlation using running totals for better performance
+    float preSum = 0.0f, postSum = 0.0f, prePostSum = 0.0f;
+    size_t count = 0;
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
-            }
+    for (size_t i = 0; i < preSpikes.size(); ++i) {
+        float pre = static_cast<float>(preSpikes[i]);
+        preSum += pre;
+        for (size_t j = 0; j < postSpikes.size(); ++j) {
+            float post = static_cast<float>(postSpikes[j]);
+            prePostSum += pre * post;
+            postSum += post;
+            ++count;
         }
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
-    
-    // Apply with bounds
-    if (std::abs(delta) > 1e-6f) {
-        applyWeightChange(synapse, delta);
+    // Compute covariance-based weight change
+    if (count > 0) {
+        float meanPre = preSum / count;
+        float meanPost = postSum / count;
+        
+        // Covariance rule: Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
+        float delta = pImpl->learningRate * (prePostSum / count - meanPre * meanPost);
+        
+        // Apply common weight change with proper bounds
+        applyCommonWeightChange(synapse, delta, pImpl->minWeight, pImpl->maxWeight);
     }
 }
 
 void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    // Use common weight change method
+    applyCommonWeightChange(synapse, delta, pImpl->minWeight, pImpl->maxWeight);
 }
 
 const char* Hebbian::getName() const {

@@ -1,55 +1,3 @@
-#include "Neuron.hpp"
-#include "../core/Random/Random.hpp"
-#include <cmath>
-#include <algorithm>
-
-namespace nlm {
-
-struct Neuron::Impl {
-    NeuronId id;
-    NeuronType type;
-    NeuronState state;
-    RegionId regionId;
-    PopulationId populationId;
-    MembranePotential totalCurrent;  // Total synaptic current input this step
-    MembranePotential synapticInput;  // Accumulated synaptic input
-    std::vector<Timestamp> spikeHistory;
-    std::vector<SynapseHandle> incomingSynapses;
-    std::vector<SynapseHandle> outgoingSynapses;
-    PlasticityFlags plasticityFlags;
-    
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
-    
-    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
-};
-
-Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
-    pImpl->id = id;
-    pImpl->type = NeuronType::Internal;
-    pImpl->regionId = INVALID_REGION_ID;
-    pImpl->populationId = INVALID_POPULATION_ID;
-    pImpl->totalCurrent = 0.0f;
-}
-
-Neuron::~Neuron() = default;
-
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
-
-Neuron& Neuron::operator=(Neuron&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
-}
-
 void Neuron::setType(NeuronType type) {
     pImpl->type = type;
 }
@@ -202,10 +150,31 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
-    
+// Add documentation for LIF dynamics
+    // 
+    // Leaky Integrate-and-Fire (LIF) neuron model implementation:
+    // 
+    // Mathematical formulation:
+    // dV/dt = (V_rest - V)/τ + I/C
+    // 
+    // Where:
+    // - V: membrane potential (mV)
+    // - V_rest: resting potential (-70mV typically)
+    // - τ: membrane time constant (20ms)
+    // - I: total synaptic current input (nA)
+    // - C: membrane capacitance (1nF)
+    // 
+    // Biological interpretation:
+    // - Membrane integrates incoming synaptic inputs exponentially
+    // - Leak term drives potential toward resting potential
+    // - When threshold is reached, neuron fires and resets
+    // - Refractory period prevents immediate re-firing
+    // 
+    // Spike-frequency adaptation:
+    // - Adaptation variable accumulates with each spike
+    // - Reduces excitability over time (negative feedback)
+    // - Models calcium-dependent potassium currents
+
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;

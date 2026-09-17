@@ -87,6 +87,21 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
+// Add memory statistics for debugging and monitoring
+    // 
+    // These metrics track the health and stability of working memory
+    // 
+    // activeTraces_: Number of actively maintained memory patterns
+    // - Higher values indicate more information is being held simultaneously
+    // - Can grow unbounded without capacity limits (purged by decayWeakTraces)
+    // 
+    // capacity_: Maximum number of neurons that can be part of working memory
+    // - Enforced in storeToNeuron and decayWeakTraces
+    // 
+    // decayRate_: How quickly memory traces weaken over time
+    // - Typical values: 0.01f to 0.1f per timestep
+    // - Controls memory persistence and forgetting
+
     Brain* brain_;
     size_t capacity_;
     float decayRate_;

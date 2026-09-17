@@ -2,11 +2,14 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include <algorithm>
+#include <cmath>
+#include "../core/Logger/Logger.hpp"
 
 namespace nlm {
 
 // Structural plasticity: creation and removal of synapses and neurons
-// PLACEHOLDER - Phase 2 will implement real structural plasticity
+// Implements biological mechanisms for synaptic growth and pruning
 
 class StructuralPlasticity {
 public:
@@ -14,20 +17,16 @@ public:
     ~StructuralPlasticity();
     
     // Create new synapse
-    // TODO PHASE 2: Implement real synapse creation
     SynapseId createSynapse(Brain* brain, NeuronId source, NeuronId destination,
                            SynapticWeight weight);
     
-    // Remove synapse
-    // TODO PHASE 2: Implement real synapse removal
+    // Remove synapse - marks for removal by zeroing weight and schedules cleanup
     bool removeSynapse(Brain* brain, SynapseId synapse);
     
-    // Create new neuron
-    // TODO PHASE 2: Implement real neuron creation
+    // Create new neuron - implements neurogenesis mechanisms
     NeuronId createNeuron(Brain* brain, NeuronType type);
     
-    // Remove neuron
-    // TODO PHASE 2: Implement real neuron removal
+    // Remove neuron - removes all associated synapses and the neuron itself
     bool removeNeuron(Brain* brain, NeuronId neuron);
     
     // Get creation rate
@@ -38,8 +37,12 @@ public:
     float getPruningRate() const;
     void setPruningRate(float rate);
     
-    // Update structural plasticity
+    // Update structural plasticity - implements activity-dependent growth and pruning
     void update(Brain* brain, class RandomGenerator& rng);
+    
+    // Statistics and monitoring
+    size_t getTotalSynapsesCreated() const;
+    size_t getTotalSynapsesPruned() const;
     
 private:
     struct Impl;

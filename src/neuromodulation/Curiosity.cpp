@@ -36,11 +36,12 @@ void Curiosity::update(float novelty, float predictionError, TimestepDuration dt
     float target = pImpl->noveltyWeight * novelty + 
                    pImpl->predictionErrorWeight * predictionError;
     
-    // Smooth update
-    pImpl->level += (target - pImpl->level) * 0.1f;
+    // Smooth update with exponential decay
+    float decay = std::exp(-pImpl->decayRate * static_cast<float>(dt));
+    pImpl->level = pImpl->level * decay + target * (1.0f - decay);
     
-    // Decay
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Clamp to reasonable range
+    pImpl->level = std::clamp(pImpl->level, 0.0f, 1.0f);
 }
 
 float Curiosity::getExplorationDrive() const {

@@ -10,6 +10,17 @@ void PlasticityRule::setEnabled(bool enabled) {
     enabled_ = enabled;
 }
 
+// Common weight change implementation with validation
+void PlasticityRule::applyCommonWeightChange(Synapse* synapse, float delta, 
+                                             float minWeight, float maxWeight) {
+    if (!synapse) return;
+    
+    // Apply weight change with bounds checking
+    float newWeight = synapse->getWeight() + delta;
+    newWeight = std::clamp(newWeight, minWeight, maxWeight);
+    synapse->setWeight(newWeight);
+}
+
 struct HebbianRule::Impl {
     float learningRate;
     

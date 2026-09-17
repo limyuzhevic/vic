@@ -2,24 +2,24 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Synapse.hpp"
+#include <algorithm>
 
 namespace nlm {
 
 // Abstract base class for plasticity rules
-// PLACEHOLDER - Phase 2 will implement real plasticity rules
+// Provides common weight change logic and error handling for all plasticity rules
 
 class PlasticityRule {
 public:
     virtual ~PlasticityRule() = default;
     
     // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,
                         TimestepDuration dt) = 0;
     
-    // Apply weight change
+    // Apply weight change with bounds checking and null pointer validation
     virtual void applyWeightChange(Synapse* synapse, SynapticWeight delta) = 0;
     
     // Get rule name
@@ -28,6 +28,11 @@ public:
     // Check if rule is enabled
     bool isEnabled() const;
     void setEnabled(bool enabled);
+    
+    // Common weight change implementation with validation
+    // Protected method for derived classes to use
+    void applyCommonWeightChange(Synapse* synapse, float delta, 
+                                 float minWeight, float maxWeight);
     
 protected:
     PlasticityRule() : enabled_(true) {}
