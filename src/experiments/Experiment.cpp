@@ -86,7 +86,8 @@ double Experiment::getMetric(const std::string& name) const {
             return pair.second;
         }
     }
-    return 0.0;
+    // Return -1.0 to indicate missing metric instead of 0.0
+    return -1.0;
 }
 
 bool Experiment::hasMetric(const std::string& name) const {

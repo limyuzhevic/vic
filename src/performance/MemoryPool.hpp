@@ -157,7 +157,11 @@ MemoryPool<T>::MemoryPool(size_t blockSize, size_t initialBlocks)
     // Align slab size to cache line (64 bytes) for false sharing prevention
     constexpr size_t cacheLineSize = 64;
     if (slabSize_ % cacheLineSize != 0) {
-        slabSize_ = ((slabSize_ / cacheLineSize) + 1) * cacheLineSize;
+        // Ensure proper cache line alignment
+        // Use division and multiplication to avoid potential integer division issues
+        // when slabSize_ is large
+        size_t cacheLinesNeeded = (slabSize_ + cacheLineSize - 1) / cacheLineSize;
+        slabSize_ = cacheLinesNeeded * cacheLineSize;
     }
     
     // Pre-allocate initial blocks

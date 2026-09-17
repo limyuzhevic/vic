@@ -8,6 +8,19 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    
+    // Plasticity flags need explicit initialization for C++ atomic operations
+    struct PlasticityFlags {
+        bool hebbian : 1;
+        bool stdp : 1;
+        bool reward_modulated : 1;
+        bool structural : 1;
+        bool eligible : 1;
+        
+        PlasticityFlags() : hebbian(false), stdp(false), 
+                           reward_modulated(false), structural(false), 
+                           eligible(false) {}
+    };
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}

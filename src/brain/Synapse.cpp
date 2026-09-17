@@ -218,7 +218,7 @@ void Synapse::step(Timestamp currentTime) {
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
-    // Clamp weight bounds
+    // Clamp weight bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 

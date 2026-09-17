@@ -220,7 +220,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V += static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -247,56 +247,148 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
-    } else {
-        pImpl->state.firingState = FiringState::Active;
+// Update adaptation for spike-frequency adaptation
+            pImpl->state.adaptationVariable += 1.0f;
+            // Clamp adaptation variable to prevent runaway growth
+            pImpl->state.adaptationVariable = std::min(pImpl->state.adaptationVariable, 100.0f);
+        } else {
+            pImpl->state.firingState = FiringState::Active;
+        }
+        
+        // Clear synaptic input for next step
+        pImpl->synapticInput = 0.0f;
+        
+        return fired;
     }
     
-    // Clear synaptic input for next step
-    pImpl->synapticInput = 0.0f;
+    void Neuron::step(Timestamp currentTime) {
+        // Default LIF step with standard timestep (1ms)
+        TimestepDuration dt = 0.001;  // 1ms default
+        stepLIF(currentTime, dt);
+    }
     
-    return fired;
-}
-
-void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
-}
-
-void Neuron::reset() {
-    pImpl->state = NeuronState();
-    pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
-}
-
-void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    void Neuron::reset() {
+        pImpl->state = NeuronState();
+        pImpl->synapticInput = 0.0f;
+        pImpl->spikeHistory.clear();
+    }
     
-    // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    void Neuron::initializeRandom(RandomGenerator& rng) {
+        // Real random initialization with biological constraints
+        // Membrane potential starts near resting potential
+        pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+        
+        // Threshold is typically -55mV with small variation
+        pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+        
+        // Resting potential typically -70mV
+        pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+        
+        // Reset potential is usually close to resting
+        pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+        
+        // Refractory period: 2-10ms typical
+        pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+        
+        // Initial state
+        pImpl->state.firingState = FiringState::Resting;
+        pImpl->state.refractoryRemaining = 0;
+        pImpl->state.adaptationVariable = 0.0f;
+        pImpl->state.lastSpikeTime = -1.0f;
+        
+        // Clear any residual state
+        pImpl->synapticInput = 0.0f;
+        pImpl->spikeHistory.clear();
+    }
     
-    // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
-    
-    // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
-    
-    // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
-    
-    // Initial state
-    pImpl->state.firingState = FiringState::Resting;
-    pImpl->state.refractoryRemaining = 0;
-    pImpl->state.adaptationVariable = 0.0f;
-    pImpl->state.lastSpikeTime = -1.0f;
-    
-    // Clear any residual state
-    pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
-}
-
 } // namespace nlm
+
+(End of file - total 302 lines)
+    
+    void Neuron::step(Timestamp currentTime) {
+        // Default LIF step with standard timestep (1ms)
+        TimestepDuration dt = 0.001;  // 1ms default
+        stepLIF(currentTime, dt);
+    }
+    
+    void Neuron::reset() {
+        pImpl->state = NeuronState();
+        pImpl->synapticInput = 0.0f;
+        pImpl->spikeHistory.clear();
+    }
+    
+    void Neuron::initializeRandom(RandomGenerator& rng) {
+        // Real random initialization with biological constraints
+        // Membrane potential starts near resting potential
+        pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+        
+        // Threshold is typically -55mV with small variation
+        pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+        
+        // Resting potential typically -70mV
+        pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+        
+        // Reset potential is usually close to resting
+        pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+        
+        // Refractory period: 2-10ms typical
+        pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+        
+        // Initial state
+        pImpl->state.firingState = FiringState::Resting;
+        pImpl->state.refractoryRemaining = 0;
+        pImpl->state.adaptationVariable = 0.0f;
+        pImpl->state.lastSpikeTime = -1.0f;
+        
+        // Clear any residual state
+        pImpl->synapticInput = 0.0f;
+        pImpl->spikeHistory.clear();
+    }
+    
+} // namespace nlm
+
+(End of file - total 302 lines)
+    
+    void Neuron::step(Timestamp currentTime) {
+        // Default LIF step with standard timestep (1ms)
+        TimestepDuration dt = 0.001;  // 1ms default
+        stepLIF(currentTime, dt);
+    }
+    
+    void Neuron::reset() {
+        pImpl->state = NeuronState();
+        pImpl->synapticInput = 0.0f;
+        pImpl->spikeHistory.clear();
+    }
+    
+    void Neuron::initializeRandom(RandomGenerator& rng) {
+        // Real random initialization with biological constraints
+        // Membrane potential starts near resting potential
+        pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+        
+        // Threshold is typically -55mV with small variation
+        pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+        
+        // Resting potential typically -70mV
+        pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+        
+        // Reset potential is usually close to resting
+        pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+        
+        // Refractory period: 2-10ms typical
+        pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+        
+        // Initial state
+        pImpl->state.firingState = FiringState::Resting;
+        pImpl->state.refractoryRemaining = 0;
+        pImpl->state.adaptationVariable = 0.0f;
+        pImpl->state.lastSpikeTime = -1.0f;
+        
+        // Clear any residual state
+        pImpl->synapticInput = 0.0f;
+        pImpl->spikeHistory.clear();
+    }
+    
+} // namespace nlm
+
+(End of file - total 302 lines)

@@ -53,27 +53,34 @@ private:
 };
 
 // Hodgkin-Huxley dynamics (detailed model)
-// TODO PHASE 2: Implement Hodgkin-Huxley
 class HodgkinHuxleyDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement HH dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
+    
+    // HH-specific parameters
+    void setSodiumConductance(float gNa);
+    void setPotassiumConductance(float gK);
+    void setLeakConductance(float gL);
+    void setTemperature(float tempC);
 };
 
-// FitzHugh-Nagumo dynamics (simplified兴奋性模型)
-// TODO PHASE 2: Implement FHN dynamics
+// FitzHugh-Nagumo dynamics (simplified excitation model)
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement FHN dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
+    
+    // FHN-specific parameters
+    void setThreshold(float threshold);
+    void setResetVoltage(float vReset);
+    void setTimeConstant(float tau);
 };
 
 } // namespace nlm
