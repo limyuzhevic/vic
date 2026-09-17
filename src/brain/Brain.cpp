@@ -242,18 +242,25 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
-    
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
-    
-    pImpl->conceptFormation->initialize(this);
-    
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+// Initialize prediction system
+        if (pImpl->predictionSystem) {
+            pImpl->predictionSystem->initialize(this);
+        }
+        
+        // Initialize cognition systems
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+        
+        pImpl->conceptFormation->initialize(this);
+        
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+        
+        // Connect cognitive systems to brain loop integration
+        pImpl->workingMemory->initialize(this);
+        pImpl->episodicMemory->initialize(this);
+        pImpl->associativeMemory->initialize(this);
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -513,9 +520,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        pImpl->predictionSystem->updatePredictions(
+            SensoryInput(),  // Would be current sensory observation
+            SensoryInput()   // Would be predicted observation
+        );
     }
     
-    // ========== STEP 9: Update attention system ==========
+    // ========== STEP 13: Connect cognition systems ==========
+    
+    // Update attention system
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -526,54 +539,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
+    // Update concept formation
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
+        // For now, just ensure it's initialized
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
-    }
-    
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
-        }
-    }
-    
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+    // Update neural planner based on working memory and attention
+    if (pImpl->planner && pImpl->workingMemory && pImpl->attention) {
+        // Create simple state vector for planning
+        std::vector<float> currentState;
+        if (!pImpl->workingMemory->getMemoryNeurons().empty()) {
+            currentState.resize(pImpl->workingMemory->getMemoryNeurons().size(), 0.0f);
+            for (size_t i = 0; i < pImpl->workingMemory->getMemoryNeurons().size(); ++i) {
+                currentState[i] = pImpl->workingMemory->getNeuronActivation(
+                    pImpl->workingMemory->getMemoryNeurons()[i]);
             }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
+        
+        // Simple planning - just get an action
+        ActionType action = pImpl->planner->planAction(currentState, 0.5f);
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========

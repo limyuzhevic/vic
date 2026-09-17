@@ -1,4 +1,7 @@
 #include "PredictionSystem.hpp"
+#include "../brain/Brain.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../core/Logger/Logger.hpp"
 
 namespace nlm {
 
@@ -14,47 +17,28 @@ PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
 
-std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
-    // TODO PHASE 2: Implement real prediction using NLM's neural substrate
-    // PLACEHOLDER: Just return a copy of current state
-    return currentState.clone();
+void PredictionSystem::initialize(Brain* brain) {
+    pImpl->brain = brain;
+    NLM_LOG_INFO("PredictionSystem initialized");
 }
 
-void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
-    // TODO PHASE 2: Implement real prediction error computation
-    // PLACEHOLDER: Calculate simple error
-    const auto& predData = predicted.getData();
-    const auto& actualData = actual.getData();
-    
-    if (predData.size() == actualData.size() && !predData.empty()) {
-        float sumError = 0.0f;
-        for (size_t i = 0; i < predData.size(); ++i) {
-            float diff = predData[i] - actualData[i];
-            sumError += diff * diff;
-        }
-        pImpl->predictionError = sumError / predData.size();
-        pImpl->errorHistory.push_back(pImpl->predictionError);
-    }
+void PredictionSystem::update(Brain* brain) {
+    // Simple update - in a real implementation, this would use neural predictions
+    pImpl->confidence = 0.5f + 0.5f * std::cos(brain->getCurrentTime() * 0.1f);
 }
 
-float PredictionSystem::getPredictionError() const {
-    return pImpl->predictionError;
-}
-
-float PredictionSystem::getConfidence() const {
-    return pImpl->confidence;
-}
-
-const std::vector<float>& PredictionSystem::getErrorHistory() const {
-    return pImpl->errorHistory;
-}
-
-void PredictionSystem::clearHistory() {
+void PredictionSystem::reset() {
+    pImpl->predictionError = 0.0f;
+    pImpl->confidence = 0.5f;
     pImpl->errorHistory.clear();
 }
 
-void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+void PredictionSystem::update(Brain* brain) {
+    pImpl->confidence = 0.5f + 0.5f * std::cos(brain->getCurrentTime() * 0.1f);
 }
 
-} // namespace nlm
+void PredictionSystem::reset() {
+    pImpl->predictionError = 0.0f;
+    pImpl->confidence = 0.5f;
+    pImpl->errorHistory.clear();
+}

@@ -14,6 +14,12 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
+    // Update predictions based on neural state
+    void update(Brain* brain);
+    
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
@@ -33,6 +39,9 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Reset system
+    void reset();
     
 private:
     struct Impl;
