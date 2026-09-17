@@ -400,22 +400,300 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Create configuration with common preset profiles
+    m.def("createConfigFromPreset", [](const std::string& preset) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        if (preset == "minimal") {
+            // Minimal configuration - small brain for quick testing
+            config->set("neuron_count", 100, ConfigSource::Default);
+            config->set("region_count", 1, ConfigSource::Default);
+            config->set("connection_probability", 0.05, ConfigSource::Default);
+            config->set("random_seed", 42, ConfigSource::Default);
+        }
+        else if (preset == "balanced") {
+            // Balanced configuration for general purpose
+            config->set("neuron_count", 500, ConfigSource::Default);
+            config->set("region_count", 2, ConfigSource::Default);
+            config->set("connection_probability", 0.1, ConfigSource::Default);
+            config->set("random_seed", 42, ConfigSource::Default);
+            
+            // Enable all plasticity mechanisms
+            config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+            config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+            config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        }
+        else if (preset == "high_performance") {
+            // High performance configuration - optimized for speed
+            config->set("neuron_count", 1000, ConfigSource::Default);
+            config->set("region_count", 2, ConfigSource::Default);
+            config->set("connection_probability", 0.15, ConfigSource::Default);
+            config->set("random_seed", 42, ConfigSource::Default);
+            
+            // Enhanced plasticity
+            config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+            config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+            config->set("plasticity.structural.enable", true, ConfigSource::Default);
+            config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+            config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        }
+        else if (preset == "research") {
+            // Research configuration - maximum flexibility
+            config->set("neuron_count", 2000, ConfigSource::Default);
+            config->set("region_count", 4, ConfigSource::Default);
+            config->set("connection_probability", 0.2, ConfigSource::Default);
+            config->set("random_seed", 42, ConfigSource::Default);
+            
+            // Advanced features
+            config->set("stdp_ltp_weight", 0.03f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.025f, ConfigSource::Default);
+            config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+            config->set("plasticity.structural.enable", true, ConfigSource::Default);
+            config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+            config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+            config->set("neuromod.dopamine.scale", 2.0f, ConfigSource::Default);
+        }
+        else {
+            // Default configuration
+            config->set("neuron_count", 1000, ConfigSource::Default);
+            config->set("region_count", 2, ConfigSource::Default);
+            config->set("connection_probability", 0.1, ConfigSource::Default);
+            config->set("random_seed", 42, ConfigSource::Default);
+        }
+        
+        return config;
+    }, py::arg("preset"),
+        "Create a configuration with preset profiles for different use cases.\n"
+        "Presets: 'minimal', 'balanced', 'high_performance', 'research', or default"
+    );
+    
+    // Create world with common presets
+    m.def("createWorldFromPreset", [](const std::string& preset) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        
+        if (preset == "small") {
+            world->configure(10, 10, 4, 4);
+        }
+        else if (preset == "medium") {
+            world->configure(20, 20, 8, 8);
+        }
+        else if (preset == "large") {
+            world->configure(40, 40, 16, 16);
+        }
+        else if (preset == "open_world") {
+            world->configure(100, 100, 20, 20);
+        }
+        else {
+            world->configure(20, 20, 8, 8);  // Default
+        }
+        
+        world->reset();
+        return world;
+    }, py::arg("preset"),
+        "Create a world with preset configurations.\n"
+        "Presets: 'small', 'medium', 'large', 'open_world', or default"
+    );
+    
+    // Create complete agent setup helper
+    m.def("createCompleteAgentSetup", 
+        [](const std::shared_ptr<Config>& config, 
+           const std::shared_ptr<SimpleWorld>& world) -> std::shared_ptr<AgentBrain> {
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            
+            auto agent = std::make_shared<AgentBrain>(brain);
+            agent->initialize(*world);
+            
+            // Enable all advanced features by default
+            agent->enableRewardModulation(true);
+            agent->enableStructuralPlasticity(true);
+            agent->enableDevelopment(true);
+            agent->enableCuriosity(true);
+            
+            return agent;
+        },
+        py::arg("config"), py::arg("world"),
+        "Create a complete agent setup with brain, world, and agent brain interface.\n"
+        "This is a convenience function for setting up a full agent in one call."
+    );
+    
+    // Advanced brain configuration methods
+    m.def("configureBrainForLearning", [](std::shared_ptr<Config> config) {
+        // Configure brain for supervised learning scenarios
+        config->set("brain.neuron_count", 1000, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.15, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.01f, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        
+        // Initialize prediction system
+        config->set("prediction_system.enable", true, ConfigSource::Default);
+        config->set("cognition.planning.enabled", true, ConfigSource::Default);
+        config->set("cognition.concept_formation.enabled", true, ConfigSource::Default);
+        
+        return config;
+    }, "Configure brain for supervised learning scenarios",
+        py::arg("config")
+    );
+    
+    m.def("configureBrainForExploration", [](std::shared_ptr<Config> config) {
+        // Configure brain for exploration and discovery scenarios
+        config->set("brain.neuron_count", 2000, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.2, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.005f, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 2.0f, ConfigSource::Default);
+        
+        // Initialize curiosity and novelty systems heavily
+        config->set("cognition.planning.enabled", true, ConfigSource::Default);
+        config->set("cognition.concept_formation.enabled", true, ConfigSource::Default);
+        config->set("development.enabled", true, ConfigSource::Default);
+        
+        return config;
+    }, "Configure brain for exploration and discovery scenarios",
+        py::arg("config")
+    );
+    
+    m.def("configureBrainForMemory", [](std::shared_ptr<Config> config) {
+        // Configure brain for memory-intensive tasks
+        config->set("brain.neuron_count", 1500, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.18, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.02f, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        
+        // Enhance memory systems
+        config->set("memory.working_memory.capacity", 200, ConfigSource::Default);
+        config->set("memory.episodic_memory.max_episodes", 5000, ConfigSource::Default);
+        config->set("memory.associative_memory.max_associations", 10000, ConfigSource::Default);
+        config->set("prediction_system.enable", true, ConfigSource::Default);
+        
+        return config;
+    }, "Configure brain for memory-intensive tasks",
+        py::arg("config")
+    );
+    
+    // Convenience functions for common tasks
+    m.def("runSimulation", 
+        [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+           std::shared_ptr<AgentBrain> agent, int steps) {
+            for (int step = 0; step < steps; ++step) {
+                world->update(0.1f);
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(*percept);
+                brain->step(step);
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+            }
+        },
+        "Run a complete simulation episode with brain, world, and agent.\n"
+        "This is a convenience function for running complete simulations."
+    );
+    
+    m.def("printBrainSummary", [](const std::shared_ptr<Brain>& brain) {
+        std::cout << "=== NLM Brain Summary ===" << std::endl;
+        std::cout << "Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        std::cout << "Synapses: " << brain->getTotalSynapseCount() << std::endl;
+        std::cout << "Active neurons: " << brain->getActiveNeuronCount() << std::endl;
+        std::cout << "Firing neurons: " << brain->getFiringNeuronCount() << std::endl;
+        std::cout << "Average firing rate: " << brain->getAverageFiringRate() << " Hz" << std::endl;
+        std::cout << "E/I ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+        std::cout << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        std::cout << "Pending events: " << brain->getPendingSpikeEventCount() << std::endl;
+        std::cout << "=========================" << std::endl;
+    }, "Print a comprehensive summary of the brain state",
+        py::arg("brain")
+    );
+    
+    m.def("estimateMemoryUsage", [](const std::shared_ptr<Brain>& brain) {
+        // Rough estimate of memory usage in MB
+        size_t neuronCount = brain->getTotalNeuronCount();
+        size_t synapseCount = brain->getTotalSynapseCount();
+        
+        // Estimate: neurons (4 float fields per neuron = 16 bytes) + synapses (6 float fields = 24 bytes)
+        double neuronMemory = static_cast<double>(neuronCount) * 16.0 / (1024.0 * 1024.0);
+        double synapseMemory = static_cast<double>(synapseCount) * 24.0 / (1024.0 * 1024.0);
+        
+        return neuronMemory + synapseMemory;
+    }, "Estimate memory usage of the brain in megabytes",
+        py::arg("brain")
+    );
+    
+    m.def("brainHash", [](const std::shared_ptr<Brain>& brain) {
+        std::hash<std::string> hasher;
+        std::string hashInput = std::to_string(brain->getTotalNeuronCount()) +
+                               std::to_string(brain->getTotalSynapseCount()) +
+                               std::to_string(brain->getTotalSpikeCount());
+        return hasher(hashInput);
+    }, "Generate a hash for the brain state for quick comparison",
+        py::arg("brain")
+    );
+
+    m.def("printBrainSummary", [](const std::shared_ptr<Brain>& brain) {
+        std::cout << "=== NLM Brain Summary ===" << std::endl;
+        std::cout << "Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        std::cout << "Synapses: " << brain->getTotalSynapseCount() << std::endl;
+        std::cout << "Active neurons: " << brain->getActiveNeuronCount() << std::endl;
+        std::cout << "Firing neurons: " << brain->getFiringNeuronCount() << std::endl;
+        std::cout << "Average firing rate: " << brain->getAverageFiringRate() << " Hz" << std::endl;
+        std::cout << "E/I ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+        std::cout << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        std::cout << "Pending events: " << brain->getPendingSpikeEventCount() << std::endl;
+        std::cout << "=========================" << std::endl;
+    }, "Print a comprehensive summary of the brain state",
+        py::arg("brain")
+    );
+    
+    m.def("estimateMemoryUsage", [](const std::shared_ptr<Brain>& brain) {
+        // Rough estimate of memory usage in MB
+        size_t neuronCount = brain->getTotalNeuronCount();
+        size_t synapseCount = brain->getTotalSynapseCount();
+        
+        // Estimate: neurons (4 float fields per neuron = 16 bytes) + synapses (6 float fields = 24 bytes)
+        double neuronMemory = static_cast<double>(neuronCount) * 16.0 / (1024.0 * 1024.0);
+        double synapseMemory = static_cast<double>(synapseCount) * 24.0 / (1024.0 * 1024.0);
+        
+        return neuronMemory + synapseMemory;
+    }, "Estimate memory usage of the brain in megabytes",
+        py::arg("brain")
+    );
+    
+    m.def("brainHash", [](const std::shared_ptr<Brain>& brain) {
+        std::hash<std::string> hasher;
+        std::string hashInput = std::to_string(brain->getTotalNeuronCount()) +
+                               std::to_string(brain->getTotalSynapseCount()) +
+                               std::to_string(brain->getTotalSpikeCount());
+        return hasher(hashInput);
+    }, "Generate a hash for the brain state for quick comparison",
+        py::arg("brain")
+    );
+    
+    // Original basic API functions for backward compatibility
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
-
+    
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
-
+    
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
-
+    
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Invalid ID constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

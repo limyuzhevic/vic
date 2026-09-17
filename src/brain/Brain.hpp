@@ -1,5 +1,31 @@
 #pragma once
 
+/**
+ * @file Brain.hpp
+ * @brief Central neural simulation brain class implementing integrated artificial intelligence
+ * 
+ * @class Brain
+ * @brief Core neural system implementing real spiking computation with integrated memory, 
+ *        cognition, neuromodulation, and development systems
+ * 
+ * The Brain class implements a Phase 6 integrated artificial brain with:
+ * - Leaky Integrate-and-Fire (LIF) neuron dynamics
+ * - Event-driven spike propagation with synaptic delays
+ * - Multiple plasticity mechanisms (STDP, Hebbian, structural)
+ * - Integrated memory systems (working, episodic, associative)
+ * - Prediction system for sensory prediction and error computation
+ * - Cognitive systems (planning, concept formation, attention)
+ * - Neuromodulation (dopamine, curiosity, novelty)
+ * - Developmental stages affecting plasticity rates
+ * 
+ * The brain operates as a closed-loop system processing sensory input,
+ * generating actions, and learning from rewards through neuromodulation.
+ * 
+ * @author NLM Project
+ * @date Phase 6: Final Integration
+ * @version 0.1.0
+ */
+
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
@@ -8,6 +34,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
