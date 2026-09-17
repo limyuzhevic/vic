@@ -675,10 +675,16 @@ float Brain::getExcitationInhibitionRatio() const {
         }
     }
     
+    // Check for division by zero - ensure inhibitory neurons exist before division
     if (totalInhibitory > 0.0f) {
         return totalExcitatory / totalInhibitory;
+    } else if (totalExcitatory > 0.0f) {
+        // If no inhibitory connections but excitatory exist, return a large ratio
+        return std::numeric_limits<float>::infinity();
+    } else {
+        // No connections at all - return zero ratio
+        return 0.0f;
     }
-    return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
 }
 
 size_t Brain::getTotalSpikeCount() const {

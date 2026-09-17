@@ -53,4 +53,59 @@ void MotorSystem::clearHistory() {
     pImpl->actionHistory.clear();
 }
 
+// Additional action execution method
+void MotorSystem::executeAction(const Action& action) {
+    // Store action in history for replay/consolidation
+    pImpl->actionHistory.push_back(&action);
+    
+    // Implement action-specific logic here
+    switch (action.getType()) {
+        case ActionType::MoveForward:
+            // Agent moves forward in environment
+            break;
+        case ActionType::MoveBackward:
+            // Agent moves backward in environment
+            break;
+        case ActionType::MoveLeft:
+            // Agent moves left in environment
+            break;
+        case ActionType::MoveRight:
+            // Agent moves right in environment
+            break;
+        case ActionType::TurnLeft:
+            // Agent turns left
+            break;
+        case ActionType::TurnRight:
+            // Agent turns right
+            break;
+        case ActionType::Look:
+            // Agent looks around
+            break;
+        case ActionType::LookUp:
+            // Agent looks up
+            break;
+        case ActionType::LookDown:
+            // Agent looks down
+            break;
+        case ActionType::Interact:
+            // Agent interacts with environment
+            break;
+        case ActionType::Eat:
+            // Agent eats food
+            break;
+        case ActionType::Drink:
+            // Agent drinks water
+            break;
+        case ActionType::Rest:
+            // Agent rests/heals
+            break;
+        case ActionType::Wait:
+            // Agent does nothing
+            break;
+        default:
+            // Unknown action - log warning
+            break;
+    }
+}
+
 } // namespace nlm
