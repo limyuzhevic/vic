@@ -97,23 +97,44 @@ public:
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
     
-    // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    // Neural action selection with cognitive planning
+    MotorCommand selectActionWithPlanning();
     
-    // Update plasticity rules (called automatically in step)
-    void updatePlasticity();
+    // Decode action from concept representations
+    MotorCommand decodeActionFromConcepts();
     
-    // Apply developmental changes (called automatically in step)
-    void develop();
+    // Create list of potential action candidates
+    std::vector<MotorCommand> createActionCandidates();
     
-    // Reset brain state
-    void reset();
+    // Simple motor command decoding (fallback)
+    MotorCommand decodeMotorCommand();
     
-    // Save brain state to file (checkpointing)
-    bool save(const std::string& filepath) const;
+    // Get prediction error for active inference
+    float getPredictionError() const;
     
-    // Load brain state from file
-    bool load(const std::string& filepath);
+    // Get current concepts for action selection
+    std::vector<ConceptInfo> getCurrentConcepts() const;
+    
+    // Update brain with concept-based learning
+    void updateWithConcepts();
+    
+    // Check if rest/consolidation should be triggered
+    bool shouldRest() const;
+    
+    // Enter rest/consolidation mode for memory consolidation
+    void enterRestMode();
+    
+    // Exit rest/consolidation mode
+    void exitRestMode();
+    
+    // Apply neuromodulation effects on learning and plasticity
+    void applyFullNeuromodulation();
+    
+    // Get developmental effects on neural excitability
+    float getDevelopmentalExcitability() const;
+    
+    // Get attention modulation strength
+    float getAttentionModulation() const;
     
     // Region management
     RegionId addRegion(const std::string& name = "");
@@ -196,6 +217,33 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+};
+
+// Forward declarations for additional types used in Brain
+struct ConceptInfo {
+    std::string name;
+    float strength;
+    float confidence;
+};
+
+struct ActionSelectionContext {
+    std::vector<MotorCommand> possibleActions;
+    bool workingMemoryActive;
+    std::vector<NeuronId> memoryNeurons;
+    float memoryConfidence;
+    float predictionError;
+    float predictionConfidence;
+    DevelopmentalStage developmentalStage;
+};
+
+// Forward declaration for PredictionInput (needed in brain.cpp)
+struct PredictionInput {
+    std::vector<float> activations;
+};
+
+// Forward declaration for ConceptFormationInput
+struct ConceptFormationInput {
+    std::vector<float> patterns;
 };
 
 } // namespace nlm
