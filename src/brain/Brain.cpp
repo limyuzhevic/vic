@@ -107,50 +107,53 @@ struct Brain::Impl {
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
+
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
+
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
-        
+
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
-        
+
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
-        
+
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
-        
+
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
         float tau = config->getOr<float>("stdp_tau", 20.0f);
         stdp->configure(ltpWeight, ltdWeight, tau);
-        
+
         // Configure structural plasticity
         float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
         float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
-        
+
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
+
         // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
+
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Initialize attention system developmental stage
+        developmentalStage = DevelopmentalStage::Initial;
     }
     
     DevelopmentalStage developmentalStage;
@@ -738,6 +741,15 @@ void Brain::develop() {
 void Brain::reset() {
     NLM_LOG_INFO("Resetting NLM Brain...");
     
+    // Clear all neuron collections
+    pImpl->sensoryNeurons.clear();
+    pImpl->motorNeurons.clear();
+    
+    // Reset all regions
+    pImpl->regions.clear();
+    pImpl->interRegionConnections.clear();
+    
+    // Reset integration state
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
     pImpl->totalSpikesThisStep = 0;
@@ -745,18 +757,39 @@ void Brain::reset() {
     pImpl->isResting = false;
     pImpl->stepsSinceLastEpisode = 0;
     
-    for (auto& region : pImpl->regions) {
-        region->reset();
-    }
+    // Reset spike system
+    if (pImpl->spikeSystem) pImpl->spikeSystem->reset();
     
-    pImpl->spikeSystem->reset();
+    // Reset plasticity systems
+    if (pImpl->stdp) pImpl->stdp->reset();
+    if (pImpl->hebbian) pImpl->hebbian->reset();
+    if (pImpl->structuralPlasticity) pImpl->structuralPlasticity->reset();
+    
+    // Reset developmental stage
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
     // Reset memory systems
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+    
+    // Reset cognition systems
     if (pImpl->attention) pImpl->attention->reset();
+    
+    // Reset development system
+    if (pImpl->developmentSystem) pImpl->developmentSystem->reset();
+    
+    // Reset neuromodulation systems
+    if (pImpl->dopamine) pImpl->dopamine->reset();
+    if (pImpl->curiosity) pImpl->curiosity->reset();
+    if (pImpl->predictionError) pImpl->predictionError->reset();
+    if (pImpl->novelty) pImpl->novelty->reset();
+    
+    // Reset prediction system
+    if (pImpl->predictionSystem) pImpl->predictionSystem->reset();
+    
+    // Reset checkpoint manager
+    if (pImpl->checkpointManager) pImpl->checkpointManager->clear();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }

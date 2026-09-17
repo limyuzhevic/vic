@@ -1,16 +1,20 @@
 #pragma once
 
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
 #include <memory>
+#include <string>
 #include <vector>
+#include <unordered_map>
+#include <any>
+#include <cmath>
+#include <algorithm>
+#include <chrono>
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Forward declarations
+class Config;
+class Brain;
+
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -69,6 +73,23 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // ========== NEW METHODS FOR IMPROVED API ==========
+    
+    // Get focus level
+    float getFocusLevel() const;
+    
+    // Get attention level
+    float getAttentionLevel() const;
+    
+    // Get comprehensive learning status
+    std::unordered_map<std::string, bool> getLearningStatus() const;
+    
+    // Get all neural levels
+    std::unordered_map<std::string, float> getAllLevels() const;
+    
+    // Get comprehensive metrics summary
+    std::unordered_map<std::string, std::any> getMetricsSummary() const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -112,6 +133,12 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Tracking state
+    size_t totalSteps_;
+    size_t totalSensoryProcessed_;
+    size_t totalActionsGenerated_;
+    double startTime_;
 };
 
 } // namespace nlm
