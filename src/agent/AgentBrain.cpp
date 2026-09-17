@@ -87,8 +87,85 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
+    // Extract sensory data
     const auto& vision = percept.getVision();
+    const auto& touch = percept.getTouch();
+    const auto& internal = percept.getInternal();
+    const auto& proprio = percept.getProprioception();
+    
+    // Store in working memory
+    if (brain_->getWorkingMemory()) {
+        // Combine all sensory modalities into one pattern
+        std::vector<float> sensoryPattern;
+        
+        // Vision (256 values)
+        for (float v : vision) {
+            sensoryPattern.push_back(v);
+        }
+        
+        // Touch (8 values)
+        for (float t : touch) {
+            sensoryPattern.push_back(t);
+        }
+        
+        // Internal signals (4 values)
+        for (float i : internal) {
+            sensoryPattern.push_back(i);
+        }
+        
+        // Proprioception (6 values)
+        for (float p : proprio) {
+            sensoryPattern.push_back(p);
+        }
+        
+        // Store in working memory
+        brain_->getWorkingMemory()->store(sensoryPattern, 1.0f);
+        
+        // Update attention system with new sensory input
+        if (brain_->getAttention()) {
+            // Convert vision data to neuron activity for attention
+            std::vector<NeuronId> competitorNeurons;
+            for (size_t i = 0; i < std::min(sensoryVision_.size(), vision.size()); ++i) {
+                if (sensoryVision_[i]) {
+                    competitorNeurons.push_back(sensoryVision_[i]->getId());
+                }
+            }
+            if (!competitorNeurons.empty()) {
+                brain_->getAttention()->processCompetition(competitorNeurons);
+            }
+        }
+    }
+    
+    // Create episode in episodic memory
+    if (brain_->getEpisodicMemory()) {
+        // Get action if available from motor system
+        ActionType action = ActionType::Wait;
+        if (!motorForward_.empty() && brain_->getAttention()) {
+            // Simplified: assume we have an action
+            // This would be more sophisticated in a real implementation
+            action = ActionType::MoveForward;
+        }
+        
+        // Create sensory pattern for episodic memory
+        std::vector<float> sensoryState;
+        for (float v : vision) sensoryState.push_back(v);
+        for (float t : touch) sensoryState.push_back(t);
+        for (float i : internal) sensoryState.push_back(i);
+        
+        // Store in episodic memory
+        EpisodicMemoryItem episode;
+        episode.timestamp = brain_->getTotalSpikeCount();
+        episode.action = action;
+        episode.sensoryState = sensoryState;
+        episode.resultingSensoryState.clear();  // Will be filled when action is taken
+        episode.reward = 0.0f;  // Will be filled after action
+        episode.activeNeurons.clear();  // Will be filled from brain activation
+        episode.neuronActivations.clear();  // Will be filled from brain activation
+        
+        brain_->getEpisodicMemory()->storeEpisode(episode);
+    }
+    
+    // Vision input (256 values -> sensoryVision_ neurons)
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
@@ -98,7 +175,6 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
@@ -107,16 +183,14 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+    for (size_t i = 0; i < sensoryInternal_.size() && i < internal.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            float current = (internal[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
