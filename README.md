@@ -82,6 +82,15 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Python Bindings Test
+```bash
+# After building, install the Python package
+pip install pynlm
+
+# Run Python examples
+python -c "import pynlm; print('pynlm version:', pynlm.__version__)"
+```
+
 ## Project Structure
 
 ```
