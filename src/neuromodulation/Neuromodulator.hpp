@@ -6,25 +6,46 @@
 
 namespace nlm {
 
-// Neuromodulator: Abstract base for neuromodulatory signals
+// Neuromodulation system: Abstract base for neuromodulatory signals
 // PLACEHOLDER - Phase 2 will implement real neuromodulation effects
 
 class Neuromodulator {
 public:
     virtual ~Neuromodulator() = default;
     
-    // Get modulator name
+    /**
+     * @brief Get the name of this neuromodulator
+     * 
+     * @return Human-readable name (e.g., "DA", "ACh", "NE", "5-HT")
+     */
     virtual const char* getName() const = 0;
     
-    // Get current concentration/level
+    /**
+     * @brief Get the current concentration/level of the neuromodulator
+     * 
+     * @return Current level (typically 0.0 to 1.0)
+     */
     virtual float getLevel() const = 0;
+    
+    /**
+     * @brief Set the concentration/level of the neuromodulator
+     * 
+     * @param level New level (will be clamped to valid range)
+     */
     virtual void setLevel(float level) = 0;
     
-    // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    /**
+     * @brief Apply neuromodulatory effect to plasticity
+     * 
+     * @return Plasticity modulation factor (multiplies learning rate)
+     */
     virtual float getPlasticityFactor() const = 0;
     
-    // Update neuromodulator state
+    /**
+     * @brief Update neuromodulator state based on time step
+     * 
+     * @param dt Time step duration
+     */
     virtual void update(TimestepDuration dt) = 0;
     
 protected:
@@ -44,8 +65,18 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
-    // Reward signaling
+    /**
+     * @brief Signal a reward event (dopamine burst)
+     * 
+     * @param reward Reward value (positive for rewards)
+     */
     void signalReward(float reward);
+    
+    /**
+     * @brief Signal a reward prediction error
+     * 
+     * @param error Prediction error (positive = better than expected)
+     */
     void signalRewardPredictionError(float error);
     
 private:
@@ -57,10 +88,39 @@ private:
 // PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
+    /**
+     * @brief Get the neuromodulator name
+     * 
+     * @return Always "ACh"
+     */
     const char* getName() const override { return "ACh"; }
+    
+    /**
+     * @brief Get current level (always 0.0)
+     * 
+     * @return 0.0 (placeholder implementation)
+     */
     float getLevel() const override { return 0.0f; }
+    
+    /**
+     * @brief Set level (does nothing in placeholder)
+     * 
+     * @param level Ignored
+     */
     void setLevel(float level) override {}
+    
+    /**
+     * @brief Get plasticity factor (always 1.0)
+     * 
+     * @return 1.0 (no modulation in placeholder)
+     */
     float getPlasticityFactor() const override { return 1.0f; }
+    
+    /**
+     * @brief Update (does nothing in placeholder)
+     * 
+     * @param dt Ignored
+     */
     void update(TimestepDuration dt) override {}
 };
 
@@ -68,10 +128,39 @@ public:
 // PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
+    /**
+     * @brief Get the neuromodulator name
+     * 
+     * @return Always "NE"
+     */
     const char* getName() const override { return "NE"; }
+    
+    /**
+     * @brief Get current level (always 0.0)
+     * 
+     * @return 0.0 (placeholder implementation)
+     */
     float getLevel() const override { return 0.0f; }
+    
+    /**
+     * @brief Set level (does nothing in placeholder)
+     * 
+     * @param level Ignored
+     */
     void setLevel(float level) override {}
+    
+    /**
+     * @brief Get plasticity factor (always 1.0)
+     * 
+     * @return 1.0 (no modulation in placeholder)
+     */
     float getPlasticityFactor() const override { return 1.0f; }
+    
+    /**
+     * @brief Update (does nothing in placeholder)
+     * 
+     * @param dt Ignored
+     */
     void update(TimestepDuration dt) override {}
 };
 
@@ -79,10 +168,39 @@ public:
 // PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
+    /**
+     * @brief Get the neuromodulator name
+     * 
+     * @return Always "5-HT"
+     */
     const char* getName() const override { return "5-HT"; }
+    
+    /**
+     * @brief Get current level (always 0.0)
+     * 
+     * @return 0.0 (placeholder implementation)
+     */
     float getLevel() const override { return 0.0f; }
+    
+    /**
+     * @brief Set level (does nothing in placeholder)
+     * 
+     * @param level Ignored
+     */
     void setLevel(float level) override {}
+    
+    /**
+     * @brief Get plasticity factor (always 1.0)
+     * 
+     * @return 1.0 (no modulation in placeholder)
+     */
     float getPlasticityFactor() const override { return 1.0f; }
+    
+    /**
+     * @brief Update (does nothing in placeholder)
+     * 
+     * @param dt Ignored
+     */
     void update(TimestepDuration dt) override {}
 };
 

@@ -14,24 +14,53 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
-    // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
+    /**
+     * @brief Make prediction for next timestep
+     * 
+     * @param currentState Current sensory state
+     * @return Predicted next state
+     */
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
-    // Update predictions based on actual observation
+    /**
+     * @brief Update predictions based on actual observation
+     * 
+     * @param predicted Predicted sensory input
+     * @param actual Actual sensory input
+     */
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
-    // Get prediction error
+    /**
+     * @brief Get prediction error
+     * 
+     * @return Prediction error (lower is better)
+     */
     float getPredictionError() const;
     
-    // Get prediction confidence
+    /**
+     * @brief Get prediction confidence
+     * 
+     * @return Confidence level (higher is better)
+     */
     float getConfidence() const;
     
-    // Get prediction history
+    /**
+     * @brief Get prediction history
+     * 
+     * @return Vector of prediction errors over time
+     */
     const std::vector<float>& getErrorHistory() const;
+    
+    /**
+     * @brief Clear prediction history
+     */
     void clearHistory();
     
-    // Train prediction model
+    /**
+     * @brief Train prediction model
+     * 
+     * @param observation Training observation
+     */
     void train(const SensoryInput& observation);
     
 private:

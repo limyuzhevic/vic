@@ -424,8 +424,6 @@ int main(int argc, char** argv) {
     brain->initialize();
     runStdpVerification(brain);
     
-    // Final brain status
-    NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
     

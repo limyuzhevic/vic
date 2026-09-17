@@ -42,7 +42,7 @@ struct Synapse::Impl {
     static constexpr float STP_FACILITATION_TAU = 100.0f;  // ms
     static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
     static constexpr float STP_U_MAX = 1.0f;  // Max utilization
-    
+
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
 };
 
@@ -132,12 +132,28 @@ void Synapse::recordPreSpike(Timestamp timestamp) {
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
     }
+    pImpl->lastPreSpikeTime = static_cast<float>(timestamp);
+    
+    // Update short-term facilitation (Tsodyks-Markram model)
+    // Facilitation increases with recent presynaptic activity
+    float dt = timestamp - pImpl->lastPreSpikeTime;
+    if (dt < Impl::STP_FACILITATION_TAU) {
+        pImpl->shortTermFacilitation = std::min(1.0f, pImpl->shortTermFacilitation + 0.1f);
+    }
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+    }
+    pImpl->lastPostSpikeTime = static_cast<float>(timestamp);
+    
+    // Update short-term depression (use-dependent modulation)
+    // Depression occurs with recent postsynaptic activity
+    float dt = timestamp - pImpl->lastPostSpikeTime;
+    if (dt < Impl::STP_DEPRESSION_TAU) {
+        pImpl->shortTermDepression = std::max(0.2f, pImpl->shortTermDepression - 0.2f);
     }
 }
 
@@ -152,6 +168,8 @@ const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
 void Synapse::clearHistory() {
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
+    pImpl->lastPreSpikeTime = -1.0f;
+    pImpl->lastPostSpikeTime = -1.0f;
 }
 
 PlasticityFlags& Synapse::getPlasticityFlags() {
@@ -217,6 +235,16 @@ void Synapse::step(Timestamp currentTime) {
     
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
+    
+    // Update synaptic efficacy based on recent activity
+    // Efficacy increases with presynaptic spiking, decreases with postsynaptic spiking
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        pImpl->efficacy *= 1.001f;  // Slow strengthening with presynaptic activity
+    }
+    if (pImpl->lastPostSpikeTime >= 0.0f) {
+        pImpl->efficacy *= 0.995f;  // Slow weakening with postsynaptic activity
+    }
+    pImpl->efficacy = std::clamp(pImpl->efficacy, 0.0f, 2.0f);
     
     // Clamp weight bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);

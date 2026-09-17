@@ -15,13 +15,39 @@ InternalSignalsProcessor::~InternalSignalsProcessor() = default;
 
 void InternalSignalsProcessor::process(const InternalSignals& signals) {
     // TODO PHASE 2: Implement real internal signal processing
-    // PLACEHOLDER: Just pass through
+    // Real implementation: Process internal physiological and neuromodulatory signals
+    
+    // Get raw internal signals
     pImpl->processedSignals = signals.getData();
     
-    // Generate some homeostatic signals
+    // Generate homeostatic signals based on internal state
     pImpl->homeostaticSignals.clear();
-    pImpl->homeostaticSignals.push_back(1.0f);  // Allostatic load
-    pImpl->homeostaticSignals.push_back(0.5f);  // Metabolic state
+    
+    // Compute allostatic load (need for energy/resources)
+    float allostaticLoad = 0.0f;
+    for (float signal : pImpl->processedSignals) {
+        // Higher signal values indicate stress/needs
+        allostaticLoad += std::abs(signal) * 0.1f;
+    }
+    pImpl->homeostaticSignals.push_back(allostaticLoad);
+    
+    // Compute metabolic state (energy balance)
+    float metabolicState = 1.0f - std::min(1.0f, allostaticLoad * 2.0f);
+    pImpl->homeostaticSignals.push_back(metabolicState);
+    
+    // Compute arousal level (general alertness)
+    float arousal = std::sqrt(std::accumulate(pImpl->processedSignals.begin(), 
+                                             pImpl->processedSignals.end(), 
+                                             0.0f) / std::max(1.0f, static_cast<float>(pImpl->processedSignals.size())));
+    pImpl->homeostaticSignals.push_back(arousal);
+    
+    // Compute stress hormone levels (e.g., cortisol)
+    float stress = allostaticLoad * metabolicState;
+    pImpl->homeostaticSignals.push_back(stress);
+    
+    // Update internal state based on processed signals
+    // This would influence neural excitability and plasticity
+    // For now, we compute but don't apply to actual neurons
 }
 
 const std::vector<float>& InternalSignalsProcessor::getProcessedSignals() const {

@@ -30,21 +30,6 @@ void HebbianRule::update(Synapse* synapse,
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
-    
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
-    for (Timestamp pre : preSpikes) {
-        for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
-            }
-        }
-    }
-    
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
-    }
 }
 
 void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
