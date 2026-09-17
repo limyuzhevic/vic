@@ -89,16 +89,18 @@ public:
     Hebbian* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
     
-    // Statistics
-    float getExcitationInhibitionRatio() const;
-    size_t getTotalSpikeCount() const;
-    size_t getPendingSpikeEventCount() const;
+    // Integration of cognitive planning into action selection
+    // This enables planning mechanisms to influence motor output
+    void applyPlannedAction(const class Action& action, SimulationStep currentStep, Timestamp currentTime);
     
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    // Get current state for planning (used by neural planner)
+    std::vector<float> getCurrentState() const;
     
-    // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    // Set current goal for planning (used by neural planner)  
+    void setCurrentGoal(const std::vector<float>& goal);
+    
+    // Get current goal
+    const std::vector<float>& getCurrentGoal() const;
     
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();

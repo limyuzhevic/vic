@@ -69,11 +69,17 @@ struct Brain::Impl {
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
     
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
-    size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
+    // Integration goals for planning and cognitive control
+    std::vector<float> currentGoal;
+    
+    // === WORLD INTERFACE ===
+    std::shared_ptr<class SimpleWorld> worldInterface;
+    
+    // === ACTION APPLICATION ===
+    void applyMotorCommand(ActionType action, SimulationStep currentStep, Timestamp currentTime);
+    
+    // === GET WORLD INTERFACE ===
+    SimpleWorld* getWorldInterface();
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
@@ -406,185 +412,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
-    
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
-        
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
-                    }
-                }
-            }
-        }
-    }
-    
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
-    float plasticityMod = 1.0f;
-    if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
-    }
-    
-    for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
-            // Apply STDP with neuromodulation
-            if (syn->getPlasticityFlags().stdp) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                    float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
-                }
-            }
-            
-            // Apply Hebbian learning
-            if (syn->getPlasticityFlags().hebbian) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                }
-            }
-            
-            // Update synapse state
-            syn->step(currentTime);
-        }
-    }
-    
-    // ========== STEP 7: Update episodic memory ==========
-    pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
-        pImpl->stepsSinceLastEpisode = 0;
-        
-        if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
-            EpisodicMemoryItem episode;
-            episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            // Store active neurons
-            for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
-                        if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
-                            episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
-                        }
-                    }
-                }
-            }
-            
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            pImpl->episodicMemory->storeEpisode(episode);
-        }
-    }
-    
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
-    }
-    
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
-        pImpl->attention->update(pImpl->timestep);
-        
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+    // ========== STEP 5: Integrate memory with attention ==========
+    if (pImpl->attention && pImpl->workingMemory) {
+        // Use working memory winners as attentional focus
+        std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+        if (!competitors.empty()) {
             pImpl->attention->processCompetition(competitors);
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // ========== STEP 6: Update prediction system ==========
+    if (pImpl->predictionSystem) {
+        // The prediction system would use sensory input to predict next state
+        // This enables prediction error computation and learning
+        pImpl->predictionSystem->update(pImpl->timestep);
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
-    }
-    
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+    // ========== STEP 7: Integration of cognitive planning ==========
+    if (pImpl->planner) {
+        // Use the neural planner to select the best action
+        // This is the cognitive integration step - learned planning emerges from neural dynamics
+        ActionType plannedAction = pImpl->planner->planAction(currentState, 0.5f);
+        if (plannedAction != ActionType::Wait) {
+            // Apply the planned action as a motor command
+            // This is the critical integration point: planning -> action selection
+            applyMotorCommand(plannedAction, currentStep, currentTime);
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
-            }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
-        }
-    }
-    
-    // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
-    }
-    
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
+    // ========== STEP 8: Integration of concept formation ==========
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Concept formation can use working memory patterns to form concepts
+        // This integrates attention, working memory, and concept discovery
+        // Future enhancement: feed working memory state to concept formation
+        pImpl->conceptFormation->updateConceptFormation(pImpl->timestep);
     }
 }
 
@@ -716,13 +577,35 @@ std::unique_ptr<class Action> Brain::produceAction() {
     return action;
 }
 
-void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
-    float modulation = signal.getLevel();
-    
-    // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
+void Brain::applyMotorCommand(ActionType action, SimulationStep currentStep, Timestamp currentTime) {
+    // Apply motor command to the world
+    // This is the integration point between neural brain and environmental interaction
+    if (worldInterface) {
+        // Convert ActionType to MotorCommand for world interaction
+        MotorCommand motorCmd;
+        switch (action) {
+            case ActionType::MoveForward: motorCmd = MotorCommand::MoveForward; break;
+            case ActionType::MoveBackward: motorCmd = MotorCommand::MoveBackward; break;
+            case ActionType::TurnLeft: motorCmd = MotorCommand::TurnLeft; break;
+            case ActionType::TurnRight: motorCmd = MotorCommand::TurnRight; break;
+            case ActionType::LookLeft: motorCmd = MotorCommand::LookLeft; break;
+            case ActionType::LookRight: motorCmd = MotorCommand::LookRight; break;
+            case ActionType::Interact: motorCmd = MotorCommand::Interact; break;
+            case ActionType::Wait: motorCmd = MotorCommand::Wait; break;
+            case ActionType::Consume: motorCmd = MotorCommand::Interact; break; // Simplified
+            case ActionType::Examine: motorCmd = MotorCommand::Wait; break; // Simplified
+            default: motorCmd = MotorCommand::Wait; break;
+        }
+        
+        // Apply the motor command to the world
+        worldInterface->applyMotorCommand(motorCmd, currentTime);
+        
+        NLM_LOG_INFO("Applied motor command: " + std::to_string(static_cast<int>(action)) + " at time " + std::to_string(currentTime));
+    }
+}
+
+SimpleWorld* Brain::getWorldInterface() {
+    return worldInterface.get();
 }
 
 void Brain::updatePlasticity() {
