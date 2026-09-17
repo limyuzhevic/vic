@@ -11,6 +11,7 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
@@ -19,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -390,8 +392,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     
                     // Store to working memory - neurons that fire become part of working memory
                     if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                        float activation = std::abs(state.membranePotential - state.restingPotential) / 10.0f;
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), activation);
+                    }
+                    
+                    // Update associative memory with co-activation patterns
+                    if (pImpl->associativeMemory) {
+                        // Create pattern from recent neural activity
+                        std::vector<float> pattern;
+                        for (auto* n : pImpl->sensoryNeurons) {
+                            const auto& nstate = n->getState();
+                            pattern.push_back(std::abs(nstate.membranePotential - nstate.restingPotential));
+                        }
+                        for (auto* n : pImpl->motorNeurons) {
+                            const auto& nstate = n->getState();
+                            pattern.push_back(std::abs(nstate.membranePotential - nstate.restingPotential));
+                        }
+                        
+                        // Store pattern in associative memory
+                        pImpl->associativeMemory->associate(pattern, pattern, activation * 0.1f);
                     }
                 }
             }
@@ -403,7 +422,91 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // Update working memory with current neural activity
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Update working memory with episodic memory content
+        if (pImpl->episodicMemory && currentStep % 50 == 0) {  // Every 50 steps
+            auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(3);
+            for (const auto* episode : recentEpisodes) {
+                // Convert episode activity to working memory patterns
+                std::vector<float> pattern;
+                for (size_t i = 0; i < episode->activeNeurons.size() && i < episode->neuronActivations.size(); ++i) {
+                    pattern.push_back(episode->neuronActivations[i]);
+                }
+                if (!pattern.empty()) {
+                    pImpl->workingMemory->store(pattern, 0.3f);
+                }
+            }
+        }
+        
+        // Rehearse important working memory traces based on attention
+        if (pImpl->attention && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            auto winners = pImpl->attention->getWinners();
+            for (const auto& neuron : winners) {
+                float currentActivation = pImpl->workingMemory->getNeuronActivation(neuron);
+                if (currentActivation > 0.2f) {
+                    pImpl->workingMemory->strengthenMemory(1.1f);
+                }
+            }
+        }
+        
+        // Integrate working memory with episodic memory - transfer important traces
+        if (pImpl->episodicMemory && currentStep % 100 == 0) {  // Every 100 steps
+            // Select strongest working memory traces
+            std::vector<float> wmActivity = pImpl->workingMemory->retrieve();
+            float maxActivity = 0.0f;
+            size_t bestIndex = 0;
+            for (size_t i = 0; i < wmActivity.size(); ++i) {
+                if (wmActivity[i] > maxActivity) {
+                    maxActivity = wmActivity[i];
+                    bestIndex = i;
+                }
+            }
+            
+            if (maxActivity > 0.5f && bestIndex < pImpl->workingMemory->getMemoryNeurons().size()) {
+                // Create an episodic memory entry from this working memory trace
+                EpisodicMemoryItem episode;
+                episode.timestamp = currentStep;
+                episode.activeNeurons.push_back(pImpl->workingMemory->getMemoryNeurons()[bestIndex]);
+                episode.neuronActivations.push_back(maxActivity);
+                episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                pImpl->episodicMemory->storeEpisode(episode);
+            }
+        }
+    }
+    
+    // ========== STEP 4b: Update associative memory with neural interactions ==========
+    if (pImpl->associativeMemory) {
+        // Process working memory content to form associations
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Get current working memory content
+            auto wmNeurons = pImpl->workingMemory->getMemoryNeurons();
+            std::vector<float> wmPattern;
+            for (size_t i = 0; i < std::min(wmNeurons.size(), size_t(10)); ++i) {
+                float activation = pImpl->workingMemory->getNeuronActivation(wmNeurons[i]);
+                if (activation > 0.1f) {
+                    wmPattern.push_back(activation);
+                }
+            }
+            
+            // Create associations from working memory patterns
+            if (wmPattern.size() > 1) {
+                pImpl->associativeMemory->associate(wmPattern, wmPattern, 0.5f);
+            }
+        }
+        
+        // Process synaptic relationships for associative learning
+        for (auto& region : pImpl->regions) {
+            for (const auto& syn : region->getSynapses()) {
+                if (syn->getWeight() > 0.5f) {
+                    // Strong synapses form associative patterns
+                    std::vector<float> patternA{1.0f, syn->getWeight()};
+                    std::vector<float> patternB{0.0f, 1.0f - syn->getWeight()};
+                    pImpl->associativeMemory->associate(patternA, patternB, 0.3f);
+                }
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -1015,6 +1118,242 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+}
+
+// ========== UNIFIED MEMORY INTERFACE IMPLEMENTATIONS ==========
+
+// --- Working Memory Unified Interface ---
+
+void Brain::storeWorkingMemory(const std::vector<float>& pattern, float strength) {
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->store(pattern, strength);
+    }
+}
+
+void Brain::storeWorkingMemoryToNeuron(NeuronId neuron, float activation) {
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->storeToNeuron(neuron, activation);
+    }
+}
+
+std::vector<float> Brain::retrieveWorkingMemory() const {
+    if (pImpl->workingMemory) {
+        return pImpl->workingMemory->retrieve();
+    }
+    return std::vector<float>();
+}
+
+size_t Brain::getWorkingMemoryActiveTraces() const {
+    if (pImpl->workingMemory) {
+        return pImpl->workingMemory->getActiveTraces();
+    }
+    return 0;
+}
+
+size_t Brain::getWorkingMemoryCapacity() const {
+    if (pImpl->workingMemory) {
+        return pImpl->workingMemory->getCapacity();
+    }
+    return 0;
+}
+
+void Brain::setWorkingMemoryCapacity(size_t capacity) {
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->setCapacity(capacity);
+    }
+}
+
+float Brain::getWorkingMemoryDecayRate() const {
+    if (pImpl->workingMemory) {
+        return pImpl->workingMemory->getDecayRate();
+    }
+    return 0.1f;
+}
+
+void Brain::setWorkingMemoryDecayRate(float rate) {
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->setDecayRate(rate);
+    }
+}
+
+const std::vector<NeuronId>& Brain::getWorkingMemoryNeurons() const {
+    static const std::vector<NeuronId> emptyVector;
+    if (pImpl->workingMemory) {
+        return pImpl->workingMemory->getMemoryNeurons();
+    }
+    return emptyVector;
+}
+
+void Brain::strengthenWorkingMemory(float factor) {
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->strengthenMemory(factor);
+    }
+}
+
+void Brain::clearWorkingMemory() {
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->clear();
+    }
+}
+
+// --- Episodic Memory Unified Interface ---
+
+void Brain::storeCurrentEpisode() {
+    if (pImpl->episodicMemory) {
+        // Capture current brain state as an episode
+        EpisodicMemoryItem episode;
+        episode.timestamp = pImpl->currentStep;
+        episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Store active neurons
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        episode.activeNeurons.push_back(neuron->getId());
+                        episode.neuronActivations.push_back(
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+        }
+        
+        // Store reward in episode
+        episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        pImpl->episodicMemory->storeEpisode(episode);
+        pImpl->stepsSinceLastEpisode = 0;
+    }
+}
+
+void Brain::storeEpisode(const EpisodicMemoryItem& episode) {
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->storeEpisode(episode);
+    }
+}
+
+std::vector<const EpisodicMemoryItem*> Brain::getRecentEpisodes(size_t count) const {
+    if (pImpl->episodicMemory) {
+        return pImpl->episodicMemory->getRecentEpisodes(count);
+    }
+    return std::vector<const EpisodicMemoryItem*>();
+}
+
+size_t Brain::getEpisodeCount() const {
+    if (pImpl->episodicMemory) {
+        return pImpl->episodicMemory->getEpisodeCount();
+    }
+    return 0;
+}
+
+std::vector<const EpisodicMemoryItem*> Brain::getEpisodesForReplay(size_t count) const {
+    if (pImpl->episodicMemory) {
+        return pImpl->episodicMemory->getEpisodesForReplay(count);
+    }
+    return std::vector<const EpisodicMemoryItem*>();
+}
+
+void Brain::replayEpisode(const EpisodicMemoryItem* episode) {
+    if (pImpl->episodicMemory && episode) {
+        pImpl->episodicMemory->replayEpisode(episode);
+    }
+}
+
+void Brain::clearEpisodicMemory() {
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->clear();
+    }
+}
+
+// --- Associative Memory Unified Interface ---
+
+void Brain::associateMemory(const std::vector<float>& patternA, const std::vector<float>& patternB, float strength) {
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->associate(patternA, patternB, strength);
+    }
+}
+
+std::vector<std::vector<float>> Brain::retrieveAssociative(const std::vector<float>& queryPattern, size_t maxResults) const {
+    if (pImpl->associativeMemory) {
+        return pImpl->associativeMemory->retrieve(queryPattern, maxResults);
+    }
+    return std::vector<std::vector<float>>();
+}
+
+float Brain::getAssociationStrength(const std::vector<float>& patternA, const std::vector<float>& patternB) const {
+    if (pImpl->associativeMemory) {
+        return pImpl->associativeMemory->getAssociationStrength(patternA, patternB);
+    }
+    return 0.0f;
+}
+
+void Brain::updateAssociation(const std::vector<float>& patternA, const std::vector<float>& patternB, float delta) {
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->updateAssociation(patternA, patternB, delta);
+    }
+}
+
+std::vector<std::vector<float>> Brain::spreadActivation(const std::vector<float>& cuePattern, size_t steps) const {
+    if (pImpl->associativeMemory) {
+        return pImpl->associativeMemory->spreadActivation(cuePattern, steps);
+    }
+    return std::vector<std::vector<float>>();
+}
+
+void Brain::clearAssociativeMemory() {
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->clear();
+    }
+}
+
+size_t Brain::getAssociationCount() const {
+    if (pImpl->associativeMemory) {
+        return pImpl->associativeMemory->getAssociationCount();
+    }
+    return 0;
+}
+
+// --- Helper Methods ---
+
+void Brain::storeCurrentState() {
+    // Store in working memory from current neural activity
+    if (pImpl->workingMemory) {
+        std::vector<float> pattern;
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < pImpl->motorNeurons.size(); ++i) {
+            const auto& nstate = pImpl->sensoryNeurons[i]->getState();
+            pattern.push_back(std::abs(nstate.membranePotential - nstate.restingPotential));
+        }
+        if (!pattern.empty()) {
+            pImpl->workingMemory->store(pattern, 1.0f);
+        }
+    }
+    
+    // Store in episodic memory
+    storeCurrentEpisode();
+    
+    // Store in associative memory
+    if (pImpl->associativeMemory && pImpl->workingMemory) {
+        auto wmPattern = pImpl->workingMemory->retrieve();
+        if (wmPattern.size() > 1) {
+            pImpl->associativeMemory->associate(wmPattern, wmPattern, 0.5f);
+        }
+    }
+}
+
+void Brain::replayRecentMemories(size_t count) {
+    if (pImpl->episodicMemory && pImpl->workingMemory) {
+        auto episodes = pImpl->episodicMemory->getEpisodesForReplay(count);
+        for (const auto* episode : episodes) {
+            pImpl->episodicMemory->replayEpisode(episode);
+        }
+    }
+}
+
+void Brain::clearAllMemory() {
+    if (pImpl->workingMemory) pImpl->workingMemory->clear();
+    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
+    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========

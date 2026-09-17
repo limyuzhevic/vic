@@ -148,6 +148,100 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
+    // ========== UNIFIED MEMORY INTERFACE ==========
+    
+    // --- Working Memory Unified Interface ---
+    
+    // Store current neural activity pattern in working memory
+    void storeWorkingMemory(const std::vector<float>& pattern, float strength = 1.0f);
+    
+    // Store activation level for specific neuron in working memory
+    void storeWorkingMemoryToNeuron(NeuronId neuron, float activation);
+    
+    // Retrieve current working memory content
+    std::vector<float> retrieveWorkingMemory() const;
+    
+    // Get number of active memory traces in working memory
+    size_t getWorkingMemoryActiveTraces() const;
+    
+    // Get working memory capacity
+    size_t getWorkingMemoryCapacity() const;
+    
+    // Set working memory capacity
+    void setWorkingMemoryCapacity(size_t capacity);
+    
+    // Get working memory decay rate
+    float getWorkingMemoryDecayRate() const;
+    
+    // Set working memory decay rate
+    void setWorkingMemoryDecayRate(float rate);
+    
+    // Get current neurons stored in working memory
+    const std::vector<NeuronId>& getWorkingMemoryNeurons() const;
+    
+    // Strengthen current working memory traces
+    void strengthenWorkingMemory(float factor);
+    
+    // Clear working memory completely
+    void clearWorkingMemory();
+    
+    // --- Episodic Memory Unified Interface ---
+    
+    // Store current brain state as an episode
+    void storeCurrentEpisode();
+    
+    // Store a specific episodic memory item
+    void storeEpisode(const EpisodicMemoryItem& episode);
+    
+    // Retrieve recent episodes
+    std::vector<const EpisodicMemoryItem*> getRecentEpisodes(size_t count) const;
+    
+    // Get total number of stored episodes
+    size_t getEpisodeCount() const;
+    
+    // Get episodes for replay (selection based on relevance and recency)
+    std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
+    
+    // Replay a specific episode
+    void replayEpisode(const EpisodicMemoryItem* episode);
+    
+    // Clear all episodes
+    void clearEpisodicMemory();
+    
+    // --- Associative Memory Unified Interface ---
+    
+    // Create association between two neural patterns
+    void associateMemory(const std::vector<float>& patternA, const std::vector<float>& patternB, float strength = 1.0f);
+    
+    // Retrieve patterns associated with a query pattern
+    std::vector<std::vector<float>> retrieveAssociative(const std::vector<float>& queryPattern, size_t maxResults = 5) const;
+    
+    // Get association strength between two patterns
+    float getAssociationStrength(const std::vector<float>& patternA, const std::vector<float>& patternB) const;
+    
+    // Update association based on outcome
+    void updateAssociation(const std::vector<float>& patternA, const std::vector<float>& patternB, float delta);
+    
+    // Spread activation from cue pattern
+    std::vector<std::vector<float>> spreadActivation(const std::vector<float>& cuePattern, size_t steps = 2) const;
+    
+    // Clear all associations
+    void clearAssociativeMemory();
+    
+    // Get number of associations
+    size_t getAssociationCount() const;
+    
+    // --- Helper Methods ---
+    
+    // Store current brain state in all memory systems
+    void storeCurrentState();
+    
+    // Replay recent important memories
+    void replayRecentMemories(size_t count = 3);
+    
+    // Clear all memory systems
+    void clearAllMemory();
+    
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
