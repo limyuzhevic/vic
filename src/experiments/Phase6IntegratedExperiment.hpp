@@ -1,138 +1,92 @@
 #pragma once
 
-/**
- * Phase6IntegratedExperiment - Phase 6 final integration test
- * 
- * This experiment demonstrates that the integrated brain systems work together:
- * - Memory systems are connected to neural processing
- * - Neuromodulation affects plasticity and neural dynamics
- * - Development affects plasticity rates
- * - Prediction system is integrated
- * - Replay and consolidation are functional
- * - Checkpoint save/load works
- * 
- * The experiment runs a complete lifetime simulation and verifies
- * that all systems interact properly.
- */
-
-#include "../experiments/Experiment.hpp"
-#include "../experiments/Metrics.hpp"
-#include <vector>
+#include <chrono>
 #include <string>
 #include <memory>
-#include <functional>
-#include <unordered_map>
+#include <vector>
 
 namespace nlm {
+    
+// Forward declarations for included headers
+class Config;
+class Brain;
+class SimpleWorld;
+class AgentBrain;
+class SensoryPercept;
+class MotorCommand;
 
-/**
- * Phase 6 integration test result
- */
-struct Phase6IntegrationResult {
-    // System integration status
-    bool memoryWorkingMemoryIntegrated;
-    bool memoryEpisodicMemoryIntegrated;
-    bool neuromodulationIntegrated;
-    bool predictionIntegrated;
-    bool developmentIntegrated;
-    bool checkpointingWorks;
-    bool replayWorks;
-    
-    // Metrics
-    float totalReward;
-    float avgFiringRate;
-    float avgSynapticWeight;
-    float memoryEpisodesStored;
-    float noveltyLevel;
-    float curiosityLevel;
-    float dopamineLevel;
-    
-    // Timestamps
-    time_t startTime;
-    time_t endTime;
-    double totalWallClockTime;
-    
-    Phase6IntegrationResult()
-        : memoryWorkingMemoryIntegrated(false)
-        , memoryEpisodicMemoryIntegrated(false)
-        , neuromodulationIntegrated(false)
-        , predictionIntegrated(false)
-        , developmentIntegrated(false)
-        , checkpointingWorks(false)
-        , replayWorks(false)
-        , totalReward(0.0f)
-        , avgFiringRate(0.0f)
-        , avgSynapticWeight(0.0f)
-        , memoryEpisodesStored(0.0f)
-        , noveltyLevel(0.0f)
-        , curiosityLevel(0.0f)
-        , dopamineLevel(0.0f)
-        , startTime(0)
-        , endTime(0)
-        , totalWallClockTime(0.0) {}
-};
-
-/**
- * Configuration for Phase 6 integration experiment
- */
+// Phase6Config structure - Configuration for Phase 6 experiments
 struct Phase6Config {
-    uint64_t maxSteps;
-    size_t neuronCount;
-    size_t regionCount;
-    float connectionProbability;
-    bool enableCheckpointing;
-    bool enableReplay;
-    bool enableDevelopment;
-    std::string checkpointPath;
-    
-    Phase6Config()
-        : maxSteps(10000)
-        , neuronCount(1000)
-        , regionCount(1)
-        , connectionProbability(0.1f)
-        , enableCheckpointing(true)
-        , enableReplay(true)
-        , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+    uint64_t neuronCount = 500;
+    uint64_t maxSteps = 2000;
+    uint64_t regionCount = 1;
+    float connectionProbability = 0.1f;
+    bool enableCheckpointing = true;
+    bool enableReplay = true;
+    bool enableDevelopment = true;
+    std::string checkpointPath = "/tmp/nlm_checkpoint.bin";
 };
 
-/**
- * Phase 6 integrated experiment runner
- */
+// Phase6IntegrationResult structure - Results from Phase 6 integration experiments
+struct Phase6IntegrationResult {
+    double totalReward = 0.0;
+    double avgFiringRate = 0.0;
+    double memoryEpisodesStored = 0.0;
+    double dopamineLevel = 0.0;
+    double curiosityLevel = 0.0;
+    double noveltyLevel = 0.0;
+    bool memoryWorkingMemoryIntegrated = false;
+    bool memoryEpisodicMemoryIntegrated = false;
+    bool neuromodulationIntegrated = false;
+    bool predictionIntegrated = false;
+    bool developmentIntegrated = false;
+    bool checkpointingWorks = false;
+    time_t startTime = 0;
+    time_t endTime = 0;
+    double totalWallClockTime = 0.0;
+};
+
+// Phase6IntegratedExperiment - Comprehensive integration test for Phase 6
 class Phase6IntegratedExperiment {
 public:
     Phase6IntegratedExperiment();
     ~Phase6IntegratedExperiment();
     
-    /**
-     * Run the complete integration test
-     */
+    // Main entry point for Phase 6 integration experiment
     Phase6IntegrationResult run(const Phase6Config& config);
     
-    /**
-     * Run a simple integration verification
-     */
+    // Integration verification methods
     bool verifyIntegration();
-    
-    /**
-     * Test memory integration
-     */
     bool testMemoryIntegration();
-    
-    /**
-     * Test neuromodulation integration
-     */
     bool testNeuromodulationIntegration();
-    
-    /**
-     * Test checkpoint save/load
-     */
     bool testCheckpointing();
-    
-    /**
-     * Test replay system
-     */
     bool testReplay();
+    
+    // Helper methods
+    void logIntegrationResults(const Phase6IntegrationResult& result) const;
+    bool isExperimentEnabled(const std::string& feature) const;
+    
+private:
+    // Integration test methods
+    bool testMemorySystemsIntegration() const;
+    bool testNeuromodulationSystemsIntegration() const;
+    bool testPredictionSystemIntegration() const;
+    bool testDevelopmentSystemIntegration() const;
+    bool testCognitionSystemsIntegration() const;
+    
+    // Helper methods
+    bool checkSystemConnection(const std::string& systemName, bool isConnected) const;
+    double calculateIntegrationScore(const Phase6IntegrationResult& result) const;
+    
+    // Configuration and state
+    Phase6Config currentConfig;
+    Phase6IntegrationResult currentResult;
+    bool isInitialized = false;
+    
+    // Statistics and metrics
+    uint64_t successfulTests = 0;
+    uint64_t totalTests = 0;
+    double experimentStartTime = 0.0;
 };
 
 } // namespace nlm

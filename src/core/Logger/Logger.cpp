@@ -32,22 +32,40 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
+    // Add timestamp with milliseconds
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        entry.timestamp.time_since_epoch()) % 1000;
     oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    oss << "." << std::setfill('0') << std::setw(3) << ms.count();
+    
+    // Add file and line info for non-Info logs
+    if (entry.level != LogLevel::Info) {
+        oss << " " << entry.file << ":" << entry.line;
+        if (!entry.function.empty()) {
+            oss << " in " << entry.function;
+        }
+    }
     
     oss << " " << entry.message;
     
     std::string output = oss.str();
     
-    // Console output
+    // Console output with enhanced formatting
     if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+        std::cout << levelToColor(entry.level) << output << "\033[0m";
+        
+        // Add context for error and critical logs
+        if (entry.level == LogLevel::Error || entry.level == LogLevel::Critical) {
+            std::cout << " [CLICK TO DETAILS]";
+        }
+        
+        std::cout << "\n";
     } else {
         std::cout << output << "\n";
     }
     
-    // File output if set
+    // File output with rotation support
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
         pImpl->fileOut.flush();

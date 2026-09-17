@@ -18,40 +18,67 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Load configuration from file with enhanced error handling and better parsing
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Cannot open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
+    int parsedLines = 0;
+    
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNumber;
         line = trim(line);
+        
+        // Skip empty lines and comments
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs with enhanced error handling
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
+            // Validate key format
+            if (key.empty()) {
+                NLM_LOG_WARNING("Empty key found in config file " + filepath + " at line " + std::to_string(lineNumber));
+                continue;
+            }
+            
+            // Remove quotes if present (support both single and double quotes)
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Try to parse value as different types based on key
             set(key, value, ConfigSource::File);
+            ++parsedLines;
+            
+            // Log config loaded for debugging (only in verbose mode)
+            if (isEnabled(LogLevel::Debug)) {
+                NLM_LOG_DEBUG("Loaded config: " + key + " = " + value);
+            }
+        } else {
+            // If no equals sign, try to parse as boolean flags
+            if (line.find('=') == std::string::npos && (line == "true" || line == "false" || 
+                line == "enabled" || line == "disabled" || line == "on" || line == "off")) {
+                set(line, line == "true" || line == "enabled" || line == "on", ConfigSource::File);
+                ++parsedLines;
+            } else {
+                NLM_LOG_WARNING("Invalid line in config file " + filepath + " at line " + std::to_string(lineNumber) + ": " + line);
+            }
         }
     }
     
+    NLM_LOG_INFO("Loaded " + std::to_string(parsedLines) + " configuration values from " + filepath);
     return true;
 }
 
