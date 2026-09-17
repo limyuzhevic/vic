@@ -1,39 +1,27 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-
-namespace nlm {
-
-// Prediction error signal for curiosity and learning
-// Computes difference between predicted and actual values
-
 class PredictionError {
 public:
     PredictionError();
     ~PredictionError();
     
     // Initialize with brain reference
-    void initialize(class Brain* brain);
+    void initialize(Brain* brain);
     
-    // Get error value
-    float getError() const;
+    // Get prediction error level
+    float getLevel() const;
     
-    // Compute prediction error
-    void computeError(float predicted, float actual);
+    // Update prediction error from sensory input
+    void update(TimestepDuration dt);
     
-    // Update prediction
-    void updatePrediction(float newPrediction);
+    // Set predicted value
+    void setPredicted(float prediction);
     
-    // Get history
-    const std::vector<float>& getHistory() const;
-    void clearHistory();
+    // Update with actual value (computes error)
+    void updateWithActual(float actual);
     
-    // Get error magnitude for neuromodulation
-    float getMagnitude() const;
+    // Reset prediction error
+    void reset();
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
-
-} // namespace nlm

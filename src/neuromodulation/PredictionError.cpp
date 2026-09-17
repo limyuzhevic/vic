@@ -1,53 +1,51 @@
 #include "PredictionError.hpp"
 #include "../core/Logger/Logger.hpp"
-#include <cmath>
 
 namespace nlm {
 
 struct PredictionError::Impl {
-    class Brain* brain;
-    float error;
-    float predictedValue;
-    float actualValue;
-    std::vector<float> history;
+    Brain* brain;
+    float level;
+    float prediction;
     
-    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
+    Impl() : brain(nullptr), level(0.0f), prediction(0.0f) {}
 };
 
-PredictionError::PredictionError() : pImpl(new Impl) {}
+PredictionError::PredictionError() : pImpl(new Impl) {
+    NLM_LOG_INFO("Prediction error system initialized");
+}
 
 PredictionError::~PredictionError() = default;
 
 void PredictionError::initialize(Brain* brain) {
     pImpl->brain = brain;
-    NLM_LOG_INFO("PredictionError system initialized");
+    reset();
 }
 
-float PredictionError::getError() const {
-    return pImpl->error;
+float PredictionError::getLevel() const {
+    return pImpl->level;
 }
 
-void PredictionError::computeError(float predicted, float actual) {
-    pImpl->predictedValue = predicted;
-    pImpl->actualValue = actual;
-    pImpl->error = actual - predicted;
-    pImpl->history.push_back(pImpl->error);
+void PredictionError::update(TimestepDuration dt) {
+    // Simple decay over time
+    pImpl->level *= (1.0f - 0.01f * dt);
 }
 
-void PredictionError::updatePrediction(float newPrediction) {
-    pImpl->predictedValue = newPrediction;
+void PredictionError::setPredicted(float prediction) {
+    pImpl->prediction = prediction;
 }
 
-const std::vector<float>& PredictionError::getHistory() const {
-    return pImpl->history;
+void PredictionError::updateWithActual(float actual) {
+    // Compute prediction error (absolute difference)
+    pImpl->level = std::abs(actual - pImpl->prediction);
+    
+    // Scale error to reasonable range
+    pImpl->level = std::min(pImpl->level, 1.0f);
 }
 
-void PredictionError::clearHistory() {
-    pImpl->history.clear();
-}
-
-float PredictionError::getMagnitude() const {
-    return std::abs(pImpl->error);
+void PredictionError::reset() {
+    pImpl->level = 0.0f;
+    pImpl->prediction = 0.0f;
 }
 
 } // namespace nlm

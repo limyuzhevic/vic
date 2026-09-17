@@ -4,55 +4,41 @@
 namespace nlm {
 
 struct Curiosity::Impl {
-    class Brain* brain;
+    Brain* brain;
     float level;
-    float noveltyWeight;
-    float predictionErrorWeight;
     float decayRate;
     
-    Impl() 
-        : brain(nullptr)
-        , level(0.0f)
-        , noveltyWeight(0.5f)
-        , predictionErrorWeight(0.5f)
-        , decayRate(0.05f) {}
+    Impl() : brain(nullptr), level(0.0f), decayRate(0.01f) {}
 };
 
-Curiosity::Curiosity() : pImpl(new Impl) {}
+Curiosity::Curiosity() : pImpl(new Impl) {
+    NLM_LOG_INFO("Curiosity system initialized");
+}
 
 Curiosity::~Curiosity() = default;
 
 void Curiosity::initialize(Brain* brain) {
     pImpl->brain = brain;
-    NLM_LOG_INFO("Curiosity system initialized");
+    reset();
 }
 
 float Curiosity::getLevel() const {
     return pImpl->level;
 }
 
-void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
-    // Curiosity increases with novelty and prediction error
-    float target = pImpl->noveltyWeight * novelty + 
-                   pImpl->predictionErrorWeight * predictionError;
-    
-    // Smooth update
-    pImpl->level += (target - pImpl->level) * 0.1f;
-    
-    // Decay
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+void Curiosity::update(TimestepDuration dt) {
+    // Natural decay over time
+    pImpl->level *= (1.0f - pImpl->decayRate * dt);
 }
 
-float Curiosity::getExplorationDrive() const {
-    return pImpl->level;
+void Curiosity::increaseCuriosity(float amount) {
+    pImpl->level += amount;
+    if (pImpl->level > 1.0f) pImpl->level = 1.0f;
 }
 
-void Curiosity::setNoveltyWeight(float weight) {
-    pImpl->noveltyWeight = weight;
-}
-
-void Curiosity::setPredictionErrorWeight(float weight) {
-    pImpl->predictionErrorWeight = weight;
+void Curiosity::decreaseCuriosity(float amount) {
+    pImpl->level -= amount;
+    if (pImpl->level < 0.0f) pImpl->level = 0.0f;
 }
 
 void Curiosity::reset() {
