@@ -48,6 +48,39 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printUsage() {
+    std::cout << "Usage: nlm [options]" << std::endl;
+    std::cout << " " << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config <file>            Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --help                     Show this help message" << std::endl;
+    std::cout << "  --version                  Show version information" << std::endl;
+    std::cout << "  --neurons <count>          Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --regions <count>          Set number of brain regions (default: 1)" << std::endl;
+    std::cout << "  --timestep <value>         Set simulation timestep in ms (default: 0.001)" << std::endl;
+    std::cout << "  --seed <value>             Set random seed for reproducibility (default: 42)" << std::endl;
+    std::cout << "  --run-mode <mode>          Set run mode: basic|learning|stdp|all (default: all)" << std::endl;
+    std::cout << "  --verbose                  Enable verbose output" << std::endl;
+    std::cout << "  --quiet                    Disable logging output" << std::endl;
+    std::cout << "  --checkpoint <dir>         Enable checkpointing to directory" << std::endl;
+    std::cout << "  --steps <count>            Run only specified number of steps" << std::endl;
+    std::cout << " " << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm                                  Run default simulation" << std::endl;
+    std::cout << "  nlm --config myconfig.cfg            Use custom configuration" << std::endl;
+    std::cout << "  nlm --neurons 1000 --regions 2      Larger network with 2 regions" << std::endl;
+    std::cout << "  nlm --run-mode learning             Only run learning experiments" << std::endl;
+    std::cout << " " << std::endl;
+    std::cout << "Advanced Options (for experienced users):" << std::endl;
+    std::cout << "  --plasticity               Enable plasticity systems" << std::endl;
+    std::cout << "  --development              Enable developmental processes" << std::endl;
+    std::cout << "  --memory                   Enable memory systems" << std::endl;
+    std::cout << "  --neuromodulation           Enable neuromodulation" << std::endl;
+    std::cout << "  --cognition                Enable cognitive systems" << std::endl;
+    std::cout << "  --prediction               Enable prediction system" << std::endl;
+    std::cout << "  --visualization             Enable visualization" << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -324,7 +357,126 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
+    // Parse command line arguments
+    bool verbose = false;
+    bool quiet = false;
+    bool enablePlasticity = true;
+    bool enableDevelopment = false;
+    bool enableMemory = false;
+    bool enableNeuromodulation = false;
+    bool enableCognition = false;
+    bool enablePrediction = false;
+    bool enableVisualization = false;
+    std::string runMode = "all"; // basic|learning|stdp|all
+    std::string configFile = "configs/default.cfg";
+    int neuronCount = 500;
+    int regionCount = 1;
+    double timestep = 0.001;
+    int64_t randomSeed = 42;
+    std::string checkpointDir = "";
+    int stepLimit = -1;
+    
+    // Parse command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help") {
+            printUsage();
+            return 0;
+        } else if (arg == "--version") {
+            std::cout << "NLM Phase 2 - Neural Learning Machine" << std::endl;
+            std::cout << "Version: 0.1.0" << std::endl;
+            std::cout << "Build: " << __DATE__ << " " << __TIME__ << std::endl;
+            return 0;
+        } else if (arg.find("--") == 0) {
+            size_t eqPos = arg.find('=');
+            if (eqPos != std::string::npos) {
+                std::string key = arg.substr(2, eqPos - 2);
+                std::string value = arg.substr(eqPos + 1);
+                
+                if (key == "config") {
+                    configFile = value;
+                } else if (key == "neurons") {
+                    neuronCount = std::stoi(value);
+                } else if (key == "regions") {
+                    regionCount = std::stoi(value);
+                } else if (key == "timestep") {
+                    timestep = std::stod(value);
+                } else if (key == "seed") {
+                    randomSeed = std::stoll(value);
+                } else if (key == "run-mode") {
+                    runMode = value;
+                } else if (key == "checkpoint") {
+                    checkpointDir = value;
+                } else if (key == "steps") {
+                    stepLimit = std::stoi(value);
+                }
+            } else {
+                // Handle boolean flags
+                if (arg == "--verbose") {
+                    verbose = true;
+                } else if (arg == "--quiet") {
+                    quiet = true;
+                } else if (arg == "--plasticity") {
+                    enablePlasticity = true;
+                } else if (arg == "--development") {
+                    enableDevelopment = true;
+                } else if (arg == "--memory") {
+                    enableMemory = true;
+                } else if (arg == "--neuromodulation") {
+                    enableNeuromodulation = true;
+                } else if (arg == "--cognition") {
+                    enableCognition = true;
+                } else if (arg == "--prediction") {
+                    enablePrediction = true;
+                } else if (arg == "--visualization") {
+                    enableVisualization = true;
+                }
+            }
+        }
+    }
+    
+    // Validate run mode
+    if (runMode != "basic" && runMode != "learning" && runMode != "stdp" && runMode != "all") {
+        std::cerr << "Error: Invalid run mode: " << runMode << std::endl;
+        std::cerr << "Valid modes: basic, learning, stdp, all" << std::endl;
+        return 1;
+    }
+    
+    // Set log level based on verbosity
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>();
+    if (quiet) {
+        consoleLogger->setLevel(LogLevel::Warning);
+    } else if (verbose) {
+        consoleLogger->setLevel(LogLevel::Debug);
+    } else {
+        consoleLogger->setLevel(LogLevel::Info);
+    }
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    std::cout << "Configuration:" << std::endl;
+    std::cout << "  Config file: " << configFile << std::endl;
+    std::cout << "  Neurons: " << neuronCount << std::endl;
+    std::cout << "  Regions: " << regionCount << std::endl;
+    std::cout << "  Timestep: " << timestep << "s" << std::endl;
+    std::cout << "  Random seed: " << randomSeed << std::endl;
+    std::cout << "  Run mode: " << runMode << std::endl;
+    std::cout << "  Plasticity: " << (enablePlasticity ? "enabled" : "disabled") << std::endl;
+    std::cout << "  Development: " << (enableDevelopment ? "enabled" : "disabled") << std::endl;
+    std::cout << "  Memory: " << (enableMemory ? "enabled" : "disabled") << std::endl;
+    std::cout << "  Neuromodulation: " << (enableNeuromodulation ? "enabled" : "disabled") << std::endl;
+    std::cout << "  Cognition: " << (enableCognition ? "enabled" : "disabled") << std::endl;
+    std::cout << "  Prediction: " << (enablePrediction ? "enabled" : "disabled") << std::endl;
+    std::cout << "  Visualization: " << (enableVisualization ? "enabled" : "disabled") << std::endl;
+    if (!checkpointDir.empty()) {
+        std::cout << "  Checkpointing: enabled (" << checkpointDir << ")" << std::endl;
+    }
+    if (stepLimit >= 0) {
+        std::cout << "  Step limit: " << stepLimit << std::endl;
+    }
+    std::cout << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
