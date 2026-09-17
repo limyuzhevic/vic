@@ -6,6 +6,7 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <algorithm>
 
 namespace nlm {
 
@@ -58,7 +59,7 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
+    // Configuration methods
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
@@ -68,6 +69,20 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // New advanced methods
+    void setExplorationRate(float rate) { explorationRate_ = rate; }
+    void setLearningRate(float rate) { learningRate_ = rate; }
+    void setMemoryCapacity(size_t capacity) { memoryCapacity_ = capacity; }
+    
+    float getExplorationRate() const { return explorationRate_; }
+    float getLearningRate() const { return learningRate_; }
+    size_t getMemoryCapacity() const { return memoryCapacity_; }
+    
+    // Statistical tracking
+    double getTotalReward() const { return totalReward_; }
+    double getTotalExploration() const { return totalExploration_; }
+    void resetStats() { totalReward_ = 0.0; totalExploration_ = 0.0; }
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -108,6 +123,15 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    
+    // Advanced configuration
+    float explorationRate_;     // Rate of exploration behavior
+    float learningRate_;        // Base learning rate
+    size_t memoryCapacity_;    // Working memory capacity
+    
+    // Statistical tracking
+    double totalReward_;
+    double totalExploration_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
