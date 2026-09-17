@@ -1,3 +1,4 @@
+#include "../core/Types/Types.hpp"
 #pragma once
 
 #include "AgentBody.hpp"
@@ -52,11 +53,60 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Access brain subsystems
+    Brain* getBrain() { return brain_.get(); }
+    
+    // Memory system access (for integration)
+    NeuralSemanticMemory* getSemanticMemory() { 
+        return brain_ ? brain_->getSemanticMemory() : nullptr; 
+    }
+    
+    NeuralProceduralMemory* getProceduralMemory() { 
+        return brain_ ? brain_->getProceduralMemory() : nullptr; 
+    }
+    
+    NeuralWorkingMemory* getWorkingMemory() { 
+        return brain_ ? brain_->getWorkingMemory() : nullptr; 
+    }
+    
+    NeuralEpisodicMemory* getEpisodicMemory() { 
+        return brain_ ? brain_->getEpisodicMemory() : nullptr; 
+    }
+    
+    NeuralAssociativeMemory* getAssociativeMemory() { 
+        return brain_ ? brain_->getAssociativeMemory() : nullptr; 
+    }
+    
+    PredictionSystem* getPredictionSystem() { 
+        return brain_ ? brain_->getPredictionSystem() : nullptr; 
+    }
+    
+    NeuralPlanner* getNeuralPlanner() { 
+        return brain_ ? brain_->getPlanner() : nullptr; 
+    }
+    
+    ConceptFormation* getConceptFormation() { 
+        return brain_ ? brain_->getConceptFormation() : nullptr; 
+    }
+    
+    AttentionalSelection* getAttention() { 
+        return brain_ ? brain_->getAttention() : nullptr; 
+    }
+    
+    Dopamine* getDopamine() { 
+        return brain_ ? brain_->getDopamine() : nullptr; 
+    }
+    
+    Curiosity* getCuriositySystem() { 
+        return brain_ ? brain_->getCuriosity() : nullptr; 
+    }
+    
+    PredictionError* getPredictionErrorSignal() { 
+        return brain_ ? brain_->getPredictionErrorSignal() : nullptr; 
+    }
+    
     // Reset agent for new episode
     void reset();
-    
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -74,7 +124,7 @@ private:
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    MotorCommand selectWithCuriosity(MotorCommand defaultCmd, Brain* brain = nullptr);
     
     std::shared_ptr<Brain> brain_;
     

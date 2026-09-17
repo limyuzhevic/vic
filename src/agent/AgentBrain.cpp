@@ -1,3 +1,4 @@
+#include "../core/Types/Types.hpp"
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
@@ -235,105 +236,59 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     return defaultCmd;
 }
 
-void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
-    
-    // Compute prediction error
-    predictionError_ = reward - predictedReward;
-    
-    // Update expected reward (exponential moving average)
-    expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
-    
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
-    
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
-    
-    // Apply to all synapses with eligibility traces
-    for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
-            
-            if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
-                syn->addToWeight(delta);
-                
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
-            }
-        }
-    }
-    
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
-    
-    // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
-    }
+// Access brain subsystems
+Brain* AgentBrain::getBrain() { return brain_.get(); }
+
+// Memory system access (for integration)
+NeuralSemanticMemory* AgentBrain::getSemanticMemory() { 
+    return brain_ ? brain_->getSemanticMemory() : nullptr; 
 }
 
-void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
-    
-    developmentalAge_ += timestep;
-    
-    // Simple developmental stages based on age
-    // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
-        plasticityModifier_ = 1.0f;  // High plasticity
-        brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
-        plasticityModifier_ = 0.8f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
-    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
-        plasticityModifier_ = 0.5f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
-    } else {
-        plasticityModifier_ = 0.2f;  // Adult - more stable
-        brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
-    }
-    
-    // Structural plasticity changes with development
-    if (structuralPlasticityEnabled_) {
-        auto* sp = brain_->getStructuralPlasticity();
-        if (sp) {
-            // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
-            sp->setSynaptogenesisRate(synRate);
-            sp->setPruningRate(pruneRate);
-        }
-    }
+NeuralProceduralMemory* AgentBrain::getProceduralMemory() { 
+    return brain_ ? brain_->getProceduralMemory() : nullptr; 
 }
 
-DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
-    if (!brain_) return DevelopmentalStage::Initial;
-    return brain_->getDevelopmentalStage();
+NeuralWorkingMemory* AgentBrain::getWorkingMemory() { 
+    return brain_ ? brain_->getWorkingMemory() : nullptr; 
 }
 
-float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
+NeuralEpisodicMemory* AgentBrain::getEpisodicMemory() { 
+    return brain_ ? brain_->getEpisodicMemory() : nullptr; 
 }
 
-float AgentBrain::getCuriosityLevel() const {
-    return curiosityLevel_;
+NeuralAssociativeMemory* AgentBrain::getAssociativeMemory() { 
+    return brain_ ? brain_->getAssociativeMemory() : nullptr; 
 }
 
-float AgentBrain::getNoveltyLevel() const {
-    return noveltyLevel_;
+PredictionSystem* AgentBrain::getPredictionSystem() { 
+    return brain_ ? brain_->getPredictionSystem() : nullptr; 
 }
 
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
+NeuralPlanner* AgentBrain::getNeuralPlanner() { 
+    return brain_ ? brain_->getPlanner() : nullptr; 
 }
 
+ConceptFormation* AgentBrain::getConceptFormation() { 
+    return brain_ ? brain_->getConceptFormation() : nullptr; 
+}
+
+AttentionalSelection* AgentBrain::getAttention() { 
+    return brain_ ? brain_->getAttention() : nullptr; 
+}
+
+Dopamine* AgentBrain::getDopamine() { 
+    return brain_ ? brain_->getDopamine() : nullptr; 
+}
+
+Curiosity* AgentBrain::getCuriositySystem() { 
+    return brain_ ? brain_->getCuriosity() : nullptr; 
+}
+
+PredictionError* AgentBrain::getPredictionErrorSignal() { 
+    return brain_ ? brain_->getPredictionErrorSignal() : nullptr; 
+}
+
+// Reset agent for new episode
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
@@ -345,6 +300,34 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
+    return brain_ ? brain_->getDevelopmentalStage() : DevelopmentalStage::Initial;
+}
+
+float AgentBrain::getNeuromodulationLevel() const {
+    float totalModulation = 0.0f;
+    if (brain_) {
+        if (auto* dopamine = brain_->getDopamine()) {
+            totalModulation += dopamine->getLevel();
+        }
+        if (auto* novelty = brain_->getNovelty()) {
+            totalModulation += novelty->getLevel();
+        }
+        if (auto* curiosity = brain_->getCuriosity()) {
+            totalModulation += curiosity->getLevel();
+        }
+    }
+    return totalModulation;
+}
+
+float AgentBrain::getCuriosityLevel() const {
+    return curiosityLevel_;
+}
+
+float AgentBrain::getNoveltyLevel() const {
+    return noveltyLevel_;
 }
 
 } // namespace nlm
