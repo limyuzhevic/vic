@@ -487,6 +487,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            episode.context = pImpl->workingMemory ? pImpl->workingMemory->retrieve() : std::vector<float>();
             
             // Store active neurons
             for (auto& region : pImpl->regions) {
@@ -826,6 +827,34 @@ bool Brain::save(const std::string& filepath) const {
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
             return false;
+        }
+        
+        // Write memory systems
+        if (pImpl->workingMemory) {
+            // Get working memory data
+            auto workingMemoryData = pImpl->workingMemory->getMemoryData();
+            if (!writer.writeWorkingMemory(workingMemoryData)) {
+                NLM_LOG_ERROR("Failed to write working memory to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->episodicMemory) {
+            // Get episodic memory data
+            auto episodicMemoryData = pImpl->episodicMemory->getMemoryData();
+            if (!writer.writeEpisodicMemory(episodicMemoryData)) {
+                NLM_LOG_ERROR("Failed to write episodic memory to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->associativeMemory) {
+            // Get associative memory data
+            auto associativeMemoryData = pImpl->associativeMemory->getMemoryData();
+            if (!writer.writeAssociativeMemory(associativeMemoryData)) {
+                NLM_LOG_ERROR("Failed to write associative memory to checkpoint");
+                return false;
+            }
         }
         
         // Finalize
