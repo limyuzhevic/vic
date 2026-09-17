@@ -78,6 +78,15 @@ private:
     
     std::shared_ptr<Brain> brain_;
     
+    // Connected cognitive systems (for Phase 6 integration)
+    NeuralWorkingMemory* workingMemory_;
+    NeuralEpisodicMemory* episodicMemory_;
+    PredictionSystem* predictionSystem_;
+    NeuralPlanner* planner_;
+    ConceptFormation* conceptFormation_;
+    AttentionalSelection* attention_;
+    DevelopmentSystem* developmentSystem_;
+    
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;

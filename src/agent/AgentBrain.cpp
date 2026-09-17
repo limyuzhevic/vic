@@ -20,6 +20,17 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Initialize working with memory systems if available
+    if (brain_) {
+        workingMemory_ = brain_->getWorkingMemory();
+        episodicMemory_ = brain_->getEpisodicMemory();
+        predictionSystem_ = brain_->getPredictionSystem();
+        planner_ = brain_->getPlanner();
+        conceptFormation_ = brain_->getConceptFormation();
+        attention_ = brain_->getAttention();
+        developmentSystem_ = brain_->getDevelopmentSystem();
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -124,6 +135,18 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
+    // Process through connected memory systems
+    if (workingMemory_) {
+        // Store sensory input in working memory
+        workingMemory_->storeSensoryInput(percept);
+    }
+    
+    if (predictionSystem_) {
+        // Use prediction system to predict next state
+        // Could be used for curiosity-driven exploration
+        predictionSystem_->train(percept.getVision());
+    }
+    
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
         float totalDiff = 0.0f;
@@ -146,6 +169,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // Update development with new sensory input
+    if (developmentSystem_) {
+        developmentSystem_->processSensoryInput(percept);
     }
 }
 

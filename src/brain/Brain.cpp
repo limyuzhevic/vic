@@ -157,11 +157,11 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+Brain::Brain(std::shared_ptr<Config> config) : pImpl(std::make_unique<Impl>(config)) {}
 
 Brain::~Brain() = default;
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
+Brain::Brain(Brain&& other) noexcept : pImpl(std::move(other.pImpl)) {
     other.pImpl = nullptr;
 }
 
@@ -404,6 +404,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Integrate working memory with attention
+        if (pImpl->attention && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+        }
+    }
+    
+    // Connect working memory to prediction system
+    if (pImpl->workingMemory && pImpl->predictionSystem) {
+        // Encode current working memory state for prediction
+        std::vector<float> wmPattern;
+        for (const auto& neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+            wmPattern.push_back(pImpl->workingMemory->getActivation(neuronId));
+        }
+        
+        // Create sensory input from working memory state
+        SensoryInput wmSensory(std::move(wmPattern));
+        pImpl->predictionSystem->train(wmSensory);
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -504,6 +523,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Apply neuromodulation to strengthen memory encoding
+            if (pImpl->dopamine) {
+                float dopamineLevel = pImpl->dopamine->getLevel();
+                if (dopamineLevel > 0.0f) {
+                    // Dopamine enhances episodic memory encoding
+                    float encodingStrength = std::min(dopamineLevel * 2.0f, 1.0f);
+                    for (auto& neuronId : episode.activeNeurons) {
+                        // Encode with dopamine-modulated strength
+                        pImpl->episodicMemory->encodeEpisode(
+                            episode.timestamp,
+                            neuronId,
+                            episode.neuronActivations[&neuronId - &episode.activeNeurons[0]],
+                            encodingStrength * episode.reward);
+                    }
+                }
+            }
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
@@ -819,6 +855,7 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                synapseData.plasticityFlags.push_back(syn->getPlasticityFlags());
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
             }
         }
