@@ -14,11 +14,29 @@ Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
 Config::~Config() = default;
 
-Config::Config(Config&&) noexcept = default;
+Config::Config(Config&& other) noexcept = default;
 
-Config& Config::operator=(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
+// Deep copy constructor
+Config::Config(const Config& other) : pImpl(std::make_unique<Impl>()) {
+    pImpl->entries.reserve(other.pImpl->entries.size());
+    for (const auto& entry : other.pImpl->entries) {
+        pImpl->entries.emplace_back(entry.key, entry.value, entry.source, entry.description);
+    }
+}
+
+// Deep copy assignment operator
+Config& Config::operator=(const Config& other) {
+    if (this != &other) {
+        pImpl->entries.clear();
+        pImpl->entries.reserve(other.pImpl->entries.size());
+        for (const auto& entry : other.pImpl->entries) {
+            pImpl->entries.emplace_back(entry.key, entry.value, entry.source, entry.description);
+        }
+    }
+    return *this;
+}
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     

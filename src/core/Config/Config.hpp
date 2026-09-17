@@ -55,6 +55,9 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
+    // Copy assignment with deep copy
+    Config& operator=(const Config&);
+    
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     

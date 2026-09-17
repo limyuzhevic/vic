@@ -153,6 +153,48 @@ agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
 ```
 
+### Pattern 4: Advanced Features
+
+```python
+# Advanced configuration and features
+import pynlm
+
+# Create custom configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2000)     # More neurons
+config.set("plasticity.stdp.enable", True) # Enable STDP
+config.set("plasticity.hebbian.enable", True) # Enable Hebbian learning
+config.set("neuromod.dopamine.scale", 2.0) # Increase dopamine effect
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create agent with world
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=12, visionHeight=12)
+agent.initialize(world)
+
+# Enable advanced features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run extended simulation with learning
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 100 == 0:
+        print(f"Step {step}: Firing rate = {brain.getAverageFiringRate():.2f}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.2f}")
+        print(f"  Neuromodulation: {agent.getNeuromodulationLevel():.2f}")
+```
+
 ---
 
 ## What Each Part Does
