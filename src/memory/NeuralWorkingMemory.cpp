@@ -77,10 +77,24 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
+        
+        // If neuron is already in memory, add to active traces
+        if (activation > 0.1f && idx < memoryNeurons_.size()) {
+            // Check if already in active traces to avoid duplicates
+            if (std::find(activeTraces_.begin(), activeTraces_.end(), idx) == activeTraces_.end()) {
+                activeTraces_.push_back(idx);
+            }
+        }
     } else if (memoryNeurons_.size() < capacity_) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        
+        // New neuron becomes active trace if strongly activated
+        if (activation > 0.1f && memoryNeurons_.size() > 0) {
+            size_t newIdx = memoryNeurons_.size() - 1;
+            activeTraces_.push_back(newIdx);
+        }
     }
     
     // Inject current to maintain activation
