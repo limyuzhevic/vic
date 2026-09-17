@@ -457,7 +457,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     // Modify weight change based on dopamine
                     pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
                     float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    // More stable weight modulation based on neuromodulation
+                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.0001f;
                     syn->setWeight(weight);
                 }
             }
@@ -991,7 +992,17 @@ size_t Brain::getActiveNeuronCount() const {
 }
 
 size_t Brain::getFiringNeuronCount() const {
-    return pImpl->totalSpikesThisStep;
+    size_t firing = 0;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                if (neuron->isFiring()) {
+                    firing++;
+                }
+            }
+        }
+    }
+    return firing;
 }
 
 float Brain::getAverageFiringRate() const {
