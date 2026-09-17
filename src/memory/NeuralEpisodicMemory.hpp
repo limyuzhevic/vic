@@ -66,9 +66,11 @@ public:
     // Initialize with brain reference
     void initialize(Brain* brain);
 
-    // Store a new experience
-    // The experience is encoded as neural activity and can influence future processing
+    // Store episode
     void storeEpisode(const EpisodicMemoryItem& episode);
+    
+    // Get episodes
+    const std::vector<EpisodicMemoryItem>& getEpisodes() const { return episodes_; }
 
     // Retrieve episodes similar to a query pattern
     // Returns episodes ordered by relevance
