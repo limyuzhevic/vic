@@ -121,6 +121,38 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Phase 5 experiments
+add_library(nlm_phase5 STATIC
+    src/experiments/Phase5Experiment.cpp
+)
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 6 integration architecture
+add_library(nlm_phase6_config STATIC
+    src/experiments/Phase6ConfigManager.cpp
+)
+target_include_directories(nlm_phase6_config PUBLIC src)
+target_link_libraries(nlm_phase6_config PUBLIC nlm_core)
+
+add_library(nlm_phase6_factory STATIC
+    src/experiments/ExperimentFactory.cpp
+)
+target_include_directories(nlm_phase6_factory PUBLIC src)
+target_link_libraries(nlm_phase6_factory PUBLIC nlm_core nlm_phase6_config)
+
+add_library(nlm_phase6_system_creators STATIC
+    src/experiments/SystemCreators.cpp
+)
+target_include_directories(nlm_phase6_system_creators PUBLIC src)
+target_link_libraries(nlm_phase6_system_creators PUBLIC nlm_core nlm_agent nlm_world)
+
+add_library(nlm_phase6_runner STATIC
+    src/experiments/ExperimentRunnerImpl.cpp
+)
+target_include_directories(nlm_phase6_runner PUBLIC src)
+target_link_libraries(nlm_phase6_runner PUBLIC nlm_core nlm_agent nlm_world nlm_phase6_config nlm_phase6_factory nlm_phase6_system_creators)
+
 # Main executable
 add_executable(nlm
     src/main.cpp
@@ -138,6 +170,24 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 5 demo executable
+add_executable(nlm_phase5_demo
+    src/experiments/Phase5Demo.cpp
+)
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
+
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6_config nlm_phase6_factory nlm_phase6_system_creators nlm_phase6_runner nlm_phase6_diagnostic_tools)
+
+# Phase 6 diagnostic tools executable
+add_executable(nlm_phase6_diagnostic_tools
+    src/experiments/Phase6DiagnosticTools.cpp
+)
+target_link_libraries(nlm_phase6_diagnostic_tools PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6_config nlm_phase6_factory nlm_phase6_system_creators nlm_phase6_runner nlm_phase6_diagnostic_tools)
 
 # Testing
 enable_testing()

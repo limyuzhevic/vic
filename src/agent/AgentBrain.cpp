@@ -2,6 +2,8 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <sstream>
 
 namespace nlm {
 
@@ -30,8 +32,8 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                                     motorTurnLeft_.size() + motorTurnRight_.size() +
+                                     motorInteract_.size() + motorWait_.size();
                         
                         switch (idx % 6) {
                             case 0: motorForward_.push_back(n); break;
@@ -46,7 +48,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
+                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
                         switch (idx % 4) {
                             case 0: sensoryVision_.push_back(n); break;
@@ -334,6 +336,10 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+float AgentBrain::getExpectedReward() const {
+    return expectedReward_;
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
@@ -345,6 +351,259 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+// Configuration validation
+bool AgentBrain::validateConfiguration() const {
+    std::vector<std::string> errors;
+    
+    if (neuronCount_ == 0) {
+        errors.push_back("Neuron count cannot be zero");
+    }
+    
+    if (regionCount_ == 0) {
+        errors.push_back("Region count cannot be zero");
+    }
+    
+    if (connectionProbability_ < 0.0f || connectionProbability_ > 1.0f) {
+        errors.push_back("Connection probability must be between 0.0 and 1.0");
+    }
+    
+    if (maxSteps_ == 0) {
+        errors.push_back("Max steps cannot be zero");
+    }
+    
+    if (checkpointPath_.empty()) {
+        errors.push_back("Checkpoint path cannot be empty");
+    }
+    
+    // Store errors for later retrieval
+    validationErrors_ = errors;
+    return errors.empty();
+}
+
+std::string AgentBrain::getValidationErrors() const {
+    std::stringstream ss;
+    for (size_t i = 0; i < validationErrors_.size(); ++i) {
+        if (i > 0) ss << "; ";
+        ss << validationErrors_[i];
+    }
+    return ss.str();
+}
+
+void AgentBrain::clearValidationErrors() {
+    validationErrors_.clear();
+}
+
+// Get default configuration
+Phase6Config AgentBrain::getDefaultConfig() {
+    Phase6Config config;
+    config.maxSteps = 10000;
+    config.neuronCount = 1000;
+    config.regionCount = 1;
+    config.connectionProbability = 0.1f;
+    config.enableCheckpointing = true;
+    config.enableReplay = true;
+    config.enableDevelopment = true;
+    config.enableCuriosity = true;
+    config.enableNovelty = true;
+    config.enablePredictionError = true;
+    config.checkpointPath = "./checkpoint_test.bin";
+    return config;
+}
+
+// Create and configure brain from this config
+std::shared_ptr<Brain> AgentBrain::createBrain() const {
+    auto cfg = std::make_shared<Config>();
+    cfg->set("neuron_count", neuronCount_);
+    cfg->set("region_count", regionCount_);
+    cfg->set("connection_probability", connectionProbability_);
+    cfg->set("stdp_ltp_weight", 0.01f);
+    cfg->set("stdp_ltd_weight", 0.012f);
+    cfg->set("synaptogenesis_rate", 0.0001f);
+    cfg->set("pruning_rate", 0.00001f);
+    
+    auto brain = std::make_shared<Brain>(cfg);
+    if (!brain->initialize()) {
+        throw std::runtime_error("Failed to initialize brain from configuration");
+    }
+    
+    return brain;
+}
+
+// Create and configure agent from this config
+std::shared_ptr<AgentBrain> AgentBrain::createAgent(const SimpleWorld& world) const {
+    auto brain = createBrain();
+    auto agent = std::make_shared<AgentBrain>(brain);
+    agent->initialize(world);
+    
+    agent->enableRewardModulation(rewardModulationEnabled_);
+    agent->enableStructuralPlasticity(structuralPlasticityEnabled_);
+    agent->enableDevelopment(developmentEnabled_);
+    agent->enableCuriosity(curiosityEnabled_);
+    
+    return agent;
+}
+
+// Create and configure world from this config
+std::shared_ptr<SimpleWorld> AgentBrain::createWorld() const {
+    auto world = std::make_shared<SimpleWorld>();
+    world->initialize(16, 16);  // Default world size
+    return world;
+}
+
+// Create and configure world from parameters
+std::shared_ptr<SimpleWorld> AgentBrain::createWorld(size_t width, size_t height) const {
+    auto world = std::make_shared<SimpleWorld>();
+    world->initialize(width, height);
+    return world;
+}
+
+// Get configuration summary for logging
+std::string AgentBrain::getConfigSummary() const {
+    std::stringstream ss;
+    ss << "AgentBrain Configuration Summary:";
+    ss << "\n  Neurons: " << neuronCount_;
+    ss << "\n  Regions: " << regionCount_;
+    ss << "\n  Connection probability: " << std::fixed << std::setprecision(3) << connectionProbability_;
+    ss << "\n  Max steps: " << maxSteps_;
+    ss << "\n  Enable checkpointing: " << (enableCheckpointing_ ? "yes" : "no");
+    ss << "\n  Enable replay: " << (enableReplay_ ? "yes" : "no");
+    ss << "\n  Enable development: " << (enableDevelopment_ ? "yes" : "no");
+    ss << "\n  Enable curiosity: " << (enableCuriosity_ ? "yes" : "no");
+    ss << "\n  Enable novelty: " << (enableNovelty_ ? "yes" : "no");
+    ss << "\n  Enable prediction error: " << (enablePredictionError_ ? "yes" : "no");
+    ss << "\n  Checkpoint path: " << checkpointPath_;
+    return ss.str();
+}
+
+// Set configuration from parsed arguments
+bool AgentBrain::loadFromArgs(int argc, char** argv) {
+    clearValidationErrors();
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg.find("--neurons=") == 0) {
+            try {
+                neuronCount_ = std::stoull(arg.substr(10));
+            } catch (...) {
+                validationErrors_.push_back("Invalid neuron count: " + arg.substr(10));
+            }
+        } else if (arg.find("--regions=") == 0) {
+            try {
+                regionCount_ = std::stoull(arg.substr(10));
+            } catch (...) {
+                validationErrors_.push_back("Invalid region count: " + arg.substr(10));
+            }
+        } else if (arg.find("--connprob=") == 0) {
+            try {
+                connectionProbability_ = std::stof(arg.substr(11));
+            } catch (...) {
+                validationErrors_.push_back("Invalid connection probability: " + arg.substr(11));
+            }
+        } else if (arg.find("--steps=") == 0) {
+            try {
+                maxSteps_ = std::stoull(arg.substr(7));
+            } catch (...) {
+                validationErrors_.push_back("Invalid max steps: " + arg.substr(7));
+            }
+        } else if (arg == "--no-checkpoint") {
+            enableCheckpointing_ = false;
+        } else if (arg == "--no-replay") {
+            enableReplay_ = false;
+        } else if (arg == "--no-development") {
+            enableDevelopment_ = false;
+        } else if (arg == "--no-curiosity") {
+            enableCuriosity_ = false;
+        } else if (arg.find("--checkpoint=") == 0) {
+            checkpointPath_ = arg.substr(13);
+        }
+    }
+    
+    return validateConfiguration();
+}
+
+// Load configuration from file
+bool AgentBrain::loadFromFile(const std::string& filename) {
+    clearValidationErrors();
+    
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        validationErrors_.push_back("Cannot open configuration file: " + filename);
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        
+        size_t pos = line.find('=');
+        if (pos == std::string::npos) {
+            continue;
+        }
+        
+        std::string key = line.substr(0, pos);
+        std::string value = line.substr(pos + 1);
+        
+        // Trim whitespace
+        key.erase(0, key.find_first_not_of(" \t"));
+        key.erase(key.find_last_not_of(" \t") + 1);
+        value.erase(0, value.find_first_not_of(" \t"));
+        value.erase(value.find_last_not_of(" \t") + 1);
+        
+        if (key == "neurons") {
+            try { neuronCount_ = std::stoull(value); } catch (...) { validationErrors_.push_back("Invalid neurons value"); }
+        } else if (key == "regions") {
+            try { regionCount_ = std::stoull(value); } catch (...) { validationErrors_.push_back("Invalid regions value"); }
+        } else if (key == "connprob") {
+            try { connectionProbability_ = std::stof(value); } catch (...) { validationErrors_.push_back("Invalid connprob value"); }
+        } else if (key == "steps") {
+            try { maxSteps_ = std::stoull(value); } catch (...) { validationErrors_.push_back("Invalid steps value"); }
+        } else if (key == "checkpoint") {
+            enableCheckpointing_ = (value == "true" || value == "1" || value == "yes");
+        } else if (key == "replay") {
+            enableReplay_ = (value == "true" || value == "1" || value == "yes");
+        } else if (key == "development") {
+            enableDevelopment_ = (value == "true" || value == "1" || value == "yes");
+        } else if (key == "curiosity") {
+            enableCuriosity_ = (value == "true" || value == "1" || value == "yes");
+        } else if (key == "checkpoint_path") {
+            checkpointPath_ = value;
+        }
+    }
+    
+    file.close();
+    
+    return validateConfiguration();
+}
+
+// Save configuration to file
+bool AgentBrain::saveToFile(const std::string& filename) const {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "# AgentBrain Configuration File" << std::endl;
+    file << "# Generated by AgentBrain" << std::endl;
+    file << std::endl;
+    
+    file << "neurons = " << neuronCount_ << std::endl;
+    file << "regions = " << regionCount_ << std::endl;
+    file << "connprob = " << std::fixed << std::setprecision(3) << connectionProbability_ << std::endl;
+    file << "steps = " << maxSteps_ << std::endl;
+    file << "checkpoint = " << (enableCheckpointing_ ? "true" : "false") << std::endl;
+    file << "replay = " << (enableReplay_ ? "true" : "false") << std::endl;
+    file << "development = " << (enableDevelopment_ ? "true" : "false") << std::endl;
+    file << "curiosity = " << (enableCuriosity_ ? "true" : "false") << std::endl;
+    file << "checkpoint_path = " << checkpointPath_ << std::endl;
+    
+    file.close();
+    return true;
 }
 
 } // namespace nlm
