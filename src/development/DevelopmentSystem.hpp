@@ -46,10 +46,38 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // Use enhanced development system
+    void useEnhancedSystem(bool useEnhanced) { useEnhanced_ = useEnhanced; }
+    
+    bool isUsingEnhancedSystem() const { return useEnhanced_; }
+    
+    // Get enhanced development system interface
+    class EnhancedDevelopmentSystem* getEnhancedSystem();
+    
+    // Initialize enhanced system
+    void initializeEnhanced(Brain* brain);
+    
+    // Get comprehensive developmental metrics
+    const class DevelopmentalMetrics& getMetrics() const;
+    
+    // Get cognitive capabilities
+    const class CognitiveCapabilities& getCognitiveCapabilities() const;
+    
+    // Get behavioral profile
+    const class BehavioralProfile& getBehavioralProfile() const;
+    
+    // Get neural region specializations
+    const std::vector<class NeuralRegionSpecialization>& getSpecializationProfile() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
     double age_;
+    bool useEnhanced_;
+    class DevelopmentalMetrics metrics;
+    class CognitiveCapabilities capabilities;
+    class BehavioralProfile behaviorProfile;
+    std::vector<class NeuralRegionSpecialization> specializationProfile;
 };
 
 } // namespace nlm

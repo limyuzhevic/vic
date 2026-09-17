@@ -12,6 +12,9 @@ struct NeuralEpisodicMemory::Impl {
     // Pattern neurons for episodic recall
     std::vector<NeuronId> episodeNeurons;
     
+    // Track replay timestamps for consolidation timing
+    std::vector<SimulationStep> replayTimestamps;
+    
     Impl() : brain(nullptr) {}
 };
 
@@ -21,6 +24,8 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
     , maxEpisodes_(1000)
     , replayEnabled_(true)
 {
+    // Initialize replay-related state
+    replayTimestamps_.clear();
 }
 
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
@@ -37,6 +42,7 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     stored.age = 0;
     
     episodes_.push_back(stored);
+    replayTimestamps_.push_back(pImpl->brain ? pImpl->brain->getCurrentStep() : 0);
     
     // Create episode neuron for pattern completion
     if (brain_ && !episode.sensoryState.empty()) {
@@ -50,6 +56,7 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     // Remove old episodes if over capacity
     while (episodes_.size() > maxEpisodes_) {
         episodes_.erase(episodes_.begin());
+        replayTimestamps_.erase(replayTimestamps_.begin());
         if (!pImpl->episodeNeurons.empty()) {
             pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
         }
@@ -167,19 +174,134 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveAfterAction
 void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
     if (!episode || !brain_) return;
     
-    // Reactivate neurons that were active during this episode
+    // Get the STDP plasticity rule for synaptic strengthening during replay
+    auto* stdp = brain_->getSTDP();
+    
+    // Reactivate neurons that were active during this episode with enhanced activation
     for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
         NeuronId neuron = episode->activeNeurons[i];
         float activation = i < episode->neuronActivations.size() ? 
                           episode->neuronActivations[i] : 0.5f;
         
-        // Inject current to reawaken this pattern
-        brain_->injectCurrent(neuron, activation * 3.0f);
+        // Inject current to reawaken this pattern with boosted activation
+        // Replay uses stronger activation to promote synaptic consolidation
+        brain_->injectCurrent(neuron, activation * 5.0f);
+        
+        // Record that this neuron was reactivated during replay
+        // (In full implementation, would update spike history for STDP)
     }
     
-    // Also inject sensory pattern if available
-    if (!episode->sensoryState.empty()) {
-        // This would go through sensory channels - simplified here
+    // Apply STDP-like synaptic strengthening for replay events
+    // This mimics the biological process where reactivating patterns
+    // strengthens connections between co-activated neurons
+    if (stdp) {
+        // Get associated neurons from the episode's resulting state
+        // These represent the neural patterns after the episode
+        if (!episode->activeNeurons.empty() && !episode->resultingSensoryState.empty()) {
+            // Find resulting pattern neurons (simplified approach)
+            // In full implementation, would have resulting neuron IDs
+            // For now, we rely on the reactivated patterns above
+        }
+        
+        // Trigger STDP update for replay consolidation
+        // This strengthens synapses that were active during the original experience
+        for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
+            // Get the neuron that was active
+            for (auto& region : brain_->getAllRegions()) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->getId() == episode->activeNeurons[i]) {
+                            // Update spike history for STDP to use in next timestep
+                            // In a real implementation, this would record pre-synaptic spike timing
+                            neuron->recordReplaySpike();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update associative memory with replayed patterns
+    // This links current state with recalled memories
+    if (brain_->getAssociativeMemory()) {
+        brain_->getAssociativeMemory()->updateAssociationFromReplay(
+            episode->sensoryState, 
+            episode->resultingSensoryState,
+            0.5f  // Moderate strengthening for replay
+        );
+    }
+    
+    // Update neuromodulatory signals based on replay content
+    // Replay of salient experiences increases curiosity and dopamine
+    if (brain_->getCuriosity()) {
+        // Calculate prediction error proxy from episode characteristics
+        float predictionErrorProxy = 0.0f;
+        if (episode->reward == 0 && episode->novelty > 0.5f) {
+            predictionErrorProxy = episode->novelty * 2.0f;
+        } else if (episode->reward > 0.5f) {
+            predictionErrorProxy = std::min(1.0f, episode->reward * 0.5f);
+        }
+        
+        if (predictionErrorProxy > 0.1f) {
+            brain_->getCuriosity()->update(predictionErrorProxy, predictionErrorProxy, 0.001f);
+        }
+    }
+    
+    // Integrate replayed patterns into working memory
+    if (brain_->getWorkingMemory()) {
+        // Store key features from replayed episode in working memory
+        std::vector<float> episodeFeatures;
+        episodeFeatures.reserve(episode->activeNeurons.size());
+        
+        for (size_t i = 0; i < std::min(size_t(10), episode->activeNeurons.size()); ++i) {
+            // Sample some neuron activations
+            float activation = i < episode->neuronActivations.size() ? 
+                              episode->neuronActivations[i] : 0.5f;
+            episodeFeatures.push_back(activation);
+        }
+        
+        brain_->getWorkingMemory()->integrateReplayPattern(episodeFeatures);
+    }
+    
+    // Trigger concept formation update with replayed patterns
+    if (brain_->getConceptFormation()) {
+        // Replay provides material for concept refinement
+        // In full implementation, would analyze patterns and suggest concept updates
+        // For now, we rely on the STDP effects to update synaptic weights
+    }
+    
+    // Update neural planner with replayed behavioral sequences
+    if (brain_->getNeuralPlanner()) {
+        // Replay of action-episode sequences helps planning
+        if (episode->action != ActionType::Wait) {
+            // Add to planner's behavioral repertoire
+            brain_->getNeuralPlanner()->recordReplayedAction(
+                episode->action,
+                episode->sensoryState,
+                episode->reward
+            );
+        }
+    }
+    
+    // Update development system with replay effects
+    if (brain_->getDevelopmentSystem()) {
+        // Replay of experiences can trigger developmental changes
+        // Stronger replay during critical periods promotes development
+        if (episode->novelty > 0.7f || episode->reward > 0.5f) {
+            brain_->getDevelopmentSystem()->updateFromReplay(
+                episode->activeNeurons,
+                episode->reward,
+                episode->novelty
+            );
+        }
+    }
+    
+    // Apply attention system modulation based on replay
+    if (brain_->getAttention()) {
+        // Replay of salient experiences biases attention toward similar patterns
+        if (episode->reward > 0.5f) {
+            brain_->getAttention()->boostAttention(0.3f, episode->reward);
+        }
     }
 }
 
@@ -232,45 +354,159 @@ void NeuralEpisodicMemory::clear() {
     pImpl->episodeNeurons.clear();
 }
 
-std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForReplay(
-    size_t count) const {
+std::vector<size_t> NeuralEpisodicMemory::selectImportantEpisodes(size_t count, bool sleepMode) const {
+    std::vector<size_t> importantIndices;
     
-    // Select episodes for replay based on:
-    // 1. Recency (more recent episodes)
-    // 2. Reward (higher reward episodes)
-    // 3. Unpredictability (higher prediction error episodes)
+    if (episodes_.empty()) return importantIndices;
     
-    std::vector<std::tuple<float, float, size_t>> scored;  // (score, reward, index)
+    // Compute importance scores for each episode
+    std::vector<std::pair<float, size_t>> importanceScores;  // (score, index)
     
     for (size_t i = 0; i < episodes_.size(); ++i) {
-        float recencyScore = 1.0f / (episodes_[i].age + 1);
-        float rewardScore = episodes_[i].reward;
-        float score = recencyScore * 0.5f + rewardScore * 0.5f;
-        scored.emplace_back(score, rewardScore, i);
+        const auto& ep = episodes_[i];
+        float importance = 0.0f;
+        
+        // Recency (more recent = higher importance)
+        float recency = 1.0f / (ep.age + 1);
+        importance += recency * 0.3f;
+        
+        // Reward salience
+        importance += ep.reward * 0.3f;
+        
+        // Novelty (unexpected experiences)
+        importance += ep.novelty * 0.2f;
+        
+        // Prediction error proxy (low reward + high novelty)
+        float predictionErrorProxy = 0.0f;
+        if (ep.reward < 0.3f && ep.novelty > 0.5f) {
+            predictionErrorProxy = (0.5f - ep.reward) * ep.novelty;
+        }
+        importance += predictionErrorProxy * 0.2f;
+        
+        // Sleep mode: prioritize consolidation of important experiences
+        if (sleepMode) {
+            // During sleep, prioritize experiences that need consolidation
+            // Experiences with moderate reward but high novelty need consolidation
+            float consolidationPriority = (ep.reward * 0.4f + ep.novelty * 0.6f);
+            importance += consolidationPriority * 0.5f;
+            
+            // Also prioritize recent experiences for temporal sequence
+            importance += recency * 0.2f;
+        }
+        
+        importanceScores.emplace_back(importance, i);
     }
     
-    // Sort by score
-    std::sort(scored.begin(), scored.end(),
+    // Sort by importance (descending)
+    std::sort(importanceScores.begin(), importanceScores.end(),
         [](const auto& a, const auto& b) {
-            return std::get<0>(a) > std::get<0>(b);
+            return a.first > b.first;
         });
     
-    std::vector<const EpisodicMemoryItem*> results;
-    for (size_t i = 0; i < std::min(count, scored.size()); ++i) {
-        results.push_back(&episodes_[std::get<2>(scored[i])]);
+    // Select top episodes
+    for (size_t i = 0; i < std::min(count, importanceScores.size()); ++i) {
+        importantIndices.push_back(importanceScores[i].second);
     }
     
-    return results;
+    return importantIndices;
 }
 
-void NeuralEpisodicMemory::replaySequence(const std::vector<size_t>& episodeIds) {
+void NeuralEpisodicMemory::integrateReplayWithCurrentState() {
+    if (!brain_) return;
+    
+    // Get current neural state
+    std::vector<float> currentPattern;
+    float currentReward = 0.0f;
+    
+    // In full implementation, would collect current neural activity
+    // For now, use a simplified approach
+    if (brain_->getDopamine()) {
+        currentReward = brain_->getDopamine()->getLevel();
+    }
+    
+    // Integrate replayed patterns into current state
+    if (brain_->getAssociativeMemory()) {
+        // Use current state to retrieve related memories
+        std::vector<std::vector<float>> related = brain_->getAssociativeMemory()->
+            spreadActivation(currentPattern, 2);
+        
+        // Combine with replay effects
+        for (const auto& pattern : related) {
+            // Integrate related patterns with replay
+            brain_->getAssociativeMemory()->integrateWithReplay(pattern, currentPattern);
+        }
+    }
+    
+    // Update working memory with integrated patterns
+    if (brain_->getWorkingMemory()) {
+        brain_->getWorkingMemory()->integrateWithReplay(currentPattern, currentReward);
+    }
+}
+
+void NeuralEpisodicMemory::applySynapticConsolidation(const EpisodicMemoryItem* episode) {
+    if (!episode || !brain_ || !brain_->getSTDP()) return;
+    
+    // Apply STDP-like consolidation for replayed episodes
+    // This strengthens synapses that were active during the original experience
+    
+    for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
+        NeuronId neuron = episode->activeNeurons[i];
+        float activation = i < episode->neuronActivations.size() ? 
+                          episode->neuronActivations[i] : 0.5f;
+        
+        // Find and update the neuron's spike history for STDP
+        for (auto& region : brain_->getAllRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* n : pop->getNeurons()) {
+                    if (n->getId() == neuron) {
+                        // Apply replay-specific STDP
+                        n->applyReplaySTDP(activation);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
+void NeuralEpisodicMemory::sleepReplay(const std::vector<size_t>& episodeIds) {
+    // Enhanced replay during rest/sleep periods
+    // Sleep replay uses stronger activation and more extensive consolidation
+    
     for (size_t id : episodeIds) {
         if (id < episodes_.size()) {
-            replayEpisode(&episodes_[id]);
+            // Boost activation for sleep replay to promote synaptic consolidation
+            const auto& episode = episodes_[id];
             
-            // Small delay between replays
-            // (In simulation, this would be steps)
+            // Reactivate with higher intensity for consolidation
+            for (size_t i = 0; i < episode.activeNeurons.size(); ++i) {
+                NeuronId neuron = episode.activeNeurons[i];
+                float activation = i < episode.neuronActivations.size() ? 
+                                  episode.neuronActivations[i] : 0.5f;
+                
+                // Much stronger injection during sleep for consolidation
+                brain_->injectCurrent(neuron, activation * 8.0f);
+                
+                // Record sleep replay spike for STDP
+                for (auto& region : brain_->getAllRegions()) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* n : pop->getNeurons()) {
+                            if (n->getId() == neuron) {
+                                n->recordSleepReplaySpike();
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Also call regular replay for full integration
+            replayEpisode(&episode);
         }
+    }
+    
+    // Post-sleep consolidation: strengthen associations
+    if (brain_->getAssociativeMemory()) {
+        brain_->getAssociativeMemory()->sleepConsolidateAssociations();
     }
 }
 

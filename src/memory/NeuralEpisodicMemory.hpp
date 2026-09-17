@@ -139,6 +139,71 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
+// Enable/disable replay
+    void enableReplay(bool enable) { replayEnabled_ = enable; }
+    bool isReplayEnabled() const { return replayEnabled_; }
+
+    // Get episodes for replay (selection based on relevance and recency)
+    std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
+
+    // Replay multiple episodes (for sleep-like consolidation)
+    void replaySequence(const std::vector<size_t>& episodeIds);
+
+    // Enhanced replay with neurological effects
+    void sleepReplay(const std::vector<size_t>& episodeIds);
+
+    // Replay all episodes (for maintenance during normal operation)
+    void maintenanceReplay();
+
+    // Determine which episodes are most important for replay
+    // Considers recency, reward, novelty, and prediction error
+    std::vector<size_t> selectImportantEpisodes(size_t count, bool sleepMode = false) const;
+
+    // Integrate replayed memories with current state
+    void integrateReplayWithCurrentState();
+
+    // Apply synaptic consolidation (STDP-like) for replay events
+    void applySynapticConsolidation(const EpisodicMemoryItem* episode);
+
+    // Set maximum number of episodes to store
+    void setMaxEpisodes(size_t max) { maxEpisodes_ = max; }
+
+    // Register spike handlers for event-driven processing
+    void registerHandlers();
+
+    // Update episodic memory system (called from Brain's main step)
+    void update(EpisodeUpdateType type = EpisodeUpdateType::Standard);
+    // Sleep-enhanced replay for consolidation
+    void sleepReplay(const std::vector<size_t>& episodeIds);
+
+    // Replay all episodes (for maintenance during normal operation)
+    void maintenanceReplay();
+
+    // Determine which episodes are most important for replay
+    // Considers recency, reward, novelty, and prediction error
+    std::vector<size_t> selectImportantEpisodes(size_t count, bool sleepMode = false) const;
+
+    // Integrate replayed memories with current state
+    void integrateReplayWithCurrentState();
+
+    // Apply synaptic consolidation (STDP-like) for replay events
+    void applySynapticConsolidation(const EpisodicMemoryItem* episode);
+
+private:
+    // Compute similarity between query and stored episode
+    float computeSimilarity(const std::vector<float>& query,
+                          const EpisodicMemoryItem& episode) const;
+
+    // Check if episode matches criteria
+    bool matchesCriteria(const EpisodicMemoryItem& episode,
+                        const std::vector<float>* sensoryQuery,
+                        SimulationStep* startTime,
+                        SimulationStep* endTime,
+                        ActionType* actionQuery) const;
+
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+
     Brain* brain_;
     std::deque<EpisodicMemoryItem> episodes_;
     size_t maxEpisodes_;
@@ -173,7 +238,7 @@ public:
 
     // Retrieve patterns associated with a query pattern
     std::vector<std::vector<float>> retrieve(const std::vector<float>& queryPattern,
-                                            size_t maxResults = 5) const;
+                                             size_t maxResults = 5) const;
 
     // Get association strength between two patterns
     float getAssociationStrength(const std::vector<float>& patternA,
@@ -195,13 +260,34 @@ public:
     // Get number of associations
     size_t getAssociationCount() const { return associations_.size(); }
 
+    // Enhanced association methods for replay integration
+    void updateAssociationFromReplay(const std::vector<float>& patternA,
+                                    const std::vector<float>& patternB,
+                                    float strength = 1.0f);
+
+    // Get pattern neurons
+    const std::vector<std::pair<NeuronId, std::vector<float>>>& getPatternNeurons() const { return patternNeurons_; }
+
+    // Get association vector
+    const std::vector<std::tuple<NeuronId, NeuronId, float>>& getAssociations() const { return associations_; }
+
+    // Sleep consolidation
+    void sleepConsolidateAssociations();
+
+    // Integration with replay
+    void integrateWithReplay(const std::vector<float>& existingPattern,
+                           const std::vector<float>& replayPattern);
+
+    // Replay-related association strengthening
+    void strengthenForReplay(const std::vector<float>& pattern, float intensity = 1.0f);
+
 private:
     // Find pattern neuron or create one
     NeuronId findPatternNeuron(const std::vector<float>& pattern);
 
     // Compute pattern similarity
     float computeSimilarity(const std::vector<float>& a,
-                            const std::vector<float>& b) const;
+                           const std::vector<float>& b) const;
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;

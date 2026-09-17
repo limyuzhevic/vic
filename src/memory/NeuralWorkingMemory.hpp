@@ -106,6 +106,55 @@ private:
     std::vector<NeuronId> winners_;
 };
 
+    // Strengthen working memory representation (for rehearsal)
+    void strengthenMemory(float factor);
+
+    // Competition between memory traces
+    void runCompetition();
+
+    // Is this neuron part of the winning population?
+    bool isWinning(NeuronId neuron) const;
+
+    // Get overall memory activity level
+    float getMemoryActivity() const;
+
+    // Enhanced working memory methods for replay integration
+    void integrateWithReplay(const std::vector<float>& pattern, float reward);
+    void integrateReplayPattern(const std::vector<float>& pattern);
+    void applyReplayEffects(float reward, bool isSleepReplay = false);
+
+private:
+    // Create recurrent connection for maintenance
+    void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
+
+    // Update recurrent connections for maintenance
+    void updateRecurrentConnections();
+
+    // Decay weak memory traces
+    void decayWeakTraces();
+
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+
+    Brain* brain_;
+    size_t capacity_;
+    float decayRate_;
+    
+    // Memory content
+    std::vector<NeuronId> memoryNeurons_;
+    std::vector<float> memoryActivations_;
+    std::vector<SimulationStep> memoryTimestamps_;
+    
+    // Active memory traces
+    std::vector<size_t> activeTraces_;
+    
+    // Recurrent connections for maintenance
+    std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
+    
+    // Winner neurons (for competition)
+    std::vector<NeuronId> winners_;
+};
+
 // AttentionalSelection: Neural attention through competition
 // NOT Transformer attention - uses lateral inhibition and gain modulation
 //
@@ -162,6 +211,10 @@ public:
 
     // Bottom-up attention (stimulus-driven)
     void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
+
+    // Enhanced attention methods for replay
+    void boostAttention(float strength, float reward = 1.0f);
+    void adjustAttentionForReplay(const std::vector<NeuronId>& neurons, bool isSleepReplay = false);
 
     // Reset attention
     void reset();

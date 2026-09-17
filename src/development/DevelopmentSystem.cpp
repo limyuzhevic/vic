@@ -1,6 +1,7 @@
 #include "DevelopmentSystem.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "EnhancedDevelopmentSystem.hpp"
 
 namespace nlm {
 
@@ -10,14 +11,20 @@ struct DevelopmentSystem::Impl {
     SimulationStep stepsInCurrentStage;
     double stageAge;  // Age since entering current stage
     
+    // Enhanced system
+    std::unique_ptr<EnhancedDevelopmentSystem> enhancedSystem;
+    
     Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
 };
 
-DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
+DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0), useEnhanced_(false) {}
 
 DevelopmentSystem::~DevelopmentSystem() = default;
 
 DevelopmentalStage DevelopmentSystem::getStage() const {
+    if (useEnhanced_ && pImpl->enhancedSystem) {
+        return pImpl->enhancedSystem->getStage();
+    }
     return pImpl->stage;
 }
 
@@ -27,6 +34,11 @@ void DevelopmentSystem::setStage(DevelopmentalStage stage) {
 }
 
 void DevelopmentSystem::advanceStage() {
+    if (useEnhanced_ && pImpl->enhancedSystem) {
+        pImpl->enhancedSystem->advanceStage();
+        return;
+    }
+    
     switch (pImpl->stage) {
         case DevelopmentalStage::Initial:
             pImpl->stage = DevelopmentalStage::CriticalPeriod;
@@ -50,6 +62,10 @@ void DevelopmentSystem::advanceStage() {
 }
 
 const char* DevelopmentSystem::getStageName() const {
+    if (useEnhanced_ && pImpl->enhancedSystem) {
+        return pImpl->enhancedSystem->getStageName();
+    }
+    
     switch (pImpl->stage) {
         case DevelopmentalStage::Initial: return "Initial";
         case DevelopmentalStage::CriticalPeriod: return "CriticalPeriod";
@@ -61,6 +77,14 @@ const char* DevelopmentSystem::getStageName() const {
 }
 
 void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
+    if (useEnhanced_ && pImpl->enhancedSystem && brain) {
+        // Use enhanced system with current timestep
+        TimestepDuration dt = 0.001;  // Approximate timestep
+        pImpl->enhancedSystem->update(brain, *brain->getRandomGenerator(), dt, currentStep);
+        age_ = pImpl->enhancedSystem->getDevelopmentalAge();
+        return;
+    }
+    
     ++pImpl->stepsInCurrentStage;
     age_ += 0.001;  // Approximate timestep
     pImpl->stageAge += 0.001;
@@ -77,6 +101,13 @@ void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
 }
 
 void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDuration dt) {
+    if (useEnhanced_ && pImpl->enhancedSystem && brain) {
+        // Use enhanced system
+        pImpl->enhancedSystem->update(brain, rng, dt, static_cast<SimulationStep>(age_ / dt));
+        age_ = pImpl->enhancedSystem->getDevelopmentalAge();
+        return;
+    }
+    
     age_ += dt;
     pImpl->stageAge += dt;
     ++pImpl->stepsInCurrentStage;
@@ -93,6 +124,10 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
 }
 
 float DevelopmentSystem::getPlasticityModifier() const {
+    if (useEnhanced_ && pImpl->enhancedSystem) {
+        return pImpl->enhancedSystem->getPlasticityModifier();
+    }
+    
     // Higher plasticity in early stages, lower in later stages
     switch (pImpl->stage) {
         case DevelopmentalStage::Initial: return 1.0f;
@@ -105,15 +140,35 @@ float DevelopmentSystem::getPlasticityModifier() const {
 }
 
 bool DevelopmentSystem::isCriticalPeriod() const {
+    if (useEnhanced_ && pImpl->enhancedSystem) {
+        return pImpl->enhancedSystem->isCriticalPeriod();
+    }
     return pImpl->stage == DevelopmentalStage::CriticalPeriod;
 }
 
 float DevelopmentSystem::getCriticalPeriodProgress() const {
+    if (useEnhanced_ && pImpl->enhancedSystem) {
+        return pImpl->enhancedSystem->getCriticalPeriodProgress();
+    }
+    
     if (pImpl->stage != DevelopmentalStage::CriticalPeriod) {
         return 0.0f;
     }
     // Progress through critical period (0 to 1)
     return std::min(1.0f, static_cast<float>(pImpl->stageAge / 300.0));
+}
+
+EnhancedDevelopmentSystem* DevelopmentSystem::getEnhancedSystem() {
+    return pImpl->enhancedSystem.get();
+}
+
+void DevelopmentSystem::initializeEnhanced(Brain* brain) {
+    if (brain) {
+        pImpl->enhancedSystem = std::make_unique<EnhancedDevelopmentSystem>();
+        pImpl->enhancedSystem->initialize(brain);
+        useEnhanced_ = true;
+        NLM_LOG_INFO("DevelopmentSystem initialized with EnhancedDevelopmentSystem");
+    }
 }
 
 } // namespace nlm
