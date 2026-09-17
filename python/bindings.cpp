@@ -28,8 +28,8 @@ PYBIND11_MODULE(pynlm, m) {
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
-
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
+    py::register_exception<std::invalid_argument>(m, "ValueError");
+    py::register_exception<std::out_of_range>(m, "IndexError");
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &NeuronId::value)
