@@ -144,7 +144,23 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        // Get curiosity level from brain's curiosity system if available
+        auto* curiosity = brain_->getCuriosity();
+        if (curiosity) {
+            curiosityLevel_ = curiosity->getLevel();
+        } else {
+            // Fallback to manual computation using brain's prediction error if available
+            float predictionError = predictionError_;  // Use agentBrain's prediction error
+            
+            // Also check brain's prediction error signal if available
+            auto* predError = brain_->getPredictionErrorSignal();
+            if (predError) {
+                predictionError = predError->getLevel();
+            }
+            
+            // Fallback to manual computation
+            curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError) * 0.5f;
+        }
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }

@@ -49,6 +49,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -92,7 +95,30 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
-    {
+        , dopamine(nullptr)
+        , curiosity(nullptr)
+        , predictionError(nullptr)
+        , novelty(nullptr)
+        , acetylcholine(nullptr)
+        , norepinephrine(nullptr)
+        , serotonin(nullptr)
+        , spikeSystem(nullptr)
+        , stdp(nullptr)
+        , hebbian(nullptr)
+        , structuralPlasticity(nullptr)
+        , workingMemory(nullptr)
+        , episodicMemory(nullptr)
+        , associativeMemory(nullptr)
+        , predictionSystem(nullptr)
+        , planner(nullptr)
+        , conceptFormation(nullptr)
+        , attention(nullptr)
+        , spatialRepresentation(nullptr)
+        , temporalRelation(nullptr)
+        , selfModel(nullptr)
+        , socialLearning(nullptr)
+        , developmentSystem(nullptr)
+        , checkpointManager(nullptr)
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
@@ -100,35 +126,49 @@ struct Brain::Impl {
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
-        // Initialize plasticity systems
+        // Initialize neuromodulation systems
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
+        dopamine = std::make_unique<Dopamine>();
+        curiosity = std::make_unique<Curiosity>();
+        predictionError = std::make_unique<PredictionError>();
+        novelty = std::make_unique<Novelty>();
+        
+        // Configure neuromodulators
+        acetylcholine->setLevel(0.5f);
+        norepinephrine->setLevel(0.3f);
+        serotonin->setLevel(0.3f);
+        
+        // Phase 2: Real neural computation components
         spikeSystem = std::make_unique<SpikeSystem>();
         stdp = std::make_unique<STDP>();
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
+        // ========== MEMORY SYSTEMS ==========
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
-        // Initialize prediction system
+        // ========== PREDICTION SYSTEM ==========
         predictionSystem = std::make_unique<PredictionSystem>();
         
-        // Initialize cognition systems
+        // ========== COGNITION SYSTEMS ==========
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
-        // Initialize development system
+        // ========== ADVANCED COGNITION SYSTEMS ==========
+        spatialRepresentation = std::make_unique<SpatialRepresentation>();
+        temporalRelation = std::make_unique<TemporalRelation>();
+        selfModel = std::make_unique<SelfModel>();
+        socialLearning = std::make_unique<SocialLearning>();
+        
+        // ========== DEVELOPMENT SYSTEM ==========
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+        // ========== INITIALIZATION ==========
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -1025,23 +1065,71 @@ PredictionSystem* Brain::getPredictionSystem() {
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
-NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
-}
+    NeuralPlanner* Brain::getPlanner() {
+        return pImpl->planner.get();
+    }
 
-ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
-}
+    ConceptFormation* Brain::getConceptFormation() {
+        return pImpl->conceptFormation.get();
+    }
 
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
-}
+    AttentionalSelection* Brain::getAttention() {
+        return pImpl->attention.get();
+    }
 
-// ========== DEVELOPMENT SYSTEM ==========
+    // ========== ADVANCED COGNITION SYSTEMS ==========
 
-DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
-}
+    SpatialRepresentation* Brain::getSpatialRepresentation() {
+        return pImpl->spatialRepresentation.get();
+    }
+
+    TemporalRelation* Brain::getTemporalRelation() {
+        return pImpl->temporalRelation.get();
+    }
+
+    SelfModel* Brain::getSelfModel() {
+        return pImpl->selfModel.get();
+    }
+
+    SocialLearning* Brain::getSocialLearning() {
+        return pImpl->socialLearning.get();
+    }
+
+    // ========== NEUROMODULATION SYSTEMS ==========
+
+    Dopamine* Brain::getDopamine() {
+        return pImpl->dopamine.get();
+    }
+
+    Curiosity* Brain::getCuriosity() {
+        return pImpl->curiosity.get();
+    }
+
+    Novelty* Brain::getNovelty() {
+        return pImpl->novelty.get();
+    }
+
+    PredictionError* Brain::getPredictionErrorSignal() {
+        return pImpl->predictionError.get();
+    }
+
+    Acetylcholine* Brain::getAcetylcholine() {
+        return pImpl->acetylcholine.get();
+    }
+
+    Norepinephrine* Brain::getNorepinephrine() {
+        return pImpl->norepinephrine.get();
+    }
+
+    Serotonin* Brain::getSerotonin() {
+        return pImpl->serotonin.get();
+    }
+
+    // ========== DEVELOPMENT SYSTEM ==========
+
+    DevelopmentSystem* Brain::getDevelopmentSystem() {
+        return pImpl->developmentSystem.get();
+    }
 
 DevelopmentalStage Brain::getDevelopmentalStage() const {
     return pImpl->developmentalStage;

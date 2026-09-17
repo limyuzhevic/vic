@@ -86,4 +86,9 @@ public:
     void update(TimestepDuration dt) override {}
 };
 
+// Forward declarations for advanced neuromodulators
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+
 } // namespace nlm
