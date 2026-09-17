@@ -4,6 +4,7 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <memory>
 #include <vector>
 
@@ -13,6 +14,7 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
+    // Main constructor/destructor and initialization
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
     
@@ -24,33 +26,6 @@ public:
     
     // Get motor output size expected
     size_t getMotorOutputSize() const;
-    
-    // Process sensory percept and inject into brain
-    void processSensoryInput(const SensoryPercept& percept);
-    
-    // Decode brain motor activity into motor command
-    MotorCommand decodeMotorCommand();
-    
-    // Apply neuromodulation based on reward
-    void applyRewardModulation(float reward, float predictedReward);
-    
-    // Update development system
-    void updateDevelopment(double timestep);
-    
-    // Get current developmental stage
-    DevelopmentalStage getDevelopmentalStage() const;
-    
-    // Get neuromodulation level
-    float getNeuromodulationLevel() const;
-    
-    // Get curiosity level
-    float getCuriosityLevel() const;
-    
-    // Get novelty level
-    float getNoveltyLevel() const;
-    
-    // Get prediction error
-    float getPredictionError() const;
     
     // Reset agent for new episode
     void reset();

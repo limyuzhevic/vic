@@ -104,18 +104,28 @@ pip install dist/*.whl
 ```python
 import pynlm
 
-# Check version
-print(pynlm.__version__)
+# Check if module is available
+print("NLM Python bindings loaded successfully!")
+
+# Show available functions
+print("\nAvailable functions:")
+print("  - pynlm.createDefaultConfig()")
+print("  - pynlm.createBrain(config)")
+print("  - pynlm.createSimpleWorld()")
+print("  - pynlm.createAgentBrain(brain)")
 
 # Create a simple brain
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
-print(f"Neurons: {brain.getTotalNeuronCount()}")
+
+print(f"\nBrain created successfully!")
+print(f"  - Total neurons: {brain.getTotalNeuronCount()}")
+print(f"  - Total synapses: {brain.getTotalSynapseCount()}")
 ```
 
 ---
 
-## Part 3: Using the Python Library
+## Part 3: Using the NLM Python API
 
 ### Basic Usage
 
@@ -127,9 +137,9 @@ import pynlm
 # Create a default configuration
 config = pynlm.createDefaultConfig()
 
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
+# Optionally configure specific parameters using the config methods
+# config.loadFromFile("my_config.json")
+# config.loadFromArgs(['--brain.neuron_count=1000'])
 
 # Create and initialize the brain
 brain = pynlm.createBrain(config)

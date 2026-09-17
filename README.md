@@ -20,49 +20,71 @@ NLM IS intended to become:
 
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 2: REAL NEURAL COMPUTATION**
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+Phase 2 implements real spiking neural computation with Leaky Integrate-and-Fire (LIF) neurons, event-driven spike propagation, and basic plasticity mechanisms. Previous phases (Phase 1) established the project skeleton and core interfaces.
 
-### Phase 6 Integration Achievements
+### Phase 2 Achievements
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+#### Real Neural Dynamics
+- Leaky Integrate-and-Fire (LIF) neuron model
+- Event-driven spike propagation with synaptic delays
+- Basic STDP and Hebbian plasticity rules
+- Structural plasticity (synaptogenesis/pruning)
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+#### Core Brain Systems
+- Neural population management with excitatory/inhibitory neurons
+- Synapse dynamics and plasticity
+- Neural region organization
+- Basic working memory
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+#### Configuration and Setup
+- JSON-based configuration system
+- Command-line argument loading
+- Checkpoint save/load for brain state
+- Development stage tracking
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+### Phase Summary
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+### Phase 1 (Complete)
+- Project skeleton
+- Core types and configuration
+- Neural interfaces
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+### Phase 2 (Current)
+- Real LIF neuron dynamics
+- Event-driven spike propagation
+- STDP and Hebbian plasticity
+- Structural plasticity
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+### Future Phases (Planned)
+
+#### Phase 3: World Interaction
+- World simulation integration
+- Sensory input and motor output
+- Reward prediction error
+- Advanced neuromodulation (curiosity, novelty)
+
+#### Phase 4: Cognitive Systems
+- Neural prediction system
+- Working memory
+- Episodic memory
+- Concept formation
+- Neural attention mechanisms
+- Predictive planning
+
+#### Phase 5: Performance Optimization
+- Memory pools and event queues
+- SIMD vectorization
+- Parallel processing
+- Enhanced checkpoint system
+
+#### Phase 6: Final Integration
+- Complete integration of all systems
+- Full memory, prediction, and cognitive systems
+- Advanced neuromodulation and development
+- Comprehensive experiment framework
+- Visualization and analysis tools
 
 ## Building
 
@@ -75,12 +97,52 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 2 Demo (Real Neural Computation Test)
 ```bash
-./nlm_phase6_demo
+./nlm
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs the Phase 2 demonstration showing real neural computation.
+
+### Phase 3 Demo
+```bash
+./nlm_phase3_demo
+```
+
+This demonstrates world interaction and basic learning.
+
+### Phase 4 Demo
+```bash
+./nlm_phase4_demo
+```
+
+This demonstrates cognitive capabilities including prediction and planning.
+
+## Python Usage
+
+Install the Python bindings:
+
+```bash
+pip install .
+```
+
+Then use the Python API:
+
+```python
+import pynlm
+
+# Create a brain with default configuration
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for step in range(100):
+    brain.step(step)
+
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Neurons firing: {brain.getFiringNeuronCount()}")
+```
 
 ## Project Structure
 
