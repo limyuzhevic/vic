@@ -7,8 +7,9 @@ namespace nlm {
 struct WorkingMemory::Impl {
     std::vector<std::pair<NeuronId, float>> items;
     size_t capacity;
+    float decayRate;
     
-    Impl(size_t cap) : capacity(cap) {}
+    Impl(size_t cap) : capacity(cap), decayRate(0.01f) {}
 };
 
 WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
@@ -16,15 +17,27 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // Find existing item
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
             return;
         }
     }
+    
+    // Add new item if capacity allows
     if (pImpl->items.size() < pImpl->capacity) {
         pImpl->items.emplace_back(neuron, value);
+    } else {
+        // Replace weakest item (lowest activation) if new value is stronger
+        auto weakestIt = std::min_element(pImpl->items.begin(), pImpl->items.end(),
+            [](const std::pair<NeuronId, float>& a, const std::pair<NeuronId, float>& b) {
+                return a.second < b.second;
+            });
+        if (weakestIt->second < value) {
+            weakestIt->first = neuron;
+            weakestIt->second = value;
+        }
     }
 }
 
@@ -59,8 +72,9 @@ size_t WorkingMemory::getCurrentSize() const {
 }
 
 void WorkingMemory::decay(float decayRate) {
+    float rate = decayRate > 0.0f ? decayRate : pImpl->decayRate;
     for (auto& item : pImpl->items) {
-        item.second *= (1.0f - decayRate);
+        item.second *= (1.0f - rate);
     }
 }
 
@@ -68,8 +82,10 @@ void WorkingMemory::decay(float decayRate) {
 struct EpisodicMemory::Impl {
     std::vector<EpisodicMemoryItem> episodes;
     size_t maxEpisodes;
+    float replayInterval;
+    float consolidationThreshold;
     
-    Impl(size_t max) : maxEpisodes(max) {}
+    Impl(size_t max) : maxEpisodes(max), replayInterval(100.0f), consolidationThreshold(0.3f) {}
 };
 
 EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {}
@@ -78,6 +94,7 @@ EpisodicMemory::~EpisodicMemory() = default;
 
 void EpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     if (pImpl->episodes.size() >= pImpl->maxEpisodes) {
+        // Remove oldest episode (circular buffer style)
         pImpl->episodes.erase(pImpl->episodes.begin());
     }
     pImpl->episodes.push_back(episode);
@@ -108,7 +125,22 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Placeholder for consolidation logic
+    // In a real implementation, this would move high-relevance episodes
+    // to long-term storage and prune low-relevance ones
+    
+    if (relevanceThreshold <= 0.0f) return;
+    
+    std::vector<EpisodicMemoryItem> toKeep;
+    for (const auto& episode : pImpl->episodes) {
+        // Calculate relevance (placeholder: use reward as relevance indicator)
+        float relevance = episode.reward * episode.novelty;
+        if (relevance >= relevanceThreshold) {
+            toKeep.push_back(episode);
+        }
+    }
+    
+    pImpl->episodes = toKeep;
 }
 
 // Semantic Memory Implementation
