@@ -98,6 +98,8 @@ struct Brain::Impl {
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
+        // FIXED: Properly initialize with seed
+        if (seed == 0) seed = 42;  // Ensure valid seed
         rng = std::make_unique<RandomGenerator>(seed);
         
         // Initialize plasticity systems
@@ -548,7 +550,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+        // FIX: Ensure rng is not null before using it
+        if (pImpl->rng) {
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
         // Development affects plasticity rates
         auto* sp = pImpl->structuralPlasticity;
