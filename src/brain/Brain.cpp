@@ -151,6 +151,11 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Set up checkpoint intervals if configured
+        if (auto interval = config->getOr<size_t>("checkpoint_interval", 0)) {
+            checkpointManager->setCheckpointInterval(static_cast<double>(interval));
+        }
     }
     
     DevelopmentalStage developmentalStage;
@@ -192,13 +197,26 @@ bool Brain::initialize() {
     
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
+    if (neuronsPerRegion == 0) neuronsPerRegion = 1; // Ensure at least 1 neuron per region
+    
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
             // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+            size_t sensoryCount = neuronsPerRegion / 4;
+            size_t internalCount = neuronsPerRegion / 2;
+            size_t motorCount = neuronsPerRegion / 4;
+            
+            // Ensure minimum population sizes
+            if (i == 0) { // First region always has full populations for testing
+                sensoryCount = std::max<size_t>(10, sensoryCount);
+                internalCount = std::max<size_t>(20, internalCount);
+                motorCount = std::max<size_t>(10, motorCount);
+            }
+            
+            auto sensoryPopId = region->addPopulation(sensoryCount, NeuronType::Sensory);
+            auto internalPopId = region->addPopulation(internalCount, NeuronType::Internal);
+            auto motorPopId = region->addPopulation(motorCount, NeuronType::Motor);
             
             // Collect sensory and motor neurons for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);
@@ -217,6 +235,9 @@ bool Brain::initialize() {
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
                         std::to_string(region->getTotalNeuronCount()) + " neurons");
+        } else {
+            NLM_LOG_ERROR("Failed to create region " + std::to_string(i + 1));
+            return false;
         }
     }
     

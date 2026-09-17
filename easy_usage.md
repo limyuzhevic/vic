@@ -71,6 +71,155 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### Example 3: Learning Brain
+
+```python
+import pynlm
+import time
+
+# Create a learning brain
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 500)
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.hebbian.enable", True)
+config.set("neuromod.dopamine.scale", 1.0)
+config.set("neuromod.curiosity.enable", True)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableStructuralPlasticity(True)
+
+print("Starting learning simulation...")
+print("Watch the brain learn and adapt!")
+
+# Run learning simulation
+for step in range(200):
+    world.update(0.1)  # Update world
+    
+    # Get what the agent sees
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    
+    # Brain thinks and learns
+    brain.step(step)
+    
+    # Brain decides action
+    action = agent.decodeMotorCommand()
+    
+    # Do the action
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Print progress every 40 steps
+    if step % 40 == 0:
+        print(f"Step {step}:")
+        print(f"  Brain Stats: {brain.getFiringNeuronCount()} firing neurons")
+        print(f"  Curiosity Level: {agent.getCuriosityLevel():.2f}")
+        print(f"  Novelty Level: {agent.getNoveltyLevel():.2f}")
+        print(f"  Developmental Stage: {brain.getDevelopmentalStage()}")
+
+print("\nLearning simulation complete!")
+print("The brain learned through experience and developed new connections.")
+```
+
+### Example 4: Building Your First Agent
+
+```python
+import pynlm
+import math
+
+# Setup: Create brain with good starting configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1000)
+config.set("brain.synapse_density", 0.15)
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.hebbian.enable", True)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create world with resources and hazards
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+# Place some resources for the agent to learn
+world.addObject(pynlm.WorldObject(5.0, 5.0, pynlm.WorldObjectType.Resource, value=10.0))
+world.addObject(pynlm.WorldObject(15.0, 15.0, pynlm.WorldObjectType.Resource, value=20.0))
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all learning features
+agent.enableRewardModulation(True)      # Learn from rewards
+agent.enableCuriosity(True)             # Explore new things
+agent.enableStructuralPlasticity(True)  # Grow new connections
+agent.enableDevelopment(True)           # Brain matures over time
+
+print("=== Agent Training Started ===")
+print(f"World size: {world.getWidth()}x{world.getHeight()}")
+print(f"Brain has {brain.getTotalNeuronCount()} neurons")
+print(f"Target: Find and collect resources")
+
+# Training loop
+episodes = 10
+steps_per_episode = 100
+
+for episode in range(episodes):
+    print(f"\n--- Episode {episode + 1}/{episodes} ---")
+    
+    # Reset world and agent for each episode
+    world.reset()
+    agent.reset()
+    world.setAgentStart(10.0, 10.0)  # Start in middle
+    
+    # Place new resources each episode
+    world.addObject(pynlm.WorldObject(3.0, 3.0, pynlm.WorldObjectType.Resource, value=5.0))
+    world.addObject(pynlm.WorldObject(17.0, 17.0, pynlm.WorldObjectType.Resource, value=15.0))
+    
+    # Run episode
+    for step in range(steps_per_episode):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        # Brain processes and learns
+        brain.step(step)
+        
+        # Select and execute action
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Check for completion
+        if step % 25 == 0:
+            # Get agent stats
+            curiosity = agent.getCuriosityLevel()
+            novelty = agent.getNoveltyLevel()
+            firing_rate = brain.getAverageFiringRate()
+            
+            print(f"  Step {step}: Curiosity={curiosity:.2f}, Novelty={novelty:.2f}, Firing={firing_rate:.1f}")
+    
+    # Episode summary
+    print(f"Episode {episode + 1} complete - Agent explored and learned")
+
+print("\n=== Training Complete ===")
+print("The agent developed neural pathways for finding resources")
+print("and learning from experience through synaptic plasticity.")
+```
+
 ---
 
 ## Simple Analogy
@@ -295,3 +444,12 @@ When you're comfortable:
 3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
+
+### 🚀 Quick Start Checklist:
+1. **Install**: `pip install pynlm`
+2. **Run the simplest example** (copy-paste above)
+3. **Try the learning example** to see the brain learn
+4. **Explore configurations** in HOW_TO_USE.md
+5. **Build from source** if you want the latest features
+
+Happy brain-building! 🧠✨

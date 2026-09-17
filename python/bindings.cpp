@@ -416,6 +416,29 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Checkpoint system
+    m.def("saveBrain", &Brain::save, py::arg("filepath"), "Save brain state to checkpoint file");
+    m.def("loadBrain", &Brain::load, py::arg("filepath"), "Load brain state from checkpoint file");
+
+    // Exploration and advanced features
+    m.def("createExplorationController", []() {
+        // Placeholder for exploration controller
+        std::cout << "Exploration controller not yet implemented in Python bindings" << std::endl;
+        return std::shared_ptr<void>(nullptr);
+    }, "Create exploration controller for curiosity-driven learning");
+
+    // Statistics and monitoring
+    m.def("getBrainStats", [](const std::shared_ptr<Brain>& brain) {
+        std::map<std::string, std::string> stats;
+        stats["total_neurons"] = std::to_string(brain->getTotalNeuronCount());
+        stats["total_synapses"] = std::to_string(brain->getTotalSynapseCount());
+        stats["firing_neurons"] = std::to_string(brain->getFiringNeuronCount());
+        stats["total_spikes"] = std::to_string(brain->getTotalSpikeCount());
+        stats["excitement_inhibition_ratio"] = std::to_string(brain->getExcitationInhibitionRatio());
+        stats["pending_events"] = std::to_string(brain->getPendingSpikeEventCount());
+        return stats;
+    }, py::arg("brain"), "Get brain statistics for monitoring");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
