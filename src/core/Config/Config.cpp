@@ -10,7 +10,40 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize default configuration values
+    // Neuron parameters
+    set(NEURON_MAX_SPIKE_HISTORY, size_t(100), ConfigSource::Default);
+    set(NEURON_TIME_CONSTANT, 20.0f, ConfigSource::Default);
+    set(NEURON_MEMBRANE_CAPACITANCE, 1.0f, ConfigSource::Default);
+    set(NEURON_REFRACTORY_CHECK_RATE, 0.001f, ConfigSource::Default);
+    set(NEURON_MAX_MEMBRANE_POTENTIAL, 1000.0f, ConfigSource::Default);
+    set(NEURON_MIN_MEMBRANE_POTENTIAL, -100.0f, ConfigSource::Default);
+    set(NEURON_ADAPTATION_DECAY, 0.01f, ConfigSource::Default);
+    set(NEURON_ADAPTATION_FACTOR_DECAY, 0.95f, ConfigSource::Default);
+    set(NEURON_SPIKE_ADAPTATION_INCREMENT, 1.0f, ConfigSource::Default);
+    set(NEURON_TEST_CURRENT_AMPLITUDE, 60.0f, ConfigSource::Default);
+    
+    // Synapse parameters
+    set(SYNAPSE_WEIGHT_MIN, -1.0f, ConfigSource::Default);
+    set(SYNAPSE_WEIGHT_MAX, 1.0f, ConfigSource::Default);
+    set(SYNAPSE_STP_FACILITATION_TIME_CONSTANT, 100.0f, ConfigSource::Default);
+    set(SYNAPSE_STP_DEPRESSION_TIME_CONSTANT, 200.0f, ConfigSource::Default);
+    set(SYNAPSE_STP_UTILIZATION_MAX, 1.0f, ConfigSource::Default);
+    set(SYNAPSE_MAX_SPIKE_HISTORY, size_t(100), ConfigSource::Default);
+    set(SYNAPSE_ELIGIBILITY_DECAY_RATE, 0.001f, ConfigSource::Default);
+    set(SYNAPSE_ELIGIBILITY_ZERO_THRESHOLD, 0.0f, ConfigSource::Default);
+    set(SYNAPSE_EFFICIENCY_MAX, 0.8f, ConfigSource::Default);
+    set(SYNAPSE_EFFICIENCY_MAX_FOR_CLAMP, 2.0f, ConfigSource::Default);
+    set(SYNAPSE_DECAY_RATE_MAX, 2.0f, ConfigSource::Default);
+    set(SYNAPSE_DEPRESSION_RECOVERY_RATE, 1.0f, ConfigSource::Default);
+    set(SYNAPSE_INITIAL_DEPRESSION, 0.0f, ConfigSource::Default);
+    set(SYNAPSE_FACILITATION_RECOVERY_RATE, 1.0f, ConfigSource::Default);
+    set(SYNAPSE_INITIAL_FACILITATION, 0.0f, ConfigSource::Default);
+    set(SYNAPSE_INITIAL_EFFICIENCY, 1.0f, ConfigSource::Default);
+    set(SYNAPSE_SPIKE_TIME_RESOLUTION, 0.001f, ConfigSource::Default);
+    set(SYNAPSE_TIME_SINCE_ACTIVITY_MAX, 60.0f, ConfigSource::Default);
+}
 
 Config::~Config() = default;
 
@@ -126,10 +159,6 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     }
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
 void Config::set(const std::string& key, int value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
@@ -140,6 +169,14 @@ void Config::set(const std::string& key, double value, ConfigSource source) {
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, float value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, size_t value, ConfigSource source) {
+    set(key, ConfigValue(static_cast<int64_t>(value)), source);
 }
 
 bool Config::has(const std::string& key) const {
@@ -199,17 +236,55 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;
+
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+
 template std::optional<double> Config::get<double>(const std::string&) const;
+
 template std::optional<bool> Config::get<bool>(const std::string&) const;
+
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
 template int Config::getOr<int>(const std::string&, const int&) const;
+
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+
 template double Config::getOr<double>(const std::string&, const double&) const;
+
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
+
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Config key constants
+const std::string Config::NEURON_MAX_SPIKE_HISTORY = "neuron.max_spike_history";
+const std::string Config::NEURON_TIME_CONSTANT = "neuron.time_constant";
+const std::string Config::NEURON_MEMBRANE_CAPACITANCE = "neuron.membrane_capacitance";
+const std::string Config::NEURON_REFRACTORY_CHECK_RATE = "neuron.refractory_check_rate";
+const std::string Config::NEURON_MAX_MEMBRANE_POTENTIAL = "neuron.max_membrane_potential";
+const std::string Config::NEURON_MIN_MEMBRANE_POTENTIAL = "neuron.min_membrane_potential";
+const std::string Config::NEURON_ADAPTATION_DECAY = "neuron.adaptation_decay";
+const std::string Config::NEURON_ADAPTATION_FACTOR_DECAY = "neuron.adaptation_factor_decay";
+const std::string Config::NEURON_SPIKE_ADAPTATION_INCREMENT = "neuron.spike_adaptation_increment";
+const std::string Config::NEURON_TEST_CURRENT_AMPLITUDE = "neuron.test_current_amplitude";
+
+const std::string Config::SYNAPSE_WEIGHT_MIN = "synapse.weight_min";
+const std::string Config::SYNAPSE_WEIGHT_MAX = "synapse.weight_max";
+const std::string Config::SYNAPSE_STP_FACILITATION_TIME_CONSTANT = "synapse.stp_facilitation_time_constant";
+const std::string Config::SYNAPSE_STP_DEPRESSION_TIME_CONSTANT = "synapse.stp_depression_time_constant";
+const std::string Config::SYNAPSE_STP_UTILIZATION_MAX = "synapse.stp_utilization_max";
+const std::string Config::SYNAPSE_MAX_SPIKE_HISTORY = "synapse.max_spike_history";
+const std::string Config::SYNAPSE_ELIGIBILITY_DECAY_RATE = "synapse.eligibility_decay_rate";
+const std::string Config::SYNAPSE_ELIGIBILITY_ZERO_THRESHOLD = "synapse.eligibility_zero_threshold";
+const std::string Config::SYNAPSE_EFFICIENCY_MAX = "synapse.efficiency_max";
+const std::string Config::SYNAPSE_EFFICIENCY_MAX_FOR_CLAMP = "synapse.efficacy_max_for_clamp";
+const std::string Config::SYNAPSE_DECAY_RATE_MAX = "synapse.decay_rate_max";
+const std::string Config::SYNAPSE_DEPRESSION_RECOVERY_RATE = "synapse.depression_recovery_rate";
+const std::string Config::SYNAPSE_INITIAL_DEPRESSION = "synapse.initial_depression";
+const std::string Config::SYNAPSE_FACILITATION_RECOVERY_RATE = "synapse.facilitation_recovery_rate";
+const std::string Config::SYNAPSE_INITIAL_FACILITATION = "synapse.initial_facilitation";
+const std::string Config::SYNAPSE_INITIAL_EFFICIENCY = "synapse.initial_efficiency";
+const std::string Config::SYNAPSE_SPIKE_TIME_RESOLUTION = "synapse.spike_time_resolution";
+const std::string Config::SYNAPSE_TIME_SINCE_ACTIVITY_MAX = "synapse.time_since_activity_max";
 
 } // namespace nlm

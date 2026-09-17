@@ -8,19 +8,19 @@
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-
 // Configuration value types
 using ConfigValue = std::variant<
     int,
     int64_t,
     double,
     bool,
+    float,
+    size_t,
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<std::string>,
+    std::vector<float>
 >;
 
 // Configuration source
@@ -77,6 +77,8 @@ public:
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, float value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, size_t value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -92,6 +94,37 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Config key constants
+    static const std::string NEURON_MAX_SPIKE_HISTORY;
+    static const std::string NEURON_TIME_CONSTANT;
+    static const std::string NEURON_MEMBRANE_CAPACITANCE;
+    static const std::string NEURON_REFRACTORY_CHECK_RATE;
+    static const std::string NEURON_MAX_MEMBRANE_POTENTIAL;
+    static const std::string NEURON_MIN_MEMBRANE_POTENTIAL;
+    static const std::string NEURON_ADAPTATION_DECAY;
+    static const std::string NEURON_ADAPTATION_FACTOR_DECAY;
+    static const std::string NEURON_SPIKE_ADAPTATION_INCREMENT;
+    static const std::string NEURON_TEST_CURRENT_AMPLITUDE;
+    
+    static const std::string SYNAPSE_WEIGHT_MIN;
+    static const std::string SYNAPSE_WEIGHT_MAX;
+    static const std::string SYNAPSE_STP_FACILITATION_TIME_CONSTANT;
+    static const std::string SYNAPSE_STP_DEPRESSION_TIME_CONSTANT;
+    static const std::string SYNAPSE_STP_UTILIZATION_MAX;
+    static const std::string SYNAPSE_MAX_SPIKE_HISTORY;
+    static const std::string SYNAPSE_ELIGIBILITY_DECAY_RATE;
+    static const std::string SYNAPSE_ELIGIBILITY_ZERO_THRESHOLD;
+    static const std::string SYNAPSE_EFFICIENCY_MAX;
+    static const std::string SYNAPSE_EFFICIENCY_MAX_FOR_CLAMP;
+    static const std::string SYNAPSE_DECAY_RATE_MAX;
+    static const std::string SYNAPSE_DEPRESSION_RECOVERY_RATE;
+    static const std::string SYNAPSE_INITIAL_DEPRESSION;
+    static const std::string SYNAPSE_FACILITATION_RECOVERY_RATE;
+    static const std::string SYNAPSE_INITIAL_FACILITATION;
+    static const std::string SYNAPSE_INITIAL_EFFICIENCY;
+    static const std::string SYNAPSE_SPIKE_TIME_RESOLUTION;
+    static const std::string SYNAPSE_TIME_SINCE_ACTIVITY_MAX;
     
 private:
     struct Impl;
