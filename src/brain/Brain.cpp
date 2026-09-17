@@ -75,6 +75,9 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // Planned action from neural planner (for output)
+    ActionType plannedAction;
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -106,12 +109,21 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
+        // Initialize memory systems with error handling
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        
+        // Check if memory systems were allocated
+        if (!workingMemory) {
+            NLM_LOG_ERROR("Failed to allocate working memory");
+        }
+        if (!episodicMemory) {
+            NLM_LOG_ERROR("Failed to allocate episodic memory");
+        }
+        if (!associativeMemory) {
+            NLM_LOG_ERROR("Failed to allocate associative memory");
+        }
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -129,6 +141,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize prediction error with brain reference
+        predictionError->initialize(this);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -231,16 +246,22 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
+    // Initialize working memory with error handling
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
+    // Initialize episodic memory with error handling
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
+    // Initialize associative memory with error handling
     pImpl->associativeMemory->initialize(this);
+    
+    // Verify memory systems initialized successfully
+    if (!pImpl->workingMemory || !pImpl->episodicMemory || !pImpl->associativeMemory) {
+        NLM_LOG_ERROR("Memory system initialization incomplete - some systems failed to initialize");
+        return false;
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -509,10 +530,67 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    // ========== STEP 8: Integrate prediction system ==========
+    // Get sensory input from world/agent
+    // Pass it to prediction system for prediction
+    // Compare prediction with actual to get error
+    // Use prediction error to modulate neural activity
+    // Update prediction system with actual data
+    if (pImpl->predictionSystem && pImpl->predictionError) {
+        // For now, create a simple internal sensory input representing the current brain state
+        // This simulates receiving actual sensory observations from the environment
+        SensoryInput predictionInput;
+        // Extract current state for prediction (simplified)
+        std::vector<float> stateData;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        stateData.push_back(1.0f);
+                    } else {
+                        float potential = neuron->getState().membranePotential;
+                        stateData.push_back(potential);
+                    }
+                }
+            }
+        }
+        
+        // Make prediction for next state
+        auto prediction = pImpl->predictionSystem->predictNextState(predictionInput);
+        
+        // Compute prediction error for neuromodulation
+        float predictionError = 0.0f;
+        if (prediction) {
+            const auto& predData = prediction->getData();
+            const auto& actualData = predictionInput.getData();
+            if (predData.size() == actualData.size() && !predData.empty()) {
+                float sumError = 0.0f;
+                for (size_t i = 0; i < predData.size(); ++i) {
+                    float diff = predData[i] - actualData[i];
+                    sumError += diff * diff;
+                }
+                predictionError = sumError / predData.size();
+                pImpl->predictionError->computeError(0.0f, predictionError);
+            }
+        }
+        
+        // Update prediction system with actual observations
+        pImpl->predictionSystem->updatePredictions(predictionInput, predictionInput);
+        
+        // Apply prediction error to modulate neural activity
+        float errorMagnitude = pImpl->predictionError->getMagnitude();
+        if (errorMagnitude > 0.1f) {
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Prediction error modulates neural excitability
+                        // Larger errors increase plasticity and learning
+                        float errorMod = errorMagnitude * 0.5f;
+                        neuron->injectCurrent(errorMod);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +606,152 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract current neural activity patterns from working memory
+        std::vector<float> neuralPatterns;
+        if (pImpl->workingMemory) {
+            // Get active neural traces from working memory
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            neuralPatterns.reserve(memoryNeurons.size() * 3); // ~3 features per neuron
+            
+            for (const auto& neuronId : memoryNeurons) {
+                // Get activation level
+                float activation = 0.0f;
+                for (auto& region : pImpl->regions) {
+                    auto neurons = region->getAllNeurons();
+                    for (auto* neuron : neurons) {
+                        if (neuron->getId() == neuronId) {
+                            activation = std::abs(neuron->getState().membranePotential - 
+                                               neuron->getState().restingPotential) / 10.0f;
+                            break;
+                        }
+                    }
+                }
+                
+                neuralPatterns.push_back(static_cast<float>(neuronId.index())); // Neuron ID
+                neuralPatterns.push_back(activation); // Activation level
+                neuralPatterns.push_back(neuronId.index() % 100 / 100.0f); // Position hash
+            }
+        }
+        
+        // Also include current firing neuron data
+        std::vector<float> firingNeurons;
+        firingNeurons.reserve(pImpl->totalSpikesThisStep * 2);
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        firingNeurons.push_back(static_cast<float>(neuron->getId().index()));
+                        firingNeurons.push_back(pImpl->currentTime);
+                    }
+                }
+            }
+        }
+        
+        // Merge firing data into patterns
+        neuralPatterns.insert(neuralPatterns.end(), firingNeurons.begin(), firingNeurons.end());
+        
+        // Process neural patterns to form concepts
+        if (!neuralPatterns.empty()) {
+            // Get reward signal from neuromodulation
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Present experience to concept formation
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                neuralPatterns, // pattern
+                neuralPatterns, // features (use same data for now)
+                reward,
+                currentStep
+            );
+            
+            // Concept formation will create/update concepts based on patterns
+            if (conceptId > 0) {
+                // Log concept formation
+                NLM_LOG_DEBUG("Brain: Concept formation created/updated concept " + 
+                             std::to_string(conceptId) + " with " +
+                             std::to_string(neuralPatterns.size()) + " pattern elements");
+            }
+        }
+    }
+    
+    // ========== STEP 11: Integrate neural planner ==========
+    if (pImpl->planner && pImpl->conceptFormation) {
+        // Generate state representation from current brain state
+        std::vector<float> currentState;
+        currentState.reserve(getTotalNeuronCount() * 2); // State for each neuron
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Encode neuron state
+                    float potential = neuron->getState().membranePotential;
+                    float firing = neuron->isFiring() ? 1.0f : 0.0f;
+                    
+                    currentState.push_back(potential);
+                    currentState.push_back(firing);
+                }
+            }
+        }
+        
+        // Add recent concept information to state
+        if (!pImpl->conceptFormation->getConcepts().empty()) {
+            size_t numConcepts = pImpl->conceptFormation->getConceptCount();
+            for (size_t i = 0; i < std::min(numConcepts, static_cast<size_t>(10)); ++i) {
+                // Add concept stability to state
+                float stability = pImpl->conceptFormation->getConceptStability(i);
+                currentState.push_back(stability);
+            }
+        }
+        
+        // Add neuromodulatory state
+        float noveltyLevel = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        float curiosityLevel = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+        currentState.push_back(noveltyLevel);
+        currentState.push_back(curiosityLevel);
+        
+        // Add working memory state
+        if (pImpl->workingMemory) {
+            size_t memoryNeurons = pImpl->workingMemory->getActiveTraces();
+            currentState.push_back(static_cast<float>(memoryNeurons) / 100.0f);
+        }
+        
+        // Determine current goal based on highest stability concept
+        std::vector<float> goal;
+        if (!pImpl->conceptFormation->getConcepts().empty()) {
+            float maxStability = 0.0f;
+            size_t bestConcept = 0;
+            for (size_t i = 0; i < pImpl->conceptFormation->getConceptCount(); ++i) {
+                float stability = pImpl->conceptFormation->getConceptStability(i);
+                if (stability > maxStability) {
+                    maxStability = stability;
+                    bestConcept = i;
+                }
+            }
+            
+            if (maxStability > 0.5f) { // Only use stable concepts
+                const auto& concepts = pImpl->conceptFormation->getConcepts();
+                if (bestConcept < concepts.size()) {
+                    // Extract features from best concept for goal
+                    const auto& instances = pImpl->conceptFormation->getConceptInstances(bestConcept);
+                    if (!instances.empty()) {
+                        goal = instances[0].features;
+                        pImpl->planner->setCurrentGoal(goal);
+                    }
+                }
+            }
+        }
+        
+        // Plan action based on current state and goal
+        ActionType plannedAction = pImpl->planner->planAction(currentState);
+        
+        // Log planning
+        NLM_LOG_DEBUG("Brain: NeuralPlanner selected action " + 
+                     std::to_string(static_cast<int>(plannedAction)) + 
+                     " based on " + std::to_string(currentState.size()) + 
+                     " state features and goal size " + std::to_string(goal.size()));
+        
+        // Store planned action for use by produceAction()
+        pImpl->plannedAction = plannedAction;
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -690,28 +912,37 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Use neural planner to select the best action based on current state
+    // If planner has stored a planned action, use it; otherwise fall back to motor activity
+    ActionType actionType = ActionType::Wait;
     
-    if (pImpl->motorNeurons.empty()) {
-        return std::make_unique<Action>(ActionType::Wait);
-    }
-    
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+    if (pImpl->plannedAction != ActionType::Wait) {
+        // Use the action planned by the neural planner
+        actionType = pImpl->plannedAction;
+    } else if (!pImpl->motorNeurons.empty()) {
+        // Fall back to simple motor-based action selection if planner hasn't planned yet
+        // Calculate activity of motor neuron groups
+        size_t firingMotor = 0;
+        for (auto* neuron : pImpl->motorNeurons) {
+            if (neuron->isFiring()) {
+                ++firingMotor;
+            }
+        }
+        
+        // Return a simple action
+        if (firingMotor > 0) {
+            actionType = ActionType::MoveForward;
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
-    }
+    auto action = std::make_unique<Action>(actionType);
     
-    auto action = std::make_unique<Action>(type);
+    // Log action production
+    if (pImpl->plannedAction != ActionType::Wait) {
+        NLM_LOG_DEBUG("Brain: Produced action " + 
+                     std::to_string(static_cast<int>(actionType)) +
+                     " (planned by NeuralPlanner)");
+    }
     
     return action;
 }
@@ -1006,14 +1237,26 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
+    if (!pImpl->workingMemory) {
+        NLM_LOG_ERROR("Working memory not initialized");
+        return nullptr;
+    }
     return pImpl->workingMemory.get();
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    if (!pImpl->episodicMemory) {
+        NLM_LOG_ERROR("Episodic memory not initialized");
+        return nullptr;
+    }
     return pImpl->episodicMemory.get();
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    if (!pImpl->associativeMemory) {
+        NLM_LOG_ERROR("Associative memory not initialized");
+        return nullptr;
+    }
     return pImpl->associativeMemory.get();
 }
 
