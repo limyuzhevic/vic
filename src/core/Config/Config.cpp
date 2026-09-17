@@ -3,8 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
-
-namespace nlm {
+#include <iomanip>
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -84,9 +83,41 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Add file header
+    file << "# NLM Configuration File" << std::endl;
+    file << "# Generated automatically" << std::endl;
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Format value based on type
+        file << entry.key << " = ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format double without unnecessary trailing zeros
+                std::ostringstream oss;
+                oss << std::fixed << std::setprecision(6) << arg;
+                std::string str = oss.str();
+                // Remove trailing zeros
+                size_t dot = str.find('.');
+                if (dot != std::string::npos) {
+                    str.erase(str.find_last_not_of('0') + 1, std::string::npos);
+                    if (str.back() == '.') str.pop_back();
+                }
+                file << str;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << "[unknown]";
+            }
+            file << "\n";
+        }, entry.value);
     }
     
     return true;
