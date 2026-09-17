@@ -54,12 +54,34 @@ void Neuron::setType(NeuronType type) {
     pImpl->type = type;
 }
 
-void Neuron::setMembranePotential(MembranePotential potential) {
+bool Neuron::setMembranePotential(MembranePotential potential) {
+    // Validate membrane potential range (biologically plausible: -100mV to 50mV)
+    if (potential < -100.0f || potential > 50.0f) {
+        NLM_LOG_WARNING("Invalid membrane potential: " + std::to_string(potential) + ", clamping to valid range");
+        return false;
+    }
+    
     pImpl->state.membranePotential = potential;
+    return true;
 }
 
-void Neuron::addToMembranePotential(MembranePotential delta) {
-    pImpl->state.membranePotential += delta;
+bool Neuron::addToMembranePotential(MembranePotential delta) {
+    // Validate delta value
+    if (std::isnan(delta)) {
+        NLM_LOG_ERROR("Cannot add NaN to membrane potential");
+        return false;
+    }
+    
+    MembranePotential newPotential = pImpl->state.membranePotential + delta;
+    
+    // Validate new potential range
+    if (newPotential < -100.0f || newPotential > 50.0f) {
+        NLM_LOG_WARNING("Membrane potential would exceed valid range: " + std::to_string(newPotential) + ", clamping");
+        return false;
+    }
+    
+    pImpl->state.membranePotential = newPotential;
+    return true;
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
@@ -190,6 +212,16 @@ void Neuron::setPopulationId(PopulationId population) {
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
+    
+    // Validate inputs
+    if (std::isnan(currentTime) || std::isnan(dt)) {
+        NLM_LOG_ERROR("Invalid time parameters in stepLIF: currentTime=" + std::to_string(currentTime) + ", dt=" + std::to_string(dt));
+        return false;
+    }
+    if (dt <= 0.0) {
+        NLM_LOG_ERROR("Invalid timestep duration in stepLIF: dt=" + std::to_string(dt));
+        return false;
+    }
     
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {

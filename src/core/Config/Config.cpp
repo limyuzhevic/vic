@@ -18,17 +18,31 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+bool Config::loadFromJSON(const std::string& filepath) {
+    // Implementation would use nlohmann::json library
+    // For now, this is a placeholder
+    NLM_LOG_WARNING("JSON support not yet implemented for '" + filepath + "', falling back to simple format");
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    // Implementation would use yaml-cpp library  
+    // For now, this is a placeholder
+    NLM_LOG_WARNING("YAML support not yet implemented for '" + filepath + "', falling back to simple format");
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -37,19 +51,37 @@ bool Config::loadFromFile(const std::string& filepath) {
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            NLM_LOG_WARNING("Invalid format in config file '" + filepath + "' at line " + 
+                          std::to_string(lineNumber) + ": missing '='");
+            continue;
         }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Validate key
+        if (key.empty()) {
+            NLM_LOG_WARNING("Empty key in config file '" + filepath + "' at line " + 
+                          std::to_string(lineNumber));
+            continue;
+        }
+        
+        // Validate value
+        if (value.empty()) {
+            NLM_LOG_WARNING("Empty value for key '" + key + "' in config file '" + filepath + 
+                          "' at line " + std::to_string(lineNumber));
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        set(key, value, ConfigSource::File);
     }
     
     return true;
@@ -127,18 +159,44 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    // Validate key
+    if (key.empty()) {
+        NLM_LOG_ERROR("Cannot set config with empty key");
+        return;
+    }
+    
+    // Validate value
+    if (value.empty()) {
+        NLM_LOG_WARNING("Setting config key '" + key + "' with empty value");
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    // Validate that value is within reasonable range
+    if (value < -1000000 || value > 1000000) {
+        NLM_LOG_WARNING("Int config value out of typical range: " + std::to_string(value));
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
+    // Validate that value is within reasonable range
+    if (std::isnan(value)) {
+        NLM_LOG_ERROR("Cannot set config with NaN value for key '" + key + "'");
+        return;
+    }
+    if (value < -1e10 || value > 1e10) {
+        NLM_LOG_WARNING("Double config value out of typical range: " + std::to_string(value));
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
+    // Boolean values are always valid
     set(key, ConfigValue(value), source);
 }
 

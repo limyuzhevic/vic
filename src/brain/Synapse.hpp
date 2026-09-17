@@ -30,10 +30,10 @@ public:
     NeuronId getSourceNeuron() const;
     NeuronId getDestinationNeuron() const;
     
-    // Weight
+// Weight
     SynapticWeight getWeight() const;
-    void setWeight(SynapticWeight weight);
-    void addToWeight(SynapticWeight delta);
+    bool setWeight(SynapticWeight weight);
+    bool addToWeight(SynapticWeight delta);
     
     // Delay (in simulation steps)
     Delay getDelay() const;
@@ -41,7 +41,7 @@ public:
     
     // Type
     SynapseType getType() const;
-    void setType(SynapseType type);
+    bool setType(SynapseType type);
     
     // Excitatory/Inhibitory
     bool isExcitatory() const;
@@ -63,7 +63,7 @@ public:
     
     // Eligibility trace (for reward-modulated learning)
     float getEligibilityTrace() const;
-    void setEligibilityTrace(float trace);
+    bool setEligibilityTrace(float trace);
     void decayEligibilityTrace(float decayRate);
     
     // Synaptic efficacy (use-dependent modulation)
@@ -71,7 +71,7 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Implements short-term plasticity, eligibility trace dynamics, and weight clamping
     void step(Timestamp currentTime);
     
     // Reset to initial state

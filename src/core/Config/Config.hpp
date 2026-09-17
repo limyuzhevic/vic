@@ -73,10 +73,16 @@ public:
     
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    bool set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    bool set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    bool set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    bool set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Set values (convenience methods with validation)
+    void set(const std::string& key, const std::string& value, ConfigSource source);
+    void set(const std::string& key, int value, ConfigSource source);
+    void set(const std::string& key, double value, ConfigSource source);
+    void set(const std::string& key, bool value, ConfigSource source);
     
     // Check existence
     bool has(const std::string& key) const;

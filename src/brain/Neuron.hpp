@@ -68,8 +68,8 @@ public:
     
     // Membrane potential
     MembranePotential getMembranePotential() const;
-    void setMembranePotential(MembranePotential potential);
-    void addToMembranePotential(MembranePotential delta);
+    bool setMembranePotential(MembranePotential potential);
+    bool addToMembranePotential(MembranePotential delta);
     
     // Threshold
     MembranePotential getThreshold() const;
@@ -134,7 +134,7 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Uses LIF (Leaky Integrate-and-Fire) dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state

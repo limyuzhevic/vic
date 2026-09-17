@@ -93,14 +93,28 @@ SynapticWeight Synapse::getWeight() const {
     return pImpl->weight;
 }
 
-void Synapse::setWeight(SynapticWeight weight) {
+bool Synapse::setWeight(SynapticWeight weight) {
+    // Validate weight range
+    if (weight < Impl::MIN_WEIGHT || weight > Impl::MAX_WEIGHT) {
+        NLM_LOG_WARNING("Synapse weight out of bounds: " + std::to_string(weight) + ", clamping to valid range");
+        weight = std::clamp(weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    }
+    
     pImpl->weight = weight;
+    return true;
 }
 
-void Synapse::addToWeight(SynapticWeight delta) {
+bool Synapse::addToWeight(SynapticWeight delta) {
+    // Validate delta value
+    if (std::isnan(delta)) {
+        NLM_LOG_ERROR("Cannot add NaN to synapse weight");
+        return false;
+    }
+    
     pImpl->weight += delta;
     // Clamp to reasonable bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    return true;
 }
 
 Delay Synapse::getDelay() const {
@@ -115,8 +129,22 @@ SynapseType Synapse::getType() const {
     return pImpl->type;
 }
 
-void Synapse::setType(SynapseType type) {
-    pImpl->type = type;
+bool Synapse::setType(SynapseType type) {
+    // Validate synapse type
+    if (type == SynapseType::Excitatory) {
+        return true;  // Valid type
+    } else if (type == SynapseType::Inhibitory) {
+        return true;  // Valid type
+    } else if (type == SynapseType::Modulatory) {
+        return true;  // Valid type
+    } else if (type == SynapseType::Electrical) {
+        return true;  // Valid type
+    } else if (type == SynapseType::GapJunction) {
+        return true;  // Valid type
+    } else {
+        NLM_LOG_ERROR("Unknown synapse type");
+        return false;
+    }
 }
 
 bool Synapse::isExcitatory() const {
