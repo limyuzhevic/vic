@@ -192,34 +192,57 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
-    
     TimestepDuration dt = 0.001;  // 1ms timestep
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
+    // Update short-term plasticity state using Tsodyks-Markram model
+    // The model tracks three variables:
+    // - x: fraction of available synaptic resources (recovers from depression)
+    // - u: utilization factor (fraction of available resources used on spike)
+    // - R: fraction of resources still available after spike
+    
+    float timeSincePre = -1.0f;
+    float timeSincePost = -1.0f;
+    
     if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+    }
+    if (pImpl->lastPostSpikeTime >= 0.0f) {
+        timeSincePost = static_cast<float>(currentTime - pImpl->lastPostSpikeTime);
+    }
+    
+    // Decay utilization factor (facilitation)
+    if (timeSincePre > 0.0f) {
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        // Constrain to physiological range
+        pImpl->shortTermFacilitation = std::max(0.0f, std::min(pImpl->shortTermFacilitation, 1.0f));
     }
     
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+    // Decay from depression (resources recover)
+    if (timeSincePost > 0.0f || timeSincePre > 0.0f) {
+        float recoveryTime = std::max(timeSincePre, timeSincePost);
+        float recoveryFactor = 1.0f - std::exp(-recoveryTime / Impl::STP_DEPRESSION_TAU);
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * recoveryFactor;
+        // Constrain to physiological range
+        pImpl->shortTermDepression = std::min(pImpl->shortTermDepression, 1.0f);
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    // Update eligibility trace for reward-modulated learning (exponential decay)
+    decayEligibilityTrace(0.001f);
     
-    // Clamp weight bounds
+    // Update synaptic efficacy based on usage history
+    // Efficacy increases with repeated use (short-term potentiation)
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        pImpl->efficacy = std::min(pImpl->efficacy + 0.01f, 2.0f);  // Cap at 2.0
+    }
+    
+    // Apply decay to efficacy over time (long-term depression)
+    pImpl->efficacy *= 0.999f;  // Very slow decay
+    
+    // Clamp weight bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    // Record last spike times for future reference
+    // (These are updated externally when neurons actually spike)
 }
 
 void Synapse::reset() {

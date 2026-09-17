@@ -90,6 +90,83 @@ PYBIND11_MODULE(pynlm, m) {
         .value("GapJunction", SynapseType::GapJunction)
         .export_values();
 
+    // Memory category modifiers for plasticiy control
+    py::enum_<PlasticityFlags::Flag>(m, "PlasticityFlags", R"pbdoc(Plasticity flags for synapse control)pbdoc")
+        .value("Hebbian", PlasticityFlags::Hebbian)
+        .value("STDP", PlasticityFlags::STDP)
+        .value("RewardModulated", PlasticityFlags::RewardModulated)
+        .export_values();
+
+    // Add advanced research functionality
+    m.def("enable_research_mode", [](std::shared_ptr<Brain> brain) {
+        if (!brain) throw std::runtime_error("Brain pointer is null");
+        // Enable research-specific features
+        auto* spikeSystem = brain->getSpikeSystem();
+        if (spikeSystem) {
+            spikeSystem->setMaxPendingSpikes(10000);
+        }
+        auto* stdp = brain->getSTDP();
+        if (stdp) {
+            stdp->configure(0.02f, 0.024f, 25.0f);  // Higher learning rates for faster learning
+        }
+    }, py::arg("brain"), R"pbdoc(Enable research mode with higher capacity and faster learning)pbdoc");
+
+    // Add visualization and analysis utilities
+    m.def("analyze_brain_connectivity", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) throw std::runtime_error("Brain pointer is null");
+        
+        // Calculate connectivity metrics
+        float totalExc = brain->getExcitationInhibitionRatio();
+        size_t totalNeurons = brain->getTotalNeuronCount();
+        size_t totalSynapses = brain->getTotalSynapseCount();
+        
+        if (totalNeurons > 0 && totalSynapses > 0) {
+            float connectionDensity = static_cast<float>(totalSynapses) / 
+                                     (totalNeurons * totalNeurons);
+            
+            return std::make_tuple(
+                totalExc,
+                connectionDensity,
+                totalSynapses / totalNeurons,  // Average synapses per neuron
+                totalNeurons,
+                totalSynapses
+            );
+        }
+        return std::make_tuple(0.0f, 0.0f, 0.0f, totalNeurons, totalSynapses);
+    }, py::arg("brain"), R"pbdoc(Analyze brain connectivity and network properties)pbdoc");
+
+    // Add pattern analysis functions
+    m.def("detect_activity_patterns", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) throw std::runtime_error("Brain pointer is null");
+        
+        // Simple pattern detection based on spike statistics
+        size_t totalSpikes = brain->getTotalSpikeCount();
+        size_t firingNeurons = brain->getFiringNeuronCount();
+        
+        // Calculate firing statistics
+        float avgFiringRate = brain->getAverageFiringRate();
+        float eiratio = brain->getExcitationInhibitionRatio();
+        
+        // Classify activity pattern
+        std::string pattern = "QUITE";  // Default
+        if (totalSpikes > 1000 && avgFiringRate > 10.0f) {
+            pattern = "HIGHLY_ACTIVE";
+        } else if (totalSpikes > 100 && avgFiringRate > 3.0f) {
+            pattern = "ACTIVE";
+        } else if (totalSpikes > 10 && avgFiringRate > 0.5f) {
+            pattern = "MODERATE";
+        }
+        
+        return std::make_tuple(
+            pattern,
+            totalSpikes,
+            avgFiringRate,
+            eiratio,
+            firingNeurons,
+            totalSpikes > 0 ? static_cast<float>(firingNeurons) / totalSpikes : 0.0f
+        );
+    }, py::arg("brain"), R"pbdoc(Detect and analyze activity patterns in the brain)pbdoc");
+
     py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
         .value("Initial", DevelopmentalStage::Initial)
         .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)

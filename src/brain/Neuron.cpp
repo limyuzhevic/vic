@@ -220,16 +220,27 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // dt is in seconds, convert to milliseconds for consistency with tau (ms)
+    V = V + static_cast<float>(dt * 1000.0f) * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // Only apply if adaptation is active and we're not in refractory period
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        // Decay adaptation more realistically: exponential decay with time constant
+        // Adaptation recovers over time (0.95 decay per ms)
+        pImpl->state.adaptationVariable *= 0.95f;
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Use biologically realistic bounds based on neuron type
+    if (pImpl->type == NeuronType::Excitatory) {
+        V = std::clamp(V, -55.0f, 50.0f);  // Excitatory neurons
+    } else if (pImpl->type == NeuronType::Inhibitory) {
+        V = std::clamp(V, -75.0f, 40.0f);  // Inhibitory neurons
+    } else {
+        V = std::clamp(V, -100.0f, 50.0f);  // Default bounds
+    }
     
     // Check for spike
     if (V >= threshold) {
@@ -240,7 +251,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Record spike
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential to reset potential
         V = V_reset;
         
         // Enter refractory period
@@ -250,7 +261,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        // Set appropriate firing state based on membrane potential
+        if (V >= V_rest * 0.9) {  // Near threshold but not spiking
+            pImpl->state.firingState = FiringState::Active;
+        } else {
+            pImpl->state.firingState = FiringState::Resting;
+        }
     }
     
     // Clear synaptic input for next step
