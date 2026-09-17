@@ -97,7 +97,7 @@ struct Phase6Config {
 };
 
 /**
- * Phase 6 integrated experiment runner
+ * Phase 6 integration test runner
  */
 class Phase6IntegratedExperiment {
 public:
@@ -133,6 +133,27 @@ public:
      * Test replay system
      */
     bool testReplay();
+    
+    /**
+     * Validate and clamp configuration values
+     */
+    Phase6Config validateAndClampConfig(const Phase6Config& config);
+    
+    /**
+     * Validate test parameters
+     */
+    bool validateTestParameters(const Phase6Config& config);
+    
+private:
+    /**
+     * Validate configuration
+     */
+    bool validateConfig();
+    
+    /**
+     * Validate brain state
+     */
+    bool validateBrainState(const std::shared_ptr<Brain>& brain);
 };
 
 } // namespace nlm
