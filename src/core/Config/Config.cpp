@@ -3,14 +3,21 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <numeric>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    bool schemaEnabled;
+    std::shared_ptr<ConfigSchema> schema;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    pImpl->schemaEnabled = false;
+    pImpl->schema.reset();
+}
 
 Config::~Config() = default;
 
@@ -18,10 +25,66 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+bool Config::loadFromJsonFile(const std::string& filepath, const ConfigSchema* schema) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    try {
+        nlohmann::json jsonConfig;
+        file >> jsonConfig;
+        
+        if (schema) {
+            std::vector<ConfigValidationError> errors;
+            if (!schema->validate(jsonConfig, errors)) {
+                std::cerr << "Configuration validation failed:" << std::endl;
+                for (const auto& error : errors) {
+                    std::cerr << "  Field \"" << error.field << "\": " 
+                             << error.message << " (value: " << error.value << ")" << std::endl;
+                }
+                return false;
+            }
+        }
+        
+        // Convert JSON to Config entries
+        for (auto it = jsonConfig.begin(); it != jsonConfig.end(); ++it) {
+            std::string key = it.key();
+            ConfigValue configValue;
+            
+            if (schema && schema->getField(key)) {
+                // Use schema validation for type conversion
+                if (!ConfigSchema::jsonToConfigValue(*it, configValue)) {
+                    std::cerr << "Configuration error: Cannot convert value for field \"" 
+                             << key << "\"" << std::endl;
+                    return false;
+                }
+            } else {
+                // Try to convert any JSON value
+                if (!jsonToConfigValue(*it, configValue)) {
+                    std::cerr << "Configuration error: Cannot convert value for field \"" 
+                             << key << "\"" << std::endl;
+                    return false;
+                }
+            }
+            
+            set(key, configValue, ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "Error loading JSON config file \"" << filepath << "\": " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
+    // First try to load as JSON
+    if (loadFromJsonFile(filepath, nullptr)) {
+        return true;
+    }
+    
+    // Fall back to legacy key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -78,6 +141,22 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
+bool Config::saveToJsonFile(const std::string& filepath) const {
+    nlohmann::json jsonConfig;
+    
+    for (const auto& entry : pImpl->entries) {
+        jsonConfig[entry.key] = configValueToJson(entry.value);
+    }
+    
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << jsonConfig.dump(2);
+    return true;
+}
+
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
@@ -92,6 +171,7 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
+// Template implementations
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
@@ -102,7 +182,17 @@ std::optional<T> Config::get(const std::string& key) const {
     }
     
     try {
-        return std::get<T>(it->value);
+        // Try direct cast first
+        if constexpr (std::is_same_v<T, int> || 
+                     std::is_same_v<T, int64_t> ||
+                     std::is_same_v<T, double> ||
+                     std::is_same_v<T, bool> ||
+                     std::is_same_v<T, std::string>) {
+            return std::get<T>(it->value);
+        } else {
+            // For unsupported types, try to extract
+            return extractValue<T>(it->value);
+        }
     } catch (const std::bad_variant_access&) {
         return std::nullopt;
     }
@@ -177,13 +267,49 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << item;
+                    first = false;
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << item;
+                    first = false;
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << "\"" << item << "\"";
+                    first = false;
+                }
+                oss << "]";
             } else {
-                oss << arg;
+                oss << static_cast<int>(arg);
             }
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
+}
+
+void Config::setEntries(const std::vector<ConfigEntry>& entries, ConfigSource source) {
+    pImpl->entries = entries;
+    for (auto& entry : pImpl->entries) {
+        if (entry.source == ConfigSource::Default) {
+            entry.source = source;
+        }
+    }
 }
 
 std::string Config::trim(const std::string& str) {
@@ -199,17 +325,148 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+bool Config::parseKeyValueLine(const std::string& line, std::string& key, std::string& value) {
+    size_t pos = line.find('=');
+    if (pos == std::string::npos) return false;
+    
+    key = trim(line.substr(0, pos));
+    value = trim(line.substr(pos + 1));
+    
+    // Remove quotes
+    if (value.size() >= 2 && 
+        ((value.front() == '"' && value.back() == '"') ||
+         (value.front() == '\'' && value.back() == '\''))) {
+        value = value.substr(1, value.size() - 2);
+    }
+    
+    return true;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool Config::jsonToConfigValue(const nlohmann::json& jsonValue, ConfigValue& configValue) {
+    if (jsonValue.is_null()) return false;
+    else if (jsonValue.is_number_integer()) {
+        // Check if it's int64_t (larger range)
+        int64_t intVal = jsonValue.get<int64_t>();
+        if (intVal <= std::numeric_limits<int>::max() &&
+            intVal >= std::numeric_limits<int>::min()) {
+            configValue = intVal;
+        } else {
+            configValue = intVal;
+        }
+    } else if (jsonValue.is_number_float()) {
+        configValue = jsonValue.get<double>();
+    } else if (jsonValue.is_boolean()) {
+        configValue = jsonValue.get<bool>();
+    } else if (jsonValue.is_string()) {
+        configValue = jsonValue.get<std::string>();
+    } else if (jsonValue.is_array()) {
+        // Determine array type
+        bool isIntArray = true;
+        bool isDoubleArray = true;
+        bool isStringArray = true;
+        
+        for (const auto& item : jsonValue) {
+            if (!item.is_number_integer()) isIntArray = false;
+            if (!item.is_number_float() && !item.is_number_integer()) isDoubleArray = false;
+            if (!item.is_string()) isStringArray = false;
+        }
+        
+        if (isIntArray && !isDoubleArray && !isStringArray) {
+            std::vector<int> vec;
+            vec.reserve(jsonValue.size());
+            for (const auto& item : jsonValue) {
+                vec.push_back(item.get<int>());
+            }
+            configValue = vec;
+        } else if (isDoubleArray) {
+            std::vector<double> vec;
+            vec.reserve(jsonValue.size());
+            for (const auto& item : jsonValue) {
+                vec.push_back(item.get<double>());
+            }
+            configValue = vec;
+        } else if (isStringArray) {
+            std::vector<std::string> vec;
+            vec.reserve(jsonValue.size());
+            for (const auto& item : jsonValue) {
+                vec.push_back(item.get<std::string>());
+            }
+            configValue = vec;
+        } else {
+            return false; // Unsupported array type
+        }
+    } else {
+        return false;
+    }
+    
+    return true;
+}
+
+nlohmann::json Config::configValueToJson(const ConfigValue& configValue) {
+    nlohmann::json jsonValue;
+    
+    std::visit([&jsonValue](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            jsonValue = arg;
+        }
+    }, configValue);
+    
+    return jsonValue;
+}
+
+// Extract value from ConfigValue to specific type
+template<typename T>
+T Config::extractValue(const ConfigValue& value) {
+    if constexpr (std::is_same_v<T, int>) {
+        return std::get<int>(value);
+    } else if constexpr (std::is_same_v<T, int64_t>) {
+        return std::get<int64_t>(value);
+    } else if constexpr (std::is_same_v<T, double>) {
+        return std::get<double>(value);
+    } else if constexpr (std::is_same_v<T, bool>) {
+        return std::get<bool>(value);
+    } else if constexpr (std::is_same_v<T, std::string>) {
+        return std::get<std::string>(value);
+    } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+        return std::get<std::vector<int>>(value);
+    } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+        return std::get<std::vector<double>>(value);
+    } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+        return std::get<std::vector<std::string>>(value);
+    }
+    throw std::runtime_error("Unsupported type for extraction");
+}
+
+} // namespace nlm
+
+// Explicit template instantiations
+namespace nlm {
+    template std::optional<int> Config::get<int>(const std::string&) const;
+    template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+    template std::optional<double> Config::get<double>(const std::string&) const;
+    template std::optional<bool> Config::get<bool>(const std::string&) const;
+    template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+    
+    template int Config::getOr<int>(const std::string&, const int&) const;
+    template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+    template double Config::getOr<double>(const std::string&, const double&) const;
+    template bool Config::getOr<bool>(const std::string&, const bool&) const;
+    template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+}
 
 } // namespace nlm

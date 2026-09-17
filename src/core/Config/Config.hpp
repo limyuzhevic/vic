@@ -5,6 +5,12 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <unordered_set>
+#include <stdexcept>
+#include <limits>
+
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -31,6 +37,52 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration validation error
+struct ConfigValidationError {
+    std::string field;
+    std::string message;
+    std::string value;
+    
+    ConfigValidationError(const std::string& f, const std::string& m, const std::string& v = "")
+        : field(f), message(m), value(v) {}
+};
+
+// Configuration schema field definition
+struct SchemaField {
+    std::string name;
+    std::string type;
+    bool required;
+    std::string defaultValue;
+    std::string description;
+    std::vector<std::string> allowedValues;
+    
+    SchemaField(const std::string& n, const std::string& t, bool r = false, 
+                const std::string& d = "", const std::string& desc = "",
+                const std::vector<std::string>& a = {})
+        : name(n), type(t), required(r), defaultValue(d), 
+          description(desc), allowedValues(a) {}
+};
+
+// Configuration schema
+class ConfigSchema {
+public:
+    void addField(const std::string& name, const std::string& type, 
+                  bool required = false, const std::string& defaultValue = "",
+                  const std::string& description = "",
+                  const std::vector<std::string>& allowedValues = {});
+    
+    bool validate(const nlohmann::json& config, std::vector<ConfigValidationError>& errors) const;
+    
+    std::vector<std::string> getRequiredFields() const;
+    std::vector<std::string> getOptionalFields() const;
+    
+    // Get field info
+    const SchemaField* getField(const std::string& name) const;
+    
+private:
+    std::map<std::string, SchemaField> fields_;
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -43,7 +95,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Main configuration class with JSON/YAML support
 class Config {
 public:
     Config();
@@ -55,13 +107,19 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from JSON file
+    bool loadFromJsonFile(const std::string& filepath, const ConfigSchema* schema = nullptr);
+    
+    // Backward compatibility: load from key=value file
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to JSON file
+    bool saveToJsonFile(const std::string& filepath) const;
+    
+    // Backward compatibility: save to key=value file
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,6 +151,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Set entries (for loading from JSON)
+    void setEntries(const std::vector<ConfigEntry>& entries, ConfigSource source);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +161,34 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Parse key=value line
+    static bool parseKeyValueLine(const std::string& line, std::string& key, std::string& value);
+    
+    // Convert JSON to ConfigValue
+    static bool jsonToConfigValue(const nlohmann::json& jsonValue, ConfigValue& configValue);
+    
+    // Convert ConfigValue to JSON
+    static nlohmann::json configValueToJson(const ConfigValue& configValue);
+    
+    // Extract value from ConfigValue to specific type
+    template<typename T>
+    static T extractValue(const ConfigValue& value);
 };
 
 } // namespace nlm
+
+// Explicit template instantiations
+namespace nlm {
+    template std::optional<int> Config::get<int>(const std::string&) const;
+    template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+    template std::optional<double> Config::get<double>(const std::string&) const;
+    template std::optional<bool> Config::get<bool>(const std::string&) const;
+    template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+    
+    template int Config::getOr<int>(const std::string&, const int&) const;
+    template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+    template double Config::getOr<double>(const std::string&, const double&) const;
+    template bool Config::getOr<bool>(const std::string&, const bool&) const;
+    template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+}
