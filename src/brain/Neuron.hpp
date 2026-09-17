@@ -127,6 +127,14 @@ public:
     PlasticityFlags& getPlasticityFlags();
     void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
     
+    // Neural dynamics integration
+    void setNeuralDynamics(class NeuralDynamics* dynamics);
+    NeuralDynamics* getNeuralDynamics() const;
+    
+    // Enhanced spike processing
+    void processOutgoingSpikes(Timestamp currentTime);
+    void updateSynapticDynamics(Timestamp currentTime, TimestepDuration dt);
+    
     // Region/population membership
     void setRegionId(RegionId region);
     RegionId getRegionId() const;

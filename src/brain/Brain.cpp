@@ -81,6 +81,23 @@ struct Brain::Impl {
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
+        , workingMemory(nullptr)
+        , episodicMemory(nullptr)
+        , associativeMemory(nullptr)
+        , predictionSystem(nullptr)
+        , planner(nullptr)
+        , conceptFormation(nullptr)
+        , attention(nullptr)
+        , developmentSystem(nullptr)
+        , dopamine(nullptr)
+        , curiosity(nullptr)
+        , predictionError(nullptr)
+        , novelty(nullptr)
+        , spikeSystem(nullptr)
+        , stdp(nullptr)
+        , hebbian(nullptr)
+        , structuralPlasticity(nullptr)
+        , checkpointManager(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -93,64 +110,134 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
+        // Enhanced initialization with proper cleanup
+    // Initialize random generator with seed from config
+    uint64_t seed = 42;  // Default seed
+    if (auto seedOpt = config->get<uint64_t>("random_seed")) {
+        seed = *seedOpt;
+    }
+    rng = std::make_unique<RandomGenerator>(seed);
+    
+    // Initialize plasticity systems
+    spikeSystem = std::make_unique<SpikeSystem>();
+    stdp = std::make_unique<STDP>();
+    hebbian = std::make_unique<Hebbian>();
+    structuralPlasticity = std::make_unique<StructuralPlasticity>();
+    
+    // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+    
+    // Initialize memory systems with error checking
+    if (!workingMemory) workingMemory = std::make_unique<NeuralWorkingMemory>();
+    if (!workingMemory) {
+        NLM_LOG_ERROR("Failed to initialize working memory");
+        return false;
+    }
+    workingMemory->initialize(this);
+    workingMemory->setCapacity(neuronCount / 10);
+    
+    if (!episodicMemory) episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+    if (!episodicMemory) {
+        NLM_LOG_ERROR("Failed to initialize episodic memory");
+        return false;
+    }
+    episodicMemory->initialize(this);
+    episodicMemory->setMaxEpisodes(1000);
+    
+    if (!associativeMemory) associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+    if (!associativeMemory) {
+        NLM_LOG_ERROR("Failed to initialize associative memory");
+        return false;
+    }
+    associativeMemory->initialize(this);
+    
+    if (!predictionSystem) predictionSystem = std::make_unique<PredictionSystem>();
+    if (!predictionSystem) {
+        NLM_LOG_ERROR("Failed to initialize prediction system");
+        return false;
+    }
+    
+    if (!planner) planner = std::make_unique<NeuralPlanner>();
+    if (!planner) {
+        NLM_LOG_ERROR("Failed to initialize neural planner");
+        return false;
+    }
+    planner->initialize(this);
+    planner->setPlanningDepth(5);
+    
+    if (!conceptFormation) conceptFormation = std::make_unique<ConceptFormation>();
+    if (!conceptFormation) {
+        NLM_LOG_ERROR("Failed to initialize concept formation");
+        return false;
+    }
+    conceptFormation->initialize(this);
+    
+    if (!attention) attention = std::make_unique<AttentionalSelection>();
+    if (!attention) {
+        NLM_LOG_ERROR("Failed to initialize attentional selection");
+        return false;
+    }
+    attention->initialize(this);
+    attention->setInhibitionStrength(0.5f);
+    attention->setExcitationStrength(1.5f);
+    
+    if (!developmentSystem) developmentSystem = std::make_unique<DevelopmentSystem>();
+    if (!developmentSystem) {
+        NLM_LOG_ERROR("Failed to initialize development system");
+        return false;
+    }
+    
+    if (!novelty) novelty = std::make_unique<Novelty>();
+    if (!novelty) {
+        NLM_LOG_ERROR("Failed to initialize novelty detection");
+        return false;
+    }
+    novelty->initialize(this);
+    
+    if (!curiosity) curiosity = std::make_unique<Curiosity>();
+    if (!curiosity) {
+        NLM_LOG_ERROR("Failed to initialize curiosity system");
+        return false;
+    }
+    curiosity->initialize(this);
+    
+    // Register spike handlers with safety checks
+    if (spikeSystem) {
+        // Spike counter handler
+        spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+            // Count spikes safely
+            if (pImpl) {
+                ++pImpl->totalSpikesThisStep;
+                ++pImpl->totalSpikesTotal;
+            }
+        });
         
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
-        
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+        // Delayed spike handler with validation
+        spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+            // Safety check for null pointer
+            if (!pImpl) return;
+            
+            // Find destination neuron safely
+            for (auto& region : pImpl->regions) {
+                if (!region) continue;
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (!neuron) continue;
+                    if (neuron->getId() == event.destination_neuron) {
+                        // Apply synaptic weight with validation
+                        if (std::abs(event.weight) > 1e6f) { // Prevent overflow
+                            return;
+                        }
+                        MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                        if (event.is_excitatory) {
+                            neuron->receiveExcitatoryInput(synapticCurrent);
+                        } else {
+                            neuron->receiveInhibitoryInput(-synapticCurrent);
+                        }
+                        return;
+                    }
+                }
+            }
+        });
     }
     
     DevelopmentalStage developmentalStage;
@@ -286,15 +373,27 @@ bool Brain::initialize() {
         }
     });
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    // Configure checkpoint manager with safety checks
+    if (pImpl->checkpointManager) {
+        std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    }
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
     NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    
+    // Verify critical systems were initialized
+    if (!pImpl->workingMemory) {
+        NLM_LOG_ERROR("Critical: Working memory not initialized");
+        return false;
+    }
+    if (!pImpl->spikeSystem) {
+        NLM_LOG_ERROR("Critical: Spike system not initialized");
+        return false;
+    }
     
     return true;
 }

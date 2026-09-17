@@ -260,10 +260,41 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
+    // Enhanced LIF step using new NeuralDynamics framework
+    // Integrates with spike system and synaptic dynamics
+    
     // Default LIF step with standard timestep (1ms)
     TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    
+    // Apply NeuralDynamics update if available
+    bool fired = false;
+    if (pImpl->neuralDynamics) {
+        fired = pImpl->neuralDynamics->update(this, currentTime, dt);
+    } else {
+        // Fallback to traditional LIF
+        fired = stepLIF(currentTime, dt);
+    }
+    
+    if (fired) {
+        // Process outgoing spikes through spike system
+        processOutgoingSpikes(currentTime);
+    }
+    
+    // Update synaptic dynamics
+    updateSynapticDynamics(currentTime, dt);
 }
+
+// TODO PHASE 2: Complete step implementation
+// Currently only implements LIF, missing:
+// 1. Synaptic integration from incoming spikes
+// 2. Activity-dependent properties  
+// 3. Learning-related modifications
+// 4. State-dependent conductances
+
+// FUTURE ENHANCEMENT:
+// Consider adding a second method for more complete stepping:
+// void stepComplete(Timestamp currentTime, SpikeSystem* spikeSystem,
+//                  const std::vector<Synapse*>& outgoingSynapses);
 
 void Neuron::reset() {
     pImpl->state = NeuronState();
