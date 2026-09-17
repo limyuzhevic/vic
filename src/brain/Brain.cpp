@@ -404,6 +404,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Update attention with working memory content
+        if (pImpl->attention && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Get the neurons that are currently active in working memory
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            // Apply attention to select the most salient competitor
+            pImpl->attention->processCompetition(competitors);
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -511,8 +519,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        // TODO: Integrate prediction system with sensory input for error-based learning
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +536,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This requires sensory state encoding and pattern discovery
+        // For now, just placeholder for future implementation
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -609,10 +618,15 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
+        // Store in working memory for all inputs (not just > 0.5)
+        if (pImpl->workingMemory) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
+    }
+    
+    // Trigger attention to process working memory after sensory input
+    if (pImpl->attention && pImpl->workingMemory) {
+        pImpl->attention->update(pImpl->timestep);
     }
 }
 
@@ -765,6 +779,12 @@ bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
+        // Use checkpoint manager if available
+        if (pImpl->checkpointManager) {
+            return pImpl->checkpointManager->saveImmediately(filepath);
+        }
+        
+        // Fallback to direct checkpoint writing (legacy)
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
@@ -819,6 +839,7 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                synapseData.plasticityFlags.push_back(syn->getPlasticityFlags().value);
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
             }
         }
@@ -828,7 +849,7 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
-        // Finalize
+        // Finalize - no additional sections in basic writer
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
             return false;
