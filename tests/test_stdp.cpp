@@ -145,6 +145,93 @@ void testSTDPWeightBounds() {
     std::cout << "    testSTDPWeightBounds passed" << std::endl;
 }
 
+void testSTDPAdvancedFeatures() {
+    nlm::STDP stdp;
+    
+    // Test variant management
+    assert(stdp.getVariant() == nlm::STDPVariant::Standard);
+    
+    stdp.setVariant(nlm::STDPVariant::RewardModulated);
+    assert(stdp.getVariant() == nlm::STDPVariant::RewardModulated);
+    
+    stdp.setVariant(nlm::STDPVariant::Triplet);
+    assert(stdp.getVariant() == nlm::STDPVariant::Triplet);
+    
+    stdp.setVariant(nlm::STDPVariant::Standard);
+    
+    // Test advanced feature management
+    stdp.enableLearningRateAdaptation(true, 0.2f);
+    stdp.enableEfficacyModulation(false);
+    stdp.enableEligibilityTraces(false);
+    
+    // Test batch processing
+    stdp.enableBatchProcessing(true, 512);
+    stdp.enableParallelProcessing(true);
+    
+    // Test profiling
+    stdp.enableProfiling(true);
+    std::cout << "    testSTDPAdvancedFeatures passed" << std::endl;
+}
+
+void testSTDPParallelProcessing() {
+    nlm::STDP stdp;
+    
+    // Create a synapse with many spike pairs for parallel processing
+    nlm::Synapse synapse(nlm::SynapseId(5), nlm::NeuronId(9), nlm::NeuronId(10));
+    synapse.setType(nlm::SynapseType::Excitatory);
+    synapse.setWeight(0.5f);
+    
+    // Generate many spike pairs to trigger parallel processing
+    std::vector<nlm::Timestamp> preSpikes;
+    std::vector<nlm::Timestamp> postSpikes;
+    
+    // Create 50 pre and 50 post spikes (2500 pairs)
+    for (int i = 0; i < 50; ++i) {
+        preSpikes.push_back(static_cast<nlm::Timestamp>(i * 10.0));
+        postSpikes.push_back(static_cast<nlm::Timestamp>(i * 10.0 + 5.0));  // All pre before post
+    }
+    
+    float initialWeight = synapse.getWeight();
+    
+    // This should trigger parallel processing due to large number of spike pairs
+    stdp.update(&synapse, preSpikes, postSpikes, 0.001);
+    
+    float finalWeight = synapse.getWeight();
+    
+    // Weight should have increased
+    assert(finalWeight > initialWeight);
+    
+    // Check that spike pair counting worked
+    assert(stdp.getSpikePairCount() > 0);
+    
+    std::cout << "    testSTDPParallelProcessing passed (pairs: " 
+              << stdp.getSpikePairCount() << ")" << std::endl;
+}
+
+void testSTDPBoundsChecking() {
+    nlm::STDP stdp;
+    
+    // Create a synapse
+    nlm::Synapse synapse(nlm::SynapseId(6), nlm::NeuronId(11), nlm::NeuronId(12));
+    synapse.setType(nlm::SynapseType::Excitatory);
+    synapse.setWeight(0.5f);
+    
+    // Test bounds checking with invalid spike history
+    std::vector<nlm::Timestamp> invalidSpikes;
+    for (int i = 0; i < 15000; ++i) {  // Too many spikes
+        invalidSpikes.push_back(static_cast<nlm::Timestamp>(i));
+    }
+    
+    // This should not crash due to bounds checking
+    // (the implementation should handle this gracefully)
+    try {
+        stdp.update(&synapse, invalidSpikes, invalidSpikes, 0.001);
+        std::cout << "    testSTDPBoundsChecking passed (handled large spike history)" << std::endl;
+    } catch (const std::invalid_argument& e) {
+        std::cout << "    testSTDPBoundsChecking passed (caught invalid argument)" << std::endl;
+    }
+}
+
 void runAll() {
     std::cout << "Running STDP tests..." << std::endl;
     testSTDPCreation();
@@ -155,6 +242,9 @@ void runAll() {
     testSTDPDepression();
     testSTDPEmptySpikes();
     testSTDPWeightBounds();
+    testSTDPAdvancedFeatures();
+    testSTDPParallelProcessing();
+    testSTDPBoundsChecking();
 }
 
 } // namespace test_stdp

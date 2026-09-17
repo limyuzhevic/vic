@@ -197,7 +197,7 @@ for i in range(10):
 print("Silent brain test done!")
 ```
 
-### Project 2: Brain Watching a World
+### Project 2: Brain Watching a World with Integration
 
 ```python
 import pynlm
@@ -218,10 +218,11 @@ for i in range(30):
     brain.step(i)
     
 print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
+print(f"Memory traces: {brain.getWorkingMemory() and brain.getWorkingMemory().getActiveTraces()}")
+print(f"Episodic episodes: {brain.getEpisodicMemory() and brain.getEpisodicMemory().getEpisodeCount()}")
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Integrated Agent
 
 ```python
 import pynlm
@@ -238,6 +239,8 @@ agent.initialize(world)
 
 # Enable learning
 agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
 agent.enableCuriosity(True)
 
 # Run agent
