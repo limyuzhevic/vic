@@ -3,6 +3,10 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <stdexcept>
+
+using json = nlohmann::json;
 
 namespace nlm {
 
@@ -19,36 +23,61 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to parse as JSON first
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        // Try to parse as JSON
+        json j;
+        file >> j;
+        
+        if (!j.is_object()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Validate JSON schema before processing
+        if (!validateJSON(j, filepath)) {
+            return false;
+        }
+        
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            std::string key = it.key();
+            const json& value = it.value();
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Convert JSON value to ConfigValue
+            setFromJSON(key, value, ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const json::parse_error& e) {
+        // If JSON parsing fails, fall back to simple key=value format
+        file.clear();
+        file.seekg(0);
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -108,38 +137,153 @@ std::optional<T> Config::get(const std::string& key) const {
     }
 }
 
+// Template specializations for known types with validation
+
+template<typename T>
+std::optional<T> Config::get(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+    
+    // Type validation
+    if constexpr (std::is_same_v<T, int>) {
+        if (!std::holds_alternative<int>(it->value)) {
+            return std::nullopt;
+        }
+    } else if constexpr (std::is_same_v<T, int64_t>) {
+        if (!std::holds_alternative<int64_t>(it->value)) {
+            return std::nullopt;
+        }
+    } else if constexpr (std::is_same_v<T, double>) {
+        if (!std::holds_alternative<double>(it->value) && 
+            !std::holds_alternative<int>(it->value) && 
+            !std::holds_alternative<int64_t>(it->value)) {
+            return std::nullopt;
+        }
+    } else if constexpr (std::is_same_v<T, bool>) {
+        if (!std::holds_alternative<bool>(it->value)) {
+            return std::nullopt;
+        }
+    } else if constexpr (std::is_same_v<T, std::string>) {
+        if (!std::holds_alternative<std::string>(it->value)) {
+            return std::nullopt;
+        }
+    } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+        if (!std::holds_alternative<std::vector<int>>(it->value)) {
+            return std::nullopt;
+        }
+    } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+        if (!std::holds_alternative<std::vector<double>>(it->value) &&
+            !std::holds_alternative<std::vector<int>>(it->value)) {
+            return std::nullopt;
+        }
+    } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+        if (!std::holds_alternative<std::vector<std::string>>(it->value)) {
+            return std::nullopt;
+        }
+    }
+    
+    try {
+        return std::get<T>(it->value);
+    } catch (const std::bad_variant_access&) {
+        return std::nullopt;
+    }
+}
+
+// getOr method implementation
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+// Setter method for std::vector<T> types
+void Config::set(const std::string& key, const std::vector<int>& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, const std::vector<double>& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, const std::vector<std::string>& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+// JSON conversion helpers
+ConfigValue Config::convertToConfigValue(const json& value) {
+    if (value.is_boolean()) {
+        return value.get<bool>();
+    } else if (value.is_number_integer()) {
+        return value.get<int64_t>();
+    } else if (value.is_number_float()) {
+        return value.get<double>();
+    } else if (value.is_string()) {
+        return value.get<std::string>();
+    } else if (value.is_array()) {
+        if (!value.empty()) {
+            const auto& first = value[0];
+            if (first.is_boolean()) {
+                std::vector<bool> arr;
+                for (const auto& item : value) {
+                    arr.push_back(item.get<bool>());
+                }
+                return arr;
+            } else if (first.is_number_integer()) {
+                std::vector<int> arr;
+                for (const auto& item : value) {
+                    arr.push_back(item.get<int>());
+                }
+                return arr;
+            } else if (first.is_number_float()) {
+                std::vector<double> arr;
+                for (const auto& item : value) {
+                    arr.push_back(item.get<double>());
+                }
+                return arr;
+            } else if (first.is_string()) {
+                std::vector<std::string> arr;
+                for (const auto& item : value) {
+                    arr.push_back(item.get<std::string>());
+                }
+                return arr;
+            }
+        }
     }
+    throw std::runtime_error("Unsupported JSON type for conversion");
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+bool Config::validateJSON(const json& config, const std::string& filepath) {
+    // Basic schema validation - check for required keys and type validation
+    for (const auto& [key, value] : config.items()) {
+        // Validate key format (alphanumeric and underscores)
+        if (!std::all_of(key.begin(), key.end(), [](char c) {
+            return std::isalnum(c) || c == '_';
+        })) {
+            throw std::runtime_error("Invalid key format in JSON: " + key);
+        }
+        
+        // Basic type checking - could be extended with more specific schema validation
+        if (value.is_object() || value.is_null()) {
+            throw std::runtime_error("Unsupported value type for key: " + key);
+        }
+    }
+    return true;
 }
 
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+std::pair<std::string, std::string> Config::parseCommandLineArg(const std::string& arg) {
+    size_t pos = arg.find('=');
+    if (pos != std::string::npos) {
+        return {arg.substr(2, pos - 2), arg.substr(pos + 1)};
+    }
+    return {"", ""};
 }
 
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::setFromJSON(const std::string& key, const json& value, ConfigSource source) {
+    set(key, convertToConfigValue(value), source);
 }
 
 bool Config::has(const std::string& key) const {

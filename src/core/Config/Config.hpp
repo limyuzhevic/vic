@@ -77,6 +77,16 @@ public:
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<int>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<double>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<std::string>& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // JSON schema validation for known configuration keys
+    static bool validateJSON(const json& config, const std::string& filepath);
+    static ConfigValue convertToConfigValue(const json& value);
+    
+    // Command line parsing utilities
+    static std::pair<std::string, std::string> parseCommandLineArg(const std::string& arg);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -100,6 +110,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON conversion helpers
+    static ConfigValue convertToConfigValue(const json& value);
+    static bool validateJSON(const json& config, const std::string& filepath);
+    static std::pair<std::string, std::string> parseCommandLineArg(const std::string& arg);
+    static void setFromJSON(const std::string& key, const json& value, ConfigSource source);
 };
 
 } // namespace nlm

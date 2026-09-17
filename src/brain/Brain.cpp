@@ -1077,41 +1077,68 @@ RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
 }
 
+Brain& Brain::operator=(Brain&& other) noexcept {
+    if (this != &other) {
+        delete pImpl;
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+    return *this;
+}
+
+void Brain::validateMoveOperator() {
+    // Test move operations for double-free detection
+    auto config = std::make_shared<Config>();
+    Brain b1(config);
+    if (!b1.initialize()) {
+        return;
+    }
+    Brain b2(std::move(b1));
+    Brain b3(config);
+    if (!b3.initialize()) {
+        return;
+    }
+    b3 = std::move(b2);
+}
+
+// Integration function for all Phase 6 systems
+void Brain::integrateAllSystems() {
+    NLM_LOG_INFO("=== INTEGRATING ALL PHASE 6 SYSTEMS ===");
+    
+    // Initialize core brain structures
+    if (pImpl->workingMemory) pImpl->workingMemory->initialize(this);
+    if (pImpl->episodicMemory) pImpl->episodicMemory->initialize(this);
+    if (pImpl->associativeMemory) pImpl->associativeMemory->initialize(this);
+    
+    // Initialize prediction system
+    if (pImpl->predictionSystem) {
+        // Prediction system integration
+    }
+    
+    // Initialize cognition systems
+    if (pImpl->planner) pImpl->planner->initialize(this);
+    if (pImpl->conceptFormation) pImpl->conceptFormation->initialize(this);
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+    }
+    
+    // Initialize development system
+    if (pImpl->developmentSystem) pImpl->developmentSystem->initialize(this);
+    
+    // Initialize neuromodulation systems
+    if (pImpl->novelty) pImpl->novelty->initialize(this);
+    if (pImpl->curiosity) pImpl->curiosity->initialize(this);
+    if (pImpl->dopamine) pImpl->dopamine->initialize(this);
+    if (pImpl->predictionError) pImpl->predictionError->initialize(this);
+    
+    NLM_LOG_INFO("All systems integration complete");
+}
+
 void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
-    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
-    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
-    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
-    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
-    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
-    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
-    
-    // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
-    }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
-    }
-    
-    // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
-    }
-    
-    // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
-    
-    for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
-    }
+    // Extract logging functionality to separate file
+    StatusLogger::logStatus(this);
 }
 
 } // namespace nlm

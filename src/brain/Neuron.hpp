@@ -55,6 +55,9 @@ public:
     Neuron(Neuron&&) noexcept;
     Neuron& operator=(Neuron&&) noexcept;
     
+    // Validate move operations for double-free detection
+    void validateMoveOperator();
+    
     // Identity
     NeuronId getId() const;
     
