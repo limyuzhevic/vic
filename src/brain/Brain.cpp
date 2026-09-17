@@ -130,6 +130,27 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
+        // Initialize neuromodulators with brain reference
+        curiosity->initialize(this);
+        predictionError->initialize(this);
+        novelty->initialize(this);
+        dopamine->setLevel(0.0f);  // Start with baseline dopamine
+        
+        // Log initialization of integrated neuromodulation
+        NLM_LOG_INFO("Neuromodulation systems initialized: " +
+                     std::to_string(pImpl->dopamine ? 1 : 0) + " DA, " +
+                     std::to_string(pImpl->curiosity ? 1 : 0) + " curiosity, " +
+                     std::to_string(pImpl->novelty ? 1 : 0) + " novelty, " +
+                     std::to_string(pImpl->predictionError ? 1 : 0) + " prediction error");
+        
+        // Initialize neuromodulators with brain reference
+        curiosity->initialize(this);
+        predictionError->initialize(this);
+        novelty->initialize(this);
+        dopamine->setLevel(0.0f);  // Start with baseline dopamine
+        
+        // Log initialization of integrated neuromodulation
+        
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
