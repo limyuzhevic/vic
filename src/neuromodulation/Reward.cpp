@@ -2,14 +2,6 @@
 
 namespace nlm {
 
-struct Reward::Impl {
-    float currentValue;
-    float accumulatedReward;
-    std::vector<float> history;
-    
-    Impl() : currentValue(0.0f), accumulatedReward(0.0f) {}
-};
-
 Reward::Reward() : pImpl(new Impl) {}
 
 Reward::~Reward() = default;
@@ -33,9 +25,24 @@ void Reward::reset() {
 }
 
 float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
-    return 0.0f;
+    float reward = 0.0f;
+    
+    // Positive reward for high vision brightness (finding something interesting)
+    for (float pixel : observation.vision) {
+        reward += std::max(0.0f, pixel * 0.5f);
+    }
+    
+    // Reward for reaching target areas in vision
+    for (float pixel : observation.vision) {
+        if (pixel > 0.8f) reward += 0.5f;
+    }
+    
+    // Moderate reward for touch (contact)
+    for (float touch : observation.touch) {
+        if (touch > 0.3f) reward += 0.1f;
+    }
+    
+    return reward;
 }
 
 const std::vector<float>& Reward::getHistory() const {

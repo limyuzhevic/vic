@@ -24,7 +24,7 @@ class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
-class Dopamine;
+class Neuromodulator;
 class Curiosity;
 class Novelty;
 class PredictionError;
@@ -98,7 +98,7 @@ public:
     std::unique_ptr<class Action> produceAction();
     
     // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    void applyNeuromodulation(const Neuromodulator& signal);
     
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();

@@ -4,16 +4,6 @@
 
 namespace nlm {
 
-struct PredictionError::Impl {
-    class Brain* brain;
-    float error;
-    float predictedValue;
-    float actualValue;
-    std::vector<float> history;
-    
-    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
-};
-
 PredictionError::PredictionError() : pImpl(new Impl) {}
 
 PredictionError::~PredictionError() = default;
@@ -36,6 +26,7 @@ void PredictionError::computeError(float predicted, float actual) {
 
 void PredictionError::updatePrediction(float newPrediction) {
     pImpl->predictedValue = newPrediction;
+    pImpl->error = pImpl->actualValue - newPrediction;
 }
 
 const std::vector<float>& PredictionError::getHistory() const {

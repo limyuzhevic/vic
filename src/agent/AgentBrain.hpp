@@ -76,6 +76,9 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Update curiosity level based on novelty and prediction error
+    void updateCuriosityLevel();
+    
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups
@@ -112,6 +115,19 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Behavioral thresholds and parameters
+    float curiosityThreshold_;
+    float maxExplorationChance_;
+    float motorActivityThreshold_;
+    
+    // Motor neuron distribution ratios
+    float motorForwardRatio_;
+    float motorBackwardRatio_;
+    float motorLeftRatio_;
+    float motorRightRatio_;
+    float motorInteractRatio_;
+    float motorWaitRatio_;
 };
 
 } // namespace nlm

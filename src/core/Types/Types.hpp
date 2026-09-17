@@ -179,14 +179,101 @@ enum class FiringState : uint8_t {
     Inhibited
 };
 
-// Generic handle types for efficiency
-using NeuronHandle = uint64_t;
-using SynapseHandle = uint64_t;
+// Neuromodulator types for categorization
+enum class NeuromodulatorType : uint8_t {
+    Dopamine,
+    Acetylcholine,
+    Norepinephrine,
+    Serotonin,
+    Novelty,
+    Curiosity,
+    PredictionError
+};
 
-// Invalid ID sentinel
-constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
-constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
-constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
-constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
+// Observation from sensory processing
+struct Observation {
+    std::vector<float> vision;
+    std::vector<float> touch;
+    std::vector<float> internal;
+    std::vector<float> proprioception;
+    Timestamp timestamp;
+    
+    Observation()
+        : vision(256, 0.0f), touch(8, 0.0f), internal(4, 0.0f), proprioception(6, 0.0f)
+        , timestamp(0.0) {}
+    
+    size_t getTotalFeatureCount() const {
+        return vision.size() + touch.size() + internal.size() + proprioception.size();
+    }
+    
+    void normalize() {
+        // Simple normalization - scale to [0, 1] range
+        auto normalize_vector = [](std::vector<float>& vec) {
+            if (!vec.empty()) {
+                float max_val = *std::max_element(vec.begin(), vec.end());
+                if (max_val > 0.0f) {
+                    for (float& val : vec) {
+                        val /= max_val;
+                    }
+                }
+            }
+        };
+        
+        normalize_vector(vision);
+        normalize_vector(touch);
+        normalize_vector(internal);
+        normalize_vector(proprioception);
+    }
+};
 
-} // namespace nlm
+// Motor action command
+struct MotorCommand {
+    enum class Action {
+        Wait,
+        MoveForward,
+        MoveBackward,
+        TurnLeft,
+        TurnRight,
+        Interact,
+        LookLeft,
+        LookRight
+    };
+    
+    Action action;
+    float confidence;
+    Timestamp timestamp;
+    
+    MotorCommand() : action(Action::Wait), confidence(0.0f), timestamp(0.0) {}
+    MotorCommand(Action a, float c = 0.0f) : action(a), confidence(c), timestamp(0.0) {}
+};
+
+// SimpleWorld dimensions
+struct WorldDimensions {
+    size_t width;
+    size_t height;
+    
+    WorldDimensions(size_t w = 16, size_t h = 16) : width(w), height(h) {}
+    
+    size_t getTotalCells() const { return width * height; }
+};
+
+// Perception vector (sensory input)
+struct SensoryPercept {
+    std::vector<float> vision;
+    std::vector<float> touch;
+    std::vector<float> internal;
+    std::vector<float> proprioception;
+    
+    SensoryPercept()
+        : vision(256, 0.0f), touch(8, 0.0f), internal(4, 0.0f), proprioception(6, 0.0f) {}
+    
+    size_t getVisionSize() const { return vision.size(); }
+    size_t getTouchSize() const { return touch.size(); }
+    size_t getInternalSize() const { return internal.size(); }
+    size_t getProprioceptionSize() const { return proprioception.size(); }
+    
+    size_t getTotalSize() const {
+        return vision.size() + touch.size() + internal.size() + proprioception.size();
+    }
+};
+
