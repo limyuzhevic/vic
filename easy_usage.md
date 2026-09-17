@@ -179,6 +179,12 @@ Gives sensory information (vision, touch, etc.) to the brain.
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
 
+### `agent.applyRewardModulation(reward, predicted_reward)`
+Applies learning based on reward prediction errors.
+
+### `agent.updateDevelopment(timestep)`
+Updates the developmental stage of the brain.
+
 ---
 
 ## Mini Projects
@@ -254,6 +260,156 @@ for step in range(100):
 print("Agent simulation complete!")
 ```
 
+### Project 4: Working Memory Example
+
+```python
+import pynlm
+
+# Create brain with memory support
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Check working memory
+working_memory = brain.getWorkingMemory()
+if working_memory:
+    print(f"Working memory capacity: {working_memory.getCapacity()}")
+    print(f"Active traces: {working_memory.getActiveTraces()}")
+
+# Run simulation to fill working memory
+for step in range(500):
+    brain.step(step)
+
+# Check memory statistics
+if working_memory:
+    print(f"Working memory after simulation: {working_memory.getActiveTraces()} active traces")
+```
+
+### Project 5: Neuromodulation Example
+
+```python
+import pynlm
+
+# Create brain and agent
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable neuromodulation
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Run simulation with learning
+for step in range(200):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    
+    # Check neuromodulation levels
+    dopamine = agent.getNeuromodulationLevel()
+    curiosity = agent.getCuriosityLevel()
+    novelty = agent.getNoveltyLevel()
+    
+    if step % 50 == 0:
+        print(f"Step {step}: Dopamine={dopamine:.3f}, Curiosity={curiosity:.3f}, Novelty={novelty:.3f}")
+
+print("Neuromodulation simulation complete!")
+```
+
+### Project 6: Configuration Example
+
+```python
+import pynlm
+
+# Create default configuration
+config = pynlm.createDefaultConfig()
+
+# Query existing configuration options
+print("Configuration options:")
+for key in config.getKeys():
+    print(f"  {key}")
+
+# Modify configuration parameters
+config.set("brain.neuron_count", 500)
+config.set("brain.connection_probability", 0.05)
+config.set("plasticity.stdp.enable", True)
+
+# Create brain with modified configuration
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Configured brain: {brain.getTotalNeuronCount()} neurons, {brain.getTotalSynapseCount()} synapses")
+```
+
+### Project 7: Development Simulation
+
+```python
+import pynlm
+
+# Create brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable development
+agent.enableDevelopment(True)
+
+# Run long-term simulation to observe development
+for step in range(5000):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    agent.updateDevelopment(0.1)
+    
+    # Monitor developmental stage
+    if step % 1000 == 0:
+        stage = brain.getDevelopmentalStage()
+        print(f"Step {step}: Developmental stage = {stage}")
+
+print("Developmental simulation complete!")
+```
+
+### Project 8: Memory Replay Example
+
+```python
+import pynlm
+
+# Create brain with episodic memory
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation to create episodic memories
+for step in range(1000):
+    brain.step(step)
+
+# Access episodic memory
+episodic_memory = brain.getEpisodicMemory()
+if episodic_memory:
+    episode_count = episodic_memory.getEpisodeCount()
+    print(f"Created {episode_count} episodic memories")
+    
+    # Get episodes for replay
+    episodes_to_replay = episodic_memory.getEpisodesForReplay(5)
+    print(f"Available for replay: {len(episodes_to_replay)} episodes")
+
+# Save brain state
+brain.save("nlm_checkpoint.bin")
+print("Brain state saved to checkpoint")
+```
+
 ---
 
 ## Quick Reference
@@ -268,6 +424,9 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Apply reward learning | `agent.applyRewardModulation(reward, predicted)` |
+| Update development | `agent.updateDevelopment(timestep)` |
+| Enable features | `agent.enableRewardModulation(True)` |
 
 ---
 
@@ -285,13 +444,72 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"My agent isn't learning"**
+- Did you enable reward modulation with `agent.enableRewardModulation(True)`?
+- Check that you have reward signals from the world
+
+**"Memory systems aren't working"**
+- Check that `brain.getWorkingMemory()` and `brain.getEpisodicMemory()` return valid objects
+- Ensure you run enough simulation steps for memory formation
+
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md`** for more technical details about building from source
+2. **Read `docs/ARCHITECTURE.md`** to understand how it all works
+3. **Experiment with different configurations!**
+4. **Try the Phase 6 demo** to see all systems working together:
+   ```bash
+   ./nlm_phase6_demo
+   ```
+
+5. **Look at the benchmark code** to understand performance characteristics
+6. **Check out the experiment framework** for running scientific studies
+
+---
+
+## Python API Quick Reference
+
+### Core Functions
+
+- `pynlm.createDefaultConfig()` - Create default configuration
+- `pynlm.createBrain(config)` - Create neural brain
+- `pynlm.createAgentBrain(brain)` - Create agent interface
+- `pynlm.createSimpleWorld()` - Create 2D simulation world
+
+### Configuration Keys
+
+Common configuration options include:
+- `brain.neuron_count` - Total number of neurons
+- `brain.synapse_density` - Synapse connectivity density
+- `brain.connection_probability` - Probability of connection between neurons
+- `plasticity.stdp.enable` - Enable STDP learning
+- `plasticity.hebbian.enable` - Enable Hebbian learning
+- `neuromod.dopamine.scale` - Dopamine modulation scale
+
+### Memory Systems
+
+- `brain.getWorkingMemory()` - Get working memory system
+- `brain.getEpisodicMemory()` - Get episodic memory system
+- `brain.getAssociativeMemory()` - Get associative memory system
+
+### Development Stages
+
+- `pynlm.DevelopmentalStage.Initial` - Initial stage
+- `pynlm.DevelopmentalStage.CriticalPeriod` - Critical period
+- `pynlm.DevelopmentalStage.Maturation` - Maturation stage
+- `pynlm.DevelopmentalStage.Adult` - Adult stage
+
+### Action Types
+
+- `pynlm.ActionType.MoveForward` - Move forward
+- `pynlm.ActionType.MoveBackward` - Move backward
+- `pynlm.ActionType.TurnLeft` - Turn left
+- `pynlm.ActionType.TurnRight` - Turn right
+- `pynlm.ActionType.Interact` - Interact with object
+- `pynlm.ActionType.Wait` - Do nothing
+
+That's it! You're now ready to use NLM. The system is powerful but the basic concepts are simple: create a brain, put it in a world, give it sensory input, and let it learn through interaction.

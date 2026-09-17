@@ -1,0 +1,76 @@
+# Build artifacts and compiled binaries
+build/
+*.o
+*.obj
+*.so
+*.dylib
+*.exe
+*.dll
+
+# Python build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+
+# Configuration files
+*.cfg
+*.ini
+*.json
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+~*
+
+# Editor backups
+*.bak
+*.swp
+*.swo
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Checkpoint files
+*.bin
+*.chk
+
+# Environment variables
+.env
+
+# Binary executables
+nlm
+nlm_phase3_demo
+nlm_phase4_demo
+nlm_phase6_demo
+nlm_test
+
+# Compiled libraries
+libnlm_core.a
+libnlm_agent.a
+libnlm_world.a
+
+# Documentation build artifacts
+htmlcov/
+.coverage
+coverage.xml
+
+# Testing artifacts
+.pytest_cache/
+
+# Git settings
+.gitconfig
