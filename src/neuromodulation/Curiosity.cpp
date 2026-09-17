@@ -32,15 +32,49 @@ float Curiosity::getLevel() const {
 }
 
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
-    // Curiosity increases with novelty and prediction error
-    float target = pImpl->noveltyWeight * novelty + 
-                   pImpl->predictionErrorWeight * predictionError;
+    // Compute curiosity as weighted combination of novelty and prediction error
+    // This drives exploration behavior when internal models are inaccurate
     
-    // Smooth update
-    pImpl->level += (target - pImpl->level) * 0.1f;
+    // Calculate combined drive from novelty and prediction error
+    float noveltyDrive = novelty * pImpl->noveltyWeight;
+    float errorDrive = predictionError * pImpl->predictionErrorWeight;
+    float combinedDrive = noveltyDrive + errorDrive;
     
-    // Decay
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Apply adaptive filtering based on recent curiosity levels (short-term memory)
+    float recentAverage = 0.0f;
+    if (pImpl->memorySize > 0) {
+        float sum = 0.0f;
+        for (size_t i = 0; i < pImpl->memorySize; ++i) {
+            sum += pImpl->memoryTrace[i];
+        }
+        recentAverage = sum / static_cast<float>(pImpl->memorySize);
+    }
+    
+    // Adaptive scaling: reduce response if recent curiosity has been high
+    float adaptationFactor = 1.0f - 0.1f * std::min(1.0f, recentAverage / pImpl->saturationLevel);
+    
+    // Compute target level with adaptive gain
+    float targetLevel = std::min(1.0f, combinedDrive * adaptationFactor);
+    
+    // Multi-timescale dynamics: fast decay for quick responses, slow recovery to baseline
+    float fastDecay = pImpl->decayRate * 2.0f;  // Faster decay for immediate curiosity
+    float slowDecay = pImpl->decayRate;        // Slower recovery to baseline
+    
+    // Smooth transition to target level
+    pImpl->level = pImpl->level * (1.0f - fastDecay * static_cast<float>(dt)) + 
+                   targetLevel * (fastDecay * static_cast<float>(dt));
+    
+    // Natural decay back to baseline
+    pImpl->level = pImpl->level * (1.0f - slowDecay * static_cast<float>(dt)) + 
+                   pImpl->baselineLevel * (slowDecay * static_cast<float>(dt));
+    
+    // Ensure level stays within bounds
+    pImpl->level = std::max(0.0f, std::min(1.0f, pImpl->level));
+    
+    // Update memory trace
+    pImpl->memoryTrace[pImpl->memoryIndex] = pImpl->level;
+    pImpl->memoryIndex = (pImpl->memoryIndex + 1) % 50;
+    if (pImpl->memorySize < 50) pImpl->memorySize++;
 }
 
 float Curiosity::getExplorationDrive() const {

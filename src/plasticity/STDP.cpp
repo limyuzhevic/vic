@@ -21,9 +21,9 @@ STDP::STDP() : pImpl(new Impl) {}
 STDP::~STDP() = default;
 
 void STDP::update(Synapse* synapse,
-                   const std::vector<Timestamp>& preSpikes,
-                   const std::vector<Timestamp>& postSpikes,
-                   TimestepDuration dt) {
+                    const std::vector<Timestamp>& preSpikes,
+                    const std::vector<Timestamp>& postSpikes,
+                    TimestepDuration dt) {
     /*
      * Real STDP implementation based on spike-timing correlation
      * 
