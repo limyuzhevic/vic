@@ -48,116 +48,220 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
-struct LearningExperiment {
-    std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
-    std::vector<float> initialWeights;
-    std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
+void printHelp(const char* programName) {
+    std::cout << "=== NLM Phase 2 - Neural Computation Demo ===" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config <file>          Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --verbose               Enable verbose logging" << std::endl;
+    std::cout << "  --loglevel <level>      Set log level (DEBUG, INFO, WARNING, ERROR)" << std::endl;
+    std::cout << "  --help                  Show this help message" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Configuration Options (can be set via command line):" << std::endl;
+    std::cout << "  --random_seed <value>    Random seed for reproducibility" << std::endl;
+    std::cout << "  --simulation_timestep <value>  Simulation timestep (seconds)" << std::endl;
+    std::cout << "  --neuron_count <value>   Number of neurons to simulate" << std::endl;
+    std::cout << "  --region_count <value>   Number of brain regions" << std::endl;
+    std::cout << "  --connection_probability <value>  Probability of synaptic connections (0-1)" << std::endl;
+    std::cout << "  --stdp_ltp_weight <value>  STDP LTP weight factor" << std::endl;
+    std::cout << "  --stdp_ltd_weight <value>  STDP LTD weight factor" << std::endl;
+    std::cout << "  --stdp_tau <value>       STDP tau parameter" << std::endl;
+    std::cout << "  --synaptogenesis_rate <value>  Structural synaptogenesis rate" << std::endl;
+    std::cout << "  --pruning_rate <value>   Structural pruning rate" << std::endl;
+    std::cout << "  --enable_hebbian <0|1>  Enable Hebbian plasticity" << std::endl;
+    std::cout << "  --enable_structural <0|1> Enable structural plasticity" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Advanced Options:" << std::endl;
+    std::cout << "  --quick_run             Run minimal demonstration" << std::endl;
+    std::cout << "  --trace_plasticity      Log all synaptic changes" << std::endl;
+    std::cout << "  --max_steps <value>     Maximum simulation steps" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Example:" << std::endl;
+    std::cout << "  " << programName << " --config myconfig.cfg --verbose --neuron_count 1000" << std::endl;
+}
+
+// Parse command line arguments and return configuration file path and verbose flag
+bool parseArguments(int argc, char** argv, std::string& configFile, LogLevel& logLevel, bool& verbose) {
+    bool helpShown = false;
     
-    LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
-    
-    void recordInitialState() {
-        initialSynapseCount = brain->getTotalSynapseCount();
-        initialWeights.clear();
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
         
-        // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+        if (arg == "--help") {
+            helpShown = true;
+            break;
+        } else if (arg == "--verbose") {
+            verbose = true;
+            logLevel = LogLevel::Debug;
+        } else if (arg == "--loglevel") {
+            if (i + 1 < argc) {
+                std::string level = argv[++i];
+                if (level == "DEBUG") logLevel = LogLevel::Debug;
+                else if (level == "INFO") logLevel = LogLevel::Info;
+                else if (level == "WARNING") logLevel = LogLevel::Warning;
+                else if (level == "ERROR") logLevel = LogLevel::Error;
+                else {
+                    std::cerr << "Invalid log level: " << level << std::endl;
+                    return false;
+                }
+            } else {
+                std::cerr << "Error: --loglevel requires a value" << std::endl;
+                return false;
+            }
+        } else if (arg == "--config") {
+            if (i + 1 < argc) {
+                configFile = argv[++i];
+            } else {
+                std::cerr << "Error: --config requires a filename" << std::endl;
+                return false;
             }
         }
-        
-        NLM_LOG_INFO("Initial state recorded:");
-        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
-        if (!initialWeights.empty()) {
-            float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-            float mean = sum / initialWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
-        }
-    }
-    
-    void recordFinalState() {
-        finalWeights.clear();
-        
-        // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+        // Configuration options
+        else if (arg == "--random_seed") {
+            if (i + 1 < argc) {
+                config->set("random_seed", static_cast<int64_t>(std::stoll(argv[++i])), ConfigSource::CommandLine);
+            } else {
+                std::cerr << "Error: --random_seed requires a value" << std::endl;
+                return false;
             }
-        }
-        
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
-        
-        NLM_LOG_INFO("Final state recorded:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        if (!finalWeights.empty()) {
-            float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-            float mean = sum / finalWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
-        }
-    }
-    
-    void computeStatistics() {
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("=== Learning Experiment Results ===");
-        NLM_LOG_INFO("");
-        
-        if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
-            return;
-        }
-        
-        // Compute weight changes
-        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-        float initialMean = initialSum / initialWeights.size();
-        float finalMean = finalSum / finalWeights.size();
-        
-        NLM_LOG_INFO("Weight Statistics:");
-        NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
-        NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
-        NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
-        
-        // Count synapses that changed significantly
-        size_t strengthened = 0;
-        size_t weakened = 0;
-        size_t unchanged = 0;
-        
-        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
-        for (size_t i = 0; i < minSize; ++i) {
-            float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
-        }
-        
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("Synaptic Changes:");
-        NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
-        NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
-        NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
-        
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("Spike Activity:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
-        
-        // Determine if learning occurred
-        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
-                                (strengthened > 0 || weakened > 0);
-        
-        NLM_LOG_INFO("");
-        if (learningOccurred) {
-            NLM_LOG_INFO("✓ LEARNING DETECTED: Synaptic weights changed through experience");
+        } else if (arg == "--simulation_timestep") {
+            if (i + 1 < argc) {
+                config->set("simulation_timestep", std::stod(argv[++i]), ConfigSource::CommandLine);
+            } else {
+                std::cerr << "Error: --simulation_timestep requires a value" << std::endl;
+                return false;
+            }
+        } else if (arg == "--neuron_count") {
+            if (i + 1 < argc) {
+                config->set("neuron_count", static_cast<int64_t>(std::stoll(argv[++i])), ConfigSource::CommandLine);
+            } else {
+                std::cerr << "Error: --neuron_count requires a value" << std::endl;
+                return false;
+            }
+        } else if (arg == "--region_count") {
+            if (i + 1 < argc) {
+                config->set("region_count", static_cast<int64_t>(std::stoll(argv[++i])), ConfigSource::CommandLine);
+            } else {
+                std::cerr << "Error: --region_count requires a value" << std::endl;
+                return false;
+            }
+        } else if (arg == "--connection_probability") {
+            if (i + 1 < argc) {
+                config->set("connection_probability", std::stod(argv[++i]), ConfigSource::CommandLine);
+            } else {
+                std::cerr << "Error: --connection_probability requires a value" << std::endl;
+                return false;
+            }
+        } else if (arg == "--stdp_ltp_weight") {
+            if (i + 1 < argc) {
+                config->set("stdp_ltp_weight", std::stof(argv[++i]), ConfigSource::CommandLine);
+            } else {
+                std::cerr << "Error: --stdp_ltp_weight requires a value" << std::endl;
+                return false;
+            }
+        } else if (arg == "--stdp_ltd_weight") {
+            if (i + 1 < argc) {
+                config->set("stdp_ltd_weight", std::stof(argv[++i]), ConfigSource::CommandLine);
+            } else {
+                std::cerr << "Error: --stdp_ltd_weight requires a value" << std::endl;
+                return false;
+            }
+        } else if (arg == "--stdp_tau") {
+            if (i + 1 < argc) {
+                config->set("stdp_tau", std::stof(argv[++i]), ConfigSource::CommandLine);
+            } else {
+                std::cerr << "Error: --stdp_tau requires a value" << std::endl;
+                return false;
+            }
+        } else if (arg == "--synaptogenesis_rate") {
+            if (i + 1 < argc) {
+                config->set("synaptogenesis_rate", std::stof(argv[++i]), ConfigSource::CommandLine);
+            } else {
+                std::cerr << "Error: --synaptogenesis_rate requires a value" << std::endl;
+                return false;
+            }
+        } else if (arg == "--pruning_rate") {
+            if (i + 1 < argc) {
+                config->set("pruning_rate", std::stof(argv[++i]), ConfigSource::CommandLine);
+            } else {
+                std::cerr << "Error: --pruning_rate requires a value" << std::endl;
+                return false;
+            }
+        } else if (arg == "--enable_hebbian") {
+            if (i + 1 < argc) {
+                config->set("hebbian_enabled", std::string(argv[++i]) == "1", ConfigSource::CommandLine);
+            } else {
+                std::cerr << "Error: --enable_hebbian requires 0 or 1" << std::endl;
+                return false;
+            }
+        } else if (arg == "--enable_structural") {
+            if (i + 1 < argc) {
+                config->set("structural_plasticity_enabled", std::string(argv[++i]) == "1", ConfigSource::CommandLine);
+            } else {
+                std::cerr << "Error: --enable_structural requires 0 or 1" << std::endl;
+                return false;
+            }
+        } else if (arg == "--quick_run") {
+            // Set parameters for quick run
+            config->set("neuron_count", 100, ConfigSource::CommandLine);
+            config->set("region_count", 1, ConfigSource::CommandLine);
+            config->set("stdp_ltp_weight", 0.01f, ConfigSource::CommandLine);
+            config->set("stdp_ltd_weight", 0.012f, ConfigSource::CommandLine);
+            config->set("synaptogenesis_rate", 0.001f, ConfigSource::CommandLine);
+            config->set("pruning_rate", 0.001f, ConfigSource::CommandLine);
+        } else if (arg == "--trace_plasticity") {
+            config->set("trace_plasticity", true, ConfigSource::CommandLine);
+        } else if (arg == "--max_steps") {
+            if (i + 1 < argc) {
+                config->set("max_steps", static_cast<int64_t>(std::stoll(argv[++i])), ConfigSource::CommandLine);
+            } else {
+                std::cerr << "Error: --max_steps requires a value" << std::endl;
+                return false;
+            }
         } else {
-            NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
+            std::cerr << "Unknown option: " << arg << std::endl;
+            helpShown = true;
         }
     }
-};
+    
+    if (helpShown) {
+        printHelp(argv[0]);
+        return false;
+    }
+    
+    return true;
+}
+
+// Include unified configuration utilities
+#include "core/Config/ConfigManager.hpp"
+
+namespace nlm {
+
+// Configuration manager instance for easy access to configuration operations
+std::unique_ptr<ConfigManager> configManager;
+
+// Global configuration helper functions
+const Config& getGlobalConfig() {
+    return configManager->getGlobalConfig();
+}
+
+void initializeConfig(const std::string& configFile = "configs/default.cfg") {
+    if (!configManager) {
+        configManager = std::make_unique<ConfigManager>();
+    }
+    configManager->loadConfig(configFile);
+    configManager->initializeDefaults();
+}
+
+void resetConfig() {
+    if (configManager) {
+        configManager->resetToDefaults();
+    }
+}
+
+} // namespace nlm
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
@@ -332,29 +436,39 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    // Parse command line arguments
+    std::string configFile = "configs/default.cfg";
+    LogLevel logLevel = LogLevel::Info;
+    bool verbose = false;
+    
+    if (argc > 1) {
+        // Check for help flag first
+        bool helpShown = false;
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (arg == "--help") {
+                printHelp(argv[0]);
+                return 0;
+            }
+        }
+        
+        // Parse other arguments
+        bool parseSuccess = parseArguments(argc, argv, configFile, logLevel, verbose);
+        if (!parseSuccess) {
+            return 1;
+        }
+    }
+    
+    // Update console logger with specified log level
+    if (verbose) {
+        consoleLogger->setLevel(LogLevel::Debug);
+        NLM_LOG_DEBUG("Verbose logging enabled");
+    } else {
+        consoleLogger->setLevel(logLevel);
+    }
     
     // Load configuration
     auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
     
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
@@ -366,19 +480,19 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 (overridden by config file or command line)
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
-    // STDP parameters
+    // STDP parameters (overridden by config file or command line)
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
     
-    // Structural plasticity parameters
+    // Structural plasticity parameters (overridden by config file or command line)
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     

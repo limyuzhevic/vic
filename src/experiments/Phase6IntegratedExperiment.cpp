@@ -4,14 +4,53 @@
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../agent/AgentBrain.hpp"
+#include "../agent/SensoryPercept.hpp"
+#include "../agent/MotorCommand.hpp"
 #include <chrono>
 #include <cmath>
+#include <string>
+#include <cstdlib>
+#include <iomanip>
 
 namespace nlm {
 
 Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
 
 Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
+
+// Print help information for Phase 6 integrated experiment
+void printPhase6Help(const char* programName) {
+    std::cout << "=== NLM Phase 6 Integrated Experiment ===" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help                  Show this help message" << std::endl;
+    std::cout << "  --verbose               Enable verbose logging" << std::endl;
+    std::cout << "  --loglevel <level>      Set log level (DEBUG, INFO, WARNING, ERROR)" << std::endl;
+    std::cout << "  --config <file>         Load configuration from file" << std::endl;
+    std::cout << "  --neuron_count <value>  Number of neurons (default: 1000)" << std::endl;
+    std::cout << "  --max_steps <value>     Maximum simulation steps (default: 10000)" << std::endl;
+    std::cout << "  --region_count <value>  Number of brain regions (default: 1)" << std::endl;
+    std::cout << "  --connection_prob <value> Connection probability (default: 0.1)" << std::endl;
+    std::cout << "  --checkpoint_path <path> Checkpoint save path (default: ./checkpoint_test.bin)" << std::endl;
+    std::cout << "  --no-checkpointing      Disable checkpoint testing" << std::endl;
+    std::cout << "  --no-replay             Disable replay testing" << std::endl;
+    std::cout << "  --no-development        Disable development system testing" << std::endl;
+    std::cout << "  --performance           Enable performance metrics collection" << std::endl;
+    std::cout << "  --quick_verify          Run quick integration verification only" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Advanced Options:" << std::endl;
+    std::cout << "  --stdp_ltp_weight <val>  STDP LTP weight factor (default: 0.01)" << std::endl;
+    std::cout << "  --stdp_ltd_weight <val>  STDP LTD weight factor (default: 0.012)" << std::endl;
+    std::cout << "  --synaptogenesis_rate <val> Structural synaptogenesis rate (default: 0.0001)" << std::endl;
+    std::cout << "  --pruning_rate <val>    Structural pruning rate (default: 0.00001)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << " --verbose --neuron_count 2000" << std::endl;
+    std::cout << "  " << programName << " --performance --no-checkpointing" << std::endl;
+    std::cout << "  " << programName << " --config custom_config.cfg" << std::endl;
+}
 
 Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
     Phase6IntegrationResult result;
@@ -371,6 +410,17 @@ bool Phase6IntegratedExperiment::testReplay() {
     
     auto brain = std::make_shared<Brain>(cfg);
     brain->initialize();
+    
+    auto* em = brain->getEpisodicMemory();
+    if (!em) {
+        NLM_LOG_ERROR("Episodic memory not available");
+        return false;
+    }
+    
+    // Run some steps
+    for (int i = 0; i < 200; ++i) {
+        brain->step(i, i * 0.001);
+    }
     
     auto* em = brain->getEpisodicMemory();
     if (!em) {
