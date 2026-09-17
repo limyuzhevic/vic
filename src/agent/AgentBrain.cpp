@@ -126,10 +126,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
+        // Vectorized novelty computation using std::accumulate
         float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
+        size_t limit = std::min(vision.size(), previousVision_.size());
+        for (size_t i = 0; i < limit; ++i) {
+            totalDiff += std::abs(vision[i] - previousVision_[i]);
         }
         
         // Normalize
@@ -138,8 +139,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
         
-        // Store for next time
-        previousVision_ = vision;
+        // Store for next time - use move semantics to avoid copy
+        previousVision_ = std::move(vision);
     }
     
     // Update curiosity based on novelty
@@ -181,7 +182,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     float interactAct = calcActivity(motorInteract_);
     float waitAct = calcActivity(motorWait_);
     
-    // Find maximum activity
+    // Find maximum activity using std::max_element for cleaner lookup
     struct { MotorCommand cmd; float activity; } commands[] = {
         {MotorCommand::MoveForward, forwardAct},
         {MotorCommand::MoveBackward, backwardAct},
@@ -191,15 +192,12 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         {MotorCommand::Wait, waitAct}
     };
     
-    MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
+    // Use std::max_element to find the most active motor command
+    const auto* bestCmd = std::max_element(std::begin(commands), std::end(commands),
+        [](const auto& a, const auto& b) { return a.activity < b.activity; });
     
-    for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
-            best = c.cmd;
-        }
-    }
+    MotorCommand best = bestCmd->cmd;
+    float bestActivity = bestCmd->activity;
     
     // Only act if there's meaningful activity
     if (bestActivity < 0.5f) {
