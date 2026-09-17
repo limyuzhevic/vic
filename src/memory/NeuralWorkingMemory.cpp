@@ -36,36 +36,37 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    // Check if we have any neurons to encode with (get from brain)
+    // Get first region which should have neurons
+    auto* region = brain_->getRegion(RegionId(1));
+    if (!region) return;
+    
+    auto allNeurons = region->getAllNeurons();
+    if (!allNeurons || allNeurons->empty()) return;
+    
+    // Convert from SensoryPercept vision format (256 values) to neurons
+    // Use vision as activation patterns for memory
+    size_t neuronsNeeded = std::min(pattern.size(), allNeurons->size());
+    
+    // Clear existing memory before storing new pattern
+    clear();
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
-        
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
-        
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
+        auto* neuron = allNeurons->at(i);
+        if (neuron && i < pattern.size()) {
+            float activation = pattern[i] * strength;
+            
+            // Store neuron and activation
+            memoryNeurons_.push_back(neuron->getId());
             memoryActivations_.push_back(activation);
             memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
+            
+            // Inject current to create the memory trace
+            neuron->injectCurrent(activation * 5.0f);
+            
+            // Create maintenance connection to this neuron for persistence
+            createRecurrentConnection(neuron->getId(), neuron->getId(), strength * 0.5f);
         }
-    }
-    
-    // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
     }
 }
 
