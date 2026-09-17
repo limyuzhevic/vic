@@ -29,6 +29,10 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Neuron and related types
+class Neuron;
+class NeuronId;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -122,10 +126,13 @@ public:
     size_t getRegionCount() const;
     std::vector<RegionId> getRegionIds() const;
     
-    // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
+    // Get a specific neuron by ID
+    Neuron* getNeuron(NeuronId id);
+    const Neuron* getNeuron(NeuronId id) const;
     
-    // Inter-region connection management
+    // Get all neurons across all regions
+    std::vector<Neuron*> getAllNeurons();
+    std::vector<const Neuron*> getAllNeurons() const;
     void addInterRegionConnection(RegionId source, RegionId target, 
                                   float weight = 0.0f, Delay delay = 1);
     void removeInterRegionConnection(RegionId source, RegionId target);
