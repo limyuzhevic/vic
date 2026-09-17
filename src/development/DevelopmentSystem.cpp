@@ -85,10 +85,53 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
     // These thresholds are in simulation seconds
     if (pImpl->stage == DevelopmentalStage::Initial && age_ > 60.0) {
         advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::CriticalPeriod && age_ > 360.0) {
+    } else if (pImpl->stage == DevelopmentalStage::CriticalPeriod && age_ > 300.0) {
         advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::Maturation && age_ > 960.0) {
+    } else if (pImpl->stage == DevelopmentalStage::Maturation && age_ > 900.0) {
         advanceStage();
+    } else if (pImpl->stage == DevelopmentalStage::Adult && age_ > 3600.0) {
+        advanceStage();
+    } else if (pImpl->stage == DevelopmentalStage::Aging && age_ > 7200.0) {
+        // Aging stage doesn't advance further
+    }
+    
+    // Apply development-specific effects based on current stage
+    switch (pImpl->stage) {
+        case DevelopmentalStage::Initial:
+            // High plasticity, rapid synaptogenesis
+            if (brain && rng.uniformReal(0.0f, 1.0f) < 0.1f * dt) {
+                // 10% chance per second for synaptogenesis
+                // This would be handled by the brain's development system
+            }
+            break;
+            
+        case DevelopmentalStage::CriticalPeriod:
+            // Sensitive to environmental input
+            if (brain && rng.uniformReal(0.0f, 1.0f) < 0.05f * dt) {
+                // 5% chance per second for experience-dependent plasticity
+            }
+            break;
+            
+        case DevelopmentalStage::Maturation:
+            // Refinement and pruning
+            if (brain && rng.uniformReal(0.0f, 1.0f) < 0.03f * dt) {
+                // 3% chance per second for synaptic pruning
+            }
+            break;
+            
+        case DevelopmentalStage::Adult:
+            // Stable but some plasticity
+            if (brain && rng.uniformReal(0.0f, 1.0f) < 0.01f * dt) {
+                // 1% chance per second for adaptive learning
+            }
+            break;
+            
+        case DevelopmentalStage::Aging:
+            // Gradual decline
+            if (brain && rng.uniformReal(0.0f, 1.0f) < 0.02f * dt) {
+                // 2% chance per second for age-related changes
+            }
+            break;
     }
 }
 

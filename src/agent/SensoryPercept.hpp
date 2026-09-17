@@ -20,6 +20,7 @@ public:
     void setVision(const std::vector<float>& v) { vision_ = v; }
     size_t getVisionWidth() const { return visionWidth_; }
     size_t getVisionHeight() const { return visionHeight_; }
+    size_t getVisionSize() const { return visionWidth_ * visionHeight_; }
     
     // Touch/proximity sensors (binary collision signals)
     const std::vector<float>& getTouch() const { return touch_; }
@@ -39,6 +40,9 @@ public:
     
     // Get all signals concatenated (for brain input)
     std::vector<float> getAllSignals() const;
+    
+    // Vision normalization helper
+    void normalizeVision(float min = 0.0f, float max = 1.0f);
     
     // Timestamp
     double getTimestamp() const { return timestamp_; }

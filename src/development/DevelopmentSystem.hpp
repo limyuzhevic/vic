@@ -46,6 +46,60 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // Update development with simple parameters (for backward compatibility)
+    void update(Brain* brain, SimulationStep currentStep);
+    
+    // Update development with full parameters (timestep, random)
+    void update(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    
+    // Apply development stage to brain systems
+    void applyDevelopmentToBrain(Brain* brain) const;
+    
+    // Calculate stage-specific parameters for plasticity
+    struct DevelopmentParams {
+        float plasticityRate;     // Base plasticity rate
+        float synaptogenesisRate; // Rate of new synapse formation
+        float pruningRate;        // Rate of synapse removal
+        float learningRate;       // Learning rate adjustment
+        float memoryRetention;    // Memory retention strength
+    };
+    
+    DevelopmentParams getDevelopmentParams() const;
+    
+    // Get developmental stage characteristics
+    static const char* getStageDescription(DevelopmentalStage stage);
+    static float getStageLifespan(DevelopmentalStage stage);  // in seconds
+    
+    // Check if development is complete (reached final stage)
+    bool isDevelopmentComplete() const;
+    
+    // Update development with simple parameters (for backward compatibility)
+    void update(Brain* brain, SimulationStep currentStep);
+    
+    // Update development with full parameters (timestep, random)
+    void update(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    
+    // Apply development stage to brain systems
+    void applyDevelopmentToBrain(Brain* brain) const;
+    
+    // Calculate stage-specific parameters for plasticity
+    struct DevelopmentParams {
+        float plasticityRate;     // Base plasticity rate
+        float synaptogenesisRate; // Rate of new synapse formation
+        float pruningRate;        // Rate of synapse removal
+        float learningRate;       // Learning rate adjustment
+        float memoryRetention;    // Memory retention strength
+    };
+    
+    DevelopmentParams getDevelopmentParams() const;
+    
+    // Get developmental stage characteristics
+    static const char* getStageDescription(DevelopmentalStage stage);
+    static float getStageLifespan(DevelopmentalStage stage);  // in seconds
+    
+    // Check if development is complete (reached final stage)
+    bool isDevelopmentComplete() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
