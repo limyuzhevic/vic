@@ -145,23 +145,58 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON file. Returns True on success, False on error.")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments. Returns True on success, False on error.")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file (JSON format if available, otherwise key=value format). Returns True on success, False on error.")
+        .def("get", &Config::get<std::string>, py::arg("key"),
+             "Get a string value from configuration. Returns None if key not found or type mismatch.")
+        .def("get_int", [](const Config& self, const std::string& key) {
+            auto val = self.get<int64_t>(key);
+            return val.has_value() ? py::cast(*val) : py::none();
+        }, py::arg("key"),
+             "Get an integer value from configuration. Returns None if key not found or type mismatch.")
+        .def("get_double", [](const Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            return val.has_value() ? py::cast(*val) : py::none();
+        }, py::arg("key"),
+             "Get a double value from configuration. Returns None if key not found or type mismatch.")
+        .def("get_bool", [](const Config& self, const std::string& key) {
+            auto val = self.get<bool>(key);
+            return val.has_value() ? py::cast(*val) : py::none();
+        }, py::arg("key"),
+             "Get a boolean value from configuration. Returns None if key not found or type mismatch.")
+        .def("get_keys", &Config::getKeys,
+             "Get all configuration keys as a list of strings.")
         .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+             "Check if a configuration key exists. Returns True if found, False otherwise.")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set a string configuration value.")
+        .def("set_int", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set an integer configuration value.")
+        .def("set_double", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set a double configuration value.")
+        .def("set_bool", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set a boolean configuration value.")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key. Returns nothing.")
         .def("clear", &Config::clear,
-             "Clear all configuration entries")
+             "Clear all configuration entries. Returns nothing.")
         .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+             "Get a summary string of the configuration with type and source information.")
         .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
+            return "<Config with " + std::to_string(cfg.getKeys().size()) + " entries>";
         });
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
