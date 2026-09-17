@@ -1,215 +1,260 @@
 #include "Config.hpp"
 #include <fstream>
 #include <sstream>
-#include <algorithm>
-#include <filesystem>
+#include <stdexcept>
 
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
-
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
-
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+Config::Config(const std::string& filepath) {
+    if (!filepath.empty()) {
+        load(filepath);
     }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
+bool Config::load(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR(std::string("Cannot open config file: ") + filepath);
+            return false;
+        }
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
-}
-
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+        deserialize(file);
+        NLM_LOG_INFO(std::string("Config loaded from ") + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Failed to load config: ") + e.what());
         return false;
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+}
+
+bool Config::save(const std::string& filepath) const {
+    try {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR(std::string("Cannot save config to file: ") + filepath);
+            return false;
+        }
+        
+        serialize(file);
+        NLM_LOG_INFO(std::string("Config saved to ") + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Failed to save config: ") + e.what());
+        return false;
     }
-    
-    return true;
+}
+
+template<typename T>
+void Config::set(const std::string& key, const T& value) {
+    auto it = std::find_if(parameters_.begin(), parameters_.end(),
+                           [&key](const Parameter& p) { return p.key == key; });n    
+    if (it != parameters_.end()) {
+        it->value = value;
+    } else {
+        parameters_.emplace_back(key, value);
+    }
 }
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    auto it = std::find_if(parameters_.begin(), parameters_.end(),
+                           [&key](const Parameter& p) { return p.key == key; });
     
-    if (it == pImpl->entries.end()) {
+    if (it == parameters_.end()) {
         return std::nullopt;
     }
     
     try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
+        return std::any_cast<T>(it->value);
+    } catch (const std::bad_any_cast&) {
+        NLM_LOG_WARNING(std::string("Type mismatch for config key: ") + key);
         return std::nullopt;
     }
 }
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    auto value = get<T>(key);
+    if (value.has_value()) {
+        return value.value();
+    }
+    return defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+void Config::createParameterGroup(const std::string& groupName, 
+                                 const std::string& description) {
+    if (std::find(parameterGroups_.begin(), parameterGroups_.end(), groupName) == parameterGroups_.end()) {
+        parameterGroups_.push_back(groupName);
+        NLM_LOG_INFO(std::string("Created parameter group: ") + groupName);
     }
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::addToGroup(const std::string& groupName, const std::string& key) {
+    auto it = std::find_if(parameters_.begin(), parameters_.end(),
+                           [&key](const Parameter& p) { return p.key == key; });
+    
+    if (it != parameters_.end()) {
+        it->groupName = groupName;
+        NLM_LOG_INFO(std::string("Added parameter ") + key + std::string(" to group ") + groupName);
+    }
 }
 
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+bool Config::validate() const {
+    validationErrors_.clear();
+    
+    for (const auto& param : parameters_) {
+        validateParameter(param);
+    }
+    
+    return validationErrors_.empty();
 }
 
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+std::vector<std::string> Config::getValidationErrors() const {
+    return validationErrors_;
 }
 
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::serialize(std::ostream& out) const {
+    // Write number of parameters
+    size_t paramCount = parameters_.size();
+    out.write(reinterpret_cast<const char*>(&paramCount), sizeof(paramCount));
+    
+    // Write each parameter
+    for (const auto& param : parameters_) {
+        // Write key length and key
+        size_t keyLen = param.key.length();
+        out.write(reinterpret_cast<const char*>(&keyLen), sizeof(keyLen));
+        out.write(param.key.c_str(), keyLen);
+        
+        // Write value (simplified - would use proper serialization for each type)
+        // For now, write type marker and then value
+        out << "{" << param.key << "}:";
+        
+        if (std::holds_alternative<bool>(param.value)) {
+            bool val = std::get<bool>(param.value);
+            out << (val ? "true" : "false");
+        } else if (std::holds_alternative<int>(param.value)) {
+            int val = std::get<int>(param.value);
+            out << val;
+        } else if (std::holds_alternative<float>(param.value)) {
+            float val = std::get<float>(param.value);
+            out << val;
+        } else if (std::holds_alternative<double>(param.value)) {
+            double val = std::get<double>(param.value);
+            out << val;
+        } else if (std::holds_alternative<std::string>(param.value)) {
+            out << "\"" << std::get<std::string>(param.value) << "\"";
+        }
+        
+        out << "\n";
+    }
 }
 
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+void Config::deserialize(std::istream& in) {
+    parameters_.clear();
+    parameterGroups_.clear();
+    
+    // Read number of parameters
+    size_t paramCount;
+    in.read(reinterpret_cast<char*>(&paramCount), sizeof(paramCount));
+    
+    // Read each parameter (simplified parsing)
+    std::string line;
+    for (size_t i = 0; i < paramCount && std::getline(in, line); ++i) {
+        // Parse line (format: {key}:value)
+        size_t colonPos = line.find(':');
+        if (colonPos != std::string::npos) {
+            std::string key = line.substr(1, colonPos - 2);
+            std::string valueStr = line.substr(colonPos + 1);
+            
+            // Simple type detection
+            if (valueStr == "true" || valueStr == "false") {
+                bool val = (valueStr == "true");
+                set(key, val);
+            } else if (valueStr.find('.') != std::string::npos) {
+                try {
+                    double val = std::stod(valueStr);
+                    set(key, val);
+                } catch (...) {
+                    set(key, valueStr);
+                }
+            } else {
+                try {
+                    int val = std::stoi(valueStr);
+                    set(key, val);
+                } catch (...) {
+                    set(key, valueStr);
+                }
+            }
+        }
+    }
 }
 
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+bool Config::hasParameter(const std::string& key) const {
+    return get<std::string>(key).has_value();
 }
 
-std::vector<std::string> Config::getKeys() const {
+std::vector<std::string> Config::getAllParameterKeys() const {
     std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+    keys.reserve(parameters_.size());
+    for (const auto& param : parameters_) {
+        keys.push_back(param.key);
     }
     return keys;
 }
 
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+std::string Config::getParameterDescription(const std::string& key) const {
+    auto it = std::find_if(parameters_.begin(), parameters_.end(),
+                           [&key](const Parameter& p) { return p.key == key; });n    
+    if (it != parameters_.end()) {
+        return it->description;
     }
-    return oss.str();
+    return "";
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+void Config::validateParameter(const Parameter& param) const {
+    if (param.required) {
+        if (!hasParameter(param.key)) {
+            validationErrors_.push_back(std::string("Required parameter missing: ") + param.key);
+        }
+    }
+    
+    if (param.validator && !param.validator(param.value)) {
+        validationErrors_.push_back(std::string("Invalid value for parameter: ") + param.key);
+    }
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+bool Config::validateTypeMatch(const ConfigValue& value, const std::type_info& type) {
+    return std::visit([&, this](const auto& val) {
+        return typeid(decltype(val)) == type;
+    }, value);
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Template specializations for common types
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// bool specializations
+template void Config::set<bool>(const std::string& key, const bool& value);
+template std::optional<bool> Config::get<bool>(const std::string& key) const;
+template bool Config::getOr<bool>(const std::string& key, const bool& defaultValue) const;
 
-} // namespace nlm
+// int specializations  
+template void Config::set<int>(const std::string& key, const int& value);
+template std::optional<int> Config::get<int>(const std::string& key) const;
+template int Config::getOr<int>(const std::string& key, const int& defaultValue) const;
+
+// float specializations
+template void Config::set<float>(const std::string& key, const float& value);
+template std::optional<float> Config::get<float>(const std::string& key) const;
+template float Config::getOr<float>(const std::string& key, const float& defaultValue) const;
+
+// double specializations
+template void Config::set<double>(const std::string& key, const double& value);
+template std::optional<double> Config::get<double>(const std::string& key) const;
+template double Config::getOr<double>(const std::string& key, const double& defaultValue) const;
+
+// string specializations
+template void Config::set<std::string>(const std::string& key, const std::string& value);
+template std::optional<std::string> Config::get<std::string>(const std::string& key) const;
+template std::string Config::getOr<std::string>(const std::string& key, const std::string& defaultValue) const;

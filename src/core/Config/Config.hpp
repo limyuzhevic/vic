@@ -1,105 +1,89 @@
 #pragma once
 
+// Config.hpp - Core configuration management
+#pragma once
+
 #include <string>
-#include <memory>
 #include <vector>
-#include <variant>
+#include <map>
+#include <memory>
+#include <type_traits>
+#include <any>
 #include <optional>
+#include <variant>
+#include <stdexcept>
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-
-// Configuration value types
+// Configuration parameter type
 using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
     bool,
+    int,
+    float,
+    double,
     std::string,
     std::vector<int>,
+    std::vector<float>,
     std::vector<double>,
     std::vector<std::string>
 >;
 
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
-};
-
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
-    
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
-};
-
-// Main configuration class
 class Config {
 public:
-    Config();
-    ~Config();
+    Config() = default;
+    explicit Config(const std::string& filepath);
+    ~Config() = default;
     
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
+    // File operations
+    bool load(const std::string& filepath);
+    bool save(const std::string& filepath) const;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Parameter management
+    template<typename T>
+    void set(const std::string& key, const T& value);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
-    
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
-    
-    // Get values
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Parameter groups
+    void createParameterGroup(const std::string& groupName, 
+                            const std::string& description = "");
+    void addToGroup(const std::string& groupName, const std::string& key);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Validation
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
     
-    // Remove key
-    void remove(const std::string& key);
+    // Serialization
+    void serialize(std::ostream& out) const;
+    void deserialize(std::istream& in);
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
+    // Parameter info
+    bool hasParameter(const std::string& key) const;
+    std::vector<std::string> getAllParameterKeys() const;
+    std::string getParameterDescription(const std::string& key) const;
     
 private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    struct Parameter {
+        std::string key;
+        ConfigValue value;
+        std::string description;
+        bool required = false;
+        std::string groupName;
+        std::function<bool(const ConfigValue&)> validator;
+        
+        template<typename T>
+        Parameter(const std::string& k, const T& v, const std::string& desc = "")
+            : key(k), value(v), description(desc), required(false) {}
+    };
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    std::vector<Parameter> parameters_;
+    std::vector<std::string> parameterGroups_;
+    mutable std::vector<std::string> validationErrors_;
+    
+    void validateParameter(const Parameter& param) const;
+    static bool validateTypeMatch(const ConfigValue& value, const std::type_info& type);
 };
-
-} // namespace nlm

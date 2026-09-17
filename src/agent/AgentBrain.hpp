@@ -13,11 +13,22 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
+    // Legacy constructor for backward compatibility
     AgentBrain(std::shared_ptr<Brain> brain);
+    
+    // Modern constructor with dependency injection
+    AgentBrain(std::shared_ptr<Brain> brain,
+               std::unique_ptr<class MotorDecodingStrategy> motorStrategy = nullptr,
+               std::unique_ptr<class CuriosityHandler> curiosityHandler = nullptr,
+               std::shared_ptr<class Config> config = nullptr);
+    
     ~AgentBrain();
     
-    // Initialize with world
+    // Legacy method for backward compatibility
     void initialize(const SimpleWorld& world);
+    
+    // Modern configuration-driven method
+    void configureFromConfig(const class Config& config);
     
     // Get sensory input size expected by brain
     size_t getSensoryInputSize() const;
@@ -55,7 +66,10 @@ public:
     // Reset agent for new episode
     void reset();
     
-    // Get brain pointer
+    // Check if agent is in valid state
+    bool isValid() const;
+    
+    // Get brain pointer (legacy)
     Brain* getBrain() { return brain_.get(); }
     
     // Configuration
@@ -69,16 +83,28 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Modern APIs
+    void setMotorDecodingStrategy(std::unique_ptr<class MotorDecodingStrategy> strategy);
+    void setCuriosityHandler(std::unique_ptr<class CuriosityHandler> handler);
+    
+    const class MotorDecodingStrategy* getMotorDecodingStrategy() const { return motorStrategy_.get(); }
+    const class CuriosityHandler* getCuriosityHandler() const { return curiosityHandler_.get(); }
+    
 private:
+    // Legacy implementation (deprecated)
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
-    // Motor command selection with curiosity/exploration
+    // Motor command selection with curiosity/exploration (legacy)
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Dependency injection fields
     std::shared_ptr<Brain> brain_;
+    std::unique_ptr<class MotorDecodingStrategy> motorStrategy_;
+    std::unique_ptr<class CuriosityHandler> curiosityHandler_;
+    std::shared_ptr<class Config> config_;
     
-    // Motor neuron groups
+    // Neuron group management
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
@@ -86,32 +112,52 @@ private:
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
-    // Sensory neuron groups
     std::vector<Neuron*> sensoryVision_;
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
     
-    // Neuromodulation state
-    float dopamineLevel_;
+    // State
+    std::vector<float> previousVision_;
     float noveltyLevel_;
-    float curiosityLevel_;
     float predictionError_;
     float expectedReward_;
-    
-    // Development state
     double developmentalAge_;
     float plasticityModifier_;
     
-    // Configuration flags
+    // Configuration
     bool rewardModulationEnabled_;
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
-    
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    size_t sensoryInputSize_;
+    size_t motorOutputSize_;
+    
+    // Legacy neuron groups for backward compatibility
+    std::vector<Neuron*> legacyMotorForward_;
+    std::vector<Neuron*> legacyMotorBackward_;
+    std::vector<Neuron*> legacyMotorTurnLeft_;
+    std::vector<Neuron*> legacyMotorTurnRight_;
+    std::vector<Neuron*> legacyMotorInteract_;
+    std::vector<Neuron*> legacyMotorWait_;
+    
+    std::vector<Neuron*> legacySensoryVision_;
+    std::vector<Neuron*> legacySensoryTouch_;
+    std::vector<Neuron*> legacySensoryInternal_;
+    std::vector<Neuron*> legacySensoryProprioception_;
+    
+    // Helper methods
+    void initializeNeuronGroups();
+    void validatePercept(const SensoryPercept& percept) const;
+    
+    template<typename T>
+    bool safeAccess(const std::vector<T*>& container, size_t index, T*& out);
+    
+    // Legacy initialization
+    void legacyInitializeNeuronGroups();
+    void legacyInitializeSensoryGroups();
+    void legacyInitializeMotorGroups();
 };
 
 } // namespace nlm
