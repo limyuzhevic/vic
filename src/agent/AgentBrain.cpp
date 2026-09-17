@@ -31,15 +31,18 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
+                                    motorLookLeft_.size() + motorLookRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
                         
-                        switch (idx % 6) {
+                        switch (idx % 8) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
                             case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                            case 4: motorLookLeft_.push_back(n); break;
+                            case 5: motorLookRight_.push_back(n); break;
+                            case 6: motorInteract_.push_back(n); break;
+                            case 7: motorWait_.push_back(n); break;
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
@@ -81,7 +84,7 @@ size_t AgentBrain::getSensoryInputSize() const {
 
 size_t AgentBrain::getMotorOutputSize() const {
     // One motor neuron per action
-    return 6;
+    return 8;  // Added LookLeft, LookRight actions
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
@@ -178,6 +181,8 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     float backwardAct = calcActivity(motorBackward_);
     float leftAct = calcActivity(motorTurnLeft_);
     float rightAct = calcActivity(motorTurnRight_);
+    float lookLeftAct = calcActivity(motorLookLeft_);
+    float lookRightAct = calcActivity(motorLookRight_);
     float interactAct = calcActivity(motorInteract_);
     float waitAct = calcActivity(motorWait_);
     
@@ -187,6 +192,8 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         {MotorCommand::MoveBackward, backwardAct},
         {MotorCommand::TurnLeft, leftAct},
         {MotorCommand::TurnRight, rightAct},
+        {MotorCommand::LookLeft, lookLeftAct},
+        {MotorCommand::LookRight, lookRightAct},
         {MotorCommand::Interact, interactAct},
         {MotorCommand::Wait, waitAct}
     };
@@ -201,8 +208,9 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         }
     }
     
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    // Only act if there's meaningful activity - make threshold configurable
+    float activityThreshold = 0.3f;  // Lower threshold for more responsiveness
+    if (bestActivity < activityThreshold) {
         return MotorCommand::Wait;
     }
     
@@ -210,24 +218,48 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+    // Enhanced exploration mechanism with intelligent decision making
+    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+        // Calculate exploration vs exploitation balance
+        float baseExploreChance = 0.1f;  // Base 10% exploration
+        float curiosityMultiplier = std::min(curiosityLevel_, 1.0f);  // Cap at 1.0
+        float exploreChance = baseExploreChance + curiosityMultiplier * 0.4f;  // Up to 50% chance
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+            // Intelligent exploration: prioritize novel actions or less active ones
+            std::vector<MotorCommand> candidates = {
+                MotorCommand::MoveForward, MotorCommand::MoveBackward,
+                MotorCommand::TurnLeft, MotorCommand::TurnRight,
+                MotorCommand::LookLeft, MotorCommand::LookRight,
+                MotorCommand::Interact, MotorCommand::Wait
+            };
+            
+            // Remove default command from candidates to avoid immediate fallback
+            candidates.erase(std::remove(candidates.begin(), candidates.end(), defaultCmd), 
+                           candidates.end());
+            
+            // If we have few candidates left, include the default
+            if (candidates.empty()) {
+                candidates.push_back(defaultCmd);
+            }
+            
+            // Choose based on curiosity level and prediction error
+            float curiosityBasedWeight = 0.6f * curiosityLevel_ + 0.4f * std::abs(predictionError_);
+            curiosityBasedWeight = std::min(curiosityBasedWeight, 1.0f);
+            
+            float r2 = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+            
+            if (r2 < curiosityBasedWeight) {
+                // Novelty-driven exploration: choose least recently used action
+                // Simple implementation: rotate through all actions
+                static int actionIndex = 0;
+                int choice = (actionIndex++ % candidates.size());
+                return candidates[choice];
+            } else {
+                // Random exploration with some intelligence
+                int choice = brain_->getRandomGenerator()->uniformInt(0, candidates.size() - 1);
+                return candidates[choice];
             }
         }
     }

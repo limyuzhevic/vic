@@ -81,5 +81,38 @@ int main(int argc, char* argv[]) {
     
     std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
     
+    std::cout << std::endl;
+    std::cout << "=== Phase 6 Integration Test Complete ===" << std::endl;
+    
+    // Print integration status
+    std::cout << std::endl;
+    std::cout << "=== FINAL RESULTS ===" << std::endl;
+    std::cout << "Total reward: " << result.totalReward << std::endl;
+    std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
+    std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
+    std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
+    
+    std::cout << std::endl;
+    std::cout << "=== INTEGRATION STATUS ===" << std::endl;
+    std::cout << "Working Memory: " << (result.memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Episodic Memory: " << (result.memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Neuromodulation: " << (result.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Prediction: " << (result.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Development: " << (result.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Checkpointing: " << (result.checkpointingWorks ? "WORKING" : "NOT WORKING") << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
+    
+    if (result.memoryWorkingMemoryIntegrated && result.memoryEpisodicMemoryIntegrated &&
+        result.neuromodulationIntegrated && result.predictionIntegrated &&
+        result.developmentIntegrated && result.checkpointingWorks) {
+        std::cout << std::endl;
+        std::cout << "=== SUCCESS: All Phase 6 systems integrated! ===" << std::endl;
+    } else {
+        std::cout << std::endl;
+        std::cout << "=== WARNING: Some Phase 6 systems may need attention ===" << std::endl;
+    }
+    
     return 0;
 }

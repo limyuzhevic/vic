@@ -61,10 +61,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
-        
-        // Process sensory input
+        // Use the agentBrain to process percept and get action
         agent.processSensoryInput(percept);
         
         // Brain step
@@ -73,11 +70,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
-        
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Apply action to world using agent's brain
+        ActionResult result = world.applyMotorCommand(cmd, step * 0.001);
+        float reward = result.reward;
         totalReward += reward;
         
         // Apply reward modulation
@@ -111,12 +106,12 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
-    // Verify integration
-    result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
-    result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
-    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
-    result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
-    result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
+    // Verify integration - more comprehensive checks
+    result.memoryWorkingMemoryIntegrated = verifyMemoryIntegration(brain);
+    result.memoryEpisodicMemoryIntegrated = verifyEpisodicMemoryIntegration(brain);
+    result.neuromodulationIntegrated = verifyNeuromodulationIntegration(brain);
+    result.predictionIntegrated = verifyPredictionIntegration(brain);
+    result.developmentIntegrated = verifyDevelopmentIntegration(brain);
     
     NLM_LOG_INFO("=== Integration Verification ===");
     NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
