@@ -3,14 +3,25 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <vector>
+#include <map>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    ParserOptions parserOptions;
+    std::vector<ConfigSchema> schema;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize default parser options
+    pImpl->parserOptions.validateSchema = true;
+    pImpl->parserOptions.supportNestedKeys = true;
+    pImpl->parserOptions.preserveOrder = true;
+    pImpl->parserOptions.configSource = "JSON";
+}
 
 Config::~Config() = default;
 
@@ -19,9 +30,13 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    ParserOptions options = pImpl->parserOptions;
+    options.configSource = "File";
+    return loadFromJSON(filepath, options);
+}
+
+// Backward compatibility for key=value format
+bool Config::loadFromFileLegacy(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -29,19 +44,16 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::string line;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
@@ -84,11 +96,7 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
+    saveToJSON(filepath);
     return true;
 }
 
@@ -199,17 +207,229 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Private methods implementation
+bool Config::loadFromJSON(const std::string& filepath, const ParserOptions& options) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string jsonString = buffer.str();
+    
+    return loadFromJSONString(jsonString, options);
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool Config::loadFromJSONString(const std::string& jsonString, const ParserOptions& options) {
+    try {
+        nlohmann::json jsonData = nlohmann::json::parse(jsonString);
+        
+        if (options.validateSchema && !validate(jsonData, pImpl->schema)) {
+            std::cerr << "Configuration schema validation failed!" << std::endl;
+            return false;
+        }
+        
+        clear();
+        flattenAndLoadJSON(jsonData, ConfigSource::File, options);
+        
+        return true;
+    } catch (const nlohmann::json::parse_error& e) {
+        std::cerr << "JSON parse error: " << e.what() << std::endl;
+        return false;
+    } catch (const std::exception& e) {
+        std::cerr << "Error loading configuration: " << e.what() << std::endl;
+        return false;
+    }
+}
 
-} // namespace nlm
+void Config::flattenAndLoadJSON(const nlohmann::json& json, ConfigSource source, const ParserOptions& options) {
+    if (options.supportNestedKeys) {
+        std::map<std::string, nlohmann::json> flattened;
+        flatten(json, "", flattened);
+        for (const auto& pair : flattened) {
+            setFromJSONValue(pair.first, pair.second, source);
+        }
+    } else {
+        for (const auto& item : json.items()) {
+            std::string key = item.key();
+            setFromJSONValue(key, item.value(), source);
+        }
+    }
+}
+
+std::string Config::flattenKey(const std::string& key, const nlohmann::json& parent) const {
+    return key;
+}
+
+void Config::setFromJSONValue(const std::string& key, const nlohmann::json& value, ConfigSource source) {
+    ConfigValue configValue;
+    
+    if (value.is_string()) {
+        configValue = value.get<std::string>();
+    } else if (value.is_number_integer()) {
+        configValue = value.get<int>();
+    } else if (value.is_number_unsigned()) {
+        configValue = value.get<uint64_t>();
+    } else if (value.is_number()) {
+        configValue = value.get<double>();
+    } else if (value.is_boolean()) {
+        configValue = value.get<bool>();
+    } else if (value.is_array()) {
+        if (value.empty()) {
+            configValue = std::vector<int>{};
+        } else if (value.front().is_number_integer()) {
+            configValue = value.get<std::vector<int>>();
+        } else if (value.front().is_number()) {
+            configValue = value.get<std::vector<double>>();
+        } else {
+            configValue = value.get<std::vector<std::string>>();
+        }
+    } else if (value.is_object()) {
+        std::string jsonStr = value.dump();
+        configValue = jsonStr;
+    } else {
+        throw std::runtime_error("Unsupported JSON value type for key: " + key);
+    }
+    
+    set(key, configValue, source);
+}
+
+// Schema validation
+bool Config::validate(const nlohmann::json& config, std::vector<ConfigValidationError>& errors) {
+    // This would be expanded with actual schema validation logic
+    return true;
+}
+
+// JSON conversion
+bool Config::jsonToConfigValue(const nlohmann::json& jsonValue, ConfigValue& configValue) {
+    if (jsonValue.is_string()) {
+        configValue = jsonValue.get<std::string>();
+        return true;
+    } else if (jsonValue.is_number_integer()) {
+        configValue = jsonValue.get<int>();
+        return true;
+    } else if (jsonValue.is_number_unsigned()) {
+        configValue = jsonValue.get<uint64_t>();
+        return true;
+    } else if (jsonValue.is_number()) {
+        configValue = jsonValue.get<double>();
+        return true;
+    } else if (jsonValue.is_boolean()) {
+        configValue = jsonValue.get<bool>();
+        return true;
+    } else if (jsonValue.is_array()) {
+        if (jsonValue.empty()) {
+            configValue = std::vector<int>{};
+            return true;
+        } else if (jsonValue.front().is_number_integer()) {
+            configValue = jsonValue.get<std::vector<int>>();
+            return true;
+        } else if (jsonValue.front().is_number()) {
+            configValue = jsonValue.get<std::vector<double>>();
+            return true;
+        } else {
+            configValue = jsonValue.get<std::vector<std::string>>();
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+nlohmann::json Config::configValueToJson(const ConfigValue& configValue) {
+    nlohmann::json jsonValue;
+    
+    std::visit([&jsonValue](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            jsonValue = arg;
+        }
+    }, configValue);
+    
+    return jsonValue;
+}
+
+// Error handling
+std::string Config::getErrorString(ConfigError::Type type) {
+    switch (type) {
+        case ConfigError::Type::ParseError:
+            return "Configuration parse error";
+        case ConfigError::Type::ValidationError:
+            return "Configuration validation error";
+        case ConfigError::Type::ConversionError:
+            return "Configuration conversion error";
+        default:
+            return "Unknown configuration error";
+    }
+}
+
+// Parser configuration
+void Config::setParserOptions(const ParserOptions& options) {
+    pImpl->parserOptions = options;
+}
+
+ParserOptions Config::getParserOptions() const {
+    return pImpl->parserOptions;
+}
+
+// Validation functions
+bool Config::validateParameter(const std::string& key, const ConfigValue& value) const {
+    return validateType(key, value) && validateRange(key, value);
+}
+
+bool Config::validateType(const std::string& key, const ConfigValue& value) const {
+    // Implement type validation based on expected types for specific keys
+    return true;
+}
+
+bool Config::validateRange(const std::string& key, const ConfigValue& value) const {
+    // Implement range validation for critical parameters
+    return true;
+}
+
+// Save helpers
+void Config::saveToJSON(const std::string& filepath) const {
+    nlohmann::json jsonConfig;
+    
+    if (pImpl->parserOptions.preserveOrder) {
+        for (const auto& entry : pImpl->entries) {
+            jsonConfig[entry.key] = configValueToJson(entry.value);
+        }
+    } else {
+        for (const auto& entry : pImpl->entries) {
+            jsonConfig[entry.key] = configValueToJson(entry.value);
+        }
+    }
+    
+    std::ofstream file(filepath);
+    if (file.is_open()) {
+        file << jsonConfig.dump(4);
+    }
+}
+
+// Private helpers
+void Config::flatten(const nlohmann::json& json, const std::string& prefix, std::map<std::string, nlohmann::json>& flattened) {
+    for (const auto& item : json.items()) {
+        std::string key = prefix.empty() ? item.key() : prefix + "." + item.key();
+        if (item.value().is_object()) {
+            flatten(item.value(), key, flattened);
+        } else if (item.value().is_array()) {
+            flattened[key] = item.value();
+        } else {
+            flattened[key] = item.value();
+        }
+    }
+}
