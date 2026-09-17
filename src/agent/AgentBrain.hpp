@@ -4,6 +4,8 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../plasticity/StructuralPlasticity.hpp"
+#include "../development/DevelopmentSystem.hpp"
 #include <memory>
 #include <vector>
 
@@ -43,14 +45,44 @@ public:
     // Get neuromodulation level
     float getNeuromodulationLevel() const;
     
+    // Set neuromodulation level
+    void setNeuromodulationLevel(float level);
+    
     // Get curiosity level
     float getCuriosityLevel() const;
+    
+    // Set curiosity level
+    void setCuriosityLevel(float level);
     
     // Get novelty level
     float getNoveltyLevel() const;
     
+    // Set novelty level
+    void setNoveltyLevel(float level);
+    
     // Get prediction error
     float getPredictionError() const;
+    
+    // Get expected reward
+    float getExpectedReward() const;
+    
+    // Get developmental age
+    double getDevelopmentalAge() const;
+    
+    // Get plasticity modifier
+    float getPlasticityModifier() const;
+    
+    // Get sensory novelty decay factor
+    float getSensoryNoveltyDecay() const;
+    
+    // Set sensory novelty decay factor
+    void setSensoryNoveltyDecay(float decay);
+    
+    // Get previous vision state for novelty detection
+    const std::vector<float>& getPreviousVision() const;
+    
+    // Set previous vision state
+    void setPreviousVision(const std::vector<float>& vision);
     
     // Reset agent for new episode
     void reset();

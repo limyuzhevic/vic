@@ -376,12 +376,38 @@ PYBIND11_MODULE(pynlm, m) {
              "Get current developmental stage")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
              "Get current neuromodulation level")
+        .def("setNeuromodulationLevel", &AgentBrain::setNeuromodulationLevel,
+             py::arg("level"),
+             "Set neuromodulation level (dopamine)")
         .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
              "Get curiosity level")
+        .def("setCuriosityLevel", &AgentBrain::setCuriosityLevel,
+             py::arg("level"),
+             "Set curiosity level")
         .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
              "Get novelty level")
+        .def("setNoveltyLevel", &AgentBrain::setNoveltyLevel,
+             py::arg("level"),
+             "Set novelty level")
         .def("getPredictionError", &AgentBrain::getPredictionError,
              "Get prediction error")
+        .def("getExpectedReward", &AgentBrain::getExpectedReward,
+             "Get expected reward (prediction target)")
+        .def("getDevelopmentalAge", &AgentBrain::getDevelopmentalAge,
+             "Get developmental age (simulation time)")
+        .def("getPlasticityModifier", &AgentBrain::getPlasticityModifier,
+             "Get current plasticity modifier")
+        .def("getSensoryNoveltyDecay", &AgentBrain::getSensoryNoveltyDecay,
+             "Get sensory novelty decay factor")
+        .def("setSensoryNoveltyDecay", &AgentBrain::setSensoryNoveltyDecay,
+             py::arg("decay"),
+             "Set sensory novelty decay factor")
+        .def("getPreviousVision", &AgentBrain::getPreviousVision,
+             py::return_value_policy::reference_internal,
+             "Get previous vision state for novelty detection")
+        .def("setPreviousVision", &AgentBrain::setPreviousVision,
+             py::arg("vision"),
+             "Set previous vision state for novelty detection")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
@@ -399,6 +425,31 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    // Add convenience properties and methods for agent status
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Agent brain status and monitoring
+    m.def("agentBrainStatus", [](const std::shared_ptr<AgentBrain>& agentBrain) {
+        if (!agentBrain) return std::string("Invalid agent brain");
+        std::stringstream ss;
+        ss << "AgentBrain Status:" << std::endl;
+        ss << "  Neuromodulation Level: " << agentBrain->getNeuromodulationLevel() << std::endl;
+        ss << "  Curiosity Level: " << agentBrain->getCuriosityLevel() << std::endl;
+        ss << "  Novelty Level: " << agentBrain->getNoveltyLevel() << std::endl;
+        ss << "  Prediction Error: " << agentBrain->getPredictionError() << std::endl;
+        ss << "  Expected Reward: " << agentBrain->getExpectedReward() << std::endl;
+        ss << "  Developmental Stage: " << static_cast<int>(agentBrain->getDevelopmentalStage()) << std::endl;
+        ss << "  Developmental Age: " << agentBrain->getDevelopmentalAge() << std::endl;
+        ss << "  Plasticity Modifier: " << agentBrain->getPlasticityModifier() << std::endl;
+        ss << "  Reward Modulation Enabled: " << (agentBrain->isRewardModulationEnabled() ? "yes" : "no") << std::endl;
+        ss << "  Structural Plasticity Enabled: " << (agentBrain->isStructuralPlasticityEnabled() ? "yes" : "no") << std::endl;
+        ss << "  Development Enabled: " << (agentBrain->isDevelopmentEnabled() ? "yes" : "no") << std::endl;
+        ss << "  Curiosity Enabled: " << (agentBrain->isCuriosityEnabled() ? "yes" : "no") << std::endl;
+        return ss.str();
+    }, py::arg("agentBrain"), "Get detailed status of an agent brain");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
