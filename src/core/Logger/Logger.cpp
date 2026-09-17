@@ -5,13 +5,18 @@
 #include <sstream>
 #include <mutex>
 
-namespace nlm {
-
+// Console logger implementation
 struct ConsoleLogger::Impl {
     LogLevel level = LogLevel::Info;
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    
+    ~Impl() {
+        if (fileOut.is_open()) {
+            fileOut.close();
+        }
+    }
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}

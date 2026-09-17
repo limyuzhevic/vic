@@ -19,36 +19,153 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to parse as JSON first, then fallback to simple key=value format
     std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    bool hasJsonBraces = false;
+    std::vector<std::string> jsonLines;
+    
+    // Check if this is a JSON file (starts with '{')
+    if (file.peek() == '{') {
+        hasJsonBraces = true;
+        // Read entire file content for JSON parsing
+        std::stringstream buffer;
+        buffer << file.rdbuf();
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Simple JSON parser - only handles basic key=value pairs in JSON format
+        std::string content = buffer.str();
+        size_t pos = 0;
+        while (pos < content.length()) {
+            pos = content.find('"', pos);
+            if (pos == std::string::npos) break;
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            size_t keyEnd = content.find('"', pos + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = content.substr(pos + 1, keyEnd - pos - 1);
+            pos = content.find(':', keyEnd);
+            if (pos == std::string::npos) break;
+            
+            // Skip whitespace after colon
+            pos++;
+            while (pos < content.length() && std::isspace(content[pos])) pos++;
+            
+            // Parse JSON value
+            if (content[pos] == '"') {
+                size_t valEnd = content.find('"', pos + 1);
+                if (valEnd == std::string::npos) break;
+                std::string value = content.substr(pos + 1, valEnd - pos - 1);
+                set(key, value, ConfigSource::File);
+                pos = valEnd + 1;
+            } else if (content[pos] == 't' || content[pos] == 'f') {
+                // Boolean value (true/false)
+                size_t valEnd = content.find_first_of(",}", pos);
+                if (valEnd == std::string::npos) break;
+                std::string valStr = content.substr(pos, valEnd - pos);
+                bool boolVal = (valStr == "true");
+                set(key, boolVal, ConfigSource::File);
+                pos = valEnd;
+            } else if (content[pos] == 'n') {
+                // null value
+                set(key, std::string("null"), ConfigSource::File);
+                pos++;
+                while (pos < content.length() && content[pos] != ',' && content[pos] != '}') pos++;
+            } else if (content[pos] == '0' || content[pos] == '1' || content[pos] == '2' ||
+                      content[pos] == '3' || content[pos] == '4' || content[pos] == '5' ||
+                      content[pos] == '6' || content[pos] == '7' || content[pos] == '8' ||
+                      content[pos] == '9' || content[pos] == '-') {
+                // Number (integer or float)
+                size_t valEnd = content.find_first_of(",}", pos);
+                if (valEnd == std::string::npos) break;
+                std::string numStr = content.substr(pos, valEnd - pos);
+                try {
+                    // Try integer first
+                    size_t posAfter;
+                    int64_t intVal = std::stoll(numStr, &posAfter);
+                    if (posAfter == numStr.length()) {
+                        set(key, intVal, ConfigSource::File);
+                    } else {
+                        // Try float
+                        double floatVal = std::stod(numStr);
+                        set(key, floatVal, ConfigSource::File);
+                    }
+                } catch (...) {
+                    // Keep as string if parsing fails
+                    set(key, numStr, ConfigSource::File);
+                }
+                pos = valEnd;
             }
             
-            set(key, value, ConfigSource::File);
+            // Skip to next key or end
+            while (pos < content.length() && content[pos] != '"') pos++;
+        }
+    }
+    
+    // If not JSON, try simple key=value format
+    if (!hasJsonBraces) {
+        file.clear();
+        file.seekg(0);
+        
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Parse boolean values
+                if (value == "true") {
+                    set(key, true, ConfigSource::File);
+                } else if (value == "false") {
+                    set(key, false, ConfigSource::File);
+                } else if (value == "null" || value == "NULL") {
+                    set(key, std::string("null"), ConfigSource::File);
+                } else {
+                    // Try to parse as number (integer or float)
+                    size_t posAfter;
+                    bool parsed = false;
+                    
+                    // Try integer
+                    try {
+                        int64_t intVal = std::stoll(value, &posAfter);
+                        if (posAfter == value.length()) {
+                            set(key, intVal, ConfigSource::File);
+                            parsed = true;
+                        }
+                    } catch (...) {}
+                    
+                    if (!parsed) {
+                        // Try float
+                        try {
+                            double floatVal = std::stod(value);
+                            set(key, floatVal, ConfigSource::File);
+                            parsed = true;
+                        } catch (...) {}
+                    }
+                    
+                    if (!parsed) {
+                        // Keep as string
+                        set(key, value, ConfigSource::File);
+                    }
+                }
+            }
         }
     }
     
