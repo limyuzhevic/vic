@@ -244,38 +244,46 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
-    
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
-    
-    // Apply to all synapses with eligibility traces
-    for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
-            
-            if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
-                syn->addToWeight(delta);
-                
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+    // Apply neuromodulation signal to brain using real dopamine system
+    Neuromodulator* dopamine = brain_->getDopamine();
+    if (dopamine) {
+        // Set prediction error as dopamine level
+        dopamine->setLevel(predictionError_);
+        
+        // Use real reward prediction error signaling
+        dopamine->signalRewardPredictionError(predictionError_);
+        
+        // Apply dopamine effects on neural excitability
+        // Dopamine modulates neural excitability by adjusting effective current injection
+        // Higher dopamine increases excitability (lower effective threshold)
+        float dopamineLevel = dopamine->getLevel();
+        float neuromodulationStrength = dopamine->getPlasticityFactor();
+        
+        // Apply neuromodulation to all neurons
+        for (const auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Dopamine modulates excitability by injecting additional current
+                    // Positive dopamine adds excitatory bias
+                    float excitabilityMod = dopamineLevel * 0.5f;
+                    if (excitabilityMod > 0.0f) {
+                        neuron->injectCurrent(excitabilityMod);
+                    }
+                }
             }
         }
-    }
-    
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
-    
-    // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+        
+        // Apply neuromodulation effects on plasticity
+        // Scale STDP learning rates
+        auto* stdp = brain_->getSTDP();
+        if (stdp) {
+            float modFactor = neuromodulationStrength;
+            stdp->setLTPWeight(0.01f * modFactor);
+            stdp->setLTDWeight(0.012f * modFactor);
+        }
+        
+        // Store dopamine level for statistics
+        dopamineLevel_ = dopamine->getLevel();
     }
 }
 

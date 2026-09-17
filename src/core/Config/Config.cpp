@@ -19,16 +19,164 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file: " + filepath);
         return false;
     }
     
+    // Determine file format by extension
+    std::string extension = "." + filepath.substr(filepath.find_last_of('.') + 1);
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+    
+    bool success;
+    if (extension == ".json") {
+        success = loadFromJSON(file, ConfigSource::File);
+    } else if (extension == ".yaml" || extension == ".yml") {
+        success = loadFromYAML(file, ConfigSource::File);
+    } else {
+        // Default to simple key=value format
+        success = loadFromSimpleFormat(file, ConfigSource::File);
+    }
+    
+    if (success) {
+        NLM_LOG_INFO("Loaded configuration from: " + filepath + " (" + 
+                    std::to_string(pImpl->entries.size()) + " entries)");
+    }
+    
+    return success;
+}
+
+bool Config::loadFromJSON(std::istream& stream, ConfigSource source) {
+    try {
+        nlohmann::json jsonData;
+        stream >> jsonData;
+        
+        // Flatten JSON structure for backward compatibility
+        // Handle both nested and flat JSON structures
+        flattenAndLoadJSON(jsonData, source);
+        
+        return true;
+    } catch (const nlohmann::json::parse_error& e) {
+        NLM_LOG_ERROR("JSON parse error: " + std::string(e.what()));
+        return false;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error loading JSON: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(std::istream& stream, ConfigSource source) {
+    try {
+        // Try to include yaml-cpp if available
+        // For now, fallback to simple format with warning
+        NLM_LOG_WARNING("YAML config loading not yet implemented, falling back to simple format");
+        // Reset stream position - this is tricky, so we need a different approach
+        stream.clear();
+        stream.seekg(0);
+        return loadFromSimpleFormat(stream, source);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error loading YAML: " + std::string(e.what()));
+        return false;
+    }
+}
+
+void Config::flattenAndLoadJSON(const nlohmann::json& json, ConfigSource source) {
+    if (json.is_object()) {
+        // Handle nested object structure
+        for (const auto& [key, value] : json.items()) {
+            // Convert nested path to dot notation (e.g., "brain.neuron_count")
+            std::string flatKey = flattenKey(key);
+            setFromJSONValue(flatKey, value, source);
+            
+            // Recursively process nested objects
+            if (value.is_object()) {
+                flattenAndLoadJSON(value, source);
+            }
+        }
+    } else if (json.is_array()) {
+        // Handle array values - convert to JSON string for now
+        std::string jsonStr = json.dump();
+        set("__json_array__", ConfigValue(jsonStr), source);
+    } else {
+        // Root-level scalar value
+        std::string flatKey = "root_value";
+        setFromJSONValue(flatKey, json, source);
+    }
+}
+
+std::string Config::flattenKey(const std::string& key, const nlohmann::json& parent) const {
+    if (!parent.is_object() || parent.empty()) {
+        return key;
+    }
+    
+    // For now, just return the key - could be enhanced to handle nested paths
+    return key;
+}
+
+void Config::setFromJSONValue(const std::string& key, const nlohmann::json& value, ConfigSource source) {
+    if (value.is_string()) {
+        set(key, value.get<std::string>(), source);
+    } else if (value.is_number_integer()) {
+        set(key, value.get<int64_t>(), source);
+    } else if (value.is_number_float()) {
+        set(key, value.get<double>(), source);
+    } else if (value.is_boolean()) {
+        set(key, value.get<bool>(), source);
+    } else if (value.is_array()) {
+        // Convert array to vector based on element type
+        if (!value.empty()) {
+            const auto& first = value[0];
+            if (first.is_string()) {
+                std::vector<std::string> vec;
+                vec.reserve(value.size());
+                for (const auto& item : value) {
+                    vec.push_back(item.get<std::string>());
+                }
+                set(key, vec, source);
+            } else if (first.is_number_integer()) {
+                std::vector<int> vec;
+                vec.reserve(value.size());
+                for (const auto& item : value) {
+                    vec.push_back(item.get<int>());
+                }
+                set(key, vec, source);
+            } else if (first.is_number_float()) {
+                std::vector<double> vec;
+                vec.reserve(value.size());
+                for (const auto& item : value) {
+                    vec.push_back(item.get<double>());
+                }
+                set(key, vec, source);
+            } else if (first.is_boolean()) {
+                std::vector<bool> vec;
+                vec.reserve(value.size());
+                for (const auto& item : value) {
+                    vec.push_back(item.get<bool>());
+                }
+                set(key, vec, source);
+            } else {
+                // Unknown type - store as JSON string
+                set(key, value.dump(), source);
+            }
+        } else {
+            // Empty array - store as empty vector
+            set(key, std::vector<std::string>(), source);
+        }
+    } else {
+        // Null or unknown type - store as string
+        set(key, value.dump(), source);
+    }
+}
+
+bool Config::loadFromSimpleFormat(std::istream& stream, ConfigSource source) {
     std::string line;
-    while (std::getline(file, line)) {
+    size_t lineNum = 0;
+    bool success = true;
+    
+    while (std::getline(stream, line)) {
+        ++lineNum;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -43,16 +191,87 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, source);
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR(std::string("Error parsing config line " + std::to_string(lineNum) + ": " + e.what()));
+                success = false;
+            }
+        } else {
+            // Invalid format, but don't fail - could be a section header
+            NLM_LOG_WARNING(std::string("Skipping malformed config line " + std::to_string(lineNum) + ": " + line));
         }
     }
     
+    return success;
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file for writing: " + filepath);
+        return false;
+    }
+    
+    // Save in human-readable INI format for compatibility
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << entry.key << " = " << getConfigValueAsString(entry.value) << "\n";
+    }
+    
+    NLM_LOG_INFO("Saved configuration to: " + filepath);
     return true;
+}
+
+std::string Config::getConfigValueAsString(const ConfigValue& value) const {
+    std::string result;
+    std::visit([&result](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            result = "\"" + arg + "\"";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            result = "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += "\"" + arg[i] + "\"";
+            }
+            result += "]";
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            result = "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += std::to_string(arg[i]);
+            }
+            result += "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            result = "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += std::to_string(arg[i]);
+            }
+            result += "]";
+        } else if constexpr (std::is_same_v<T, std::vector<bool>>) {
+            result = "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += arg[i] ? "true" : "false";
+            }
+            result += "]";
+        } else {
+            // For scalar types (int, double, bool)
+            if constexpr (std::is_same_v<T, bool>) {
+                result = arg ? "true" : "false";
+            } else {
+                result = std::to_string(arg);
+            }
+        }
+    }, value);
+    return result;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
