@@ -1,9 +1,32 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
 
 namespace nlm {
+
+// Constants for magic numbers
+namespace {
+    const float VISION_SCALE_FACTOR = 5.0f;
+    const float TOUCH_SCALE_FACTOR = 8.0f;
+    const float INTERNAL_SIGNAL_CENTER_SCALE = 2.0f;
+    const float INTERNAL_SIGNAL_SCALE = 5.0f;
+    const float PROPRIOCEPTION_CENTER_SCALE = 2.0f;
+    const float PROPRIOCEPTION_SCALE = 3.0f;
+    const float CURVITY_FACTOR = 2.0f;
+    const float PREDICTION_ERROR_FACTOR = 0.5f;
+    const float NOVELTY_DECAY = 0.99f;
+    const float MOTOR_ACTIVITY_THRESHOLD = 0.5f;
+    const float EXPLORATION_CHANCE_MULTIPLIER = 0.3f;
+    const float DOPAMINE_CLAMP_MIN = -1.0f;
+    const float DOPAMINE_CLAMP_MAX = 1.0f;
+    const float PLASTICITY_FACTOR_MIN = 0.1f;
+    const float PLASTICITY_FACTOR_MAX = 2.0f;
+    const float SYNAPTONGENESIS_RATE_BASE = 0.0001f;
+    const float PRUNING_RATE_BASE = 0.00001f;
+    const float PLasticity_MODIFIER_INITIAL = 1.0f;
+    const float DEVELOPMENT_AGE_INITIAL = 60.0;
+    const float DEVELOPMENT_AGE_MATURATION = 300.0;
+    const float DEVELOPMENT_AGE_ADULT = 900.0;
+}
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
