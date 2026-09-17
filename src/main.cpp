@@ -324,6 +324,98 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
+    // Parse command line arguments
+    bool quietMode = false;
+    bool showHelp = false;
+    double benchmarkDuration = 0.0;
+    int neurons = 500;
+    int regions = 1;
+    int randomSeed = 42;
+    int verbosityLevel = 2; // INFO level
+    std::string checkpointDir = "";
+    bool enablePlasticity = true;
+    bool enableStructural = true;
+    bool testMode = false;
+    
+    std::string configFile = "configs/default.cfg";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--quiet" || arg == "-q") {
+            quietMode = true;
+        } else if (arg.find("--config=") == 0) {
+            configFile = arg.substr(9);
+        } else if (arg == "--benchmark=help") {
+            std::cout << "Benchmark units: ms (milliseconds) for simulation duration\n" << std::endl;
+            return 0;
+        } else if (arg.find("--benchmark=") == 0) {
+            benchmarkDuration = std::stod(arg.substr(12));
+        } else if (arg.find("--neurons=") == 0) {
+            neurons = std::stoi(arg.substr(10));
+        } else if (arg.find("--regions=") == 0) {
+            regions = std::stoi(arg.substr(10));
+        } else if (arg.find("--seed=") == 0) {
+            randomSeed = std::stoi(arg.substr(7));
+        } else if (arg.find("--stdp=") == 0) {
+            // Parse "ltp,ltd,tau" parameters
+            std::string params = arg.substr(7);
+            size_t pos1 = params.find(',');
+            size_t pos2 = params.find(',', pos1 + 1);
+            if (pos1 != std::string::npos && pos2 != std::string::npos) {
+                std::string ltpStr = params.substr(0, pos1);
+                std::string ltdStr = params.substr(pos1 + 1, pos2 - pos1 - 1);
+                std::string tauStr = params.substr(pos2 + 1);
+                
+                try {
+                    float ltp = std::stof(ltpStr);
+                    float ltd = std::stof(ltdStr);
+                    float tau = std::stof(tauStr);
+                    
+                    // Store for later use
+                    std::cout << "STDP parameters configured: LTP=" << ltp << ", LTD=" << ltd << ", Tau=" << tau << std::endl;
+                } catch (...) {
+                    NLM_LOG_ERROR("Invalid STDP parameters format. Use --stdp=<ltp>,<ltd>,<tau>");
+                }
+            }
+        } else if (arg.find("--verbose=") == 0) {
+            verbosityLevel = std::stoi(arg.substr(10));
+        } else if (arg.find("--checkpoint=") == 0) {
+            checkpointDir = arg.substr(13);
+        } else if (arg == "--enable-plasticity") {
+            enablePlasticity = true;
+        } else if (arg == "--disable-plasticity") {
+            enablePlasticity = false;
+        } else if (arg == "--enable-structural") {
+            enableStructural = true;
+        } else if (arg == "--disable-structural") {
+            enableStructural = false;
+        } else if (arg == "--test-mode") {
+            testMode = true;
+        }
+    }
+    
+    if (showHelp) {
+        printHelp(argv[0]);
+        return 0;
+    }
+    
+    // Adjust configuration for quiet mode
+    if (quietMode) {
+        verbosityLevel = 1; // WARN level
+    }
+    
+    // Adjust configuration for test mode
+    if (testMode) {
+        neurons = std::min(neurons, 100);
+        regions = 1;
+        benchmarkDuration = 1000; // 1 second benchmark
+    }
+    
+    printBanner();
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
@@ -344,7 +436,6 @@ int main(int argc, char** argv) {
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -367,10 +458,10 @@ int main(int argc, char** argv) {
     config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("random_seed", static_cast<int64_t>(randomSeed), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(neurons), ConfigSource::Default);  // Smaller for faster test
+    config->set("region_count", static_cast<int64_t>(regions), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
     // STDP parameters
@@ -385,10 +476,10 @@ int main(int argc, char** argv) {
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", randomSeed)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", neurons)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", regions)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     

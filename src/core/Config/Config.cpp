@@ -3,11 +3,91 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_set>
 
 namespace nlm {
 
+// Initialize static member
+std::vector<std::string> ConfigValidator::validationErrors_;
+
+// Configuration validation implementation
+bool ConfigValidator::validate(const std::string& key, const ConfigValue& value) {
+    // Clear previous errors
+    validationErrors_.clear();
+    
+    // Basic validation rules
+    if (key.empty()) {
+        validationErrors_.push_back("Empty configuration key");
+        return false;
+    }
+    
+    // Validate value based on key
+    bool isValid = true;
+    
+    // Check for duplicate keys will be handled by Config class
+    // but we can add basic validation here
+    
+    // Type-based validation
+    if (std::holds_alternative<int>(value)) {
+        int val = std::get<int>(value);
+        if (val < -1000000 || val > 1000000) {
+            validationErrors_.push_back("Value for key '" + key + "' is out of reasonable range: " + std::to_string(val));
+            isValid = false;
+        }
+    }
+    else if (std::holds_alternative<int64_t>(value)) {
+        int64_t val = std::get<int64_t>(value);
+        if (val < -1000000000000LL || val > 1000000000000LL) {
+            validationErrors_.push_back("Value for key '" + key + "' is out of reasonable range: " + std::to_string(val));
+            isValid = false;
+        }
+    }
+    else if (std::holds_alternative<double>(value)) {
+        double val = std::get<double>(value);
+        if (std::isnan(val) || std::isinf(val) || val < -1e15 || val > 1e15) {
+            validationErrors_.push_back("Value for key '" + key + "' is invalid or out of range: " + std::to_string(val));
+            isValid = false;
+        }
+    }
+    else if (std::holds_alternative<bool>(value)) {
+        // No validation needed for bool
+    }
+    else if (std::holds_alternative<std::string>(value)) {
+        std::string val = std::get<std::string>(value);
+        if (val.length() > 1000) {
+            validationErrors_.push_back("Value for key '" + key + "' is too long (max 1000 chars)");
+            isValid = false;
+        }
+    }
+    
+    // Special validation for certain keys
+    if (key == "random_seed") {
+        if (auto seedOpt = std::get<int64_t>(value); seedOpt >= 0 && seedOpt < 2147483647) {
+            // Valid seed
+        } else {
+            validationErrors_.push_back("random_seed must be a valid non-negative integer");
+            isValid = false;
+        }
+    }
+    else if (key == "neuron_count") {
+        if (auto countOpt = std::get<int64_t>(value); countOpt <= 0) {
+            validationErrors_.push_back("neuron_count must be positive");
+            isValid = false;
+        }
+    }
+    else if (key == "simulation_timestep") {
+        if (auto dtOpt = std::get<double>(value); dtOpt <= 0.0) {
+            validationErrors_.push_back("simulation_timestep must be positive");
+            isValid = false;
+        }
+    }
+    
+    return isValid;
+}
+
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_set<std::string> seenKeys;  // Track duplicates
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -115,14 +195,33 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Check for duplicates
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
+        [&key](const ConfigEntry& e) { return e.key == key; });n    
     if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+        // Key exists - update if different source has higher priority
+        if (it->source < source) {
+            it->value = value;
+            it->source = source;
+        } else {
+            // Same or higher priority source - ignore
+            return;
+        }
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        // New key - check for duplicates by source priority
+        bool duplicateFound = false;
+        for (const auto& entry : pImpl->entries) {
+            if (entry.key == key) {
+                if (entry.source >= source) {
+                    duplicateFound = true;
+                    break;
+                }
+            }
+        }
+        
+        if (!duplicateFound) {
+            pImpl->entries.emplace_back(key, value, source);
+        }
     }
 }
 
@@ -166,6 +265,7 @@ std::vector<std::string> Config::getKeys() const {
 
 void Config::clear() {
     pImpl->entries.clear();
+    ConfigValidator::clearErrors();
 }
 
 std::string Config::summary() const {
@@ -213,3 +313,4 @@ template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
+

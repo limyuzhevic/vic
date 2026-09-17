@@ -5,8 +5,29 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <utility>
+#include <stdexcept>
 
 namespace nlm {
+
+// Result type for operations that can fail
+// Returns the value on success, error message on failure
+template<typename T>
+class Result {
+public:
+    Result(T value) : value_(std::move(value)), error_(), success_(true) {}
+    Result(const std::string& error) : value_(), error_(error), success_(false) {}
+    
+    bool success() const { return success_; }
+    const std::string& error() const { return error_; }
+    const T& value() const { return value_; }
+    T& value() { return value_; }
+    
+private:
+    T value_;
+    std::string error_;
+    bool success_;
+};
 
 // Forward declarations
 class Config;

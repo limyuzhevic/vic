@@ -8,6 +8,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <optional>
 
 namespace nlm {
 
@@ -42,6 +43,21 @@ struct InterRegionConnection {
     
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+};
+
+// Result type for error handling - allows detailed error messages instead of just bool
+// Returns success state and detailed error message on failure
+class Result {
+public:
+    Result() : success_(true) {}
+    Result(const std::string& error) : error_(error), success_(false) {}
+    
+    bool success() const { return success_; }
+    const std::string& error() const { return error_; }
+    
+private:
+    std::string error_;
+    bool success_;
 };
 
 // Brain: The central coordinator of the neural system
