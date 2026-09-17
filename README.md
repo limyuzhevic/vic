@@ -82,6 +82,101 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Python Library (pynlm)
+The NLM project also provides Python bindings for easier prototyping and experimentation. See `python/bindings.cpp` for the complete API.
+
+#### Quick Python Example
+```python
+import pynlm
+import numpy as np
+
+# 1. Create a default brain
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1000)
+config.set("plasticity.stdp.learning_rate", 0.001)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# 2. Create an agent and world
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+# 3. Run simulation loop
+for step in range(1000):
+    # Update world
+    world.update(0.1)
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    
+    # Process in brain
+    agent.processSensoryInput(percept)
+    
+    # Step brain dynamics
+    brain.step(step)
+    
+    # Get action and apply to world
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Print progress every 100 steps
+    if step % 100 == 0:
+        print(f"Step {step}: "
+              f"Firing={brain.getFiringNeuronCount()}, "
+              f"Curiosity={agent.getCuriosityLevel():.2f}, "
+              f"DevStage={brain.getDevelopmentalStage()}")
+
+print("Simulation complete!")
+```
+
+#### Error Handling Example
+```python
+def safe_agent_simulation(num_steps=1000, max_spikes=5000):
+    """Run simulation with error handling and performance monitoring."""
+    try:
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        agent = pynlm.createAgentBrain(brain)
+        world = pynlm.createSimpleWorld()
+        world.configure(width=10, height=10, visionWidth=4, visionHeight=4)
+        world.reset()
+        agent.initialize(world)
+        
+        for step in range(num_steps):
+            # Check for excessive spiking (potential instability)
+            spike_count = brain.getTotalSpikeCount()
+            if spike_count > max_spikes:
+                print(f"Warning: High spike count ({spike_count}) at step {step}")
+                brain.reset()
+                world.reset()
+                agent.reset()
+                continue
+            
+            # Run simulation step
+            world.update(0.1)
+            agent.processSensoryInput(world.getSensoryPercept())
+            brain.step(step)
+            world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+            
+    except Exception as e:
+        print(f"Simulation error: {e}")
+        # Implement recovery strategy if needed
+        return False
+    
+    return True
+
+# Run safe simulation
+if safe_agent_simulation(500):
+    print("Simulation completed successfully")
+else:
+    print("Simulation failed and recovered")
+```
+
 ## Project Structure
 
 ```
