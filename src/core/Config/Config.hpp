@@ -43,6 +43,30 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration exceptions
+class ConfigException : public std::exception {
+protected:
+    std::string message;
+public:
+    explicit ConfigException(const std::string& msg) : message(msg) {}
+    const char* what() const noexcept override { return message.c_str(); }
+};
+
+class ConfigFileException : public ConfigException {
+public:
+    explicit ConfigFileException(const std::string& msg) : ConfigException("Config file error: " + msg) {}
+};
+
+class ConfigParseException : public ConfigException {
+public:
+    explicit ConfigParseException(const std::string& msg) : ConfigException("Config parse error: " + msg) {}
+};
+
+class ConfigValidationException : public ConfigException {
+public:
+    explicit ConfigValidationException(const std::string& msg) : ConfigException("Config validation error: " + msg) {}
+};
+
 // Main configuration class
 class Config {
 public:
@@ -97,9 +121,33 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
+// Add configuration validation
+    bool validate(const Config& config, std::string& error) const;
+    
+    // Get configuration schema (validation rules)
+    static std::vector<ConfigEntry> getSchema();
+    
+    // Configuration validation rules
+    struct ValidationRule {
+        std::string key;
+        std::function<bool(const ConfigValue&)> validator;
+        std::string errorMessage;
+    };
+
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool parseValue(const std::string& str, ConfigValue& outValue);
+    static std::string valueToString(const ConfigValue& value);
+    static bool validateConnectionProbability(const ConfigValue& value);
+    static bool validateNeuronCount(const ConfigValue& value);
+    static bool validateRegionCount(const ConfigValue& value);
+    static bool validateTimestep(const ConfigValue& value);
+    static bool validatePositiveInt(const ConfigValue& value);
+    static bool validateNonNegativeFloat(const ConfigValue& value);
+    static bool validateFloatRange(const ConfigValue& value, float min, float max);
+    static bool validateString(const ConfigValue& value);
+    static bool validateArray(const ConfigValue& value, size_t minSize, size_t maxSize);
 };
 
 } // namespace nlm

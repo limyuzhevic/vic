@@ -363,6 +363,22 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
+    // Show help and exit if requested
+    if (config->has("help") || config->has("h") || config->has("?") || 
+        config->has("usage") || config->has("--help") || config->has("--h")) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== NLM Usage ===");
+        NLM_LOG_INFO("  --config=<file>      Load configuration from file");
+        NLM_LOG_INFO("  --help, -h, --h     Show this help message");
+        NLM_LOG_INFO("  --verbose           Enable verbose logging");
+        NLM_LOG_INFO("  --steps=<n>         Set maximum simulation steps");
+        NLM_LOG_INFO("  --neurons=<n>       Set number of neurons");
+        NLM_LOG_INFO("  --random=<seed>     Set random seed");
+        NLM_LOG_INFO("  --quiet, -q         Suppress non-essential output");
+        NLM_LOG_INFO("");
+        return 0;
+    }
+    
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
@@ -382,32 +398,50 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
-    
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
-    
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
-    
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
-        return 1;
+    // Check for negative steps if specified
+    if (config->has("max_simulation_steps")) {
+        int64_t steps = config->getOr<int64_t>("max_simulation_steps", 0);
+        if (steps < 0) {
+            NLM_LOG_ERROR("Invalid configuration: max_simulation_steps cannot be negative");
+            return 1;
+        }
     }
     
-    brain->logStatus();
+    // Check for negative neuron count if specified
+    if (config->has("neuron_count")) {
+        int64_t neurons = config->getOr<int64_t>("neuron_count", 0);
+        if (neurons <= 0) {
+            NLM_LOG_ERROR("Invalid configuration: neuron_count must be positive");
+            return 1;
+        }
+    }
+    
+    // Check for negative region count if specified
+    if (config->has("region_count")) {
+        int64_t regions = config->getOr<int64_t>("region_count", 0);
+        if (regions <= 0) {
+            NLM_LOG_ERROR("Invalid configuration: region_count must be positive");
+            return 1;
+        }
+    }
+    
+    // Check connection probability range if specified
+    if (config->has("connection_probability")) {
+        float prob = config->getOr<float>("connection_probability", 0.0f);
+        if (prob < 0.0f || prob > 1.0f) {
+            NLM_LOG_ERROR("Invalid configuration: connection_probability must be between 0.0 and 1.0");
+            return 1;
+        }
+    }
+    
+    // Check timestep if specified
+    if (config->has("simulation_timestep")) {
+        double timestep = config->getOr<double>("simulation_timestep", 0.0);
+        if (timestep <= 0.0) {
+            NLM_LOG_ERROR("Invalid configuration: simulation_timestep must be positive");
+            return 1;
+        }
+    }
     
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);

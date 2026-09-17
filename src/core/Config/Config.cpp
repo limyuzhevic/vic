@@ -19,40 +19,63 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            throw ConfigFileException("Cannot open file: " + filepath);
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        std::string content((std::istreambuf_iterator<char>(file)), 
+                             std::istreambuf_iterator<char>());
+        
+        // Check if it's JSON format
+        if (content.find('{') != std::string::npos && content.find('}') != std::string::npos) {
+            // TODO PHASE 3: Implement full JSON parsing
+            // For now, fallback to simple format
+            NLM_LOG_WARNING("JSON format detected but not yet implemented, using simple format");
+        }
+        
+        // Fallback to simple key=value format
+        std::istringstream stream(content);
+        std::string line;
+        int lineNum = 0;
+        
+        while (std::getline(stream, line)) {
+            ++lineNum;
+            line = trim(line);
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Skip empty lines and comments
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            } else {
+                NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNum) + ": '" + line + "'");
+            }
         }
+        
+        return true;
+    } catch (const ConfigException& e) {
+        NLM_LOG_ERROR(std::string("Config file error: ") + e.what());
+        return false;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Unexpected error loading config file: ") + e.what());
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -198,7 +221,6 @@ std::string Config::toLower(const std::string& str) {
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
 }
-
 // Explicit template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
