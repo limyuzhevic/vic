@@ -1,9 +1,17 @@
-#include "AgentBrain.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
-
 namespace nlm {
+
+// Helper function to calculate average activity from neurons
+float CalculateNeuronActivity(const std::vector<Neuron*>& neurons) {
+    if (neurons.empty()) return 0.0f;
+    float sum = 0.0f;
+    for (Neuron* n : neurons) {
+        // Use membrane potential deviation from rest as activity measure
+        sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+    }
+    return sum / neurons.size();
+}
+
+} // namespace nlm
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
@@ -163,23 +171,12 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
-        float sum = 0.0f;
-        for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
-        }
-        return sum / neurons.size();
-    };
-    
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
+    float forwardAct = CalculateNeuronActivity(motorForward_);
+    float backwardAct = CalculateNeuronActivity(motorBackward_);
+    float leftAct = CalculateNeuronActivity(motorTurnLeft_);
+    float rightAct = CalculateNeuronActivity(motorTurnRight_);
+    float interactAct = CalculateNeuronActivity(motorInteract_);
+    float waitAct = CalculateNeuronActivity(motorWait_);
     
     // Find maximum activity
     struct { MotorCommand cmd; float activity; } commands[] = {
@@ -277,6 +274,12 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
     }
+    
+    NLM_LOG_INFO("Reward modulation: " + std::to_string(reward) + 
+                 " (predicted: " + std::to_string(predictedReward) + ")" +
+                 " -> Error: " + std::to_string(predictionError_) +
+                 " -> Dopamine: " + std::to_string(dopamineLevel_) +
+                 " -> Plasticity: " + std::to_string(plasticityFactor));
 }
 
 void AgentBrain::updateDevelopment(double timestep) {

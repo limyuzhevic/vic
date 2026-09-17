@@ -100,6 +100,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Internal file format helpers
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromSimpleFormatFile(const std::string& filepath);
+    static std::string join(const std::vector<std::string>& strings, const std::string& separator);
+    static std::string unescapeString(const std::string& str);
 };
 
 } // namespace nlm

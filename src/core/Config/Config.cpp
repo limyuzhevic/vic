@@ -43,7 +43,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -96,11 +96,11 @@ template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
-    
+
     if (it == pImpl->entries.end()) {
         return std::nullopt;
     }
-    
+
     try {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
@@ -117,7 +117,7 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
-    
+
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
