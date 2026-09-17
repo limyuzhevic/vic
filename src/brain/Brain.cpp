@@ -229,9 +229,9 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
+    // ========== INITIALIZE INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
+    // Initialize memory systems
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
@@ -243,7 +243,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
