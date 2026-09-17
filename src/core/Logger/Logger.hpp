@@ -49,12 +49,23 @@ public:
     LogLevel getLevel() const override;
     
     // Enable/disable colors
-    void setUseColors(bool useColors);
-    bool getUseColors() const;
+    void setUseColors(bool useColors) override;
+    bool getUseColors() const override;
     
     // Set output file (in addition to console)
-    void setOutputFile(const std::string& filepath);
-    void closeOutputFile();
+    void setOutputFile(const std::string& filepath) override;
+    void closeOutputFile() override;
+    
+    // Formatting options
+    void enableTimestamps(bool enable);
+    void enableSourceLocation(bool enable);
+    void enableThreadId(bool enable);
+    void setFormat(const std::string& format);
+    
+    // Statistics
+    size_t getMessageCount() const;
+    double getMessagesPerSecond() const;
+    std::chrono::system_clock::time_point getStartTime() const;
     
 private:
     struct Impl;
@@ -62,6 +73,75 @@ private:
     
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;
+    std::string formatMessage(const LogEntry& entry) const;
+    void replaceAll(std::string& str, const std::string& from, const std::string& to);
+};
+
+// Main Logger class
+class Logger {
+public:
+    Logger();
+    ~Logger();
+    
+    // Disable copying
+    Logger(const Logger&) = delete;
+    Logger& operator=(const Logger&) = delete;
+    
+    // Add logger sink
+    void addLogger(std::shared_ptr<ILogger> logger);
+    
+    // Remove all loggers
+    void clearLoggers();
+    
+    // Set minimum level for all loggers
+    void setLevel(LogLevel level);
+    
+    // Global logging functions
+    void log(LogLevel level, const std::string& message, 
+             const std::string& file = "", int line = 0, 
+             const std::string& function = "");
+    
+    // Convenience methods
+    void debug(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
+    void info(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
+    void warning(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
+    void error(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
+    void critical(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
+    
+    // Check if level is enabled
+    bool isEnabled(LogLevel level) const;
+    
+    // Get global logger instance
+    static Logger& getGlobal();
+    
+    // Set global logger
+    static void setGlobal(std::shared_ptr<Logger> logger);
+    
+    // Configure global logger
+    static void configureGlobalLogger();
+    
+    // Logging statistics and monitoring
+    struct LogStats {
+        size_t debugCount = 0;
+        size_t infoCount = 0;
+        size_t warningCount = 0;
+        size_t errorCount = 0;
+        size_t criticalCount = 0;
+        size_t totalMessages = 0;
+        double messagesPerSecond = 0.0;
+        std::chrono::system_clock::time_point startTime;
+    };
+    
+    static LogStats getLogStats();
+    static void resetLogStats();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
+    // Internal helpers
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
 };
 
 // Main Logger class

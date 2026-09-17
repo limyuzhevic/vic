@@ -80,7 +80,6 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -93,64 +92,35 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
-        
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
-        
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+        // ========== NEURAL DYNAMICS AND SPIKING ==========
+    // These systems are fundamental and must be initialized first
+    // They provide the spiking dynamics and plasticity engine
+    
+    spikeSystem = std::make_unique<SpikeSystem>();
+    stdp = std::make_unique<STDP>();
+    hebbian = std::make_unique<Hebbian>();
+    structuralPlasticity = std::make_unique<StructuralPlasticity>();
+    
+    // Configure plasticity parameters for learning
+    float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+    float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+    float tau = config->getOr<float>("stdp_tau", 20.0f);
+    stdp->configure(ltpWeight, ltdWeight, tau);
+    
+    float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+    structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+    structuralPlasticity->setPruningRate(pruningRate);
+    
+    // Set simulation timestep from configuration
+    timestep = config->getOr<double>("simulation_timestep", 0.001);
+    
+    // Initialize memory integration intervals
+    replayInterval = config->getOr<size_t>("replay_interval", 100);
+    consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+    
+    // Initialize checkpoint manager for persistence
+    checkpointManager = std::make_unique<CheckpointManager>();
     }
     
     DevelopmentalStage developmentalStage;
@@ -289,6 +259,8 @@ bool Brain::initialize() {
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    
+    // ========== INITIALIZATION COMPLETE ==========
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));

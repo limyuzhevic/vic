@@ -28,24 +28,159 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+// Command-line interface for NLM
+// Enhanced with comprehensive configuration management and debugging capabilities
+
+#include <iostream>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <chrono>
+
+// Include NLM components
+#include "core/Config/Config.hpp"
+#include "core/Logger/Logger.hpp"
+#include "core/Random/Random.hpp"
+#include "core/SimulationClock/SimulationClock.hpp"
+#include "brain/Brain.hpp"
+#include "brain/Neuron.hpp"
+#include "brain/Synapse.hpp"
+#include "sensory/SensoryInput.hpp"
+#include "motor/Action.hpp"
+#include "environment/Environment.hpp"
+#include "experiments/ExperimentRunner.hpp"
+
+using namespace nlm;
+using namespace std;
+
+// Program usage and help information
+void printUsage() {
+    cout << R"(
+=====================================================================
+                    NLM — 熙然 (Neural Learning Machine)
+=====================================================================
+
+An experimental artificial developmental brain simulating real neural
+computation with event-driven dynamics, multiple plasticity mechanisms,
+and integrated cognitive systems.
+
+=====================================================================
+                                USAGE
+=====================================================================
+
+Basic Usage:
+    nlm [OPTIONS]
+
+Examples:
+    nlm                                    # Run with default configuration
+    nlm --config=my_config.cfg              # Load custom config file
+    nlm --neuron_count=2000 --verbose      # Create 2000-neuron brain
+    nlm -s 1000 -t 0.01 --save=checkpoint  # Simulate 1000 steps with 0.01s timestep
+
+=====================================================================
+                                OPTIONS
+=====================================================================
+
+Configuration Options:
+    --config=<file>                     Load configuration from file (default: configs/default.cfg)
+    --neuron_count=<N>                  Total number of neurons (default: 1000)
+    --region_count=<N>                   Number of brain regions (default: 1)
+    --connection_probability=<P>         Probability of neural connections (0-1, default: 0.1)
+    --simulation_timestep=<T>            Simulation timestep in seconds (default: 0.001)
+
+Plasticity Configuration:
+    --stdp_ltp_weight=<W>                STDP Long-Term Potentiation weight (default: 0.01)
+    --stdp_ltd_weight=<W>                STDP Long-Term Depression weight (default: 0.012)
+    --stdp_tau=<T>                       STDP time constant (default: 20.0)
+    --plasticity_learning_rate=<R>       General learning rate (default: 0.01)
+    --synaptogenesis_rate=<R>            Rate of new synapse formation (default: 0.0001)
+    --pruning_rate=<R>                   Rate of synapse removal (default: 0.00001)
+
+Neuromodulation Configuration:
+    --dopamine_baseline=<B>              Dopamine baseline level (default: 0.1)
+    --curiosity_weight=<W>               Curiosity influence on exploration (default: 0.5)
+    --novelty_weight=<W>                 Novelty detection sensitivity (default: 0.5)
+
+Development Configuration:
+    --replay_interval=<I>                Memory replay interval (default: 100)
+    --consolidation_interval=<I>         Memory consolidation interval (default: 1000)
+    --development_synaptogenesis_rate=<R> Development synaptogenesis rate (default: 0.001)
+    --development_pruning_rate=<R>        Development pruning rate (default: 0.0001)
+
+Simulation Control:
+    -s, --steps=<N>                      Number of simulation steps (default: 1000)
+    -t, --timestep=<T>                   Override timestep for this simulation (default: 0.001)
+    --random_seed=<S>                    Random seed for reproducibility (default: 42)
+    --checkpoint_dir=<D>                 Directory for checkpoint files (default: ./checkpoints)
+    --save=<file>                        Save brain state to file after simulation
+    --load=<file>                        Load brain state from file before simulation
+
+Output and Logging:
+    -v, --verbose                        Enable verbose logging (can be repeated for more detail)
+    --log_level=<L>                      Log level: TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL (default: INFO)
+    --log_to_file=<file>                 Write logs to file instead of stdout
+    --performance_stats                   Display performance metrics (timing, memory, etc.)
+    --experimental_mode                  Enable experimental features and verbose debugging
+
+Phase-Specific Modes:
+    --phase1                             Run Phase 1: Basic brain skeleton (legacy)
+    --phase2                             Run Phase 2: Real neural computation (legacy)
+    --phase3                             Run Phase 3: World interaction (legacy)
+    --phase4                             Run Phase 4: Cognition integration (legacy)
+    --phase6demo                         Run Phase 6 integration demo (default)
+
+Debugging and Development:
+    --debug-neurons=<N>                  Debug specific neurons by ID (comma-separated)
+    --debug-synapses=<S>                 Debug specific synapses by ID (comma-separated)
+    --debug-memory                        Enable memory system debugging
+    --debug-plasticity                   Enable plasticity system debugging
+    --validate-config                     Validate configuration parameters
+    --validate-connections                Check neural connectivity and health
+
+=====================================================================
+                                EXAMPLES
+=====================================================================
+
+Run a simple simulation:
+    nlm --steps=500 --timestep=0.01
+
+Run with custom configuration:
+    nlm --config=experiments/my_config.cfg --neuron_count=5000 --save=brain_state
+
+Run learning experiment:
+    nlm --steps=10000 --plasticity_learning_rate=0.001 --stdp_ltp_weight=0.02
+
+Run with debugging:
+    nlm --verbose --log_level=DEBUG --debug-memory --debug-plasticity
+
+Load and continue simulation:
+    nlm --load=checkpoint.bin --steps=1000 --save=checkpoint2.bin
+
+=====================================================================
+                                HELP
+=====================================================================
+    --help                              Show this help message
+    -h                                  Alias for --help
+
+=====================================================================
+                                NOTES
+=====================================================================
+- Configuration files can be in simple key=value format (configs/default.cfg)
+- Command-line options override configuration file values
+- Random seed ensures reproducible simulations
+- Checkpoints allow saving/loading brain state for long simulations
+- Performance optimizations are enabled by default (SIMD, memory pools)
+- Phase 6 represents the current fully-integrated artificial brain
+
+=====================================================================
+                            COPYRIGHT AND LICENSE
+=====================================================================
+Copyright (c) 2026 NLM Project Authors
+License: MIT
+This is an experimental research project - do not use for production systems.
+
+=====================================================================
+)" << endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
