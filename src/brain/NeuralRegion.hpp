@@ -6,11 +6,12 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <string>
 
 namespace nlm {
 
 // NeuralRegion: A brain region containing multiple populations and local connectivity
-// PLACEHOLDER - Phase 2 will implement region-level dynamics
+// IMPLEMENTED - Phase 2 region for neural computation
 
 class NeuralRegion {
 public:
@@ -71,9 +72,9 @@ public:
     
     // Initialize connectivity
     void initializeRandomConnectivity(class RandomGenerator& rng, 
-                                      float connectionProbability,
-                                      float meanWeight,
-                                      float weightVariance);
+                                       float connectionProbability,
+                                       float meanWeight,
+                                       float weightVariance);
     
     // Get all neurons across all populations
     std::vector<Neuron*> getAllNeurons();
