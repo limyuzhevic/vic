@@ -6,6 +6,7 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <mutex>
 
 namespace nlm {
 
@@ -69,6 +70,30 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced configuration
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = threshold; }
+    void setExplorationBase(float base) { explorationBase_ = base; }
+    void setMotorCommandTimeout(float timeout) { motorCommandTimeout_ = timeout; }
+    void setNeuromodulationGain(float gain) { neuromodulationGain_ = gain; }
+    void setDevelopmentRate(double rate) { developmentRate_ = rate; }
+    
+    // Statistics and debugging
+    struct AgentStats {
+        size_t totalSteps = 0;
+        size_t motorCommandsIssued = 0;
+        float averageFiringRate = 0.0f;
+        float totalRewardReceived = 0.0f;
+        double averageDevelopmentAge = 0.0;
+        size_t episodeCount = 0;
+    };
+    
+    AgentStats getStats() const { return stats_; }
+    void resetStats() { stats_ = AgentStats(); }
+    
+    // Utility methods
+    std::string getDebugInfo() const;
+    bool validateState() const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -112,6 +137,29 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
-};
+    
+    // Thread safety
+    mutable std::mutex stateMutex_;
+    
+    // Advanced configuration parameters
+    float curiosityThreshold_;
+    float explorationBase_;
+    float motorCommandTimeout_;
+    float neuromodulationGain_;
+    double developmentRate_;
+    
+    // Statistics and debugging
+    mutable AgentStats stats_;
+    
+    // Constants for motor commands
+    static constexpr size_t NUM_MOTOR_COMMANDS = 6;
+    static constexpr float DEFAULT_EXPLORATION_CHANCE = 0.3f;
+    static constexpr float DEFAULT_ACTIVITY_THRESHOLD = 0.5f;
+    static constexpr float DEFAULT_CURIOUSNESS_THRESHOLD = 0.3f;
+    static constexpr float DEFAULT_EXPLORATION_THRESHOLD = 0.5f;
+    static constexpr float DEFAULT_NOVLEDY_DECAY = 0.99f;
+    static constexpr float DEFAULT_PLASTICITY_MODIFIER = 1.0f;
+    static constexpr double DEFAULT_DEVELOPMENT_RATE = 0.001;
+    static constexpr float DEFAULT_NEUROMODULATION_GAIN = 1.0f;
 
 } // namespace nlm
