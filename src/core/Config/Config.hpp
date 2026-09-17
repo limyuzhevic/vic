@@ -5,11 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include "ConfigParser.hpp"
 
 namespace nlm {
-
-// Forward declarations
-class Config;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -93,9 +91,14 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // ConfigParser access
+    ConfigParser& getParser() { return parser; }
+    const ConfigParser& getParser() const { return parser; }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    ConfigParser parser;
     
     // Internal helpers
     static std::string trim(const std::string& str);
