@@ -38,6 +38,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain");
         result.endTime = time(nullptr);
+        // Also set wall clock time
+        auto endWall = std::chrono::high_resolution_clock::now();
+        result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
         return result;
     }
     
