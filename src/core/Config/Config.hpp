@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <functional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -29,6 +32,29 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Configuration validation error
+struct ValidationError {
+    std::string key;
+    std::string message;
+    
+    ValidationError(const std::string& k, const std::string& m) : key(k), message(m) {}
+};
+
+// Configuration schema entry
+struct ConfigSchemaEntry {
+    std::string key;
+    std::string description;
+    ConfigValue defaultValue;
+    std::function<bool(const ConfigValue&)> validator;
+    bool required;
+    std::string typeName;
+    
+    ConfigSchemaEntry() : required(false) {}
+    ConfigSchemaEntry(const std::string& k, const std::string& d, const ConfigValue& def,
+                      const std::function<bool(const ConfigValue&)>& val, bool req, const std::string& type)
+        : key(k), description(d), defaultValue(def), validator(val), required(req), typeName(type) {}
 };
 
 // Configuration entry
@@ -58,8 +84,8 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load from JSON string
+    bool loadFromJSON(const std::string& jsonStr);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -75,6 +101,7 @@ public:
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
@@ -93,13 +120,50 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validate all configuration values
+    std::vector<ValidationError> validate() const;
+    
+    // Get configuration schema
+    const std::map<std::string, ConfigSchemaEntry>& getSchema() const { return schema; }
+    
+    // Add schema entry (for internal use)
+    void addSchemaEntry(const ConfigSchemaEntry& entry);
+    
+    // Load default configuration from file
+    bool loadDefaults(const std::string& filepath = "configs/default.cfg");
+    
+    // Convert ConfigValue to JSON
+    static nlohmann::json configValueToJSON(const ConfigValue& value);
+    
+    // Convert JSON to ConfigValue
+    static std::optional<ConfigValue> jsonToConfigValue(const nlohmann::json& json, const std::string& key = "");
+    
+    // Error recovery - fix invalid values
+    static bool fixInvalidValue(ConfigValue& value, const std::string& key = "");
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    std::map<std::string, ConfigSchemaEntry> schema;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string getTypeName(const ConfigValue& value);
+    
+    // Type conversion helpers
+    static std::optional<ConfigValue> stringToConfigValue(const std::string& str, const std::string& key = "");
+    static std::string configValueToString(const ConfigValue& value);
+    
+    // Validation helpers
+    static bool validateInt(const ConfigValue& value, const ConfigSchemaEntry& schema);
+    static bool validateDouble(const ConfigValue& value, const ConfigSchemaEntry& schema);
+    static bool validateBool(const ConfigValue& value, const ConfigSchemaEntry& schema);
+    static bool validateString(const ConfigValue& value, const ConfigSchemaEntry& schema);
+    static bool validateVector(const ConfigValue& value, const ConfigSchemaEntry& schema);
+    
+    // Initialize default schema
+    void initializeDefaultSchema();
 };
 
 } // namespace nlm

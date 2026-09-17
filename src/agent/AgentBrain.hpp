@@ -6,14 +6,73 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <string>
 
 namespace nlm {
+
+// Motor neuron distribution algorithms
+enum class MotorDistributionAlgorithm {
+    RoundRobin,
+    Balanced,
+    Random
+};
+
+// Sensory neuron grouping configuration
+struct SensoryGroupingConfig {
+    bool enableVision;
+    bool enableTouch;
+    bool enableInternal;
+    bool enableProprioception;
+    bool enableAudio;
+    
+    SensoryGroupingConfig() 
+        : enableVision(true), enableTouch(true), 
+          enableInternal(true), enableProprioception(true), enableAudio(false) {}
+};
+
+// Novelty detection weights for different modalities
+struct NoveltyWeights {
+    float vision;
+    float touch;
+    float internal;
+    float proprioception;
+    float audio;
+    
+    NoveltyWeights() 
+        : vision(1.0f), touch(0.5f), internal(0.3f), 
+          proprioception(0.4f), audio(0.2f) {}
+};
+
+// Exploration probability curve parameters
+struct ExplorationCurve {
+    enum CurveType {
+        Linear,
+        Exponential,
+        Sigmoid,
+        Logistic
+    };
+    
+    CurveType type;
+    float minExploration;
+    float maxExploration;
+    float inflectionPoint;
+    float steepness;
+    
+    ExplorationCurve() 
+        : type(CurveType::Linear), minExploration(0.1f), 
+          maxExploration(0.5f), inflectionPoint(0.5f), steepness(1.0f) {}
+};
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
+    // Constructor with configuration
+    AgentBrain(std::shared_ptr<Brain> brain,
+               const MotorDistributionAlgorithm& motorDistAlgorithm = MotorDistributionAlgorithm::RoundRobin,
+               const SensoryGroupingConfig& sensoryConfig = SensoryGroupingConfig(),
+               const NoveltyWeights& noveltyWeights = NoveltyWeights(),
+               const ExplorationCurve& explorationCurve = ExplorationCurve());
     ~AgentBrain();
     
     // Initialize with world
@@ -57,6 +116,7 @@ public:
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    const Brain* getBrain() const { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -69,12 +129,73 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // New configuration setters
+    void setMotorDistributionAlgorithm(MotorDistributionAlgorithm algorithm) { motorDistAlgorithm_ = algorithm; }
+    void setSensoryGroupingConfig(const SensoryGroupingConfig& config) { sensoryConfig_ = config; }
+    void setNoveltyWeights(const NoveltyWeights& weights) { noveltyWeights_ = weights; }
+    void setMotorCommandThreshold(float threshold) { motorCommandThreshold_ = threshold; }
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = threshold; }
+    void setExplorationCurve(const ExplorationCurve& curve) { explorationCurve_ = curve; }
+    void setExplorationBaseProbability(float prob) { explorationBaseProb_ = prob; }
+    void setNoveltyDecayRate(float decay) { noveltyDecayRate_ = decay; }
+    
+    // Novelty calculation methods
+    void computeNoveltyFromAllModalities(const SensoryPercept& percept);
+    void computeVisionNovelty(const std::vector<float>& current, const std::vector<float>& previous);
+    void computeTouchNovelty(const std::vector<float>& current, const std::vector<float>& previous);
+    void computeInternalNovelty(const std::vector<float>& current, const std::vector<float>& previous);
+    void computeProprioceptionNovelty(const std::vector<float>& current, const std::vector<float>& previous);
+    void computeAudioNovelty(const std::vector<float>& current, const std::vector<float>& previous);
+    
+    // Query methods for neuron group states
+    size_t getMotorNeuronCount(MotorCommand command) const;
+    size_t getSensoryNeuronCount(const std::string& modality) const;
+    float getNeuronGroupActivity(const std::vector<Neuron*>& group) const;
+    float getAverageMotorActivity() const;
+    float getAverageSensoryActivity() const;
+    
+    // Exploration tuning methods
+    float getExplorationProbability(float curiosity) const;
+    float calculateCuriosityFromNovelty() const;
+    MotorCommand getRandomMotorCommand() const;
+    bool shouldExplore(float curiosity) const;
+    
+    // State inspection methods
+    std::string getDistributionStats() const;
+    float getTotalSensoryActivity() const;
+    float getTotalMotorActivity() const;
+    bool isNeuronGroupEmpty(const std::vector<Neuron*>& group) const;
+    
+    // Utility methods
+    void updateDistribution();
+    void resetNoveltyHistory();
+    float getExplorationProbabilityForLevel(float curiosityLevel) const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Configuration data
+    MotorDistributionAlgorithm motorDistAlgorithm_;
+    SensoryGroupingConfig sensoryConfig_;
+    NoveltyWeights noveltyWeights_;
+    ExplorationCurve explorationCurve_;
+    
+    // Thresholds and parameters
+    float motorCommandThreshold_;
+    float curiosityThreshold_;
+    float explorationBaseProb_;
+    float noveltyDecayRate_;
+    
+    // Novelty history for all modalities
+    std::vector<float> previousVision_;
+    std::vector<float> previousTouch_;
+    std::vector<float> previousInternal_;
+    std::vector<float> previousProprioception_;
+    std::vector<float> previousAudio_;
     
     std::shared_ptr<Brain> brain_;
     
@@ -91,6 +212,7 @@ private:
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
+    std::vector<Neuron*> sensoryAudio_;
     
     // Neuromodulation state
     float dopamineLevel_;
@@ -109,8 +231,7 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
+    // Backward compatibility
     float sensoryNoveltyDecay_;
 };
 
