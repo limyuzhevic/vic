@@ -8,6 +8,8 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <stdexcept>
+#include <sstream>
 
 namespace nlm {
 
@@ -29,6 +31,201 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+/**
+ * @brief Base exception class for all NLM brain errors
+ */
+class BrainException : public std::runtime_error {
+public:
+    explicit BrainException(const std::string& message) 
+        : std::runtime_error("NLM Brain Error: " + message) {}
+    
+    explicit BrainException(const std::string& context, const std::string& message)
+        : std::runtime_error("NLM Brain Error: " + context + ": " + message) {}
+};
+
+/**
+ * @brief Exception thrown when brain initialization fails
+ */
+class InitializationException : public BrainException {
+public:
+    explicit InitializationException(const std::string& message)
+        : BrainException("Initialization", message) {}
+    
+    explicit InitializationException(const std::string& component, const std::string& message)
+        : BrainException("Initialization: " + component, message) {}
+};
+
+/**
+ * @brief Exception thrown when configuration operations fail
+ */
+class ConfigurationException : public BrainException {
+public:
+    explicit ConfigurationException(const std::string& message)
+        : BrainException("Configuration", message) {}
+    
+    explicit ConfigurationException(const std::string& key, const std::string& message)
+        : BrainException("Configuration: key=" + key, message) {}
+};
+
+/**
+ * @brief Exception thrown when neuron operations fail
+ */
+class NeuronException : public BrainException {
+public:
+    explicit NeuronException(const std::string& message)
+        : BrainException("Neuron", message) {}
+    
+    explicit NeuronException(const NeuronId& id, const std::string& message)
+        : BrainException("Neuron: id=" + std::to_string(id.value), message) {}
+};
+
+/**
+ * @brief Exception thrown when synapse operations fail
+ */
+class SynapseException : public BrainException {
+public:
+    explicit SynapseException(const std::string& message)
+        : BrainException("Synapse", message) {}
+    
+    explicit SynapseException(const SynapseId& id, const std::string& message)
+        : BrainException("Synapse: id=" + std::to_string(id.value), message) {}
+};
+
+/**
+ * @brief Exception thrown when memory operations fail
+ */
+class MemoryException : public BrainException {
+public:
+    explicit MemoryException(const std::string& message)
+        : BrainException("Memory", message) {}
+    
+    explicit MemoryException(const std::string& system, const std::string& message)
+        : BrainException("Memory: " + system, message) {}
+};
+
+/**
+ * @brief Exception thrown when plasticity operations fail
+ */
+class PlasticityException : public BrainException {
+public:
+    explicit PlasticityException(const std::string& message)
+        : BrainException("Plasticity", message) {}
+    
+    explicit PlasticityException(const std::string& rule, const std::string& message)
+        : BrainException("Plasticity: " + rule, message) {}
+};
+
+/**
+ * @brief Exception thrown when neuromodulation operations fail
+ */
+class NeuromodulationException : public BrainException {
+public:
+    explicit NeuromodulationException(const std::string& message)
+        : BrainException("Neuromodulation", message) {}
+    
+    explicit NeuromodulationException(const std::string& modulator, const std::string& message)
+        : BrainException("Neuromodulation: " + modulator, message) {}
+};
+
+/**
+ * @brief Exception thrown when world interaction fails
+ */
+class WorldException : public BrainException {
+public:
+    explicit WorldException(const std::string& message)
+        : BrainException("World", message) {}
+    
+    explicit WorldException(const std::string& operation, const std::string& message)
+        : BrainException("World: " + operation, message) {}
+};
+
+/**
+ * @brief Exception thrown when file I/O operations fail
+ */
+class IOError : public BrainException {
+public:
+    explicit IOError(const std::string& message)
+        : BrainException("File I/O", message) {}
+    
+    explicit IOError(const std::string& filepath, const std::string& message)
+        : BrainException("File I/O: " + filepath, message) {}
+};
+
+// Helper function for creating exception messages with context
+inline std::string formatError(const std::string& context, const std::string& operation, const std::string& details = "") {
+    std::ostringstream oss;
+    oss << context;
+    if (!operation.empty()) {
+        oss << ". " << operation;
+    }
+    if (!details.empty()) {
+        oss << ". " << details;
+    }
+    return oss.str();
+}
+
+// Helper function for validating preconditions
+inline void validatePrecondition(bool condition, const std::string& context, const std::string& operation) {
+    if (!condition) {
+        throw InitializationException(formatError(context, operation, "Precondition not met"));
+    }
+}
+
+// Helper function for validating configuration
+inline void validateConfig(const std::string& key, const std::string& value, const std::string& constraint) {
+    if (value.empty() && key.find("name") != std::string::npos) {
+        throw ConfigurationException(key, "Name cannot be empty");
+    }
+}
+
+// Helper function for validating neuron operations
+inline void validateNeuron(const NeuronId& id, const std::string& operation) {
+    if (id.value == 0) {
+        throw NeuronException(id, "Invalid neuron ID for " + operation);
+    }
+}
+
+// Helper function for validating synapse operations
+inline void validateSynapse(const SynapseId& id, const std::string& operation) {
+    if (id.value == 0) {
+        throw SynapseException(id, "Invalid synapse ID for " + operation);
+    }
+}
+
+// Helper function for validating file operations
+inline void validateFileOperation(const std::string& filepath, bool success, const std::string& operation) {
+    if (!success && !filepath.empty()) {
+        throw IOError(filepath, operation + " failed");
+    }
+}
+
+// Helper function for memory validation
+inline void validateMemoryAllocation(void* ptr, const std::string& context) {
+    if (!ptr) {
+        throw MemoryException(context, "Memory allocation failed");
+    }
+}
+
+// Helper function for plasticity validation
+inline void validatePlasticity(float weightChange, const std::string& rule) {
+    if (std::isnan(weightChange)) {
+        throw PlasticityException(rule, "NaN weight change detected");
+    }
+    if (std::isinf(weightChange)) {
+        throw PlasticityException(rule, "Infinite weight change detected");
+    }
+}
+
+// Helper function for neuromodulation validation
+inline void validateNeuromodulation(float level, const std::string& modulator) {
+    if (std::isnan(level)) {
+        throw NeuromodulationException(modulator, "NaN neuromodulation level");
+    }
+    if (level < 0.0f) {
+        throw NeuromodulationException(modulator, "Negative neuromodulation level: " + std::to_string(level));
+    }
+}
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -44,100 +241,7 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
-
-class Brain {
-public:
-    // Create brain with configuration
-    explicit Brain(std::shared_ptr<Config> config);
-    
-    ~Brain();
-    
-    // Disable copying, enable moving
-    Brain(const Brain&) = delete;
-    Brain& operator=(const Brain&) = delete;
-    Brain(Brain&&) noexcept;
-    Brain& operator=(Brain&&) noexcept;
-    
-    // Initialize brain with configuration
-    bool initialize();
-    
-    // Main simulation step
-    void step(SimulationStep currentStep);
-    
-    // Simulation time step
-    void step(SimulationStep currentStep, Timestamp currentTime);
-    
-    // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
-    void receiveSensoryInput(const class SensoryInput& input);
-    
-    // Inject current directly into a specific neuron
-    void injectCurrent(NeuronId neuron, MembranePotential current);
-    
-    // Inject current into all neurons of a specific type
-    void injectCurrentToNeurons(NeuronType type, MembranePotential current);
-    
-    // Spike system access
-    SpikeSystem* getSpikeSystem();
-    const SpikeSystem* getSpikeSystem() const;
-    
-    // Plasticity system access
-    STDP* getSTDP();
-    Hebbian* getHebbian();
-    StructuralPlasticity* getStructuralPlasticity();
-    
-    // Statistics
-    float getExcitationInhibitionRatio() const;
-    size_t getTotalSpikeCount() const;
-    size_t getPendingSpikeEventCount() const;
-    
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
-    
-    // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
-    
-    // Update plasticity rules (called automatically in step)
-    void updatePlasticity();
-    
-    // Apply developmental changes (called automatically in step)
-    void develop();
-    
-    // Reset brain state
-    void reset();
-    
-    // Save brain state to file (checkpointing)
-    bool save(const std::string& filepath) const;
-    
-    // Load brain state from file
-    bool load(const std::string& filepath);
-    
-    // Region management
-    RegionId addRegion(const std::string& name = "");
-    NeuralRegion* getRegion(RegionId id);
-    const NeuralRegion* getRegion(RegionId id) const;
-    size_t getRegionCount() const;
-    std::vector<RegionId> getRegionIds() const;
-    
-    // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
-    
-    // Inter-region connection management
-    void addInterRegionConnection(RegionId source, RegionId target, 
-                                  float weight = 0.0f, Delay delay = 1);
-    void removeInterRegionConnection(RegionId source, RegionId target);
-    
-    // Global statistics
-    size_t getTotalNeuronCount() const;
-    size_t getTotalSynapseCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
-    
-    // ========== MEMORY SYSTEMS ==========
+// ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
