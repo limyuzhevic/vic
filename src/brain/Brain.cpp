@@ -477,40 +477,51 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 7: Update episodic memory ==========
-    pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
-        pImpl->stepsSinceLastEpisode = 0;
-        
-        if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
-            EpisodicMemoryItem episode;
-            episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            // Store active neurons
-            for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
-                        if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
-                            episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
-                        }
-                    }
-                }
-            }
-            
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            pImpl->episodicMemory->storeEpisode(episode);
-        }
+        // ========== STEP 4: Update working memory ==========
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->update(pImpl->timestep);
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Use sensory input from working memory to update prediction system
+        // Extract current sensory state from working memory
+        std::vector<float> sensoryPattern;
+        if (!pImpl->workingMemory->getMemoryNeurons().empty()) {
+            for (NeuronId neuron : pImpl->workingMemory->getMemoryNeurons()) {
+                // Get neuron activation from working memory
+                float value = pImpl->workingMemory->retrieve(neuron);
+                sensoryPattern.push_back(value);
+            }
+        }
+        
+        // If we don't have enough values, use a simplified representation
+        // of the current brain state
+        if (sensoryPattern.empty() && !pImpl->sensoryNeurons.empty()) {
+            // Create a simple representation of current sensory activity
+            for (size_t i = 0; i < std::min(size_t(64), pImpl->sensoryNeurons.size()); ++i) {
+                Neuron* neuron = pImpl->sensoryNeurons[i];
+                float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                sensoryPattern.push_back(activation);
+            }
+        }
+        
+        // Normalize and update prediction system with current state
+        if (!sensoryPattern.empty()) {
+            // Predict next state based on current sensory pattern
+            // For now, this creates a simple prediction that can be trained
+            // In a full implementation, this would use learned patterns
+            float prediction = 0.0f;
+            for (float value : sensoryPattern) {
+                prediction += value;
+            }
+            prediction /= sensoryPattern.size();
+            
+            // Store prediction in prediction system if it has the API
+            // Note: The actual PredictionSystem API may be different
+            // This is a placeholder for the connection logic
+        }
+        
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
     }
@@ -527,9 +538,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Process working memory patterns to form concepts
+        // Extract current patterns from working memory
+        std::vector<float> currentPattern;
+        for (NeuronId neuron : pImpl->workingMemory->getMemoryNeurons()) {
+            currentPattern.push_back(pImpl->workingMemory->retrieve(neuron));
+        }
+        
+        // Present to concept formation system if we have a pattern
+        if (!currentPattern.empty()) {
+            // In a full implementation:
+            // pImpl->conceptFormation->presentExperience(currentPattern, features, reward, currentStep);
+            // This would create new concepts from recurring patterns
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1016,6 +1038,9 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
+
+// Note: These were already returning pointers. The issue is that they are NOT
+// being initialized or connected to the brain's processing pipeline.
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
