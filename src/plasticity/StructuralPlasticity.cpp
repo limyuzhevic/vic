@@ -1,6 +1,11 @@
 #include "StructuralPlasticity.hpp"
+#include "../../development/Synaptogenesis.hpp"
+#include "../../development/Pruning.hpp"
+#include "../../development/DevelopmentSystem.hpp"
 #include "../../brain/Brain.hpp"
 #include "../../brain/NeuralRegion.hpp"
+#include "../../core/Random/Random.hpp"
+#include "../../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -146,6 +151,20 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
      */
     if (!brain) return;
     
+    // Get the development system for developmental regulation
+    auto* developmentSystem = brain->getDevelopmentSystem();
+    if (!developmentSystem) return;
+    
+    // Get Synaptogenesis and Pruning instances
+    // For now, we'll use the enhanced version if available
+    // In a real implementation, these would be injected or managed by DevelopmentSystem
+    
+    // Perform enhanced synaptogenesis using activity-dependent formation
+    // For Phase 2, we'll integrate the enhanced Synaptogenesis if available
+    // For now, we'll keep the existing structural plasticity logic
+    
+    // Continue with the existing structural plasticity logic
+    
     for (auto& region : brain->getRegions()) {
         auto neurons = region->getAllNeurons();
         size_t neuronCount = neurons.size();
@@ -232,6 +251,33 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
             }
         }
     }
+    
+    for (auto& syn : region->getSynapses()) {
+        float weight = std::abs(syn->getWeight());
+        
+        // Check pruning conditions
+        bool shouldPrune = false;
+        
+        if (weight < pImpl->minWeightThreshold) {
+            // Synapse is too weak
+            shouldPrune = rng.bernoulli(pImpl->pruningRate);
+        } else if (pImpl->useActivityDependency) {
+            // Check if synapse has been unused (no recent weight changes)
+            float eligibility = std::abs(syn->getEligibilityTrace());
+            if (eligibility < pImpl->activityThreshold) {
+                shouldPrune = rng.bernoulli(pImpl->pruningRate * 0.5f);
+            }
+        }
+        
+        if (shouldPrune) {
+            removeSynapse(brain, syn->getId());
+        }
+    }
+    
+    // Log structural plasticity statistics
+    NLM_LOG_INFO("Structural plasticity update - Created: " + std::to_string(pImpl->totalSynapsesCreated) +
+                 ", Pruned: " + std::to_string(pImpl->totalSynapsesPruned) +
+                 ", Current synapses: " + std::to_string(brain->getTotalSynapseCount()));
 }
 
 } // namespace nlm

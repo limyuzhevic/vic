@@ -1,6 +1,11 @@
 #include "DevelopmentSystem.hpp"
+#include "Synaptogenesis.hpp"
+#include "Pruning.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../plasticity/StructuralPlasticity.hpp"
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
@@ -13,7 +18,7 @@ struct DevelopmentSystem::Impl {
     Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
 };
 
-DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
+DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0), synaptogenesisEfficiency_(0.0f), pruningEfficiency_(0.0f) {}
 
 DevelopmentSystem::~DevelopmentSystem() = default;
 
@@ -114,6 +119,41 @@ float DevelopmentSystem::getCriticalPeriodProgress() const {
     }
     // Progress through critical period (0 to 1)
     return std::min(1.0f, static_cast<float>(pImpl->stageAge / 300.0));
+}
+
+void DevelopmentSystem::configureStructuralPlasticity(Synaptogenesis* synaptogenesis, 
+                                                       Pruning* pruning) const {
+    if (!synaptogenesis || !pruning) return;
+    
+    float plasticityMod = getPlasticityModifier();
+    
+    // Configure synaptogenesis based on developmental stage
+    float synaptogenesisRate = 0.001f * plasticityMod;
+    float synaptogenesisTarget = 0.1f * plasticityMod;
+    
+    synaptogenesis->setFormationRate(synaptogenesisRate);
+    synaptogenesis->setTargetDensity(synaptogenesisTarget);
+    synaptogenesis->setDevelopmentalInfluence(plasticityMod);
+    synaptogenesis->setHomeostaticTarget(synaptogenesisTarget);
+    
+    NLM_LOG_DEBUG("Development: Configured synaptogenesis - rate=" + std::to_string(synaptogenesisRate) +
+                 ", target=" + std::to_string(synaptogenesisTarget) +
+                 ", influence=" + std::to_string(plasticityMod));
+    
+    // Configure pruning based on developmental stage
+    float pruningRate = 0.0001f * (2.0f - plasticityMod);  // Less pruning in high plasticity stages
+    float pruningThreshold = 0.05f / std::max(0.1f, plasticityMod);  // More pruning in high plasticity
+    
+    pruning->setPruningRate(pruningRate);
+    pruning->setThreshold(pruningThreshold);
+    pruning->setDevelopmentalInfluence(plasticityMod);
+    pruning->setHomeostaticTarget(0.1f);
+    pruning->setStrengthThreshold(0.05f);
+    pruning->setActivityThreshold(0.001f);
+    
+    NLM_LOG_DEBUG("Development: Configured pruning - rate=" + std::to_string(pruningRate) +
+                 ", threshold=" + std::to_string(pruningThreshold) +
+                 ", influence=" + std::to_string(plasticityMod));
 }
 
 } // namespace nlm

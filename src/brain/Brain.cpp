@@ -550,30 +550,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
-            }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
-        }
+        // Development affects plasticity rates - use enhanced DevelopmentSystem
+        pImpl->developmentSystem->configureStructuralPlasticity(
+            pImpl->structuralPlasticity.get(), 
+            pImpl->structuralPlasticity.get()
+        );
+        
+        // Log development stage and plasticity effects
+        NLM_LOG_INFO("Development stage: " + std::string(pImpl->developmentSystem->getStageName()) +
+                     ", plasticity modifier: " + std::to_string(pImpl->developmentSystem->getPlasticityModifier()) +
+                     ", synaptogenesis efficiency: " + std::to_string(pImpl->developmentSystem->getSynaptogenesisEfficiency()) +
+                     ", pruning efficiency: " + std::to_string(pImpl->developmentSystem->getPruningEfficiency()));
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========

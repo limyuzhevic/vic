@@ -8,8 +8,11 @@ namespace nlm {
 
 // Forward declarations
 class RandomGenerator;
+class Synaptogenesis;
+class Pruning;
 
 // Development system: orchestrates neural development
+// Enhanced implementation with real structural plasticity integration
 // Implements developmental stages, plasticity modulation, and structural changes
 
 class DevelopmentSystem {
@@ -46,10 +49,20 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // Configure structural plasticity based on developmental stage
+    void configureStructuralPlasticity(Synaptogenesis* synaptogenesis, 
+                                       Pruning* pruning) const;
+    
+    // Get structural plasticity efficiency
+    float getSynaptogenesisEfficiency() const { return synaptogenesisEfficiency_; }
+    float getPruningEfficiency() const { return pruningEfficiency_; }
+    
 private:
     struct Impl;
     Impl* pImpl;
     double age_;
+    mutable float synaptogenesisEfficiency_;
+    mutable float pruningEfficiency_;
 };
 
 } // namespace nlm

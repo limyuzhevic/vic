@@ -103,10 +103,6 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
 };
 
 // Convenience macro for file/line/function info

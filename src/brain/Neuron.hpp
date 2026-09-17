@@ -133,9 +133,20 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
+    // Update neuron for one simulation step - implement real integrate-and-fire dynamics
+    void step(Timestamp currentTime) {
+        // Phase 2: Implement real LIF dynamics using neuron parameters
+        // Uses exponential Euler integration for membrane potential update
+        TimestepDuration dt = 0.001;  // Standard 1ms timestep
+        bool fired = stepLIF(currentTime, dt);
+        
+        // Handle post-spike reset and refractory state
+        if (fired) {
+            pImpl->state.firingState = FiringState::Active;
+            // Adaptation variable increases with spike
+            pImpl->state.adaptationVariable += 1.0f;
+        }
+    }
     
     // Reset to initial state
     void reset();
