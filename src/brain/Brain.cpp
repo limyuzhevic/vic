@@ -497,6 +497,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                             episode.activeNeurons.push_back(neuron->getId());
                             episode.neuronActivations.push_back(
                                 std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                            
+                            // ALSO STORE TO WORKING MEMORY - integrate with working memory
+                            if (pImpl->workingMemory) {
+                                pImpl->workingMemory->storeToNeuron(neuron->getId(),
+                                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+                            }
                         }
                     }
                 }
@@ -605,6 +611,16 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         if (i < values.size()) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
         }
+        
+        // Inject current into this sensory neuron
+        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+        
+        // ALSO STORE TO WORKING MEMORY - integrate with working memory
+        if (pImpl->workingMemory && normalizedValue > 0.5f) {
+            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        }
+    }
+}
         
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);

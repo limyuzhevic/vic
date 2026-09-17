@@ -33,8 +33,23 @@ void Reward::reset() {
 }
 
 float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
+    // Extract data from observation
+    const SensoryInput* sensoryInput = observation.getSensoryInput();
+    if (!sensoryInput) return 0.0f;
+    
+    const auto& values = sensoryInput->getData();
+    if (values.empty()) return 0.0f;
+    
+    // Simple reward: positive if any input is above threshold
+    for (float val : values) {
+        if (val > 0.5f) return 1.0f;
+    }
+    
+    // Simple reward: negative if any input is below threshold
+    for (float val : values) {
+        if (val < -0.5f) return -1.0f;
+    }
+    
     return 0.0f;
 }
 

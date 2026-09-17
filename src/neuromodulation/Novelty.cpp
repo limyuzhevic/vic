@@ -33,9 +33,13 @@ void Novelty::setLevel(float level) {
     pImpl->level = level;
 }
 
-void Novelty::detectNovelty(const Observation& observation, 
-                            const Observation& previousObservation) {
-    // Extract features from observations and compare
+void Novelty::detectNovelty(const class Observation& observation, 
+                            const class Observation& previousObservation) {
+    // Extract data from observations
+    const auto& currentData = observation.getData();
+    const auto& previousData = previousObservation.getData();
+    
+    // Detect novelty from comparison
     // Simple implementation: just set to a placeholder
     pImpl->level = 1.0f;
     pImpl->history.push_back(pImpl->level);
