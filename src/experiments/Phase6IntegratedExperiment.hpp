@@ -28,111 +28,82 @@ namespace nlm {
 /**
  * Phase 6 integration test result
  */
-struct Phase6IntegrationResult {
-    // System integration status
-    bool memoryWorkingMemoryIntegrated;
-    bool memoryEpisodicMemoryIntegrated;
-    bool neuromodulationIntegrated;
-    bool predictionIntegrated;
-    bool developmentIntegrated;
-    bool checkpointingWorks;
-    bool replayWorks;
+// Simple sync mechanism between master and slave brains
+    bool syncComplete;
+    double syncError;
+    double syncIterations;
     
-    // Metrics
-    float totalReward;
-    float avgFiringRate;
-    float avgSynapticWeight;
-    float memoryEpisodesStored;
-    float noveltyLevel;
-    float curiosityLevel;
-    float dopamineLevel;
+    // Integration status - various systems connected?
+    bool neuralWorkingMemoryIntegrated;
+    bool neuralEpisodicMemoryIntegrated;
+    bool neuralAssociativeMemoryIntegrated;
     
-    // Timestamps
-    time_t startTime;
-    time_t endTime;
-    double totalWallClockTime;
+    // Connection metrics
+    float memoryConnectionStrength;
+    float predictionConnectionStrength;
+    float neuromodulationConnectionStrength;
+    float developmentConnectionStrength;
     
-    Phase6IntegrationResult()
-        : memoryWorkingMemoryIntegrated(false)
-        , memoryEpisodicMemoryIntegrated(false)
-        , neuromodulationIntegrated(false)
-        , predictionIntegrated(false)
-        , developmentIntegrated(false)
-        , checkpointingWorks(false)
-        , replayWorks(false)
-        , totalReward(0.0f)
-        , avgFiringRate(0.0f)
-        , avgSynapticWeight(0.0f)
-        , memoryEpisodesStored(0.0f)
-        , noveltyLevel(0.0f)
-        , curiosityLevel(0.0f)
-        , dopamineLevel(0.0f)
-        , startTime(0)
-        , endTime(0)
-        , totalWallClockTime(0.0) {}
-};
-
-/**
- * Configuration for Phase 6 integration experiment
- */
-struct Phase6Config {
-    uint64_t maxSteps;
-    size_t neuronCount;
-    size_t regionCount;
-    float connectionProbability;
-    bool enableCheckpointing;
-    bool enableReplay;
-    bool enableDevelopment;
-    std::string checkpointPath;
+    // Developmental stage comparison
+    DevelopmentalStage masterDevelopmentalStage;
+    DevelopmentalStage slaveDevelopmentalStage;
     
-    Phase6Config()
-        : maxSteps(10000)
-        , neuronCount(1000)
-        , regionCount(1)
-        , connectionProbability(0.1f)
-        , enableCheckpointing(true)
-        , enableReplay(true)
-        , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
-};
-
-/**
- * Phase 6 integrated experiment runner
- */
-class Phase6IntegratedExperiment {
-public:
-    Phase6IntegratedExperiment();
-    ~Phase6IntegratedExperiment();
-    
-    /**
-     * Run the complete integration test
-     */
-    Phase6IntegrationResult run(const Phase6Config& config);
-    
-    /**
-     * Run a simple integration verification
-     */
+    // Integration verification
     bool verifyIntegration();
     
-    /**
-     * Test memory integration
-     */
+    // Integration testing
     bool testMemoryIntegration();
-    
-    /**
-     * Test neuromodulation integration
-     */
     bool testNeuromodulationIntegration();
+    bool testPredictionIntegration();
+    bool testDevelopmentIntegration();
     
-    /**
-     * Test checkpoint save/load
-     */
-    bool testCheckpointing();
+    // Actual integration execution
+    bool integrateWorkingMemory(NeuralWorkingMemory* master, NeuralWorkingMemory* slave);
+    bool integrateEpisodicMemory(NeuralEpisodicMemory* master, NeuralEpisodicMemory* slave);
+    bool integrateAssociativeMemory(NeuralAssociativeMemory* master, NeuralAssociativeMemory* slave);
+    bool integratePredictionSystem(PredictionSystem* master, PredictionSystem* slave);
+    bool integrateNeuromodulation(Neuromodulator* master, Neuromodulator* slave);
+    bool integrateDevelopment(DevelopmentSystem* master, DevelopmentSystem* slave);
     
-    /**
-     * Test replay system
-     */
-    bool testReplay();
+    // Integration metrics
+    double computeIntegrationMetrics();
+    double computeSyncMetrics();
+    double computeConnectionMetrics();
+    
+    // Data collection for integration
+    IntegrationData collectMasterData();
+    IntegrationData collectSlaveData();
+    IntegrationData computeDifference(const IntegrationData& master, const IntegrationData& slave);
+    
+    // Output and visualization
+    void outputIntegrationReport();
+    void outputSyncReport();
+    void outputConnectionReport();
+    
+    // Debugging and monitoring
+    void monitorIntegration();
+    bool checkIntegrationHealth();
+    
+    // Phase 6 specific integration tests
+    bool runPhase6StressTest();
+    bool runPhase6ConsistencyTest();
+    bool runPhase6PerformanceTest();
+    
+    // Cross-system validation
+    bool validateNeuralConsistency();
+    bool validateMemoryConsistency();
+    bool validatePredictionConsistency();
+    bool validateDevelopmentConsistency();
+    
+    // Learning and adaptation
+    void learnFromMasterSlaveDifference();
+    void adaptConnectionWeights();
+    void updateIntegrationParameters();
+    
+    // Maintenance and cleanup
+    void cleanupSlaveBrain();
+    void resetIntegration();
+    void shutdownIntegration();
 };
 
 } // namespace nlm

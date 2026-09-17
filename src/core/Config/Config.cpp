@@ -3,6 +3,10 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <variant>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -19,9 +23,67 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PHASE 2: Implement proper JSON/YAML parser support
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    // Try to determine file type by extension
+    std::string ext = "." + filepath.substr(filepath.find_last_of(".") + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    bool success = false;
+    if (ext == ".json") {
+        success = loadFromJSON(filepath);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        success = loadFromYAML(filepath);
+    } else {
+        // Default to simple key=value format for backward compatibility
+        success = loadFromSimpleFormat(filepath);
+    }
+    
+    return success;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        nlohmann::json j;
+        file >> j;
+        
+        // Recursively load JSON into config
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            std::string key = it.key();
+            loadJSONValueRecursive(key, it.value());
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        // Fall back to simple format if JSON parsing fails
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    try {
+        YAML::Node doc = YAML::LoadFile(filepath);
+        
+        // Recursively load YAML into config
+        loadYAMLNodeRecursive("", doc);
+        
+        return true;
+    } catch (const std::exception& e) {
+        // Fall back to simple format if YAML parsing fails
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -53,6 +115,255 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
+}
+
+void Config::loadJSONValueRecursive(const std::string& prefix, const nlohmann::json& value) {
+    if (value.is_object()) {
+        for (auto it = value.begin(); it != value.end(); ++it) {
+            std::string key = prefix.empty() ? it.key() : prefix + "." + it.key();
+            loadJSONValueRecursive(key, it.value());
+        }
+    } else if (value.is_array()) {
+        // For arrays, convert to string representation
+        std::string key = prefix + "[]";
+        set(key, value.dump(), ConfigSource::File);
+    } else {
+        // For primitive types, set the value
+        setValueFromJSON(prefix, value);
+    }
+}
+
+void Config::loadYAMLNodeRecursive(const std::string& prefix, const YAML::Node& node) {
+    if (node.IsMap()) {
+        for (auto it = node.begin(); it != node.end(); ++it) {
+            std::string key = prefix.empty() ? it->first.Get<std::string>() : prefix + "." + it->first.Get<std::string>();
+            loadYAMLNodeRecursive(key, it->second);
+        }
+    } else if (node.IsSequence()) {
+        // For sequences, convert to string representation
+        std::string key = prefix + "[]";
+        set(key, node.As<std::string>(), ConfigSource::File);
+    } else {
+        // For scalar types, set the value
+        setValueFromYAML(prefix, node);
+    }
+}
+
+void Config::setValueFromJSON(const std::string& key, const nlohmann::json& value) {
+    if (value.is_string()) {
+        set(key, value.get<std::string>(), ConfigSource::File);
+    } else if (value.is_number_integer()) {
+        set(key, value.get<int64_t>(), ConfigSource::File);
+    } else if (value.is_number_float()) {
+        set(key, value.get<double>(), ConfigSource::File);
+    } else if (value.is_boolean()) {
+        set(key, value.get<bool>(), ConfigSource::File);
+    } else {
+        // For complex types, convert to string representation
+        set(key, value.dump(), ConfigSource::File);
+    }
+}
+
+void Config::setValueFromYAML(const std::string& key, const YAML::Node& node) {
+    if (node.IsScalar()) {
+        std::string value = node.Scalar();
+        // Try to infer type
+        if (value == "true" || value == "false") {
+            set(key, value == "true", ConfigSource::File);
+        } else {
+            try {
+                // Try to parse as number
+                size_t pos;
+                int intVal = std::stoi(value, &pos);
+                if (pos == value.size()) {
+                    set(key, intVal, ConfigSource::File);
+                    return;
+                }
+                double doubleVal = std::stod(value, &pos);
+                if (pos == value.size()) {
+                    set(key, doubleVal, ConfigSource::File);
+                    return;
+                }
+            } catch (...) {
+                // Not a number, keep as string
+            }
+            set(key, value, ConfigSource::File);
+        }
+    }
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Determine file type by extension
+    std::string ext = "." + filepath.substr(filepath.find_last_of(".") + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    bool success = false;
+    if (ext == ".json") {
+        success = saveToJSON(filepath);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        success = saveToYAML(filepath);
+    } else {
+        // Default to simple key=value format for backward compatibility
+        success = saveToSimpleFormat(filepath);
+    }
+    
+    return success;
+}
+
+bool Config::saveToJSON(const std::string& filepath) const {
+    try {
+        nlohmann::json j;
+        
+        // Convert config entries to JSON
+        for (const auto& entry : pImpl->entries) {
+            nlohmann::json& current = j;
+            // Split key by dots to create nested structure
+            std::string key = entry.key;
+            size_t dotPos = key.find('.');
+            while (dotPos != std::string::npos) {
+                std::string part = key.substr(0, dotPos);
+                key = key.substr(dotPos + 1);
+                if (!current.contains(part)) {
+                    current[part] = nlohmann::json::object();
+                }
+                current = current[part];
+                dotPos = key.find('.');
+            }
+            
+            setValueToJSON(current, entry.key, entry.value);
+        }
+        
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        file << j.dump(4); // Pretty print with 4-space indentation
+        return true;
+    } catch (const std::exception& e) {
+        // Fall back to simple format if JSON saving fails
+        return saveToSimpleFormat(filepath);
+    }
+}
+
+bool Config::saveToYAML(const std::string& filepath) const {
+    try {
+        YAML::Emitter out;
+        
+        // Convert config entries to YAML
+        std::string currentPath;
+        for (const auto& entry : pImpl->entries) {
+            std::string key = entry.key;
+            std::vector<std::string> parts;
+            size_t pos = 0;
+            while (pos < key.length()) {
+                size_t dotPos = key.find('.', pos);
+                if (dotPos == std::string::npos) {
+                    parts.push_back(key.substr(pos));
+                    break;
+                }
+                parts.push_back(key.substr(pos, dotPos - pos));
+                pos = dotPos + 1;
+            }
+            
+            // Navigate/create YAML structure
+            YAML::Emitter current = out;
+            for (size_t i = 0; i < parts.size() - 1; ++i) {
+                current << YAML::BeginMap;
+                current << YAML::Key << parts[i];
+                current << YAML::Value;
+                current = YAML::Emitter();
+            }
+            
+            // Set the value
+            setValueToYAML(current, parts.back(), entry.value);
+        }
+        
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        out << YAML::Doc;
+        file << out.c_str();
+        return true;
+    } catch (const std::exception& e) {
+        // Fall back to simple format if YAML saving fails
+        return saveToSimpleFormat(filepath);
+    }
+}
+
+bool Config::saveToSimpleFormat(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << entry.key << " = " << getValueString(entry.value) << "\n";
+    }
+    
+    return true;
+}
+
+void Config::setValueToJSON(nlohmann::json& parent, const std::string& key, const ConfigValue& value) const {
+    std::visit([&parent, &key](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            parent[key] = arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            parent[key] = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            parent[key] = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            parent[key] = arg;
+        } else {
+            // For complex types, convert to string representation
+            parent[key] = "PLACEHOLDER_VALUE";
+        }
+    }, value);
+}
+
+void Config::setValueToYAML(YAML::Emitter& parent, const std::string& key, const ConfigValue& value) const {
+    std::visit([&parent, &key](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            parent << YAML::Key << key;
+            parent << YAML::Value << arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            parent << YAML::Key << key;
+            parent << YAML::Value << static_cast<int>(arg);
+        } else if constexpr (std::is_same_v<T, double>) {
+            parent << YAML::Key << key;
+            parent << YAML::Value << arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            parent << YAML::Key << key;
+            parent << YAML::Value << arg;
+        } else {
+            // For complex types, use placeholder
+            parent << YAML::Key << key;
+            parent << YAML::Value << "PLACEHOLDER_VALUE";
+        }
+    }, value);
+}
+
+std::string Config::getValueString(const ConfigValue& value) const {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

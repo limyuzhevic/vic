@@ -175,6 +175,15 @@ public:
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Noradrenaline - arousal and vigilance
+    Norepinephrine* getNoradrenaline();
+    
+    // Serotonin - mood and behavioral flexibility
+    Serotonin* getSerotonin();
+    
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
     

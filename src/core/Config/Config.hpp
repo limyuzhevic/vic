@@ -55,13 +55,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON, YAML, and simple formats)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (supports JSON, YAML, and simple formats)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -97,7 +97,26 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
-    // Internal helpers
+    // Internal helpers for format-specific operations
+    bool loadFromSimpleFormat(const std::string& filepath);
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    
+    bool saveToSimpleFormat(const std::string& filepath) const;
+    bool saveToJSON(const std::string& filepath) const;
+    bool saveToYAML(const std::string& filepath) const;
+    
+    void loadJSONValueRecursive(const std::string& prefix, const nlohmann::json& value);
+    void loadYAMLNodeRecursive(const std::string& prefix, const YAML::Node& node);
+    
+    void setValueFromJSON(const std::string& key, const nlohmann::json& value);
+    void setValueFromYAML(const std::string& key, const YAML::Node& node);
+    
+    void setValueToJSON(nlohmann::json& parent, const std::string& key, const ConfigValue& value) const;
+    void setValueToYAML(YAML::Emitter& parent, const std::string& key, const ConfigValue& value) const;
+    
+    std::string getValueString(const ConfigValue& value) const;
+    
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
