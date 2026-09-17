@@ -1,11 +1,13 @@
+// Novelty.hpp
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <memory>
 
 namespace nlm {
 
-// Novelty detection signal
-// Computes novelty from comparison with previous observations
+// Novelty: Novelty detection and exploration driver
+// Detects unexpected sensory input and drives exploration behavior
 
 class Novelty {
 public:
@@ -13,30 +15,23 @@ public:
     ~Novelty();
     
     // Initialize with brain reference
-    void initialize(class Brain* brain);
+    void initialize(Brain* brain);
     
-    // Get novelty level
+    // Detect novelty from sensory input
+    void detectNovelty(const SensoryInput& input);
+    
+    // Get current novelty level
     float getLevel() const;
-    void setLevel(float level);
     
-    // Detect novelty from observation
-    void detectNovelty(const class Observation& observation, 
-                       const class Observation& previousObservation);
+    // Get contribution to prediction error
+    float getPredictionErrorContribution() const;
     
-    // Detect novelty from sensory input pattern
-    void detectNovelty(const std::vector<float>& currentPattern,
-                       const std::vector<float>& previousPattern);
-    
-    // Decay novelty over time
+    // Update novelty system state
     void update(TimestepDuration dt);
-    
-    // Get novelty history
-    const std::vector<float>& getHistory() const;
-    void clearHistory();
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

@@ -1,11 +1,13 @@
+// Curiosity.hpp
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <memory>
 
 namespace nlm {
 
-// Curiosity drive: exploration motivation based on novelty and prediction error
-// Computed as weighted combination of novelty and prediction error
+// Curiosity: Exploration motivation system
+// Combines novelty detection and prediction error to drive exploration
 
 class Curiosity {
 public:
@@ -13,27 +15,23 @@ public:
     ~Curiosity();
     
     // Initialize with brain reference
-    void initialize(class Brain* brain);
+    void initialize(Brain* brain);
     
-    // Get curiosity level
+    // Get current curiosity level
     float getLevel() const;
     
-    // Update curiosity based on novelty and prediction error
-    void update(float novelty, float predictionError, TimestepDuration dt);
+    // Get exploration bias for action selection
+    float getExplorationBias() const;
     
-    // Get exploration drive (same as level)
-    float getExplorationDrive() const;
+    // Get plasticity factor for learning
+    float getPlasticityFactor() const;
     
-    // Set curiosity parameters
-    void setNoveltyWeight(float weight);
-    void setPredictionErrorWeight(float weight);
-    
-    // Reset
-    void reset();
+    // Update curiosity system state
+    void update(TimestepDuration dt);
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

@@ -1,38 +1,46 @@
+// Reward.hpp
 #pragma once
 
-#include "Neuromodulator.hpp"
+#include "../core/Types/Types.hpp"
+#include <memory>
 
 namespace nlm {
 
-// Reward signal for reinforcement learning
-// PLACEHOLDER - Phase 2 will implement real reward computation
+// Reward: Reward prediction error signal from dopamine system
+// Integrates prediction error with synaptic eligibility traces for learning
 
 class Reward {
 public:
     Reward();
     ~Reward();
     
-    // Get current reward value
-    float getValue() const;
-    void setValue(float value);
+    // Initialize with brain reference
+    void initialize(Brain* brain);
     
-    // Accumulate reward
-    void add(float delta);
+    // Signal received reward
+    void signalReward(float reward);
     
-    // Reset accumulated reward
-    void reset();
+    // Signal reward prediction error
+    void signalRewardPredictionError(float error);
     
-    // Compute reward from environment state
-    // TODO PHASE 2: Implement real reward computation
-    float computeReward(const class Observation& observation) const;
+    // Get current reward level
+    float getLevel() const;
     
-    // Reward history
-    const std::vector<float>& getHistory() const;
-    void clearHistory();
+    // Get expected reward
+    float getExpectedReward() const;
+    
+    // Get prediction error
+    float getPredictionError() const;
+    
+    // Get plasticity factor for STDP
+    float getPlasticityFactor() const;
+    
+    // Update reward system state
+    void update(TimestepDuration dt);
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

@@ -1,3 +1,4 @@
+// Novelty.cpp - Implementation
 #include "Novelty.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
@@ -6,14 +7,14 @@
 namespace nlm {
 
 struct Novelty::Impl {
-    class Brain* brain;
-    float level;
-    float decayRate;
-    std::vector<float> history;
-    std::vector<float> lastPattern;
-    float noveltyThreshold;
+    Brain* brain;
+    float noveltyLevel;
+    std::vector<float> recentSensoryHistory;
+    size_t historySize;
     
-    Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
+    Impl() : brain(nullptr), noveltyLevel(0.0f), historySize(100) {
+        recentSensoryHistory.resize(historySize, 0.0f);
+    }
 };
 
 Novelty::Novelty() : pImpl(new Impl) {}
@@ -22,63 +23,55 @@ Novelty::~Novelty() = default;
 
 void Novelty::initialize(Brain* brain) {
     pImpl->brain = brain;
-    NLM_LOG_INFO("Novelty detection initialized");
+    NLM_LOG_INFO("Novelty detection system initialized");
 }
 
-float Novelty::getLevel() const {
-    return pImpl->level;
-}
-
-void Novelty::setLevel(float level) {
-    pImpl->level = level;
-}
-
-void Novelty::detectNovelty(const Observation& observation, 
-                            const Observation& previousObservation) {
-    // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
-    pImpl->history.push_back(pImpl->level);
-}
-
-void Novelty::detectNovelty(const std::vector<float>& currentPattern,
-                            const std::vector<float>& previousPattern) {
-    if (currentPattern.empty() || previousPattern.empty()) {
-        pImpl->level = 0.0f;
-        return;
+void Novelty::detectNovelty(const SensoryInput& input) {
+    if (!pImpl->brain) return;
+    
+    const auto& newInput = input.getData();
+    
+    // Calculate difference from recent history
+    float avgPrevious = 0.0f;
+    for (float val : pImpl->recentSensoryHistory) {
+        avgPrevious += val;
+    }
+    avgPrevious /= pImpl->recentSensoryHistory.size();
+    
+    // Novelty is based on deviation from average
+    float sumDiff = 0.0f;
+    for (size_t i = 0; i < newInput.size() && i < pImpl->recentSensoryHistory.size(); ++i) {
+        sumDiff += std::abs(newInput[i] - pImpl->recentSensoryHistory[i]);
     }
     
-    // Compute difference between patterns
-    float totalDiff = 0.0f;
-    size_t compareLen = std::min(currentPattern.size(), previousPattern.size());
-    
-    for (size_t i = 0; i < compareLen; ++i) {
-        float diff = std::abs(currentPattern[i] - previousPattern[i]);
-        totalDiff += diff;
+    if (!pImpl->recentSensoryHistory.empty()) {
+        float avgDiff = sumDiff / pImpl->recentSensoryHistory.size();
+        pImpl->noveltyLevel = std::min(1.0f, avgDiff * 10.0f); // Scale factor
     }
     
-    // Normalize by pattern size
-    float avgDiff = totalDiff / compareLen;
-    
-    // Update novelty level based on difference
-    pImpl->level = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
-    pImpl->history.push_back(pImpl->level);
-    
-    // Store current pattern for next comparison
-    pImpl->lastPattern = currentPattern;
+    // Store for next comparison
+    if (!pImpl->recentSensoryHistory.empty() && !newInput.empty()) {
+        size_t idx = pImpl->recentSensoryHistory.size() - 1;
+        for (size_t i = 0; i < newInput.size() && i < pImpl->recentSensoryHistory.size(); ++i) {
+            pImpl->recentSensoryHistory[i] = newInput[i];
+        }
+    }
 }
 
 void Novelty::update(TimestepDuration dt) {
-    // Decay novelty
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    if (!pImpl->brain) return;
+    
+    // Decay novelty level
+    pImpl->noveltyLevel *= 0.9f;
 }
 
-const std::vector<float>& Novelty::getHistory() const {
-    return pImpl->history;
+float Novelty::getLevel() const {
+    return pImpl->noveltyLevel;
 }
 
-void Novelty::clearHistory() {
-    pImpl->history.clear();
+float Novelty::getPredictionErrorContribution() const {
+    // Novelty contributes to prediction error
+    return pImpl->noveltyLevel * 0.5f;
 }
 
 } // namespace nlm
