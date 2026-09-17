@@ -258,6 +258,12 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);
+    
+    // Initialize neuromodulation systems with their parameters
+    pImpl->dopamine->configure(0.1f, 1.0f);  // baseline, scale
+    pImpl->novelty->configure(0.01f, 0.1f);  // sensitivity, decay
+    pImpl->predictionError->configure(0.1f, 0.5f);  // threshold, learning_rate
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -717,12 +723,127 @@ std::unique_ptr<class Action> Brain::produceAction() {
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
+    // Apply neuromodulatory effects on plasticity
     float modulation = signal.getLevel();
     
     // Scale STDP learning rates
     pImpl->stdp->setLTPWeight(0.01f * modulation);
     pImpl->stdp->setLTDWeight(0.012f * modulation);
+}
+
+// ========== INTEGRATED UTILITY METHODS ==========
+
+// Connect sensory input to working memory for storage and later retrieval
+void Brain::connectSensoryToWorkingMemory() {
+    if (pImpl->workingMemory) {
+        // Register callback to store sensory input in working memory
+        pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+            // If this is from a sensory neuron, store in working memory
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                if (neuron->getId() == event.source_neuron) {
+                    pImpl->workingMemory->storeToNeuron(event.source_neuron, event.weight * 10.0f);
+                    break;
+                }
+            }
+        });
+    }
+}
+
+// Connect working memory to attention for selective focus
+void Brain::connectWorkingMemoryToAttention() {
+    if (pImpl->workingMemory && pImpl->attention) {
+        pImpl->workingMemory->registerUpdateCallback([this]() {
+            std::vector<NeuronId> activeNeurons = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(activeNeurons);
+        });
+    }
+}
+
+// Connect attention to concept formation for pattern discovery
+void Brain::connectAttentionToConceptFormation() {
+    if (pImpl->attention && pImpl->conceptFormation) {
+        pImpl->attention->registerFocusCallback([this](const std::vector<NeuronId>& focusNeurons) {
+            pImpl->conceptFormation->updatePatternDatabase(focusNeurons);
+        });
+    }
+}
+
+// Connect concept formation to planning
+void Brain::connectConceptFormationToPlanning() {
+    if (pImpl->conceptFormation && pImpl->planner) {
+        pImpl->conceptFormation->registerPatternCallback([this](const Concept& concept) {
+            pImpl->planner->addConceptToPlanning(concept);
+        });
+    }
+}
+
+// Connect planning to action selection
+void Brain::connectPlanningToActionSelection() {
+    if (pImpl->planner) {
+        pImpl->planner->registerActionCallback([this](const Action& action) {
+            // Planning directly affects motor neuron group bias
+            if (action.type == ActionType::MoveForward) {
+                pImpl->injectCurrentToNeurons(NeuronType::Motor, 1.0f);
+            } else if (action.type == ActionType::TurnLeft) {
+                pImpl->injectCurrentToNeurons(NeuronType::Motor, 0.5f);
+            }
+        });
+    }
+}
+
+// Connect episodic memory to prediction system
+void Brain::connectEpisodicMemoryToPrediction() {
+    if (pImpl->episodicMemory && pImpl->predictionSystem) {
+        pImpl->episodicMemory->registerEpisodeCallback([this](const EpisodicMemoryItem& episode) {
+            pImpl->predictionSystem->trainFromEpisode(episode);
+        });
+    }
+}
+
+// Connect prediction error to neuromodulation for learning
+void Brain::connectPredictionErrorToNeuromodulation() {
+    if (pImpl->predictionError && pImpl->dopamine) {
+        pImpl->predictionError->registerErrorCallback([this](float error) {
+            pImpl->dopamine->setLevel(error);
+        });
+    }
+}
+
+// Connect novelty detection to curiosity for exploration
+void Brain::connectNoveltyToCuriosity() {
+    if (pImpl->novelty && pImpl->curiosity) {
+        pImpl->novelty->registerNoveltyCallback([this](float novelty) {
+            pImpl->curiosity->setCuriosityLevel(novelty);
+        });
+    }
+}
+
+// Connect development system to plasticity modulation
+void Brain::connectDevelopmentToPlasticity() {
+    if (pImpl->developmentSystem && pImpl->stdp && pImpl->hebbian) {
+        pImpl->developmentSystem->registerStageCallback([this](DevelopmentalStage stage) {
+            pImpl->developmentalStage = stage;
+            // Update plasticity parameters based on developmental stage
+            float plasticityMod = 1.0f;
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    plasticityMod = 1.0f;  // High plasticity
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    plasticityMod = 0.8f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    plasticityMod = 0.5f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    plasticityMod = 0.2f;
+                    break;
+            }
+            // Apply developmental modulation to plasticity rules
+            pImpl->stdp->setLearningRate(pImpl->stdp->getLearningRate() * plasticityMod);
+            pImpl->hebbian->setLearningRate(pImpl->hebbian->getLearningRate() * plasticityMod);
+        });
+    }
 }
 
 void Brain::updatePlasticity() {
@@ -1017,9 +1138,13 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
+// ========== PREDICTION SYSTEM ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
+    return pImpl->predictionSystem.get();
+}
+
+const PredictionSystem* Brain::getPredictionSystem() const {
     return pImpl->predictionSystem.get();
 }
 
