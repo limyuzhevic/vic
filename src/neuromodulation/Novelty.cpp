@@ -33,6 +33,10 @@ void Novelty::setLevel(float level) {
     pImpl->level = level;
 }
 
+NeuromodulatorType Novelty::getType() const {
+    return NeuromodulatorType::Novelty;
+}
+
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
     // Extract features from observations and compare

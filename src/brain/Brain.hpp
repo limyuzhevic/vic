@@ -11,24 +11,6 @@
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
-
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -147,6 +129,12 @@ public:
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    
+    // Semantic memory - gradually acquired knowledge
+    NeuralSemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - learned skills and habits
+    NeuralProceduralMemory* getProceduralMemory();
     
     // ========== PREDICTION SYSTEM ==========
     

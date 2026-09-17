@@ -1,11 +1,10 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
+#include <vector>
 
 namespace nlm {
-
-// Prediction error signal for curiosity and learning
-// Computes difference between predicted and actual values
 
 class PredictionError {
 public:
@@ -13,7 +12,7 @@ public:
     ~PredictionError();
     
     // Initialize with brain reference
-    void initialize(class Brain* brain);
+    void initialize(Brain* brain);
     
     // Get error value
     float getError() const;
@@ -31,9 +30,15 @@ public:
     // Get error magnitude for neuromodulation
     float getMagnitude() const;
     
+    // Integrate with memory systems
+    void integrateWithMemory(const std::vector<float>& workingMemoryState, 
+                             float neuromodulationSignal);
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
+    
+    Brain* brain_;
 };
 
 } // namespace nlm

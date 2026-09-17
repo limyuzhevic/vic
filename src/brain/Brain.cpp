@@ -32,6 +32,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<NeuralSemanticMemory> semanticMemory;
+    std::unique_ptr<NeuralProceduralMemory> proceduralMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -108,10 +110,9 @@ struct Brain::Impl {
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        // Create neural memory systems
+        semanticMemory = std::make_unique<NeuralSemanticMemory>();
+        proceduralMemory = std::make_unique<NeuralProceduralMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -390,8 +391,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     
                     // Store to working memory - neurons that fire become part of working memory
                     if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                        float activation = std::abs(state.membranePotential - state.restingPotential) / 10.0f;
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), activation);
+                        
+                        // Enhanced integration: also update semantic memory
+                        if (pImpl->semanticMemory && neuron->getNeuronType() == NeuronType::Internal) {
+                            // Store internal neuron firing as semantic pattern
+                            std::string factKey = "neuron_" + std::to_string(neuron->getId().index()) + "_firing_rate_" + std::to_string(activation);
+                            pImpl->semanticMemory->storeFact(factKey, 
+                                "firing_rate_" + std::to_string(activation) + ",_type_internal");
+                        }
+                        
+                        // Update prediction system with neuron firing
+                        if (pImpl->predictionSystem) {
+                            // Prediction error: unexpected neuron firing
+                            pImpl->predictionSystem->updatePredictionError(0.1f * (1.0f - activation));
+                        }
                     }
                 }
             }
@@ -404,6 +419,53 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Enhanced integration: update semantic memory based on working memory content
+        if (pImpl->semanticMemory) {
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            if (!memoryNeurons.empty()) {
+                // Extract semantic patterns from working memory
+                std::vector<float> patterns = pImpl->workingMemory->retrieve();
+                for (size_t i = 0; i < std::min(patterns.size(), memoryNeurons.size()); ++i) {
+                    if (patterns[i] > 0.1f) {
+                        // Store pattern as semantic fact
+                        std::string factKey = "wm_pattern_" + std::to_string(i) + "_activation_" + std::to_string(patterns[i]);
+                        pImpl->semanticMemory->storeFact(factKey, 
+                            "activation_" + std::to_string(patterns[i]) + ",_neurons_" + std::to_string(memoryNeurons[i].index()));
+                    }
+                }
+            }
+        }
+        
+        // Enhanced integration: pass working memory state to episodic memory
+        if (pImpl->episodicMemory) {
+            // Check for working memory consolidation - if strong enough, create episode
+            if (pImpl->workingMemory->getMemoryActivity() > 0.3f) {
+                // Create a memory-based episode
+                EpisodicMemoryItem episode;
+                episode.timestamp = currentStep;
+                episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                
+                // Store working memory neurons as episode content
+                const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+                const auto& memoryActivations = pImpl->workingMemory->retrieve();
+                
+                if (!memoryNeurons.empty() && memoryActivations.size() == memoryNeurons.size()) {
+                    episode.activeNeurons = memoryNeurons;
+                    episode.neuronActivations = memoryActivations;
+                    
+                    // Check if this is part of an action sequence
+                    if (pImpl->predictionSystem && pImpl->predictionSystem->getPredictionError() > 0.5f) {
+                        episode.action = ActionType::Explore;  // Default action
+                    }
+                    
+                    pImpl->episodicMemory->storeEpisode(episode);
+                    
+                    // Increase relevance for this episode (memory-based consolidation)
+                    pImpl->episodicMemory->updateRelevance(currentStep, 0.2f);
+                }
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -436,6 +498,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                 }
             }
+        }
+        
+        // Enhanced integration: Dopamine modulates memory consolidation
+        if (pImpl->workingMemory && pImpl->episodicMemory) {
+            float memoryConsolidation = dopamineLevel * 0.3f;
+            if (memoryConsolidation > 0.1f) {
+                // Weaken weak episodic memories (consolidate only strong ones)
+                pImpl->episodicMemory->consolidate(0.2f + memoryConsolidation * 0.3f);
+                
+                // Strengthen working memory traces
+                pImpl->workingMemory->strengthenMemory(1.0f + memoryConsolidation * 0.5f);
+            }
+        }
+    }
+    
+    // Enhanced integration: Neuromodulators affect semantic memory
+    if (pImpl->novelty) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        if (noveltyLevel > 0.5f && pImpl->semanticMemory) {
+            // Novelty updates semantic memory - new facts added
+            std::string factKey = "novelty_" + std::to_string(static_cast<int>(currentStep)) + "_level_" + std::to_string(noveltyLevel);
+            pImpl->semanticMemory->storeFact(factKey, 
+                "novelty_level_" + std::to_string(noveltyLevel) + ",_time_" + std::to_string(currentStep));
         }
     }
     
@@ -511,8 +596,31 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
+        // Update predictions with current sensory observations
         // For now, just track prediction error history
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Update prediction error based on working memory
+            std::vector<float> currentPatterns = pImpl->workingMemory->retrieve();
+            float predictionError = 0.0f;
+            for (float pattern : currentPatterns) {
+                predictionError += std::abs(pattern - 0.5f);  // Compare to baseline expectation
+            }
+            if (!currentPatterns.empty()) {
+                predictionError /= currentPatterns.size();
+                pImpl->predictionSystem->updatePredictionError(predictionError);
+            }
+        }
+        
+        // Enhanced integration: Use prediction errors to update semantic memory
+        if (pImpl->dopamine && pImpl->semanticMemory) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (predictionError > 0.5f) {
+                // Store prediction error as a semantic learning opportunity
+                std::string factKey = "prediction_error_" + std::to_string(currentStep) + "_value_" + std::to_string(predictionError);
+                pImpl->semanticMemory->storeFact(factKey, 
+                    "prediction_error_" + std::to_string(predictionError) + ",_dopamine_" + std::to_string(pImpl->dopamine->getLevel()));
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -523,13 +631,37 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Enhanced integration: Feed attention winners into semantic memory
+            if (pImpl->semanticMemory) {
+                const auto& winners = pImpl->attention->getWinners();
+                for (const NeuronId& winner : winners) {
+                    if (pImpl->workingMemory->contains(winner)) {
+                        float activation = pImpl->workingMemory->getNeuronActivation(winner);
+                        std::string factKey = "attention_winner_" + std::to_string(winner.index()) + "_activation_" + std::to_string(activation);
+                        pImpl->semanticMemory->storeFact(factKey,
+                            "winner_activation_" + std::to_string(activation) + ",_attention_focus");
+                    }
+                }
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
+        // Concept formation would process current neural activity patterns to form concepts
         // This requires sensory state encoding
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Present working memory content to concept formation
+            std::vector<float> patterns = pImpl->workingMemory->retrieve();
+            if (!patterns.empty()) {
+                // Get dopamine reward signal
+                float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                
+                // Present pattern to concept formation system
+                pImpl->conceptFormation->presentExperience(patterns, patterns, reward, currentStep);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -717,12 +849,79 @@ std::unique_ptr<class Action> Brain::produceAction() {
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
+    // Apply comprehensive neuromodulation effects on brain systems
     float modulation = signal.getLevel();
     
     // Scale STDP learning rates
     pImpl->stdp->setLTPWeight(0.01f * modulation);
     pImpl->stdp->setLTDWeight(0.012f * modulation);
+    
+    // Apply neuromodulation to prediction error system
+    if (pImpl->predictionError) {
+        // Prediction error is modulated by neuromodulation
+        float errorModulation = modulation * 0.5f;
+        pImpl->predictionError->computeError(
+            pImpl->predictionError->getError(),
+            pImpl->predictionError->getError() + errorModulation
+        );
+    }
+    
+    // Apply neuromodulation to memory systems
+    if (modulation > 0.5f) {
+        // Strong neuromodulation enhances memory consolidation
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->strengthenMemory(1.0f + modulation * 0.3f);
+        }
+        
+        if (pImpl->episodicMemory) {
+            // Consolidate episodic memories
+            pImpl->episodicMemory->consolidate(0.3f + modulation * 0.4f);
+        }
+        
+        if (pImpl->semanticMemory) {
+            // Update semantic memory with new learning opportunities
+            std::string factKey = "neuromod_consolidation_" + std::to_string(static_cast<int>(pImpl->currentStep)) + "_level_" + std::to_string(modulation);
+            pImpl->semanticMemory->storeFact(factKey,
+                "consolidation_level_" + std::to_string(modulation) + ",_memory_boost");
+        }
+    }
+    
+    // Dopamine affects working memory through prediction error
+    if (signal.getType() == NeuromodulatorType::Dopamine && pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        if (pImpl->workingMemory) {
+            // Dopamine enhances working memory encoding
+            pImpl->workingMemory->strengthenMemory(1.0f + dopamineLevel * 0.5f);
+        }
+        
+        // Also affects episodic memory relevance
+        if (pImpl->episodicMemory) {
+            pImpl->episodicMemory->updateRelevance(pImpl->currentStep, dopamineLevel * 0.2f);
+        }
+    }
+    
+    // Novelty affects semantic memory
+    if (signal.getType() == NeuromodulatorType::Novelty && pImpl->novelty) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        if (pImpl->semanticMemory) {
+            std::string factKey = "novelty_learning_" + std::to_string(static_cast<int>(pImpl->currentStep)) + "_level_" + std::to_string(noveltyLevel);
+            pImpl->semanticMemory->storeFact(factKey,
+                "novelty_level_" + std::to_string(noveltyLevel) + ",_new_knowledge");
+        }
+    }
+    
+    // Curiosity affects concept formation
+    if (signal.getType() == NeuromodulatorType::Curiosity && pImpl->curiosity) {
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        if (pImpl->conceptFormation && pImpl->workingMemory) {
+            // Trigger concept exploration based on working memory patterns
+            std::vector<float> patterns = pImpl->workingMemory->retrieve();
+            if (!patterns.empty()) {
+                float reward = curiosityLevel * 0.5f;
+                pImpl->conceptFormation->presentExperience(patterns, patterns, reward, pImpl->currentStep);
+            }
+        }
+    }
 }
 
 void Brain::updatePlasticity() {
@@ -756,6 +955,8 @@ void Brain::reset() {
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+    if (pImpl->semanticMemory) pImpl->semanticMemory->clear();
+    if (pImpl->proceduralMemory) pImpl->proceduralMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
     
     NLM_LOG_INFO("NLM Brain reset complete");
@@ -858,6 +1059,23 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
+        // Create memory systems if they don't exist
+        if (!pImpl->workingMemory) {
+            pImpl->workingMemory = std::make_unique<NeuralWorkingMemory>();
+        }
+        if (!pImpl->episodicMemory) {
+            pImpl->episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        }
+        if (!pImpl->semanticMemory) {
+            pImpl->semanticMemory = std::make_unique<NeuralSemanticMemory>();
+        }
+        if (!pImpl->proceduralMemory) {
+            pImpl->proceduralMemory = std::make_unique<NeuralProceduralMemory>();
+        }
+        
+        // Reset brain to initial state
+        reset();
+        
         // Read neurons
         NeuronCheckpointData neuronData;
         if (!reader.readNeurons(neuronData)) {
@@ -895,9 +1113,111 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - need to find matching synapses and update weights
+        for (size_t i = 0; i < synapseData.sourceNeuron.size() && i < synapseData.weight.size(); ++i) {
+            RegionId sourceRegion(synapseData.sourceNeuron[i].index() / 1000);
+            RegionId targetRegion(synapseData.destinationNeuron[i].index() / 1000);
+            
+            auto* sourceRegionPtr = getRegion(sourceRegion);
+            auto* targetRegionPtr = getRegion(targetRegion);
+            
+            if (sourceRegionPtr && targetRegionPtr) {
+                // Find the source and target neurons
+                auto sourceNeurons = sourceRegionPtr->getAllNeurons();
+                auto targetNeurons = targetRegionPtr->getAllNeurons();
+                
+                NeuronId sourceId(synapseData.sourceNeuron[i]);
+                NeuronId targetId(synapseData.destinationNeuron[i]);
+                
+                Neuron* sourceNeuron = nullptr;
+                Neuron* targetNeuron = nullptr;
+                
+                for (auto* n : sourceNeurons) {
+                    if (n->getId() == sourceId) {
+                        sourceNeuron = n;
+                        break;
+                    }
+                }
+                
+                for (auto* n : targetNeurons) {
+                    if (n->getId() == targetId) {
+                        targetNeuron = n;
+                        break;
+                    }
+                }
+                
+                if (sourceNeuron && targetNeuron) {
+                    // Find or create synapse
+                    auto sourceSynapses = sourceNeuron->getOutgoingSynapses();
+                    Synapse* existingSyn = nullptr;
+                    
+                    for (auto* syn : sourceSynapses) {
+                        if (syn->getDestinationNeuron() == targetId) {
+                            existingSyn = syn;
+                            break;
+                        }
+                    }
+                    
+                    if (existingSyn) {
+                        // Update existing synapse
+                        existingSyn->setWeight(synapseData.weight[i]);
+                        existingSyn->setDelay(synapseData.delay[i]);
+                        existingSyn->setType(static_cast<SynapseType>(synapseData.synapseType[i]));
+                        existingSyn->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                    }
+                }
+            }
+        }
+        
+        // Restore working memory, episodic memory, and other systems from checkpoint if available
+        
+        if (reader.hasWorkingMemoryData()) {
+            auto workingMemData = reader.readWorkingMemory();
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->restoreFromCheckpoint(workingMemData);
+                NLM_LOG_INFO("Restored working memory from checkpoint");
+            }
+        }
+        
+        if (reader.hasEpisodicMemoryData()) {
+            auto episodicMemData = reader.readEpisodicMemory();
+            if (pImpl->episodicMemory) {
+                pImpl->episodicMemory->restoreFromCheckpoint(episodicMemData);
+                NLM_LOG_INFO("Restored episodic memory from checkpoint");
+            }
+        }
+        
+        if (reader.hasSemanticMemoryData()) {
+            auto semanticMemData = reader.readSemanticMemory();
+            if (pImpl->semanticMemory) {
+                pImpl->semanticMemory->restoreFromCheckpoint(semanticMemData);
+                NLM_LOG_INFO("Restored semantic memory from checkpoint");
+            }
+        }
+        
+        if (reader.hasProceduralMemoryData()) {
+            auto proceduralMemData = reader.readProceduralMemory();
+            if (pImpl->proceduralMemory) {
+                pImpl->proceduralMemory->restoreFromCheckpoint(proceduralMemData);
+                NLM_LOG_INFO("Restored procedural memory from checkpoint");
+            }
+        }
+        
+        if (reader.hasPredictionSystemData()) {
+            auto predictionData = reader.readPredictionSystem();
+            if (pImpl->predictionSystem) {
+                pImpl->predictionSystem->restoreFromCheckpoint(predictionData);
+                NLM_LOG_INFO("Restored prediction system from checkpoint");
+            }
+        }
+        
+        if (reader.hasNeuromodulatorData("dopamine")) {
+            auto dopamineData = reader.readNeuromodulatorData("dopamine");
+            if (pImpl->dopamine) {
+                pImpl->dopamine->restoreFromCheckpoint(dopamineData);
+                NLM_LOG_INFO("Restored dopamine from checkpoint");
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -1003,8 +1323,6 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
-
 NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
 }
@@ -1015,6 +1333,16 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+}
+
+// Semantic memory accessor
+NeuralSemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+// Procedural memory accessor
+NeuralProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========

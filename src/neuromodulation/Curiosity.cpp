@@ -31,6 +31,10 @@ float Curiosity::getLevel() const {
     return pImpl->level;
 }
 
+NeuromodulatorType Curiosity::getType() const {
+    return NeuromodulatorType::Curiosity;
+}
+
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
     // Curiosity increases with novelty and prediction error
     float target = pImpl->noveltyWeight * novelty + 

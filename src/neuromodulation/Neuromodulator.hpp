@@ -6,6 +6,16 @@
 
 namespace nlm {
 
+// Neuromodulator type enumeration
+enum class NeuromodulatorType {
+    Dopamine,
+    Curiosity,
+    Novelty,
+    Acetylcholine,
+    Norepinephrine,
+    Serotonin
+};
+
 // Neuromodulator: Abstract base for neuromodulatory signals
 // PLACEHOLDER - Phase 2 will implement real neuromodulation effects
 
@@ -19,6 +29,9 @@ public:
     // Get current concentration/level
     virtual float getLevel() const = 0;
     virtual void setLevel(float level) = 0;
+    
+    // Get neuromodulator type
+    virtual NeuromodulatorType getType() const = 0;
     
     // Apply neuromodulatory effect to plasticity
     // TODO PHASE 2: Implement real modulation
@@ -41,6 +54,7 @@ public:
     const char* getName() const override;
     float getLevel() const override;
     void setLevel(float level) override;
+    NeuromodulatorType getType() const override;
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
@@ -60,6 +74,7 @@ public:
     const char* getName() const override { return "ACh"; }
     float getLevel() const override { return 0.0f; }
     void setLevel(float level) override {}
+    NeuromodulatorType getType() const override { return NeuromodulatorType::Acetylcholine; }
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
 };
@@ -71,6 +86,7 @@ public:
     const char* getName() const override { return "NE"; }
     float getLevel() const override { return 0.0f; }
     void setLevel(float level) override {}
+    NeuromodulatorType getType() const override { return NeuromodulatorType::Norepinephrine; }
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
 };
@@ -82,6 +98,7 @@ public:
     const char* getName() const override { return "5-HT"; }
     float getLevel() const override { return 0.0f; }
     void setLevel(float level) override {}
+    NeuromodulatorType getType() const override { return NeuromodulatorType::Serotonin; }
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
 };

@@ -41,6 +41,11 @@ float PredictionSystem::getPredictionError() const {
     return pImpl->predictionError;
 }
 
+void PredictionSystem::updatePredictionError(float error) {
+    pImpl->predictionError = error;
+    pImpl->errorHistory.push_back(error);
+}
+
 float PredictionSystem::getConfidence() const {
     return pImpl->confidence;
 }
