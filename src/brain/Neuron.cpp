@@ -214,24 +214,18 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
     // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // I/C gives V in mV when I is in pA and C is in nF
+    // For millisecond time units, we need I/C * 1000 to convert to mV/ms
+    float synapticContribution = pImpl->synapticInput / C * 1000.0f;  // Convert to mV/ms
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Leak contribution (unit: mV/ms)
+    float leakContribution = (V_rest - V) / tau;  // (mV)/(ms) = mV/ms
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // dt is in seconds, but our rate contributions are in mV/ms, so convert dt to milliseconds
+    float dt_ms = static_cast<float>(dt) * 1000.0f;  // Convert seconds to ms
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
-    }
-    
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
-    
-    // Check for spike
+    // Check for spike (compare with old value BEFORE adaptation changes)
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
@@ -240,7 +234,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Record spike
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential to reset value
         V = V_reset;
         
         // Enter refractory period
@@ -250,8 +244,19 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
+        // Neuron is active but not firing (just crossed threshold)
         pImpl->state.firingState = FiringState::Active;
+        
+        // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+        // Only applies when neuron is not in refractory period and not spiking
+        if (pImpl->state.adaptationVariable > 0.0f) {
+            V -= pImpl->state.adaptationVariable * 0.01f;
+            pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        }
     }
+    
+    // Clamp membrane potential to prevent instability
+    V = std::clamp(V, -100.0f, 50.0f);
     
     // Clear synaptic input for next step
     pImpl->synapticInput = 0.0f;

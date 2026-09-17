@@ -412,38 +412,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
-        
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
-                    }
+    // Apply dopamine effects on neural excitability and plasticity
+    // Dopamine modulates neural excitability by adjusting effective current injection
+    // Higher dopamine increases excitability (lower effective threshold)
+    float dopamineLevel = pImpl->dopamine->getLevel();
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                // Dopamine modulates excitability by injecting additional current
+                // Positive dopamine adds excitatory bias
+                float excitabilityMod = dopamineLevel * 0.5f;
+                if (excitabilityMod > 0.0f) {
+                    neuron->injectCurrent(excitabilityMod);
                 }
             }
         }
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        // Get plasticity factor from dopamine (if available, otherwise use level)
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        // Use dopamine level as plasticity modifier (0.1 to 2.0 range)
+        plasticityMod = std::clamp(1.0f + dopamineLevel, 0.1f, 2.0f);
     }
     
     for (auto& region : pImpl->regions) {
