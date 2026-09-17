@@ -21,6 +21,58 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Build options
+option(BUILD_PYTHON_BINDINGS "Build Python bindings for NLM" ON)
+option(BUILD_PYTHON_TESTS "Build Python test suite" OFF)
+option(BUILD_EXAMPLES "Build example applications" ON)
+option(BUILD_DEMOS "Build demo applications" ON)
+option(BUILD_UNIT_TESTS "Build unit tests" ON)
+option(ENABLE_PERFORMANCE_OPTIMIZATIONS "Enable performance optimizations" ON)
+option(ENABLE_EXPERIMENTAL "Enable experimental features" OFF)
+option(ENABLE_DEVELOPMENT_MODES "Enable development modes for better debugging" OFF)
+
+# Documentation options
+option(BUILD_DOCUMENTATION "Build documentation" ON)
+option(BUILD_API_REFERENCE "Build API reference documentation" OFF)
+
+# Installation options
+set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "Installation prefix")
+set(NLM_INSTALL_PYTHON_PACKAGE "ON" CACHE STRING "Install Python package")
+
+# Performance optimization flags
+if(ENABLE_PERFORMANCE_OPTIMIZATIONS)
+    add_compile_options(-O3 -march=native -flto)
+    add_link_options(-flto)
+    
+    # Additional optimization flags
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        add_compile_options(-ffast-math -funroll-loops -fomit-frame-pointer)
+    endif()
+endif()
+
+# Debug build options
+if(ENABLE_DEVELOPMENT_MODES)
+    add_compile_options(-g -O0 -DDEBUG)
+    add_definitions(-D_DEBUG -DDEVELOPMENT_MODE)
+    
+    # Development-specific options
+    add_compile_options(-Wconversion -Wsign-conversion -Wshadow)
+    add_definitions(-DENABLE_ASSERTIONS)
+endif()
+
+# Enable CTest integration
+include(CTest)
+
+# Set output directories
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
+# Add python bindings if enabled
+if(BUILD_PYTHON_BINDINGS)
+    add_subdirectory(python)
+endif()
+
 # Core library
 add_library(nlm_core STATIC
     # Core

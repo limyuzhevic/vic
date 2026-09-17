@@ -4,6 +4,14 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
 #include <memory>
 #include <vector>
 
@@ -11,6 +19,7 @@ namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Integrates cognitive systems (NeuralPlanner, ConceptFormation, SelfModel, SocialLearning)
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -76,7 +85,17 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Cognitive system integration
+    void integrateCognitiveSystems();
+    void updateCognitiveSystems();
+    
     std::shared_ptr<Brain> brain_;
+    
+    // Cognitive system pointers (accessed via brain_)
+    NeuralPlanner* neuralPlanner_;
+    ConceptFormation* conceptFormation_;
+    SelfModel* selfModel_;
+    SocialLearning* socialLearning_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -112,6 +131,10 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Cognitive state
+    std::vector<float> currentSensoryPattern_;
+    size_t currentConceptId_;
 };
 
 } // namespace nlm

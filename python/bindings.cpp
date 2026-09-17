@@ -398,7 +398,57 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Advanced cognitive system access
+        .def("getWorkingMemorySize", &AgentBrain::getWorkingMemorySize,
+             "Get size of working memory traces")
+        .def("getEpisodicMemoryCount", &AgentBrain::getEpisodicMemoryCount,
+             "Get number of episodic memory episodes")
+        .def("getAssociativeMemoryStrength", &AgentBrain::getAssociativeMemoryStrength,
+             "Get average associative memory strength")
+        .def("getPlannerDepth", &AgentBrain::getPlannerDepth,
+             "Get planning depth")
+        .def("setPlannerDepth", &AgentBrain::setPlannerDepth, py::arg("depth"),
+             "Set planning depth")
+        .def("getCuriosityDrivenExploration", &AgentBrain::getCuriosityDrivenExploration,
+             "Check if curiosity is driving exploration")
+        .def("getPredictionAccuracy", &AgentBrain::getPredictionAccuracy,
+             "Get prediction accuracy")
+        .def("getLearningRate", &AgentBrain::getLearningRate,
+             "Get current learning rate")
+        .def("setLearningRate", &AgentBrain::setLearningRate, py::arg("rate"),
+             "Set learning rate")
+        .def("getExperienceCount", &AgentBrain::getExperienceCount,
+             "Get number of experiences recorded")
+        .def("getConceptCount", &AgentBrain::getConceptCount,
+             "Get number of discovered concepts")
+        .def("getSocialLearningCount", &AgentBrain::getSocialLearningCount,
+             "Get number of social learning observations")
+        .def("getDevelopmentalProgress", &AgentBrain::getDevelopmentalProgress,
+             "Get developmental progress (0-1)")
+        .def("getMemoryEfficiency", &AgentBrain::getMemoryEfficiency,
+             "Get memory efficiency score")
+        .def("getPredictionErrorHistory", &AgentBrain::getPredictionErrorHistory,
+             "Get prediction error history vector")
+        .def("clearShortTermMemory", &AgentBrain::clearShortTermMemory,
+             "Clear short-term memory")
+        .def("consolidateMemory", &AgentBrain::consolidateMemory,
+             "Force memory consolidation")
+        .def("getAttentionFocus", &AgentBrain::getAttentionFocus,
+             "Get current attention focus")
+        .def("setAttentionFocus", &AgentBrain::setAttentionFocus, py::arg("focus"),
+             "Set attention focus (0-1)")
+        .def("getSelfModelConfidence", &AgentBrain::getSelfModelConfidence,
+             "Get self-model confidence")
+        .def("getSocialLearningEnabled", &AgentBrain::getSocialLearningEnabled,
+             "Check if social learning is enabled")
+        .def("enableSocialLearning", &AgentBrain::enableSocialLearning, py::arg("enable"),
+             "Enable or disable social learning")
+        .def("getImitationAbility", &AgentBrain::getImitationAbility,
+             "Get imitation ability (0-1)")
+        .def("getTheoryOfMind", &AgentBrain::getTheoryOfMind,
+             "Get theory of mind level (0-1)");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

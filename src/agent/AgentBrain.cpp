@@ -1,5 +1,11 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../cognition/DevelopmentSystem.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -7,6 +13,10 @@ namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
+    , neuralPlanner_(nullptr)
+    , conceptFormation_(nullptr)
+    , selfModel_(nullptr)
+    , socialLearning_(nullptr)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -19,7 +29,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , currentConceptId_(0)
 {
+    // Initialize cognitive systems
+    integrateCognitiveSystems();
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -63,10 +77,48 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 
 AgentBrain::~AgentBrain() = default;
 
+void AgentBrain::integrateCognitiveSystems() {
+    if (!brain_) return;
+    
+    // Get cognitive systems from brain
+    neuralPlanner_ = brain_->getPlanner();
+    conceptFormation_ = brain_->getConceptFormation();
+    selfModel_ = brain_->getSelfModel();
+    socialLearning_ = brain_->getSocialLearning();
+    
+    NLM_LOG_INFO("AgentBrain integrated cognitive systems:");
+    NLM_LOG_INFO("  - NeuralPlanner: " + std::string(neuralPlanner_ ? "YES" : "NO"));
+    NLM_LOG_INFO("  - ConceptFormation: " + std::string(conceptFormation_ ? "YES" : "NO"));
+    NLM_LOG_INFO("  - SelfModel: " + std::string(selfModel_ ? "YES" : "NO"));
+    NLM_LOG_INFO("  - SocialLearning: " + std::string(socialLearning_ ? "YES" : "NO"));
+}
+
+void AgentBrain::updateCognitiveSystems() {
+    if (!brain_) return;
+    
+    // Update SelfModel with sensory consequences
+    if (selfModel_ && !currentSensoryPattern_.empty()) {
+        // Predict self-generated sensory change
+        for (size_t i = 0; i < motorForward_.size(); ++i) {
+            if (motorForward_[i]->isFiring()) {
+                // Record action effect
+                selfModel_->recordSelfAction(ActionType::MoveForward, currentSensoryPattern_, currentSensoryPattern_);
+            }
+        }
+    }
+    
+    // Update SocialLearning with observed patterns
+    if (socialLearning_ && !currentSensoryPattern_.empty()) {
+        // Could observe patterns from other agents
+    }
+}
+
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    currentSensoryPattern_.clear();
+    currentConceptId_ = 0;
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -142,11 +194,33 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
+    // Concept formation: present experience to cognitive system
+    if (conceptFormation_) {
+        // Create feature vector from sensory input
+        std::vector<float> features;
+        features.insert(features.end(), vision.begin(), vision.end());
+        features.insert(features.end(), touch.begin(), touch.end());
+        features.insert(features.end(), intern.begin(), intern.end());
+        features.insert(features.end(), proprio.begin(), proprio.end());
+        
+        // Present experience to concept formation system
+        currentSensoryPattern_ = features;
+        currentConceptId_ = conceptFormation_->presentExperience(features, features, predictionError_, 0);
+        
+        // Update self-model with this experience
+        if (selfModel_ && currentConceptId_ > 0) {
+            selfModel_->recordSelfAction(ActionType::Wait, features, features);
+        }
+    }
+    
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // Update cognitive systems
+    updateCognitiveSystems();
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
@@ -157,6 +231,48 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
+    }
+    
+    // Enhanced action selection using NeuralPlanner
+    if (neuralPlanner_ && curiosityLevel_ < 0.3f) {
+        // Use NeuralPlanner for planned action selection
+        // Convert current neural activity to state for planner
+        std::vector<float> currentState;
+        
+        // Sample motor neuron activities as state representation
+        for (auto* neuron : motorForward_) {
+            currentState.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+        }
+        for (auto* neuron : motorBackward_) {
+            currentState.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+        }
+        for (auto* neuron : motorTurnLeft_) {
+            currentState.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+        }
+        for (auto* neuron : motorTurnRight_) {
+            currentState.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+        }
+        for (auto* neuron : motorInteract_) {
+            currentState.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+        }
+        for (auto* neuron : motorWait_) {
+            currentState.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+        }
+        
+        // Use NeuralPlanner to select action
+        ActionType plannedAction = neuralPlanner_->planAction(currentState, expectedReward_);
+        
+        // Convert planner action to MotorCommand
+        switch (plannedAction) {
+            case ActionType::MoveForward: return MotorCommand::MoveForward;
+            case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+            case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+            case ActionType::TurnRight: return MotorCommand::TurnRight;
+            case ActionType::Interact: return MotorCommand::Interact;
+            case ActionType::LookLeft: return MotorCommand::LookLeft;
+            case ActionType::LookRight: return MotorCommand::LookRight;
+            default: break;
+        }
     }
     
     return decoded;
@@ -250,6 +366,18 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
+    // Apply reward to concept formation system
+    if (conceptFormation_) {
+        // Provide reward signal to concept formation for learning
+        conceptFormation_->updateConcept(currentConceptId_, currentSensoryPattern_, currentSensoryPattern_, reward);
+    }
+    
+    // Apply reward to NeuralPlanner
+    if (neuralPlanner_) {
+        // Update planner's action quality based on reward
+        neuralPlanner_->updatePlanQuality(std::vector<ActionType>(), std::vector<ActionType>(), reward);
+    }
+    
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
@@ -342,9 +470,25 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    currentSensoryPattern_.clear();
+    currentConceptId_ = 0;
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset cognitive systems
+    if (conceptFormation_) {
+        conceptFormation_->clear();
+    }
+    if (selfModel_) {
+        selfModel_->clear();
+    }
+    if (socialLearning_) {
+        socialLearning_->clear();
+    }
+    if (neuralPlanner_) {
+        neuralPlanner_->clearCache();
+    }
 }
 
 } // namespace nlm

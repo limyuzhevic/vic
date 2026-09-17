@@ -22,6 +22,8 @@ class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
+class SelfModel;
+class SocialLearning;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
