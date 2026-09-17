@@ -106,29 +106,39 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+    // Initialize memory systems for Phase 6 integration
+    // These are the primary memory systems used by the integrated brain
+    // Working memory: persistent activity traces of current experiences
+    // Episodic memory: stored episodes with temporal and causal relationships
+    // Associative memory: pattern-based associations and rule extraction
+    workingMemory = std::make_unique<NeuralWorkingMemory>();
+    episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+    associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+    
+    // Initialize prediction system for temporal anticipation
+    predictionSystem = std::make_unique<PredictionSystem>();
+    
+    // Initialize cognition systems
+    // NeuralPlanner: action planning and strategy selection
+    // ConceptFormation: pattern discovery and categorization
+    // AttentionalSelection: focus modulation and selection
+    planner = std::make_unique<NeuralPlanner>();
+    conceptFormation = std::make_unique<ConceptFormation>();
+    attention = std::make_unique<AttentionalSelection>();
+    
+    // Initialize development system
+    // Manages developmental stages, structural changes, and maturation
+    developmentSystem = std::make_unique<DevelopmentSystem>();
+    
+    // Initialize neuromodulation systems
+    // Dopamine: reward prediction error, reinforcement learning
+    // Curiosity: novelty detection and exploration motivation
+    // Novelty: change detection and adaptation signals
+    // PredictionError: model-based learning and prediction monitoring
+    dopamine = std::make_unique<Dopamine>();
+    curiosity = std::make_unique<Curiosity>();
+    predictionError = std::make_unique<PredictionError>();
+    novelty = std::make_unique<Novelty>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);

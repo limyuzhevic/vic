@@ -87,6 +87,15 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
+    // Connect to working memory for experience storage
+    if (auto* workingMemory = brain_->getWorkingMemory()) {
+        // Store sensory percept in working memory
+        auto allSignals = percept.getAllSignals();
+        if (!allSignals.empty()) {
+            workingMemory->storePercept(allSignals);
+        }
+    }
+    
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {

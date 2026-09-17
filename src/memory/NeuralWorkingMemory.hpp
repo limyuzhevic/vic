@@ -48,16 +48,30 @@ public:
     // Clear working memory
     void clear();
 
-    // Get number of active memory traces
-    size_t getActiveTraces() const { return activeTraces_.size(); }
+    // Store sensory percept in working memory
+    void storePercept(const std::vector<float>& percept) {
+        if (!brain_) return;
+        
+        // Encode percept into neural activity
+        size_t neuronsNeeded = std::min(percept.size(), memoryNeurons_.size());
+        for (size_t i = 0; i < neuronsNeeded; ++i) {
+            NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
+            float activation = percept[i] * strength_;
+            
+            // Store activation
+            if (i < memoryActivations_.size()) {
+                memoryActivations_[i] = activation;
+            } else {
+                memoryActivations_.push_back(activation);
+                memoryTimestamps_.push_back(0);
+                memoryNeurons_.push_back(neuron);
+            }
+            
+            // Inject current into neuron
+            brain_->injectCurrent(neuron, activation * 5.0f);
+        }
+    }
 
-    // Get capacity
-    size_t getCapacity() const { return capacity_; }
-    void setCapacity(size_t cap) { capacity_ = cap; }
-
-    // Decay rate for memory traces
-    float getDecayRate() const { return decayRate_; }
-    void setDecayRate(float rate) { decayRate_ = rate; }
 
     // Get neurons currently in working memory
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
