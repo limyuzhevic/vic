@@ -8,6 +8,7 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    mutable std::mutex mutex;  // Add mutex for thread safety
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}

@@ -7,7 +7,7 @@ namespace nlm {
 struct NeuralPopulation::Impl {
     PopulationId id;
     size_t size;
-    std::vector<Neuron*> neurons;
+    std::vector<std::shared_ptr<Neuron>> neurons;
     NeuronType neuronType;
     std::vector<MembranePotential> membranePotentials;  // for statistics
     
@@ -43,28 +43,28 @@ bool NeuralPopulation::isEmpty() const {
     return pImpl->neurons.empty();
 }
 
-Neuron* NeuralPopulation::getNeuron(NeuronIndex index) {
+std::shared_ptr<Neuron> NeuralPopulation::getNeuron(NeuronIndex index) {
     if (index >= pImpl->neurons.size()) {
         return nullptr;
     }
     return pImpl->neurons[index];
 }
 
-const Neuron* NeuralPopulation::getNeuron(NeuronIndex index) const {
+const std::shared_ptr<Neuron> NeuralPopulation::getNeuron(NeuronIndex index) const {
     if (index >= pImpl->neurons.size()) {
         return nullptr;
     }
     return pImpl->neurons[index];
 }
 
-void NeuralPopulation::addNeuron(Neuron* neuron) {
-    pImpl->neurons.push_back(neuron);
+void NeuralPopulation::addNeuron(std::shared_ptr<Neuron> neuron) {
+    pImpl->neurons.push_back(std::move(neuron));
     if (pImpl->size < pImpl->neurons.size()) {
         pImpl->size = pImpl->neurons.size();
     }
 }
 
-const std::vector<Neuron*>& NeuralPopulation::getNeurons() const {
+const std::vector<std::shared_ptr<Neuron>>& NeuralPopulation::getNeurons() const {
     return pImpl->neurons;
 }
 
@@ -74,8 +74,8 @@ NeuronType NeuralPopulation::getNeuronType() const {
 
 void NeuralPopulation::setNeuronType(NeuronType type) {
     pImpl->neuronType = type;
-    for (auto* neuron : pImpl->neurons) {
-        neuron->setType(type);
+    for (const auto& neuron : pImpl->neurons) {
+        if (neuron) neuron->setType(type);
     }
 }
 
@@ -104,8 +104,10 @@ float NeuralPopulation::getAverageFiringRate() const {
         return 0.0f;
     }
     float sum = 0.0f;
-    for (const auto* neuron : pImpl->neurons) {
-        sum += neuron->getFiringRate();
+    for (const auto& neuron : pImpl->neurons) {
+        if (neuron) {
+            sum += neuron->getFiringRate();
+        }
     }
     return sum / static_cast<float>(pImpl->neurons.size());
 }

@@ -8,6 +8,8 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <mutex>
+#include <atomic>
 
 namespace nlm {
 

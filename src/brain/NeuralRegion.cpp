@@ -1,6 +1,7 @@
 #include "NeuralRegion.hpp"
 #include <algorithm>
 #include <stdexcept>
+#include <mutex>
 
 namespace nlm {
 
@@ -12,6 +13,7 @@ struct NeuralRegion::Impl {
     std::unordered_map<NeuronId, std::vector<SynapseId>> outgoingSynapses;  // source -> synapse ids
     std::unordered_map<NeuronId, std::vector<SynapseId>> incomingSynapses;  // dest -> synapse ids
     SynapseId nextSynapseId;
+    mutable std::mutex mutex;  // Add mutex for thread safety
     
     explicit Impl(RegionId id) : id(id), nextSynapseId(1) {}
 };
@@ -129,6 +131,7 @@ const std::vector<std::unique_ptr<Synapse>>& NeuralRegion::getSynapses() const {
 }
 
 std::vector<Synapse*> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     std::vector<Synapse*> result;
     auto it = pImpl->outgoingSynapses.find(neuron);
     if (it != pImpl->outgoingSynapses.end()) {
@@ -142,6 +145,7 @@ std::vector<Synapse*> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
 }
 
 std::vector<Synapse*> NeuralRegion::getSynapsesTo(NeuronId neuron) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     std::vector<Synapse*> result;
     auto it = pImpl->incomingSynapses.find(neuron);
     if (it != pImpl->incomingSynapses.end()) {
@@ -297,9 +301,11 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
 
 std::vector<Neuron*> NeuralRegion::getAllNeurons() {
     std::vector<Neuron*> result;
-    for (auto& pop : pImpl->populations) {
+    for (const auto& pop : pImpl->populations) {
         auto popNeurons = pop->getNeurons();
-        result.insert(result.end(), popNeurons.begin(), popNeurons.end());
+        for (const auto& neuron : popNeurons) {
+            if (neuron) result.push_back(neuron.get());
+        }
     }
     return result;
 }
@@ -308,7 +314,9 @@ std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
     std::vector<const Neuron*> result;
     for (const auto& pop : pImpl->populations) {
         auto popNeurons = pop->getNeurons();
-        result.insert(result.end(), popNeurons.begin(), popNeurons.end());
+        for (const auto& neuron : popNeurons) {
+            if (neuron) result.push_back(neuron.get());
+        }
     }
     return result;
 }

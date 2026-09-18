@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <mutex>
 
 namespace nlm {
 
@@ -82,6 +83,9 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    mutable std::mutex mutex;  // Add mutex for thread safety
 };
+
+} // namespace nlm
 
 } // namespace nlm

@@ -31,14 +31,14 @@ public:
     bool isEmpty() const;
     
     // Neuron access
-    Neuron* getNeuron(NeuronIndex index);
-    const Neuron* getNeuron(NeuronIndex index) const;
+    std::shared_ptr<Neuron> getNeuron(NeuronIndex index);
+    const std::shared_ptr<Neuron> getNeuron(NeuronIndex index) const;
     
     // Add neuron to population
-    void addNeuron(Neuron* neuron);
+    void addNeuron(std::shared_ptr<Neuron> neuron);
     
     // Get all neurons
-    const std::vector<Neuron*>& getNeurons() const;
+    const std::vector<std::shared_ptr<Neuron>>& getNeurons() const;
     
     // Population type (all neurons in population share same type)
     NeuronType getNeuronType() const;
