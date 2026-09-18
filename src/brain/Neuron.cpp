@@ -43,7 +43,7 @@ Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        delete pImpl;  // Properly clean up existing resource
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }

@@ -3,7 +3,7 @@
 #include "../agent/SensoryPercept.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../brain/Brain.hpp"
-#include "../core/Config/Config.hpp"
+#include "../core/Config/ConfigManager.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <iostream>
 #include <fstream>
@@ -24,10 +24,12 @@ public:
         std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
         std::cout << "===========================================\n\n";
         
-        // Create configuration
-        auto config = std::make_shared<Config>();
-        configureEnvironment(config);
-        configureBrain(config);
+        // Use central ConfigManager
+        auto& configManager = ConfigManager::getInstance();
+        configManager.reset();
+        configureEnvironment(configManager.getConfig());
+        configureBrain(configManager.getConfig());
+        auto config = configManager.getConfig();
         
         // Create world
         SimpleWorld world;
