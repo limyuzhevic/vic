@@ -11,7 +11,7 @@ SensoryPercept::SensoryPercept()
     touch_.resize(8, 0.0f);
     internal_.resize(4, 0.0f);
     proprioception_.resize(6, 0.0f);
-    audio_.resize(0, 0.0f);
+    audio_.resize(8, 0.0f);  // Initialize audio with 8 channels
 }
 
 std::vector<float> SensoryPercept::getAllSignals() const {
