@@ -1,11 +1,18 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Final Integration
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
+// This phase implements the complete integrated artificial brain with:
+// - Real LIF neuron dynamics
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+// - Memory systems (working, episodic, associative)
+// - Neuromodulation (dopamine, curiosity, novelty, prediction error)
+// - Prediction systems with error signals
+// - Cognitive mechanisms (neural planning, concept formation, attention)
+// - Development system with age-dependent plasticity
+// - Replay and consolidation systems
+// - Checkpoint save/load persistence
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -32,10 +39,10 @@ void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+        ║     NLM — 熙然                                                ║
+        ║     Neural Learning Machine                                   ║
+        ║                                                               ║
+        ║     Phase 6: Final Integration                               ║
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
@@ -332,7 +339,7 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("=== NLM Phase 6: Final Integration ===");
     NLM_LOG_INFO("Implementing:");
     NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
     NLM_LOG_INFO("  - Event-driven spike propagation with delays");
