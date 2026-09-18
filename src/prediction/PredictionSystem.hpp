@@ -31,12 +31,17 @@ public:
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
     
-    // Train prediction model
-    void train(const SensoryInput& observation);
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-};
+    // Update prediction system with current state
+    void update(TimestepDuration dt);
+
+    // Set prediction error directly (used by brain integration)
+    void setPredictionError(float error) {
+        pImpl->predictionError = error;
+    }
+
+    // Set confidence level
+    void setConfidence(float confidence) {
+        pImpl->confidence = confidence;
+    }
 
 } // namespace nlm

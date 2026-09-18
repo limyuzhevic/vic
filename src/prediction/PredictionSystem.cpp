@@ -1,4 +1,6 @@
 #include "PredictionSystem.hpp"
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
@@ -13,6 +15,28 @@ struct PredictionSystem::Impl {
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
+
+void PredictionSystem::update(TimestepDuration dt) {
+    // Update prediction system state
+    // Increase confidence for good predictions, decrease for bad ones
+    pImpl->confidence = 0.5f - std::min(0.5f, pImpl->predictionError);
+    if (pImpl->confidence < 0.1f) {
+        pImpl->confidence = 0.1f;
+    }
+    
+    // Learn from prediction error for next prediction
+    // Higher error leads to more plasticity in prediction system
+    if (pImpl->predictionError > 0.5f) {
+        // Enable learning - weight updates would happen here
+        pImpl->confidence *= 0.9f;
+    } else {
+        // Good prediction - consolidate learning
+        pImpl->confidence *= 1.05f;
+    }
+    
+    // Keep confidence bounded
+    pImpl->confidence = std::min(1.0f, std::max(0.1f, pImpl->confidence));
+}
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
