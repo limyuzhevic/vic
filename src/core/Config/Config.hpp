@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -29,6 +30,17 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Parameter validation constraints
+struct ParameterConstraints {
+    std::string description;
+    std::string category;  // "neural", "plasticity", "development", "neuromodulation"
+    std::optional<double> min_value;
+    std::optional<double> max_value;
+    std::optional<std::string> unit;
+    bool is_required = false;
+    std::string default_example;
 };
 
 // Configuration entry
@@ -92,6 +104,24 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Enhanced parameter validation
+    bool validateParameter(const std::string& key, const ConfigValue& value, std::string& error) const;
+    bool validateAllParameters(std::vector<std::string>& errors) const;
+    
+    // Get parameter constraints
+    bool hasParameterConstraints(const std::string& key) const;
+    ParameterConstraints getParameterConstraints(const std::string& key) const;
+    
+    // Help system
+    std::string getHelpForParameter(const std::string& key) const;
+    std::string getHelpForCategory(const std::string& category) const;
+    std::vector<std::string> getAllCategories() const;
+    std::string getFullHelp() const;
+    
+    // Parameter metadata management
+    void registerParameter(const std::string& key, const ParameterConstraints& constraints);
+    void unregisterParameter(const std::string& key);
     
 private:
     struct Impl;
