@@ -68,8 +68,15 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
+    // Verify world dimensions match expectations
+    size_t expectedVisionSize = world.getVisionWidth() * world.getVisionHeight();
+    if (previousVision_.size() != expectedVisionSize) {
+        previousVision_.resize(expectedVisionSize, 0.0f);
+    }
+    
+    NLM_LOG_INFO("AgentBrain initialized with world dimensions: " +
+                 std::to_string(world.getVisionWidth()) + "x" + std::to_string(world.getVisionHeight()) +
+                 " vision, " + std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
 }
@@ -126,6 +133,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
+        // Ensure previousVision_ has the correct size before accessing
+        if (previousVision_.size() != vision.size()) {
+            previousVision_.resize(vision.size(), 0.0f);
+        }
+        
         float totalDiff = 0.0f;
         for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
             float diff = std::abs(vision[i] - previousVision_[i]);
