@@ -138,6 +138,15 @@ public:
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
 
+    // Update concept formation from sensory input
+    void updateFromSensory(const SensoryInput& input);
+    
+    // Update concept formation from episodic memory
+    void updateFromEpisodicMemory(const NeuralEpisodicMemory& em);
+    
+    // Get current concepts as strings
+    void getCurrentConcepts(std::vector<std::string>& concepts) const;
+
 private:
     // Create new concept from pattern
     size_t createConcept(const std::vector<float>& pattern,

@@ -8,8 +8,27 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include "../sensory/SensoryInput.hpp"
+#include "../motor/Action.hpp"
+#include "../prediction/NeuralPrediction.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 
 namespace nlm {
+
+// Event type for triggering memory replay
+enum class EventType {
+    None,
+    Reward,
+    Punishment,
+    Novelty,
+    GoalAchieved,
+    ThreatDetected,
+    SocialInteraction,
+    Exploration,
+    Pain,
+    Pleasure
+};
 
 // Forward declarations
 class Config;
@@ -106,14 +125,34 @@ public:
     // Apply developmental changes (called automatically in step)
     void develop();
     
-    // Reset brain state
+// Reset brain state
     void reset();
-    
+
     // Save brain state to file (checkpointing)
     bool save(const std::string& filepath) const;
-    
+
     // Load brain state from file
     bool load(const std::string& filepath);
+
+    // ========== SLEEP/REST CYCLE ==========
+
+    // Enter sleep mode with gradual transition
+    void enterSleepMode();
+
+    // Exit sleep mode with gradual transition
+    void exitSleepMode();
+
+    // Consolidate memories during sleep (systematic strengthening/weakening)
+    void consolidateMemoriesDuringSleep();
+
+    // Replay memories during sleep (replay selected memories)
+    void replayMemoriesDuringSleep();
+
+    // Update sleep phases (NREM, REM, transitions)
+    void updateSleepPhases();
+
+    // Check if brain is in sleep mode
+    bool isInSleepMode() const;
     
     // Region management
     RegionId addRegion(const std::string& name = "");
@@ -164,6 +203,25 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
+// ========== COGNITION SYSTEM INTEGRATION ==========
+
+    // Integrate cognition systems with memory and other brain systems
+    void integrateCognitionWithMemory(const NeuralWorkingMemory& wm, const NeuralEpisodicMemory& em);
+    void updateCognitionFromSensory(const SensoryInput& input);
+    void applyCognitionToActionSelection();
+    void updateConceptFormationFromEpisodic(const NeuralEpisodicMemory& em);
+    void updatePlanningFromRewards(float reward);
+    void applyAttentionToMemorySelection();
+    
+    // ========== NEUROMODULATION SYSTEM INTEGRATION ==========
+
+    // Integrate neuromodulation with memory systems
+    void integrateNeuromodulationWithMemory(NeuralWorkingMemory& wm, NeuralEpisodicMemory& em);
+    void updateNeuromodulationFromSensory(const SensoryInput& input);
+    void applyNeuromodulationToPlasticity();
+    void updateNeuromodulationFromPrediction(float error);
+    void updateNeuromodulationFromRewards(float reward);
+    
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
@@ -184,14 +242,102 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
-    
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
     // Logging
     void logStatus() const;
+
+    // ========== SLEEP/REST CYCLE ==========
+
+    // Enter sleep mode with gradual transition
+    void enterSleepMode();
+
+    // Exit sleep mode with gradual transition
+    void exitSleepMode();
+
+    // Consolidate memories during sleep (systematic strengthening/weakening)
+    void consolidateMemoriesDuringSleep();
+
+    // Replay memories during sleep (replay selected memories)
+    void replayMemoriesDuringSleep();
+
+    // Update sleep phases (NREM, REM, transitions)
+    void updateSleepPhases();
+
+    // Check if brain is in sleep mode
+    bool isInSleepMode() const;
+
+    // Get current sleep phase
+    std::string getSleepPhase() const;
+    
+    // Get sleep duration remaining
+    SimulationStep getSleepDurationRemaining() const;
+    
+    // Get sleep consolidation effectiveness
+    float getSleepConsolidationRate() const;
+
+private:
+    // Sleep/rest cycle state
+    bool isResting;  // For sleep/rest cycle
+    bool isSleeping; // True when in sleep mode
+    size_t stepsSinceLastEpisode;
+    size_t replayInterval;
+    size_t consolidationInterval;
+    
+    // Sleep phase tracking
+    enum SleepPhase {
+        Awake,
+        NREM1,
+        NREM2,
+        NREM3,
+        REM,
+        TransitionAwakeToSleep,
+        TransitionSleepToAwake
+    } currentSleepPhase;
+    
+    // Sleep timing
+    SimulationStep sleepStartStep;
+    SimulationStep sleepDuration;
+    SimulationStep sleepProbability;
+    
+    // Sleep consolidation parameters
+    float memoryConsolidationRate;
+    float replayStrength;
+    float pruningThreshold;
+
+public:
+    // Integrate sensory input to working memory
+    void integrateSensoryToMemory(const SensoryInput& input);
+    
+    // Update memory from attention
+    void updateMemoryFromAttention();
+    
+    // Trigger memory replay based on events
+    void triggerMemoryReplay(EventType trigger);
+    
+    // Consolidate memories
+    void consolidateMemories();
+    
+    // Update all memories from brain state
+    void updateAllMemoriesFromBrainState();
+    
+    // Integrate memories with prediction
+    void integrateMemoriesWithPrediction(const PredictionSystem& prediction);
+    
+    // ========== PREDICTION SYSTEM INTEGRATION ==========
+    
+    // Integrate prediction with sensory processing
+    void integratePredictionWithSensory(const SensoryInput& input, const PredictionSystem& prediction);
+    
+    // Update prediction from working memory content
+    void updatePredictionFromWorkingMemory(const NeuralWorkingMemory& wm);
+    
+    // Update prediction from episodic memory recall
+    void updatePredictionFromEpisodicMemory(const NeuralEpisodicMemory& em);
+    
+    // Use prediction to influence action selection
+    void applyPredictionToActionSelection();
+    
+    // Update prediction error signals
+    void updatePredictionError(float error);
     
 private:
     struct Impl;

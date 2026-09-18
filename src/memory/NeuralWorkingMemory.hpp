@@ -55,55 +55,34 @@ public:
     size_t getCapacity() const { return capacity_; }
     void setCapacity(size_t cap) { capacity_ = cap; }
 
-    // Decay rate for memory traces
-    float getDecayRate() const { return decayRate_; }
-    void setDecayRate(float rate) { decayRate_ = rate; }
+        // Update working memory from attention mechanisms
+    void updateFromAttention();
+    
+    // Integrate with attentional selection
+    void integrateWithAttention(const AttentionalSelection& attention);
+    
+    // Update from prediction system
+    void updateFromPrediction(const PredictionSystem& prediction);
 
-    // Get neurons currently in working memory
-    const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
+    // Get current memory statistics
+    size_t getUpdateCount() const { return updateCount_; }
+    
+    // Reset update counter
+    void resetUpdateCount() { updateCount_ = 0; }
 
-    // Strengthen working memory representation (for rehearsal)
-    void strengthenMemory(float factor);
-
-    // Competition between memory traces
-    void runCompetition();
-
-    // Is this neuron part of the winning population?
-    bool isWinning(NeuronId neuron) const;
-
-    // Get overall memory activity level
-    float getMemoryActivity() const;
+    // Sleep/rest cycle functions
+    void decayForSleep();
+    void reactivateAfterSleep();
 
 private:
-    // Create recurrent connection for maintenance
-    void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
-
-    // Update recurrent connections for maintenance
-    void updateRecurrentConnections();
-
-    // Decay weak memory traces
-    void decayWeakTraces();
-
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    size_t capacity_;
+    // Update counter for statistics
+    size_t updateCount_;
+    
+    // Decay rate for memory traces
     float decayRate_;
     
-    // Memory content
-    std::vector<NeuronId> memoryNeurons_;
-    std::vector<float> memoryActivations_;
-    std::vector<SimulationStep> memoryTimestamps_;
-    
-    // Active memory traces
-    std::vector<size_t> activeTraces_;
-    
-    // Recurrent connections for maintenance
-    std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
-    
-    // Winner neurons (for competition)
-    std::vector<NeuronId> winners_;
+    // Capacity limit
+    size_t capacity_;
 };
 
 // AttentionalSelection: Neural attention through competition

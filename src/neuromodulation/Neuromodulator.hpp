@@ -79,11 +79,66 @@ public:
 // PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Novelty detection for memory consolidation
+    void updateFromNovelty(bool isNovel);
+    void affectMemoryConsolidation();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Norepinephrine: Arousal and vigilance
+// PLACEHOLDER - Phase 2
+class Norepinephrine : public Neuromodulator {
+public:
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Attention modulation for memory encoding
+    void updateFromAttention(float attentionLevel);
+    void modulateEncoding();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Acetylcholine: Attention and memory consolidation
+// PLACEHOLDER - Phase 2
+class Acetylcholine : public Neuromodulator {
+public:
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Learning event for plasticity enhancement
+    void updateFromLearningEvent(float learningRate);
+    void enhancePlasticity();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

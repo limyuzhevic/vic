@@ -118,6 +118,13 @@ public:
     void enableReplay(bool enable) { replayEnabled_ = enable; }
     bool isReplayEnabled() const { return replayEnabled_; }
 
+    // Sleep/rest cycle functions
+    void setSleepConsolidation(bool enable) { sleepConsolidationEnabled_ = enable; }
+    bool isSleepConsolidationEnabled() const { return sleepConsolidationEnabled_; }
+    
+    // Replay memories during sleep (systematic consolidation)
+    void replayDuringSleep();
+
     // Get episodes for replay (selection based on relevance and recency)
     std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
 
@@ -143,6 +150,7 @@ private:
     std::deque<EpisodicMemoryItem> episodes_;
     size_t maxEpisodes_;
     bool replayEnabled_;
+    bool sleepConsolidationEnabled_;
 };
 
 // AssociativeMemory: Creates and retrieves relationships between experiences

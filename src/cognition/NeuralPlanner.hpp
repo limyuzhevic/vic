@@ -67,12 +67,14 @@ public:
         actionQuality_[static_cast<size_t>(action)] = quality;
     }
 
-    // Get current goal
-    std::vector<float> getCurrentGoal() const { return currentGoal_; }
-    void setCurrentGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
-
-    // Has recent planning been successful?
-    bool wasRecentPlanSuccessful() const;
+// Update planner with memory content
+    void updateFromMemory(const NeuralWorkingMemory& wm, const NeuralEpisodicMemory& em);
+    
+    // Update planning based on reward signals
+    void updateFromRewards(float reward);
+    
+    // Generate new action plan
+    void generateActionPlan();
 
 private:
     // Generate possible action sequences

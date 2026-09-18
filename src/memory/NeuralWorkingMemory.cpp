@@ -17,11 +17,14 @@ struct NeuralWorkingMemory::Impl {
     Impl() : brain(nullptr) {}
 };
 
+// NeuralWorkingMemory methods implementation
+
 NeuralWorkingMemory::NeuralWorkingMemory()
     : pImpl(new Impl)
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , updateCount_(0)
 {
 }
 
