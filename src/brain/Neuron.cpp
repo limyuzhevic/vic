@@ -143,6 +143,10 @@ void Neuron::injectCurrent(MembranePotential current) {
     pImpl->synapticInput += current;
 }
 
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->synapticInput;
+}
+
 void Neuron::clearTotalCurrent() {
     pImpl->synapticInput = 0.0f;
 }
@@ -260,9 +264,9 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    // Use timestep from config or default to 1ms
+    static float defaultTimestep = 0.001f;  // 1ms default
+    stepLIF(currentTime, defaultTimestep);
 }
 
 void Neuron::reset() {
