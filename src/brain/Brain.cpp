@@ -74,6 +74,7 @@ struct Brain::Impl {
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
+    bool developmentalStageChanged;  // Track if development stage has been updated this rest cycle
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
@@ -92,6 +93,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , developmentalStageChanged(false)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -477,7 +479,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 7: Update episodic memory ==========
+    // ========== STEP 7: Update episodic memory with current experience ==========
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
@@ -511,8 +513,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory observations
+        // Get recent sensory state from working memory if available
+        std::vector<float> sensoryState;
+        if (pImpl->workingMemory) {
+            sensoryState = pImpl->workingMemory->retrieve();
+        }
+        
+        // Also get motor state
+        std::vector<float> motorState;
+        if (pImpl->motorNeurons.size() > 0 && pImpl->workingMemory) {
+            // Sample motor neuron activations
+            motorState.reserve(pImpl->motorNeurons.size());
+            for (auto* neuron : pImpl->motorNeurons) {
+                float activation = neuron->getMembranePotential();
+                activation = std::clamp((activation - neuron->getRestingPotential()) / 20.0f, 0.0f, 1.0f);
+                motorState.push_back(activation);
+            }
+        }
+        
+        // Train prediction system with current state
+        pImpl->predictionSystem->train(sensoryState, motorState);
+        
+        // Get prediction error and provide to neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (pImpl->predictionError) {
+            pImpl->predictionError->setError(predictionError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +555,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Get current sensory state from working memory
+        std::vector<float> currentSensoryState;
+        if (pImpl->workingMemory) {
+            currentSensoryState = pImpl->workingMemory->retrieve();
+        }
+        
+        // Also include motor state for action-effect associations
+        std::vector<float> currentMotorState;
+        if (pImpl->motorNeurons.size() > 0 && pImpl->workingMemory) {
+            // Sample motor neuron activations
+            currentMotorState.reserve(pImpl->motorNeurons.size());
+            for (auto* neuron : pImpl->motorNeurons) {
+                float activation = neuron->getMembranePotential();
+                activation = std::clamp((activation - neuron->getRestingPotential()) / 20.0f, 0.0f, 1.0f);
+                currentMotorState.push_back(activation);
+            }
+        }
+        
+        // Form concepts from current experience
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentSensoryState, currentMotorState, 
+            pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f, currentStep);
+        
+        // Log concept formation
+        if (conceptId > 0) {
+            NLM_LOG_INFO("Brain::step: New concept formed (ID: " + std::to_string(conceptId) + ")");
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -537,13 +590,168 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+    // ========== STEP 12: Sleep/rest cycle with memory consolidation ==========
+    // Every 60 seconds (600 steps at 0.001s timestep), brain enters rest phase
+    if (currentStep % 600 == 0 && pImpl->workingMemory) {
+        pImpl->isResting = true;
+        
+        // Enhanced memory consolidation during rest
+        if (pImpl->episodicMemory) {
+            // Strong consolidation during rest
+            NLM_LOG_INFO("Brain::step: Entering rest phase for memory consolidation...");
+            pImpl->episodicMemory->consolidate(0.8f);  // Strong consolidation
         }
+        
+        // Replay important memories
+        if (pImpl->episodicMemory && currentStep > 1000) {
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+            NLM_LOG_INFO("Brain::step: Replayed " + std::to_string(episodesToReplay.size()) + 
+                        " important episodes during rest.");
+        }
+        
+        // Decay dopamine during rest (lower arousal)
+        if (pImpl->dopamine) {
+            float restDopamine = pImpl->dopamine->getLevel() * 0.5f;
+            pImpl->dopamine->setLevel(restDopamine);
+        }
+        
+        // Check for developmental milestones
+        if (currentStep >= 100000 && !pImpl->developmentalStageChanged) {
+            // Move to next developmental stage every 1 minute of rest
+            pImpl->developmentalStageChanged = true;
+            if (pImpl->developmentSystem) {
+                pImpl->developmentSystem->updateStage(this, currentStep, *pImpl->rng);
+                NLM_LOG_INFO("Brain::step: Developmental stage updated during rest.");
+            }
+        }
+    } else if (pImpl->isResting) {
+        // Still in rest phase
+        pImpl->isResting = true;
+    } else {
+        // Normal active phase
+        pImpl->isResting = false;
+    }
+    
+    // Reset developmental stage change flag each rest cycle
+    if (currentStep % 600 == 0) {
+        pImpl->developmentalStageChanged = false;
+    }
+    
+    // ========== STEP 13: Periodic memory consolidation ==========
+    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+        // Consolidate important memories, remove weak ones
+        pImpl->episodicMemory->consolidate(0.3f);
+    }
+    
+    // ========== STEP 9: Update planning system ==========
+    if (pImpl->planner) {
+        // Get current sensory state from working memory for planning context
+        std::vector<float> sensoryContext;
+        if (pImpl->workingMemory) {
+            sensoryContext = pImpl->workingMemory->retrieve();
+        }
+        
+        // Also get current developmental stage for age-appropriate planning
+        DevelopmentalStage stage = getDevelopmentalStage();
+        
+        // Plan actions based on current state and goals
+        ActionType plannedAction = pImpl->planner->planAction(sensoryContext, expectedReward_);
+        
+        // Store planned action for execution
+        // This would connect to motor system in full integration
+        if (plannedAction != ActionType::Wait) {
+            NLM_LOG_INFO("Brain::step: Planned action: " + std::to_string(static_cast<int>(plannedAction)));
+        }
+    }
+    
+    // ========== STEP 10: Update concept formation ==========
+    if (pImpl->conceptFormation) {
+        // Process current neural activity patterns to form concepts
+        // Get current sensory state from working memory
+        std::vector<float> currentSensoryState;
+        if (pImpl->workingMemory) {
+            currentSensoryState = pImpl->workingMemory->retrieve();
+        }
+        
+        // Also include motor state for action-effect associations
+        std::vector<float> currentMotorState;
+        if (pImpl->motorNeurons.size() > 0 && pImpl->workingMemory) {
+            // Sample motor neuron activations
+            currentMotorState.reserve(pImpl->motorNeurons.size());
+            for (auto* neuron : pImpl->motorNeurons) {
+                float activation = neuron->getMembranePotential();
+                activation = std::clamp((activation - neuron->getRestingPotential()) / 20.0f, 0.0f, 1.0f);
+                currentMotorState.push_back(activation);
+            }
+        }
+        
+        // Form concepts from current experience
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentSensoryState, currentMotorState, 
+            pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f, currentStep);
+        
+        // Log concept formation
+        if (conceptId > 0) {
+            NLM_LOG_INFO("Brain::step: New concept formed (ID: " + std::to_string(conceptId) + ")");
+        }
+    }
+    
+    // ========== STEP 11: Apply structural plasticity periodically ==========
+    if (currentStep % 100 == 0) {
+        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    }
+    
+    // ========== STEP 8: Sleep/rest cycle with memory consolidation ==========
+    // Every 60 seconds (600 steps at 0.001s timestep), brain enters rest phase
+    if (currentStep % 600 == 0 && pImpl->workingMemory) {
+        pImpl->isResting = true;
+        
+        // Enhanced memory consolidation during rest
+        if (pImpl->episodicMemory) {
+            // Strong consolidation during rest
+            NLM_LOG_INFO("Brain::step: Entering rest phase for memory consolidation...");
+            pImpl->episodicMemory->consolidate(0.8f);  // Strong consolidation
+        }
+        
+        // Replay important memories
+        if (pImpl->episodicMemory && currentStep > 1000) {
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+            NLM_LOG_INFO("Brain::step: Replayed " + std::to_string(episodesToReplay.size()) + 
+                        " important episodes during rest.");
+        }
+        
+        // Decay dopamine during rest (lower arousal)
+        if (pImpl->dopamine) {
+            float restDopamine = pImpl->dopamine->getLevel() * 0.5f;
+            pImpl->dopamine->setLevel(restDopamine);
+        }
+        
+        // Check for developmental milestones
+        if (currentStep >= 100000 && !pImpl->developmentalStageChanged) {
+            // Move to next developmental stage every 1 minute of rest
+            pImpl->developmentalStageChanged = true;
+            if (pImpl->developmentalSystem) {
+                pImpl->developmentalSystem->updateStage(this, currentStep, *pImpl->rng);
+                NLM_LOG_INFO("Brain::step: Developmental stage updated during rest.");
+            }
+        }
+    } else if (pImpl->isResting) {
+        // Still in rest phase
+        pImpl->isResting = true;
+    } else {
+        // Normal active phase
+        pImpl->isResting = false;
+    }
+    
+    // Reset developmental stage change flag each rest cycle
+    if (currentStep % 600 == 0) {
+        pImpl->developmentalStageChanged = false;
     }
     
     // ========== STEP 13: Apply development effects ==========

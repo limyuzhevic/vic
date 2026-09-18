@@ -1,7 +1,8 @@
-#include "NeuralPlanner.hpp"
+//include "SelfModel.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -29,7 +30,7 @@ void NeuralPlanner::initialize(Brain* brain) {
 }
 
 ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
-                                    float targetReward) {
+                                     float targetReward) {
     // Generate possible action sequences
     auto sequences = generateActionSequences(planningDepth_);
     
@@ -170,7 +171,7 @@ float NeuralPlanner::evaluateAction(ActionType action, const std::vector<float>&
 }
 
 std::vector<float> NeuralPlanner::predictNextState(ActionType action,
-                                                  const std::vector<float>& currentState) {
+                                                   const std::vector<float>& currentState) {
     // Use simple action-consequence prediction
     // In a full implementation, this would use learned forward models
     
@@ -219,8 +220,8 @@ std::vector<float> NeuralPlanner::predictNextState(ActionType action,
 }
 
 void NeuralPlanner::updatePlanQuality(const std::vector<ActionType>& plannedActions,
-                                     const std::vector<ActionType>& actualActions,
-                                     float actualReward) {
+                                   const std::vector<ActionType>& actualActions,
+                                   float actualReward) {
     // Update action quality based on how well plan worked
     size_t minLen = std::min(plannedActions.size(), actualActions.size());
     
@@ -255,16 +256,38 @@ bool NeuralPlanner::wasRecentPlanSuccessful() const {
 // SelfModel Implementation
 struct SelfModel::Impl {
     Brain* brain;
+    float capabilityLevel;
+    float bodyAwareness;
+    float agency;
+    float confidence;
     
-    Impl() : brain(nullptr) {}
+    // Action-effect associations for self-model
+    std::unordered_map<uint64_t, std::vector<ActionEffect>> actionEffects;
+    
+    // Self-location tracking (for spatial representation)
+    std::vector<NeuronId> bodyNeurons;
+    std::pair<float, float> currentPosition;
+    
+    // Experience history for self-model updates
+    std::vector<std::vector<float>> experienceBuffer;
+    SimulationStep experienceBufferSize;
+    
+    Impl() : brain(nullptr), capabilityLevel(0.5f), bodyAwareness(0.5f), agency(0.5f), confidence(0.5f),
+             experienceBufferSize(100) {
+        actionEffects.reserve(10);  // 10 action types
+    }
 };
 
 SelfModel::SelfModel()
     : pImpl(new Impl)
     , brain_(nullptr)
     , capabilityLevel_(0.5f)
+    , bodyAwareness_(0.5f)
+    , agency_(0.5f)
+    , confidence_(0.5f)
+    , experienceBuffer_(100)
 {
-    actionEffects_.resize(10);  // 10 action types
+    NLM_LOG_INFO("SelfModel initialized for self-representation and experience tracking");
 }
 
 SelfModel::~SelfModel() = default;
@@ -272,12 +295,28 @@ SelfModel::~SelfModel() = default;
 void SelfModel::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("SelfModel initialized");
+    
+    // Initialize with brain reference for better self-model updates
+    if (brain) {
+        // Connect to neuromodulation systems
+        auto* dopamine = brain->getDopamine();
+        if (dopamine) {
+            // Integrate with dopamine for agency and motivation updates
+        }
+        
+        // Connect to working memory for experience updates
+        auto* workingMemory = brain->getWorkingMemory();
+        if (workingMemory) {
+            // Integrate with working memory for self-model updates
+        }
+    }
+    
+    NLM_LOG_INFO("SelfModel initialized for self-representation and experience tracking");
 }
 
 void SelfModel::recordSelfAction(ActionType action,
-                                const std::vector<float>& beforeState,
-                                const std::vector<float>& afterState) {
+                                 const std::vector<float>& beforeState,
+                                 const std::vector<float>& afterState) {
     size_t actionIdx = static_cast<size_t>(action);
     if (actionIdx >= actionEffects_.size()) return;
     
@@ -291,7 +330,7 @@ void SelfModel::recordSelfAction(ActionType action,
     for (const auto& prev : actionEffects_[actionIdx]) {
         if (computeSimilarity(beforeState, prev.beforeState) > 0.8f) {
             consistency = std::max(consistency, 
-                computeSimilarity(afterState, prev.afterState));
+                                 computeSimilarity(afterState, prev.afterState));
             effect.observationCount += prev.observationCount;
         }
     }
@@ -299,7 +338,7 @@ void SelfModel::recordSelfAction(ActionType action,
     
     actionEffects_[actionIdx].push_back(effect);
     
-    // Update capability level
+    // Update capability level based on successful action execution
     float totalConfidence = 0.0f;
     size_t count = 0;
     for (const auto& effects : actionEffects_) {
@@ -311,6 +350,15 @@ void SelfModel::recordSelfAction(ActionType action,
     if (count > 0) {
         capabilityLevel_ = totalConfidence / count;
     }
+    
+    // Update body awareness if this action involves movement
+    if (isMovementAction(action)) {
+        updateBodyAwareness(action, beforeState, afterState);
+    }
+    
+    // Log self-model update
+    NLM_LOG_INFO("SelfModel: Recorded action " + std::to_string(static_cast<int>(action)) +
+                " (confidence: " + std::to_string(consistency) + ")");
 }
 
 std::vector<float> SelfModel::predictActionConsequence(ActionType action,
@@ -335,13 +383,13 @@ float SelfModel::getSelfModelConfidence(ActionType action) const {
     return totalConf / effects.size();
 }
 
-float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeState,
-                                              const std::vector<float>& afterState,
-                                              ActionType action) const {
+void SelfModel::computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
+                                            const std::vector<float>& afterState,
+                                            ActionType action) const {
     // If we have a good prediction for this action, it's likely self-generated
     auto predicted = findMatchingEffect(action, beforeState);
     
-    if (predicted.empty()) return 0.0f;
+    if (predicted.empty()) return;
     
     float similarity = computeSimilarity(predicted, afterState);
     return similarity;
@@ -386,21 +434,93 @@ void SelfModel::updateSelfModel(const std::vector<float>& predicted,
             effect.confidence = std::max(0.1f, effect.confidence);
         }
     }
+    
+    // Update overall capability based on prediction accuracy
+    float predictionAccuracy = computeSimilarity(predicted, actual);
+    capabilityLevel_ = capabilityLevel_ * 0.9f + predictionAccuracy * 0.1f;
 }
 
 float SelfModel::getBodyAwareness() const {
-    return capabilityLevel_;
+    return bodyAwareness_;
 }
 
-void SelfModel::clear() {
-    for (auto& effects : actionEffects_) {
-        effects.clear();
+void SelfModel::updateBodyAwareness(ActionType action,
+                                     const std::vector<float>& beforeState,
+                                     const std::vector<float>& afterState) {
+    // Body awareness is updated when we perform movement actions
+    // and observe the consequences
+    float stateChange = 0.0f;
+    if (beforeState.size() == afterState.size()) {
+        for (size_t i = 0; i < beforeState.size(); ++i) {
+            stateChange += std::abs(afterState[i] - beforeState[i]);
+        }
+        stateChange /= beforeState.size();
     }
-    capabilityLevel_ = 0.5f;
+    
+    bodyAwareness_ = bodyAwareness_ * 0.9f + stateChange * 0.1f;
+    bodyAwareness_ = std::clamp(bodyAwareness_, 0.0f, 1.0f);
+}
+
+bool SelfModel::isMovementAction(ActionType action) const {
+    switch (action) {
+        case ActionType::MoveForward:
+        case ActionType::MoveBackward:
+        case ActionType::TurnLeft:
+        case ActionType::TurnRight:
+        case ActionType::LookLeft:
+        case ActionType::LookRight:
+            return true;
+        default:
+            return false;
+    }
+}
+
+void SelfModel::recordExperience(const std::vector<float>& experience) {
+    // Add experience to buffer
+    pImpl->experienceBuffer.push_back(experience);
+    
+    // Maintain buffer size
+    if (pImpl->experienceBuffer.size() > pImpl->experienceBufferSize) {
+        pImpl->experienceBuffer.erase(pImpl->experienceBuffer.begin());
+    }
+    
+    // Update capability level based on experience diversity and success
+    updateCapabilityFromExperience();
+}
+
+void SelfModel::updateCapabilityFromExperience() {
+    if (pImpl->experienceBuffer.empty()) return;
+    
+    // Compute capability level based on experience quality
+    float totalCapability = 0.0f;
+    size_t count = 0;
+    
+    for (const auto& experience : pImpl->experienceBuffer) {
+        // Capability = variety of successful outcomes
+        if (!experience.empty()) {
+            float avgValue = 0.0f;
+            for (float value : experience) {
+                avgValue += value;
+            }
+            avgValue /= experience.size();
+            
+            // Successful experiences (high value) contribute more to capability
+            if (avgValue > 0.5f) {
+                totalCapability += avgValue;
+                ++count;
+            }
+        }
+    }
+    
+    if (count > 0) {
+        float newCapability = totalCapability / count;
+        // Smooth update
+        capabilityLevel_ = capabilityLevel_ * 0.9f + newCapability * 0.1f;
+    }
 }
 
 std::vector<float> SelfModel::findMatchingEffect(ActionType action,
-                                                const std::vector<float>& beforeState) const {
+                                                 const std::vector<float>& beforeState) const {
     size_t actionIdx = static_cast<size_t>(action);
     if (actionIdx >= actionEffects_.size()) return {};
     
@@ -422,7 +542,7 @@ std::vector<float> SelfModel::findMatchingEffect(ActionType action,
 }
 
 float SelfModel::computeSimilarity(const std::vector<float>& a,
-                                  const std::vector<float>& b) const {
+                                   const std::vector<float>& b) const {
     if (a.size() != b.size() || a.empty()) return 0.0f;
     
     float dot = 0.0f, normA = 0.0f, normB = 0.0f;
@@ -435,6 +555,19 @@ float SelfModel::computeSimilarity(const std::vector<float>& a,
     if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
     
     return dot / (std::sqrt(normA) * std::sqrt(normB));
+}
+
+void SelfModel::clear() {
+    for (auto& effects : actionEffects_) {
+        effects.clear();
+    }
+    capabilityLevel_ = 0.5f;
+    bodyAwareness_ = 0.5f;
+    agency_ = 0.5f;
+    confidence_ = 0.5f;
+    
+    // Clear experience buffer
+    pImpl->experienceBuffer.clear();
 }
 
 // SocialLearning Implementation
@@ -450,6 +583,7 @@ SocialLearning::SocialLearning()
     , observationCount_(0)
     , signalMeaning_(0.0f)
 {
+    NLM_LOG_INFO("SocialLearning initialized for observation and imitation");
 }
 
 SocialLearning::~SocialLearning() = default;
@@ -457,7 +591,23 @@ SocialLearning::~SocialLearning() = default;
 void SocialLearning::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("SocialLearning initialized");
+    
+    // Initialize with brain reference for better social learning integration
+    if (brain) {
+        // Connect to curiosity and novelty systems
+        auto* curiosity = brain->getCuriosity();
+        if (curiosity) {
+            // Integrate with curiosity for social exploration
+        }
+        
+        // Connect to dopamine for reward prediction
+        auto* dopamine = brain->getDopamine();
+        if (dopamine) {
+            // Integrate with dopamine for social reward learning
+        }
+    }
+    
+    NLM_LOG_INFO("SocialLearning initialized for observation and imitation");
 }
 
 void SocialLearning::observeAgentAction(ActionType observedAction,
@@ -475,6 +625,12 @@ void SocialLearning::observeAgentAction(ActionType observedAction,
     if (observedActions_.size() > 500) {
         observedActions_.erase(observedActions_.begin());
     }
+    
+    // Update social knowledge based on outcome
+    updateSocialKnowledge(0.0f);  // Default reward since observer doesn't know it
+    
+    NLM_LOG_INFO("SocialLearning: Observed action " + std::to_string(static_cast<int>(observedAction)) +
+                " (observations: " + std::to_string(observationCount_) + ")");
 }
 
 bool SocialLearning::canImitate(ActionType observedAction) const {
@@ -506,6 +662,9 @@ void SocialLearning::learnCommunicationSignal(const std::vector<float>& signalPa
                                               float signalReward) {
     signalPattern_ = signalPattern;
     signalMeaning_ = signalReward;
+    
+    NLM_LOG_INFO("SocialLearning: Learned communication signal (meaning: " + 
+                std::to_string(signalMeaning_) + ")");
 }
 
 bool SocialLearning::detectSignal(const std::vector<float>& neuralPattern) const {
@@ -528,6 +687,20 @@ void SocialLearning::updateSocialKnowledge(float interactionReward) {
     for (auto& pair : observedActions_) {
         // Adjust reward estimate based on interaction outcome
         pair.second.reward = pair.second.reward * 0.9f + interactionReward * 0.1f;
+    }
+    
+    // Update agency and social learning based on outcome
+    if (observationCount_ > 0) {
+        float avgReward = 0.0f;
+        for (const auto& pair : observedActions_) {
+            avgReward += pair.second.reward;
+        }
+        avgReward /= observationCount_;
+        
+        // High positive reward increases agency
+        if (avgReward > 0.5f) {
+            // Future enhancement: update agency levels
+        }
     }
 }
 
