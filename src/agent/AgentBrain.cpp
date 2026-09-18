@@ -28,40 +28,41 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                        if (n) {  // Safety check for null neuron pointer
+                            // Distribute motor neurons to different action groups
+                            size_t idx = motorForward_.size() + motorBackward_.size() + 
+                                        motorTurnLeft_.size() + motorTurnRight_.size() +
+                                        motorInteract_.size() + motorWait_.size();
+                            
+                            switch (idx % 6) {
+                                case 0: motorForward_.push_back(n); break;
+                                case 1: motorBackward_.push_back(n); break;
+                                case 2: motorTurnLeft_.push_back(n); break;
+                                case 3: motorTurnRight_.push_back(n); break;
+                                case 4: motorInteract_.push_back(n); break;
+                                case 5: motorWait_.push_back(n); break;
+                            }
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
+                        if (n) {  // Safety check for null neuron pointer
+                            // Distribute sensory neurons
+                            size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
+                                        sensoryInternal_.size() + sensoryProprioception_.size();
+                            
+                            switch (idx % 4) {
+                                case 0: sensoryVision_.push_back(n); break;
+                                case 1: sensoryTouch_.push_back(n); break;
+                                case 2: sensoryInternal_.push_back(n); break;
+                                case 3: sensoryProprioception_.push_back(n); break;
+                            }
                         }
                     }
                 }
             }
         }
-    }
-}
-
-AgentBrain::~AgentBrain() = default;
+    AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
@@ -133,7 +134,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
         
         // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        noveltyLevel_ = totalDiff / static_cast<float>(std::max<size_t>(vision.size(), 1));
         
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
