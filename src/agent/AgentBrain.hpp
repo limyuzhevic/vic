@@ -2,12 +2,17 @@
 
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
+#include "MotorDecoder.hpp"
+#include "NoveltyDetector.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
+
+class MotorDecoder;
+class NoveltyDetector;
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
@@ -77,6 +82,10 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    
+    // Agent subsystems
+    std::unique_ptr<MotorDecoder> motorDecoder_;
+    std::unique_ptr<NoveltyDetector> noveltyDetector_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;

@@ -84,9 +84,63 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write header comment
+    file << "# NLM Configuration File\n";
+    file << "# Format: key = value (value can be quoted if it contains spaces)\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write description
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write key
+        file << entry.key << " = ";
+        
+        // Write value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Quote strings that contain spaces
+                if (arg.find(' ') != std::string::npos || arg.find('#') != std::string::npos) {
+                    file << "\"" << arg << "\"";
+                } else {
+                    file << arg;
+                }
+            } else if constexpr (std::is_same_v<T, int> ||
+                                 std::is_same_v<T, int64_t> ||
+                                 std::is_same_v<T, double> ||
+                                 std::is_same_v<T, bool>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (arg[i].find(' ') != std::string::npos || arg[i].find('#') != std::string::npos) {
+                        file << "\"" << arg[i] << "\"";
+                    } else {
+                        file << arg[i];
+                    }
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;

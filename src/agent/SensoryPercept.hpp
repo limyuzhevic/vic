@@ -7,11 +7,14 @@
 
 namespace nlm {
 
+// Forward declarations
+class Config;
+
 // Sensory data packet - what the agent perceives
 // Contains only low-level sensory signals, NO semantic labels
 class SensoryPercept {
 public:
-    SensoryPercept();
+    SensoryPercept(std::shared_ptr<Config> config = nullptr);
     ~SensoryPercept() = default;
     
     // Vision: simple grayscale intensity grid (no RGB, no object labels)

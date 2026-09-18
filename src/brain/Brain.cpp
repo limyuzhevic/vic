@@ -19,6 +19,27 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <unordered_map>
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/Attention.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../sensory/Vision.hpp"
+#include "../sensory/Audio.hpp"
+#include "../sensory/InternalSignals.hpp"
+#include "../motor/MotorSystem.hpp"
+#include "../environment/Environment.hpp"
+#include "../environment/Observation.hpp"
+#include "../environment/Action.hpp"
+#include "../experiments/Experiment.hpp"
+#include "../experiments/ExperimentRunner.hpp"
+#include "../experiments/Metrics.hpp"
+#include "../visualization/VisualizationInterface.hpp"
+#include <fstream>
+#include <algorithm>
+#include <cmath>
+#include <sstream>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -31,7 +52,9 @@ struct Brain::Impl {
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
+    std::unique_ptr<AssociativeMemory> associativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -111,7 +134,9 @@ struct Brain::Impl {
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        semanticMemory = std::make_unique<SemanticMemory>();
+        proceduralMemory = std::make_unique<ProceduralMemory>();
+        associativeMemory = std::make_unique<AssociativeMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -895,9 +920,58 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - need to find matching synapses
+        std::unordered_map<std::pair<NeuronId, NeuronId>, size_t> synapseMap;
+        size_t synapseIndex = 0;
+        
+        // First pass: create mapping from (source, destination) to synapse index
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                synapseMap[{syn->getSourceNeuron(), syn->getDestinationNeuron()}] = synapseIndex++;
+            }
+        }
+        
+        // Second pass: restore synapse states from saved data
+        for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+            std::pair<NeuronId, NeuronId> key(
+                synapseData.sourceNeuron[i],
+                synapseData.destinationNeuron[i]
+            );
+            
+            auto it = synapseMap.find(key);
+            if (it != synapseMap.end()) {
+                // Found matching synapse - restore its state
+                size_t synapseIdx = it->second;
+                
+                // Find the actual synapse in the region
+                for (auto& region : pImpl->regions) {
+                    auto synapses = region->getSynapses();
+                    size_t idx = 0;
+                    for (auto* syn : synapses) {
+                        if (idx == synapseIdx) {
+                            // Restore synapse state
+                            syn->setWeight(synapseData.weight[i]);
+                            syn->setDelay(synapseData.delay[i]);
+                            syn->setType(static_cast<SynapseType>(synapseData.synapseType[i]));
+                            syn->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                            
+                            // Clear and restore spike histories
+                            syn->clearHistory();
+                            // Note: STDP spike history could be saved if needed
+                            
+                            break;
+                        }
+                        idx++;
+                    }
+                }
+            } else {
+                NLM_LOG_WARN("Warning: No matching synapse found for source=" +
+                    std::to_string(synapseData.sourceNeuron[i]) +
+                    ", destination=" + std::to_string(synapseData.destinationNeuron[i]));
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses from checkpoint");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
