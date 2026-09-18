@@ -296,6 +296,82 @@ void ConceptFormation::clear() {
     nextConceptId_ = 1;
 }
 
+void ConceptFormation::updateFromPredictionError(const std::vector<float>& predicted,
+                                                  const std::vector<float>& actual) {
+    if (predicted.empty() || actual.empty()) return;
+    
+    // Update concept prototypes based on prediction error
+    // This helps concepts become more accurate at predicting future states
+    for (auto& concept : concepts_) {
+        // Check if concept applies to this prediction error
+        float similarity = computeSimilarity(predicted, concept.prototype);
+        if (similarity >= formationThreshold_) {
+            // Update prototype using prediction error
+            float error = 1.0f - computeSimilarity(predicted, actual);
+            
+            // Adjust prototype towards actual state
+            for (size_t i = 0; i < concept.prototype.size() && i < actual.size(); ++i) {
+                // Move prototype towards actual state by error amount
+                concept.prototype[i] = concept.prototype[i] * (1.0f - error * 0.1f) + 
+                                      actual[i] * (error * 0.1f);
+            }
+            
+            // Update stability based on prediction accuracy
+            concept.avgStability = (concept.avgStability + (1.0f - error)) / 2.0f;
+            
+            // Add new instance if prediction was reasonably good
+            if (error < 0.3f) {
+                ConceptInstance instance;
+                instance.pattern = predicted;
+                instance.features = actual;
+                instance.observationCount = 1;
+                instance.lastObserved = 0;
+                instance.avgReward = error > 0.5f ? -0.5f : 0.5f;
+                instance.stability = 1.0f - error;
+                
+                concept.instances.push_back(instance);
+                concept.totalObservations++;
+                
+                // Remove oldest instance if we have too many
+                if (concept.instances.size() > stabilityWindow_) {
+                    concept.instances.erase(concept.instances.begin());
+                }
+            }
+        }
+    }
+}
+
+std::vector<size_t> ConceptFormation::getConceptsForAttention(const std::vector<NeuronId>& attendedNeurons) const {
+    std::vector<size_t> relevantConcepts;
+    
+    if (attendedNeurons.empty()) {
+        // If no attended neurons, return all concepts
+        for (const auto& concept : concepts_) {
+            relevantConcepts.push_back(concept.id);
+        }
+        return relevantConcepts;
+    }
+    
+    // Find concepts that match attended neuron patterns
+    // This helps attention focus on relevant concepts
+    for (const auto& concept : concepts_) {
+        bool hasMatch = false;
+        
+        // Check if concept prototype contains any attended neurons
+        // Note: This is a simplified implementation - in practice,
+        // you'd need to map neurons to pattern indices
+        if (!concept.prototype.empty() && !attendedNeurons.empty()) {
+            hasMatch = true; // Simplification: all concepts are potentially relevant
+        }
+        
+        if (hasMatch) {
+            relevantConcepts.push_back(concept.id);
+        }
+    }
+    
+    return relevantConcepts;
+}
+
 // SpatialRepresentation Implementation
 struct SpatialRepresentation::Impl {
     Brain* brain;

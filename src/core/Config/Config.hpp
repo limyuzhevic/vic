@@ -5,11 +5,19 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <unordered_map>
+#include <functional>
+#include <set>
+#include "nlohmann/json.hpp"
 
 namespace nlm {
 
+using json = nlohmann::json;
+
 // Forward declarations
 class Config;
+class ConfigSchema;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -43,6 +51,28 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration schema type definition
+enum class ConfigDataType {
+    Int,
+    Int64,
+    Double,
+    Bool,
+    String,
+    IntArray,
+    DoubleArray,
+    StringArray
+};
+
+// Schema validation rule
+struct ConfigValidationRule {
+    std::string key;
+    ConfigDataType type;
+    std::optional<std::string> defaultValue;
+    std::optional<std::vector<std::string>> allowedValues;
+    std::function<bool(const ConfigValue&)> customValidator;
+    std::string description;
+};
+
 // Main configuration class
 class Config {
 public:
@@ -55,14 +85,14 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Save to file (JSON/YAML format)
+    bool saveToFile(const std::string& filepath, bool pretty = true) const;
     
     // Get values
     template<typename T>
@@ -93,6 +123,18 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // JSON/YAML support
+    json toJson() const;
+    bool fromJson(const json& j);
+    
+    // Schema validation
+    bool validateSchema(const std::vector<ConfigValidationRule>& schema) const;
+    void setSchema(const std::vector<ConfigValidationRule>& schema);
+    
+    // Backward compatibility - simple key=value parsing
+    static std::map<std::string, std::string> parseSimpleFormat(const std::string& content);
+    static std::string serializeSimpleFormat() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +142,21 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML conversion helpers
+    static json valueToJson(const ConfigValue& value);
+    static bool jsonToValue(const json& j, ConfigValue& value);
+};
+
+// ConfigSchema helper class (implementation in .cpp)
+class ConfigSchema {
+public:
+    static ConfigValidationRule createRule(const std::string& key, ConfigDataType type,
+                                           const std::string& description = "",
+                                           const std::optional<std::string>& defaultValue = std::nullopt,
+                                           const std::optional<std::vector<std::string>>& allowedValues = std::nullopt);
+    static bool validateValue(const ConfigValue& value, ConfigDataType type);
+    static std::string getTypeName(ConfigDataType type);
 };
 
 } // namespace nlm

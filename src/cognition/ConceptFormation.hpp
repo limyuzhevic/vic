@@ -125,18 +125,25 @@ public:
     bool isNovel(const std::vector<float>& pattern,
                  float similarityThreshold = 0.7f) const;
 
-    // Get concept for a given pattern
+// Get concept for a given pattern
     size_t findConceptForPattern(const std::vector<float>& pattern) const;
-
+    
     // Clear all concepts
     void clear();
-
+    
     // Get generalization ability (can concept handle variations?)
     float getGeneralizationAbility(size_t conceptId) const;
-
+    
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+    
+    // Update based on prediction error
+    void updateFromPredictionError(const std::vector<float>& predicted, 
+                                  const std::vector<float>& actual);
+    
+    // Get concepts aligned with current attention focus
+    std::vector<size_t> getConceptsForAttention(const std::vector<NeuronId>& attendedNeurons) const;
 
 private:
     // Create new concept from pattern
