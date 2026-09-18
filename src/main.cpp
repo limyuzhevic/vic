@@ -372,16 +372,21 @@ int main(int argc, char** argv) {
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
+
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
+
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
+
+    // Phase 6 specific parameters
+    config->set("replay_interval", 100, ConfigSource::Default);
+    config->set("consolidation_interval", 1000, ConfigSource::Default);
+    config->set("enable_development", true, ConfigSource::Default);
+
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -391,6 +396,26 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
+
+    // Initialize prediction system
+    if (brain->getPredictionSystem()) {
+        brain->getPredictionSystem()->initialize(brain);
+        NLM_LOG_INFO("Prediction system initialized with brain integration");
+    }
+
+    // Initialize concept formation (advanced feature)
+    if (brain->getConceptFormation()) {
+        brain->getConceptFormation()->initialize(brain);
+        NLM_LOG_INFO("Concept formation system initialized with brain integration");
+    }
+
+    // Initialize attention system (advanced feature)
+    if (brain->getAttention()) {
+        brain->getAttention()->initialize(brain);
+        brain->getAttention()->setInhibitionStrength(0.5f);
+        brain->getAttention()->setExcitationStrength(1.5f);
+        NLM_LOG_INFO("Attention system initialized with brain integration");
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);

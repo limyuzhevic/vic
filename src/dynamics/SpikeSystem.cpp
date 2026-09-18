@@ -95,11 +95,11 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
 }
 
 void SpikeSystem::registerHandler(SpikeHandler handler) {
-    pImpl->handlers.push_back(handler);
+    pImpl->handlers.push_back(std::move(handler));
 }
 
 void SpikeSystem::registerDelayedHandler(DelayedSpikeHandler handler) {
-    pImpl->delayedHandlers.push_back(handler);
+    pImpl->delayedHandlers.push_back(std::move(handler));
 }
 
 const std::vector<DetailedSpikeEvent>& SpikeSystem::getSpikeHistory() const {
