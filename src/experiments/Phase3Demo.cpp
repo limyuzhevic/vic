@@ -3,7 +3,7 @@
 #include "../agent/SensoryPercept.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../brain/Brain.hpp"
-#include "../core/Config/Config.hpp"
+#include "../core/Config/PhaseConfig.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <iostream>
 #include <fstream>
@@ -24,10 +24,8 @@ public:
         std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
         std::cout << "===========================================\n\n";
         
-        // Create configuration
-        auto config = std::make_shared<Config>();
-        configureEnvironment(config);
-        configureBrain(config);
+        // Create configuration using centralized utilities
+        auto config = PhaseConfig::createConfig(3);
         
         // Create world
         SimpleWorld world;
@@ -48,6 +46,12 @@ public:
         agentBrain.enableDevelopment(true);
         agentBrain.enableCuriosity(true);
         
+        // Configure agent brain
+        agentBrain.enableRewardModulation(true);
+        agentBrain.enableStructuralPlasticity(true);
+        agentBrain.enableDevelopment(true);
+        agentBrain.enableCuriosity(true);
+        
         std::cout << "Initial brain state:\n";
         std::cout << "  Neurons: " << brain->getTotalNeuronCount() << "\n";
         std::cout << "  Synapses: " << brain->getTotalSynapseCount() << "\n";
@@ -61,7 +65,7 @@ public:
         for (int episode = 0; episode < numEpisodes; ++episode) {
             std::cout << "--- Episode " << episode << " started ---\n";
             
-            // Reset world
+            // Reset world and brain
             world.reset();
             agentBrain.reset();
             brain->reset();

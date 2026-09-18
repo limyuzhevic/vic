@@ -78,7 +78,9 @@ private:
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
+    // Motor neuron groups - raw pointers for performance
+    // These neurons are owned by the brain and guaranteed to live throughout simulation
+    // Performance-critical: direct pointer access without weak_ptr indirection
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
@@ -86,7 +88,7 @@ private:
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
-    // Sensory neuron groups
+    // Sensory neuron groups - raw pointers for performance
     std::vector<Neuron*> sensoryVision_;
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;

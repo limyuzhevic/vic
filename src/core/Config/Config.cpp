@@ -24,11 +24,16 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNum = 0;
+    int successfulParses = 0;
+    
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +46,13 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key is not empty
+            if (key.empty()) {
+                NLM_LOG_WARNING(std::string("Empty key found in config file ") + filepath + 
+                              " at line " + std::to_string(lineNum));
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -48,8 +60,25 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+                successfulParses++;
+            } catch (const std::exception& e) {
+                NLM_LOG_WARNING(std::string("Error parsing config key '") + key + 
+                              "' at line " + std::to_string(lineNum) + ": " + e.what());
+            }
+        } else {
+            NLM_LOG_WARNING(std::string("Invalid line format in config file ") + 
+                          filepath + " at line " + std::to_string(lineNum) + ": '" + line + "'");
         }
+    }
+    
+    if (successfulParses == 0 && lineNum > 0) {
+        NLM_LOG_WARNING(std::string("No valid configuration parameters parsed from ") + 
+                      filepath + " (" + std::to_string(lineNum) + " lines)");
+    } else {
+        NLM_LOG_INFO(std::string("Successfully parsed ") + std::to_string(successfulParses) + 
+                    " configuration parameters from " + filepath);
     }
     
     return true;
