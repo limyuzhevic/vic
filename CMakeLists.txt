@@ -127,6 +127,14 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
+# Command Line Interface executable
+add_executable(nlm_cli
+    src/cli/NLMCLI.cpp
+    src/cli/NLMCLISource.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_agent nlm_world)
+target_include_directories(nlm_cli PRIVATE src/cli)
+
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
