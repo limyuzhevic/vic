@@ -416,10 +416,191 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Create agent with automatic initialization
+    m.def("createAgentWithWorld", [](std::shared_ptr<Brain> brain,
+                                   std::shared_ptr<SimpleWorld> world,
+                                   size_t visionWidth = 8,
+                                   size_t visionHeight = 8) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        if (world) {
+            world->configure(20, 20, visionWidth, visionHeight);
+            world->reset();
+            agent->initialize(*world);
+            
+            // Enable all learning systems
+            agent->enableRewardModulation(true);
+            agent->enableStructuralPlasticity(true);
+            agent->enableDevelopment(true);
+            agent->enableCuriosity(true);
+        }
+        
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+        py::arg("visionWidth") = 8, py::arg("visionHeight") = 8,
+        "Create an agent brain with world and automatic initialization");
+    
+    // Create world with agent placement
+    m.def("createWorldWithAgent", [](size_t width = 20,
+                                   size_t height = 20,
+                                   size_t visionWidth = 8,
+                                   size_t visionHeight = 8,
+                                   float agentX = 10.0f,
+                                   float agentY = 10.0f) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        world->reset();
+        world->setAgentStart(agentX, agentY);
+        
+        return world;
+    }, py::arg("width") = 20, py::arg("height") = 20,
+        py::arg("visionWidth") = 8, py::arg("visionHeight") = 8,
+        py::arg("agentX") = 10.0f, py::arg("agentY") = 10.0f,
+        "Create a simple world with configured vision and agent position");
+    
+    // Create simplified beginner API wrapper
+    m.def("createSimpleBrain", [](
+        size_t neuronCount = 500,
+        size_t regionCount = 1,
+        float connectionProbability = 0.1f,
+        bool enableLearning = true,
+        bool enableDevelopment = true,
+        bool enableCuriosity = true
+    ) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::Default);
+        config->set("connection_probability", connectionProbability, ConfigSource::Default);
+        config->set("plasticity_stdp_enable", true, ConfigSource::Default);
+        config->set("plasticity_hebbian_enable", true, ConfigSource::Default);
+        config->set("neuromod_curiosity_enable", enableCuriosity, ConfigSource::Default);
+        config->set("neuromod_novelty_enable", true, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        
+        return brain;
+    }, py::arg("neuronCount") = 500, py::arg("regionCount") = 1,
+        py::arg("connectionProbability") = 0.1f, py::arg("enableLearning") = true,
+        py::arg("enableDevelopment") = true, py::arg("enableCuriosity") = true,
+        "Create a simple, ready-to-use brain with sensible defaults");
+    
+    // Create quick simulation helper
+    m.def("runQuickSimulation", [](std::shared_ptr<Brain> brain, 
+                                 std::shared_ptr<SimpleWorld> world,
+                                 std::shared_ptr<AgentBrain> agent,
+                                 size_t numSteps,
+                                 bool verbose = false) {
+        if (!brain || !world || !agent) {
+            throw std::runtime_error("Invalid simulation components");
+        }
+        
+        if (verbose) {
+            std::cout << "Starting quick simulation with " << numSteps << " steps" << std::endl;
+        }
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            // Update world
+            world->update(0.1f);
+            
+            // Get sensory percept
+            auto percept = world->getSensoryPercept();
+            
+            // Process in brain
+            agent->processSensoryInput(percept);
+            brain->step(static_cast<uint64_t>(step));
+            
+            // Get motor command and apply
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Print progress every 100 steps
+            if (verbose && step % 100 == 0) {
+                std::cout << "Step " << step << ": "
+                         << "Firing neurons: " << brain->getFiringNeuronCount()
+                         << ", "
+                         << "Avg firing rate: " << brain->getAverageFiringRate()
+                         << ", "
+                         << "Curiosity: " << agent->getCuriosityLevel()
+                         << std::endl;
+            }
+        }
+        
+        if (verbose) {
+            std::cout << "Simulation complete!" << std::endl;
+            std::cout << "Final stats:" << std::endl;
+            std::cout << "  Total neurons: " << brain->getTotalNeuronCount() << std::endl;
+            std::cout << "  Total synapses: " << brain->getTotalSynapseCount() << std::endl;
+            std::cout << "  Final firing rate: " << brain->getAverageFiringRate() << std::endl;
+            std::cout << "  Final curiosity: " << agent->getCuriosityLevel() << std::endl;
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+        py::arg("numSteps") = 1000, py::arg("verbose") = false,
+        "Run a complete simulation with brain, world, and agent");
+    
+    // Create brain statistics helper
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null");
+        }
+        
+        std::map<std::string, double> stats;
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["pending_spikes"] = brain->getPendingSpikeEventCount();
+        
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain statistics as a dictionary");
+    
+    // Create simulation summary helper
+    m.def("simulateWithStats", [](std::shared_ptr<Brain> brain,
+                                 std::shared_ptr<SimpleWorld> world,
+                                 std::shared_ptr<AgentBrain> agent,
+                                 size_t numSteps) {
+        std::cout << "=== NLM Simulation Started ===" << std::endl;
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            // Update world
+            world->update(0.1f);
+            
+            // Get sensory percept
+            auto percept = world->getSensoryPercept();
+            
+            // Process in brain
+            agent->processSensoryInput(percept);
+            brain->step(static_cast<uint64_t>(step));
+            
+            // Get motor command and apply
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Print progress every 100 steps
+            if (step % 100 == 0) {
+                std::cout << "Step " << step << ": "
+                         << "Firing: " << brain->getFiringNeuronCount()
+                         << " Rate: " << brain->getAverageFiringRate()
+                         << " Cur: " << agent->getCuriosityLevel()
+                         << std::endl;
+            }
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::seconds>(endTime - startTime);
+        
+        std::cout << "=== NLM Simulation Complete ===" << std::endl;
+        std::cout << "Duration: " << duration.count() << " seconds" << std::endl;
+        std::cout << "Steps per second: " << (numSteps / std::max<double>(duration.count(), 1.0)) << std::endl;
+        
+        return getBrainStats(brain);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+        py::arg("numSteps") = 1000, "Run a simulation with automatic statistics output");
 
 } // namespace nlm
