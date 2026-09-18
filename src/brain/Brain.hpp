@@ -163,15 +163,15 @@ public:
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
-    
+
     // ========== DEVELOPMENT SYSTEM ==========
-    
+
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
-    
+
     // ========== NEUROMODULATION SYSTEMS ==========
-    
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     

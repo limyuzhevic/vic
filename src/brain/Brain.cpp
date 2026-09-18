@@ -1006,41 +1006,73 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
+    if (pImpl->workingMemory) {
+        return pImpl->workingMemory.get();
+    }
+    NLM_LOG_WARNING("Working memory not initialized - returning nullptr");
+    return nullptr;
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
+    if (pImpl->episodicMemory) {
+        return pImpl->episodicMemory.get();
+    }
+    NLM_LOG_WARNING("Episodic memory not initialized - returning nullptr");
+    return nullptr;
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
+    if (pImpl->associativeMemory) {
+        return pImpl->associativeMemory.get();
+    }
+    NLM_LOG_WARNING("Associative memory not initialized - returning nullptr");
+    return nullptr;
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
+    if (pImpl->predictionSystem) {
+        return pImpl->predictionSystem.get();
+    }
+    NLM_LOG_WARNING("Prediction system not initialized - returning nullptr");
+    return nullptr;
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
+    if (pImpl->planner) {
+        return pImpl->planner.get();
+    }
+    NLM_LOG_WARNING("Neural planner not initialized - returning nullptr");
+    return nullptr;
 }
 
 ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
+    if (pImpl->conceptFormation) {
+        return pImpl->conceptFormation.get();
+    }
+    NLM_LOG_WARNING("Concept formation not initialized - returning nullptr");
+    return nullptr;
 }
 
 AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
+    if (pImpl->attention) {
+        return pImpl->attention.get();
+    }
+    NLM_LOG_WARNING("Attention system not initialized - returning nullptr");
+    return nullptr;
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
+    if (pImpl->developmentSystem) {
+        return pImpl->developmentSystem.get();
+    }
+    NLM_LOG_WARNING("Development system not initialized - returning nullptr");
+    return nullptr;
 }
 
 DevelopmentalStage Brain::getDevelopmentalStage() const {
@@ -1054,19 +1086,35 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 // ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
+    if (pImpl->dopamine) {
+        return pImpl->dopamine.get();
+    }
+    NLM_LOG_WARNING("Dopamine not initialized - returning nullptr");
+    return nullptr;
 }
 
 Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
+    if (pImpl->curiosity) {
+        return pImpl->curiosity.get();
+    }
+    NLM_LOG_WARNING("Curiosity not initialized - returning nullptr");
+    return nullptr;
 }
 
 Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
+    if (pImpl->novelty) {
+        return pImpl->novelty.get();
+    }
+    NLM_LOG_WARNING("Novelty not initialized - returning nullptr");
+    return nullptr;
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
+    if (pImpl->predictionError) {
+        return pImpl->predictionError.get();
+    }
+    NLM_LOG_WARNING("Prediction error not initialized - returning nullptr");
+    return nullptr;
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
