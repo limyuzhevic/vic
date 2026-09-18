@@ -18,6 +18,10 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Find required packages
+find_package(nlohmann_json 3.2.0 REQUIRED)
+find_package(yaml-cpp REQUIRED)
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
