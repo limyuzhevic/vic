@@ -58,60 +58,105 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Cognitive system integration
+    enum class CognitiveMode {
+        Passive,      // No cognitive processing, only basic sensory/motor
+        Active,       // Basic attention and concept formation
+        Planning,     // Full planning capabilities
+        Reflective     // Memory-based reflection and evaluation
+    };
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Cognitive system access
+    NeuralPlanner* getPlanner() const { return planner_.get(); }
+    ConceptFormation* getConceptFormation() const { return conceptFormation_.get(); }
+    AttentionalSelection* getAttention() const { return attention_.get(); }
+    Curiosity* getCuriositySystem() const { return curiositySystem_.get(); }
+    PredictionSystem* getPredictionSystem() const { return predictionSystem_.get(); }
+    DevelopmentSystem* getDevelopmentSystem() const { return developmentSystem_.get(); }
     
+    // Memory system access
+    NeuralWorkingMemory* getWorkingMemory() const { return workingMemory_.get(); }
+    NeuralEpisodicMemory* getEpisodicMemory() const { return episodicMemory_.get(); }
+    NeuralAssociativeMemory* getAssociativeMemory() const { return associativeMemory_.get(); }
+    
+    // Advanced features
+    void setCognitiveMode(CognitiveMode mode) { cognitiveMode_ = mode; }
+    CognitiveMode getCognitiveMode() const { return cognitiveMode_; }
+    
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = threshold; }
+    void setPlanningDepth(int depth) { planningDepth_ = depth; }
+    void setAttentionSpan(float span) { attentionSpan_ = span; }
+    
+    void enableAdvancedPlanning(bool enable) { advancedPlanning_ = enable; }
+    void enableConceptLearning(bool enable) { conceptLearning_ = enable; }
+    void enableSocialLearning(bool enable) { socialLearning_ = enable; }
+    
+    bool isAdvancedPlanningEnabled() const { return advancedPlanning_; }
+    bool isConceptLearningEnabled() const { return conceptLearning_; }
+    bool isSocialLearningEnabled() const { return socialLearning_; }
+    
+    // State tracking for learning
+    void trackConcept(const std::string& concept) { concepts_.insert(concept); }
+    bool hasConcept(const std::string& concept) const { return concepts_.find(concept) != concepts_.end(); }
+    size_t getConceptCount() const { return concepts_.size(); }
+    
+    void trackSocialInteraction(const std::string& interaction) { socialInteractions_.insert(interaction); }
+    bool hasSocialInteraction(const std::string& interaction) const { return socialInteractions_.find(interaction) != socialInteractions_.end(); }
+    
+    void recordPredictionError(float error) { predictionError_ = error; }
+    float getAveragePredictionError() const { return averagePredictionError_; }
+    
+    // Advanced processing methods
+    void processConceptLearning(const std::vector<float>& patterns);
+    void processSocialLearning(const std::vector<float>& socialPatterns);
+    void updatePlanningSystem(double timestep);
+    void updateAttentionSystem(double timestep);
+    
+    // State save/load
+    void saveState(std::ostream& stream) const;
+    void loadState(std::istream& stream);
+
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    // Cognitive system pointers
+    std::shared_ptr<NeuralPlanner> planner_;
+    std::shared_ptr<ConceptFormation> conceptFormation_;
+    std::shared_ptr<AttentionalSelection> attention_;
+    std::shared_ptr<Curiosity> curiositySystem_;
+    std::shared_ptr<PredictionSystem> predictionSystem_;
+    std::shared_ptr<DevelopmentSystem> developmentSystem_;
     
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    // Memory system pointers
+    std::shared_ptr<NeuralWorkingMemory> workingMemory_;
+    std::shared_ptr<NeuralEpisodicMemory> episodicMemory_;
+    std::shared_ptr<NeuralAssociativeMemory> associativeMemory_;
     
-    std::shared_ptr<Brain> brain_;
+    // Advanced features
+    CognitiveMode cognitiveMode_;
+    NeuronId attentionTarget_;
+    int planningDepth_;
+    float curiosityThreshold_;
+    float attentionSpan_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    // Feature flags
+    bool advancedPlanning_;
+    bool conceptLearning_;
+    bool socialLearning_;
     
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    // Learning tracking
+    std::set<std::string> concepts_;
+    std::set<std::string> socialInteractions_;
+    std::vector<float> predictionErrors_;
+    float averagePredictionError_;
     
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
+    // Planning and attention state
+    std::vector<NeuronId> attentionQueue_;
+    std::map<NeuronId, float> actionValues_;
+    float totalExplorationBonus_;
     
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
-    
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
-    
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    // Social and interaction state
+    std::map<std::string, float> socialValueWeights_;
+    std::vector<std::pair<NeuronId, NeuronId>> socialPairs_;
+    std::vector<NeuronId> observedAgents_;
 };
 
 } // namespace nlm

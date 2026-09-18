@@ -505,6 +505,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Store working memory state
+            if (pImpl->workingMemory) {
+                episode.workingMemorySnapshots.push_back(pImpl->workingMemory->getMemoryState());
+            }
+            
+            // Store prediction system state
+            if (pImpl->predictionSystem) {
+                episode.predictionSnapshots.push_back(pImpl->predictionSystem->getPredictionState());
+            }
+            
+            // Store cognitive system states
+            if (pImpl->planner) {
+                episode.plannerSnapshots.push_back(pImpl->planner->getPlannerState());
+            }
+            if (pImpl->conceptFormation) {
+                episode.conceptSnapshots.push_back(pImpl->conceptFormation->getConceptState());
+            }
+            if (pImpl->attention) {
+                episode.attentionSnapshots.push_back(pImpl->attention->getAttentionState());
+            }
+            
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
