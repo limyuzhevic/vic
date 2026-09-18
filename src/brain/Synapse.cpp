@@ -78,56 +78,108 @@ Synapse& Synapse::operator=(Synapse&& other) noexcept {
 }
 
 SynapseId Synapse::getId() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getId: Null pImpl pointer");
+        return INVALID_SYNAPSE_ID;
+    }
     return pImpl->id;
 }
 
 NeuronId Synapse::getSourceNeuron() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getSourceNeuron: Null pImpl pointer");
+        return INVALID_NEURON_ID;
+    }
     return pImpl->sourceNeuron;
 }
 
 NeuronId Synapse::getDestinationNeuron() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getDestinationNeuron: Null pImpl pointer");
+        return INVALID_NEURON_ID;
+    }
     return pImpl->destinationNeuron;
 }
 
 SynapticWeight Synapse::getWeight() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getWeight: Null pImpl pointer");
+        return 0.0f;
+    }
     return pImpl->weight;
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::setWeight: Null pImpl pointer");
+        return;
+    }
     pImpl->weight = weight;
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::addToWeight: Null pImpl pointer");
+        return;
+    }
     pImpl->weight += delta;
     // Clamp to reasonable bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 Delay Synapse::getDelay() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getDelay: Null pImpl pointer");
+        return 0;
+    }
     return pImpl->delay;
 }
 
 void Synapse::setDelay(Delay delay) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::setDelay: Null pImpl pointer");
+        return;
+    }
     pImpl->delay = delay;
 }
 
 SynapseType Synapse::getType() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getType: Null pImpl pointer");
+        return SynapseType::Excitatory;
+    }
     return pImpl->type;
 }
 
 void Synapse::setType(SynapseType type) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::setType: Null pImpl pointer");
+        return;
+    }
     pImpl->type = type;
 }
 
 bool Synapse::isExcitatory() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::isExcitatory: Null pImpl pointer");
+        return false;
+    }
     return pImpl->type == SynapseType::Excitatory;
 }
 
 bool Synapse::isInhibitory() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::isInhibitory: Null pImpl pointer");
+        return false;
+    }
     return pImpl->type == SynapseType::Inhibitory;
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::recordPreSpike: Null pImpl pointer");
+        return;
+    }
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
@@ -135,6 +187,10 @@ void Synapse::recordPreSpike(Timestamp timestamp) {
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::recordPostSpike: Null pImpl pointer");
+        return;
+    }
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
@@ -142,41 +198,81 @@ void Synapse::recordPostSpike(Timestamp timestamp) {
 }
 
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getPreSpikeHistory: Null pImpl pointer");
+        static const std::vector<Timestamp> empty;
+        return empty;
+    }
     return pImpl->preSpikeHistory;
 }
 
 const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getPostSpikeHistory: Null pImpl pointer");
+        static const std::vector<Timestamp> empty;
+        return empty;
+    }
     return pImpl->postSpikeHistory;
 }
 
 void Synapse::clearHistory() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::clearHistory: Null pImpl pointer");
+        return;
+    }
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
 }
 
 PlasticityFlags& Synapse::getPlasticityFlags() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getPlasticityFlags: Null pImpl pointer");
+        static PlasticityFlags empty;
+        return empty;
+    }
     return pImpl->plasticityFlags;
 }
 
 void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::enablePlasticity: Null pImpl pointer");
+        return;
+    }
     pImpl->plasticityFlags.hebbian = hebbian;
     pImpl->plasticityFlags.stdp = stdp;
     pImpl->plasticityFlags.reward_modulated = rewardModulated;
 }
 
 const PlasticityFlags& Synapse::getPlasticityFlags() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getPlasticityFlags: Null pImpl pointer");
+        static const PlasticityFlags empty;
+        return empty;
+    }
     return pImpl->plasticityFlags;
 }
 
 float Synapse::getEligibilityTrace() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getEligibilityTrace: Null pImpl pointer");
+        return 0.0f;
+    }
     return pImpl->eligibilityTrace;
 }
 
 void Synapse::setEligibilityTrace(float trace) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::setEligibilityTrace: Null pImpl pointer");
+        return;
+    }
     pImpl->eligibilityTrace = trace;
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::decayEligibilityTrace: Null pImpl pointer");
+        return;
+    }
     pImpl->eligibilityTrace *= (1.0f - decayRate);
     if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
         pImpl->eligibilityTrace = 0.0f;
@@ -184,14 +280,26 @@ void Synapse::decayEligibilityTrace(float decayRate) {
 }
 
 float Synapse::getEfficacy() const {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::getEfficacy: Null pImpl pointer");
+        return 1.0f;
+    }
     return pImpl->efficacy;
 }
 
 void Synapse::setEfficacy(float efficacy) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::setEfficacy: Null pImpl pointer");
+        return;
+    }
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
 void Synapse::step(Timestamp currentTime) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::step: Null pImpl pointer");
+        return;
+    }
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace

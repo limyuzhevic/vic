@@ -1,13 +1,16 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "NeuralPopulation.hpp"
-#include "Synapse.hpp"
 #include <vector>
 #include <memory>
 #include <unordered_map>
 
 namespace nlm {
+
+// Forward declarations to avoid circular dependencies
+class NeuralPopulation;
+class Synapse;
+class RandomGenerator;
 
 // NeuralRegion: A brain region containing multiple populations and local connectivity
 // PLACEHOLDER - Phase 2 will implement region-level dynamics
@@ -70,7 +73,7 @@ public:
     void reset();
     
     // Initialize connectivity
-    void initializeRandomConnectivity(class RandomGenerator& rng, 
+    void initializeRandomConnectivity(RandomGenerator& rng, 
                                       float connectionProbability,
                                       float meanWeight,
                                       float weightVariance);

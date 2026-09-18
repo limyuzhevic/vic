@@ -1,11 +1,14 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "Neuron.hpp"
 #include <vector>
 #include <memory>
 
 namespace nlm {
+
+// Forward declarations to avoid circular dependencies
+class Neuron;
+class RandomGenerator;
 
 // NeuralPopulation: A group of neurons with shared properties
 // PLACEHOLDER - Phase 2 will implement population-level dynamics
@@ -51,7 +54,7 @@ public:
     float getActivityLevel() const;  // fraction of active neurons
     
     // Initialize all neurons randomly
-    void initializeRandom(class RandomGenerator& rng);
+    void initializeRandom(RandomGenerator& rng);
     
     // Step all neurons
     void step(Timestamp currentTime);

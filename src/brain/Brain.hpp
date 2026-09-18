@@ -1,11 +1,6 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
 
@@ -28,6 +23,16 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+class SensoryInput;
+class Action;
+class Neuromodulator;
+
+// Forward declaration to avoid circular dependency
+class NeuralRegion;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {

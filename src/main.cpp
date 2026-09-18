@@ -25,6 +25,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <filesystem>
 
 using namespace nlm;
 
@@ -160,12 +161,26 @@ struct LearningExperiment {
 };
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+    if (!brain) {
+        std::cerr << "Error: Invalid brain pointer in runBasicConnectivityTest" << std::endl;
+        return;
+    }
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
+    // Validate brain initialization
+    if (brain->getTotalNeuronCount() == 0) {
+        NLM_LOG_ERROR("Brain has no neurons");
+        return;
+    }
+    
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Failed to get region 1");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -179,12 +194,18 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
+        if (!neurons[i]) continue;
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
     }
     
     // Run a few steps
     for (SimulationStep step = 0; step < 50; ++step) {
-        brain->step(step, step * 0.001);
+        try {
+            brain->step(step, step * 0.001);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Error during step " + std::to_string(step) + ": ") + e.what());
+            break;
+        }
     }
     
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
@@ -195,14 +216,21 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            if (neurons[i]) {
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                            " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                            " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            }
         }
     }
 }
 
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
+    if (!brain) {
+        std::cerr << "Error: Invalid brain pointer in runPlasticityExperiment" << std::endl;
+        return;
+    }
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
     
@@ -214,7 +242,9 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     // Enable plasticity on synapses
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+            if (syn) {
+                syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+            }
         }
     }
     
@@ -228,7 +258,12 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
         }
         
-        brain->step(step, step * 0.001);
+        try {
+            brain->step(step, step * 0.001);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Error during step " + std::to_string(step) + ": ") + e.what());
+            break;
+        }
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
@@ -246,11 +281,19 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
 }
 
 void runStdpVerification(std::shared_ptr<Brain> brain) {
+    if (!brain) {
+        std::cerr << "Error: Invalid brain pointer in runStdpVerification" << std::endl;
+        return;
+    }
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Failed to get region 1 for STDP test");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
@@ -264,10 +307,15 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     // Record initial weights
     std::vector<float> beforeWeights;
     for (size_t i = 0; i < 5; ++i) {
-        beforeWeights.push_back(synapses[i]->getWeight());
-        synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+        if (synapses[i]) {
+            beforeWeights.push_back(synapses[i]->getWeight());
+            synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
+            NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
+                        " before: " + std::to_string(beforeWeights[i]));
+        } else {
+            beforeWeights.push_back(0.0f);
+            NLM_LOG_INFO("    Synapse " + std::to_string(i) + " before: 0.0 (null)");
+        }
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -288,27 +336,42 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         if (preNeuron && postNeuron) {
             // Pre fires first
             preNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2, trial * 2 * 0.001);
+            try {
+                brain->step(trial * 2, trial * 2 * 0.001);
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR(std::string("Error during step " + std::to_string(trial * 2) + ": ") + e.what());
+                continue;
+            }
             
             // Then post fires
             postNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+            try {
+                brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR(std::string("Error during step " + std::to_string(trial * 2 + 1) + ": ") + e.what());
+                continue;
+            }
         }
     }
     
     // Record after weights
     NLM_LOG_INFO("  After correlated activity:");
     for (size_t i = 0; i < 5; ++i) {
-        float delta = synapses[i]->getWeight() - beforeWeights[i];
+        float delta = 0.0f;
+        if (i < synapses.size() && synapses[i]) {
+            delta = synapses[i]->getWeight() - beforeWeights[i];
+        }
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
+                    " after: " + std::to_string(synapses[i] ? synapses[i]->getWeight() : 0.0f) +
                     " (Δ=" + std::to_string(delta) + ")");
     }
     
     // Check if weights increased (LTP)
     float totalDelta = 0.0f;
     for (size_t i = 0; i < 5; ++i) {
-        totalDelta += synapses[i]->getWeight() - beforeWeights[i];
+        if (i < synapses.size() && synapses[i]) {
+            totalDelta += synapses[i]->getWeight() - beforeWeights[i];
+        }
     }
     
     NLM_LOG_INFO("");
@@ -326,8 +389,60 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
+    // Validate command line arguments
+    if (argc < 1) {
+        std::cerr << "Error: Invalid arguments count" << std::endl;
+        printBanner();
+        return 1;
+    }
+    
+    // Parse command line arguments with validation
+    std::string configFile = "configs/default.cfg";
+    bool helpRequested = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle help request
+        if (arg == "--help" || arg == "-h") {
+            helpRequested = true;
+            continue;
+        }
+        
+        // Handle config file specification
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            } else {
+                std::cerr << "Error: Missing config file path after --config" << std::endl;
+                return 1;
+            }
+        } else {
+            std::cerr << "Error: Unknown command line argument: " << arg << std::endl;
+            std::cerr << "Use --help for usage information" << std::endl;
+            return 1;
+        }
+    }
+    
+    if (helpRequested) {
+        printBanner();
+        std::cout << "\nUsage: " << argv[0] << " [OPTIONS]\n" << std::endl;
+        std::cout << "Options:\n" << std::endl;
+        std::cout << "  --config=file   Specify configuration file (default: configs/default.cfg)\n" << std::endl;
+        std::cout << "  --help, -h      Show this help message\n" << std::endl;
+        return 0;
+    }
+    
+    printBanner();
+    
     // Initialize logger
     auto logger = std::make_shared<Logger>();
+    if (!logger) {
+        std::cerr << "Error: Failed to create logger" << std::endl;
+        return 1;
+    }
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
@@ -342,6 +457,10 @@ int main(int argc, char** argv) {
     
     // Load configuration
     auto config = std::make_shared<Config>();
+    if (!config) {
+        std::cerr << "Error: Failed to create configuration object" << std::endl;
+        return 1;
+    }
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
@@ -356,15 +475,32 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    // Validate config file path
+    if (configFile.empty()) {
+        std::cerr << "Error: Empty config file path provided" << std::endl;
+        return 1;
+    }
+    
+    // Load config from file with better error handling
+    if (configFile != "configs/default.cfg") {
+        if (!std::filesystem::exists(configFile)) {
+            std::cerr << "Error: Config file not found: " << configFile << std::endl;
+            std::cerr << "Using default configuration instead" << std::endl;
+        } else if (!config->loadFromFile(configFile)) {
+            std::cerr << "Error: Failed to parse config file: " << configFile << std::endl;
+            std::cerr << "Using default configuration instead" << std::endl;
+        } else {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        }
     }
     
     // Override with command line args
-    config->loadFromArgs(argc, argv);
+    try {
+        config->loadFromArgs(argc, argv);
+    } catch (const std::exception& e) {
+        std::cerr << "Error: Failed to parse command line arguments: " << e.what() << std::endl;
+        return 1;
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -397,31 +533,57 @@ int main(int argc, char** argv) {
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
+    // Initialize brain with error handling
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
     
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+    auto brain = std::make_shared<Brain>(config);
+    if (!brain) {
+        std::cerr << "Error: Failed to create brain object" << std::endl;
+        return 1;
+    }
+    
+    try {
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return 1;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error: Brain initialization exception: " << e.what() << std::endl;
         return 1;
     }
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
+    // Run Test 1: Basic connectivity with validation
     runBasicConnectivityTest(brain);
     
     // Reset brain for plasticity experiment
     brain->reset();
-    brain->initialize();
+    try {
+        if (!brain->initialize()) {
+            std::cerr << "Error: Failed to re-initialize brain after reset" << std::endl;
+            return 1;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error: Brain re-initialization exception: " << e.what() << std::endl;
+        return 1;
+    }
     
-    // Run Test 2: Plasticity learning experiment
+    // Run Test 2: Plasticity learning experiment with validation
     runPlasticityExperiment(brain);
     
-    // Reset and run Test 3: STDP verification
+    // Reset and run Test 3: STDP verification with validation
     brain->reset();
-    brain->initialize();
+    try {
+        if (!brain->initialize()) {
+            std::cerr << "Error: Failed to re-initialize brain for STDP test" << std::endl;
+            return 1;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error: Brain re-initialization exception for STDP test: " << e.what() << std::endl;
+        return 1;
+    }
     runStdpVerification(brain);
     
     // Final brain status
