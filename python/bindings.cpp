@@ -15,6 +15,37 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/AttentionalSelection.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/NeuralAssociativeMemory.hpp"
+#include "../src/dynamics/SpikeSystem.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/plasticity/StructuralPlasticity.hpp"
+#include "../src/brain/Neuron.hpp"
+#include "../src/brain/Synapse.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/dynamics/NeuralDynamics.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -141,6 +172,167 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Wall", WorldObjectType::Wall)
         .value("Marker", WorldObjectType::Marker)
         .export_values();
+
+    // Neural Working Memory for temporary storage
+    py::class_<NeuralWorkingMemory>(m, "NeuralWorkingMemory", R"pbdoc(Neural working memory for temporary information storage)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralWorkingMemory::initialize, py::arg("brain"),
+             "Initialize working memory with brain reference")
+        .def("storeToNeuron", &NeuralWorkingMemory::storeToNeuron, py::arg("neuronId"), py::arg("activation"),
+             "Store neural activation in working memory")
+        .def("getActiveTraces", &NeuralWorkingMemory::getActiveTraces,
+             "Get number of active memory traces")
+        .def("getMemoryNeurons", &NeuralWorkingMemory::getMemoryNeurons,
+             "Get neurons currently in memory")
+        .def("getMemoryCapacity", &NeuralWorkingMemory::getMemoryCapacity,
+             "Get working memory capacity")
+        .def("setCapacity", &NeuralWorkingMemory::setCapacity, py::arg("capacity"),
+             "Set working memory capacity")
+        .def("getMemoryStrength", &NeuralWorkingMemory::getMemoryStrength, py::arg("neuronId"),
+             "Get memory strength for a neuron")
+        .def("update", &NeuralWorkingMemory::update, py::arg("dt"), "Update working memory")
+        .def("getMemoryAge", &NeuralWorkingMemory::getMemoryAge, py::arg("neuronId"),
+             "Get age of memory trace")
+        .def("reset", &NeuralWorkingMemory::reset, "Reset working memory");
+
+    // Neural Episodic Memory for experience storage
+    py::class_<NeuralEpisodicMemory>(m, "NeuralEpisodicMemory", R"pbdoc(Neural episodic memory for experience storage)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralEpisodicMemory::initialize, py::arg("brain"),
+             "Initialize episodic memory with brain reference")
+        .def("storeEpisode", &NeuralEpisodicMemory::storeEpisode, py::arg("episode"),
+             "Store an episodic memory")
+        .def("getEpisodeCount", &NeuralEpisodicMemory::getEpisodeCount,
+             "Get number of stored episodes")
+        .def("getMaxEpisodes", &NeuralEpisodicMemory::getMaxEpisodes,
+             "Get maximum number of episodes")
+        .def("setMaxEpisodes", &NeuralEpisodicMemory::setMaxEpisodes, py::arg("maxEpisodes"),
+             "Set maximum number of episodes")
+        .def("getEpisodesForReplay", &NeuralEpisodicMemory::getEpisodesForReplay, py::arg("count"),
+             "Get episodes for replay")
+        .def("replayEpisode", &NeuralEpisodicMemory::replayEpisode, py::arg("episode"),
+             "Replay an episodic memory")
+        .def("consolidate", &NeuralEpisodicMemory::consolidate, py::arg("threshold"),
+             "Consolidate important memories")
+        .def("getEpisodeCount", &NeuralEpisodicMemory::getEpisodeCount,
+             "Get number of stored episodes")
+        .def("reset", &NeuralEpisodicMemory::reset, "Reset episodic memory");
+
+    // Neural Associative Memory for pattern associations
+    py::class_<NeuralAssociativeMemory>(m, "NeuralAssociativeMemory", R"pbdoc(Neural associative memory for pattern associations)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralAssociativeMemory::initialize, py::arg("brain"),
+             "Initialize associative memory with brain reference")
+        .def("storeAssociation", &NeuralAssociativeMemory::storeAssociation, py::arg("pattern"), py::arg("associatedPattern"),
+             "Store an associative memory between two patterns")
+        .def("retrieve", &NeuralAssociativeMemory::retrieve, py::arg("pattern"),
+             "Retrieve associated pattern for given pattern")
+        .def("getAssociationCount", &NeuralAssociativeMemory::getAssociationCount,
+             "Get number of stored associations")
+        .def("clearAssociations", &NeuralAssociativeMemory::clearAssociations,
+             "Clear all associations")
+        .def("getActivationStrength", &NeuralAssociativeMemory::getActivationStrength, py::arg("pattern1"), py::arg("pattern2"),
+             "Get activation strength between patterns")
+        .def("reset", &NeuralAssociativeMemory::reset, "Reset associative memory");
+
+    // Neural systems
+    py::class_<PlanningCandidate>(m, "PlanningCandidate", R"pbdoc(A possible action sequence considered during planning)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("actions", &PlanningCandidate::actions)
+        .def_readwrite("predictedStates", &PlanningCandidate::predictedStates)
+        .def_readwrite("expectedReward", &PlanningCandidate::expectedReward)
+        .def_readwrite("confidence", &PlanningCandidate::confidence)
+        .def_readwrite("depth", &PlanningCandidate::depth);
+
+    py::class_<NeuralPlanner>(m, "NeuralPlanner", R"pbdoc(Neural planner: uses predictions to plan multi-step actions)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralPlanner::initialize, py::arg("brain"), R"pbdoc(Initialize with brain reference)pbdoc")
+        .def("planAction", &NeuralPlanner::planAction, py::arg("currentState"), py::arg("targetReward") = 0.5f, R"pbdoc(Plan next action)pbdoc")
+        .def("evaluateSequence", &NeuralPlanner::evaluateSequence, py::arg("actions"), py::arg("startState"), R"pbdoc(Evaluate action sequence)pbdoc")
+        .def("getPlanningDepth", &NeuralPlanner::getPlanningDepth, R"pbdoc(Get planning depth)pbdoc")
+        .def("setPlanningDepth", &NeuralPlanner::setPlanningDepth, py::arg("depth"), R"pbdoc(Set planning depth)pbdoc")
+        .def("getPlanningConfidence", &NeuralPlanner::getPlanningConfidence, R"pbdoc(Get planning confidence)pbdoc")
+        .def("updatePlanQuality", &NeuralPlanner::updatePlanQuality, py::arg("plannedActions"), py::arg("actualActions"), py::arg("actualReward"), R"pbdoc(Update plan quality)pbdoc")
+        .def("clearCache", &NeuralPlanner::clearCache, R"pbdoc(Clear planning cache)pbdoc")
+        .def("setActionQuality", &NeuralPlanner::setActionQuality, py::arg("action"), py::arg("quality"), R"pbdoc(Set action quality)pbdoc")
+        .def("getCurrentGoal", &NeuralPlanner::getCurrentGoal, R"pbdoc(Get current goal)pbdoc")
+        .def("setCurrentGoal", &NeuralPlanner::setCurrentGoal, py::arg("goal"), R"pbdoc(Set current goal)pbdoc")
+        .def("wasRecentPlanSuccessful", &NeuralPlanner::wasRecentPlanSuccessful, R"pbdoc(Check if recent plan was successful)pbdoc")
+        .def("generateActionSequences", &NeuralPlanner::generateActionSequences, py::arg("depth"), R"pbdoc(Generate action sequences)pbdoc")
+        .def("evaluateAction", &NeuralPlanner::evaluateAction, py::arg("action"), py::arg("state"), R"pbdoc(Evaluate single action)pbdoc");
+
+    // Self model
+    py::class_<SelfModel>(m, "SelfModel", R"pbdoc(Self model: agent's internal model of itself)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SelfModel::initialize, py::arg("brain"), R"pbdoc(Initialize with brain reference)pbdoc")
+        .def("recordSelfAction", &SelfModel::recordSelfAction, py::arg("action"), py::arg("beforeState"), py::arg("afterState"), R"pbdoc(Record self action)pbdoc")
+        .def("predictActionConsequence", &SelfModel::predictActionConsequence, py::arg("action"), py::arg("currentState"), R"pbdoc(Predict action consequence)pbdoc")
+        .def("getSelfModelConfidence", &SelfModel::getSelfModelConfidence, py::arg("action"), R"pbdoc(Get self-model confidence)pbdoc")
+        .def("computeSelfGeneratedLikeness", &SelfModel::computeSelfGenerated Likeness, py::arg("beforeState"), py::arg("afterState"), py::arg("action"), R"pbdoc(Compute self-generated likeness)pbdoc")
+        .def("getPreferredAction", &SelfModel::getPreferredAction, py::arg("state"), R"pbdoc(Get preferred action)pbdoc")
+        .def("updateSelfModel", &SelfModel::updateSelfModel, py::arg("predicted"), py::arg("actual"), py::arg("action"), R"pbdoc(Update self-model)pbdoc")
+        .def("getCapabilityLevel", &SelfModel::getCapabilityLevel, R"pbdoc(Get capability level)pbdoc")
+        .def("getBodyAwareness", &SelfModel::getBodyAwareness, R"pbdoc(Get body awareness)pbdoc")
+        .def("clear", &SelfModel::clear, R"pbdoc(Clear self-model)pbdoc")
+        .def("hasSelfModel", &SelfModel::hasSelfModel, R"pbdoc(Check if self-model formed)pbdoc")
+        .def("findMatchingEffect", &SelfModel::findMatchingEffect, py::arg("action"), py::arg("beforeState"), R"pbdoc(Find matching effect)pbdoc");
+
+    // Social learning
+    py::class_<SocialLearning>(m, "SocialLearning", R"pbdoc(Social learning: learning from other agents)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SocialLearning::initialize, py::arg("brain"), R"pbdoc(Initialize with brain reference)pbdoc")
+        .def("observeAgentAction", &SocialLearning::observeAgentAction, py::arg("observedAction"), py::arg("observerState"), py::arg("resultingState"), R"pbdoc(Observe agent action)pbdoc")
+        .def("canImitate", &SocialLearning::canImitate, py::arg("observedAction"), R"pbdoc(Check if can imitate)pbdoc")
+        .def("getImitationAction", &SocialLearning::getImitationAction, py::arg("currentState"), R"pbdoc(Get imitation action)pbdoc")
+        .def("learnCommunicationSignal", &SocialLearning::learnCommunicationSignal, py::arg("signalPattern"), py::arg("signalReward"), R"pbdoc(Learn communication signal)pbdoc")
+        .def("detectSignal", &SocialLearning::detectSignal, py::arg("neuralPattern"), R"pbdoc(Detect signal)pbdoc")
+        .def("getSignalPattern", &SocialLearning::getSignalPattern, R"pbdoc(Get signal pattern)pbdoc")
+        .def("getSignalMeaning", &SocialLearning::getSignalMeaning, R"pbdoc(Get signal meaning)pbdoc")
+        .def("updateSocialKnowledge", &SocialLearning::updateSocialKnowledge, py::arg("interactionReward"), R"pbdoc(Update social knowledge)pbdoc")
+        .def("clear", &SocialLearning::clear, R"pbdoc(Clear social learning)pbdoc")
+        .def("hasSocialKnowledge", &SocialLearning::hasSocialKnowledge, R"pbdoc(Check if has social knowledge)pbdoc")
+        .def("getObservationCount", &SocialLearning::getObservationCount, R"pbdoc(Get observation count)pbdoc");
+
+    // Concept formation
+    py::class_<ConceptInstance>(m, "ConceptInstance", R"pbdoc(A single instance of a concept)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("pattern", &ConceptInstance::pattern)
+        .def_readwrite("features", &ConceptInstance::features)
+        .def_readwrite("observationCount", &ConceptInstance::observationCount)
+        .def_readwrite("lastObserved", &ConceptInstance::lastObserved)
+        .def_readwrite("avgReward", &ConceptInstance::avgReward)
+        .def_readwrite("stability", &ConceptInstance::stability);
+
+    py::class_<DiscoveredConcept>(m, "DiscoveredConcept", R"pbdoc(A concept discovered from experience)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("id", &DiscoveredConcept::id)
+        .def_readwrite("prototype", &DiscoveredConcept::prototype)
+        .def("getInstances", &DiscoveredConcept::instances, R"pbdoc(Get concept instances)pbdoc")
+        .def("getTotalObservations", &DiscoveredConcept::totalObservations, R"pbdoc(Get total observations)pbdoc")
+        .def("getAverageStability", &DiscoveredConcept::avgStability, R"pbdoc(Get average stability)pbdoc")
+        .def_readwrite("categoryHint", &DiscoveredConcept::categoryHint)
+        .def("getAssociatedConceptIds", &DiscoveredConcept::associatedConceptIds, R"pbdoc(Get associated concept IDs)pbdoc")
+        .def("update", &DiscoveredConcept::update, R"pbdoc(Update concept)pbdoc");
+
+    py::class_<ConceptFormation>(m, "ConceptFormation", R"pbdoc(Concept formation: discovers recurring patterns)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &ConceptFormation::initialize, py::arg("brain"), R"pbdoc(Initialize concept formation)pbdoc")
+        .def("presentExperience", &ConceptFormation::presentExperience, py::arg("pattern"), py::arg("features"), py::arg("reward"), py::arg("currentTime"), R"pbdoc(Present experience)pbdoc")
+        .def("getMatchingConcept", &ConceptFormation::getMatchingConcept, py::arg("pattern"), py::arg("similarityThreshold") = 0.7f, R"pbdoc(Get matching concept)pbdoc")
+        .def("getConcepts", &ConceptFormation::getConcepts, R"pbdoc(Get all concepts)pbdoc")
+        .def("getConcept", &ConceptFormation::getConcept, py::arg("conceptId"), R"pbdoc(Get specific concept)pbdoc")
+        .def("getConceptPrototype", &ConceptFormation::getConceptPrototype, py::arg("conceptId"), R"pbdoc(Get concept prototype)pbdoc")
+        .def("getConceptInstances", &ConceptFormation::getConceptInstances, py::arg("conceptId"), R"pbdoc(Get concept instances)pbdoc")
+        .def("getConceptStability", &ConceptFormation::getConceptStability, py::arg("conceptId"), R"pbdoc(Get concept stability)pbdoc")
+        .def("mergeConcepts", &ConceptFormation::mergeConcepts, py::arg("conceptA"), py::arg("conceptB"), R"pbdoc(Merge two concepts)pbdoc")
+        .def("updateConcept", &ConceptFormation::updateConcept, py::arg("conceptId"), py::arg("newPattern"), py::arg("features"), py::arg("reward"), R"pbdoc(Update concept)pbdoc")
+        .def("computeSimilarity", &ConceptFormation::computeSimilarity, py::arg("a"), py::arg("b"), R"pbdoc(Compute similarity between patterns)pbdoc")
+        .def("isNovel", &ConceptFormation::isNovel, py::arg("pattern"), py::arg("similarityThreshold") = 0.7f, R"pbdoc(Check if pattern is novel)pbdoc")
+        .def("findConceptForPattern", &ConceptFormation::findConceptForPattern, py::arg("pattern"), R"pbdoc(Find concept for pattern)pbdoc")
+        .def("clear", &ConceptFormation::clear, R"pbdoc(Clear all concepts)pbdoc")
+        .def("getGeneralizationAbility", &ConceptFormation::getGeneralizationAbility, py::arg("conceptId"), R"pbdoc(Get generalization ability)pbdoc")
+        .def("setFormationThreshold", &ConceptFormation::setFormationThreshold, py::arg("threshold"), R"pbdoc(Set formation threshold)pbdoc")
+        .def("setStabilityWindow", &ConceptFormation::setStabilityWindow, py::arg("window"), R"pbdoc(Set stability window)pbdoc");
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
