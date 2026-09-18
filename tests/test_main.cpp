@@ -33,7 +33,7 @@ namespace test_stdp {
     void runAll();
 }
 
-namespace test_brain {
+namespace test_phase6_integration {
     void runAll();
 }
 
