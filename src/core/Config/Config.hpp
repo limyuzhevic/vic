@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -55,13 +57,19 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (auto-detect format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON string
+    bool loadFromJson(const std::string& jsonString);
+    
+    // Load from YAML string
+    bool loadFromYaml(const std::string& yamlString);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (auto-detect format based on extension)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,13 +101,42 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration schema validation
+    struct Schema {
+        std::string key;
+        std::string type; // "int", "float", "string", "bool", "vector<int>", "vector<float>", "vector<string>"
+        std::string description;
+        std::optional<std::string> defaultValue;
+        bool required = false;
+        std::vector<std::string> allowedValues;
+        
+        std::vector<double> minValue;
+        std::vector<double> maxValue;
+        bool validate(const ConfigValue& value) const;
+    };
+    
+    // Schema management
+    void addSchema(const Schema& schema);
+    void validateSchema(const nlohmann::json& schema) const;
+    bool validate() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    std::vector<Schema> schemas;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Format detection
+    static std::string detectFormat(const std::string& filepath);
+    
+    // Parsing helpers
+    static ConfigValue jsonValueToConfigValue(const nlohmann::json& jsonValue);
+    static nlohmann::json configValueToJson(const ConfigValue& configValue);
+    static ConfigValue yamlValueToConfigValue(const YAML::Node& yamlValue);
+    static YAML::Node configValueToYaml(const ConfigValue& configValue);
 };
 
 } // namespace nlm

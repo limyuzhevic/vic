@@ -1,0 +1,146 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "NLM Configuration Schema",
+    "type": "object",
+    "properties": {
+        "random_seed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Random seed for reproducible experiments"
+        },
+        "simulation_timestep": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Simulation timestep in seconds"
+        },
+        "neuron_count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of neurons in the brain"
+        },
+        "region_count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of brain regions"
+        },
+        "connection_probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Connection probability for random connectivity"
+        },
+        "plasticity_learning_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Plasticity learning rate"
+        },
+        "stdp_ltp_weight": {
+            "type": "number",
+            "minimum": 0,
+            "description": "STDP LTP weight"
+        },
+        "stdp_ltd_weight": {
+            "type": "number",
+            "minimum": 0,
+            "description": "STDP LTD weight"
+        },
+        "stdp_time_constant": {
+            "type": "number",
+            "minimum": 0,
+            "description": "STDP time constant"
+        },
+        "development_synaptogenesis_rate": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Development synaptogenesis rate"
+        },
+        "development_pruning_rate": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Development pruning rate"
+        },
+        "dopamine_baseline": {
+            "type": "number",
+            "description": "Dopamine baseline value"
+        },
+        "reward_discount_factor": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Reward discount factor"
+        },
+        "environment_name": {
+            "type": "string",
+            "description": "Name of the environment"
+        },
+        "environment_width": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Environment width"
+        },
+        "environment_height": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Environment height"
+        },
+        "log_level": {
+            "type": "string",
+            "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            "description": "Log level"
+        },
+        "log_to_file": {
+            "type": "boolean",
+            "description": "Whether to log to file"
+        },
+        "log_filename": {
+            "type": "string",
+            "description": "Log filename"
+        },
+        "max_simulation_steps": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum simulation steps"
+        },
+        "simulation_time_limit": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Simulation time limit"
+        },
+        "visualization_enabled": {
+            "type": "boolean",
+            "description": "Whether visualization is enabled"
+        },
+        "visualization_update_rate": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Visualization update rate"
+        }
+    },
+    "required": [
+        "random_seed",
+        "simulation_timestep",
+        "neuron_count",
+        "region_count",
+        "connection_probability",
+        "plasticity_learning_rate",
+        "stdp_ltp_weight",
+        "stdp_ltd_weight",
+        "stdp_time_constant",
+        "development_synaptogenesis_rate",
+        "development_pruning_rate",
+        "dopamine_baseline",
+        "reward_discount_factor",
+        "environment_name",
+        "environment_width",
+        "environment_height",
+        "log_level",
+        "log_to_file",
+        "log_filename",
+        "max_simulation_steps",
+        "simulation_time_limit",
+        "visualization_enabled",
+        "visualization_update_rate"
+    ]
+}
