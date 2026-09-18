@@ -13,8 +13,8 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
-    ~AgentBrain();
+    explicit AgentBrain(std::shared_ptr<Brain> brain);
+    ~AgentBrain() = default;
     
     // Initialize with world
     void initialize(const SimpleWorld& world);
@@ -56,9 +56,9 @@ public:
     void reset();
     
     // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    Brain* getBrain() const { return brain_.get(); }
     
-    // Configuration
+    // Configuration methods
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
@@ -69,6 +69,17 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Utility methods for advanced users
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = std::clamp(threshold, 0.0f, 1.0f); }
+    void setExplorationScale(float scale) { explorationScale_ = std::clamp(scale, 0.0f, 1.0f); }
+    
+    // Get current configuration and state
+    float getCuriosityThreshold() const { return curiosityThreshold_; }
+    float getExplorationScale() const { return explorationScale_; }
+    
+    // Check if agent is properly initialized
+    bool isInitialized() const { return brain_ != nullptr; }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -76,17 +87,30 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Helper methods for processing and validation
+    void validateState() const;
+    void distributeMotorNeurons(const Brain& brain);
+    void distributeSensoryNeurons(const Brain& brain);
+    void processVisionInput(const std::vector<float>& vision);
+    void processTouchInput(const std::vector<float>& touch);
+    void processInternalInput(const std::vector<float>& internal);
+    void processProprioceptionInput(const std::vector<float>& proprio);
+    void computeNovelty(const std::vector<float>& vision);
+    MotorCommand findBestMotorCommand(const std::array<std::pair<MotorCommand, float>, 6>& commands) const;
+    
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
+    // Motor neuron groups - organized by action type
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
     std::vector<Neuron*> motorTurnRight_;
+    std::vector<Neuron*> motorLookLeft_;
+    std::vector<Neuron*> motorLookRight_;
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
-    // Sensory neuron groups
+    // Sensory neuron groups - organized by modality
     std::vector<Neuron*> sensoryVision_;
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
@@ -112,6 +136,10 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Advanced configuration parameters
+    float curiosityThreshold_;
+    float explorationScale_;
 };
 
 } // namespace nlm
