@@ -143,19 +143,56 @@ void Neuron::injectCurrent(MembranePotential current) {
     pImpl->synapticInput += current;
 }
 
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->synapticInput;
+}
+
 void Neuron::clearTotalCurrent() {
     pImpl->synapticInput = 0.0f;
 }
 
-void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
-    }
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active;
 }
 
-void Neuron::clearSpikeHistory() {
-    pImpl->spikeHistory.clear();
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
+NeuronId Neuron::getId() const {
+    return pImpl->id;
+}
+
+NeuronType Neuron::getType() const {
+    return pImpl->type;
+}
+
+const NeuronState& Neuron::getState() const {
+    return pImpl->state;
+}
+
+NeuronState& Neuron::getState() {
+    return pImpl->state;
+}
+
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
+void Neuron::setRegionId(RegionId region) {
+    pImpl->regionId = region;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
+}
+
+void Neuron::setPopulationId(PopulationId population) {
+    pImpl->populationId = population;
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
@@ -166,8 +203,16 @@ void Neuron::addOutgoingSynapse(SynapseHandle handle) {
     pImpl->outgoingSynapses.push_back(handle);
 }
 
-NeuronState& Neuron::getState() {
-    return pImpl->state;
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
 }
 
 PlasticityFlags& Neuron::getPlasticityFlags() {
@@ -180,16 +225,21 @@ void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
     pImpl->plasticityFlags.reward_modulated = rewardModulated;
 }
 
-void Neuron::setRegionId(RegionId region) {
-    pImpl->regionId = region;
-}
-
-void Neuron::setPopulationId(PopulationId population) {
-    pImpl->populationId = population;
-}
-
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
+    
+    // Validate timestep for numerical stability in LIF integration
+    // Acceptable range: 0.000001s (1μs) to 0.1s (100ms)
+    const TimestepDuration MIN_LIF_TIMESTEP = 0.000001f;  // 1 microsecond
+    const TimestepDuration MAX_LIF_TIMESTEP = 0.1f;       // 100 milliseconds
+    
+    if (dt <= 0.0f) {
+        // Invalid timestep - use minimum safe value for stability
+        dt = MIN_LIF_TIMESTEP;
+    } else if (dt > MAX_LIF_TIMESTEP) {
+        // Timestep too large for stable LIF integration - use maximum stable value
+        dt = MAX_LIF_TIMESTEP;
+    }
     
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
@@ -204,7 +254,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     // LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    // Discrete approximation using exponential Euler integration
+    // V_new = V + dt * 1000.0 * ((V_rest - V)/tau + I/C)
     
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
@@ -213,13 +264,14 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
-    // Synaptic input contributes to membrane potential change
+    // Synaptic input contributes to membrane potential change (I/C)
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
+    // Leak contribution (V_rest - V)/tau, scaled by 1000 for dt in seconds
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
+    // dt is in seconds, need to scale by 1000 to match ms units
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
@@ -228,19 +280,19 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
+    // Clamp membrane potential to prevent instability from numerical errors
     V = std::clamp(V, -100.0f, 50.0f);
     
-    // Check for spike
+    // Check for spike (threshold crossing)
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike timestamp for STDP
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential after spike
         V = V_reset;
         
         // Enter refractory period
@@ -253,15 +305,30 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Active;
     }
     
-    // Clear synaptic input for next step
+    // Clear synaptic input for next step to avoid accumulation
     pImpl->synapticInput = 0.0f;
     
     return fired;
 }
 
-void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+void Neuron::step(Timestamp currentTime, TimestepDuration dt) {
+    // Integrate neuron over the timestep using Leaky Integrate-and-Fire dynamics
+    // dt must be positive and within reasonable bounds for numerical stability
+    
+    // Validate timestep for numerical stability
+    // Accept: 1μs to 1s (0.000001s to 1s) - covers realistic simulation ranges
+    const TimestepDuration MIN_TIMESTEP = 0.000001f;  // 1 microsecond
+    const TimestepDuration MAX_TIMESTEP = 1.0f;       // 1 second
+    
+    if (dt <= 0.0f) {
+        // Invalid timestep - use minimum safe value
+        dt = MIN_TIMESTEP;
+    } else if (dt > MAX_TIMESTEP) {
+        // Timestep too large - use maximum stable value
+        dt = MAX_TIMESTEP;
+    }
+    
+    // Apply LIF dynamics with validated timestep
     stepLIF(currentTime, dt);
 }
 

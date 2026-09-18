@@ -7,11 +7,6 @@ namespace nlm {
 // Novelty detection signal
 // Computes novelty from comparison with previous observations
 
-class Novelty {
-public:
-    Novelty();
-    ~Novelty();
-    
     // Initialize with brain reference
     void initialize(class Brain* brain);
     
@@ -19,7 +14,13 @@ public:
     float getLevel() const;
     void setLevel(float level);
     
-    // Detect novelty from observation
+    // Get novelty components
+    float getSurpriseMagnitude() const;
+    float getRecentNovelty() const;
+    float getSustainedNovelty() const;
+    float getNoveltyVelocity() const;
+    
+    // Detection methods
     void detectNovelty(const class Observation& observation, 
                        const class Observation& previousObservation);
     
@@ -33,6 +34,15 @@ public:
     // Get novelty history
     const std::vector<float>& getHistory() const;
     void clearHistory();
+    
+    // Configuration methods
+    void setNoveltyThreshold(float threshold);
+    void setDecayRate(float rate);
+    void setAdaptationRate(float rate);
+    void setSurpriseThreshold(float threshold);
+    
+    // Feature extraction
+    void extractFeatures(const class Observation& observation, std::vector<float>& features) const;
     
 private:
     struct Impl;

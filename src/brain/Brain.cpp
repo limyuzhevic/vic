@@ -61,6 +61,11 @@ struct Brain::Impl {
     SimulationStep currentStep;
     Timestamp currentTime;
     
+    // Development system configuration
+    size_t developmentStepInterval;
+    float synaptogenesisRateDefault;
+    float pruningRateDefault;
+    
     // Statistics
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
@@ -83,7 +88,7 @@ struct Brain::Impl {
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
-        , timestep(0.001)
+        , timestep(0.0)
         , currentStep(0)
         , currentTime(0.0)
         , totalSpikesThisStep(0)
@@ -142,15 +147,109 @@ struct Brain::Impl {
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        // Get timestep from config (remove hardcoded default)
+        timestep = config->getOr<double>("simulation_timestep", 0.0);
         
         // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
+        // Get development configuration
+        developmentStepInterval = config->getOr<size_t>("development_step_interval", 1000);
+        
+        // Get structural plasticity configuration
+        synaptogenesisRateDefault = config->getOr<float>("synaptogenesis_rate_default", 0.0001f);
+        pruningRateDefault = config->getOr<float>("pruning_rate_default", 0.00001f);
+        
+        // Validate timestep configuration
+        validateTimestepConfiguration();
+        
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+    }
+    
+    // Validate timestep configuration and consistency across integrated systems
+    void validateTimestepConfiguration() {
+        if (timestep <= 0.0) {
+            NLM_LOG_ERROR("Invalid simulation timestep: " + std::to_string(timestep) + ". Using default 0.001");
+            timestep = 0.001;
+        }
+        
+        // Check that timestep is reasonable for the neural dynamics
+        if (timestep > 0.1) {
+            NLM_LOG_WARNING("Large simulation timestep detected: " + std::to_string(timestep) + ". May affect neural dynamics accuracy");
+        }
+        
+        // Validate that integrated systems support this timestep
+        validateSystemTimestepCompatibility();
+        
+        NLM_LOG_INFO("Validated simulation timestep: " + std::to_string(timestep) + " seconds");
+    }
+    
+    // Check compatibility of timestep with integrated systems
+    void validateSystemTimestepCompatibility() {
+        // Check working memory - uses timestep for synaptic decay
+        if (workingMemory) {
+            float workingMemoryTimestep = workingMemory->getTimeStep();
+            if (std::abs(workingMemoryTimestep - timestep) > 1e-6) {
+                NLM_LOG_WARNING("Working memory timestep mismatch: system uses " + 
+                    std::to_string(workingMemoryTimestep) + ", Brain uses " + std::to_string(timestep));
+            }
+        }
+        
+        // Check attention system - uses timestep for inhibition
+        if (attention) {
+            float attentionTimestep = attention->getTimeStep();
+            if (std::abs(attentionTimestep - timestep) > 1e-6) {
+                NLM_LOG_WARNING("Attention system timestep mismatch: system uses " + 
+                    std::to_string(attentionTimestep) + ", Brain uses " + std::to_string(timestep));
+            }
+        }
+        
+        // Check novelty system - uses timestep for decay
+        if (novelty) {
+            float noveltyTimestep = novelty->getTimeStep();
+            if (std::abs(noveltyTimestep - timestep) > 1e-6) {
+                NLM_LOG_WARNING("Novelty system timestep mismatch: system uses " + 
+                    std::to_string(noveltyTimestep) + ", Brain uses " + std::to_string(timestep));
+            }
+        }
+        
+        // Check dopamine system - uses timestep for plasticity factor
+        if (dopamine) {
+            float dopamineTimestep = dopamine->getTimeStep();
+            if (std::abs(dopamineTimestep - timestep) > 1e-6) {
+                NLM_LOG_WARNING("Dopamine system timestep mismatch: system uses " + 
+                    std::to_string(dopamineTimestep) + ", Brain uses " + std::to_string(timestep));
+            }
+        }
+        
+        // Check curiosity system - uses timestep for exploration rate
+        if (curiosity) {
+            float curiosityTimestep = curiosity->getTimeStep();
+            if (std::abs(curiosityTimestep - timestep) > 1e-6) {
+                NLM_LOG_WARNING("Curiosity system timestep mismatch: system uses " + 
+                    std::to_string(curiosityTimestep) + ", Brain uses " + std::to_string(timestep));
+            }
+        }
+        
+        // Check development system - uses timestep for development rate
+        if (developmentSystem) {
+            float developmentTimestep = developmentSystem->getTimeStep();;
+            if (std::abs(developmentTimestep - timestep) > 1e-6) {
+                NLM_LOG_WARNING("Development system timestep mismatch: system uses " + 
+                    std::to_string(developmentTimestep) + ", Brain uses " + std::to_string(timestep));
+            }
+        }
+        
+        // Check structural plasticity - uses timestep for synaptogenesis/pruning rates
+        if (structuralPlasticity) {
+            float plasticityTimestep = structuralPlasticity->getTimeStep();
+            if (std::abs(plasticityTimestep - timestep) > 1e-6) {
+                NLM_LOG_WARNING("Structural plasticity system timestep mismatch: system uses " + 
+                    std::to_string(plasticityTimestep) + ", Brain uses " + std::to_string(timestep));
+            }
+        }
     }
     
     DevelopmentalStage developmentalStage;
@@ -333,10 +432,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // Use Brain's timestep for all neurons to ensure consistency
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
+                // Use the improved step() method with proper timestep integration
+                neuron->step(currentTime, pImpl->timestep);
             }
         }
     }
@@ -457,7 +558,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     // Modify weight change based on dopamine
                     pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
                     float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * pImpl->timestep;
                     syn->setWeight(weight);
                 }
             }
@@ -757,6 +858,8 @@ void Brain::reset() {
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+}
+
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }

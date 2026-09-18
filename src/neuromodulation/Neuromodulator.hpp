@@ -44,13 +44,26 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
-    // Reward signaling
-    void signalReward(float reward);
-    void signalRewardPredictionError(float error);
+    // Exploration-exploitation balance
+    float getExplorationBias() const;
+    float getTimeSinceLastReward() const;
     
-private:
-    struct Impl;
-    Impl* pImpl;
+    // RPE tracking
+    float getExpectedReward() const;
+    float getRewardPredictionError() const;
+    
+    // Configuration methods
+    void setBaseline(float baseline);
+    void setPeak(float peak);
+    void setDecayRate(float decayRate);
+    void setReleaseRate(float releaseRate);
+    void setLearningRate(float learningRate);
+    void setExplorationBias(float bias);
+    
+    // Time constants configuration
+    void setDecayTimeConstant(float timeConstant);
+    void setBurstTimeConstant(float timeConstant);
+    void setRecoveryTimeConstant(float timeConstant);
 };
 
 // Acetylcholine: Attention and memory consolidation

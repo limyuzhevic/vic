@@ -134,8 +134,9 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
+    // Implements Leaky Integrate-and-Fire dynamics with proper timestep integration
+    // Validates timestep (1μs to 1s) for numerical stability before processing
+    void step(Timestamp currentTime, TimestepDuration dt);
     
     // Reset to initial state
     void reset();
