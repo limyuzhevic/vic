@@ -588,33 +588,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
 }
 
-void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
-    
-    const auto& values = input.getData();
-    if (values.empty()) return;
-    
-    size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
-    
-    // Distribute input across sensory neurons
-    for (size_t i = 0; i < numSensory; ++i) {
-        // Normalize input value to range [-10, 10] mV
-        float normalizedValue = 0.0f;
-        if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
+// Store sensory input in working memory
+        if (pImpl->workingMemory) {
+            // Inject sensory current into sensory neurons
+            receiveSensoryInput(input);
+            
+            // Store key sensory patterns in working memory
+            for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < values.size(); ++i) {
+                if (values[i] > 0.5f) {  // Significant input
+                    pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), values[i] / 10.0f);
+                }
+            }
+        } else {
+            // Fallback to original behavior if working memory not available
+            receiveSensoryInput(input);
         }
-        
-        // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
-        
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
-        }
-    }
-}
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
     for (auto& region : pImpl->regions) {
