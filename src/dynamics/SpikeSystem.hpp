@@ -1,14 +1,15 @@
 #pragma once
-
+ 
 #include "../core/Types/Types.hpp"
 #include "../brain/Neuron.hpp"
 #include <vector>
 #include <queue>
 #include <functional>
 #include <unordered_map>
-
+#include <list>  // Added for std::list support
+ 
 namespace nlm {
-
+ 
 // SpikeEvent with additional metadata
 struct DetailedSpikeEvent {
     NeuronId source;
@@ -76,5 +77,5 @@ private:
     struct Impl;
     Impl* pImpl;
 };
-
+ 
 } // namespace nlm

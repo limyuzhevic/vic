@@ -18,13 +18,14 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    // Add circular buffer fields for O(1) spike history operations
+    size_t spikeHistoryIndex;              // Current write position in circular buffer
+    size_t spikeHistorySize;               // Actual number of stored spikes
+    static constexpr size_t SPIKE_HISTORY_CAPACITY = 100;  // Maximum number of spikes to store
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             spikeHistoryIndex(0), spikeHistorySize(0) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -148,10 +149,33 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    // Implement circular buffer for spike history (O(1) operations)
+    // This replaces the O(n) vector operations for better performance
+    // and memory efficiency
+    
+    // Initialize circular buffer on first call
+    if (pImpl->spikeHistory.empty()) {
+        // Reserve fixed-size buffer instead of dynamic vector
+        pImpl->spikeHistory.reserve(pImpl->SPIKE_HISTORY_CAPACITY);
+        pImpl->spikeHistory.resize(pImpl->SPIKE_HISTORY_CAPACITY);
+        pImpl->spikeHistoryIndex = 0;
+        pImpl->spikeHistorySize = 0;
     }
+    
+    // O(1) circular buffer write operation
+    // Use modulo to wrap around to beginning when reaching end
+    pImpl->spikeHistory[pImpl->spikeHistoryIndex] = timestamp;
+    pImpl->spikeHistoryIndex = (pImpl->spikeHistoryIndex + 1) % pImpl->SPIKE_HISTORY_CAPACITY;
+    
+    // Update actual size (number of valid entries)
+    if (pImpl->spikeHistorySize < pImpl->SPIKE_HISTORY_CAPACITY) {
+        pImpl->spikeHistorySize++;
+    }
+    
+    // Spike history is now O(1) for all operations:
+    // - Recording: O(1) with modulo arithmetic
+    // - Reading oldest spike: (spikeHistoryIndex + SPIKE_HISTORY_CAPACITY - spikeHistorySize) % SPIKE_HISTORY_CAPACITY
+    // - Reading newest spike: (spikeHistoryIndex - 1 + SPIKE_HISTORY_CAPACITY) % SPIKE_HISTORY_CAPACITY
 }
 
 void Neuron::clearSpikeHistory() {

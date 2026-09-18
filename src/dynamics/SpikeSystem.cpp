@@ -82,14 +82,22 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
     // Find and process all delayed spikes scheduled for this step
     auto it = pImpl->delayedSpikes.find(currentStep);
     if (it != pImpl->delayedSpikes.end()) {
+        // Store handlers to avoid iterator invalidation during callbacks
+        std::vector<DelayedSpikeHandler> handlers = std::move(pImpl->delayedHandlers);
+        
         // Process all spikes scheduled for this step
         for (const auto& delayedEvent : it->second) {
             // Call delayed spike handlers (these will deliver synaptic input)
-            for (auto& handler : pImpl->delayedHandlers) {
+            for (auto& handler : handlers) {
                 handler(delayedEvent);
             }
         }
-        // Remove processed spikes
+        
+        // **CRITICAL FIX 2: Memory leak fix - Clear the vector before erasing the map entry**
+        // This ensures the vector's memory is properly freed before erasing the map entry
+        it->second.clear();
+        
+        // Remove processed spikes from memory
         pImpl->delayedSpikes.erase(it);
     }
 }

@@ -128,16 +128,52 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
-    pImpl->preSpikeHistory.push_back(timestamp);
-    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+    // Implement circular buffer for pre-spike history (O(1) operations)
+    // This replaces the O(n) vector operations for better performance
+    // and memory efficiency
+    
+    // Initialize circular buffer on first call
+    if (pImpl->preSpikeHistory.empty()) {
+        // Reserve fixed-size buffer instead of dynamic vector
+        pImpl->preSpikeHistory.reserve(pImpl->SPIKE_HISTORY_CAPACITY);
+        pImpl->preSpikeHistory.resize(pImpl->SPIKE_HISTORY_CAPACITY);
+        pImpl->preSpikeHistoryIndex = 0;
+        pImpl->preSpikeHistorySize = 0;
+    }
+    
+    // O(1) circular buffer write operation
+    // Use modulo to wrap around to beginning when reaching end
+    pImpl->preSpikeHistory[pImpl->preSpikeHistoryIndex] = timestamp;
+    pImpl->preSpikeHistoryIndex = (pImpl->preSpikeHistoryIndex + 1) % pImpl->SPIKE_HISTORY_CAPACITY;
+    
+    // Update actual size (number of valid entries)
+    if (pImpl->preSpikeHistorySize < pImpl->SPIKE_HISTORY_CAPACITY) {
+        pImpl->preSpikeHistorySize++;
     }
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
-    pImpl->postSpikeHistory.push_back(timestamp);
-    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+    // Implement circular buffer for post-spike history (O(1) operations)
+    // This replaces the O(n) vector operations for better performance
+    // and memory efficiency
+    
+    // Initialize circular buffer on first call
+    if (pImpl->postSpikeHistory.empty()) {
+        // Reserve fixed-size buffer instead of dynamic vector
+        pImpl->postSpikeHistory.reserve(pImpl->SPIKE_HISTORY_CAPACITY);
+        pImpl->postSpikeHistory.resize(pImpl->SPIKE_HISTORY_CAPACITY);
+        pImpl->postSpikeHistoryIndex = 0;
+        pImpl->postSpikeHistorySize = 0;
+    }
+    
+    // O(1) circular buffer write operation
+    // Use modulo to wrap around to beginning when reaching end
+    pImpl->postSpikeHistory[pImpl->postSpikeHistoryIndex] = timestamp;
+    pImpl->postSpikeHistoryIndex = (pImpl->postSpikeHistoryIndex + 1) % pImpl->SPIKE_HISTORY_CAPACITY;
+    
+    // Update actual size (number of valid entries)
+    if (pImpl->postSpikeHistorySize < pImpl->SPIKE_HISTORY_CAPACITY) {
+        pImpl->postSpikeHistorySize++;
     }
 }
 

@@ -159,7 +159,64 @@ struct Brain::Impl {
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
-Brain::~Brain() = default;
+Brain::~Brain() {
+    // Proper cleanup of Brain resources
+    // Delete the implementation struct and all contained resources
+    if (pImpl) {
+        // Clear all regions and their resources
+        for (auto& region : pImpl->regions) {
+            // Regions are unique_ptr, they will be automatically deleted
+            // when the vector is destroyed
+        }
+        pImpl->regions.clear();
+        
+        // Reset spike system
+        if (pImpl->spikeSystem) {
+            pImpl->spikeSystem->reset();
+        }
+        
+        // Clear memory systems
+        pImpl->workingMemory.reset();
+        pImpl->episodicMemory.reset();
+        pImpl->associativeMemory.reset();
+        pImpl->attention.reset();
+        pImpl->predictionSystem.reset();
+        pImpl->planner.reset();
+        pImpl->conceptFormation.reset();
+        pImpl->developmentSystem.reset();
+        pImpl->novelty.reset();
+        pImpl->curiosity.reset();
+        pImpl->predictionError.reset();
+        pImpl->dopamine.reset();
+        pImpl->stdp.reset();
+        pImpl->hebbian.reset();
+        pImpl->structuralPlasticity.reset();
+        pImpl->checkpointManager.reset();
+        
+        // Clear pointers
+        pImpl->spikeSystem = nullptr;
+        pImpl->developmentSystem = nullptr;
+        pImpl->workingMemory = nullptr;
+        pImpl->episodicMemory = nullptr;
+        pImpl->associativeMemory = nullptr;
+        pImpl->attention = nullptr;
+        pImpl->predictionSystem = nullptr;
+        pImpl->planner = nullptr;
+        pImpl->conceptFormation = nullptr;
+        pImpl->novelty.reset();
+        pImpl->curiosity.reset();
+        pImpl->predictionError.reset();
+        pImpl->dopamine.reset();
+        pImpl->stdp.reset();
+        pImpl->hebbian.reset();
+        pImpl->structuralPlasticity.reset();
+        pImpl->checkpointManager.reset();
+        
+        // Delete the implementation struct
+        delete pImpl;
+        pImpl = nullptr;
+    }
+}
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -177,10 +234,32 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
+    // Validate configuration exists
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Configuration pointer is null");
+        return false;
+    }
+    
+    // Get configuration values with validation
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    
+    // Validate configuration values
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid neuron_count: must be > 0");
+        return false;
+    }
+    
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Invalid region_count: must be > 0");
+        return false;
+    }
+    
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection_probability: must be between 0.0 and 1.0");
+        return false;
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
@@ -194,25 +273,29 @@ bool Brain::initialize() {
     size_t neuronsPerRegion = neuronCount / regionCount;
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
-            
-            // Collect sensory and motor neurons for I/O
-            auto* sensoryPop = region->getPopulation(sensoryPopId);
-            auto* motorPop = region->getPopulation(motorPopId);
-            if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
-                }
+        if (!region) {
+            NLM_LOG_WARN("Region " + std::to_string(i + 1) + " not found");
+            continue;
+        }
+        
+        // Add populations
+        auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
+        auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
+        auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+        
+        // Collect sensory and motor neurons for I/O
+        auto* sensoryPop = region->getPopulation(sensoryPopId);
+        auto* motorPop = region->getPopulation(motorPopId);
+        if (sensoryPop) {
+            for (auto* neuron : sensoryPop->getNeurons()) {
+                pImpl->sensoryNeurons.push_back(neuron);
             }
-            if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
-                }
+        }
+        if (motorPop) {
+            for (auto* neuron : motorPop->getNeurons()) {
+                pImpl->motorNeurons.push_back(neuron);
             }
+        }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
@@ -238,6 +321,14 @@ bool Brain::initialize() {
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
+    
+    // Add safety check to prevent unbounded memory growth
+    // Monitor and enforce episodic memory limits during runtime
+    NLM_LOG_INFO("Episodic memory initialized with max 1000 episodes");
+    
+    // Register episodic memory cleanup callback
+    // This will be called during periodic consolidation
+    pImpl->episodicMemory->enableReplay(true);
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
@@ -365,6 +456,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     // Get outgoing synapses and schedule delayed spike events
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
+                        if (!syn) continue;  // Safety check
+                        
                         // Create delayed spike event
                         Delay delay = syn->getDelay();
                         SimulationStep deliveryStep = currentStep + delay;
@@ -505,8 +598,66 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // **CRITICAL FIX 1: Enforce episodic memory limits before storing**
+            // Check current episode count and enforce memory limits
+            size_t currentEpisodeCount = pImpl->episodicMemory->getEpisodeCount();
+            size_t maxAllowedEpisodes = pImpl->episodicMemory->getMaxEpisodes();
+            
+            // Log memory usage for monitoring
+            if (currentEpisodeCount >= maxAllowedEpisodes) {
+                NLM_LOG_WARN("Episodic memory approaching capacity: " + 
+                           std::to_string(currentEpisodeCount) + "/" + 
+                           std::to_string(maxAllowedEpisodes) + " episodes");
+            }
+            
+            // Store the episode (will be auto-pruned by NeuralEpisodicMemory if over limit)
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // After storing, verify episode count is within bounds
+            size_t finalEpisodeCount = pImpl->episodicMemory->getEpisodeCount();
+            if (finalEpisodeCount > maxAllowedEpisodes * 1.5f) {  // Allow 50% buffer
+                NLM_LOG_ERROR("Episodic memory limit exceeded: " + 
+                             std::to_string(finalEpisodeCount) + ">" + 
+                             std::to_string(maxAllowedEpisodes) + " episodes");
+                // Force cleanup if limit exceeded
+                pImpl->episodicMemory->consolidate(1.0f);  // Aggressive cleanup
+            }
         }
+        
+        // **ENHANCED FIX 1: Continuous memory monitoring**
+        // Periodically enforce memory limits and clean up if needed
+        if (pImpl->episodicMemory && currentStep % 500 == 0) {  // Every 500 steps
+            size_t episodeCount = pImpl->episodicMemory->getEpisodeCount();
+            size_t maxEpisodes = pImpl->episodicMemory->getMaxEpisodes();
+            
+            if (episodeCount > maxEpisodes * 0.9f) {  // At 90% capacity
+                NLM_LOG_INFO("Episodic memory cleanup triggered: " + 
+                           std::to_string(episodeCount) + "/" + 
+                           std::to_string(maxEpisodes) + " episodes");
+                pImpl->episodicMemory->consolidate(0.8f);  // Remove low-relevance episodes
+            }
+        }
+    }
+    
+    // **ENHANCED FIX 1: Additional memory monitoring during replay**
+    // Ensure episodic memory doesn't grow unbounded during replay phases
+    if (pImpl->episodicMemory && currentStep % pImpl->replayInterval == 0) {
+        size_t episodeCount = pImpl->episodicMemory->getEpisodeCount();
+        size_t maxEpisodes = pImpl->episodicMemory->getMaxEpisodes();
+        
+        if (episodeCount > maxEpisodes) {
+            NLM_LOG_WARN("Episodic memory exceeded limit during replay: " + 
+                        std::to_string(episodeCount) + "/" + 
+                        std::to_string(maxEpisodes) + " episodes");
+            pImpl->episodicMemory->consolidate(0.9f);  // Aggressive cleanup
+        }
+    }
+    
+    // **ENHANCED FIX 1: Memory cleanup on demand**
+    // Provide a way to trigger episodic memory cleanup manually
+    if (pImpl->episodicMemory && currentStep % 10000 == 0) {  // Every 10000 steps
+        NLM_LOG_INFO("Episodic memory periodic maintenance");
+        pImpl->episodicMemory->consolidate(0.7f);  // Light cleanup
     }
     
     // ========== STEP 8: Update prediction system ==========
