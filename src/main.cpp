@@ -163,9 +163,15 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
+    // Add timer for test execution
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Region not found!");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -190,6 +196,11 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
     NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
     
+    // Calculate and report test execution time
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    NLM_LOG_INFO("  Test completed in " + std::to_string(duration.count()) + " milliseconds");
+    
     if (spikes > 0) {
         NLM_LOG_INFO("  ✓ Spikes propagate through network");
     } else {
@@ -209,23 +220,38 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     LearningExperiment experiment(brain, 42);
     
     // Record initial state
-    experiment.recordInitialState();
+    try {
+        experiment.recordInitialState();
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to record initial state: " + std::string(e.what()));
+        return;
+    }
     
     // Enable plasticity on synapses
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto& syn : region->getSynapses()) {
             syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
         }
+    } else {
+        NLM_LOG_ERROR("Region not found for plasticity experiment!");
+        return;
     }
     
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
+    // Start timing for plasticity experiment
+    auto experimentStartTime = std::chrono::high_resolution_clock::now();
+    
     for (SimulationStep step = 0; step < 1000; ++step) {
         // Create input pattern - inject current into sensory neurons
-        for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+        try {
+            for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
+                brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to inject current at step " + std::to_string(step) + ": " + std::string(e.what()));
         }
         
         brain->step(step, step * 0.001);
@@ -238,8 +264,18 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         }
     }
     
+    // Calculate and report plasticity experiment execution time
+    auto experimentEndTime = std::chrono::high_resolution_clock::now();
+    auto experimentDuration = std::chrono::duration_cast<std::chrono::milliseconds>(experimentEndTime - experimentStartTime);
+    NLM_LOG_INFO("  Plasticity experiment completed in " + std::to_string(experimentDuration.count()) + " milliseconds");
+    
     // Record final state
-    experiment.recordFinalState();
+    try {
+        experiment.recordFinalState();
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to record final state: " + std::string(e.what()));
+        return;
+    }
     
     // Compute and display statistics
     experiment.computeStatistics();
@@ -250,7 +286,10 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Region not found for STDP verification!");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
@@ -274,27 +313,51 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
     
+    // Use vector for neurons to improve cache locality and avoid repeated getAllNeurons() calls
+    auto neurons = region->getAllNeurons();
+    
+    // Start timing for STDP test
+    auto testStartTime = std::chrono::high_resolution_clock::now();
+    
     for (int trial = 0; trial < 50; ++trial) {
         // Fire pre-synaptic neuron
         Neuron* preNeuron = nullptr;
         Neuron* postNeuron = nullptr;
         
-        auto neurons = region->getAllNeurons();
         if (neurons.size() >= 2) {
             preNeuron = neurons[0];
             postNeuron = neurons[1];
         }
         
-        if (preNeuron && postNeuron) {
-            // Pre fires first
-            preNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2, trial * 2 * 0.001);
-            
-            // Then post fires
-            postNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+        // Use timer for performance tracking
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        try {
+            if (preNeuron && postNeuron) {
+                // Pre fires first
+                preNeuron->injectCurrent(60.0f);
+                brain->step(trial * 2, trial * 2 * 0.001);
+                
+                // Then post fires
+                postNeuron->injectCurrent(60.0f);
+                brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error in STDP trial " + std::to_string(trial) + ": " + std::string(e.what()));
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+        if (trial % 10 == 0) {  // Log every 10 trials to reduce overhead
+            NLM_LOG_INFO("    Trial " + std::to_string(trial) + " completed in " + 
+                        std::to_string(duration.count()) + " microseconds");
         }
     }
+    
+    // Calculate and report STDP test execution time
+    auto testEndTime = std::chrono::high_resolution_clock::now();
+    auto testDuration = std::chrono::duration_cast<std::chrono::milliseconds>(testEndTime - testStartTime);
+    NLM_LOG_INFO("  STDP test completed in " + std::to_string(testDuration.count()) + " milliseconds");
     
     // Record after weights
     NLM_LOG_INFO("  After correlated activity:");
@@ -345,21 +408,38 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool configSpecified = false;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
+            configSpecified = true;
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
-                configFile = argv[++i];
+                configFile = argv[i + 1];  // Use i+1 instead of ++i to avoid skipping
+                i++;  // Skip the next argument since it's the config value
             }
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
+    // Try multiple possible config paths to ensure robustness
+    std::vector<std::string> possiblePaths = {
+        configFile,                                           // Original path
+        "configs/default.cfg",                                // Relative to working dir
+        "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/configs/default.cfg", // Absolute path
+        "./configs/default.cfg"                               // Explicit relative path
+    };
+    
+    bool configLoaded = false;
+    for (const auto& path : possiblePaths) {
+        if (config->loadFromFile(path)) {
+            NLM_LOG_INFO("Loaded configuration from: " + path);
+            configLoaded = true;
+            break;
+        }
+    }
+    
+    if (!configLoaded) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
@@ -410,19 +490,51 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
+    try {
+        runBasicConnectivityTest(brain);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Test 1 failed: " + std::string(e.what()));
+    }
+    
+    NLM_LOG_INFO("");
     
     // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    try {
+        brain->reset();
+        brain->initialize();
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Brain reset/initialize failed: " + std::string(e.what()));
+        return 1;
+    }
     
     // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
+    try {
+        runPlasticityExperiment(brain);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Test 2 failed: " + std::string(e.what()));
+    }
+    
+    NLM_LOG_INFO("");
     
     // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    try {
+        brain->reset();
+        brain->initialize();
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Brain reset/initialize failed: " + std::string(e.what()));
+        return 1;
+    }
+    
+    NLM_LOG_INFO("=== Test 3: STDP Verification ===");
+    try {
+        runStdpVerification(brain);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Test 3 failed: " + std::string(e.what()));
+    }
+    
+    NLM_LOG_INFO("");
     
     // Final brain status
     NLM_LOG_INFO("");

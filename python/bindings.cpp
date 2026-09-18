@@ -29,117 +29,97 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const NeuronId& id) {
-            return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+// Helper function to bind ID types with common patterns
+    template<typename IDType>
+    void bindIDType(py::module_ &m, const std::string &name) {
+        py::class_<IDType>(m, name.c_str(), (std::string("Unique identifier for a ") + name).c_str())
+            .def(py::init<>())
+            .def(py::init<uint64_t>(), py::arg("value"))
+            .def_readwrite("value", &IDType::value)
+            .def("index", &IDType::index)
+            .def("__eq__", &IDType::operator==)
+            .def("__ne__", &IDType::operator!=)
+            .def("__hash__", [](const IDType& id) { return std::hash<uint64_t>{}(id.value); })
+            .def("__repr__", [](const IDType& id) {
+                return "<" + name + ": " + std::to_string(id.value) + ">";
+            });
+    }
 
-    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
-        .def("__eq__", &SynapseId::operator==)
-        .def("__ne__", &SynapseId::operator!=)
-        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const SynapseId& id) {
-            return "<SynapseId: " + std::to_string(id.value) + ">";
-        });
+    // Bind ID types using the helper function
+    bindIDType<NeuronId>(m, "NeuronId");
+    bindIDType<SynapseId>(m, "SynapseId");
+    bindIDType<RegionId>(m, "RegionId");
+    bindIDType<PopulationId>(m, "PopulationId");
 
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
-        .def("__eq__", &RegionId::operator==)
-        .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const RegionId& id) {
-            return "<RegionId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
-        .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
-
+    // Enhanced enum bindings with better documentation and descriptions
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
-        .value("Excitatory", NeuronType::Excitatory)
-        .value("Inhibitory", NeuronType::Inhibitory)
-        .value("Modulatory", NeuronType::Modulatory)
-        .value("Sensory", NeuronType::Sensory)
-        .value("Motor", NeuronType::Motor)
-        .value("Internal", NeuronType::Internal)
+        .value("Excitatory", NeuronType::Excitatory, R"pbdoc(Excitatory neuron type)pbdoc")
+        .value("Inhibitory", NeuronType::Inhibitory, R"pbdoc(Inhibitory neuron type)pbdoc")
+        .value("Modulatory", NeuronType::Modulatory, R"pbdoc(Modulatory neuron type)pbdoc")
+        .value("Sensory", NeuronType::Sensory, R"pbdoc(Sensory neuron type)pbdoc")
+        .value("Motor", NeuronType::Motor, R"pbdoc(Motor neuron type)pbdoc")
+        .value("Internal", NeuronType::Internal, R"pbdoc(Internal neuron type)pbdoc")
         .export_values();
 
     py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
-        .value("Excitatory", SynapseType::Excitatory)
-        .value("Inhibitory", SynapseType::Inhibitory)
-        .value("Modulatory", SynapseType::Modulatory)
-        .value("Electrical", SynapseType::Electrical)
-        .value("GapJunction", SynapseType::GapJunction)
+        .value("Excitatory", SynapseType::Excitatory, R"pbdoc(Excitatory synapse)pbdoc")
+        .value("Inhibitory", SynapseType::Inhibitory, R"pbdoc(Inhibitory synapse)pbdoc")
+        .value("Modulatory", SynapseType::Modulatory, R"pbdoc(Modulatory synapse)pbdoc")
+        .value("Electrical", SynapseType::Electrical, R"pbdoc(Electrical synapse)pbdoc")
+        .value("GapJunction", SynapseType::GapJunction, R"pbdoc(Gap junction synapse)pbdoc")
         .export_values();
 
     py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
-        .value("Initial", DevelopmentalStage::Initial)
-        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
-        .value("Maturation", DevelopmentalStage::Maturation)
-        .value("Adult", DevelopmentalStage::Adult)
-        .value("Aging", DevelopmentalStage::Aging)
+        .value("Initial", DevelopmentalStage::Initial, R"pbdoc(Initial developmental stage)pbdoc")
+        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod, R"pbdoc(Critical period stage)pbdoc")
+        .value("Maturation", DevelopmentalStage::Maturation, R"pbdoc(Maturation stage)pbdoc")
+        .value("Adult", DevelopmentalStage::Adult, R"pbdoc(Adult stage)pbdoc")
+        .value("Aging", DevelopmentalStage::Aging, R"pbdoc(Aging stage)pbdoc")
         .export_values();
 
     py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
-        .value("Resting", FiringState::Resting)
-        .value("Active", FiringState::Active)
-        .value("Refractory", FiringState::Refractory)
-        .value("Inhibited", FiringState::Inhibited)
+        .value("Resting", FiringState::Resting, R"pbdoc(Rest state)pbdoc")
+        .value("Active", FiringState::Active, R"pbdoc(Active state)pbdoc")
+        .value("Refractory", FiringState::Refractory, R"pbdoc(Refractory state)pbdoc")
+        .value("Inhibited", FiringState::Inhibited, R"pbdoc(Inhibited state)pbdoc")
         .export_values();
 
     py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
-        .value("MoveForward", ActionType::MoveForward)
-        .value("MoveBackward", ActionType::MoveBackward)
-        .value("MoveLeft", ActionType::MoveLeft)
-        .value("MoveRight", ActionType::MoveRight)
-        .value("TurnLeft", ActionType::TurnLeft)
-        .value("TurnRight", ActionType::TurnRight)
-        .value("Look", ActionType::Look)
-        .value("LookUp", ActionType::LookUp)
-        .value("LookDown", ActionType::LookDown)
-        .value("Interact", ActionType::Interact)
-        .value("Eat", ActionType::Eat)
-        .value("Drink", ActionType::Drink)
-        .value("Rest", ActionType::Rest)
-        .value("Wait", ActionType::Wait)
-        .value("Custom", ActionType::Custom)
+        .value("MoveForward", ActionType::MoveForward, R"pbdoc(Move forward action)pbdoc")
+        .value("MoveBackward", ActionType::MoveBackward, R"pbdoc(Move backward action)pbdoc")
+        .value("MoveLeft", ActionType::MoveLeft, R"pbdoc(Move left action)pbdoc")
+        .value("MoveRight", ActionType::MoveRight, R"pbdoc(Move right action)pbdoc")
+        .value("TurnLeft", ActionType::TurnLeft, R"pbdoc(Turn left action)pbdoc")
+        .value("TurnRight", ActionType::TurnRight, R"pbdoc(Turn right action)pbdoc")
+        .value("Look", ActionType::Look, R"pbdoc(Look action)pbdoc")
+        .value("LookUp", ActionType::LookUp, R"pbdoc(Look up action)pbdoc")
+        .value("LookDown", ActionType::LookDown, R"pbdoc(Look down action)pbdoc")
+        .value("Interact", ActionType::Interact, R"pbdoc(Interact action)pbdoc")
+        .value("Eat", ActionType::Eat, R"pbdoc(Eat action)pbdoc")
+        .value("Drink", ActionType::Drink, R"pbdoc(Drink action)pbdoc")
+        .value("Rest", ActionType::Rest, R"pbdoc(Rest action)pbdoc")
+        .value("Wait", ActionType::Wait, R"pbdoc(Wait action)pbdoc")
+        .value("Custom", ActionType::Custom, R"pbdoc(Custom action)pbdoc")
         .export_values();
 
     py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
-        .value("MoveForward", MotorCommand::MoveForward)
-        .value("MoveBackward", MotorCommand::MoveBackward)
-        .value("TurnLeft", MotorCommand::TurnLeft)
-        .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
-        .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
+        .value("MoveForward", MotorCommand::MoveForward, R"pbdoc(Move forward command)pbdoc")
+        .value("MoveBackward", MotorCommand::MoveBackward, R"pbdoc(Move backward command)pbdoc")
+        .value("TurnLeft", MotorCommand::TurnLeft, R"pbdoc(Turn left command)pbdoc")
+        .value("TurnRight", MotorCommand::TurnRight, R"pbdoc(Turn right command)pbdoc")
+        .value("LookLeft", MotorCommand::LookLeft, R"pbdoc(Look left command)pbdoc")
+        .value("LookRight", MotorCommand::LookRight, R"pbdoc(Look right command)pbdoc")
+        .value("Interact", MotorCommand::Interact, R"pbdoc(Interact command)pbdoc")
+        .value("Wait", MotorCommand::Wait, R"pbdoc(Wait command)pbdoc")
         .export_values();
 
+    // Enhanced enum bindings with better documentation and descriptions
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
-        .value("Empty", WorldObjectType::Empty)
-        .value("Resource", WorldObjectType::Resource)
-        .value("Hazard", WorldObjectType::Hazard)
-        .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
+        .value("Empty", WorldObjectType::Empty, R"pbdoc(Empty world object)pbdoc")
+        .value("Resource", WorldObjectType::Resource, R"pbdoc(Resource world object)pbdoc")
+        .value("Hazard", WorldObjectType::Hazard, R"pbdoc(Hazard world object)pbdoc")
+        .value("Wall", WorldObjectType::Wall, R"pbdoc(Wall world object)pbdoc")
+        .value("Marker", WorldObjectType::Marker, R"pbdoc(Marker world object)pbdoc")
         .export_values();
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
