@@ -8,6 +8,15 @@
 
 namespace nlm {
 
+// Object types in the world (for rendering/debug only, NOT given to brain)
+enum class WorldObjectType {
+    Empty = 0,
+    Resource = 1,      // Positive reward
+    Hazard = 2,        // Negative reward
+    Wall = 3,         // Boundary
+    Marker = 4        // Navigation aid
+};
+
 // World object - represents an object in the world
 // Position and type only - no semantic labels
 struct WorldObject {

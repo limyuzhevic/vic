@@ -1,4 +1,7 @@
 #include "AgentBrain.hpp"
+#include "AgentBody.hpp"
+#include "world/SimpleWorld.hpp"
+#include "core/Types/Types.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>

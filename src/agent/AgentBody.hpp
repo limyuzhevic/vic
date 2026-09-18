@@ -76,6 +76,53 @@ struct ActionResult {
         : reward(r), success(s), message(m) {}
 };
 
+// Agent body state - contains physical properties and internal state
+// This is part of the environment, not the brain
+struct AgentBody {
+    // Position in world
+    float x;
+    float y;
+    
+    // Orientation (radians)
+    float orientation;
+    
+    // Velocity
+    float velocityX;
+    float velocityY;
+    float angularVelocity;
+    
+    // Internal state
+    float energy;          // Energy level (0-1)
+    float health;          // Health (0-1)
+    float age;             // Developmental age in simulation steps
+    
+    // Movement state
+    bool isMoving;
+    bool isTurning;
+    float lastActionTime;
+    
+    AgentBody()
+        : x(0.0f), y(0.0f), orientation(0.0f)
+        , velocityX(0.0f), velocityY(0.0f), angularVelocity(0.0f)
+        , energy(1.0f), health(1.0f), age(0.0f)
+        , isMoving(false), isTurning(false), lastActionTime(0.0f) {}
+    
+    void reset() {
+        x = 0.0f;
+        y = 0.0f;
+        orientation = 0.0f;
+        velocityX = 0.0f;
+        velocityY = 0.0f;
+        angularVelocity = 0.0f;
+        energy = 1.0f;
+        health = 1.0f;
+        age = 0.0f;
+        isMoving = false;
+        isTurning = false;
+        lastActionTime = 0.0f;
+    }
+};
+
 // Object types in the world (for rendering/debug only, NOT given to brain)
 enum class WorldObjectType {
     Empty = 0,
