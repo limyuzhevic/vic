@@ -124,11 +124,24 @@ struct Brain::Impl {
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
-        // Initialize neuromodulation systems
+// Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Connect systems to brain instance for bidirectional access
+        // This enables integrated information flow and coordination
+        workingMemory->initialize(this);
+        episodicMemory->initialize(this);
+        associativeMemory->initialize(this);
+        predictionSystem->initialize(this);
+        planner->initialize(this);
+        conceptFormation->initialize(this);
+        attention->initialize(this);
+        developmentSystem->initialize(this);
+        curiosity->initialize(this);
+        novelty->initialize(this);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -406,36 +419,154 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
+    // ========== STEP 5: Enhanced neuromodulation integration ==========
     
-    // Update curiosity
+    // Update curiosity with enhanced integration
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        // Get sensory input activity for curiosity calculation
+        float noveltyLevel = 0.0f;
+        float predictionError = 0.0f;
+        
+        // Calculate novelty from sensory neuron activity
+        for (size_t i = 0; i < std::min<size_t>(3, pImpl->sensoryNeurons.size()); ++i) {
+            auto* sensoryNeuron = pImpl->sensoryNeurons[i];
+            noveltyLevel += std::abs(sensoryNeuron->getMembranePotential() - sensoryNeuron->getRestingPotential());
+        }
+        noveltyLevel = std::min(1.0f, noveltyLevel / 300.0f);  // Normalize
+        
+        // Get prediction error from prediction system
+        if (pImpl->predictionSystem) {
+            predictionError = pImpl->predictionSystem->getPredictionError();
+        }
+        
+        pImpl->curiosity->update(noveltyLevel, predictionError, pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
+    // Enhanced novelty detection with brain integration
+    if (pImpl->novelty) {
+        // Novelty based on recent sensory input changes
+        float currentNovelty = 0.0f;
+        if (pImpl->sensoryNeurons.size() > 0) {
+            float totalActivity = 0.0f;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                totalActivity += std::abs(neuron->getMembranePotential() - neuron->getRestingPotential());
+            }
+            currentNovelty = std::min(1.0f, totalActivity / 500.0f);
+        }
+        
+        pImpl->novelty->update(pImpl->timestep, currentNovelty);
+    }
+    
+    // Apply neuromodulation effects on neural dynamics
+    // Enhanced dopamine integration with multiple effects
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // 1. Excitability modulation (as before)
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
+                    // Enhanced excitability modulation
+                    float excitabilityMod = dopamineLevel * pImpl->dopamine->getExcitabilityModulation();
                     if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+                        neuron->injectCurrent(excitabilityMod * 2.0f);  // Double strength for enhanced effect
+                    }
+                    
+                    // Reduce inhibition during high dopamine
+                    if (dopamineLevel > 0.5f) {
+                        // Decrease inhibitory synapse efficacy
+                        for (auto* synapse : region->getSynapsesTo(neuron->getId())) {
+                            float weight = synapse->getWeight();
+                            if (weight < 0) {  // Inhibitory synapse
+                                synapse->setWeight(weight * 1.2f);  // Make less inhibitory
+                            }
+                        }
                     }
                 }
             }
+        }
+        
+        // 2. Plasticity modulation with developmental stage awareness
+        float plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        if (dopamineLevel > 0.3f) {
+            // Stage-dependent plasticity enhancement
+            float stageFactor = 1.0f;
+            switch (pImpl->developmentalStage) {
+                case DevelopmentalStage::Initial:
+                    stageFactor = 1.5f;  // More plastic during initial stage
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    stageFactor = 1.2f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    stageFactor = 1.0f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    stageFactor = 0.8f;
+                    break;
+                case DevelopmentalStage::Aging:
+                    stageFactor = 0.6f;
+                    break;
+            }
+            
+            plasticityMod *= stageFactor;
+        }
+        
+        // Apply enhanced plasticity modulation
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                if (syn->getPlasticityFlags().stdp || syn->getPlasticityFlags().hebbian) {
+                    // Enhance synaptic modifications based on dopamine
+                    float currentWeight = syn->getWeight();
+                    float weightChange = (dopamineLevel - 0.5f) * 0.01f * plasticityMod;
+                    
+                    if (std::abs(weightChange) > 0.001f) {
+                        float newWeight = currentWeight + weightChange;
+                        // Clamp to reasonable range
+                        newWeight = std::clamp(newWeight, -1.0f, 1.0f);
+                        syn->setWeight(newWeight);
+                    }
+                }
+            }
+        }
+        
+        // 3. Memory modulation for consolidation
+        if (pImpl->dopamine->getMemoryModulation() > 0.5f && pImpl->episodicMemory) {
+            // Enhanced memory consolidation during high dopamine
+            if (pImpl->currentStep % 500 == 0) {  // Consolidate every 500 steps
+                pImpl->episodicMemory->consolidate(0.5f);  // Stronger consolidation
+            }
+        }
+        
+        // 4. Attention modulation
+        if (pImpl->attention && pImpl->dopamine->getAttentionModulation() > 0.3f) {
+            // Apply attention focus based on dopamine levels
+            float attentionFocus = dopamineLevel * 0.7f + 0.3f;  // Base attention + dopamine modulation
+            pImpl->attention->setInhibitionStrength(0.5f * attentionFocus);
+            pImpl->attention->setExcitationStrength(1.5f * attentionFocus);
+        }
+    }
+    
+    // Novelty-based learning enhancement
+    if (pImpl->novelty && pImpl->dopamine) {
+        // Integrate novelty with dopamine for learning
+        float novelty = pImpl->novelty->getLevel();
+        float predictionError = pImpl->predictionSystem ? 
+                               pImpl->predictionSystem->getPredictionError() : 0.0f;
+        
+        // Enhance learning during novel or surprising events
+        if (novelty > 0.7f || predictionError > 0.5f) {
+            // Temporarily boost dopamine to enhance learning
+            float originalLevel = pImpl->dopamine->getLevel();
+            pImpl->dopamine->setLevel(std::min(1.0f, originalLevel + 0.3f));
+            
+            // Apply enhanced learning for this step
+            pImpl->dopamine->enhanceLearning(novelty, predictionError);
+            
+            // Restore dopamine level
+            pImpl->dopamine->setLevel(originalLevel);
         }
     }
     
@@ -537,42 +668,345 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+    // ========== STEP 12: Sleep/rest cycle with memory replay ==========
+    
+    // Sleep/rest cycle implementation
+    // During rest, the brain consolidates memories and replays important episodes
+    if (pImpl->currentStep % pImpl->replayInterval == 0) {
+        pImpl->isResting = true;  // Enter rest/sleep state
+        
+        // Sleep/rest cycle benefits
+        if (pImpl->episodicMemory) {
+            // During rest, consolidate and replay important memories
+            // This is critical for long-term memory formation
+            
+            // Get episodes for replay based on importance
+            size_t replayCount = std::min<size_t>(5, pImpl->developmentSystem ? 
+                                                (pImpl->developmentSystem->getStage() == DevelopmentalStage::Initial ? 3 : 5) : 3);
+            
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(replayCount);
+            
+            if (!episodesToReplay.empty()) {
+                NLM_LOG_INFO("Entering rest/sleep cycle - replaying " + std::to_string(episodesToReplay.size()) + " episodes");
+                
+                // Replay each episode multiple times for consolidation
+                for (const auto* episode : episodesToReplay) {
+                    // Replay the episode multiple times for stronger consolidation
+                    for (int replayIter = 0; replayIter < 3; ++replayIter) {
+                        pImpl->episodicMemory->replayEpisode(episode);
+                    }
+                }
+                
+                // Force consolidation after replay
+                pImpl->episodicMemory->consolidate(0.4f);  // Stronger consolidation during sleep
+                
+                // Reduce working memory activity during rest to prevent interference
+                if (pImpl->workingMemory) {
+                    pImpl->workingMemory->clear();  // Clear working memory during sleep
+                }
+                
+                // Apply sleep-specific neuromodulation
+                if (pImpl->dopamine) {
+                    // Increase dopamine to enhance memory consolidation
+                    float currentDA = pImpl->dopamine->getLevel();
+                    pImpl->dopamine->setLevel(std::min(1.0f, currentDA + 0.3f));
+                }
+            }
+        }
+        
+        // Development-specific sleep effects
+        if (pImpl->developmentSystem) {
+            switch (pImpl->developmentalStage) {
+                case DevelopmentalStage::Initial:
+                    // Critical period sleep - essential for sensory map formation
+                    // More frequent and deeper sleep for normal development
+                    pImpl->replayInterval = 50;   // Replay every 50 steps during critical period
+                    pImpl->consolidationInterval = 300;  // More frequent consolidation
+                    break;
+                
+                case DevelopmentalStage::CriticalPeriod:
+                    // Active learning phase - sleep supports synaptic strengthening
+                    pImpl->replayInterval = 80;
+                    pImpl->consolidationInterval = 500;
+                    break;
+                
+                case DevelopmentalStage::Maturation:
+                    // Fine-tuning phase - sleep refines existing connections
+                    pImpl->replayInterval = 100;
+                    pImpl->consolidationInterval = 1000;
+                    break;
+                
+                case DevelopmentalStage::Adult:
+                    // Maintenance phase - sleep for memory maintenance
+                    pImpl->replayInterval = 150;
+                    pImpl->consolidationInterval = 2000;
+                    break;
+                
+                case DevelopmentalStage::Aging:
+                    // Reduced plasticity - less frequent replay
+                    pImpl->replayInterval = 200;
+                    pImpl->consolidationInterval = 3000;
+                    break;
+            }
+        }
+        
+        // Record sleep statistics for monitoring
+        NLM_LOG_INFO("Sleep/rest cycle active - stage: " + std::string(getStageName()) + 
+                    ", replay interval: " + std::to_string(pImpl->replayInterval) +
+                    ", consolidation interval: " + std::to_string(pImpl->consolidationInterval));
+    } else {
+        // Not in rest cycle
+        pImpl->isResting = false;
+    }
+    
+    // Sleep-specific neuromodulation effects
+    if (pImpl->dopamine && pImpl->isResting) {
+        // During sleep, dopamine modulates memory consolidation
+        float sleepModulation = pImpl->dopamine->getMemoryModulation();
+        
+        if (sleepModulation > 0.3f && pImpl->episodicMemory) {
+            // Enhanced consolidation during sleep
+            // This simulates the brain "processing" memories during rest
+            pImpl->episodicMemory->consolidate(sleepModulation * 0.5f);
+            
+            // Update sleep statistics
+            pImpl->stepsSinceLastEpisode = 0;  // Reset episode counter during sleep
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+    // ========== STEP 13: Enhanced development integration ==========
+    if (pImpl->developmentSystem) {
+        // Update development system
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
+        // Development affects more than just structural plasticity rates
+        
+        // 1. Neural excitability modulation
+        if (pImpl->developmentalStage == DevelopmentalStage::CriticalPeriod) {
+            // Critical period: dramatically increase neural excitability and learning capacity
+            float excitabilityBoost = 1.5f;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Boost excitability during critical period
+                        float currentPotential = neuron->getMembranePotential();
+                        float targetResting = -65.0f;  // More depolarized resting potential
+                        float delta = targetResting - currentPotential;
+                        if (delta > 0.0f) {
+                            neuron->setMembranePotential(currentPotential + delta * 0.01f);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 2. Attention system development
+        if (pImpl->attention) {
             DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+            float attentionMaturation = 1.0f;
             
             switch (stage) {
                 case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
+                    attentionMaturation = 0.3f;  // Poor attention control initially
                     break;
                 case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
+                    attentionMaturation = 0.6f;  // Developing attention
                     break;
                 case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
+                    attentionMaturation = 0.8f;  // Improving attention
                     break;
                 case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
+                    attentionMaturation = 1.0f;  // Mature attention
+                    break;
+                case DevelopmentalStage::Aging:
+                    attentionMaturation = 0.7f;  // Some decline in aging
                     break;
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            // Update attention parameters based on development
+            pImpl->attention->setInhibitionStrength(0.5f * attentionMaturation);
+            pImpl->attention->setExcitationStrength(1.5f * attentionMaturation);
+            pImpl->attention->setCompetitionThreshold(0.3f / attentionMaturation);
+        }
+        
+        // 3. Memory system development
+        if (pImpl->workingMemory) {
+            float memoryCapacity = 100.0f;  // Base capacity
+            float memoryMaturation = 1.0f;
+            
+            switch (pImpl->developmentalStage) {
+                case DevelopmentalStage::Initial:
+                    memoryCapacity = 50.0f;   // Limited working memory initially
+                    memoryMaturation = 0.5f;
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    memoryCapacity = 75.0f;   // Developing capacity
+                    memoryMaturation = 0.7f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    memoryCapacity = 100.0f;  // Approaching mature capacity
+                    memoryMaturation = 0.9f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    memoryCapacity = 100.0f;  // Mature capacity
+                    memoryMaturation = 1.0f;
+                    break;
+                case DevelopmentalStage::Aging:
+                    memoryCapacity = 80.0f;   // Some decline in aging
+                    memoryMaturation = 0.8f;
+                    break;
+            }
+            
+            pImpl->workingMemory->setCapacity(static_cast<size_t>(memoryCapacity));
+            pImpl->workingMemory->setDecayRate(0.02f / memoryMaturation);  // Slower decay as memory matures
+        }
+        
+        if (pImpl->episodicMemory) {
+            float episodeMaturation = 1.0f;
+            
+            switch (pImpl->developmentalStage) {
+                case DevelopmentalStage::Initial:
+                    episodeMaturation = 0.3f;  // Few episodes initially
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    episodeMaturation = 0.6f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    episodeMaturation = 0.9f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    episodeMaturation = 1.0f;
+                    break;
+                case DevelopmentalStage::Aging:
+                    episodeMaturation = 0.8f;
+                    break;
+            }
+            
+            // Stage-appropriate consolidation parameters
+            if (pImpl->currentStep % 2000 == 0) {  // More frequent consolidation in early stages
+                float consolidationStrength = 0.3f * episodeMaturation;
+                pImpl->episodicMemory->consolidate(consolidationStrength);
+            }
+        }
+        
+        // 4. Neuromodulation system development
+        if (pImpl->dopamine) {
+            float neuromodulationMaturation = 1.0f;
+            
+            switch (pImpl->developmentalStage) {
+                case DevelopmentalStage::Initial:
+                    neuromodulationMaturation = 0.4f;  // Immature neuromodulation
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    neuromodulationMaturation = 0.7f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    neuromodulationMaturation = 0.9f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    neuromodulationMaturation = 1.0f;
+                    break;
+                case DevelopmentalStage::Aging:
+                    neuromodulationMaturation = 0.8f;
+                    break;
+            }
+            
+            // Update neuromodulation parameters based on development
+            // This could affect how neuromodulators respond to rewards, novelties, etc.
+        }
+        
+        // 5. Cognitive system development
+        if (pImpl->planner) {
+            int planningDepth = 2;  // Starting depth
+            
+            switch (pImpl->developmentalStage) {
+                case DevelopmentalStage::Initial:
+                    planningDepth = 1;
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    planningDepth = 3;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    planningDepth = 5;
+                    break;
+                case DevelopmentalStage::Adult:
+                    planningDepth = 8;
+                    break;
+                case DevelopmentalStage::Aging:
+                    planningDepth = 5;
+                    break;
+            }
+            
+            pImpl->planner->setPlanningDepth(planningDepth);
+        }
+        
+        if (pImpl->conceptFormation) {
+            float conceptMaturation = 1.0f;
+            
+            switch (pImpl->developmentalStage) {
+                case DevelopmentalStage::Initial:
+                    conceptMaturation = 0.2f;  // Limited concept formation initially
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    conceptMaturation = 0.5f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    conceptMaturation = 0.8f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    conceptMaturation = 1.0f;
+                    break;
+                case DevelopmentalStage::Aging:
+                    conceptMaturation = 0.7f;
+                    break;
+            }
+            
+            // Concept formation becomes more abstract and sophisticated with development
+            // This could involve updating concept formation parameters
+        }
+        
+        // 6. Plasticity rule development
+        if (pImpl->stdp && pImpl->hebbian) {
+            switch (pImpl->developmentalStage) {
+                case DevelopmentalStage::Initial:
+                    // Emphasize Hebbian learning for rapid association formation
+                    // STDP still functional but less dominant
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Both STDP and Hebbian active, balanced learning
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // STDP dominant for precise timing-based learning
+                    break;
+                case DevelopmentalStage::Adult:
+                    // Mature balance of plasticity rules
+                    break;
+                case DevelopmentalStage::Aging:
+                    // Shift back to Hebbian for relearning
+                    break;
+            }
+            
+            // Development could tune plasticity rule parameters
+        }
+        
+        // 7. Sleep/rest cycle initiation
+        // During development, sleep becomes more prominent for memory consolidation
+        if (pImpl->developmentSystem->getStage() == DevelopmentalStage::Initial || 
+            pImpl->developmentSystem->getStage() == DevelopmentalStage::CriticalPeriod) {
+            pImpl->isResting = true;  // Enter resting/sleep state during development
+        }
+        
+        // 8. Replay system activation during development
+        // Critical for memory consolidation during developmental periods
+        if (pImpl->episodicMemory) {
+            if (pImpl->currentStep % pImpl->replayInterval == 0 && 
+                pImpl->developmentSystem->getStage() != DevelopmentalStage::Adult) {
+                // More frequent replay during development for enhanced learning
+                auto episodes = pImpl->episodicMemory->getEpisodesForReplay(5);  // More episodes
+                for (const auto* episode : episodes) {
+                    pImpl->episodicMemory->replayEpisode(episode);
+                }
+            }
         }
     }
     
