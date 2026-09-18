@@ -1,5 +1,6 @@
-#include "Neuron.hpp"
-#include "../core/Random/Random.hpp"
+// Add missing includes at the top of the file
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
 #include <cmath>
 #include <algorithm>
 
@@ -33,6 +34,14 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+}
+
+NeuronId Neuron::getId() const {
+    return pImpl->id;
+}
+
+NeuronType Neuron::getType() const {
+    return pImpl->type;
 }
 
 Neuron::~Neuron() = default;

@@ -1,8 +1,6 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <filesystem>
+// Add JSON/YAML parsing support
+    #include <nlohmann/json.hpp>
+    using json = nlohmann::json;
 
 namespace nlm {
 
@@ -19,9 +17,35 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Phase 2: Implement proper JSON/YAML parser
+    // Try JSON first
+    {
+        std::ifstream file(filepath);
+        if (file.is_open()) {
+            try {
+                json j;
+                file >> j;
+                
+                // Clear existing entries
+                pImpl->entries.clear();
+                
+                // Parse JSON object
+                for (auto it = j.begin(); it != j.end(); ++it) {
+                    const std::string& key = it.key();
+                    const json& value = it.value();
+                    ConfigValue configValue = jsonToConfigValue(value);
+                    set(key, configValue, ConfigSource::File);
+                }
+                
+                NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath);
+                return true;
+            } catch (const json::parse_error& e) {
+                // Not JSON, try as key=value format
+            }
+        }
+    }
     
+    // Try key=value format as fallback
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,7 +67,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }

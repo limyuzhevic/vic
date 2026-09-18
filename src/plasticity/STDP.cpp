@@ -1,9 +1,52 @@
-#include "STDP.hpp"
-#include "../../brain/Synapse.hpp"
-#include <cmath>
-#include <algorithm>
-
+// Add helper function to serialize/deserialize ConfigValue for JSON
 namespace nlm {
+
+ConfigValue jsonToConfigValue(const json& j) {
+    ConfigValue result;
+    if (j.is_number_integer()) {
+        result = j.get<int64_t>();
+    } else if (j.is_number_float()) {
+        result = j.get<double>();
+    } else if (j.is_boolean()) {
+        result = j.get<bool>();
+    } else if (j.is_string()) {
+        result = j.get<std::string>();
+    } else if (j.is_array()) {
+        // Default to vector<int> for arrays
+        result = j.get<std::vector<int>>();
+    }
+    return result;
+}
+
+json configValueToJson(const ConfigValue& value) {
+    json result;
+    std::visit([&result](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            result = arg;
+        }
+    }, value);
+    return result;
+}
+
+// Add forward declaration for logging
+void NLM_LOG_INFO(const std::string& message);
+
+} // namespace nlm
 
 struct STDP::Impl {
     float ltpWeight;      // A+ for potentiation
