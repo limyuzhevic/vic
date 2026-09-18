@@ -43,6 +43,14 @@ int main(int argc, char* argv[]) {
     experiment.testNeuromodulationIntegration();
     std::cout << std::endl;
     
+    std::cout << "--- Prediction Integration Test ---" << std::endl;
+    experiment.testPredictionIntegration();
+    std::cout << std::endl;
+    
+    std::cout << "--- Cognition Integration Test ---" << std::endl;
+    experiment.testCognitionIntegration();
+    std::cout << std::endl;
+    
     std::cout << "--- Checkpoint Test ---" << std::endl;
     experiment.testCheckpointing();
     std::cout << std::endl;

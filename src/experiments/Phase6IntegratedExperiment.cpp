@@ -205,6 +205,13 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
+    if (brain->getNovelty() != nullptr) {
+        NLM_LOG_INFO("[PASS] Novelty system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Novelty system is NOT integrated");
+        success = false;
+    }
+    
     // Test 3: Prediction system exists
     if (brain->getPredictionSystem() != nullptr) {
         NLM_LOG_INFO("[PASS] Prediction system is integrated");

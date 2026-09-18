@@ -511,8 +511,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Prediction system generates predictions about sensory input
+        // Predicts next state based on current neural activity
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Apply prediction to action selection
+        if (pImpl->predictionSystem && pImpl->dopamine) {
+            // Prediction error guides learning
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            pImpl->dopamine->signalRewardPredictionError(predictionError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +532,75 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Attention modulates neural excitability
+        float attentionStrength = pImpl->attention->getAttentionStrength();
+        if (attentionStrength > 0.0f) {
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Apply attentional boost
+                        neuron->injectCurrent(attentionStrength * 2.0f);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation processes current experience to discover patterns
+        
+        // Create a simple sensory pattern from current neural state
+        std::vector<float> sensoryPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == NeuronType::Sensory) {
+                    // Use average activation as feature
+                    float avgActivation = 0.0f;
+                    size_t count = 0;
+                    for (auto* neuron : pop->getNeurons()) {
+                        float activation = std::abs(
+                            neuron->getState().membranePotential - 
+                            neuron->getState().restingPotential);
+                        avgActivation += activation;
+                        count++;
+                    }
+                    if (count > 0) {
+                        sensoryPattern.push_back(avgActivation / count);
+                    }
+                }
+            }
+        }
+        
+        // Also consider working memory patterns
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Use memory neuron IDs as part of pattern
+            for (NeuronId id : pImpl->workingMemory->getMemoryNeurons()) {
+                // Convert neuron ID to feature value
+                sensoryPattern.push_back(static_cast<float>(id % 1000) / 1000.0f);
+            }
+        }
+        
+        if (!sensoryPattern.empty()) {
+            pImpl->conceptFormation->presentExperience(
+                sensoryPattern,  // Pattern
+                sensoryPattern,  // Features (simplified)
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,  // Reward
+                currentStep
+            );
+            
+            // Get current concept and influence attention
+            size_t currentConcept = pImpl->conceptFormation->getMatchingConcept(sensoryPattern);
+            if (currentConcept > 0) {
+                // Concept influences planning depth
+                if (pImpl->planner) {
+                    pImpl->planner->setPlanningDepth(
+                        std::min(5, currentConcept)
+                    );
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -575,6 +646,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
+    
+    // ========== STEP 14: Periodic memory consolidation ==========
+    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+        // Consolidate important memories, remove weak ones
+        pImpl->episodicMemory->consolidate(0.3f);
+    }
+    
+    // ========== STEP 15: Checkpoint management ==========
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+    
+    // ========== STEP 16: Weekly replay ==========
+    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
+        // Get important episodes for consolidation
+        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+        for (const auto* episode : episodesToReplay) {
+            // Replay episodes to strengthen connections
+            pImpl->episodicMemory->replayEpisode(episode);
+        }
+    }
+}
     
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
