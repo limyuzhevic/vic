@@ -400,6 +400,22 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    m.def("createPredictionSystem", []() -> std::unique_ptr<PredictionSystem> {
+        return std::make_unique<PredictionSystem>();
+    }, "Create a new prediction system");
+
+    m.def("createConceptFormation", []() -> std::unique_ptr<ConceptFormation> {
+        return std::make_unique<ConceptFormation>();
+    }, "Create a new concept formation system");
+
+    m.def("createNeuralPlanner", []() -> std::unique_ptr<NeuralPlanner> {
+        return std::make_unique<NeuralPlanner>();
+    }, "Create a new neural planner");
+
+    m.def("createAttentionalSelection", []() -> std::unique_ptr<AttentionalSelection> {
+        return std::make_unique<AttentionalSelection>();
+    }, "Create a new attentional selection system");
+
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
