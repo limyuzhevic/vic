@@ -915,22 +915,23 @@ RegionId Brain::addRegion(const std::string& name) {
     return id;
 }
 
-NeuralRegion* Brain::getRegion(RegionId id) {
-    for (auto& region : pImpl->regions) {
-        if (region->getId() == id) {
-            return region.get();
-        }
-    }
-    return nullptr;
+NeuralRegion* Brain::getRegionFast(RegionId id) {
+    // Fast lookup using pre-built map
+    auto it = pImpl->regionLookup.find(id);
+    return it != pImpl->regionLookup.end() ? it->second : nullptr;
 }
 
-const NeuralRegion* Brain::getRegion(RegionId id) const {
-    for (const auto& region : pImpl->regions) {
-        if (region->getId() == id) {
-            return region.get();
-        }
+const NeuralRegion* Brain::getRegionFast(RegionId id) const {
+    // Fast lookup using pre-built map
+    auto it = pImpl->regionLookup.find(id);
+    return it != pImpl->regionLookup.end() ? it->second : nullptr;
+}
+
+void Brain::buildRegionLookup() {
+    pImpl->regionLookup.clear();
+    for (auto& region : pImpl->regions) {
+        pImpl->regionLookup[region->getId()] = region.get();
     }
-    return nullptr;
 }
 
 size_t Brain::getRegionCount() const {

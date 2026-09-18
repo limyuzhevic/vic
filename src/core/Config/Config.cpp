@@ -114,6 +114,43 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
+// Configuration validation
+bool Config::validate(const std::vector<std::string>& requiredKeys) const {
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            NLM_LOG_ERROR("Missing required configuration key: " + key);
+            return false;
+        }
+    }
+    
+    // Validate specific keys have reasonable values
+    if (has("neuron_count")) {
+        auto count = get<size_t>("neuron_count");
+        if (!count.has_value() || count.value() == 0) {
+            NLM_LOG_ERROR("neuron_count must be > 0");
+            return false;
+        }
+    }
+    
+    if (has("connection_probability")) {
+        auto prob = get<float>("connection_probability");
+        if (!prob.has_value() || prob.value() < 0.0f || prob.value() > 1.0f) {
+            NLM_LOG_ERROR("connection_probability must be between 0.0 and 1.0");
+            return false;
+        }
+    }
+    
+    if (has("simulation_timestep")) {
+        auto timestep = get<double>("simulation_timestep");
+        if (!timestep.has_value() || timestep.value() <= 0.0) {
+            NLM_LOG_ERROR("simulation_timestep must be > 0");
+            return false;
+        }
+    }
+    
+    return true;
+}
+
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });

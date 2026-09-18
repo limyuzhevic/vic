@@ -87,11 +87,14 @@ public:
     // Get all keys
     std::vector<std::string> getKeys() const;
     
-    // Clear all
-    void clear();
+    // Validate configuration
+    bool validate() const;
     
-    // Get configuration summary
-    std::string summary() const;
+    // Validate configuration with required keys
+    bool validate(const std::vector<std::string>& requiredKeys) const;
+    
+    // Get validation error messages (if any)
+    std::vector<std::string> getValidationErrors() const;
     
 private:
     struct Impl;

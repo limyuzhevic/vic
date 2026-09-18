@@ -221,6 +221,18 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &WorldObject::value)
         .def_readwrite("active", &WorldObject::active);
 
+    py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
+        .def(py::init<>())
+        .def(py::init<float, float, WorldObjectType, float, float>(),
+             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
+             py::arg("radius") = 0.5f)
+        .def_readwrite("x", &WorldObject::x)
+        .def_readwrite("y", &WorldObject::y)
+        .def_readwrite("radius", &WorldObject::radius)
+        .def_readwrite("type", &WorldObject::type)
+        .def_readwrite("value", &WorldObject::value)
+        .def_readwrite("active", &WorldObject::active);
+
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
         .def_readwrite("x", &AgentBody::x)
@@ -400,21 +412,51 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("createBrain", &createBrain, py::arg("config"), 
+          "Create a new brain with the given configuration.\n\n"
+          "Example:\n"
+          "  import pynlm\n"
+          "  config = pynlm.createDefaultConfig()\n"
+          "  config.set('brain.neuron_count', 500)\n"
+          "  brain = pynlm.createBrain(config)\n"
+          "  brain.initialize()")
+          .def("createBrain", []() {
+              auto config = std::make_shared<Config>();
+              return createBrain(config);
+          }, "Create a new brain with default configuration")
+          .def("createSimpleWorld", &createSimpleWorld,
+               "Create a new simple world for agent interaction.\n\n"
+               "Example:\n"
+               "  import pynlm\n"
+               "  world = pynlm.createSimpleWorld()\n"
+               "  world.configure(20, 20, 8, 8)\n"
+               "  world.reset()")
+          .def("createAgentBrain", &createAgentBrain, py::arg("brain"),
+               "Create an agent brain interface that connects a brain to a world.\n\n"
+               "Example:\n"
+               "  import pynlm\n"
+               "  brain = pynlm.createBrain(config)\n"
+               "  brain.initialize()\n"
+               "  agent = pynlm.createAgentBrain(brain)")
+          .def("getVersion", []() { return "0.1.0"; },
+               "Get the version of the NLM Python bindings")
+          .def("printBanner", []() {
+              std::cout << "NLM Python Bindings " << "0.1.0" << "\n";
+              std::cout << "Phase 6 - Final Integration\n";
+          }, "Print a banner with NLM version information")
+          .def("quickStartDemo", []() {
+              auto config = std::make_shared<Config>();
+              config->set("neuron_count", 100, ConfigSource::Runtime);
+              config->set("simulation_timestep", 0.001, ConfigSource::Runtime);
+              
+              auto brain = createBrain(config);
+              brain->initialize();
+              
+              std::cout << "Quick start demo complete!\n";
+              std::cout << "Brain created with " << brain->getTotalNeuronCount() 
+                       << " neurons\n";
+              std::cout << "Total spikes: " << brain->getTotalSpikeCount() << "\n";
+          }, "Run a quick demonstration of basic NLM functionality");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
