@@ -29,6 +29,11 @@ public:
     
 protected:
     Neuromodulator() = default;
+    
+    // Helper for neuromodulatory dynamics
+    float clampLevel(float level, float minLevel = 0.0f, float maxLevel = 1.0f) const {
+        return std::clamp(level, minLevel, maxLevel);
+    }
 };
 
 // Dopamine: Reward and reinforcement learning signal

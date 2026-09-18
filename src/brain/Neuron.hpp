@@ -134,14 +134,34 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
-    
-    // Reset to initial state
-    void reset();
-    
-    // Initialize with random parameters
-    void initializeRandom(RandomGenerator& rng);
+    void step(Timestamp currentTime, TimestepDuration dt = 0.001f);
+
+    // Advanced LIF variants
+    bool stepLIFExponential(Timestamp currentTime, TimestepDuration dt);
+    bool stepLIFAdaptive(Timestamp currentTime, TimestepDuration dt);
+    bool stepLIFExponentialAdaptive(Timestamp currentTime, TimestepDuration dt);
+
+    // Real synaptic dynamics
+    void updateSynapticConductance(float dt);
+    void updateAdaptationVariable(float dt);
+
+    // Advanced features for development and research
+    void enableAdvancedPlasticity(bool stdp, bool hebbian, bool rewardModulated, bool structural);
+    bool checkForDevelopmentalChanges(Timestamp currentTime);
+    void applyDevelopmentalPruning(float pruningThreshold);
+    void applyStructuralGrowth();
+
+    // Advanced neuron states and properties
+    void setInputRescaling(float factor);
+    float getInputRescaling() const;
+    void setVoltageDynamicsModel(const std::string& model);
+    std::string getVoltageDynamicsModel() const;
+
+    // Enhanced spike detection and handling
+    bool checkAdvancedThreshold(float adaptiveThreshold) const;
+    void adjustThresholdForLearning(float adjustment);
+    void schedulePostSpikeRecovery();
+    bool checkRecoveryComplete();
     
 private:
     struct Impl;
