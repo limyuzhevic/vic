@@ -106,7 +106,7 @@ print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 
 ## Common Patterns
 
-### Pattern 1: Run a Simulation
+### Pattern 1: Run a Complete Simulation (Beginner)
 
 ```python
 def run_simulation(brain, world, agent, num_steps):
@@ -133,7 +133,47 @@ def run_simulation(brain, world, agent, num_steps):
 run_simulation(brain, world, agent, 1000)
 ```
 
-### Pattern 2: Get Brain Stats
+### Pattern 2: Advanced Agent with Learning (Intermediate)
+
+```python
+def run_advanced_simulation(brain, world, agent, num_steps):
+    for step in range(num_steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input
+        agent.processSensoryInput(percept)
+        
+        # Brain thinking
+        brain.step(step)
+        
+        # Get action
+        action = agent.decodeMotorCommand()
+        
+        # Apply action
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply reward modulation (learning)
+        if percept.getInternal():
+            reward = percept.getInternal()[0]
+            agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.001)
+
+# Enable learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run simulation
+run_advanced_simulation(brain, world, agent, 1000)
+```
+
+### Pattern 3: Get Brain Stats
 
 ```python
 # Just add these inside your loop:
@@ -143,7 +183,7 @@ print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 4: Enable Brain Features
 
 ```python
 # These are all optional:
@@ -151,6 +191,37 @@ agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
+```
+
+### Pattern 5: Complete Agent Example
+
+```python
+import pynlm
+
+def run_agent_simulation(brain, world, agent, num_steps):
+    for step in range(num_steps):
+        world.update(0.1)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Run agent
+run_agent_simulation(brain, world, agent, 1000)
 ```
 
 ---
@@ -221,7 +292,7 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Learning Agent
 
 ```python
 import pynlm
@@ -239,6 +310,7 @@ agent.initialize(world)
 # Enable learning
 agent.enableRewardModulation(True)
 agent.enableCuriosity(True)
+agent.enableDevelopment(True)
 
 # Run agent
 for step in range(100):
@@ -252,6 +324,58 @@ for step in range(100):
         print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
 
 print("Agent simulation complete!")
+```
+
+### Project 4: Development Study (Advanced)
+
+```python
+import pynlm
+import time
+
+# Create agent
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 500)  # Smaller brain for demo
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=4, visionHeight=4)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all advanced features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Track development over time
+development_data = []
+start_time = time.time()
+
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Record development state
+    if step % 50 == 0:
+        dev_stage = brain.getDevelopmentalStage()
+        firing_rate = brain.getAverageFiringRate()
+        curiosity = agent.getCuriosityLevel()
+        development_data.append({
+            'step': step,
+            'stage': dev_stage,
+            'firing_rate': firing_rate,
+            'curiosity': curiosity,
+            'time': time.time() - start_time
+        })
+
+print("Development study complete!")
+print(f"Final developmental stage: {brain.getDevelopmentalStage()}")
+print(f"Final firing rate: {brain.getAverageFiringRate():.2f} Hz")
 ```
 
 ---

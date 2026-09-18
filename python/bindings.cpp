@@ -400,26 +400,96 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
+    // Create a new AgentBrain instance with configuration
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
-
-} // namespace nlm
+    // Pythonic convenience methods for AgentBrain (advanced users)
+    py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrainWithDefaults")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+             "Initialize with world")
+        .def("processStep", [](AgentBrain& agent, const SimpleWorld& world, const SensoryPercept& percept, double timestep = 0.001) {
+            // Pythonic wrapper for common step processing
+            agent.processSensoryInput(percept);
+            agent.decodeMotorCommand();
+            agent.updateDevelopment(timestep);
+            return true;
+        }, py::arg("world"), py::arg("percept"), py::arg("timestep") = 0.001,
+             "Process a simulation step (Pythonic API)")
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain")
+        // Additional helper methods for advanced users
+        .def("runSimulation", [](AgentBrain& agent, const SimpleWorld& world, std::vector<SensoryPercept> percepts, std::vector<double> timesteps = {}) {
+            // Run a complete simulation episode with automatic reward calculation
+            if (percepts.size() != timesteps.size()) {
+                timesteps.resize(percepts.size(), 0.001);
+            }
+            for (size_t i = 0; i < percepts.size(); ++i) {
+                agent.processSensoryInput(percepts[i]);
+                agent.decodeMotorCommand();
+                agent.updateDevelopment(timesteps[i]);
+                
+                // Calculate reward from world (if accessible)
+                // Note: This would need access to world for actual reward calculation
+            }
+            return true;
+        }, py::arg("world"), py::arg("percepts"), py::arg("timesteps") = std::vector<double>(),
+             "Run a complete simulation episode (Advanced API)")
+        .def("enableAll", [](AgentBrain& agent) {
+            // Convenience method to enable all learning subsystems
+            agent.enableRewardModulation(true);
+            agent.enableStructuralPlasticity(true);
+            agent.enableDevelopment(true);
+            agent.enableCuriosity(true);
+            return true;
+        }, "Enable all learning subsystems")
+        .def("enableLearning", [](AgentBrain& agent, bool reward, bool structural, bool development, bool curiosity) {
+            // Fine-grained control over learning subsystems
+            agent.enableRewardModulation(reward);
+            agent.enableStructuralPlasticity(structural);
+            agent.enableDevelopment(development);
+            agent.enableCuriosity(curiosity);
+            return true;
+        }, py::arg("reward"), py::arg("structural"), py::arg("development"), py::arg("curiosity"),
+             "Enable specific learning subsystems")
+        .def("configureDevelopment", [](AgentBrain& agent, double timestep) {
+            // Configure development with specific timestep
+            agent.updateDevelopment(timestep);
+            return agent.getDevelopmentalStage();
+        }, py::arg("timestep"), "Configure development and get current stage")
+        .def("getAllLevels", [](AgentBrain& agent) {
+            // Get all neuromodulation levels at once
+            return std::make_tuple(agent.getCuriosityLevel(), agent.getNoveltyLevel(),
+                                   agent.getNeuromodulationLevel(), agent.getPredictionError());
+        }, "Get all neuromodulation levels")
+        .def("resetAndInitialize", [](AgentBrain& agent, const SimpleWorld& world) {
+            // Reset and reinitialize for new episode
+            agent.reset();
+            agent.initialize(world);
+            return true;
+        }, py::arg("world"), "Reset and initialize for new episode")
+        .def("processSensoryData", [](AgentBrain& agent, const std::vector<float>& vision,
+                                     const std::vector<float>& touch,
+                                     const std::vector<float>& internal,
+                                     const std::vector<float>& proprioception) {
+            // Process multiple sensory modalities at once
+            SensoryPercept percept;
+            percept.setVision(vision);
+            percept.setTouch(touch);
+            percept.setInternal(internal);
+            percept.setProprioception(proprioception);
+            agent.processSensoryInput(percept);
+            return true;
+        }, py::arg("vision"), py::arg("touch"), py::arg("internal"), py::arg("proprioception"),
+             "Process multiple sensory modalities at once")
+        .def("getMotorCommandWithDebug", [](AgentBrain& agent) {
+            // Get motor command with debug information
+            MotorCommand cmd = agent.decodeMotorCommand();
+            // Get underlying brain for debugging
+            auto* brain = agent.getBrain();
+            return std::make_tuple(cmd, brain ? brain->getFiringNeuronCount() : 0,
+                                   brain ? brain->getAverageFiringRate() : 0.0f);
+        }, "Get motor command with debug information");

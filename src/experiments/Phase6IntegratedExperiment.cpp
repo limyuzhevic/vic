@@ -61,8 +61,17 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get observation - safely handle empty regions
+        if (agent.getBrain()->getRegionCount() == 0) {
+            NLM_LOG_ERROR("Brain has no regions - cannot proceed with simulation");
+            break;
+        }
+        auto region = agent.getBrain()->getRegions()[0];
+        if (!region) {
+            NLM_LOG_ERROR("First region is null - cannot proceed with simulation");
+            break;
+        }
+        SensoryPercept percept = world.observe(region.get());
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -74,10 +83,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyAction(region.get(), cmd);
         
         // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        float reward = world.computeReward(region.get());
         totalReward += reward;
         
         // Apply reward modulation
@@ -92,7 +101,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
         
-        // Periodic status
+        // Periodic status (avoid division by zero)
         if (step % 1000 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 
                         " | Reward: " + std::to_string(totalReward / (step + 1)) +
@@ -101,17 +110,18 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
                             brain->getWorkingMemory()->getActiveTraces() : 0));
         }
     }
+    }
     
-    // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
-    result.avgFiringRate = totalFiringRate / config.maxSteps;
+    // Collect final metrics - fix: totalReward and totalFiringRate are already accumulated
+    result.totalReward = totalReward;  // Store total, not average
+    result.avgFiringRate = (config.maxSteps > 0) ? (totalFiringRate / config.maxSteps) : 0.0f;
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
-    // Verify integration
+    // Verify integration - add null checks for all systems
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
@@ -128,6 +138,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Test checkpointing
     if (config.enableCheckpointing) {
         NLM_LOG_INFO("Testing checkpoint save/load...");
+        bool checkpointSuccess = true;
+        
         if (brain->save(config.checkpointPath)) {
             NLM_LOG_INFO("Checkpoint saved successfully");
             
@@ -137,13 +149,16 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
             
             if (brain2->load(config.checkpointPath)) {
                 NLM_LOG_INFO("Checkpoint loaded successfully");
-                result.checkpointingWorks = true;
             } else {
                 NLM_LOG_ERROR("Failed to load checkpoint");
+                checkpointSuccess = false;
             }
         } else {
             NLM_LOG_ERROR("Failed to save checkpoint");
+            checkpointSuccess = false;
         }
+        
+        result.checkpointingWorks = checkpointSuccess;
     }
     
     result.endTime = time(nullptr);
@@ -166,6 +181,7 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", 100);
     cfg->set("region_count", 1);
+    cfg->set("connection_probability", 0.15f);
     
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {

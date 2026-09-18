@@ -271,12 +271,6 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
-    // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
-    }
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
@@ -345,6 +339,11 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset brain development system
+    if (brain_) {
+        brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
+    }
 }
 
 } // namespace nlm
