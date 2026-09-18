@@ -6,8 +6,10 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../performance/ParallelProcessing.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -64,10 +66,13 @@ public:
     // Initialize brain with configuration
     bool initialize();
     
-    // Main simulation step
+    // Main simulation step with parallelization
+    void stepParallel(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Main simulation step (default implementation)
     void step(SimulationStep currentStep);
     
-    // Simulation time step
+    // Main simulation step
     void step(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment

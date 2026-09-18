@@ -12,10 +12,16 @@ struct SpikeSystem::Impl {
     std::unordered_map<SimulationStep, std::vector<DelayedSpikeEvent>> delayedSpikes;  // Grouped by delivery step
     size_t maxHistorySize;
     
+    // Event queues for efficient processing
+    nlm::SpikeRingBuffer immediateSpikeQueue;
+    nlm::DelayedSpikeQueue delayedSpikeQueue;
+    
     // Spike counting for statistics
     std::unordered_map<uint64_t, size_t> spikeCountPerNeuron;  // neuron_id -> count
     
-    Impl() : maxHistorySize(10000) {}
+    Impl() : maxHistorySize(10000)
+        , immediateSpikeQueue(nlm::SPIKE_QUEUE_CAPACITY)
+        , delayedSpikeQueue() {}
 };
 
 SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
@@ -36,35 +42,88 @@ SpikeSystem& SpikeSystem::operator=(SpikeSystem&& other) noexcept {
 }
 
 void SpikeSystem::queueSpike(const SpikeEvent& event) {
-    pImpl->pendingSpikes.push(event);
+    // Use EventQueue for O(1) enqueue operation
+    nlm::QueuedSpikeEvent queuedEvent;
+    queuedEvent.sourceNeuron = event.source_neuron.value;
+    queuedEvent.destNeuron = event.destination_neuron.value;
+    queuedEvent.synapseId = event.synapse_id.value;
+    queuedEvent.weight = event.weight;
+    queuedEvent.isExcitatory = 1;  // Default excitatory
+    
+    if (!pImpl->immediateSpikeQueue.push(queuedEvent)) {
+        // Fallback to queue if EventQueue is full
+        pImpl->pendingSpikes.push(event);
+    }
 }
 
 void SpikeSystem::queueSpike(NeuronId neuron, Timestamp timestamp, SimulationStep step) {
-    pImpl->pendingSpikes.emplace(neuron, timestamp, step);
+    // Use EventQueue for O(1) enqueue operation
+    nlm::QueuedSpikeEvent queuedEvent;
+    queuedEvent.sourceNeuron = neuron.value;
+    queuedEvent.destNeuron = neuron.value;  // Same neuron for immediate spike
+    queuedEvent.synapseId = 0;  // Self-connection for immediate spike
+    queuedEvent.weight = 1.0f;
+    queuedEvent.isExcitatory = 1;
+    
+    if (!pImpl->immediateSpikeQueue.push(queuedEvent)) {
+        // Fallback to queue if EventQueue is full
+        pImpl->pendingSpikes.emplace(neuron, timestamp, step);
+    }
 }
 
 void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
-    // Store by delivery step for efficient processing
-    pImpl->delayedSpikes[event.delivery_step].push_back(event);
+    // Use EventQueue for O(1) enqueue operation
+    pImpl->delayedSpikeQueue.schedule(
+        event.source_neuron,
+        event.destination_neuron,
+        event.synapse_id,
+        event.weight,
+        event.is_excitatory,
+        event.delivery_step
+    );
 }
 
 void SpikeSystem::processSpikes(SimulationStep currentStep) {
-    // Process all pending immediate spikes
+    // Process immediate spikes using EventQueue for O(1) delivery
+    std::vector<nlm::QueuedSpikeEvent> processedEvents;
+    
+    // Drain the ring buffer
+    while (!pImpl->immediateSpikeQueue.empty()) {
+        auto event = pImpl->immediateSpikeQueue.pop();
+        if (event) {
+            processedEvents.push_back(*event);
+        }
+    }
+    
+    // Also process any remaining spikes in the old queue
     while (!pImpl->pendingSpikes.empty()) {
-        SpikeEvent event = pImpl->pendingSpikes.front();
+        SpikeEvent oldEvent = pImpl->pendingSpikes.front();
         pImpl->pendingSpikes.pop();
         
+        // Convert to QueuedSpikeEvent for uniform processing
+        nlm::QueuedSpikeEvent queuedEvent;
+        queuedEvent.sourceNeuron = oldEvent.source_neuron.value;
+        queuedEvent.destNeuron = oldEvent.destination_neuron.value;
+        queuedEvent.synapseId = oldEvent.synapse_id.value;
+        queuedEvent.weight = oldEvent.weight;
+        queuedEvent.isExcitatory = 1;
+        
+        processedEvents.push_back(queuedEvent);
+    }
+    
+    // Process all spikes
+    for (const auto& event : processedEvents) {
         // Create detailed event
         DetailedSpikeEvent detailed;
-        detailed.source = event.source_neuron;
-        detailed.timestamp = event.timestamp;
-        detailed.step = event.step;
+        detailed.source = event.sourceNeuron;
+        detailed.timestamp = static_cast<Timestamp>(currentStep) * 0.001f;  // Assuming 1ms timestep
+        detailed.step = currentStep;
         
         // Add to history
         pImpl->spikeHistory.push_back(detailed);
         
         // Track spike count per neuron
-        pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
+        pImpl->spikeCountPerNeuron[event.sourceNeuron]++;
         
         // Trim history if needed
         if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
@@ -79,18 +138,15 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
 }
 
 void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime) {
-    // Find and process all delayed spikes scheduled for this step
-    auto it = pImpl->delayedSpikes.find(currentStep);
-    if (it != pImpl->delayedSpikes.end()) {
-        // Process all spikes scheduled for this step
-        for (const auto& delayedEvent : it->second) {
-            // Call delayed spike handlers (these will deliver synaptic input)
-            for (auto& handler : pImpl->delayedHandlers) {
-                handler(delayedEvent);
-            }
+    // Process delayed spikes using time-bucketed EventQueue for O(1) delivery
+    auto delayedEvents = pImpl->delayedSpikeQueue.getDueSpikes(currentStep);
+    
+    // Process all delayed spikes scheduled for this step
+    for (const auto& delayedEvent : delayedEvents) {
+        // Call delayed spike handlers (these will deliver synaptic input)
+        for (auto& handler : pImpl->delayedHandlers) {
+            handler(delayedEvent);
         }
-        // Remove processed spikes
-        pImpl->delayedSpikes.erase(it);
     }
 }
 
@@ -109,6 +165,8 @@ const std::vector<DetailedSpikeEvent>& SpikeSystem::getSpikeHistory() const {
 void SpikeSystem::clearHistory() {
     pImpl->spikeHistory.clear();
     pImpl->spikeCountPerNeuron.clear();
+    pImpl->immediateSpikeQueue.clear();
+    pImpl->delayedSpikeQueue.clear();
 }
 
 size_t SpikeSystem::getSpikeCount() const {
@@ -116,15 +174,11 @@ size_t SpikeSystem::getSpikeCount() const {
 }
 
 size_t SpikeSystem::getPendingSpikeCount() const {
-    return pImpl->pendingSpikes.size();
+    return pImpl->immediateSpikeQueue.size() + pImpl->pendingSpikes.size();
 }
 
 size_t SpikeSystem::getPendingDelayedCount() const {
-    size_t count = 0;
-    for (const auto& pair : pImpl->delayedSpikes) {
-        count += pair.second.size();
-    }
-    return count;
+    return pImpl->delayedSpikeQueue.pendingCount();
 }
 
 float SpikeSystem::getAverageSpikeRate() const {
@@ -177,7 +231,9 @@ void SpikeSystem::reset() {
     }
     pImpl->spikeHistory.clear();
     pImpl->spikeCountPerNeuron.clear();
-    pImpl->delayedSpikes.clear();
+    pImpl->pendingSpikes = std::queue<SpikeEvent>();
+    pImpl->immediateSpikeQueue.clear();
+    pImpl->delayedSpikeQueue.clear();
 }
 
 } // namespace nlm

@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include "../performance/SIMDVectorization.hpp"
 
 namespace nlm {
 
@@ -136,10 +137,16 @@ public:
     // Update neuron for one simulation step
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
-    
+
+    // Vectorized update for batch processing
+    // SIMD accelerated version - updates multiple neurons in parallel
+    void stepSIMD(size_t startIdx, size_t endIdx,
+                  std::vector<Neuron*>& neurons,
+                  std::vector<float>& inputs);
+
     // Reset to initial state
     void reset();
-    
+
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     

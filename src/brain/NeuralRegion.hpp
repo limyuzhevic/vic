@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../performance/SparseConnectivity.hpp"
 #include "NeuralPopulation.hpp"
 #include "Synapse.hpp"
 #include <vector>
@@ -75,9 +76,16 @@ public:
                                       float meanWeight,
                                       float weightVariance);
     
-    // Get all neurons across all populations
+    // Get all neurons across all populations (optimized)
     std::vector<Neuron*> getAllNeurons();
     std::vector<const Neuron*> getAllNeurons() const;
+    
+    // Optimized neuron access methods
+    Neuron* getNeuron(NeuronId id);
+    const Neuron* getNeuron(NeuronId id) const;
+    
+    // Cache management
+    void clearNeuronCache();
     
 private:
     struct Impl;

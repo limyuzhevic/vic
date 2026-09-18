@@ -265,6 +265,86 @@ void Neuron::step(Timestamp currentTime) {
     stepLIF(currentTime, dt);
 }
 
+void Neuron::stepSIMD(size_t startIdx, size_t endIdx,
+                      std::vector<Neuron*>& neurons,
+                      std::vector<float>& inputs) {
+    // SIMD accelerated batch update for multiple neurons
+    // Each neuron is represented by its membrane potential and input
+    
+    const size_t count = endIdx - startIdx;
+    if (count == 0) return;
+    
+    // Extract neuron states into SIMD-friendly arrays
+    alignas(64) float V_array[32];  // Support up to 32 neurons per SIMD batch
+    alignas(64) float I_array[32];
+    alignas(64) uint32_t refractory_array[32];
+    alignas(64) uint8_t fired_array[32];
+    
+    // Fill arrays from neuron objects
+    size_t simdCount = std::min(count, static_cast<size_t>(32));
+    for (size_t i = 0; i < simdCount; ++i) {
+        size_t idx = startIdx + i;
+        V_array[i] = neurons[idx]->getMembranePotential();
+        I_array[i] = inputs[idx];
+        refractory_array[i] = neurons[idx]->getState().refractoryRemaining;
+        fired_array[i] = 0;
+    }
+    
+    // Prepare VectorizedLIF parameters
+    nlm::VectorizedLIF lifUpdater;
+    lifUpdater.V_rest = -70.0f;
+    lifUpdater.V_reset = -70.0f;
+    lifUpdater.V_threshold = -55.0f;
+    lifUpdater.tau = 20.0f;
+    lifUpdater.C = 1.0f;
+    lifUpdater.dt = 0.001f;
+    lifUpdater.refractoryDecay = 1.0f;
+    
+    // Use SIMDVectorization for batch update
+    size_t firedCount = lifUpdater.update(
+        V_array, I_array, refractory_array, 
+        fired_array, simdCount);
+    
+    // Copy results back to neuron objects
+    for (size_t i = 0; i < simdCount; ++i) {
+        size_t idx = startIdx + i;
+        neurons[idx]->setMembranePotential(V_array[i]);
+        neurons[idx]->getState().refractoryRemaining = refractory_array[i];
+        if (fired_array[i]) {
+            neurons[idx]->setFiringState(FiringState::Refractory);
+            neurons[idx]->setRefractoryPeriod(refractory_array[i]);
+            neurons[idx]->recordSpike(0);  // currentTime would be passed in
+            ++firedCount;
+        }
+    }
+    
+    // Handle remaining neurons (one by one)
+    for (size_t i = simdCount; i < count; ++i) {
+        size_t idx = startIdx + i;
+        Neuron* neuron = neurons[idx];
+        
+        if (refractory_array[i] > 0) {
+            --refractory_array[i];
+            neuron->setMembranePotential(-70.0f);
+            neuron->setFiringState(FiringState::Resting);
+        } else {
+            float V = neuron->getMembranePotential();
+            float leak = (-70.0f - V) / 20.0f;
+            float input = inputs[idx] / 1.0f;
+            V += 0.001f * 1000.0f * (leak + input);
+            
+            if (V >= -55.0f) {
+                neuron->setFiringState(FiringState::Refractory);
+                neuron->recordSpike(0);  // currentTime would be passed in
+                V = -70.0f;
+                neuron->setRefractoryPeriod(static_cast<uint32_t>(1.0f));
+                ++firedCount;
+            }
+            neuron->setMembranePotential(V);
+        }
+    }
+}
+
 void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;

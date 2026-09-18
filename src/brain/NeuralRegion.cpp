@@ -13,7 +13,11 @@ struct NeuralRegion::Impl {
     std::unordered_map<NeuronId, std::vector<SynapseId>> incomingSynapses;  // dest -> synapse ids
     SynapseId nextSynapseId;
     
-    explicit Impl(RegionId id) : id(id), nextSynapseId(1) {}
+    // Neuron cache for optimized access
+    std::vector<Neuron*> neuronCache;
+    bool connectionCacheValid;
+    
+    explicit Impl(RegionId id) : id(id), nextSynapseId(1), connectionCacheValid(false) {}
 };
 
 NeuralRegion::NeuralRegion(RegionId id) : pImpl(new Impl(id)) {}
@@ -232,85 +236,90 @@ void NeuralRegion::reset() {
     }
 }
 
-void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
-                                               float connectionProbability,
-                                               float meanWeight,
-                                               float weightVariance) {
-    // Efficient random connectivity initialization
-    // Creates synapses based on neuron types:
-    // - Excitatory neurons -> all neurons (excitatory synapses)
-    // - Inhibitory neurons -> all neurons (inhibitory synapses)
-    
-    // Get all neurons
-    auto neurons = getAllNeurons();
-    size_t neuronCount = neurons.size();
-    
-    // Create random connections
-    for (size_t i = 0; i < neuronCount; ++i) {
-        Neuron* preNeuron = neurons[i];
-        NeuronType preType = preNeuron->getType();
+    for (auto& region : pImpl->regions) {
+        auto neurons = region->getAllNeurons();
+        size_t neuronCount = neurons.size();
         
-        // Skip if not a proper source neuron
-        if (preType == NeuronType::Modulatory) continue;
+        if (neuronCount < 2) continue;
         
-        for (size_t j = 0; j < neuronCount; ++j) {
-            if (i == j) continue;  // No self-connections
+        // Collect activity statistics
+        struct NeuronActivity {
+            NeuronId id;
+            float activity;
+            float avgWeight;
+        };
+        std::vector<NeuronActivity> activities;
+        activities.reserve(neuronCount);
+        
+        for (auto* neuron : neurons) {
+            float activity = 0.0f;
+            float avgWeight = 0.0f;
+            size_t synCount = 0;
             
-            Neuron* postNeuron = neurons[j];
-            
-            // Probabilistic connection
-            if (!rng.bernoulli(connectionProbability)) continue;
-            
-            // Determine synapse type based on pre-synaptic neuron type
-            SynapseType synType;
-            float weight;
-            
-            if (preType == NeuronType::Excitatory || 
-                preType == NeuronType::Sensory ||
-                preType == NeuronType::Motor ||
-                preType == NeuronType::Internal) {
-                // excitatory synapse
-                synType = SynapseType::Excitatory;
-                weight = meanWeight + rng.normal(0.0f, weightVariance);
-                weight = std::max(0.01f, weight);  // Ensure positive
-            } else if (preType == NeuronType::Inhibitory) {
-                // inhibitory synapse
-                synType = SynapseType::Inhibitory;
-                weight = -(meanWeight + rng.normal(0.0f, weightVariance));
-                weight = std::min(-0.01f, weight);  // Ensure negative
-            } else {
-                synType = SynapseType::Excitatory;
-                weight = meanWeight + rng.normal(0.0f, weightVariance);
+            auto incoming = region->getSynapsesTo(neuron->getId());
+            for (auto* syn : incoming) {
+                avgWeight += std::abs(syn->getWeight());
+                ++synCount;
             }
             
-            // Add synapse
-            SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);
+            // Activity based on spike history
+            const auto& spikes = neuron->getSpikeHistory();
+            if (!spikes.empty()) {
+                // More recent spikes = higher activity
+                activity = static_cast<float>(spikes.size());
+            }
             
-            // Initialize random properties
-            if (Synapse* syn = getSynapse(synId)) {
-                syn->setType(synType);
-                syn->initializeRandom(rng);
+            if (synCount > 0) {
+                avgWeight /= static_cast<float>(synCount);
+            }
+            
+            activities.push_back({neuron->getId(), activity, avgWeight});
+        }
+        
+        // Synaptogenesis: Create new synapses between active neurons
+        if (region->getSynapseCount() < pImpl->maxTotalSynapses) {
+            for (size_t attempt = 0; attempt < neuronCount; ++attempt) {
+                // Probabilistic synapse formation
+                if (!rng.bernoulli(pImpl->synaptogenesisRate)) continue;
+                
+                size_t idx1 = rng.uniformInt(0, static_cast<int>(neuronCount) - 1);
+                size_t idx2 = rng.uniformInt(0, static_cast<int>(neuronCount) - 1);
+                
+                if (idx1 != idx2) {
+                    NeuronId src = activities[idx1].id;
+                    NeuronId dst = activities[idx2].id;
+                    
+                    // Only create if both neurons are somewhat active
+                    if (activities[idx1].activity > 0.1f || activities[idx2].activity > 0.1f) {
+                        // Initial weight based on activity
+                        float weight = 0.1f + rng.uniformReal(0.0f, 0.2f);
+                        createSynapse(brain, src, dst, weight);
+                    }
+                }
+            }
+        }
+        
+        // Pruning: Remove weak or unused synapses
+        for (auto& syn : region->getSynapses()) {
+            float weight = std::abs(syn->getWeight());
+            
+            // Check pruning conditions
+            bool shouldPrune = false;
+            
+            if (weight < pImpl->minWeightThreshold) {
+                // Synapse is too weak
+                shouldPrune = rng.bernoulli(pImpl->pruningRate);
+            } else if (pImpl->useActivityDependency) {
+                // Check if synapse has been unused (no recent weight changes)
+                float eligibility = std::abs(syn->getEligibilityTrace());
+                if (eligibility < pImpl->activityThreshold) {
+                    shouldPrune = rng.bernoulli(pImpl->pruningRate * 0.5f);
+                }
+            }
+            
+            if (shouldPrune) {
+                removeSynapse(brain, syn->getId());
             }
         }
     }
 }
-
-std::vector<Neuron*> NeuralRegion::getAllNeurons() {
-    std::vector<Neuron*> result;
-    for (auto& pop : pImpl->populations) {
-        auto popNeurons = pop->getNeurons();
-        result.insert(result.end(), popNeurons.begin(), popNeurons.end());
-    }
-    return result;
-}
-
-std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
-    std::vector<const Neuron*> result;
-    for (const auto& pop : pImpl->populations) {
-        auto popNeurons = pop->getNeurons();
-        result.insert(result.end(), popNeurons.begin(), popNeurons.end());
-    }
-    return result;
-}
-
-} // namespace nlm
