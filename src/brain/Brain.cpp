@@ -185,7 +185,7 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
-    // Create regions
+    // Create regions with populations and neurons
     for (size_t i = 0; i < regionCount; ++i) {
         addRegion("Region_" + std::to_string(i + 1));
     }
@@ -226,6 +226,36 @@ bool Brain::initialize() {
         if (region) {
             // Initialize random connectivity and synapse weights
             region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+        }
+    }
+    
+    // ========== ADD INTER-REGION CONNECTIONS ==========
+    
+    // Create inter-region connections for realistic brain wiring
+    for (size_t i = 0; i < regionCount - 1; ++i) {
+        RegionId sourceId = RegionId(i + 1);
+        for (size_t j = i + 1; j < regionCount; ++j) {
+            RegionId targetId = RegionId(j + 1);
+            
+            // Create probabilistic long-range connections
+            float connectionProbabilityLR = 0.05f; // 5% probability for long-range connections
+            if (pImpl->rng->uniformReal(0.0f, 1.0f) < connectionProbabilityLR) {
+                // Create bidirectional connections (like real neural connections)
+                addInterRegionConnection(sourceId, targetId, 0.1f, 1);
+                if (pImpl->rng->uniformReal(0.0f, 1.0f) < 0.5f) {
+                    addInterRegionConnection(targetId, sourceId, 0.1f, 2);
+                }
+            }
+        }
+    }
+    
+    // Create hierarchical region connections
+    for (size_t i = 1; i < regionCount; ++i) {
+        RegionId sourceId = RegionId(i);
+        RegionId targetId = RegionId(1); // All regions connect to region 1 (hub)
+        
+        if (pImpl->rng->uniformReal(0.0f, 1.0f) < 0.3f) {
+            addInterRegionConnection(sourceId, targetId, 0.05f, 3);
         }
     }
     
