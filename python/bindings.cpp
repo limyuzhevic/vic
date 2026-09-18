@@ -416,10 +416,620 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Add more convenience functions
+    m.def("createWorldWithConfig", [](int width, int height, int visionWidth, int visionHeight) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width").default_value(20), py::arg("height").default_value(20),
+        py::arg("visionWidth").default_value(8), py::arg("visionHeight").default_value(8),
+        "Create a simple world with default configuration");
+
+    m.def("runLearningSimulation", [](int numSteps, bool verbose = false) {
+        runCompleteAgentSimulation(numSteps, true);
+    }, py::arg("numSteps"), py::arg("verbose").default_value(false),
+        "Run a complete learning agent simulation");
+
+    m.def("runSilentSimulation", [](int numSteps) {
+        auto config = createBrainWithDefaults();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        for (int step = 0; step < numSteps; ++step) {
+            brain->step(step);
+        }
+        
+        return std::make_tuple(brain->getTotalNeuronCount(), 
+                              brain->getTotalSpikeCount());
+    }, py::arg("numSteps"), "Run a silent brain simulation and return neuron/spike counts");
+
+    m.def("getAllNeuronTypes", []() {
+        std::vector<std::string> types;
+        types.push_back("Excitatory");
+        types.push_back("Inhibitory");
+        types.push_back("Sensory");
+        types.push_back("Motor");
+        types.push_back("Internal");
+        types.push_back("Modulatory");
+        return types;
+    }, "Get list of all neuron types");
+
+    m.def("getAllActionTypes", []() {
+        std::vector<std::string> actions;
+        actions.push_back("MoveForward");
+        actions.push_back("MoveBackward");
+        actions.push_back("TurnLeft");
+        actions.push_back("TurnRight");
+        actions.push_back("Look");
+        actions.push_back("Interact");
+        actions.push_back("Eat");
+        actions.push_back("Drink");
+        actions.push_back("Rest");
+        actions.push_back("Wait");
+        return actions;
+    }, "Get list of all action types");
+
+    m.def("createQuickBrain", []() {
+        auto brain = std::make_shared<Brain>(createBrainWithDefaults());
+        brain->initialize();
+        return brain;
+    }, "Create a brain with default configuration and initialize it");
+
+    m.def("createQuickAgent", [](int width, int height, int visionWidth, int visionHeight) {
+        auto brain = createQuickBrain();
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("width").default_value(20), py::arg("height").default_value(20),
+        py::arg("visionWidth").default_value(8), py::arg("visionHeight").default_value(8),
+        "Create a quick brain, world, and agent for testing");
+
+    m.def("printHelp", []() {
+        std::cout << R"(
+=== NLM Python Bindings Help ===
+
+Basic Usage:
+  import pynlm
+
+  # Create and initialize a brain
+  brain = pynlm.createQuickBrain()
+  
+  # Run simulation
+  for i in range(100):
+      brain.step(i)
+  
+  # Get stats
+  print(f"Neurons: {brain.getTotalNeuronCount()}")
+  print(f"Spikes: {brain.getTotalSpikeCount()}")
+
+Learning Examples:
+  # Create full agent environment
+  brain, world, agent = pynlm.createQuickAgent(20, 20, 8, 8)
+  
+  # Run learning simulation
+  pynlm.runLearningSimulation(1000)
+
+Useful Functions:
+  - createBrainWithDefaults(): Create config with common defaults
+  - runSilentSimulation(N): Run silent brain simulation
+  - runLearningSimulation(N, verbose): Run learning agent simulation
+  - getAllNeuronTypes(): Get list of neuron types
+  - getAllActionTypes(): Get list of action types
+  - printHelp(): Show this help message
+
+File I/O:
+  - brain.save("checkpoint.bin"): Save brain state
+  - brain.load("checkpoint.bin"): Load brain state
+  - config.saveToFile("config.json"): Save config
+  - config.loadFromFile("config.json"): Load config
+
+System Integration:
+  World objects can be added: world.addObject(obj)
+  Motor commands can be applied: world.applyMotorCommand(action, time)
+  Sensor data can be read: world.getSensoryPercept()
+
+For more details, see:
+  - docs/ARCHITECTURE.md: System architecture
+  - docs/SCIENCE.md: Scientific background
+  - HOW_TO_USE.md: Python usage guide
+        )" << std::endl;
+    }, "Print usage help for NLM Python bindings");
+
+    // Add version and info attributes
+    m.attr("VERSION") = py::str(getVersionString());
+    m.attr("__version__") = py::str(getVersionString());
+    
+    // Add help function as a callable
+    m.def("help", &printHelp, "Show usage help");
+
+    // Initialize module
+    initializeModule(m);
+
+    // Add some additional Pythonic convenience functions
+    py::class_<py::module_> module_class(m, "module");  // Just for adding static methods if needed
+
+    // Add a convenience function to check if NLM is properly initialized
+    m.def("checkSetup", []() {
+        std::cout << "NLM Python Bindings version " << getVersionString() << std::endl;
+        std::cout << "Build configuration: C++20, Pybind11" << std::endl;
+        std::cout << "Phase: Final Integration (Phase 6)" << std::endl;
+        return true;
+    }, "Check if NLM is properly set up and print status");
+
+// Version information
+const char* getVersionString() {
+    return "0.1.0";
+}
+
+// Helper function to create a config with common defaults
+py::object createBrainWithDefaults() {
+    auto config = std::make_shared<Config>();
+    // Apply typical defaults for easier usage
+    config->set("brain.neuron_count", int64_t(1000), ConfigSource::Runtime);
+    config->set("brain.synapse_density", 0.1, ConfigSource::Runtime);
+    config->set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+    config->set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+    return py::cast(config);
+}
+
+// High-level function to create and run a complete agent simulation
+void runCompleteAgentSimulation(int numSteps, bool enableLearning = true) {
+    // Create brain with defaults
+    auto config = createBrainWithDefaults();
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
+    
+    // Create world
+    auto world = std::make_shared<SimpleWorld>();
+    world->configure(20, 20, 8, 8);
+    world->reset();
+    
+    // Create agent
+    auto agent = std::make_shared<AgentBrain>(brain);
+    agent->initialize(world);
+    
+    // Enable learning if requested
+    if (enableLearning) {
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+    }
+    
+    // Run simulation
+    for (int step = 0; step < numSteps; ++step) {
+        // Update world
+        world->update(0.1);
+        
+        // Get sensory input
+        auto percept = world->getSensoryPercept();
+        
+        // Process sensory input
+        agent->processSensoryInput(percept);
+        
+        // Brain step
+        brain->step(step);
+        
+        // Decode motor command
+        auto action = agent->decodeMotorCommand();
+        
+        // Apply motor command
+        world->applyMotorCommand(action, world->getSimulationTime());
+        
+        // Apply reward if learning is enabled
+        if (enableLearning && world->getSensoryPercept().getInternal().size() > 0) {
+            double reward = world->getSensoryPercept().getInternal()[0];
+            agent->applyRewardModulation(reward, 0.0);
+            agent->updateDevelopment(0.1);
+        }
+        
+        // Print progress every 100 steps
+        if (step % 100 == 0) {
+            std::cout << "Step " << step << ": " << brain->getFiringNeuronCount() 
+                      << " neurons firing, " << brain->getTotalSpikeCount() 
+                      << " total spikes" << std::endl;
+        }
+    }
+    
+    std::cout << "Simulation complete!" << std::endl;
+    std::cout << "Final stats: " << brain->getAverageFiringRate() << " avg firing rate" << std::endl;
+}
+
+// Helper function to create a config from JSON/YAML file
+py::object loadConfigFromFile(const std::string& filepath) {
+    auto config = std::make_shared<Config>();
+    if (!config->loadFromFile(filepath)) {
+        throw std::runtime_error("Failed to load config from: " + filepath);
+    }
+    return py::cast(config);
+}
+
+// Helper function to save config to file
+void saveConfigToFile(py::object configObj, const std::string& filepath) {
+    auto config = py::cast<std::shared_ptr<Config>>(configObj);
+    if (!config->saveToFile(filepath)) {
+        throw std::runtime_error("Failed to save config to: " + filepath);
+    }
+}
+
+// Factory function to create brain with custom configuration
+py::object createBrainWithCustomConfig(py::object configObj) {
+    auto config = py::cast<std::shared_ptr<Config>>(configObj);
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
+    return py::cast(brain);
+}
+
+// Function to create agent with world
+std::tuple<py::object, py::object, py::object> createCompleteAgent(int width = 20, int height = 20, 
+                                                                   int visionWidth = 8, int visionHeight = 8) {
+    auto config = createBrainWithDefaults();
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
+    
+    auto world = std::make_shared<SimpleWorld>();
+    world->configure(width, height, visionWidth, visionHeight);
+    world->reset();
+    
+    auto agent = std::make_shared<AgentBrain>(brain);
+    agent->initialize(world);
+    
+    return std::make_tuple(py::cast(brain), py::cast(world), py::cast(agent));
+}
+
+// Python-style string conversion helper
+std::string toPythonString(const std::string& str) {
+    return str;
+}
+
+// Add neuron type enumeration
+py::enum_<NeuronType> getNeuronTypeEnum(py::module_& m) {
+    return py::enum_<NeuronType>(m, "NeuronType")
+        .value("Excitatory", NeuronType::Excitatory)
+        .value("Inhibitory", NeuronType::Inhibitory)
+        .value("Modulatory", NeuronType::Modulatory)
+        .value("Sensory", NeuronType::Sensory)
+        .value("Motor", NeuronType::Motor)
+        .value("Internal", NeuronType::Internal);
+}
+
+// Add synapse type enumeration  
+py::enum_<SynapseType> getSynapseTypeEnum(py::module_& m) {
+    return py::enum_<SynapseType>(m, "SynapseType")
+        .value("Excitatory", SynapseType::Excitatory)
+        .value("Inhibitory", SynapseType::Inhibitory)
+        .value("Modulatory", SynapseType::Modulatory)
+        .value("Electrical", SynapseType::Electrical)
+        .value("GapJunction", SynapseType::GapJunction);
+}
+
+// Add action type enumeration
+py::enum_<ActionType> getActionTypeEnum(py::module_& m) {
+    return py::enum_<ActionType>(m, "ActionType")
+        .value("MoveForward", ActionType::MoveForward)
+        .value("MoveBackward", ActionType::MoveBackward)
+        .value("MoveLeft", ActionType::MoveLeft)
+        .value("MoveRight", ActionType::MoveRight)
+        .value("TurnLeft", ActionType::TurnLeft)
+        .value("TurnRight", ActionType::TurnRight)
+        .value("Look", ActionType::Look)
+        .value("LookUp", ActionType::LookUp)
+        .value("LookDown", ActionType::LookDown)
+        .value("Interact", ActionType::Interact)
+        .value("Eat", ActionType::Eat)
+        .value("Drink", ActionType::Drink)
+        .value("Rest", ActionType::Rest)
+        .value("Wait", ActionType::Wait)
+        .value("Custom", ActionType::Custom);
+}
+
+// Add world object type enumeration
+py::enum_<WorldObjectType> getWorldObjectTypeEnum(py::module_& m) {
+    return py::enum_<WorldObjectType>(m, "WorldObjectType")
+        .value("Empty", WorldObjectType::Empty)
+        .value("Resource", WorldObjectType::Resource)
+        .value("Hazard", WorldObjectType::Hazard)
+        .value("Wall", WorldObjectType::Wall)
+        .value("Marker", WorldObjectType::Marker);
+}
+
+// Python initialization function
+void initializePythonModule(py::module_& m) {
+    // Set module metadata
+    m.attr("__version__") = py::str(getVersionString());
+    m.attr("__author__") = "NLM Authors";
+    m.attr("__description__") = "NLM (Neural Learning Machine) Python Bindings";
+    
+    // Set module docstring
+    m.doc() = R"pbdoc(
+        NLM (Neural Learning Machine) Python Bindings
+        
+        A Python binding for the NLM C++ neural simulation framework.
+        
+        This module provides classes for:
+        - Brain: Central neural simulation brain class
+        - Config: Configuration class for NLM system
+        - AgentBrain: Agent brain interface connecting NLM brain to world
+        - SimpleWorld: Simple 2D world for NLM simulation
+        - SensoryInput: Base class for sensory input
+        - Vision: Vision sensory input
+        - Audio: Audio sensory input
+        - InternalSignals: Internal signals sensory input
+        - Action: Action representation for motor output
+        - WorldObject: World object representation
+        - AgentBody: Agent body state
+        - ActionResult: Action result from world
+        - SensoryPercept: Sensory percept data
+        
+        Usage example:
+            import pynlm
+            
+            config = pynlm.createDefaultConfig()
+            brain = pynlm.createBrain(config)
+            brain.initialize()
+            
+            for i in range(100):
+                brain.step(i)
+                
+            print(f"Neurons: {brain.getTotalNeuronCount()}")
+        )pbdoc";
+    
+    // Get enumerations
+    auto neuronTypeEnum = getNeuronTypeEnum(m);
+    auto synapseTypeEnum = getSynapseTypeEnum(m);
+    auto actionTypeEnum = getActionTypeEnum(m);
+    auto worldObjectTypeEnum = getWorldObjectTypeEnum(m);
+    
+    // Add documentation strings to enumerations
+    neuronTypeEnum.doc() = "Neuron type enumeration";
+    synapseTypeEnum.doc() = "Synapse type enumeration";
+    actionTypeEnum.doc() = "Action type enumeration";
+    worldObjectTypeEnum.doc() = "World object type enumeration";
+    
+    // Add convenience functions
+    m.def("createDefaultConfig", []() {
+        return std::make_shared<Config>();
+    }, "Create a default configuration object");
+    
+    m.def("createBrain", [](py::object configObj) {
+        auto config = py::cast<std::shared_ptr<Config>>(configObj);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("config"), "Create a brain with given configuration");
+    
+    m.def("createSimpleWorld", []() {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a simple world object");
+    
+    m.def("createAgentBrain", [](py::object brainObj) {
+        auto brain = py::cast<std::shared_ptr<Brain>>(brainObj);
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create an agent brain interface");
+    
+    // Convenience factory functions
+    m.def("createQuickBrain", []() {
+        return createBrainWithDefaults();
+    }, "Create and initialize a brain with default configuration");
+    
+    m.def("createQuickAgent", [](int width, int height, int visionWidth, int visionHeight) {
+        auto [brain, world, agent] = createCompleteAgent(width, height, visionWidth, visionHeight);
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("width").default_value(20), py::arg("height").default_value(20),
+        py::arg("visionWidth").default_value(8), py::arg("visionHeight").default_value(8),
+        "Create a complete agent setup with brain, world, and agent");
+    
+    m.def("loadConfig", &loadConfigFromFile, 
+        py::arg("filepath"), "Load configuration from JSON or YAML file");
+    
+    m.def("saveConfig", &saveConfigToFile,
+        py::arg("config"), py::arg("filepath"), "Save configuration to file");
+    
+    m.def("runLearningSimulation", [](int numSteps, bool verbose = false) {
+        runCompleteAgentSimulation(numSteps, true);
+    }, py::arg("numSteps"), py::arg("verbose").default_value(false),
+        "Run a complete learning agent simulation");
+    
+    m.def("runSilentSimulation", [](int numSteps) {
+        auto config = createBrainWithDefaults();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        for (int step = 0; step < numSteps; ++step) {
+            brain->step(step);
+        }
+        
+        return std::make_tuple(brain->getTotalNeuronCount(), 
+                              brain->getTotalSpikeCount());
+    }, py::arg("numSteps"), "Run a silent brain simulation and return neuron/spike counts");
+    
+    // Get type lists
+    m.def("getNeuronTypes", []() {
+        std::vector<std::string> types;
+        types.push_back("Excitatory");
+        types.push_back("Inhibitory");
+        types.push_back("Sensory");
+        types.push_back("Motor");
+        types.push_back("Internal");
+        types.push_back("Modulatory");
+        return types;
+    }, "Get list of all neuron types");
+    
+    m.def("getSynapseTypes", []() {
+        std::vector<std::string> types;
+        types.push_back("Excitatory");
+        types.push_back("Inhibitory");
+        types.push_back("Modulatory");
+        types.push_back("Electrical");
+        types.push_back("GapJunction");
+        return types;
+    }, "Get list of all synapse types");
+    
+    m.def("getActionTypes", []() {
+        std::vector<std::string> actions;
+        actions.push_back("MoveForward");
+        actions.push_back("MoveBackward");
+        actions.push_back("MoveLeft");
+        actions.push_back("MoveRight");
+        actions.push_back("TurnLeft");
+        actions.push_back("TurnRight");
+        actions.push_back("Look");
+        actions.push_back("Interact");
+        actions.push_back("Eat");
+        actions.push_back("Drink");
+        actions.push_back("Rest");
+        actions.push_back("Wait");
+        actions.push_back("Custom");
+        return actions;
+    }, "Get list of all action types");
+    
+    m.def("getWorldObjectTypes", []() {
+        std::vector<std::string> types;
+        types.push_back("Empty");
+        types.push_back("Resource");
+        types.push_back("Hazard");
+        types.push_back("Wall");
+        types.push_back("Marker");
+        return types;
+    }, "Get list of all world object types");
+    
+    // System information
+    m.def("getSystemInfo", []() {
+        std::ostringstream oss;
+        oss << "NLM Python Bindings " << getVersionString() << std::endl;
+        oss << "Build: C++20 with Pybind11" << std::endl;
+        oss << "Phase: Final Integration (Phase 6)" << std::endl;
+        oss << "Features: LIF neurons, STDP plasticity, neuromodulation" << std::endl;
+        oss << "APIs: Brain, Config, AgentBrain, SimpleWorld";
+        return oss.str();
+    }, "Get system information");
+    
+    m.def("printHelp", []() {
+        std::cout << R"(
+=== NLM Python Bindings Help ===
+
+Basic Usage:
+  import pynlm
+
+  # Create and initialize a brain
+  brain = pynlm.createQuickBrain()
+  
+  # Run simulation
+  for i in range(100):
+      brain.step(i)
+  
+  # Get stats
+  print(f"Neurons: {brain.getTotalNeuronCount()}")
+  print(f"Spikes: {brain.getTotalSpikeCount()}")
+
+Learning Examples:
+  # Create full agent environment
+  brain, world, agent = pynlm.createQuickAgent(20, 20, 8, 8)
+  
+  # Run learning simulation
+  pynlm.runLearningSimulation(1000)
+
+Factory Functions:
+  - createQuickBrain(): Create brain with defaults
+  - createQuickAgent(): Create complete agent setup
+  - loadConfig(filepath): Load config from file
+  - saveConfig(config, filepath): Save config to file
+  - runLearningSimulation(steps, verbose): Run learning simulation
+  - runSilentSimulation(steps): Run silent simulation
+
+Type Lists:
+  - getNeuronTypes(): Get all neuron types
+  - getSynapseTypes(): Get all synapse types
+  - getActionTypes(): Get all action types
+  - getWorldObjectTypes(): Get all object types
+
+System Info:
+  - getSystemInfo(): Get build information
+  - printHelp(): Show this help message
+
+File I/O:
+  - brain.save("checkpoint.bin"): Save brain state
+  - brain.load("checkpoint.bin"): Load brain state
+  - config.loadFromFile("config.json"): Load config
+  - config.saveToFile("config.json"): Save config
+
+System Integration:
+  - World objects can be added: world.addObject(obj)
+  - Motor commands: world.applyMotorCommand(action, time)
+  - Sensor data: world.getSensoryPercept()
+  - Agent brain interface: agent.processSensoryInput(percept)
+
+For more details, see:
+  - docs/ARCHITECTURE.md: System architecture
+  - docs/SCIENCE.md: Scientific background
+  - HOW_TO_USE.md: Python usage guide
+  - README.md: Project overview
+        )" << std::endl;
+    }, "Print usage help for NLM Python bindings");
+    
+    // Add module-level constants
+    m.attr("VERSION") = py::str(getVersionString());
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Add test/simulation helpers
+    m.def("runPhase2Demo", []() {
+        std::cout << "=== NLM Phase 2 Demo ===" << std::endl;
+        std::cout << "Running real neural computation demo..." << std::endl;
+        return createQuickBrain();
+    }, "Run Phase 2 demonstration with real LIF neuron dynamics");
 }
 
-} // namespace nlm
+void addAdvancedFeatures(py::module_& m) {
+    // Add additional advanced features for power users
+    m.def("createAdvancedConfig", []() {
+        auto config = std::make_shared<Config>();
+        // Set up advanced configuration
+        config->set("brain.neuron_count", int64_t(5000), ConfigSource::Runtime);
+        config->set("brain.synapse_density", 0.15f, ConfigSource::Runtime);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.stdp.learning_rate", 0.001, ConfigSource::Runtime);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+        config->set("neuromod.dopamine.scale", 1.0, ConfigSource::Runtime);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Runtime);
+        config->set("development.enable", true, ConfigSource::Runtime);
+        return py::cast(config);
+    }, "Create an advanced configuration with high parameters");
+    
+    m.def("createComplexAgent", [](int numSteps) {
+        auto [brain, world, agent] = createCompleteAgent(30, 30, 12, 12);
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        std::cout << "Running complex agent simulation..." << std::endl;
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            agent->processSensoryInput(world->getSensoryPercept());
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            if (step % 100 == 0) {
+                std::cout << "Step " << step << ": " << brain->getFiringNeuronCount() 
+                          << " neurons firing" << std::endl;
+            }
+        }
+        
+        return std::make_tuple(brain->getTotalSpikeCount(), 
+                              agent->getCuriosityLevel(),
+                              agent->getPredictionError());
+    }, py::arg("numSteps"), "Create and run a complex agent simulation");
+}
+

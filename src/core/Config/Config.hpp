@@ -100,6 +100,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Additional load methods
+    bool loadFromSimpleFormat(const std::string& filepath);
+    bool loadFromJSON(const std::string& filepath);
 };
 
 } // namespace nlm
