@@ -1,16 +1,3 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 class RandomGenerator;
@@ -25,9 +12,13 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
-class Curiosity;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+class Reward;
 class Novelty;
 class PredictionError;
+class Curiosity;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -175,14 +166,26 @@ public:
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
-    // Novelty - novelty detection
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and sleep
+    Serotonin* getSerotonin();
+    
+    // Reward signal for reinforcement learning
+    Reward* getReward();
+    
+    // Novelty detection for exploration
     Novelty* getNovelty();
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Curiosity drive for exploration
+    Curiosity* getCuriosity();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

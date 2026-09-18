@@ -46,6 +46,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -126,6 +129,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -502,17 +508,54 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Also store sensory state if available
+            if (!pImpl->sensoryNeurons.empty()) {
+                for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 10; ++i) {
+                    auto* neuron = pImpl->sensoryNeurons[i];
+                    episode.activeNeurons.push_back(neuron->getId());
+                    episode.neuronActivations.push_back(neuron->getMembranePotential() / 20.0f);
+                }
+            }
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Update prediction with current working memory state as sensory input
+        
+        // Convert working memory traces to sensory pattern for prediction
+        std::vector<float> sensoryPattern;
+        auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        
+        for (const auto& neuronId : memoryNeurons) {
+            if (pImpl->workingMemory->contains(neuronId)) {
+                float value = pImpl->workingMemory->retrieve(neuronId);
+                sensoryPattern.push_back(value);
+            }
+        }
+        
+        // Also include some current neural activity
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 10; ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            if (neuron) {
+                sensoryPattern.push_back(neuron->getMembranePotential() / 10.0f);
+            }
+        }
+        
+        // Train prediction system with current state
+        // In a real implementation, this would use actual forward models
+        // For now, update the prediction with sensory pattern
+        pImpl->predictionSystem->train(sensoryPattern);
+        
+        // Compute prediction error for neuromodulation
+        // This connects prediction error to learning signals
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (pImpl->predictionError) {
+            // Feed prediction error to prediction error system
+            pImpl->predictionError->update(predictionError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========

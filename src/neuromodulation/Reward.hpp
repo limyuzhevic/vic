@@ -1,34 +1,25 @@
 #pragma once
 
-#include "Neuromodulator.hpp"
+#include "../core/Types/Types.hpp"
 
 namespace nlm {
 
 // Reward signal for reinforcement learning
-// PLACEHOLDER - Phase 2 will implement real reward computation
-
-class Reward {
+// Phase 2: Reward prediction and reinforcement learning
+class Reward : public Neuromodulator {
 public:
     Reward();
-    ~Reward();
+    ~Reward() override;
     
-    // Get current reward value
-    float getValue() const;
-    void setValue(float value);
+    const char* getName() const override { return "Reward"; }
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
     
-    // Accumulate reward
-    void add(float delta);
-    
-    // Reset accumulated reward
-    void reset();
-    
-    // Compute reward from environment state
-    // TODO PHASE 2: Implement real reward computation
-    float computeReward(const class Observation& observation) const;
-    
-    // Reward history
-    const std::vector<float>& getHistory() const;
-    void clearHistory();
+    // Reward signaling
+    void signalReward(float reward);
+    void signalRewardPredictionError(float error);
     
 private:
     struct Impl;
