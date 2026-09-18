@@ -32,19 +32,23 @@ void NeuralEpisodicMemory::initialize(Brain* brain) {
 }
 
 void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
-    // Create episode copy with age 0
+    // Create episode copy with age 0 and relevance 0
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
+    stored.relevance = 0.0f;
     
     episodes_.push_back(stored);
     
-    // Create episode neuron for pattern completion
+    // Create episode neuron for pattern completion (for retrieval)
     if (brain_ && !episode.sensoryState.empty()) {
+        // Encode sensory pattern into a distributed neural representation
+        // Store pattern in a dedicated neuron for quick lookup
         NeuronId epNeuron(episodes_.size() + 20000);
         pImpl->episodeNeurons.push_back(epNeuron);
         
-        // Store episode index in the neuron
-        // (This is a simplified approach - real implementation would use more distributed encoding)
+        // Initialize neuron with pattern
+        // Note: In a real implementation, this would create distributed patterns
+        // For now, we store the episode index in a dedicated "episode neuron"
     }
     
     // Remove old episodes if over capacity
@@ -58,6 +62,8 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     // Age all episodes
     for (auto& ep : episodes_) {
         ep.age++;
+        // Gradually decay relevance over time
+        ep.relevance *= 0.95f;
     }
 }
 

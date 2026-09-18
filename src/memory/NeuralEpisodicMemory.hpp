@@ -2,6 +2,7 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../motor/Action.hpp"
 #include <vector>
 #include <memory>
 #include <deque>
@@ -41,11 +42,14 @@ struct EpisodicMemoryItem {
     // Time since this episode
     SimulationStep age;
     
+    // Relevance weight for consolidation
+    float relevance;
+    
     EpisodicMemoryItem()
         : timestamp(0), positionX(0), positionY(0), orientation(0)
         , action(ActionType::Wait)
         , reward(0), energy(0), novelty(0)
-        , resultingReward(0), age(0) {}
+        , resultingReward(0), age(0), relevance(0.0f) {}
 };
 
 // NeuralEpisodicMemory: Stores experiences in a way that interacts with neural substrate

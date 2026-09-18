@@ -119,9 +119,10 @@ public:
     RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);
     const NeuralRegion* getRegion(RegionId id) const;
-    size_t getRegionCount() const;
+size_t getRegionCount() const;
+    RegionId getRegionId(int index);
     std::vector<RegionId> getRegionIds() const;
-    
+
     // Get all regions
     const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
     
