@@ -53,6 +53,13 @@ void PredictionSystem::clearHistory() {
     pImpl->errorHistory.clear();
 }
 
+// Update prediction system (compute next prediction)
+void PredictionSystem::update(const SensoryInput& currentState, TimestepDuration dt) {
+    // TODO PHASE 2: Implement real predictive coding using NLM's neural substrate
+    // PLACEHOLDER: Just calculate prediction error from current state
+    updatePredictions(currentState, currentState);
+}
+
 void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
 }

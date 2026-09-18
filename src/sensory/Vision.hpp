@@ -21,6 +21,13 @@ public:
     // Get feature dimensionality
     size_t getFeatureDimensions() const;
     
+    // New enhanced vision processing methods
+    void setEdgeSensitivity(float sensitivity);
+    void setColorSensitivity(float sensitivity);
+    void setMotionSensitivity(float sensitivity);
+    void setFeatureLearningRate(float rate);
+    float getFeatureLearningRate() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

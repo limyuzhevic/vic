@@ -28,6 +28,8 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;  // Added for Phase 6 integration
+class SocialLearning;  // Added for Phase 6 integration
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -155,14 +157,11 @@ public:
     
     // ========== COGNITION SYSTEMS ==========
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    // Self model - internal representation of the agent's body and capabilities
+    SelfModel* getSelfModel();
     
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
-    
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // Social learning - learning from observing other agents
+    SocialLearning* getSocialLearning();
     
     // ========== DEVELOPMENT SYSTEM ==========
     

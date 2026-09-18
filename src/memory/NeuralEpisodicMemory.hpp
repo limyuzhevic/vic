@@ -96,6 +96,9 @@ public:
     // Update episode relevance based on recent use
     void updateRelevance(SimulationStep episodeId, float relevanceDelta);
 
+    // Update episodic memory (decay, relevance adjustment)
+    void update(TimestepDuration dt);
+
     // Get episode by index
     const EpisodicMemoryItem* getEpisode(size_t index) const;
 

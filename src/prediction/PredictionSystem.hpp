@@ -23,14 +23,17 @@ public:
     
     // Get prediction error
     float getPredictionError() const;
-    
+
     // Get prediction confidence
     float getConfidence() const;
-    
+
     // Get prediction history
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
-    
+
+    // Update prediction system (compute next prediction)
+    void update(const SensoryInput& currentState, TimestepDuration dt);
+
     // Train prediction model
     void train(const SensoryInput& observation);
     
