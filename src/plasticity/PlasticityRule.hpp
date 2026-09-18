@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "../brain/Synapse.hpp"
+#include "Synapse.hpp"
 
 namespace nlm {
 
@@ -81,6 +81,42 @@ public:
                  TimestepDuration dt) override {}
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
     const char* getName() const override { return "BCM"; }
+};
+
+// Spike-Timing-Dependent Plasticity (STDP)
+// PLACEHOLDER - Phase 2
+class STDP : public PlasticityRule {
+public:
+    void update(Synapse* synapse,
+                 const std::vector<Timestamp>& preSpikes,
+                 const std::vector<Timestamp>& postSpikes,
+                 TimestepDuration dt) override {}
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+    const char* getName() const override { return "STDP"; }
+};
+
+// Reward-modulated STDP (R-STDP)
+// PLACEHOLDER - Phase 2
+class RewardModulatedSTDP : public PlasticityRule {
+public:
+    void update(Synapse* synapse,
+                 const std::vector<Timestamp>& preSpikes,
+                 const std::vector<Timestamp>& postSpikes,
+                 TimestepDuration dt) override {}
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+    const char* getName() const override { return "R-STDP"; }
+};
+
+// Spike-timing dependent plasticity with triplet interactions
+// PLACEHOLDER - Phase 2
+class TripletSTDP : public PlasticityRule {
+public:
+    void update(Synapse* synapse,
+                 const std::vector<Timestamp>& preSpikes,
+                 const std::vector<Timestamp>& postSpikes,
+                 TimestepDuration dt) override {}
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+    const char* getName() const override { return "TripletSTDP"; }
 };
 
 } // namespace nlm

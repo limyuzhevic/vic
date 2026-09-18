@@ -32,7 +32,7 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Enhanced with real reward prediction error computation and temporal difference learning
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -47,6 +47,18 @@ public:
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    
+    // Learning system components
+    float getPredictionError() const;
+    float getExpectedValue() const;
+    void setExpectedValue(float value);
+    
+    // Learning parameters
+    void setLearningRate(float rate);
+    void setNeuromodulationStrength(float strength);
+    
+    // Reset system state
+    void reset();
     
 private:
     struct Impl;

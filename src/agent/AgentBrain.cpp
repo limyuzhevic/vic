@@ -210,15 +210,63 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
+    // Advanced exploration with curiosity-driven behavior and goal-directed actions
+    if (!curiosityEnabled_) {
+        return defaultCmd;
+    }
+    
+    // Check for goal-directed behaviors
+    bool shouldExplore = false;
+    bool shouldHarvest = false;
+    bool shouldRepair = false;
+    bool hasResourceNeed = false;
+    
+    // Determine behavior based on internal state and environment
+    if (brain_) {
+        // Check for resources nearby (this would need world knowledge in a real implementation)
+        // For now, use random exploration with some patterns
+        
+        // Higher curiosity -> more exploration
+        if (curiosityLevel_ > 0.6f) {
+            shouldExplore = true;
+        }
+        
+        // Check for repair needs based on prediction error
+        if (predictionError_ < -0.1f) {  // Negative prediction error suggests problems
+            shouldRepair = true;
+        }
+        
+        // Check for resource gathering motivation
+        if (dopamineLevel_ > 0.3f && noveltyLevel_ < 0.2f) {  // High dopamine, low novelty
+            hasResourceNeed = true;
+        }
+        
+        // Apply goal prioritization
+        if (shouldRepair && repairNeeds_ > 0.3f) {
+            // Prioritize repair if significant damage and curiosity-driven learning
+            return prioritizeRepair(defaultCmd);
+        }
+        
+        if (shouldHarvest && hasResourceNeed) {
+            // Resource gathering
+            return prioritizeResourceGathering(defaultCmd);
+        }
+        
+        if (shouldExplore && !isLocationKnown(brain_->getWorkingMemory(), x_, y_)) {
+            // Explore unknown areas
+            return prioritizeExploration(defaultCmd);
+        }
+    }
+    
+    // Fallback to original curiosity behavior
     if (curiosityLevel_ > 0.5f) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            // Random motor command with more options for exploration
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 10);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -227,12 +275,105 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
+                case 7: return MotorCommand::MoveForward;  // Repeat forward
+                case 8: return MotorCommand::TurnLeft;      // Repeat left
+                case 9: return MotorCommand::TurnRight;     // Repeat right
                 default: return MotorCommand::Wait;
             }
         }
     }
     
     return defaultCmd;
+}
+
+// Additional helper methods for goal-directed behavior
+bool AgentBrain::isLocationKnown(NeuralWorkingMemory* workingMem, float x, float y) const {
+    if (!workingMem) return false;
+    
+    // Check if location is in working memory
+    // This would require implementing location tracking
+    // For now, return false to allow exploration
+    return false;
+}
+
+MotorCommand AgentBrain::prioritizeExploration(MotorCommand defaultCmd) {
+    // Explore systematically: try to move to new areas
+    // Based on curiosity and random exploration
+    if (curiosityLevel_ < 0.3f) {
+        return MotorCommand::Wait;  // Too little curiosity to explore effectively
+    }
+    
+    int choice = brain_->getRandomGenerator()->uniformInt(0, 8);
+    switch (choice) {
+        case 0: return MotorCommand::MoveForward;
+        case 1: return MotorCommand::TurnLeft;
+        case 2: return MotorCommand::TurnRight;
+        case 3: return MotorCommand::LookLeft;
+        case 4: return MotorCommand::LookRight;
+        case 5: return MotorCommand::MoveBackward;
+        case 6: return MotorCommand::Interact;  // Try to interact with environment
+        case 7: return MotorCommand::Wait;     // Pause to assess situation
+        default: return MotorCommand::Wait;
+    }
+}
+
+MotorCommand AgentBrain::prioritizeResourceGathering(MotorCommand defaultCmd) {
+    // Focus on gathering resources when motivated
+    if (dopamineLevel_ > 0.5f) {
+        // High motivation: move toward potential resources
+        int choice = brain_->getRandomGenerator()->uniformInt(0, 6);
+        switch (choice) {
+            case 0: return MotorCommand::MoveForward;
+            case 1: return MotorCommand::MoveBackward;
+            case 2: return MotorCommand::TurnLeft;
+            case 3: return MotorCommand::TurnRight;
+            case 4: return MotorCommand::LookLeft;
+            case 5: return MotorCommand::LookRight;
+            default: return MotorCommand::Wait;
+        }
+    }
+    
+    return defaultCmd;
+}
+
+MotorCommand AgentBrain::prioritizeRepair(MotorCommand defaultCmd) {
+    // Focus on repair when prediction error indicates problems
+    if (std::abs(predictionError_) > 0.2f) {
+        // High repair needs: systematic exploration to find damage
+        return selectRepairAction();
+    }
+    
+    return defaultCmd;
+}
+
+MotorCommand AgentBrain::selectRepairAction() {
+    // Select repair actions based on repair needs
+    if (repairNeeds_ > 0.7f) {
+        // Critical repair needs: explore broadly
+        int choice = brain_->getRandomGenerator()->uniformInt(0, 8);
+        switch (choice) {
+            case 0: return MotorCommand::MoveForward;
+            case 1: return MotorCommand::TurnLeft;
+            case 2: return MotorCommand::TurnRight;
+            case 3: return MotorCommand::LookLeft;
+            case 4: return MotorCommand::LookRight;
+            case 5: return MotorCommand::MoveBackward;
+            case 6: return MotorCommand::Interact;
+            case 7: return MotorCommand::Wait;
+            default: return MotorCommand::Wait;
+        }
+    } else {
+        // Moderate repair needs: focused exploration
+        int choice = brain_->getRandomGenerator()->uniformInt(0, 5);
+        switch (choice) {
+            case 0: return MotorCommand::MoveForward;
+            case 1: return MotorCommand::MoveBackward;
+            case 2: return MotorCommand::TurnLeft;
+            case 3: return MotorCommand::TurnRight;
+            case 4: return MotorCommand::Wait;
+            default: return MotorCommand::Wait;
+        }
+    }
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {

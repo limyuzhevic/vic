@@ -30,11 +30,24 @@ struct AgentBody {
     bool isTurning;
     float lastActionTime;
     
+    // Advanced behavior state
+    bool isExploring;      // Currently exploring unknown areas
+    bool isHarvesting;     // Currently harvesting resources
+    bool isRepairing;      // Currently repairing damage
+    bool hasSetPath;       // Has a navigation path set
+    float explorationRange; // Range for exploration/scanning
+    std::vector<std::pair<float, float>> path; // Navigation path (x,y coordinates)
+    int resourcesCollected; // Number of resources collected
+    float repairNeeds;     // Health repair needs (0-1)
+    
     AgentBody()
         : x(0.0f), y(0.0f), orientation(0.0f)
         , velocityX(0.0f), velocityY(0.0f), angularVelocity(0.0f)
         , energy(1.0f), health(1.0f), age(0.0f)
-        , isMoving(false), isTurning(false), lastActionTime(0.0f) {}
+        , isMoving(false), isTurning(false), lastActionTime(0.0f)
+        , isExploring(false), isHarvesting(false), isRepairing(false)
+        , hasSetPath(false), explorationRange(5.0f), resourcesCollected(0)
+        , repairNeeds(0.0f) {}
     
     void reset() {
         x = 0.0f;
@@ -49,6 +62,16 @@ struct AgentBody {
         isMoving = false;
         isTurning = false;
         lastActionTime = 0.0f;
+        
+        // Reset advanced state
+        isExploring = false;
+        isHarvesting = false;
+        isRepairing = false;
+        hasSetPath = false;
+        explorationRange = 5.0f;
+        resourcesCollected = 0;
+        repairNeeds = 0.0f;
+        path.clear();
     }
 };
 
