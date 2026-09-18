@@ -77,8 +77,8 @@ public:
     ConceptFormation();
     ~ConceptFormation();
 
-    // Initialize with brain reference
     void initialize(Brain* brain);
+    void update(const TimestepDuration& timestep);
 
     // Present a new experience to the concept formation system
     // Returns concept ID if this experience belongs to an existing concept,

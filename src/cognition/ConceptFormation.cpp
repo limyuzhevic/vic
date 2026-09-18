@@ -12,28 +12,39 @@ struct ConceptFormation::Impl {
     Impl() : brain(nullptr) {}
 };
 
-ConceptFormation::ConceptFormation()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-    , nextConceptId_(1)
-    , formationThreshold_(0.75f)
-    , stabilityThreshold_(0.7f)
-    , stabilityWindow_(5)
-{
-}
-
-ConceptFormation::~ConceptFormation() = default;
-
 void ConceptFormation::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("ConceptFormation initialized");
 }
 
-size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
-                                          const std::vector<float>& features,
-                                          float reward,
-                                          SimulationStep currentTime) {
+void ConceptFormation::update(const TimestepDuration& timestep) {
+    // Update concept stability based on recent observations
+    // This runs every step to maintain concept quality
+    for (auto& concept : concepts_) {
+        if (concept.instances.size() > 1) {
+            // Compute stability based on recent observations
+            float totalSim = 0.0f;
+            size_t recentCount = std::min(concept.instances.size(), stabilityWindow_);
+            
+            for (size_t i = concept.instances.size() - recentCount; 
+                 i < concept.instances.size(); ++i) {
+                totalSim += computeSimilarity(concept.instances[i].pattern, concept.prototype);
+            }
+            
+            float stability = totalSim / recentCount;
+            concept.avgStability = concept.avgStability * 0.9f + stability * 0.1f;
+            
+            // Update instance stability
+            concept.instances.back().stability = stability;
+        }
+    }
+}
+
+void ConceptFormation::presentExperience(const std::vector<float>& pattern,
+                                      const std::vector<float>& features,
+                                      float reward,
+                                      SimulationStep currentTime) {
     if (pattern.empty()) return 0;
     
     // Check if this pattern matches any existing concept

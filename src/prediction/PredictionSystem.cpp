@@ -14,6 +14,21 @@ PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
 
+void PredictionSystem::initialize(Brain* brain) {
+    // Initialize with brain reference for neural substrate
+    // Phase 2 TODO: Implement real neural prediction
+    NLM_LOG_INFO("PredictionSystem initialized");
+}
+
+void PredictionSystem::update(const TimestepDuration& timestep) {
+    // Update prediction model with current neural activity
+    // Phase 2 TODO: Implement actual prediction updates using neural dynamics
+    // For now, just maintain error history
+    if (!pImpl->errorHistory.empty()) {
+        pImpl->confidence = 1.0f / (1.0f + pImpl->predictionError * 10.0f);
+    }
+}
+
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
     // PLACEHOLDER: Just return a copy of current state
