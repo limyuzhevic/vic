@@ -25,27 +25,195 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <algorithm>
 
 using namespace nlm;
 
+// ANSI color codes for terminal output
+const std::string COLOR_RESET = "\033[0m";
+const std::string COLOR_CYAN = "\033[36m";
+const std::string COLOR_GREEN = "\033[32m";
+const std::string COLOR_BLUE = "\033[34m";
+const std::string COLOR_MAGENTA = "\033[35m";
+const std::string COLOR_YELLOW = "\033[33m";
+const std::string COLOR_RED = "\033[31m";
+const std::string COLOR_WHITE = "\033[37m";
+const std::string COLOR_BOLD = "\033[1m";
+const std::string COLOR_DIM = "\033[2m";
+
+// Configuration validation utilities
+namespace ConfigValidation {
+    bool validateRange(const std::string& key, double value, double min, double max, std::string& error) {
+        if (value < min || value > max) {
+            error = "Parameter " + key + " must be between " + 
+                   std::to_string(min) + " and " + std::to_string(max) + ", got " + std::to_string(value);
+            return false;
+        }
+        return true;
+    }
+    
+    bool validatePositive(const std::string& key, double value, std::string& error) {
+        if (value < 0) {
+            error = "Parameter " + key + " must be positive, got " + std::to_string(value);
+            return false;
+        }
+        return true;
+    }
+    
+    bool validateInteger(const std::string& key, double value, std::string& error) {
+        if (value != std::floor(value)) {
+            error = "Parameter " + key + " must be an integer, got " + std::to_string(value);
+            return false;
+        }
+        return true;
+    }
+}
+
+// Configuration validation function
+bool validateConfiguration(std::shared_ptr<Config> config, 
+                         std::vector<std::string>& errors, 
+                         std::vector<std::string>& warnings) {
+    bool isValid = true;
+    
+    // Validate neuron count (positive integer)
+    auto neuronCount = config->getOr<int64_t>("neuron_count", 1000);
+    std::string error;
+    if (!ConfigValidation::validatePositive("neuron_count", neuronCount, error)) {
+        errors.push_back(error);
+        isValid = false;
+    }
+    if (!ConfigValidation::validateInteger("neuron_count", neuronCount, error)) {
+        errors.push_back(error);
+        isValid = false;
+    }
+    
+    // Validate region count (positive integer, reasonable upper bound)
+    auto regionCount = config->getOr<int64_t>("region_count", 1);
+    if (!ConfigValidation::validatePositive("region_count", regionCount, error)) {
+        errors.push_back(error);
+        isValid = false;
+    }
+    if (!ConfigValidation::validateInteger("region_count", regionCount, error)) {
+        errors.push_back(error);
+        isValid = false;
+    }
+    if (regionCount > 10) {
+        warnings.push_back("region_count > 10 may impact performance significantly");
+    }
+    
+    // Validate simulation timestep (positive, reasonable upper bound)
+    auto timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (!ConfigValidation::validatePositive("simulation_timestep", timestep, error)) {
+        errors.push_back(error);
+        isValid = false;
+    }
+    if (timestep > 0.1) {
+        warnings.push_back("simulation_timestep > 0.1 may cause numerical instability");
+    }
+    
+    // Validate connection probability (between 0 and 1)
+    auto connProb = config->getOr<float>("connection_probability", 0.1f);
+    if (!ConfigValidation::validateRange("connection_probability", connProb, 0.0, 1.0, error)) {
+        errors.push_back(error);
+        isValid = false;
+    }
+    
+    // Validate STDP parameters (non-negative)
+    auto stdpLtp = config->getOr<float>("stdp_ltp_weight", 0.01f);
+    if (!ConfigValidation::validatePositive("stdp_ltp_weight", stdpLtp, error)) {
+        errors.push_back(error);
+        isValid = false;
+    }
+    
+    auto stdpLtd = config->getOr<float>("stdp_ltd_weight", 0.012f);
+    if (!ConfigValidation::validatePositive("stdp_ltd_weight", stdpLtd, error)) {
+        errors.push_back(error);
+        isValid = false;
+    }
+    
+    // Validate structural plasticity rates (non-negative, very small)
+    auto synRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    if (!ConfigValidation::validateRange("synaptogenesis_rate", synRate, 0.0, 0.001, error)) {
+        errors.push_back(error);
+        isValid = false;
+    }
+    
+    auto pruneRate = config->getOr<float>("pruning_rate", 0.00001f);
+    if (!ConfigValidation::validateRange("pruning_rate", pruneRate, 0.0, 0.001, error)) {
+        errors.push_back(error);
+        isValid = false;
+    }
+    
+    // Validate advanced boolean flags
+    auto enableStdp = config->getOr<bool>("enable_stdp", true);
+    if (!enableStdp) {
+        warnings.push_back("enable_stdp is false - STDP plasticity will be disabled");
+    }
+    
+    auto enableHebbian = config->getOr<bool>("enable_hebbian", true);
+    if (!enableHebbian) {
+        warnings.push_back("enable_hebbian is false - Hebbian plasticity will be disabled");
+    }
+    
+    auto enableStructPlasticity = config->getOr<bool>("enable_structural_plasticity", true);
+    if (!enableStructPlasticity) {
+        warnings.push_back("enable_structural_plasticity is false - structural plasticity will be disabled");
+    }
+    
+    // Validate checkpoint parameters (positive integers)
+    auto checkpointInterval = config->getOr<int64_t>("checkpoint_interval", 1000);
+    if (!ConfigValidation::validatePositive("checkpoint_interval", checkpointInterval, error)) {
+        errors.push_back(error);
+        isValid = false;
+    }
+    if (!ConfigValidation::validateInteger("checkpoint_interval", checkpointInterval, error)) {
+        errors.push_back(error);
+        isValid = false;
+    }
+    
+    auto maxCheckpoints = config->getOr<int64_t>("max_checkpoints", 10);
+    if (!ConfigValidation::validatePositive("max_checkpoints", maxCheckpoints, error)) {
+        errors.push_back(error);
+        isValid = false;
+    }
+    if (!ConfigValidation::validateInteger("max_checkpoints", maxCheckpoints, error)) {
+        errors.push_back(error);
+        isValid = false;
+    }
+    
+    // Validate use_colored_output flag
+    auto useColored = config->getOr<bool>("use_colored_output", true);
+    
+    // Check for parameter consistency
+    if (neuronCount < regionCount * 10) {
+        warnings.push_back("neuron_count too small for specified region_count - each region will have few neurons");
+    }
+    
+    return isValid;
+}
+
+// Enhanced banner with color and dynamic sizing
 void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+    // Get terminal width for dynamic centering
+    int terminalWidth = 80;
+    
+    std::cout << COLOR_CYAN << COLOR_BOLD;
+    std::cout << "\n" + std::string(terminalWidth, '═') << "\n";
+    std::cout << "║" << std::string((terminalWidth - 6) / 2, ' ') << "NLM — 熙然" << std::string((terminalWidth - 6) / 2, ' ') << "║\n";
+    std::cout << "║" << std::string((terminalWidth - 4) / 2, ' ') << "Neural Learning Machine" << std::string((terminalWidth - 4) / 2, ' ') << "║\n";
+    std::cout << "║" << std::string((terminalWidth - 2), ' ') << "║\n";
+    std::cout << "║" << std::string((terminalWidth - 2), ' ') << "║\n";
+    std::cout << "║" << std::string((terminalWidth - 4) / 2, ' ') << COLOR_GREEN << "Phase 2: Real Neural Computation" << COLOR_CYAN << std::string((terminalWidth - 4) / 2, ' ') << "║\n";
+    std::cout << "║" << std::string((terminalWidth - 2), ' ') << "║\n";
+    std::cout << "║" << std::string((terminalWidth - 2), ' ') << "║\n";
+    std::cout << "║" << std::string((terminalWidth - 6) / 2, ' ') << COLOR_YELLOW << "An experimental artificial developmental brain." << COLOR_CYAN << std::string((terminalWidth - 6) / 2, ' ') << "║\n";
+    std::cout << "║" << std::string((terminalWidth - 4) / 2, ' ') << "This phase implements:" << std::string((terminalWidth - 4) / 2, ' ') << "║\n";
+    std::cout << "║" << std::string(4, ' ') << COLOR_BLUE << "├ Real LIF neuron dynamics" << COLOR_CYAN << std::string((terminalWidth - 36), ' ') << "║\n";
+    std::cout << "║" << std::string(4, ' ') << COLOR_BLUE << "├ Event-driven spike propagation" << COLOR_CYAN << std::string((terminalWidth - 40), ' ') << "║\n";
+    std::cout << "║" << std::string(4, ' ') << COLOR_BLUE << "├ STDP and Hebbian plasticity" << COLOR_CYAN << std::string((terminalWidth - 34), ' ') << "║\n";
+    std::cout << "║" << std::string(4, ' ') << COLOR_BLUE << "└ Structural plasticity" << COLOR_CYAN << std::string((terminalWidth - 30), ' ') << "║\n";
+    std::cout << "╚═══════════════════════════════════════════════════════════════╝\n";
+    std::cout << COLOR_RESET;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -338,6 +506,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Event-driven spike propagation with delays");
     NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("  - Integrated memory systems (working, episodic, associative)");
+    NLM_LOG_INFO("  - Prediction and cognition systems");
+    NLM_LOG_INFO("  - Neuromodulation (dopamine, curiosity, novelty)");
+    NLM_LOG_INFO("  - Developmental stages (initial, critical period, maturation, adult)");
     NLM_LOG_INFO("");
     
     // Load configuration
@@ -365,22 +537,34 @@ int main(int argc, char** argv) {
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
-    
+
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
+
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
+
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Additional advanced configuration options
+    config->set("enable_stdp", true, ConfigSource::Default);
+    config->set("enable_hebbian", true, ConfigSource::Default);
+    config->set("enable_structural_plasticity", true, ConfigSource::Default);
+    config->set("enable_prediction_system", true, ConfigSource::Default);
+    config->set("enable_cognition", true, ConfigSource::Default);
+    config->set("enable_neuromodulation", true, ConfigSource::Default);
+    config->set("enable_checkpoints", true, ConfigSource::Default);
+    config->set("checkpoint_interval", 1000, ConfigSource::Default);
+    config->set("max_checkpoints", 10, ConfigSource::Default);
+    config->set("use_colored_output", true, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -391,6 +575,25 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
+    
+    // Validate configuration
+    std::vector<std::string> configErrors;
+    std::vector<std::string> configWarnings;
+    
+    if (!validateConfiguration(config, configErrors, configWarnings)) {
+        NLM_LOG_ERROR("Configuration validation failed:");
+        for (const auto& error : configErrors) {
+            NLM_LOG_ERROR("  ERROR: " + error);
+        }
+        for (const auto& warning : configWarnings) {
+            NLM_LOG_WARNING("  WARNING: " + warning);
+        }
+        
+        if (!configErrors.empty()) {
+            NLM_LOG_ERROR("Exiting due to configuration errors");
+            return 1;
+        }
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
