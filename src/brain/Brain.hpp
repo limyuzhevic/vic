@@ -193,6 +193,14 @@ public:
     // Logging
     void logStatus() const;
     
+    // ============ DEBUGGING AND MAINTENANCE ==========
+    
+    // Check if system is properly initialized
+    bool isValid() const;
+    
+    // Get detailed status information for debugging
+    std::string getDebugStatus() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

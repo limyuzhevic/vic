@@ -64,14 +64,34 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
+    // Initialize based on world configuration
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    // Validate world parameters
+    if (world.getVisionWidth() == 0 || world.getVisionHeight() == 0) {
+        NLM_LOG_ERROR("Invalid world vision dimensions: " + 
+                     std::to_string(world.getVisionWidth()) + " x " +
+                     std::to_string(world.getVisionHeight()));
+        return;
+    }
+    
+    // Initialize state based on world properties
+    dopamineLevel_ = 0.1f;  // Start with baseline dopamine
+    curiosityLevel_ = 0.5f;  // Moderate initial curiosity
+    
+    // Update developmental stage
+    brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
+    
+    // Reset sensory novelty decay
+    sensoryNoveltyDecay_ = 0.99f;
+    
+    NLM_LOG_INFO("AgentBrain initialized for world " + 
+                 std::to_string(world.getWidth()) + " x " + 
+                 std::to_string(world.getHeight()) + " with vision " +
+                 std::to_string(world.getVisionWidth()) + " x " +
+                 std::to_string(world.getVisionHeight()) + ".");
 }
 
 size_t AgentBrain::getSensoryInputSize() const {

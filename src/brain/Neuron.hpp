@@ -143,6 +143,12 @@ public:
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     
+    // Reset to initial state
+    void reset();
+    
+    // Initialize with random parameters
+    void initializeRandom(RandomGenerator& rng);
+    
 private:
     struct Impl;
     Impl* pImpl;

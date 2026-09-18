@@ -1021,97 +1021,134 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
 
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
-}
-
-// ========== COGNITION SYSTEM ACCESSORS ==========
-
-NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
-}
-
-ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
-}
-
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
-}
-
-// ========== DEVELOPMENT SYSTEM ==========
-
-DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
-}
-
-DevelopmentalStage Brain::getDevelopmentalStage() const {
-    return pImpl->developmentalStage;
-}
-
-void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
-    pImpl->developmentalStage = stage;
-}
-
-// ========== NEUROMODULATION SYSTEMS ==========
-
-Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
-}
-
-Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
-}
-
-Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
-}
-
-PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
-}
-
-std::shared_ptr<const Config> Brain::getConfig() const {
-    return pImpl->config;
-}
-
-RandomGenerator* Brain::getRandomGenerator() {
-    return pImpl->rng.get();
-}
-
-void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
-    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
-    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
-    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
-    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
-    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
-    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
+std::string Brain::getDebugStatus() const {
+    std::ostringstream oss;
+    oss << "=== NLM BRAIN DEBUG STATUS (Phase 6 - Integrated) ===" << std::endl;
+    oss << "System State: " << (isValid() ? "VALID" : "INVALID") << std::endl;
+    oss << "Region Count: " << getRegionCount() << std::endl;
+    oss << "Total Neurons: " << getTotalNeuronCount() << std::endl;
+    oss << "Total Synapses: " << getTotalSynapseCount() << std::endl;
+    oss << "Active Neurons: " << getActiveNeuronCount() << std::endl;
+    oss << "Firing Neurons (this step): " << getFiringNeuronCount() << std::endl;
+    oss << "Total Spikes: " << getTotalSpikeCount() << std::endl;
+    oss << "Pending Spike Events: " << getPendingSpikeEventCount() << std::endl;
+    oss << "Average Firing Rate: " << getAverageFiringRate() << " Hz" << std::endl;
+    oss << "E/I Ratio: " << getExcitationInhibitionRatio() << std::endl;
     
     // Memory system status
     if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+        oss << "Working Memory Traces: " << pImpl->workingMemory->getActiveTraces() << std::endl;
+    } else {
+        oss << "Working Memory: NOT INITIALIZED" << std::endl;
     }
     if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+        oss << "Episodic Memory Episodes: " << pImpl->episodicMemory->getEpisodeCount() << std::endl;
+    } else {
+        oss << "Episodic Memory: NOT INITIALIZED" << std::endl;
     }
     
     // Neuromodulation status
     if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+        oss << "Dopamine Level: " << pImpl->dopamine->getLevel() << std::endl;
+    }
+    if (pImpl->curiosity) {
+        oss << "Curiosity Level: " << pImpl->curiosity->getLevel() << std::endl;
+    }
+    if (pImpl->novelty) {
+        oss << "Novelty Level: " << pImpl->novelty->getLevel() << std::endl;
     }
     
     // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    oss << "Developmental Stage: " << static_cast<int>(pImpl->developmentalStage) << std::endl;
+    oss << "Development Age: " << pImpl->developmentSystem ? pImpl->developmentSystem->getAge() : 0.0 << " seconds" << std::endl;
     
+    // Region details
+    oss << "\n=== REGION DETAILS ===" << std::endl;
     for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+        oss << "Region " << region->getId().index() << " (" << region->getName() << "):" << std::endl;
+        oss << "  Neurons: " << region->getTotalNeuronCount() << std::endl;
+        oss << "  Synapses: " << region->getSynapseCount() << std::endl;
+        oss << "  Average Weight: " << region->getAverageSynapticWeight() << std::endl;
+        oss << "  Active Neurons: " << region->getActiveNeuronCount() << std::endl;
     }
+    
+    // Integration health
+    oss << "\n=== INTEGRATION HEALTH ===" << std::endl;
+    oss << "Memory Integrated: " << (pImpl->workingMemory ? "YES" : "NO") << std::endl;
+    oss << "Episodic Memory: " << (pImpl->episodicMemory ? "YES" : "NO") << std::endl;
+    oss << "Neuromodulation: " << (pImpl->dopamine ? "YES" : "NO") << std::endl;
+    oss << "Prediction System: " << (pImpl->predictionSystem ? "YES" : "NO") << std::endl;
+    oss << "Development System: " << (pImpl->developmentSystem ? "YES" : "NO") << std::endl;
+    oss << "Cognition Systems: " << (pImpl->planner ? "YES" : "NO") << std::endl;
+    
+    // Check for potential issues
+    oss << "\n=== POTENTIAL ISSUES ===" << std::endl;
+    bool hasIssues = false;
+    
+    if (getTotalNeuronCount() == 0) {
+        oss << "WARNING: No neurons in brain" << std::endl;
+        hasIssues = true;
+    }
+    
+    if (getTotalSynapseCount() == 0 && getTotalNeuronCount() > 0) {
+        oss << "WARNING: No synapses despite having neurons" << std::endl;
+        hasIssues = true;
+    }
+    
+    if (pImpl->workingMemory && pImpl->workingMemory->getActiveTraces() == 0) {
+        oss << "INFO: No working memory traces (may be normal)" << std::endl;
+    }
+    
+    if (pImpl->episodicMemory && pImpl->episodicMemory->getEpisodeCount() == 0) {
+        oss << "INFO: No episodic memory episodes (may be normal for short simulation)" << std::endl;
+    }
+    
+    if (hasIssues) {
+        oss << "\nSYSTEM HAS POTENTIAL ISSUES - Check integration" << std::endl;
+    } else {
+        oss << "\nSYSTEM INTEGRATION HEALTHY" << std::endl;
+    }
+    
+    return oss.str();
+}
+
+bool Brain::isValid() const {
+    // Check if brain is properly initialized
+    bool valid = true;
+    
+    if (!pImpl) {
+        return false;
+    }
+    
+    // Check configuration
+    if (!pImpl->config) {
+        valid = false;
+    }
+    
+    // Check regions
+    if (pImpl->regions.empty()) {
+        valid = false;
+    }
+    
+    // Check essential systems
+    if (!pImpl->spikeSystem) {
+        valid = false;
+    }
+    
+    if (!pImpl->stdp) {
+        valid = false;
+    }
+    
+    if (!pImpl->hebbian) {
+        valid = false;
+    }
+    
+    // Check memory systems
+    if (!pImpl->workingMemory && pImpl->config->getOr<bool>("enable_working_memory", false)) {
+        valid = false;
+    }
+    
+    return valid;
 }
 
 } // namespace nlm

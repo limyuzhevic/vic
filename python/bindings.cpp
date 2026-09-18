@@ -25,6 +25,32 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        This module provides high-level access to the NLM (熙然) artificial brain system.
+        The brain implements real spiking neural computation using Leaky Integrate-and-Fire
+        (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple
+        plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
+        
+        Key Features:
+        - Real spiking neural computation (Phase 2 implementation)
+        - Event-driven simulation with synaptic delays
+        - Multiple plasticity rules: STDP, Hebbian, structural
+        - Neuromodulation: dopamine, curiosity, novelty, prediction error
+        - Memory systems: working memory, episodic memory, associative memory
+        - Prediction system and cognitive modules
+        - Developmental stages and age-dependent plasticity
+        - Checkpoint save/load capabilities
+        - Replay and consolidation mechanisms
+        
+        The system follows the brain-inspired architecture:
+        WORLD → SENSORY INPUT → NEURAL PROCESSING → INTERNAL STATE → 
+        MEMORY/PREDICTION → MOTIVATION/NEUROMODULATION → ACTION SELECTION → 
+        MOTOR OUTPUT → WORLD CONSEQUENCE
+        
+        For comprehensive documentation, see:
+        - README.md: Basic usage and examples
+        - HOW_TO_USE.md: Detailed API documentation
+        - docs/ARCHITECTURE.md: System architecture
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -289,69 +315,99 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)
+        
+        The Brain class implements the core artificial neural substrate for NLM.
+        It represents a complete brain capable of real spiking neural computation
+        with integrated memory, prediction, cognition, and neuromodulation systems.
+        
+        The brain operates according to the brain-inspired architecture:
+        WORLD → SENSORY INPUT → NEURAL PROCESSING → INTERNAL STATE → 
+        MEMORY/PREDICTION → MOTIVATION/NEUROMODULATION → ACTION SELECTION → 
+        MOTOR OUTPUT → WORLD CONSEQUENCE
+        
+        Key Features:
+        - Real LIF neuron dynamics with event-driven spike propagation
+        - Integrated memory systems (working, episodic, associative)
+        - Neuromodulation for reinforcement learning (dopamine, curiosity, etc.)
+        - Prediction and cognitive systems (planning, attention, concept formation)
+        - Developmental stages affecting plasticity rates
+        - Checkpoint save/load and replay capabilities
+        
+        The brain continuously cycles through neural processing, updates memory,
+        applies neuromodulation, and produces actions based on neural activity.
+    )pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"),
+             "Create a new brain with configuration")
         .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
+             "Initialize the brain with configuration. Must be called before using the brain!")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
-             "Perform a simulation step")
+             "Perform a simulation step with default timestep")
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
+             "Perform a simulation step with explicit timestamp")
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
-             "Inject sensory input into the brain")
+             "Inject sensory input into the brain by stimulating sensory neurons")
         .def("injectCurrent", &Brain::injectCurrent,
              py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
+             "Inject current directly into a specific neuron")
         .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
              py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
+             "Inject current into all neurons of a specific type (Sensory, Motor, etc.)")
         .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
+             "Produce motor action based on neural activity. Returns an Action object.")
         .def("reset", &Brain::reset,
-             "Reset brain state")
+             "Reset brain state to initial conditions. Use before starting a new simulation.")
         .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
+             "Save brain state to file for checkpointing and resuming simulations")
         .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
+             "Load brain state from file to resume a simulation")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
+             "Add a new neural region to the brain. Returns region ID.")
         .def("getRegion", &Brain::getRegion, py::arg("id"),
              py::return_value_policy::reference_internal,
-             "Get a region by ID")
+             "Get a region by ID. Returns None if region not found.")
         .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
+             "Get the number of regions in the brain")
         .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
+             "Get all region IDs in the brain")
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
-             "Get all regions")
+             "Get all regions in the brain")
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
              "Get total neuron count across all regions")
         .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
              "Get total synapse count across all regions")
         .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
+             "Get count of currently active neurons")
         .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
              "Get count of currently firing neurons")
         .def("getAverageFiringRate", &Brain::getAverageFiringRate,
              "Get average firing rate across all neurons")
         .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
+             "Get excitation/inhibition balance ratio (E/I ratio)")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
+             "Get total spike count since brain initialization")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events (not yet delivered)")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
+             "Get current developmental stage (Initial, CriticalPeriod, Maturation, Adult, Aging)")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
-             "Set developmental stage")
+             "Set developmental stage manually")
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
-             "Get the configuration")
+             "Get the configuration object used to create this brain")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             "Get the random generator for reproducible experiments")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log current brain status and statistics (useful for debugging)")
+        .def("isValid", &Brain::isValid,
+             "Check if brain is properly initialized and valid for simulation")
+        .def("getDebugStatus", &Brain::getDebugStatus,
+             "Get detailed debug information including integration status and potential issues");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

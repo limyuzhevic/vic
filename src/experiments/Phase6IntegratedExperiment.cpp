@@ -43,7 +43,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create simple world
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.configure(16, 16, 8, 8);
     
     // Create agent
     AgentBrain agent(brain);
@@ -62,7 +62,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        SensoryPercept percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -74,10 +74,16 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyMotorCommand(cmd, world.getSimulationTime());
         
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Apply reward modulation based on energy
+        float reward = 0.0f;
+        if (agent.getBrain()->getRegions()[0].get()) {
+            auto* region = agent.getBrain()->getRegions()[0].get();
+            if (auto* memory = region->getWorkingMemory()) {
+                reward = memory->getActiveTraces() * 0.01f; // Small reward for memory activity
+            }
+        }
         totalReward += reward;
         
         // Apply reward modulation
