@@ -94,17 +94,17 @@ public:
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
-    // Produce motor/action output based on motor neuron activity
+    // Produce motor/action output based on motor neuron activity and working memory
     std::unique_ptr<class Action> produceAction();
     
-    // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    // Plan next action using neural planner
+    ActionType planNextAction(const std::vector<float>& currentState, float targetReward = 0.5f);
     
-    // Update plasticity rules (called automatically in step)
-    void updatePlasticity();
+    // Update neural planner with current state and episodic memories
+    void updatePlanner(const std::vector<float>& currentState);
     
-    // Apply developmental changes (called automatically in step)
-    void develop();
+    // Apply planned action to influence motor neuron activation
+    void injectPlannedAction(ActionType action);
     
     // Reset brain state
     void reset();
