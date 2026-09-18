@@ -16,7 +16,11 @@ int main(int argc, char* argv[]) {
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
     // Initialize logging
-    Logger::getInstance().setLevel(Logger::Level::Info);
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::getGlobal().addLogger(consoleLogger);
+    consoleLogger->setUseColors(true);
     
     // Create experiment
     Phase6IntegratedExperiment experiment;
