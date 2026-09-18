@@ -95,8 +95,8 @@ struct Brain::Impl {
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
+        if (config->has("random_seed")) {
+            seed = config->get<uint64_t>("random_seed");
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
@@ -261,9 +261,11 @@ bool Brain::initialize() {
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
+        // Count spikes - with thread safety in mind
+        // In a real multithreaded implementation, this would need atomic operations
+        // or proper synchronization
+        pImpl->totalSpikesThisStep++;
+        pImpl->totalSpikesTotal++;
     });
     
     // Register delayed spike handler to deliver synaptic input

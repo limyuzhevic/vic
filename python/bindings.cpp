@@ -351,7 +351,61 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Enhanced Python-specific methods
+        .def("getBrainStats", [](Brain& self) {
+            py::dict stats;
+            stats["neuron_count"] = self.getTotalNeuronCount();
+            stats["synapse_count"] = self.getTotalSynapseCount();
+            stats["firing_neurons"] = self.getFiringNeuronCount();
+            stats["total_spikes"] = self.getTotalSpikeCount();
+            stats["avg_firing_rate"] = self.getAverageFiringRate();
+            stats["development_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            return stats;
+        }, "Get comprehensive brain statistics as a dictionary")
+        .def("runIntegrationTest", [](Brain& self, int steps) {
+            for (int i = 0; i < steps; ++i) {
+                self.step(i, i * 0.001);
+            }
+            return self.getTotalSpikeCount();
+        }, py::arg("steps") = 100,
+             "Run an integration test for specified steps and return spike count")
+        .def("enableAllFeatures", [](Brain& self) {
+            auto agent = AgentBrain(std::make_shared<Brain>(self.getConfig()));
+            agent.enableRewardModulation(true);
+            agent.enableStructuralPlasticity(true);
+            agent.enableDevelopment(true);
+            agent.enableCuriosity(true);
+            return agent;
+        }, "Enable all learning and development features and return agent interface")
+        .def("benchmark", [](Brain& self, int neuronCount, int steps) {
+            // Run a quick benchmark with specified parameters
+            auto config = self.getConfig();
+            config->set("neuron_count", neuronCount);
+            config->set("simulation_timestep", 0.001);
+            
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            
+            auto start = std::chrono::high_resolution_clock::now();
+            for (int i = 0; i < steps; ++i) {
+                brain->step(i, i * 0.001);
+            }
+            auto end = std::chrono::high_resolution_clock::now();
+            
+            double elapsed = std::chrono::duration<double>(end - start).count();
+            double stepsPerSec = steps / elapsed;
+            
+            py::dict result;
+            result["time_elapsed"] = elapsed;
+            result["steps_per_second"] = stepsPerSec;
+            result["neurons"] = neuronCount;
+            result["steps"] = steps;
+            result["spikes_per_step"] = static_cast<double>(brain->getTotalSpikeCount()) / steps;
+            
+            return result;
+        }, py::arg("neuron_count") = 500, py::arg("steps") = 100,
+             "Run a performance benchmark and return timing/results as dictionary")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

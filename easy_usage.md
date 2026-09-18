@@ -10,6 +10,8 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
+**NOTE:** This is the comprehensive Phase 6 version of NLM with all integrated systems (memory, prediction, development, neuromodulation). Previous simplified versions exist but this version includes full functionality.
+
 That's it! NLM simulates all of this.
 
 ---
