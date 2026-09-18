@@ -1,4 +1,4 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM - Easy Usage Guide for Beginners (Enhanced)
 
 ## What is NLM?
 
@@ -22,7 +22,7 @@ That's it! NLM simulates all of this.
 
 ---
 
-## Quick Start (Copy & Paste)
+## Quick Start (Copy & Paste - Basic)
 
 ### Example 1: Simplest Brain
 
@@ -71,6 +71,34 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### NEW: Quick Agent Setup with Enhanced API
+
+```python
+import pynlm
+
+# One-line setup for a complete agent with learning
+agent = pynlm.create_development_agent(
+    stages=["initial", "critical_period"],
+    curiosity_enabled=True,
+    plasticity_multiplier=1.5
+)
+
+# World setup (simplified)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+
+# Complete simulation
+agent.initialize(world)
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+print("Enhanced agent simulation complete!")
+```
+
 ---
 
 ## Simple Analogy
@@ -104,53 +132,106 @@ print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 
 ---
 
-## Common Patterns
+## NEW: Common Patterns with Enhanced API
 
-### Pattern 1: Run a Simulation
+### Pattern 1: Run a Complete Simulation with Helper
 
 ```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
-        
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
-        brain.step(step)
-        
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
+import pynlm
 
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
+# Create agent with enhanced API
+agent = pynlm.create_curiosity_agent(
+    intrinsic_reward_weight=0.7,
+    novelty_threshold=0.05
+)
+
+# Setup world
+world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=16, visionHeight=16)
+agent.initialize(world)
+
+# Run complete simulation with monitoring
+result = pynlm.run_complete_simulation(
+    agent,
+    world,
+    num_steps=500,
+    headless=False,
+    save_interval=100,
+    output_file="simulation.json"
+)
 ```
 
-### Pattern 2: Get Brain Stats
+### Pattern 2: Training with Enhanced API
 
 ```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
+import pynlm
+
+# Create development agent
+agent = pynlm.create_development_agent()
+
+# Setup environment
+world = pynlm.createSimpleWorld()
+world.configure(width=25, height=25, visionWidth=12, visionHeight=12)
+
+# Train with evaluation
+metrics = agent.train_with_preset(
+    world,
+    preset_name="curiosity_driven",
+    num_episodes=200,
+    evaluation_interval=50,
+    save_interval=100
+)
+
+print(f"Training complete! Mean reward: {metrics['mean_reward']:.2f}")
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 3: Get Brain Stats (Enhanced)
 
 ```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+import pynlm
+
+# Create enhanced agent
+agent = pynlm.create_standard_agent()
+brain = agent.getBrain()
+world = pynlm.createSimpleWorld()
+agent.initialize(world)
+
+# Simulation loop with monitoring
+for step in range(200):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 50 == 0:
+        print(f"Step {step}:")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+        print(f"  Avg firing rate: {brain.getAverageFiringRate():.2f}")
+        print(f"  Development stage: {brain.getDevelopmentalStage()}")
+        print(f"  Curiosity level: {agent.getCuriosityLevel():.2f}")
+        print(f"  Novelty level: {agent.getNoveltyLevel():.2f}")
+```
+
+### Pattern 4: Enable Brain Features (Enhanced)
+
+```python
+import pynlm
+
+# Create enhanced agent
+agent = pynlm.create_standard_agent()
+
+# Enable all advanced features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Additional exploration strategies (if available)
+# exploration_manager = pynlm.ExplorationManager(agent, world)
+# exploration_manager.set_strategy(pynlm.ExplorationStrategy.UCB)
 ```
 
 ---
@@ -179,11 +260,21 @@ Gives sensory information (vision, touch, etc.) to the brain.
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
 
+### NEW: Enhanced Agent Features
+
+- `agent.create_from_preset("preset_name")` - Create agent from preset configuration
+- `agent.train_with_preset(world, "preset_name", num_episodes)` - Train with preset
+- `agent.evaluate_with_benchmark(environments)` - Evaluate against benchmark suite
+- `agent.is_developing` - Check if agent is developing
+- `agent.curiosity_level` - Get curiosity level
+- `agent.novelty_score` - Get novelty score
+- `agent.reward_prediction_error` - Get reward prediction error
+
 ---
 
-## Mini Projects
+## Mini Projects (Enhanced)
 
-### Project 1: Silent Brain (Just Neurons)
+### Project 1: Silent Brain (Basic)
 
 ```python
 import pynlm
@@ -197,77 +288,116 @@ for i in range(10):
 print("Silent brain test done!")
 ```
 
-### Project 2: Brain Watching a World
+### Project 2: Brain Watching a World (Enhanced)
 
 ```python
 import pynlm
 
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
+# Setup with enhanced API
+agent = pynlm.create_standard_agent()
 world = pynlm.createSimpleWorld()
 world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
 world.reset()
-agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Watch the world for 30 steps
+# Watch the world with monitoring
 for i in range(30):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
     
 print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
+print(f"Firing rate: {agent.getBrain().getAverageFiringRate():.2f}")
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent with Learning (Enhanced)
 
 ```python
 import pynlm
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
+# Setup with learning capabilities
+agent = pynlm.create_development_agent(
+    stages=["initial", "critical_period", "maturation"],
+    curiosity_enabled=True,
+    plasticity_multiplier=1.2
+)
+
 world = pynlm.createSimpleWorld()
 world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
 world.reset()
-agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
+# Enable advanced learning
 agent.enableRewardModulation(True)
 agent.enableCuriosity(True)
 
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
-    
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+# Run enhanced agent simulation
+metrics = agent.train_with_preset(
+    world,
+    preset_name="development",
+    num_episodes=100
+)
 
-print("Agent simulation complete!")
+print("Enhanced agent simulation complete!")
+print(f"Performance metrics: {metrics}")
 ```
 
 ---
 
-## Quick Reference
+## NEW: Quick Reference (Enhanced)
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+| What you want | Code (Basic) | Code (Enhanced) |
+|--------------|--------------|----------------|
+| Create brain | `pynlm.createBrain(config)` | `pynlm.create_development_agent()` |
+| Start brain | `brain.initialize()` | `agent.initialize(world)` |
+| Make brain think | `brain.step(step)` | `agent.processSensoryInput(percept)` |
+| Create world | `pynlm.createSimpleWorld()` | `pynlm.createSimpleWorld()` |
+| Create agent | `pynlm.createAgentBrain(brain)` | `pynlm.create_development_agent()` |
+| Get brain stats | `brain.getFiringNeuronCount()` | `agent.getBrain().getFiringNeuronCount()` |
+| See world | `world.getSensoryPercept()` | `percept = world.getSensoryPercept()` |
+| Make action | `agent.decodeMotorCommand()` | `action = agent.decodeMotorCommand()` |
+| Train agent | - | `agent.train_with_preset(world, "curiosity_driven", 200)` |
+| Evaluate agent | - | `agent.evaluate_with_benchmark([env1, env2])` |
+
+---
+
+## NEW: Configuration Presets
+
+The enhanced API includes preset configurations:
+
+- `"development"` - Developmental agent with maturation stages
+- `"curiosity_driven"` - Curiosity and exploration focused
+- `"reward_based"` - Reward and reinforcement learning
+- `"critical_period"` - Critical period learning
+- `"rl_integrated"` - Full reinforcement learning
+- `"standard"` - Standard agent
+
+```python
+# Use any preset
+agent = pynlm.create_development_agent()
+agent = pynlm.create_curiosity_agent()
+agent = pynlm.create_reward_agent()
+```
+
+---
+
+## NEW: Helper Classes
+
+The enhanced API includes helper classes for advanced users:
+
+- `pynlm.SimulationManager` - Comprehensive simulation management
+- `pynlm.TrainingLoop` - Training loop with evaluation
+- `pynlm.ExplorationManager` - Exploration strategy management
+- `pynlm.BenchmarkSuite` - Benchmarking framework
+- `pynlm.AgentFactory` - Agent factory functions
+- `pynlm.EnhancedAgentBrain` - Enhanced agent with additional features
+
+```python
+# Use helper classes
+simulation = pynlm.run_complete_simulation(agent, world, 500)
+metrics = pynlm.TrainingLoop(agent, world).train(100)
+```
 
 ---
 
@@ -285,6 +415,18 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**NEW: Enhanced Troubleshooting**
+
+**"My enhanced agent isn't learning"**
+- Check that learning subsystems are enabled: `agent.enableRewardModulation(True)`
+- Verify the preset is appropriate for your task
+- Try shorter training episodes with more frequent evaluation
+
+**"Simulation is crashing"**
+- Try reducing the simulation time steps
+- Use headless mode for faster execution
+- Check that your environment is properly configured
+
 ---
 
 ## Next Steps
@@ -292,6 +434,8 @@ print("Agent simulation complete!")
 When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+3. Experiment with different enhanced configurations!
+4. Try using the helper classes for more complex simulations
+5. Use preset configurations to quickly set up different agent types
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with the enhanced API for faster development and more powerful simulations.
