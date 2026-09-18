@@ -406,6 +406,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
+    // ========== STEP 5: Update attentional selection ==========
+    if (pImpl->attention) {
+        pImpl->attention->update(pImpl->timestep);
+    }
+    
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
@@ -757,6 +762,10 @@ void Brain::reset() {
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    
+    // Reset sensory and motor neuron lists for next episode
+    pImpl->sensoryNeurons.clear();
+    pImpl->motorNeurons.clear();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }

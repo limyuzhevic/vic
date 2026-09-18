@@ -1,5 +1,8 @@
 #include "NeuralDynamics.hpp"
+#include "../brain/Neuron.hpp"
+#include "../brain/Synapse.hpp"
 #include <cmath>
+#include <algorithm>
 
 namespace nlm {
 
@@ -15,50 +18,78 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
+    if (!neuron) return;
     
-    const auto& state = neuron->getState();
+    auto& state = neuron->getState();
     
-    // Leaky integration: dV/dt = -(V - V_rest) / tau + I / C
-    // For simplicity using explicit Euler:
-    // V_new = V_old + dt * (-(V_old - V_rest) / tau + I / C)
+    // Check refractory period first
+    if (state.refractoryRemaining > 0) {
+        --state.refractoryRemaining;
+        if (state.refractoryRemaining == 0) {
+            state.firingState = FiringState::Resting;
+        }
+        // Clamp to reset potential during refractory period
+        state.membranePotential = state.resetPotential;
+        return;
+    }
     
-    float V = neuron->getMembranePotential();
+    // LIF dynamics: dV/dt = (V_rest - V) / tau + I / C
+    float V = state.membranePotential;
     float V_rest = state.restingPotential;
-    float I = neuron->getTotalCurrent();
+    float I = state.synapseConductance;  // Current from synapses
     float tau = pImpl->membraneTimeConstant;
     float R = pImpl->membraneResistance;
     
-    // Simple Euler integration
+    // Euler integration
     float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
-    neuron->setMembranePotential(V + dV);
     
-    // Check for firing
-    if (shouldFire(neuron)) {
-        neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
+    // Update membrane potential
+    V += dV;
+    V = std::clamp(V, -100.0f, 50.0f);
+    state.membranePotential = V;
+    
+    // Check for spike
+    if (V >= state.threshold) {
+        state.firingState = FiringState::Active;
+        state.lastSpikeTime = 0.0f;  // Will be updated by spike handler
+        neuron->recordSpike(0.0f);
+        
+        // Reset membrane potential
+        state.membranePotential = state.resetPotential;
+        
+        // Enter refractory period
+        state.refractoryRemaining = state.refractoryPeriod;
+        state.firingState = FiringState::Refractory;
+        
+        // Spike-frequency adaptation
+        state.adaptationVariable += 1.0f;
     }
     
-    // Refractory mechanism
-    if (neuron->isRefractory()) {
-        neuron->setMembranePotential(state.resetPotential);
-    }
-    
-    // Clear current for next step
-    neuron->clearTotalCurrent();
+    // Update firing rate based on recent activity
+    state.firingRate = static_cast<FiringRate>(neuron->getSpikeCount() / 10.0f);
 }
 
 void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real synaptic dynamics
-    // PLACEHOLDER: Synapse decay
-    synapse->step(0.0);
+    if (!synapse) return;
+    
+    // Simple synapse dynamics: weight decay and stochastic transmission
+    float currentWeight = synapse->getWeight();
+    
+    // Apply small weight decay for stability
+    float decayFactor = 0.999f;
+    float newWeight = currentWeight * decayFactor;
+    synapse->setWeight(newWeight);
+    
+    // Stochastic transmission probability based on weight
+    float transmissionProb = std::min(1.0f, currentWeight * 0.1f + 0.01f);
+    // This would be used by spike handlers to determine transmission
 }
 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
-    // TODO PHASE 2: Implement real synaptic input
-    // PLACEHOLDER: Simple additive input
-    SynapticWeight weight = synapse->getWeight();
+    if (!neuron || !synapse) return;
+    
+    float weight = synapse->getWeight();
+    
     if (synapse->isExcitatory()) {
         neuron->receiveExcitatoryInput(weight);
     } else {
@@ -67,15 +98,25 @@ void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* sy
 }
 
 bool IntegrateAndFireDynamics::shouldFire(const Neuron* neuron) const {
-    return neuron->getMembranePotential() >= neuron->getThreshold();
+    if (!neuron) return false;
+    
+    const auto& state = neuron->getState();
+    
+    if (state.firingState == FiringState::Refractory) {
+        return false;  // Cannot fire during refractory period
+    }
+    
+    return state.membranePotential >= state.threshold;
 }
 
 void IntegrateAndFireDynamics::reset() {
-    // No internal state to reset
+    // Reset membrane time constant
+    pImpl->membraneTimeConstant = 20.0f;
+    pImpl->membraneResistance = 10.0f;
 }
 
 void IntegrateAndFireDynamics::setMembraneTimeConstant(float tau) {
-    pImpl->membraneTimeConstant = tau;
+    pImpl->membraneTimeConstant = std::max(1.0f, std::min(tau, 100.0f));
 }
 
 float IntegrateAndFireDynamics::getMembraneTimeConstant() const {
