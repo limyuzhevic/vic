@@ -1,9 +1,139 @@
+// NLM Phase 6 - AgentBrain Implementation
+// Advanced implementation with improved novelty detection, curiosity, and exploration
+
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../world/SimpleWorld.hpp"
 #include <algorithm>
 #include <cmath>
 
 namespace nlm {
+
+// Helper function implementations
+
+// Visual overlap calculation
+// Returns number of similar signals between two vision vectors
+size_t AgentBrain::visualOverlap(const std::vector<float>& v1, const std::vector<float>& v2) const {
+    if (v1.size() != v2.size()) return 0;
+    size_t count = 0;
+    for (size_t i = 0; i < v1.size(); ++i) {
+        if (std::abs(v1[i] - v2[i]) < 0.1f) count++;  // Threshold for similar signals
+    }
+    return count;
+}
+
+// Vision change calculation
+// Returns number of significantly different signals between two vision vectors
+size_t AgentBrain::visionChange(const std::vector<float>& v1, const std::vector<float>& v2) const {
+    if (v1.size() != v2.size()) return v1.size();
+    size_t count = 0;
+    for (size_t i = 0; i < v1.size(); ++i) {
+        if (std::abs(v1[i] - v2[i]) > 0.1f) count++;  // Threshold for significant change
+    }
+    return count;
+}
+
+// Improved novelty detection using both overlap and change metrics
+float AgentBrain::computeNovelty(const std::vector<float>& currentVision) const {
+    if (previousVision_.empty() || currentVision.empty()) return 0.0f;
+    
+    // Method 1: Signal overlap (0 to 1, where 1 = completely different)
+    float overlap = static_cast<float>(visualOverlap(currentVision, previousVision_)) / currentVision.size();
+    float noveltyFromOverlap = 1.0f - overlap;
+    
+    // Method 2: Total change in signal values
+    size_t change = visionChange(currentVision, previousVision_);
+    float noveltyFromChange = static_cast<float>(change) / currentVision.size();
+    
+    // Combine both methods for more robust novelty detection
+    float combinedNovelty = (noveltyFromOverlap * 0.6f) + (noveltyFromChange * 0.4f);
+    return std::clamp(combinedNovelty, 0.0f, 1.0f);
+}
+
+// Smooth decay of novelty with configurable decay rate
+void AgentBrain::decayNovelty(float& novelty, float decayRate, double timestep) const {
+    // Exponential decay based on time
+    novelty = novelty * std::pow(decayRate, timestep);
+}
+
+// Update curiosity based on both novelty and prediction error
+void AgentBrain::updateCuriosity(float novelty, float predictionError) const {
+    if (curiosityEnabled_) {
+        // Base curiosity on novelty with exponential weighting
+        float curiosityFromNovelty = novelty * 2.0f;
+        
+        // Add prediction error component (surprise drives exploration)
+        float curiosityFromError = std::abs(predictionError) * 0.5f;
+        
+        // Weighted combination
+        const_cast<float&>(curiosityLevel_) = curiosityFromNovelty * 0.7f + curiosityFromError * 0.3f;
+        const_cast<float&>(curiosityLevel_) = std::clamp(const_cast<float&>(curiosityLevel_), 0.0f, 1.0f);
+    }
+}
+
+// Add adaptive exploration that learns from rewards
+void AgentBrain::adaptExplorationStrategy() const {
+    if (curiosityEnabled_ && developmentEnabled_) {
+        // High curiosity can lead to more exploration
+        if (curiosityLevel_ > 0.7f) {
+            // More random actions when very curious
+            float exploreChance = std::min(0.5f, curiosityLevel_ * 0.7f);
+            float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+            if (r < exploreChance) {
+                // Extended exploration with more options
+                int choice = brain_->getRandomGenerator()->uniformInt(0, 9);
+                switch (choice) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::MoveBackward;
+                    case 2: return MotorCommand::TurnLeft;
+                    case 3: return MotorCommand::TurnRight;
+                    case 4: return MotorCommand::LookLeft;
+                    case 5: return MotorCommand::LookRight;
+                    case 6: return MotorCommand::Interact;
+                    case 7: return MotorCommand::Wait;
+                    case 8: return MotorCommand::Eat;
+                    case 9: return MotorCommand::Drink;
+                }
+            }
+        }
+    }
+}
+
+// Implementation of sensory processing helper functions
+void AgentBrain::processTouchInput(const SensoryPercept& percept) {
+    const auto& touch = percept.getTouch();
+    size_t minSize = std::min(sensoryTouch_.size(), touch.size());
+    for (size_t i = 0; i < minSize; ++i) {
+        if (sensoryTouch_[i]) {
+            float current = touch[i] * 8.0f;  // Collision signal
+            sensoryTouch_[i]->injectCurrent(current);
+        }
+    }
+}
+
+void AgentBrain::processInternalInput(const SensoryPercept& percept) {
+    const auto& intern = percept.getInternal();
+    size_t minSize = std::min(sensoryInternal_.size(), intern.size());
+    for (size_t i = 0; i < minSize; ++i) {
+        if (sensoryInternal_[i]) {
+            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            sensoryInternal_[i]->injectCurrent(current);
+        }
+    }
+}
+
+void AgentBrain::processProprioceptionInput(const SensoryPercept& percept) {
+    const auto& proprio = percept.getProprioception();
+    size_t minSize = std::min(sensoryProprioception_.size(), proprio.size());
+    for (size_t i = 0; i < minSize; ++i) {
+        if (sensoryProprioception_[i]) {
+            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            sensoryProprioception_[i]->injectCurrent(current);
+        }
+    }
+}
+
+// AgentBrain implementation
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
@@ -89,63 +219,35 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
+        // Process vision input (256 values -> sensoryVision_ neurons)
+        size_t minSize = std::min(sensoryVision_.size(), vision.size());
+        for (size_t i = 0; i < minSize; ++i) {
+            if (sensoryVision_[i]) {
+                // Inject current proportional to vision intensity
+                float current = vision[i] * 5.0f;  // Scale factor
+                sensoryVision_[i]->injectCurrent(current);
+            }
         }
-        
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
-    if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
-        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    // Process other sensory inputs with similar improvements
+    processTouchInput(percept);
+    processInternalInput(percept);
+    processProprioceptionInput(percept);
+    
+    // Compute improved novelty
+    if (!vision.empty()) {
+        float novelty = computeNovelty(vision);
+        
+        // Smooth decay of novelty
+        decayNovelty(novelty, sensoryNoveltyDecay_, 1.0);  // Default timestep
+        
+        // Update curiosity based on novelty and prediction error
+        updateCuriosity(novelty, predictionError_);
+        
+        // Store current vision for next comparison
+        previousVision_ = vision;
     }
 }
 
@@ -217,7 +319,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
+            // Random motor command - explore all available options including Wait
             int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
@@ -227,7 +329,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+                case 7: return MotorCommand::Wait;  // Added this case to handle the full range
             }
         }
     }

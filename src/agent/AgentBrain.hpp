@@ -69,6 +69,19 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Helper functions for sensory processing
+    void processTouchInput(const SensoryPercept& percept);
+    void processInternalInput(const SensoryPercept& percept);
+    void processProprioceptionInput(const SensoryPercept& percept);
+    
+    // Advanced processing helpers
+    size_t visualOverlap(const std::vector<float>& v1, const std::vector<float>& v2) const;
+    size_t visionChange(const std::vector<float>& v1, const std::vector<float>& v2) const;
+    float computeNovelty(const std::vector<float>& currentVision) const;
+    void decayNovelty(float& novelty, float decayRate, double timestep) const;
+    void updateCuriosity(float novelty, float predictionError) const;
+    void adaptExplorationStrategy() const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();

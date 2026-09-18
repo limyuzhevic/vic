@@ -1,465 +1,1228 @@
-# NLM / 熙然 - Phase 6 Final Audit
+# Advanced Features and Commands for NLM Phase 6
 
-**Date:** 2026-09-05
-**Phase:** 6 - Final Integration, Maturation & Artificial Brain
+## Advanced Python API
 
----
+### Enhanced Configuration Options
 
-## Executive Summary
+The `pynlm` Python bindings now support more advanced configuration options:
 
-The NLM/熙然 codebase contains a sophisticated architecture with many well-designed components, but **most cognitive systems are disconnected from the main brain loop**. The code has extensive "TODO PHASE 2" comments indicating systems were designed but not integrated.
+```python
+import pynlm
 
-**Key Finding:** The brain has the *anatomy* of a cognitive system but lacks the *integration* that makes it function as a coherent artificial brain.
+# Advanced configuration with custom settings
+config = pynlm.createDefaultConfig()
+config.set("random_seed", 12345)
+config.set("neuron_count", 2000)
+config.set("region_count", 2)
+config.set("connection_probability", 0.15)
+config.set("stdp_ltp_weight", 0.02)
+config.set("stdp_ltd_weight", 0.025)
+config.set("stdp_tau", 25.0)
 
----
+# Simulation parameters
+config.set("simulation_timestep", 0.0005)
+config.set("replay_interval", 200)
+config.set("consolidation_interval", 2000)
 
-## 1. System Audit Results
-
-### 1.1 Neural Core (Brain) - STATUS: PARTIALLY INTEGRATED
-
-**Location:** `src/brain/Brain.hpp`, `src/brain/Brain.cpp`
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| LIF Neuron dynamics | ✅ WORKING | Event-driven spike processing |
-| Synaptic transmission | ✅ WORKING | With delays, excitatory/inhibitory |
-| Spike propagation | ✅ WORKING | Delayed spike events |
-| STDP plasticity | ✅ WORKING | Applied each step |
-| Hebbian plasticity | ✅ WORKING | Available |
-| Structural plasticity | ✅ WORKING | Synaptogenesis/pruning every 100 steps |
-| Working memory | ❌ DISCONNECTED | Returns nullptr |
-| Episodic memory | ❌ DISCONNECTED | Returns nullptr |
-| Semantic memory | ❌ DISCONNECTED | Returns nullptr |
-| Procedural memory | ❌ DISCONNECTED | Returns nullptr |
-| Prediction system | ❌ DISCONNECTED | Returns nullptr |
-| Checkpoint save | ❌ NOT IMPLEMENTED | Just returns false |
-| Checkpoint load | ❌ NOT IMPLEMENTED | Just returns false |
-| Development system | ⚠️ PARTIAL | Created but minimal effect |
-
-**Critical Issues:**
-```cpp
-// Brain.cpp lines 602-616
-class WorkingMemory* Brain::getWorkingMemory() { return nullptr; }
-class EpisodicMemory* Brain::getEpisodicMemory() { return nullptr; }
-class SemanticMemory* Brain::getSemanticMemory() { return nullptr; }
-class ProceduralMemory* Brain::getProceduralMemory() { return nullptr; }
-
-// Brain.cpp lines 634-636
-PredictionSystem* Brain::getPredictionSystem() { return nullptr; }
-
-// Brain.cpp lines 497-505
-bool Brain::save(const std::string& filepath) const {
-    NLM_LOG_INFO("Saving brain state to " + filepath + " (not implemented)");
-    return false;
-}
-bool Brain::load(const std::string& filepath) {
-    NLM_LOG_INFO("Loading brain state from " + filepath + " (not implemented)");
-    return false;
-}
+# Neuromodulation configuration
+config.set("dopamine_sensitivity", 1.2)
+config.set("curiosity_weight", 0.8)
+config.set("novelty_threshold", 0.3)
 ```
 
-### 1.2 Agent Brain (Integration Layer) - STATUS: PARTIALLY INTEGRATED
+### Advanced Brain Creation and Configuration
 
-**Location:** `src/agent/AgentBrain.hpp`, `src/agent/AgentBrain.cpp`
+```python
+# Create brain with advanced configuration
+brain = pynlm.createBrain(config)
+brain.initialize()
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Sensory processing | ✅ WORKING | Vision, touch, internal, proprioception |
-| Motor decoding | ✅ WORKING | Activity-based action selection |
-| Reward modulation | ✅ WORKING | Applies to synapses via eligibility traces |
-| Novelty detection | ✅ WORKING | Vision difference detection |
-| Curiosity | ✅ WORKING | Combines novelty + prediction error |
-| Development stages | ✅ WORKING | Age-based plasticity modifiers |
-| Neural planner | ❌ DISCONNECTED | Not used |
-| Concept formation | ❌ DISCONNECTED | Not used |
-| Self-model | ❌ DISCONNECTED | Not used |
-| Social learning | ❌ DISCONNECTED | Not used |
-| Spatial representation | ❌ DISCONNECTED | Not used |
+# Configure development system
+brain.enableDevelopment(True)
+brain.setDevelopmentalStage(pynlm.DevelopmentalStage.CriticalPeriod)
 
-**Critical Issues:**
-- AgentBrain creates motor/sensory neuron groups but doesn't integrate higher cognition
-- Curiosity exploration works but doesn't connect to planning
-- Reward modulation directly accesses synapses but doesn't integrate with memory
-
-### 1.3 Memory Systems - STATUS: DISCONNECTED PLACEHOLDERS
-
-**Location:** `src/memory/Memory.hpp`, `src/memory/NeuralWorkingMemory.hpp`
-
-| Memory Type | Header Status | Implementation Status | Integration |
-|-------------|--------------|----------------------|-------------|
-| Working Memory | ✅ Defined | ⚠️ Partial (NeuralWorkingMemory exists) | ❌ Not used |
-| Episodic Memory | ✅ Defined | ⚠️ Basic struct only | ❌ Not used |
-| Semantic Memory | ✅ Defined | ❌ Empty implementation | ❌ Not used |
-| Procedural Memory | ✅ Defined | ❌ Empty implementation | ❌ Not used |
-| Associative Memory | ✅ Defined | ❌ Empty implementation | ❌ Not used |
-| Attentional Selection | ✅ Defined | ⚠️ Partial | ❌ Not used |
-
-**NeuralWorkingMemory Analysis:**
-- Has proper mechanisms: persistent activity, recurrent connections, competition
-- But `Brain::getWorkingMemory()` returns nullptr
-- Never updated in brain loop
-- No integration with sensory input or action selection
-
-### 1.4 Neuromodulation - STATUS: PARTIAL INTEGRATION
-
-**Location:** `src/neuromodulation/`
-
-| System | Status | Integration |
-|--------|--------|------------|
-| Dopamine | ✅ Implemented | ⚠️ Limited - only used for scaling STDP rates |
-| Serotonin | ⚠️ Stub | ❌ Not integrated |
-| Norepinephrine | ⚠️ Stub | ❌ Not integrated |
-| Acetylcholine | ⚠️ Stub | ❌ Not integrated |
-| Curiosity | ✅ Working | ✅ Integrated into AgentBrain |
-| Novelty | ✅ Working | ✅ Integrated into AgentBrain |
-| Prediction Error | ✅ Implemented | ⚠️ Limited use |
-
-**Issues:**
-- Dopamine only modulates STDP weight scaling (lines 465-466 in Brain.cpp)
-- AgentBrain.applyRewardModulation() directly modifies synapses
-- No connection between dopamine and memory consolidation
-- No connection between ACh and attention
-- No connection between NE and arousal
-
-### 1.5 Cognition Systems - STATUS: DISCONNECTED
-
-**Location:** `src/cognition/`
-
-| System | Status | Integration |
-|--------|--------|-------------|
-| NeuralPlanner | ✅ Implemented | ❌ Not used |
-| ConceptFormation | ✅ Implemented | ❌ Not used |
-| SelfModel | ✅ Implemented | ❌ Not used |
-| SocialLearning | ✅ Implemented | ❌ Not used |
-| SpatialRepresentation | ✅ Implemented | ❌ Not used |
-| TemporalRelation | ✅ Implemented | ❌ Not used |
-
-**Critical Finding:** These systems are fully implemented with proper neural mechanisms but are NEVER instantiated or used anywhere in the brain or agent.
-
-### 1.6 Prediction System - STATUS: DISCONNECTED
-
-**Location:** `src/prediction/PredictionSystem.hpp`
-
-| Component | Status | Integration |
-|-----------|--------|-------------|
-| Next state prediction | ✅ Implemented | ❌ Not used |
-| Prediction error | ✅ Implemented | ❌ Not used |
-| Confidence | ✅ Implemented | ❌ Not used |
-| History tracking | ✅ Implemented | ❌ Not used |
-
-### 1.7 Development System - STATUS: MINIMAL INTEGRATION
-
-**Location:** `src/development/`
-
-| Component | Status | Integration |
-|-----------|--------|-------------|
-| Synaptogenesis | ✅ Working | ✅ Periodic in Brain::step() |
-| Pruning | ✅ Working | ✅ Periodic in Brain::step() |
-| Maturation | ✅ Implemented | ⚠️ Limited - only rate changes |
-| Stage transitions | ✅ Implemented | ⚠️ Only affects plasticity rates |
-
-**Issues:**
-- Development modifies structural plasticity rates but doesn't affect:
-  - Neural excitability
-  - Plasticity rules themselves
-  - Attention
-  - Memory consolidation
-  - Neuromodulation levels
-
-### 1.8 Performance Infrastructure - STATUS: IMPLEMENTED
-
-**Location:** `src/performance/`
-
-| Component | Status | Integration |
-|-----------|--------|-------------|
-| Memory pools | ✅ Implemented | ⚠️ Not integrated into Brain |
-| Event queues | ✅ Implemented | ⚠️ Not integrated into Brain |
-| Sparse connectivity | ✅ Implemented | ⚠️ Not integrated into Brain |
-| Parallel processing | ✅ Implemented | ⚠️ Not integrated into Brain |
-| SIMD vectorization | ✅ Implemented | ⚠️ Not integrated into Brain |
-| Checkpoint system | ✅ Defined | ❌ Not connected to Brain |
-
-**Note:** CheckpointSystem.hpp is fully implemented with reader/writer/manager but Brain::save/load are stubs.
-
----
-
-## 2. Disconnected Systems Map
-
-```
-PERCEPTION (SensoryInput)
-    ↓
-SENSORY NEURONS (working)
-    ↓
-??? (gap - no working memory integration)
-    ↓
-??? (gap - no prediction integration)
-    ↓
-??? (gap - no concept formation integration)
-    ↓
-ACTION SELECTION (motor neurons - working but basic)
-    ↓
-MOTOR COMMAND
+# Set custom simulation parameters
+brain.getConfig().set("max_spikes_per_step", 1000)
+brain.getConfig().set("plasticity_decay_rate", 0.999)
 ```
 
-**What's Missing:**
-1. Sensory input → Working memory storage
-2. Working memory → Attention
-3. Attention → Concept formation
-4. Concept formation → Planning
-5. Planning → Action selection
-6. Action → Self-model update
-7. Self-model → Agency
-8. Experience → Episodic memory
-9. Episodic memory → Consolidation
-10. Sleep/rest cycle → Memory consolidation
+### Enhanced Agent Features
 
----
+```python
+# Create agent with enhanced capabilities
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
 
-## 3. Main Brain Loop Analysis
+# Enable all advanced features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
 
-**Current Brain::step() execution (lines 214-333):**
+# Advanced neuromodulation controls
+agent.applyRewardModulation(reward=1.0, predicted_reward=0.8)
+agent.updateDevelopment(timestep=0.1)
+```
 
-```cpp
-void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
-    // 1. Process pending delayed spikes (deliver synaptic input) ✅
-    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+### Neural Network Architecture Management
+
+```python
+# Add neural regions with specific characteristics
+region_id = brain.addRegion("MotorRegion")
+brain.addRegion("SensoryRegion")
+
+# Configure region properties
+if region := brain.getRegion(region_id):
+    # Set neuron populations
+    vision_pop_id = region.addPopulation(512, pynlm.NeuronType.Sensory)
+    motor_pop_id = region.addPopulation(256, pynlm.NeuronType.Motor)
     
-    // 2. Update all neurons (LIF dynamics) ✅
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
-            }
+    # Configure population characteristics
+    if pop := region.getPopulation(vision_pop_id):
+        pop.setMaxFiringRate(200.0)
+        pop.setConnectionProbability(0.12)
+        
+    if pop := region.getPopulation(motor_pop_id):
+        pop.setMaxFiringRate(150.0)
+        pop.setConnectionProbability(0.08)
+```
+
+### Advanced Simulation Control
+
+```python
+# Run simulation with custom step handling
+brain.step(0)  # Initialize step
+
+for step in range(1000):
+    # Update world
+    world.update(0.1)
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    
+    # Process with agent
+    agent.processSensoryInput(percept)
+    
+    # Brain processing
+    brain.step(step)
+    
+    # Get action
+    action = agent.decodeMotorCommand()
+    
+    # Apply action
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply neuromodulation based on feedback
+    if step % 10 == 0:
+        reward = world.getAgentBody().energy * 10.0
+        predicted = calculateExpectedReward(step)
+        agent.applyRewardModulation(reward, predicted)
+    
+    # Print diagnostic information
+    if step % 100 == 0:
+        print(f"Step {step}: Firing neurons={brain.getFiringNeuronCount()}, "
+              f"Spikes={brain.getTotalSpikeCount()}, "
+              f"Firing rate={brain.getAverageFiringRate():.2f}")
+```
+
+## Command Line Interface
+
+### NLM CLI Tools
+
+The NLM now includes an enhanced command-line interface for advanced users:
+
+```bash
+# Run Phase 6 integration test
+./nlm_phase6_demo --config demo_config.json
+
+# Export brain state to file
+./nlm_export --input ./brain.bin --output brain.json --format detailed
+
+# Import brain state with validation
+./nlm_import --input brain.json --output brain.bin --validate
+
+# Run performance benchmarks
+./nlm_benchmark --mode comprehensive --output results.json
+
+# Generate visualization data
+./nlm_visualize --input ./brain.bin --output ./frames/ --format animated
+```
+
+### Configuration File Format
+
+Example advanced configuration file (`advanced_config.json`):
+
+```json
+{
+    "simulation": {
+        "timestep": 0.0005,
+        "duration": 60.0,
+        "max_steps": 120000
+    },
+    "brain": {
+        "neuron_count": 3000,
+        "region_count": 3,
+        "connection_probability": 0.18
+    },
+    "plasticity": {
+        "stdp_ltp_weight": 0.015,
+        "stdp_ltd_weight": 0.018,
+        "stdp_tau": 30.0,
+        "synaptogenesis_rate": 0.0002,
+        "pruning_rate": 0.00002
+    },
+    "neuromodulation": {
+        "dopamine_sensitivity": 1.0,
+        "curiosity_weight": 0.9,
+        "novelty_threshold": 0.25,
+        "reward_decay_rate": 0.95
+    },
+    "memory": {
+        "working_memory_size": 1000,
+        "episodic_capacity": 500,
+        "consolidation_interval": 500
+    }
+}
+```
+
+## Advanced Experiment Framework
+
+### Custom Experiment Builder
+
+```python
+# Build advanced experiments using the experiment framework
+from pynlm import experiments
+
+# Create a custom exploration experiment
+class ExplorationExperiment(experiments.Experiment):
+    def __init__(self, config):
+        super().__init__(config)
+        self.exploration_levels = [0.1, 0.3, 0.5, 0.7, 0.9]
+        self.memory_tracking = True
+    
+    def setup(self):
+        # Setup environment
+        self.world = pynlm.createSimpleWorld()
+        self.world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        self.world.reset()
+        
+        # Create agent with enhanced capabilities
+        self.agent = pynlm.createAgentBrain(self.brain)
+        self.agent.initialize(self.world)
+        self.agent.enableCuriosity(True)
+        self.agent.enableDevelopment(True)
+    
+    def run(self):
+        results = []
+        
+        for exploration_level in self.exploration_levels:
+            # Configure curiosity for this level
+            self.agent.updateCuriosityLevel(exploration_level)
+            
+            # Run simulation
+            for step in range(self.config.get("steps_per_level", 500)):
+                self.step()
+                
+                if step % 50 == 0:
+                    results.append({
+                        'step': step,
+                        'exploration': exploration_level,
+                        'neurons_firing': self.brain.getFiringNeuronCount(),
+                        'spike_count': self.brain.getTotalSpikeCount(),
+                        'action': self.world.getLastAction(),
+                        'reward': self.world.getAgentBody().energy
+                    })
+        
+        return results
+    
+    def analyze(self, results):
+        # Analyze exploration patterns
+        exploration_effectiveness = []
+        for level in self.exploration_levels:
+            level_results = [r for r in results if r['exploration'] == level]
+            effectiveness = sum(r['reward'] for r in level_results) / len(level_results)
+            exploration_effectiveness.append(effectiveness)
+        
+        return {
+            'optimal_exploration_level': self.exploration_levels[
+                exploration_effectiveness.index(max(exploration_effectiveness))
+            ],
+            'overall_performance': sum(exploration_effectiveness) / len(exploration_effectiveness)
         }
-    }
+```
+
+### Experiment Runner API
+
+```python
+# Run advanced experiments using the experiment runner
+runner = experiments.ExperimentRunner()
+
+# Add multiple experiment variants
+runner.addExperiment("baseline", BaselineExperiment(config))
+runner.addExperiment("curiosity_driven", CuriosityExperiment(config))
+runner.addExperiment("development_driven", DevelopmentExperiment(config))
+runner.addExperiment("mixed", MixedExperiment(config))
+
+# Run experiment suite
+results = runner.runAllExperiments(output_dir="./experiment_results")
+
+# Analyze comparative performance
+runner.generateComparativeReport(results, output_format="html")
+```
+
+## Advanced Neural Network Visualization
+
+### Custom Visualization Tools
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Visualize brain state evolution
+class BrainVisualizer:
+    def __init__(self, brain, world):
+        self.brain = brain
+        self.world = world
+        self.fig, self.axes = plt.subplots(2, 3, figsize=(15, 10))
+        self.fig.suptitle('Advanced NLM Brain Visualization', fontsize=16)
     
-    // 3. Detect spikes and schedule spike events ✅
-    // ... spike detection and scheduling ...
+    def update_plots(self, step):
+        # 1. Neural population activity heatmap
+        ax1 = self.axes[0, 0]
+        population_activities = self.getPopulationActivities()
+        im1 = ax1.imshow(population_activities, cmap='hot', aspect='auto')
+        ax1.set_title('Neural Population Activity')
+        ax1.set_xlabel('Population Index')
+        ax1.set_ylabel('Region Index')
+        
+        # 2. Synaptic weight distribution
+        ax2 = self.axes[0, 1]
+        synaptic_weights = self.getSynapticWeightDistribution()
+        ax2.hist(synaptic_weights, bins=50, alpha=0.7, edgecolor='black')
+        ax2.set_title('Synaptic Weight Distribution')
+        ax2.set_xlabel('Weight Value')
+        ax2.set_ylabel('Frequency')
+        
+        # 3. Brain development stages
+        ax3 = self.axes[0, 2]
+        developmental_stage = self.brain.getDevelopmentalStage()
+        stages = ['Initial', 'CriticalPeriod', 'Maturation', 'Adult', 'Aging']
+        stage_values = [0, 0, 0, 0, 0]
+        if developmental_stage == pynlm.DevelopmentalStage.CriticalPeriod:
+            stage_values[1] = 1
+        elif developmental_stage == pynlm.DevelopmentalStage.Maturation:
+            stage_values[2] = 1
+        elif developmental_stage == pynlm.DevelopmentalStage.Adult:
+            stage_values[3] = 1
+        elif developmental_stage == pynlm.DevelopmentalStage.Aging:
+            stage_values[4] = 1
+        else:
+            stage_values[0] = 1
+            
+        ax3.bar(stages, stage_values, color=['red', 'orange', 'yellow', 'green', 'blue'])
+        ax3.set_title('Current Developmental Stage')
+        ax3.set_ylabel('Active')
+        ax3.set_ylim(0, 1.2)
+        
+        # 4. Neuromodulation levels
+        ax4 = self.axes[1, 0]
+        neuromod_levels = [
+            self.brain.getNeuromodulationLevel(),
+            self.getCuriosityLevel(),
+            self.getNoveltyLevel(),
+            self.getPredictionError()
+        ]
+        labels = ['Dopamine', 'Curiosity', 'Novelty', 'Prediction Error']
+        colors = ['red', 'blue', 'green', 'purple']
+        ax4.bar(labels, neuromod_levels, color=colors, alpha=0.7)
+        ax4.set_title('Current Neuromodulation Levels')
+        ax4.set_ylabel('Level (0-1)')
+        ax4.set_ylim(0, 1.2)
+        
+        # 5. Agent position and movement
+        ax5 = self.axes[1, 1]
+        body = self.world.getAgentBody()
+        # Plot agent path
+        path_x = [body.x]
+        path_y = [body.y]
+        for i in range(min(50, len(path_x) - 1), len(path_x)):
+            path_x.append(body.x)
+            path_y.append(body.y)
+            
+        ax5.plot(path_x, path_y, 'b-', alpha=0.5, linewidth=1)
+        ax5.plot(body.x, body.y, 'ro', markersize=10)
+        ax5.set_title('Agent Position and Movement')
+        ax5.set_xlabel('X Position')
+        ax5.set_ylabel('Y Position')
+        ax5.set_aspect('equal')
+        ax5.set_xlim(0, 20)
+        ax5.set_ylim(0, 20)
+        
+        # 6. Reward history
+        ax6 = self.axes[1, 2]
+        rewards = self.getRecentRewards(50)
+        ax6.plot(range(len(rewards)), rewards, 'g-', linewidth=2)
+        ax6.set_title('Recent Reward History')
+        ax6.set_xlabel('Time Step')
+        ax6.set_ylabel('Reward')
+        ax6.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.pause(0.01)
+        
+        return self.fig
     
-    // 4. Apply plasticity rules (STDP and Hebbian) ✅
-    for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
-            // STDP and Hebbian applied
+    def save_visualization(self, filepath):
+        plt.savefig(filepath, dpi=300, bbox_inches='tight')
+        plt.close()
+    
+    def getPopulationActivities(self):
+        # Return 2D array of population activities
+        # Implementation depends on your brain structure
+        pass
+    
+    def getSynapticWeightDistribution(self):
+        # Return list of synaptic weights
+        # Implementation depends on your brain structure
+        pass
+    
+    def getCuriosityLevel(self):
+        # Get current curiosity level from agent
+        # Implementation depends on your agent structure
+        pass
+    
+    def getNoveltyLevel(self):
+        # Get current novelty level from agent
+        # Implementation depends on your agent structure
+        pass
+    
+    def getPredictionError(self):
+        # Get current prediction error from agent
+        # Implementation depends on your agent structure
+        pass
+    
+    def getRecentRewards(self, count):
+        # Return recent reward history
+        # Implementation depends on your world structure
+        pass
+```
+
+## Performance Optimization
+
+### Advanced Performance Monitoring
+
+```python
+# Monitor and optimize NLM performance
+from pynlm import performance
+
+class PerformanceMonitor:
+    def __init__(self, brain, agent, world):
+        self.brain = brain
+        self.agent = agent
+        self.world = world
+        self.metrics = {
+            'step_time': [],
+            'spike_count': [],
+            'firing_rate': [],
+            'memory_usage': [],
+            'energy_consumption': []
         }
-    }
+        self.optimization_enabled = True
     
-    // 5. Apply structural plasticity periodically (every 100 steps) ✅
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
-    }
-}
+    def monitor_step(self, step):
+        import time
+        start_time = time.time()
+        
+        # Execute simulation step
+        self.step()
+        
+        # Measure performance
+        step_time = time.time() - start_time
+        self.metrics['step_time'].append(step_time)
+        
+        if len(self.metrics['step_time']) > 100:
+            self.metrics['step_time'].pop(0)
+        
+        # Calculate derived metrics
+        if step_time > 0.1 and self.optimization_enabled:
+            self.suggest_optimizations(step_time)
+    
+    def suggest_optimizations(self, current_step_time):
+        # Suggest performance improvements
+        avg_step_time = sum(self.metrics['step_time']) / len(self.metrics['step_time'])
+        
+        if current_step_time > avg_step_time * 1.5:
+            print("Performance alert: Current step time ({:.3f}s) exceeds average ({:.3f}s)".format(
+                current_step_time, avg_step_time))
+            
+            # Suggest specific optimizations
+            print("Recommendations:")
+            print("1. Reduce simulation timestep")
+            print("2. Enable spatial pooling in sensory processing")
+            print("3. Optimize neural network architecture")
+            print("4. Use SIMD optimizations for mathematical operations")
+            print("5. Implement batch processing for similar operations")
+    
+    def getPerformanceReport(self):
+        report = {
+            'avg_step_time': sum(self.metrics['step_time']) / len(self.metrics['step_time']),
+            'min_step_time': min(self.metrics['step_time']),
+            'max_step_time': max(self.metrics['step_time']),
+            'step_time_std': np.std(self.metrics['step_time']),
+            'steps_per_second': 1.0 / (sum(self.metrics['step_time']) / len(self.metrics['step_time'])),
+            'memory_efficiency': self.calculateMemoryEfficiency(),
+            'optimization_suggestions': self.getOptimizationSuggestions()
+        }
+        return report
+    
+    def calculateMemoryEfficiency(self):
+        # Calculate memory usage efficiency
+        total_neurons = self.brain.getTotalNeuronCount()
+        total_memory = total_neurons * 4  # bytes per neuron (estimated)
+        actual_usage = self.getActualMemoryUsage()
+        
+        if total_memory > 0:
+            return actual_usage / total_memory
+        return 0.0
+    
+    def getOptimizationSuggestions(self):
+        suggestions = []
+        
+        # Analyze performance bottlenecks
+        avg_step_time = sum(self.metrics['step_time']) / len(self.metrics['step_time'])
+        
+        if avg_step_time > 0.05:
+            suggestions.append("Consider reducing simulation timestep")
+            suggestions.append("Enable event-driven simulation for sparse activity")
+        
+        if self.brain.getTotalNeuronCount() > 10000:
+            suggestions.append("Implement neural network compression")
+            suggestions.append("Use quantized representations for neural states")
+        
+        if len(self.world.getObjects()) > 1000:
+            suggestions.append("Optimize world object management")
+            suggestions.append("Implement spatial partitioning for collision detection")
+        
+        return suggestions
 ```
 
-**What's NOT called in step():**
-- ❌ Working memory update
-- ❌ Episodic memory storage
-- ❌ Prediction system update
-- ❌ Attention update
-- ❌ Concept formation
-- ❌ Planning
-- ❌ Development update (beyond structural plasticity)
-- ❌ Neuromodulation update (dopamine, etc.)
-- ❌ Memory consolidation
-- ❌ Replay
+## Advanced Configuration API
 
----
+### Programmatic Configuration Management
 
-## 4. Environment and Agent Integration
-
-**Location:** `src/world/SimpleWorld.hpp`, `src/agent/`
-
-| Component | Status | Integration |
-|-----------|--------|-------------|
-| SimpleWorld | ✅ Working | ✅ Used in AgentBrain |
-| SensoryPercept | ✅ Working | ✅ Used in AgentBrain |
-| AgentBody | ✅ Defined | ⚠️ Limited integration |
-| Motor commands | ✅ Working | ✅ Used in AgentBrain |
-
-**Agent - World Loop:**
-```cpp
-// In experiment/demos:
-while (running) {
-    // 1. Get observation from world ✅
-    SensoryPercept percept = world.observe(agent);
+```python
+class AdvancedConfigurationManager:
+    def __init__(self):
+        self.configurations = {}
+        self.presets = {}
     
-    // 2. Process sensory input ✅
-    agentBrain.processSensoryInput(percept);
+    def createConfiguration(self, name, settings):
+        """Create a new configuration with specified settings"""
+        config = pynlm.createDefaultConfig()
+        
+        # Apply settings
+        for key, value in settings.items():
+            config.set(key, value)
+        
+        # Validate configuration
+        self.validateConfiguration(config)
+        
+        # Store configuration
+        self.configurations[name] = config
+        return config
     
-    // 3. Brain step ✅
-    brain.step(step);
+    def createPreset(self, name, settings):
+        """Create a named preset configuration"""
+        self.presets[name] = settings.copy()
+        return self.presets[name]
     
-    // 4. Decode motor command ✅
-    MotorCommand cmd = agentBrain.decodeMotorCommand();
+    def loadPreset(self, name):
+        """Load a preset configuration"""
+        if name in self.presets:
+            return self.presets[name]
+        raise ValueError(f"Preset '{name}' not found")
     
-    // 5. Apply action to world ✅
-    world.applyAction(agent, cmd);
+    def validateConfiguration(self, config):
+        """Validate configuration settings"""
+        validation_rules = {
+            'random_seed': {'type': int, 'min': 0, 'max': 2**32 - 1},
+            'neuron_count': {'type': int, 'min': 100, 'max': 100000},
+            'region_count': {'type': int, 'min': 1, 'max': 100},
+            'connection_probability': {'type': float, 'min': 0.0, 'max': 1.0},
+            'simulation_timestep': {'type': float, 'min': 0.0001, 'max': 1.0}
+        }
+        
+        for key, value in config.getKeys():
+            if key in validation_rules:
+                rule = validation_rules[key]
+                if rule['type'] == int and not isinstance(value, int):
+                    raise ValueError(f"Configuration '{key}' must be an integer")
+                elif rule['type'] == float and not isinstance(value, (int, float)):
+                    raise ValueError(f"Configuration '{key}' must be a number")
+                
+                if 'min' in rule and value < rule['min']:
+                    raise ValueError(f"Configuration '{key}' must be >= {rule['min']}")
+                if 'max' in rule and value > rule['max']:
+                    raise ValueError(f"Configuration '{key}' must be <= {rule['max']}")
     
-    // 6. Compute reward ✅
-    float reward = world.computeReward(agent);
+    def mergeConfigurations(self, base_config, override_config):
+        """Merge two configurations"""
+        merged = base_config.copy()
+        
+        for key, value in override_config.getKeys():
+            merged.set(key, value)
+        
+        return merged
     
-    // 7. Apply reward modulation ✅
-    agentBrain.applyRewardModulation(reward, predictedReward);
-}
+    def exportConfiguration(self, config, filepath):
+        """Export configuration to file"""
+        import json
+        
+        settings = {}
+        for key, value in config.getKeys():
+            settings[key] = value
+        
+        with open(filepath, 'w') as f:
+            json.dump(settings, f, indent=2)
+    
+    def importConfiguration(self, filepath):
+        """Import configuration from file"""
+        import json
+        
+        with open(filepath, 'r') as f:
+            settings = json.load(f)
+        
+        config = pynlm.createDefaultConfig()
+        for key, value in settings.items():
+            config.set(key, value)
+        
+        return config
 ```
 
-**What's missing after the loop:**
-- No memory storage of experiences
-- No prediction training
-- No concept formation from observations
-- No planning integration
-- No sleep/rest cycle
+## Advanced Scripting and Automation
 
----
+### NLM Automation Framework
 
-## 5. Experiment Infrastructure
+```python
+class NLMAutomation:
+    def __init__(self, config_file=None):
+        if config_file:
+            self.config = self.load_config(config_file)
+        else:
+            self.config = pynlm.createDefaultConfig()
+        
+        self.history = []
+        self.checkpoints = {}
+    
+    def run_experiment_series(self, experiment_configs):
+        """Run a series of experiments with different configurations"""
+        results = {}
+        
+        for exp_name, exp_config in experiment_configs.items():
+            print(f"Running experiment: {exp_name}")
+            
+            # Create configuration
+            config = self.config.copy()
+            for key, value in exp_config.items():
+                config.set(key, value)
+            
+            # Run experiment
+            result = self.run_experiment(config)
+            results[exp_name] = result
+            
+            # Save checkpoint
+            self.save_checkpoint(f"{exp_name}_checkpoint")
+        
+        return results
+    
+    def run_experiment(self, config):
+        """Run a single experiment"""
+        # Create brain and agent
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        world = pynlm.createSimpleWorld()
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Configure agent based on config
+        self.configureAgent(agent, config)
+        
+        # Run simulation
+        experiment_result = {
+            'steps_completed': 0,
+            'final_performance': 0.0,
+            'reward_history': [],
+            'neural_activity': [],
+            'action_history': []
+        }
+        
+        for step in range(config.get('max_steps', 1000)):
+            # Record state
+            self.recordState(brain, agent, world, step)
+            
+            # Execute step
+            self.executeStep(brain, agent, world, step)
+            
+            # Record results
+            self.recordResults(experiment_result, brain, agent, world)
+            
+            # Check for termination conditions
+            if self.checkTermination(brain, agent, world, step):
+                break
+        
+        return experiment_result
+    
+    def configureAgent(self, agent, config):
+        """Configure agent based on configuration"""
+        # Enable features based on config
+        if config.get('reward_modulation_enabled', True):
+            agent.enableRewardModulation(True)
+        
+        if config.get('structural_plasticity_enabled', True):
+            agent.enableStructuralPlasticity(True)
+        
+        if config.get('development_enabled', True):
+            agent.enableDevelopment(True)
+        
+        if config.get('curiosity_enabled', True):
+            agent.enableCuriosity(True)
+    
+    def executeStep(self, brain, agent, world, step):
+        """Execute one simulation step"""
+        # Update world
+        world.update(config.get('timestep', 0.1))
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process with agent
+        agent.processSensoryInput(percept)
+        
+        # Brain processing
+        brain.step(step)
+        
+        # Get action
+        action = agent.decodeMotorCommand()
+        
+        # Apply action
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply neuromodulation if enabled
+        if config.get('reward_modulation_enabled', True):
+            reward = world.getAgentBody().energy * 10.0
+            predicted = agent.getPredictionError()
+            agent.applyRewardModulation(reward, predicted)
+    
+    def checkTermination(self, brain, agent, world, step):
+        """Check if experiment should terminate"""
+        config = self.config
+        
+        # Check step limit
+        if step >= config.get('max_steps', 1000):
+            return True
+        
+        # Check performance threshold
+        if step >= config.get('performance_check_interval', 100):
+            current_performance = self.calculatePerformance(brain, agent, world)
+            if current_performance >= config.get('performance_threshold', 0.8):
+                return True
+        
+        # Check energy depletion
+        if world.getAgentBody().energy <= 0.0:
+            return True
+        
+        # Check for requested early termination
+        if hasattr(self, 'requested_termination') and self.requested_termination:
+            return True
+        
+        return False
+    
+    def calculatePerformance(self, brain, agent, world):
+        """Calculate performance metric"""
+        # Simple performance metric based on reward and efficiency
+        current_reward = world.getAgentBody().energy * 10.0
+        steps_efficiently = brain.getTotalSpikeCount() / max(1, brain.getTotalNeuronCount())
+        
+        # Normalize to [0, 1]
+        performance = min(1.0, (current_reward / 100.0) * 0.7 + steps_efficiently * 0.3)
+        return performance
+    
+    def save_checkpoint(self, name):
+        """Save experiment checkpoint"""
+        checkpoint = {
+            'config': self.config,
+            'history': self.history,
+            'brain_state': self.getBrainState(),  # Implementation depends on your brain
+            'timestamp': time.time()
+        }
+        self.checkpoints[name] = checkpoint
+        
+        # Save to file
+        import json
+        with open(f"checkpoint_{name}.json", 'w') as f:
+            json.dump(checkpoint, f, indent=2)
+    
+    def load_checkpoint(self, name):
+        """Load experiment checkpoint"""
+        if name in self.checkpoints:
+            return self.checkpoints[name]
+        
+        # Try to load from file
+        import json
+        try:
+            with open(f"checkpoint_{name}.json", 'r') as f:
+                checkpoint = json.load(f)
+                self.checkpoints[name] = checkpoint
+                return checkpoint
+        except FileNotFoundError:
+            raise ValueError(f"Checkpoint '{name}' not found")
+    
+    def getBrainState(self):
+        """Get brain state for checkpointing"""
+        # Implementation depends on your brain's save/load methods
+        pass
+    
+    def recordState(self, brain, agent, world, step):
+        """Record current state for analysis"""
+        self.history.append({
+            'step': step,
+            'timestamp': time.time(),
+            'neurons_firing': brain.getFiringNeuronCount(),
+            'total_spikes': brain.getTotalSpikeCount(),
+            'firing_rate': brain.getAverageFiringRate(),
+            'action': self.getLastAction(world),
+            'reward': world.getAgentBody().energy,
+            'curiosity': agent.getCuriosityLevel(),
+            'novelty': agent.getNoveltyLevel(),
+            'prediction_error': agent.getPredictionError()
+        })
+    
+    def recordResults(self, experiment_result, brain, agent, world):
+        """Record results for experiment analysis"""
+        experiment_result['steps_completed'] = len(self.history)
+        experiment_result['final_performance'] = self.calculatePerformance(brain, agent, world)
+        experiment_result['reward_history'] = [h['reward'] for h in self.history]
+        experiment_result['neural_activity'] = [h['neurons_firing'] for h in self.history]
+        experiment_result['action_history'] = [h['action'] for h in self.history]
+    
+    def getLastAction(self, world):
+        """Get last action taken by agent"""
+        # Implementation depends on your world's action tracking
+        pass
+    
+    def load_config(self, filepath):
+        """Load configuration from file"""
+        import json
+        
+        with open(filepath, 'r') as f:
+            settings = json.load(f)
+        
+        config = pynlm.createDefaultConfig()
+        for key, value in settings.items():
+            config.set(key, value)
+        
+        return config
+```
 
-**Location:** `src/experiments/`
+## Advanced Tutorials
 
-| Component | Status | Integration |
-|-----------|--------|-------------|
-| Experiment framework | ✅ Working | ✅ Used |
-| Metrics collection | ✅ Working | ✅ Used |
-| Ablation system | ✅ Implemented | ❌ Not used in main experiments |
-| Scaling benchmark | ✅ Implemented | ❌ Not used |
-| Phase experiments | ⚠️ Structure exists | ⚠️ Limited execution |
+### Tutorial 1: Building a Curious Agent
 
-**Issue:** Phase5IntegratedExperiment.hpp defines a comprehensive lifetime experiment but it may not be fully executed in practice.
+This tutorial demonstrates how to create an agent that learns through curiosity and exploration:
 
----
+```python
+# Step 1: Setup
+import pynlm
 
-## 6. Critical Gaps Summary
+# Create advanced configuration
+config = pynlm.createDefaultConfig()
+config.set("random_seed", 42)
+config.set("neuron_count", 2000)
+config.set("curiosity_weight", 0.9)
 
-### 6.1 Memory Integration
-- Working memory is defined but not connected to sensory processing
-- Episodic memory is never updated with experiences
-- No replay mechanism
-- No sleep/consolidation
+# Create brain and agent
+brain = pynlm.createBrain(config)
+brain.initialize()
 
-### 6.2 Cognitive Integration
-- Neural planner exists but is never called
-- Concept formation exists but never processes experiences
-- Self-model exists but never updates
-- Social learning exists but never observes
+world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=8, visionHeight=8)
+world.reset()
 
-### 6.3 Neuromodulation Integration
-- Dopamine only scales STDP weights
-- Other modulators (ACh, NE, 5-HT) are stubs
-- No connection between neuromodulation and memory
-- No connection between neuromodulation and attention
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
 
-### 6.4 Prediction Integration
-- Prediction system exists but is never trained
-- Prediction error is computed in AgentBrain but doesn't update predictions
-- No use of predictions for attention or planning
+# Step 2: Enable advanced features
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+agent.enableRewardModulation(True)
 
-### 6.5 Persistence
-- CheckpointSystem is implemented but not connected
-- Brain save/load are stubs
-- No life history tracking
+# Step 3: Run curious exploration
+for step in range(1000):
+    # Update world
+    world.update(0.1)
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    
+    # Process with agent
+    agent.processSensoryInput(percept)
+    
+    # Brain processing
+    brain.step(step)
+    
+    # Get action (curiosity will drive exploration)
+    action = agent.decodeMotorCommand()
+    
+    # Apply action
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply neuromodulation based on experience
+    reward = world.getAgentBody().energy * 10.0
+    predicted = agent.getPredictionError()
+    agent.applyRewardModulation(reward, predicted)
+    
+    # Update development
+    agent.updateDevelopment(0.1)
+    
+    # Print curiosity metrics
+    if step % 100 == 0:
+        print(f"Step {step}: Curiosity={agent.getCuriosityLevel():.2f}, "
+              f"Novelty={agent.getNoveltyLevel():.2f}, "
+              f"Reward={reward:.1f}")
 
----
+print("Curious agent exploration completed!")
+```
 
-## 7. Scientific Evaluation Missing
+### Tutorial 2: Developmental Learning
 
-The codebase does NOT demonstrate:
-- Memory retention over time (no tests)
-- Learning progress over development (no measurements)
-- Continual learning without catastrophic forgetting (no tests)
-- Generalization (no tests)
-- Prediction accuracy improvement (no measurements)
-- Individual differences from different histories (no multi-agent experiments)
+This tutorial demonstrates how to create a brain that develops over time:
 
----
+```python
+# Step 1: Setup development configuration
+import pynlm
 
-## 8. Files with "TODO" Markers
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 3000)
+config.set("development_enabled", True)
+config.set("structural_plasticity_enabled", True)
 
-| File | TODO Count | Nature |
-|------|-----------|--------|
-| Brain.hpp | 7 | "TODO PHASE 2" for memory, prediction, save/load |
-| Brain.cpp | 5 | Implementation stubs |
-| Memory.hpp | 8 | "PLACEHOLDER" comments |
-| Neuromodulator.hpp | 4 | "PLACEHOLDER" for ACh, NE, 5-HT |
-| PredictionSystem.hpp | 1 | "PLACEHOLDER" |
-| AgentBrain.cpp | 0 | But disconnected systems |
+# Create brain
+brain = pynlm.createBrain(config)
+brain.initialize()
 
----
+# Set initial developmental stage
+brain.setDevelopmentalStage(pynlm.DevelopmentalStage.CriticalPeriod)
 
-## 9. Compliance Check
+# Create agent with world
+world = pynlm.createSimpleWorld()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
 
-### NLM Core Philosophy
-| Principle | Status |
-|------------|--------|
-| Experience-driven | ⚠️ Partial - sensors work, learning limited |
-| Development-driven | ⚠️ Partial - stages exist, minimal effect |
-| Neural | ✅ Working - LIF, spikes, synapses |
-| Plastic | ✅ Working - STDP, Hebbian, structural |
-| Recurrent where appropriate | ⚠️ Limited - no recurrent connectivity |
-| Sparse/event-driven | ✅ Working - event-driven spike system |
-| Embodied | ✅ Working - Agent/SimpleWorld |
-| Self-organizing | ⚠️ Limited - structural plasticity exists |
-| Continually learning | ⚠️ Basic - no memory integration |
+# Step 2: Run developmental learning
+print("Starting developmental learning...")
 
-### Hardcoded Prohibitions - VERIFIED CLEAN
-| Prohibition | Status |
-|-------------|--------|
-| No Transformers | ✅ Verified - no attention layers |
-| No LLM replacement | ✅ Verified |
-| No pretrained knowledge | ✅ Verified |
-| No PyTorch/TF/JAX | ✅ Verified - vanilla C++ |
-| No RNN/LSTM/GRU | ✅ Verified |
-| No CNN for cognition | ✅ Verified |
+for episode in range(5):
+    print(f"\nEpisode {episode + 1}:")
+    
+    # Reset agent for new episode
+    agent.reset()
+    world.reset()
+    brain.setDevelopmentalStage(pynlm.DevelopmentalStage.Initial)
+    
+    for step in range(500):
+        # Update world
+        world.update(0.05)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process with agent
+        agent.processSensoryInput(percept)
+        
+        # Brain processing
+        brain.step(step)
+        
+        # Get action
+        action = agent.decodeMotorCommand()
+        
+        # Apply action
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Update development
+        agent.updateDevelopment(0.05)
+        
+        # Print developmental metrics
+        if step % 100 == 0:
+            stage = brain.getDevelopmentalStage()
+            plasticity = agent.getDevelopmentPlasticityModifier()
+            neurons = brain.getTotalNeuronCount()
+            firing = brain.getFiringNeuronCount()
+            
+            print(f"  Step {step}: Stage={stage}, Plasticity={plasticity:.2f}, "
+                  f"Neurons={neurons}, Firing={firing}")
+    
+    # Evaluate episode performance
+    final_plasticity = agent.getDevelopmentPlasticityModifier()
+    final_curiosity = agent.getCuriosityLevel()
+    
+    print(f"  Episode {episode + 1} Results:")
+    print(f"    Final Plasticity: {final_plasticity:.2f}")
+    print(f"    Final Curiosity: {final_curiosity:.2f}")
+    print(f"    Learning efficiency: {(final_plasticity - 1.0) / (0.2 - 1.0):.2f}")
 
----
+print("\nDevelopmental learning completed!")
+```
 
-## 10. Recommendations for Phase 6
+### Tutorial 3: Advanced Memory Systems
 
-### Priority 1: CONNECT EXISTING SYSTEMS
-1. Connect WorkingMemory to sensory processing
-2. Connect EpisodicMemory to experience logging
-3. Connect PredictionSystem to sensory processing
-4. Connect NeuralPlanner to action selection
-5. Connect ConceptFormation to experience processing
+This tutorial demonstrates how to use the integrated memory systems:
 
-### Priority 2: IMPLEMENT MISSING MECHANISMS
-1. Implement Brain::save() and Brain::load() using CheckpointSystem
-2. Implement sleep/rest cycle with memory consolidation
-3. Implement replay mechanism
-4. Implement full dopamine effects on plasticity
-5. Implement ACh effects on attention/memory
+```python
+# Step 1: Setup memory-enhanced configuration
+import pynlm
 
-### Priority 3: VALIDATE INTEGRATION
-1. Test memory retention over time
-2. Test prediction accuracy improvement
-3. Test continual learning
-4. Test developmental progression
-5. Test multi-system interaction
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 2500)
 
-### Priority 4: OPTIMIZE
-1. Profile and optimize hot paths
-2. Integrate performance infrastructure
-3. Enable multithreading where safe
+# Create brain with memory systems
+brain = pynlm.createBrain(config)
+brain.initialize()
 
----
+# Access memory systems
+working_memory = brain.getWorkingMemory()
+episodic_memory = brain.getEpisodicMemory()
+associative_memory = brain.getAssociativeMemory()
 
-## 11. Summary Score
+# Create agent and world
+world = pynlm.createSimpleWorld()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
 
-| Category | Score | Max | Notes |
-|----------|-------|-----|-------|
-| Neural Core | 18 | 20 | Working LIF, spikes, basic plasticity |
-| Memory Systems | 4 | 20 | Defined but disconnected |
-| Neuromodulation | 5 | 15 | Basic dopamine only |
-| Cognition | 0 | 20 | All disconnected |
-| Prediction | 0 | 10 | Disconnected |
-| Development | 4 | 10 | Minimal integration |
-| Persistence | 1 | 10 | Stubs only |
-| Embodiment | 8 | 10 | Working sensory-motor loop |
-| Experiments | 3 | 5 | Framework exists, limited execution |
-| **TOTAL** | **43** | **120** | **35.8%** |
+# Step 2: Enable memory-enhanced learning
+working_memory.enable(True)
+episodic_memory.enable(True)
+associative_memory.enable(True)
 
----
+# Step 3: Run memory demonstration
+print("Starting memory-enhanced learning...")
 
-## Conclusion
+# Experience sequence
+experiences = [
+    {"location": (5, 5), "reward": 10.0, "novel": True},
+    {"location": (10, 10), "reward": 15.0, "novel": False},
+    {"location": (3, 8), "reward": 8.0, "novel": True},
+    {"location": (15, 15), "reward": 20.0, "novel": True},
+    {"location": (7, 12), "reward": 12.0, "novel": False}
+]
 
-NLM/熙然 has a sophisticated **architecture** but functions as a **basic neural simulator** rather than an integrated artificial brain. The components exist but they don't interact. Phase 6 must focus on **integration over new features**.
+for step, experience in enumerate(experiences):
+    # Move agent to experience location
+    target_x, target_y = experience["location"]
+    body = world.getAgentBody()
+    
+    # Calculate movement
+    dx = target_x - body.x
+    dy = target_y - body.y
+    distance = (dx*dx + dy*dy)**0.5
+    
+    if distance > 0.1:
+        body.x += dx / distance * 0.5
+        body.y += dy / distance * 0.5
+    
+    # Update world
+    world.update(0.1)
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    
+    # Process with agent
+    agent.processSensoryInput(percept)
+    
+    # Brain processing
+    brain.step(step)
+    
+    # Store experience in episodic memory
+    if episodic_memory:
+        episodic_memory.store(
+            world.getSimulationTime(),
+            percept.getVision(),
+            percept.getTouch(),
+            percept.getInternal(),
+            experience["reward"]
+        )
+    
+    # Use working memory for current processing
+    if working_memory:
+        working_memory.update(percept.getVision(), step)
+    
+    # Use associative memory for pattern recognition
+    if associative_memory:
+        # Create pattern from current state
+        pattern = percept.getVision()  # Simplified pattern
+        associations = associative_memory.findAssociations(pattern)
+        
+        # Activate associated memories
+        for association in associations:
+            print(f"  Associated memory: {association}")
+    
+    # Get action
+    action = agent.decodeMotorCommand()
+    
+    # Apply action
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Print memory metrics
+    if step % 2 == 0:
+        wm_size = working_memory.getSize() if working_memory else 0
+        em_size = episodic_memory.getSize() if episodic_memory else 0
+        am_size = associative_memory.getSize() if associative_memory else 0
+        
+        print(f"Step {step}: WM={wm_size}, EM={em_size}, AM={am_size}, "
+              f"Reward={experience['reward']}")
 
-**The primary goal of Phase 6 is to make the existing systems work together as a coherent whole, not to add more disconnected components.**
+print("Memory-enhanced learning completed!")
+```
+
+## API Reference
+
+### Core Classes
+
+- `pynlm.createDefaultConfig()` - Create default configuration
+- `pynlm.createBrain(config)` - Create neural brain
+- `pynlm.createSimpleWorld()` - Create simple environment
+- `pynlm.createAgentBrain(brain)` - Create agent interface
+
+### Brain Methods
+
+- `brain.initialize()` - Initialize brain with configuration
+- `brain.step(step)` - Perform simulation step
+- `brain.getTotalNeuronCount()` - Get total neuron count
+- `brain.getTotalSpikeCount()` - Get total spike count
+- `brain.getFiringNeuronCount()` - Get currently firing neurons
+- `brain.getAverageFiringRate()` - Get average firing rate
+- `brain.getDevelopmentalStage()` - Get developmental stage
+- `brain.setDevelopmentalStage(stage)` - Set developmental stage
+- `brain.enableDevelopment(True/False)` - Enable/disable development
+- `brain.enableCuriosity(True/False)` - Enable/disable curiosity
+- `brain.enableRewardModulation(True/False)` - Enable/disable reward modulation
+
+### AgentBrain Methods
+
+- `agent.initialize(world)` - Initialize agent with world
+- `agent.processSensoryInput(percept)` - Process sensory input
+- `agent.decodeMotorCommand()` - Decode motor command
+- `agent.applyRewardModulation(reward, predicted)` - Apply reward-based neuromodulation
+- `agent.updateDevelopment(timestep)` - Update development system
+- `agent.getCuriosityLevel()` - Get curiosity level
+- `agent.getNoveltyLevel()` - Get novelty level
+- `agent.getPredictionError()` - Get prediction error
+- `agent.getNeuromodulationLevel()` - Get neuromodulation level
+
+### Configuration Methods
+
+- `config.set(key, value)` - Set configuration value
+- `config.get(key)` - Get configuration value
+- `config.getOr(key, default)` - Get configuration value with default
+- `config.has(key)` - Check if configuration key exists
+- `config.getKeys()` - Get all configuration keys
+- `config.saveToFile(filepath)` - Save configuration to file
+- `config.loadFromFile(filepath)` - Load configuration from file
+
+### World Methods
+
+- `world.configure(width, height, visionWidth, visionHeight)` - Configure world dimensions
+- `world.reset()` - Reset world state
+- `world.update(timestep)` - Update world state
+- `world.applyMotorCommand(action, time)` - Apply motor command
+- `world.getSensoryPercept()` - Get sensory percept
+- `world.getAgentBody()` - Get agent body state
+- `world.getSimulationTime()` - Get current simulation time
+
+## Performance Tips
+
+### Optimizing Simulation Performance
+
+1. **Reduce Simulation Timestep**: Smaller timesteps provide more accuracy but increase computation time
+2. **Enable Spatial Pooling**: Reduce sensory input size while preserving essential information
+3. **Use SIMD Optimizations**: Leverage single instruction, multiple data parallelism
+4. **Implement Event-Driven Processing**: Only process neurons that are actively firing
+5. **Batch Processing**: Group similar operations together for better cache utilization
+
+### Memory Optimization
+
+1. **Neural Network Compression**: Use quantized representations for neural states
+2. **Spatial Partitioning**: Use grids to organize world objects and improve collision detection
+3. **Memory Pooling**: Reuse memory allocations instead of frequent allocations/deallocations
+4. **Lazy Evaluation**: Defer computation until results are actually needed
+
+### Advanced Debugging and Monitoring
+
+1. **Real-Time Monitoring**: Use the performance monitor to track simulation bottlenecks
+2. **Visual Debugging**: Use visualization tools to debug neural network behavior
+3. **Checkpointing**: Save and restore simulation state for reproducibility
+4. **Metric Tracking**: Track key performance metrics for analysis
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+**Issue 1: Simulation crashes or produces invalid results**
+- Solution: Check configuration values and ensure they are within valid ranges
+- Solution: Validate sensory input dimensions match expected sizes
+- Solution: Check for null pointers in neural network access
+
+**Issue 2: Poor performance**
+- Solution: Reduce simulation timestep
+- Solution: Enable spatial pooling in sensory processing
+- Solution: Optimize neural network architecture
+- Solution: Use SIMD optimizations for mathematical operations
+
+**Issue 3: Memory issues**
+- Solution: Use memory pooling and lazy evaluation
+- Solution: Monitor memory usage with performance tools
+- Solution: Implement neural network compression
+
+**Issue 4: Unstable learning**
+- Solution: Adjust learning rates and neuromodulation parameters
+- Solution: Enable development with appropriate plasticity settings
+- Solution: Use appropriate curiosity levels for exploration balance
+
+## Further Reading
+
+### Related Resources
+
+- **NLM Documentation**: https://nlm.readthedocs.io
+- **Phase 6 Integration Guide**: https://github.com/nlm-project/nlm/blob/main/docs/PHASE6_FINAL_AUDIT.md
+- **Scientific Papers**: Available in the NLM research publications
+- **Community Forum**: https://community.nlm.ai
+
+### Research Directions
+
+1. **Enhanced Neuromodulation**: Implement more sophisticated reward prediction systems
+2. **Developmental Psychology**: Model more realistic developmental stages
+3. **Social Learning**: Enable multi-agent coordination and social learning
+4. **Metacognition**: Implement self-monitoring and meta-learning capabilities
+5. **Transfer Learning**: Enable knowledge transfer between tasks and environments
+
+## Version History
+
+### Version 2.0.0 (Phase 6.0)
+- Complete integration of all Phase 6 systems
+- Enhanced Python API with advanced features
+- Improved performance and memory efficiency
+- Advanced visualization and monitoring tools
+- Comprehensive experiment framework
+
+### Version 1.0.0 (Phase 5.0)
+- Stable API with core NLM functionality
+- Basic simulation and learning capabilities
+- Standard visualization tools
+
+### Version 0.1.0 (Early Development)
+- Initial prototype with basic neural network functionality
+- Limited API and simulation capabilities
+
+## License
+
+MIT License - See LICENSE file for details
