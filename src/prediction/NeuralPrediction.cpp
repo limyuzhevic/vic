@@ -198,16 +198,47 @@ void NeuralPrediction::recordAction(ActionType action, SimulationStep step) {
     }
 }
 
-void NeuralPrediction::learnTemporalSequence(const std::vector<float>& currentState,
+void NeuralPrediction::findBetterAssociations(const std::vector<float>& currentState,
                                             const std::vector<float>& nextState,
-                                            SimulationStep currentStep) {
-    // Find or create pattern neuron for current state
-    NeuronId currentNeuron = findMatchingPatternNeuron(currentState);
-    NeuronId nextNeuron = findMatchingPatternNeuron(nextState);
+                                            float& strength) {
+    // Try different similarity thresholds to find better matches
+    float bestMatchStrength = 0.0f;
     
-    if (currentNeuron != nextNeuron) {
-        createSequenceAssociation(currentNeuron, nextNeuron, 0.8f);
+    // First try with a reasonable threshold
+    NeuronId currentNeuron = findMatchingPatternNeuron(currentState, 0.7f);
+    NeuronId nextNeuron = findMatchingPatternNeuron(nextState, 0.7f);
+    
+    if (currentNeuron != INVALID_NEURON_ID && nextNeuron != INVALID_NEURON_ID) {
+        // Check if this association is already known
+        bool associationExists = false;
+        for (const auto& assoc : pImpl->sequenceAssociations) {
+            if (assoc.first == currentNeuron && assoc.second == nextNeuron) {
+                associationExists = true;
+                break;
+            }
+        }
+        
+        if (!associationExists) {
+            // We found a new valid association
+            createSequenceAssociation(currentNeuron, nextNeuron, 0.7f);
+            bestMatchStrength = 0.7f;
+        }
     }
+    
+    // Try with stricter threshold for better precision
+    if (bestMatchStrength == 0.0f) {
+        currentNeuron = findMatchingPatternNeuron(currentState, 0.9f);
+        nextNeuron = findMatchingPatternNeuron(nextState, 0.9f);
+        
+        if (currentNeuron != INVALID_NEURON_ID && nextNeuron != INVALID_NEURON_ID && 
+            currentNeuron != nextNeuron) {
+            createSequenceAssociation(currentNeuron, nextNeuron, 0.9f);
+            bestMatchStrength = 0.9f;
+        }
+    }
+    
+    // Return the best found association
+    strength = bestMatchStrength;
 }
 
 NeuronId NeuralPrediction::findMatchingPatternNeuron(const std::vector<float>& pattern,
@@ -220,12 +251,51 @@ NeuronId NeuralPrediction::findMatchingPatternNeuron(const std::vector<float>& p
         }
     }
     
-    // Create new pattern neuron
+    // Create new pattern neuron with improved uniqueness
     if (brain_) {
-        NeuronId newId = NeuronId(pImpl->patternNeurons.size() + 10000);
-        pImpl->patternNeurons.push_back(newId);
-        pImpl->patternRepresentations.push_back(pattern);
-        return newId;
+        // Use pattern hash for more unique IDs (avoid conflicts with existing neurons)
+        // Incorporate step information to differentiate similar patterns
+        size_t newId = pImpl->patternNeurons.size() + 10000 + stateTimestamps_.size();
+        
+        // Check if this ID already exists in brain regions
+        bool idExists = false;
+        for (const auto& region : brain_->getRegions()) {
+            for (const auto* neuron : region->getAllNeurons()) {
+                if (neuron->getId() == static_cast<NeuronId>(newId)) {
+                    idExists = true;
+                    break;
+                }
+            }
+            if (idExists) break;
+        }
+        
+        if (!idExists) {
+            pImpl->patternNeurons.push_back(static_cast<NeuronId>(newId));
+            pImpl->patternRepresentations.push_back(pattern);
+            return static_cast<NeuronId>(newId);
+        } else {
+            // Try next available ID
+            newId++;
+            for (size_t attempts = 0; attempts < 100 && !idExists; ++attempts) {
+                idExists = false;
+                for (const auto& region : brain_->getRegions()) {
+                    for (const auto* neuron : region->getAllNeurons()) {
+                        if (neuron->getId() == static_cast<NeuronId>(newId)) {
+                            idExists = true;
+                            break;
+                        }
+                    }
+                    if (idExists) break;
+                }
+                
+                if (!idExists) {
+                    pImpl->patternNeurons.push_back(static_cast<NeuronId>(newId));
+                    pImpl->patternRepresentations.push_back(pattern);
+                    return static_cast<NeuronId>(newId);
+                }
+                newId++;
+            }
+        }
     }
     
     return INVALID_NEURON_ID;
@@ -331,6 +401,189 @@ ActionConsequencePredictor::~ActionConsequencePredictor() = default;
 void ActionConsequencePredictor::initialize(Brain* brain) {
     pImpl->brain = brain;
 }
+
+void ActionConsequencePredictor::recordExperience(ActionType action,
+                                                  const std::vector<float>& beforeState,
+                                                  const std::vector<float>& afterState,
+                                                  float reward) {
+    pImpl->experiences.push_back({{beforeState, action}, afterState});
+    pImpl->actionQuality.push_back({action, reward});
+    
+    // Update average reward for this action
+    float totalReward = 0.0f;
+    size_t count = 0;
+    for (const auto& aq : pImpl->actionQuality) {
+        if (aq.first == action) {
+            totalReward += aq.second;
+            ++count;
+        }
+    }
+    
+    // Update or add to action quality
+    for (auto& aq : pImpl->actionQuality) {
+        if (aq.first == action) {
+            aq.second = totalReward / count;
+            break;
+        }
+    }
+    
+    // Limit experience memory
+    if (pImpl->experiences.size() > 1000) {
+        pImpl->experiences.erase(pImpl->experiences.begin());
+    }
+}
+
+std::vector<float> ActionConsequencePredictor::predictConsequence(ActionType action,
+                                                                 const std::vector<float>& currentState) {
+    // Find most similar previous experience with this action
+    float bestSimilarity = 0.0f;
+    std::vector<float> bestConsequence;
+    
+    for (const auto& exp : pImpl->experiences) {
+        if (exp.first.second == action) {
+            // Compute similarity between current state and stored before-state
+            const auto& before = exp.first.first;
+            const auto& after = exp.second;
+            
+            if (before.size() != currentState.size()) continue;
+            
+            float dot = 0.0f, norm1 = 0.0f, norm2 = 0.0f;
+            for (size_t i = 0; i < before.size(); ++i) {
+                dot += before[i] * currentState[i];
+                norm1 += before[i] * before[i];
+                norm2 += currentState[i] * currentState[i];
+            }
+            
+            float sim = (norm1 > 0.0001f && norm2 > 0.0001f) ? 
+                        dot / (std::sqrt(norm1) * std::sqrt(norm2)) : 0.0f;
+            
+            if (sim > bestSimilarity) {
+                bestSimilarity = sim;
+                bestConsequence = after;
+            }
+        }
+    }
+    
+    if (bestSimilarity > 0.5f && !bestConsequence.empty()) {
+        return bestConsequence;
+    }
+    
+    return currentState;  // Default: no predicted change
+}
+
+float ActionConsequencePredictor::getConsequenceConfidence(ActionType action,
+                                                           const std::vector<float>& currentState) const {
+    size_t matchingCount = 0;
+    for (const auto& exp : pImpl->experiences) {
+        if (exp.first.second == action) {
+            ++matchingCount;
+        }
+    }
+    
+    // More experiences = higher confidence
+    return std::min(1.0f, static_cast<float>(matchingCount) / 10.0f);
+}
+
+void ActionConsequencePredictor::updatePrediction(ActionType action,
+                                                  const std::vector<float>& predicted,
+                                                  const std::vector<float>& actual,
+                                                  float reward) {
+    // This would update the internal model
+    // For now, just record the new experience
+    recordExperience(action, predicted, actual, reward);
+}
+
+float ActionConsequencePredictor::getActionQuality(ActionType action) const {
+    for (const auto& aq : pImpl->actionQuality) {
+        if (aq.first == action) {
+            return aq.second;
+        }
+    }
+    return 0.0f;
+}
+
+void ActionConsequencePredictor::clear() {
+    pImpl->experiences.clear();
+    pImpl->actionQuality.clear();
+}
+
+// PredictionErrorSignal Implementation
+struct PredictionErrorSignal::Impl {
+    float lastIntensityError;
+    float lastSpatialError;
+    float lastTemporalError;
+    
+    Impl() : lastIntensityError(0.0f), lastSpatialError(0.0f), lastTemporalError(0.0f) {}
+};
+
+PredictionErrorSignal::PredictionErrorSignal()
+    : pImpl(new Impl)
+    , lastError_(0.0f)
+    , surpriseThreshold_(0.3f)
+{
+    errorComponents_.intensityError = 0.0f;
+    errorComponents_.spatialError = 0.0f;
+    errorComponents_.temporalError = 0.0f;
+    errorComponents_.totalError = 0.0f;
+}
+
+PredictionErrorSignal::~PredictionErrorSignal() = default;
+
+float PredictionErrorSignal::computeError(const std::vector<float>& predicted,
+                                          const std::vector<float>& actual) {
+    if (predicted.empty() || actual.empty()) {
+        lastError_ = 0.0f;
+        return 0.0f;
+    }
+    
+    // Compute overall difference
+    float totalDiff = 0.0f;
+    float intensityDiff = 0.0f;
+    
+    for (size_t i = 0; i < std::min(predicted.size(), actual.size()); ++i) {
+        float diff = std::abs(predicted[i] - actual[i]);
+        totalDiff += diff;
+        intensityDiff += diff * diff;
+    }
+    
+    float meanError = totalDiff / predicted.size();
+    float meanSqError = intensityDiff / predicted.size();
+    
+    // Compute spatial error (variance of differences)
+    float spatialVar = 0.0f;
+    for (size_t i = 0; i < predicted.size(); ++i) {
+        float diff = predicted[i] - actual[i];
+        spatialVar += (diff - meanError) * (diff - meanError);
+    }
+    float spatialError = std::sqrt(spatialVar / predicted.size());
+    
+    // Update components
+    pImpl->lastIntensityError = std::sqrt(meanSqError);
+    pImpl->lastSpatialError = spatialError;
+    errorComponents_.intensityError = pImpl->lastIntensityError;
+    errorComponents_.spatialError = pImpl->lastSpatialError;
+    
+    // Compute total error (combining components)
+    lastError_ = std::sqrt(meanSqError + spatialError * spatialError);
+    errorComponents_.totalError = lastError_;
+    
+    return lastError_;
+}
+
+float PredictionErrorSignal::getModulationSignal() const {
+    // Convert error to modulation signal (0-1)
+    // Higher error = stronger modulation for learning
+    return std::min(1.0f, lastError_ * 2.0f);
+}
+
+void PredictionErrorSignal::recordError(float error, SimulationStep step) {
+    errorHistory_.push_back(error);
+    if (errorHistory_.size() > 10000) {
+        errorHistory_.erase(errorHistory_.begin());
+    }
+}
+
+} // namespace nlm
 
 void ActionConsequencePredictor::recordExperience(ActionType action,
                                                   const std::vector<float>& beforeState,

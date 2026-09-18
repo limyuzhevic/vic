@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Config/Config.hpp"
 #include "../brain/Brain.hpp"
 #include <vector>
 #include <deque>
@@ -71,8 +72,12 @@ public:
     void setPredictionHorizon(size_t steps) { predictionHorizon_ = steps; }
 
     // Get neurons involved in prediction
-    std::vector<NeuronId> getPredictionNeurons() const;
-    std::vector<NeuronId> getSequenceNeurons() const;
+    std::vector<NeuronId> getPredictionNeurons() const {
+        return predictionNeurons_;
+    }
+    std::vector<NeuronId> getSequenceNeurons() const {
+        return sequenceNeurons_;
+    }
 
 private:
     // Learn temporal sequence from sensory observations
