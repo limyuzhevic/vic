@@ -72,6 +72,9 @@ public:
     // Reset
     void reset();
     
+    // Reset only spike counts for continuous simulation
+    void resetSpikeCounts();
+    
 private:
     struct Impl;
     Impl* pImpl;

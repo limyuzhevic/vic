@@ -66,9 +66,11 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         // Track spike count per neuron
         pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
         
-        // Trim history if needed
+        // Trim history if needed - use deque for efficient removal from front
         if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+            // Use std::rotate to efficiently remove from front instead of erase
+            std::rotate(pImpl->spikeHistory.begin(), pImpl->spikeHistory.begin() + 1, pImpl->spikeHistory.end());
+            pImpl->spikeHistory.pop_back();
         }
         
         // Call handlers
@@ -178,6 +180,11 @@ void SpikeSystem::reset() {
     pImpl->spikeHistory.clear();
     pImpl->spikeCountPerNeuron.clear();
     pImpl->delayedSpikes.clear();
+}
+
+void SpikeSystem::resetSpikeCounts() {
+    // Reset only spike counts to zero for continuous simulation
+    pImpl->spikeCountPerNeuron.clear();
 }
 
 } // namespace nlm

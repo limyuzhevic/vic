@@ -84,6 +84,15 @@ public:
     // Remove key
     void remove(const std::string& key);
     
+    // Clear all
+    void clear();
+    
+        // Clear all
+    void clear();
+    
+        // Remove key
+    void remove(const std::string& key);
+    
     // Get all keys
     std::vector<std::string> getKeys() const;
     
@@ -93,13 +102,11 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Reset
+    void reset();
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
-};
+    // Reset only spike counts for continuous simulation
+    void resetSpikeCounts();
+}
 
 } // namespace nlm

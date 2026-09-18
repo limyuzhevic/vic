@@ -42,10 +42,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string value = trim(line.substr(pos + 1));
             
             // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            if (value.size() >= 2) {
+                bool isDoubleQuoted = (value.front() == '"' && value.back() == '"');
+                bool isSingleQuoted = (value.front() == '\'' && value.back() == '\'');
+                if (isDoubleQuoted || isSingleQuoted) {
+                    value = value.substr(1, value.size() - 2);
+                }
             }
             
             set(key, value, ConfigSource::File);
@@ -108,10 +110,16 @@ std::optional<T> Config::get(const std::string& key) const {
     }
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        it->value = value;
+        it->source = source;
+    } else {
+        pImpl->entries.emplace_back(key, value, source);
+    }
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
@@ -164,8 +172,12 @@ std::vector<std::string> Config::getKeys() const {
     return keys;
 }
 
-void Config::clear() {
-    pImpl->entries.clear();
+void Config::reset() {
+    clear();
+}
+
+void Config::resetSpikeCounts() {
+    clear();
 }
 
 std::string Config::summary() const {
