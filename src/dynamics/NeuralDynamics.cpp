@@ -1,13 +1,20 @@
 #include "NeuralDynamics.hpp"
+#include "FitzHughNagumoDynamics.hpp"
+#include "HodgkinHuxleyDynamics.hpp"
 #include <cmath>
+#include <algorithm>
 
 namespace nlm {
 
 struct IntegrateAndFireDynamics::Impl {
     float membraneTimeConstant;  // ms
     float membraneResistance;     // MOhm
+    float threshold;              // mV (threshold for firing)
+    float reset_potential;        // mV (reset after spike)
+    float leak_reversal;          // mV (resting potential)
     
-    Impl() : membraneTimeConstant(20.0f), membraneResistance(10.0f) {}
+    Impl() : membraneTimeConstant(20.0f), membraneResistance(10.0f),
+             threshold(-50.0f), reset_potential(-70.0f), leak_reversal(-70.0f) {}
 };
 
 IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
@@ -15,8 +22,7 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
+    if (!neuron || dt <= 0.0f) return;
     
     const auto& state = neuron->getState();
     
@@ -32,17 +38,21 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     
     // Simple Euler integration
     float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
-    neuron->setMembranePotential(V + dV);
+    V += dV;
     
-    // Check for firing
-    if (shouldFire(neuron)) {
+    // Update neuron membrane potential
+    neuron->setMembranePotential(V);
+    
+    // Check for firing threshold
+    if (V >= pImpl->threshold) {
         neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
+        neuron->setMembranePotential(pImpl->reset_potential);
+        neuron->recordSpike(0.0); // TODO: pass actual time
     }
     
     // Refractory mechanism
     if (neuron->isRefractory()) {
-        neuron->setMembranePotential(state.resetPotential);
+        neuron->setMembranePotential(pImpl->reset_potential);
     }
     
     // Clear current for next step
@@ -50,14 +60,16 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
 }
 
 void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real synaptic dynamics
-    // PLACEHOLDER: Synapse decay
-    synapse->step(0.0);
+    if (!synapse || dt <= 0.0f) return;
+    
+    // Exponential decay of synaptic conductance
+    synapse->step(static_cast<float>(dt));
 }
 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
-    // TODO PHASE 2: Implement real synaptic input
-    // PLACEHOLDER: Simple additive input
+    if (!neuron || !synapse) return;
+    
+    // Simple additive synaptic input
     SynapticWeight weight = synapse->getWeight();
     if (synapse->isExcitatory()) {
         neuron->receiveExcitatoryInput(weight);
@@ -67,7 +79,8 @@ void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* sy
 }
 
 bool IntegrateAndFireDynamics::shouldFire(const Neuron* neuron) const {
-    return neuron->getMembranePotential() >= neuron->getThreshold();
+    if (!neuron) return false;
+    return neuron->getMembranePotential() >= pImpl->threshold;
 }
 
 void IntegrateAndFireDynamics::reset() {
@@ -75,7 +88,7 @@ void IntegrateAndFireDynamics::reset() {
 }
 
 void IntegrateAndFireDynamics::setMembraneTimeConstant(float tau) {
-    pImpl->membraneTimeConstant = tau;
+    if (tau > 0) pImpl->membraneTimeConstant = tau;
 }
 
 float IntegrateAndFireDynamics::getMembraneTimeConstant() const {

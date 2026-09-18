@@ -3,32 +3,67 @@
 #include "../core/Types/Types.hpp"
 #include "../brain/Neuron.hpp"
 #include "../brain/Synapse.hpp"
+#include <unordered_map>
 
 namespace nlm {
 
-// Abstract base class for neural dynamics
-// PLACEHOLDER - Phase 2 will implement various dynamics models
-
-class NeuralDynamics {
+// Hodgkin-Huxley dynamics (detailed model)
+// Based on the original HH equations for ion channel dynamics
+class HodgkinHuxleyDynamics : public NeuralDynamics {
 public:
-    virtual ~NeuralDynamics() = default;
+    HodgkinHuxleyDynamics(float temperature = 6.3f); // Q10 factor for temperature
+    ~HodgkinHuxleyDynamics() override;
     
-    // Update neuron state for one step
-    // TODO PHASE 2: Implement real dynamics
-    virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
     
-    // Update synapse state for one step
-    // TODO PHASE 2: Implement real synaptic dynamics
-    virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
+    // Parameters
+    void setTemperature(float temperature);
+    float getTemperature() const;
     
-    // Apply synaptic input from spike
-    virtual void applySpikeInput(Neuron* neuron, const Synapse* synapse) = 0;
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// FitzHugh-Nagumo dynamics (simplified excitatory model)
+// Based on the original FHN equations: dv/dt = I - v^3/3 + v + I_inj
+// dw/dt = epsilon * (v + a - b*w)
+// Where v is membrane potential, w is recovery variable
+class FitzHughNagumoDynamics : public NeuralDynamics {
+public:
+    FitzHughNagumoDynamics(float a = 0.7f, float b = 0.8f, float epsilon = 0.08f,
+                           float threshold = -0.5f, float reset_v = -2.0f);
+    ~FitzHughNagumoDynamics() override;
     
-    // Check if neuron should fire
-    virtual bool shouldFire(const Neuron* neuron) const = 0;
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
     
-    // Reset dynamics state
-    virtual void reset() = 0;
+    // Parameters
+    void setA(float a);
+    float getA() const;
+    void setB(float b);
+    float getB() const;
+    void setEpsilon(float epsilon);
+    float getEpsilon() const;
+    void setThreshold(float threshold);
+    float getThreshold() const;
+    void setResetV(float v);
+    float getResetV() const;
+    
+    // I_inj (injected current) parameter
+    void setInjectedCurrent(float I_inj);
+    float getInjectedCurrent() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Integrate-and-fire dynamics (simple model)
@@ -52,28 +87,112 @@ private:
     Impl* pImpl;
 };
 
-// Hodgkin-Huxley dynamics (detailed model)
-// TODO PHASE 2: Implement Hodgkin-Huxley
-class HodgkinHuxleyDynamics : public NeuralDynamics {
+// Real synaptic dynamics implementation
+// Based on exponential decay model for synaptic conductance
+class SynapticDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement HH dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    SynapticDynamics(float time_constant = 5.0f, float reversal_potential = 0.0f);
+    ~SynapticDynamics();
+    
+    void update(Synapse* synapse, TimestepDuration dt);
+    void applyInput(Synapse* synapse, SynapticWeight weight);
+    void reset();
+    
+    // Parameters
+    void setTimeConstant(float tau);
+    float getTimeConstant() const;
+    void setReversalPotential(float reversal);
+    float getReversalPotential() const;
+    void setDecayRate(float rate);
+    float getDecayRate() const;
+    
+    // State
+    float getConductance(SynapseId synapseId) const;
+    void setConductance(SynapseId synapseId, float conductance);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
-// FitzHugh-Nagumo dynamics (simplified兴奋性模型)
-// TODO PHASE 2: Implement FHN dynamics
-class FitzHughNagumoDynamics : public NeuralDynamics {
+// Real plasticity implementation based on STDP
+// Spike-Timing-Dependent Plasticity (STDP)
+class STDPPlasticity : public PlasticityRule {
 public:
-    // PLACEHOLDER - Phase 2 will implement FHN dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    STDPPlasticity(float learning_rate = 0.001f, float tau_plus = 20.0f, float tau_minus = 20.0f);
+    ~STDPPlasticity() override;
+    
+    void applyPlasticity(Neuron* pre, Neuron* post, float dt) override;
+    void recordPreSynapseSpike(Neuron* neuron) override;
+    void recordPostSynapseSpike(Neuron* neuron) override;
+    void reset() override;
+    
+    // Parameters
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    void setTauPlus(float tau);
+    float getTauPlus() const;
+    void setTauMinus(float tau);
+    float getTauMinus() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Hebbian learning implementation
+class HebbianPlasticity : public PlasticityRule {
+public:
+    HebbianPlasticity(float learning_rate = 0.001f, float threshold = 0.1f);
+    ~HebbianPlasticity() override;
+    
+    void applyPlasticity(Neuron* pre, Neuron* post, float dt) override;
+    void recordPreSynapseSpike(Neuron* neuron) override;
+    void recordPostSynapseSpike(Neuron* neuron) override;
+    void reset() override;
+    
+    // Parameters
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    void setThreshold(float threshold);
+    float getThreshold() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Structural plasticity for creating/removing synapses
+class StructuralPlasticity : public PlasticityRule {
+public:
+    StructuralPlasticity(float creation_rate = 0.0001f, float removal_rate = 0.00005f,
+                         float min_weight = 0.01f, float max_weight = 1.0f);
+    ~StructuralPlasticity() override;
+    
+    void applyPlasticity(Neuron* pre, Neuron* post, float dt) override;
+    void recordPreSynapseSpike(Neuron* neuron) override;
+    void recordPostSynapseSpike(Neuron* neuron) override;
+    void reset() override;
+    
+    // Structural operations
+    bool createSynapse(Neuron* pre, Neuron* post);
+    bool removeSynapse(SynapseId synapseId);
+    bool createNeuron(RegionId regionId, NeuronType type = NeuronType::Excitatory);
+    bool removeNeuron(NeuronId neuronId);
+    
+    // Parameters
+    void setCreationRate(float rate);
+    float getCreationRate() const;
+    void setRemovalRate(float rate);
+    float getRemovalRate() const;
+    void setMinWeight(float weight);
+    float getMinWeight() const;
+    void setMaxWeight(float weight);
+    float getMaxWeight() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

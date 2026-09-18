@@ -488,7 +488,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store active neurons and their states
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,8 +502,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
+            // Store additional context from cognition systems
+            if (pImpl->attention) {
+                const auto& winners = pImpl->attention->getWinners();
+                for (NeuronId winner : winners) {
+                    if (std::find(episode.activeNeurons.begin(), episode.activeNeurons.end(), winner) == episode.activeNeurons.end()) {
+                        episode.activeNeurons.push_back(winner);
+                        episode.neuronActivations.push_back(1.0f); // High activation for attended items
+                    }
+                }
+            }
+            
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Add metadata about current state
+            std::stringstream metadata;
+            metadata << "step_" << currentStep << 
+                        "_dopamine_" << (pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f) <<
+                        "_curiosity_" << (pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f);
+            episode.metadata = metadata.str();
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
@@ -511,8 +529,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // The prediction system would predict next states based on current activity
+        // For now, just track that it exists and is being called
+        static_cast<void>(pImpl->predictionSystem); // Suppress unused warning
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,13 +548,39 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This creates abstract representations from experience
+        std::vector<float> currentActivity;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        currentActivity.push_back(
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential));
+                    }
+                }
+            }
+        }
+        
+        if (!currentActivity.empty()) {
+            pImpl->conceptFormation->processActivity(currentActivity);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
+        
+        // Apply cognitive influences on structural plasticity
+        if (pImpl->conceptFormation) {
+            // Concepts can guide where to create new connections
+            const auto& importantConcepts = pImpl->conceptFormation->getImportantConcepts();
+            for (const auto& conceptId : importantConcepts) {
+                // Stronger connectivity for important concepts
+                pImpl->structuralPlasticity->setSynaptogenesisRate(
+                    pImpl->structuralPlasticity->getSynaptogenesisRate() * 1.1f);
+            }
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========
@@ -723,6 +769,45 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     // Scale STDP learning rates
     pImpl->stdp->setLTPWeight(0.01f * modulation);
     pImpl->stdp->setLTDWeight(0.012f * modulation);
+    
+    // Also apply to Hebbian plasticity
+    auto* hebbian = getHebbian();
+    if (hebbian) {
+        hebbian->setLTPWeight(0.01f * modulation);
+        hebbian->setLTDWeight(0.012f * modulation);
+    }
+    
+    // Enhance dopamine effects on working memory consolidation
+    auto* dopamine = getDopamine();
+    if (dopamine && modulation > 0.5f) {
+        // Strong dopamine boosts memory storage
+        auto* wm = getWorkingMemory();
+        if (wm) {
+            wm->strengthenMemory(modulation);
+        }
+    }
+    
+    // Novelty influences attention selection
+    auto* novelty = getNovelty();
+    if (novelty) {
+        float noveltyLevel = novelty->getLevel();
+        auto* attention = getAttention();
+        if (attention) {
+            // High novelty increases attention exploration
+            attention->setInhibitionStrength(0.5f - noveltyLevel * 0.3f);
+        }
+    }
+    
+    // Curiosity modulates exploration in planning
+    auto* curiosity = getCuriosity();
+    if (curiosity) {
+        float curiosityLevel = curiosity->getLevel();
+        auto* planner = getPlanner();
+        if (planner) {
+            // Higher curiosity increases exploration in planning
+            planner->setExplorationBias(curiosityLevel);
+        }
+    }
 }
 
 void Brain::updatePlasticity() {
@@ -757,6 +842,16 @@ void Brain::reset() {
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    
+    // Reset cognition systems
+    if (pImpl->planner) pImpl->planner->reset();
+    if (pImpl->conceptFormation) pImpl->conceptFormation->reset();
+    
+    // Reset neuromodulation systems
+    if (pImpl->dopamine) pImpl->dopamine->reset();
+    if (pImpl->curiosity) pImpl->curiosity->reset();
+    if (pImpl->novelty) pImpl->novelty->reset();
+    if (pImpl->predictionError) pImpl->predictionError->reset();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
