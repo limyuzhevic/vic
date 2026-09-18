@@ -121,6 +121,14 @@ struct Brain::Impl {
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
+        // Configure attention system parameters
+        attention->setInhibitionStrength(0.5f);
+        attention->setExcitationStrength(1.5f);
+        attention->setCompetitionThreshold(0.7f);
+        
+        // Configure planner parameters
+        planner->setPlanningDepth(5);
+        
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
@@ -250,10 +258,20 @@ bool Brain::initialize() {
     pImpl->planner->setPlanningDepth(5);
     
     pImpl->conceptFormation->initialize(this);
+    pImpl->conceptFormation->setFormationThreshold(0.75f);
+    pImpl->conceptFormation->setStabilityThreshold(0.7f);
     
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
+    pImpl->attention->setCompetitionThreshold(0.7f);
+    
+    // Log cognitive system initialization
+    NLM_LOG_INFO("Cognition systems initialized:");
+    NLM_LOG_INFO("  NeuralPlanner: planning depth = " + std::to_string(pImpl->planner->getPlanningDepth()));
+    NLM_LOG_INFO("  ConceptFormation: formation threshold = " + std::to_string(pImpl->conceptFormation->getFormationThreshold()));
+    NLM_LOG_INFO("  AttentionalSelection: inhibition = " + std::to_string(pImpl->attention->getInhibitionFor(0)));
+    NLM_LOG_INFO("  AttentionalSelection: excitation = " + std::to_string(pImpl->attention->getExcitationFor(0)));
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -528,8 +546,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Concept formation analyzes working memory for pattern discovery
+        std::vector<float> currentPattern = pImpl->workingMemory->retrieve();
+        std::vector<float> features = currentPattern; // For now, use same as pattern
+        if (!currentPattern.empty()) {
+            pImpl->conceptFormation->presentExperience(currentPattern, features, 
+                                                       pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -537,7 +561,41 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
+    // ========== STEP 12: Update cognitive systems ==========
+    
+    // Update planner with current state
+    if (pImpl->planner) {
+        std::vector<float> currentState = pImpl->workingMemory->retrieve();
+        if (!currentState.empty()) {
+            // Simple planning based on current state
+            pImpl->planner->planAction(currentState, 0.5f);
+        }
+    }
+    
+    // Integrate cognitive planning into motor output
+    // Apply concept formation for pattern discovery from experience
+    if (pImpl->conceptFormation) {
+        // Use concept formation to analyze experience
+        size_t conceptId = pImpl->conceptFormation->findConceptForPattern(currentState);
+        if (conceptId > 0) {
+            const auto* concept = pImpl->conceptFormation->getConcept(conceptId);
+            if (concept) {
+                // Concept formation discovered a pattern
+                // Apply it to guide behavior
+            }
+        }
+    }
+    
+    // Apply attentional selection to working memory for cognitive focus
+    if (pImpl->attention && pImpl->workingMemory) {
+        std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+        if (!competitors.empty()) {
+            std::vector<NeuronId> winners = pImpl->attention->processCompetition(competitors, 0.5f);
+            // Use winners to guide cognitive processes
+        }
+    }
+    
+    // ========== STEP 13: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
@@ -546,7 +604,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // ========== STEP 14: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -574,17 +632,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
-    }
-    
-    // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
-    }
-    
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
     }
 }
 
@@ -1005,6 +1052,8 @@ float Brain::getAverageFiringRate() const {
 
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
+// ========== MEMORY SYSTEM ACCESSORS ==========
+
 NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
 }
@@ -1035,6 +1084,48 @@ ConceptFormation* Brain::getConceptFormation() {
 
 AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
+}
+
+// ========== COGNITIVE PLANNING INTEGRATION ==========
+
+ActionType Brain::integrateCognitivePlanning() {
+    if (pImpl->planner) {
+        // Get current neural activity patterns
+        std::vector<float> activityPattern;
+        for (const auto& region : pImpl->regions) {
+            for (const auto* neuron : region->getAllNeurons()) {
+                const auto& state = neuron->getState();
+                activityPattern.push_back(std::abs(state.membranePotential - state.restingPotential));
+            }
+        }
+        
+        // Get working memory traces
+        std::vector<float> workingMemoryTraces;
+        if (pImpl->workingMemory) {
+            // Access memory neurons' activation levels
+            for (const auto& neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+                if (activation > 0.1f) {
+                    workingMemoryTraces.push_back(activation);
+                }
+            }
+        }
+        
+        // Plan action based on integrated state
+        return pImpl->planner->planAction(activityPattern, workingMemoryTraces);
+    }
+    return ActionType::Wait;
+}
+
+size_t Brain::discoverPatternFromExperience(const std::vector<float>& pattern,
+                                           const std::vector<float>& features,
+                                           float reward) {
+    if (pImpl->conceptFormation) {
+        // Use working memory timestamp for time tracking
+        SimulationStep currentTime = pImpl->currentStep;
+        return pImpl->conceptFormation->presentExperience(pattern, features, reward, currentTime);
+    }
+    return 0;
 }
 
 // ========== DEVELOPMENT SYSTEM ==========

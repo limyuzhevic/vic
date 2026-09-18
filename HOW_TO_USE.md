@@ -137,6 +137,7 @@ brain.initialize()
 
 print(f"Total neurons: {brain.getTotalNeuronCount()}")
 print(f"Total synapses: {brain.getTotalSynapseCount()}")
+print(f"Development stage: {brain.getDevelopmentalStage()}")
 ```
 
 #### Running a Simulation

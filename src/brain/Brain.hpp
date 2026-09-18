@@ -164,6 +164,14 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
+    // Cognitive planning integration with motor output
+    ActionType integrateCognitivePlanning();
+    
+    // Concept formation for pattern discovery from experience
+    size_t discoverPatternFromExperience(const std::vector<float>& pattern,
+                                        const std::vector<float>& features,
+                                        float reward);
+    
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();

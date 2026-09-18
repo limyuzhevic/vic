@@ -104,16 +104,22 @@ bool NeuralWorkingMemory::contains(NeuronId neuron) const {
     return std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) != memoryNeurons_.end();
 }
 
-float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
-    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
-        return memoryActivations_[idx];
+// Get neurons currently in working memory
+    const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
+    
+    // Get active memory traces as vectors for cognitive integration
+    std::vector<float> getActiveTracesVector() const {
+        std::vector<float> traces;
+        traces.reserve(activeTraces_.size());
+        
+        for (size_t traceId : activeTraces_) {
+            if (traceId < memoryActivations_.size()) {
+                traces.push_back(memoryActivations_[traceId]);
+            }
+        }
+        
+        return traces;
     }
-    return 0.0f;
-}
-
-void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
     
     // Update maintenance - reinforce active memory neurons
