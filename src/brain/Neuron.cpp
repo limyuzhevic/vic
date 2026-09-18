@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -27,7 +28,7 @@ struct Neuron::Impl {
              totalCurrent(0.0f), synapticInput(0.0f) {}
 };
 
-Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+Neuron::Neuron(NeuronId id) : pImpl(std::make_unique<Impl>()) {
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
@@ -37,40 +38,49 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Neuron::Neuron(Neuron&& other) noexcept = default;
 
-Neuron& Neuron::operator=(Neuron&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
-}
+Neuron& Neuron::operator=(Neuron&& other) noexcept = default;
 
 void Neuron::setType(NeuronType type) {
+    if (!pImpl) {
+        throw std::runtime_error("Neuron::setType called on null Neuron");
+    }
     pImpl->type = type;
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
+    if (!pImpl) {
+        throw std::runtime_error("Neuron::setMembranePotential called on null Neuron");
+    }
     pImpl->state.membranePotential = potential;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
+    if (!pImpl) {
+        throw std::runtime_error("Neuron::addToMembranePotential called on null Neuron");
+    }
     pImpl->state.membranePotential += delta;
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
+    if (!pImpl) {
+        throw std::runtime_error("Neuron::setThreshold called on null Neuron");
+    }
     pImpl->state.threshold = threshold;
 }
 
 void Neuron::setFiringState(FiringState state) {
+    if (!pImpl) {
+        throw std::runtime_error("Neuron::setFiringState called on null Neuron");
+    }
     pImpl->state.firingState = state;
 }
 
 void Neuron::decrementRefractory() {
+    if (!pImpl) {
+        throw std::runtime_error("Neuron::decrementRefractory called on null Neuron");
+    }
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         if (pImpl->state.refractoryRemaining == 0) {
@@ -260,8 +270,30 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Real integrate-and-fire dynamics implementation
+    // Uses adaptive timestep and integrates physical equations for biological realism
+    
+    // Validate input
+    if (currentTime < 0.0f) {
+        throw std::invalid_argument("Neuron::step called with negative timestamp: " + std::to_string(currentTime));
+    }
+    
+    // Adaptive timestep based on neural state for accuracy
+    TimestepDuration dt = 0.001;  // Default 1ms
+    
+    // Reduce timestep during rapid changes for stability
+    const NeuronState& state = pImpl->state;
+    if (std::abs(state.membranePotential - state.restingPotential) > 20.0f || 
+        state.firingState == FiringState::Active) {
+        dt = 0.0001f;  // 0.1ms during dynamics or firing
+    }
+    
+    // Validate timestep
+    if (dt <= 0.0f) {
+        throw std::invalid_argument("Neuron::step called with invalid timestep: " + std::to_string(dt));
+    }
+    
+    // Step with real LIF dynamics
     stepLIF(currentTime, dt);
 }
 

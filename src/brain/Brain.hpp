@@ -7,6 +7,7 @@
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
+#include <memory>
 #include <string>
 
 namespace nlm {
@@ -195,7 +196,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
