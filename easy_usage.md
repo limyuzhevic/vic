@@ -1,53 +1,94 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM - Comprehensive Usage Guide for All Skill Levels
 
-## What is NLM?
+## Overview
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
-
-Think of it like this:
-- **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
-- **Learning** = When connections get stronger or weaker based on what happens
-- **Memory** = The brain remembering patterns
-
-That's it! NLM simulates all of this.
+NLM (熙然, meaning "serene flow") is a brain simulator that lets you create virtual brains capable of learning, memory, and decision-making. This guide covers everything from basic usage to advanced techniques for building complex artificial cognitive systems.
 
 ---
 
-## The 3 Things You Need to Know
+## Quick Start
 
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
+### Installation & Setup
+```bash
+# Clone the repository
+cd /path/to/nlm
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
 
----
-
-## Quick Start (Copy & Paste)
-
-### Example 1: Simplest Brain
-
-```python
-import pynlm
-
-# Step 1: Make a brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Step 2: Turn it on
-brain.initialize()
-
-# Step 3: Make it think for 100 steps
-for i in range(100):
-    brain.step(i)  # One step of thinking
-
-print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+# Run demo
+./nlm_phase6_demo
 ```
 
-### Example 2: Brain in a Simple World
+### Python Bindings
+```python
+# If using Python bindings
+import pynlm
 
+# Create a basic brain with default configuration
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Simple test - let the brain process for 100 steps
+for i in range(100):
+    brain.step(i)
+
+print(f"Brain processed {brain.getTotalSpikeCount()} spikes")
+```
+
+---
+
+## The 3 Core Components
+
+### 1. Brain
+The virtual neural substrate that thinks, learns, and stores memories.
+- Contains neurons, synapses, and neural populations
+- Implements LIF dynamics, plasticity, and neuromodulation
+- Manages working memory, episodic memory, and conceptual knowledge
+
+### 2. World
+The environment where the brain operates and learns.
+- Provides sensory inputs (vision, touch, internal states)
+- Handles motor outputs and action execution
+- Manages objects, resources, and hazards
+- Tracks time and provides feedback
+
+### 3. Agent
+The interface that connects brain to world.
+- Processes sensory inputs and converts to neural signals
+- Decodes neural activity into motor commands
+- Applies reward modulation and learning
+- Manages curiosity and exploration behavior
+
+---
+
+## Basic Examples
+
+### Example 1: The Simplest Brain
 ```python
 import pynlm
 
-# Create everything
+# Create brain with default configuration (500 neurons)
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# Initialize - this sets up neurons and connections
+brain.initialize()
+
+# Run brain processing for 100 time steps
+for i in range(100):
+    brain.step(i)  # Each step simulates neural dynamics
+
+print(f"✓ Brain active with {brain.getTotalSpikeCount()} spikes")
+print(f"✓ {brain.getFiringNeuronCount()} neurons currently firing")
+print(f"✓ Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+```
+
+### Example 2: Basic Agent-WORLD Interaction
+```python
+import pynlm
+
+# Setup the components
 brain = pynlm.createBrain(pynlm.createDefaultConfig())
 brain.initialize()
 
@@ -58,17 +99,507 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Run for 50 steps
+# Run the agent-world loop
 for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+    # 1. Update the world (time passes)
+    world.update(0.1)
+    
+    # 2. Get sensory perception from world
+    percept = world.getSensoryPercept()
+    
+    # 3. Process sensory input through agent
+    agent.processSensoryInput(percept)
+    
+    # 4. Brain processes and computes
+    brain.step(step)
+    
+    # 5. Decode motor command from brain's motor neurons
+    action = agent.decodeMotorCommand()
+    
+    # 6. Execute action in world
+    world.applyMotorCommand(action, world.getSimulationTime())
 
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
+print("✓ Simulation completed successfully")
+print(f"✓ Final firing rate: {brain.getAverageFiringRate():.2f} Hz")
+```
+
+---
+
+## Advanced Usage
+
+### Advanced Example 1: Learning Agent with Reward Modulation
+```python
+import pynlm
+
+class LearningAgent:
+    def __init__(self, neuron_count=1000, enable_curiosity=True):
+        # Create custom configuration for advanced control
+        self.config = pynlm.createDefaultConfig()
+        self.config.set("neuron_count", neuron_count)
+        self.config.set("connection_probability", 0.15)
+        self.config.set("curiosity_enabled", enable_curiosity)
+        self.config.set("structural_plasticity_enabled", True)
+        
+        # Initialize brain and agent
+        self.brain = pynlm.createBrain(self.config)
+        self.brain.initialize()
+        
+        self.world = pynlm.createSimpleWorld()
+        self.world.configure(
+            width=20, 
+            height=20, 
+            visionWidth=12, 
+            visionHeight=12
+        )
+        self.world.reset()
+        
+        self.agent = pynlm.createAgentBrain(self.brain)
+        self.agent.initialize(self.world)
+        
+        # Enable all learning features
+        self.agent.enableRewardModulation(True)
+        self.agent.enableCuriosity(True)
+        self.agent.enableStructuralPlasticity(True)
+        self.agent.enableDevelopment(True)
+        
+        # Statistics tracking
+        self.stats = {
+            'total_reward': 0.0,
+            'max_reward': 0.0,
+            'steps': 0,
+            'curiosity_history': [],
+            'reward_history': []
+        }
+    
+    def run_episode(self, max_steps=1000):
+        """Run a complete learning episode"""
+        print(f"Starting learning episode (max {max_steps} steps)...")
+        
+        for self.stats['steps'] in range(max_steps):
+            # Update world and get sensory input
+            self.world.update(0.1)
+            percept = self.world.getSensoryPercept()
+            
+            # Process through agent and brain
+            self.agent.processSensoryInput(percept)
+            self.brain.step(self.stats['steps'])
+            
+            # Get action and execute it
+            action = self.agent.decodeMotorCommand()
+            result = self.world.applyMotorCommand(action, self.world.getSimulationTime())
+            
+            # Learn from experience
+            self.agent.applyRewardModulation(result.reward, 0.0f)
+            
+            # Track statistics
+            self.stats['total_reward'] += result.reward
+            self.stats['reward_history'].append(result.reward)
+            self.stats['curiosity_history'].append(self.agent.getCuriosityLevel())
+            
+            # Log progress every 100 steps
+            if self.stats['steps'] % 100 == 0:
+                self._log_progress()
+            
+            # Check termination conditions
+            if self._should_terminate():
+                print(f"Episode terminated at step {self.stats['steps']}")
+                break
+        
+        self._log_final_stats()
+        return self._get_summary()
+    
+    def _log_progress(self):
+        """Log current episode progress"""
+        avg_reward = self.stats['total_reward'] / (self.stats['steps'] + 1)
+        curiosity = self.agent.getCuriosityLevel()
+        
+        print(f"  Step {self.stats['steps']}:")
+        print(f"    Avg reward: {avg_reward:.3f}")
+        print(f"    Current curiosity: {curiosity:.3f}")
+        print(f"    Neurons firing: {self.brain.getFiringNeuronCount()}")
+        print(f"    Development stage: {self.agent.getDevelopmentalStage()}")
+    
+    def _should_terminate(self):
+        """Determine if episode should end"""
+        # End if adult development reached
+        if self.agent.getDevelopmentalStage() == nlm.DevelopmentalStage::Adult:
+            return True
+        
+        # End if no learning for extended period
+        if self.stats['steps'] > 500 and self.agent.getCuriosityLevel() < 0.01:
+            return True
+            
+        return False
+    
+    def _log_final_stats(self):
+        """Log episode summary"""
+        avg_reward = self.stats['total_reward'] / self.stats['steps']
+        max_curiosity = max(self.stats['curiosity_history'])
+        
+        print(f"\nEpisode completed!")
+        print(f"  Total steps: {self.stats['steps']}")
+        print(f"  Total reward: {self.stats['total_reward']:.3f}")
+        print(f"  Average reward: {avg_reward:.3f}")
+        print(f"  Maximum curiosity: {max_curiosity:.3f}")
+        print(f"  Final development: {self.agent.getDevelopmentalStage()}")
+    
+    def _get_summary(self):
+        """Get episode statistics as dictionary"""
+        avg_reward = self.stats['total_reward'] / max(1, self.stats['steps'])
+        max_curiosity = max(self.stats['curiosity_history'])
+        
+        return {
+            'steps': self.stats['steps'],
+            'total_reward': self.stats['total_reward'],
+            'avg_reward': avg_reward,
+            'max_curiosity': max_curiosity,
+            'final_stage': self.agent.getDevelopmentalStage(),
+            'spikes': self.brain.getTotalSpikeCount(),
+            'firing_rate': self.brain.getAverageFiringRate()
+        }
+
+# Usage example
+if __name__ == "__main__":
+    import nlm
+    
+    print("Creating advanced learning agent...")
+    agent = LearningAgent(neuron_count=800)
+    
+    # Run multiple episodes for comparison
+    all_summaries = []
+    for episode in range(3):
+        print(f"\n{'='*60}")
+        print(f"EPISODE {episode + 1}")
+        print(f"{'='*60}")
+        
+        summary = agent.run_episode(max_steps=1000)
+        all_summaries.append(summary)
+        
+        # Reset for next episode
+        agent.brain.reset()
+        agent.brain.initialize()
+        agent.world.reset()
+        agent.agent.reset()
+    
+    # Compare episodes
+    print(f"\n{'='*60}")
+    print("EPISODE COMPARISON")
+    print(f"{'='*60}")
+    
+    best_episode = max(all_summaries, key=lambda x: x['avg_reward'])
+    
+    for i, summary in enumerate(all_summaries):
+        print(f"Episode {i + 1}:")
+        print(f"  Average reward: {summary['avg_reward']:.3f}")
+        print(f"  Total reward: {summary['total_reward']:.3f}")
+        print(f"  Max curiosity: {summary['max_curiosity']:.3f}")
+        print(f"  Final stage: {summary['final_stage']}")
+        print()
+    
+    print("BEST PERFORMING EPISODE:")
+    print(f"  Average reward: {best_episode['avg_reward']:.3f}")
+    print(f"  Total reward: {best_episode['total_reward']:.3f}")
+    print(f"  Steps: {best_episode['steps']}")
+    print(f"  Development stage: {best_episode['final_stage']}")
+```
+
+---
+
+## Quick Start
+
+### Installation & Setup
+```bash
+# Clone the repository
+cd /path/to/nlm
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+
+# Run demo
+./nlm_phase6_demo
+```
+
+### Python Bindings
+```python
+# If using Python bindings
+import pynlm
+
+# Create a basic brain with default configuration
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Simple test - let the brain process for 100 steps
+for i in range(100):
+    brain.step(i)
+
+print(f"Brain processed {brain.getTotalSpikeCount()} spikes")
+```
+
+---
+
+## The 3 Core Components
+
+### 1. Brain
+The virtual neural substrate that thinks, learns, and stores memories.
+- Contains neurons, synapses, and neural populations
+- Implements LIF dynamics, plasticity, and neuromodulation
+- Manages working memory, episodic memory, and conceptual knowledge
+
+### 2. World
+The environment where the brain operates and learns.
+- Provides sensory inputs (vision, touch, internal states)
+- Handles motor outputs and action execution
+- Manages objects, resources, and hazards
+- Tracks time and provides feedback
+
+### 3. Agent
+The interface that connects brain to world.
+- Processes sensory inputs and converts to neural signals
+- Decodes neural activity into motor commands
+- Applies reward modulation and learning
+- Manages curiosity and exploration behavior
+
+---
+
+## Basic Examples
+
+### Example 1: The Simplest Brain
+```python
+import pynlm
+
+# Create brain with default configuration (500 neurons)
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# Initialize - this sets up neurons and connections
+brain.initialize()
+
+# Run brain processing for 100 time steps
+for i in range(100):
+    brain.step(i)  # Each step simulates neural dynamics
+
+print(f"✓ Brain active with {brain.getTotalSpikeCount()} spikes")
+print(f"✓ {brain.getFiringNeuronCount()} neurons currently firing")
+print(f"✓ Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+```
+
+### Example 2: Basic Agent-WORLD Interaction
+```python
+import pynlm
+
+# Setup the components
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run the agent-world loop
+for step in range(50):
+    # 1. Update the world (time passes)
+    world.update(0.1)
+    
+    # 2. Get sensory perception from world
+    percept = world.getSensoryPercept()
+    
+    # 3. Process sensory input through agent
+    agent.processSensoryInput(percept)
+    
+    # 4. Brain processes and computes
+    brain.step(step)
+    
+    # 5. Decode motor command from brain's motor neurons
+    action = agent.decodeMotorCommand()
+    
+    # 6. Execute action in world
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+print("✓ Simulation completed successfully")
+print(f"✓ Final firing rate: {brain.getAverageFiringRate():.2f} Hz")
+```
+
+---
+
+## Advanced Usage
+
+### Advanced Example 1: Learning Agent with Reward Modulation
+```python
+import pynlm
+
+class LearningAgent:
+    def __init__(self, neuron_count=1000, enable_curiosity=True):
+        # Create custom configuration for advanced control
+        self.config = pynlm.createDefaultConfig()
+        self.config.set("neuron_count", neuron_count)
+        self.config.set("connection_probability", 0.15)
+        self.config.set("curiosity_enabled", enable_curiosity)
+        self.config.set("structural_plasticity_enabled", True)
+        
+        # Initialize brain and agent
+        self.brain = pynlm.createBrain(self.config)
+        self.brain.initialize()
+        
+        self.world = pynlm.createSimpleWorld()
+        self.world.configure(
+            width=20, 
+            height=20, 
+            visionWidth=12, 
+            visionHeight=12
+        )
+        self.world.reset()
+        
+        self.agent = pynlm.createAgentBrain(self.brain)
+        self.agent.initialize(self.world)
+        
+        # Enable all learning features
+        self.agent.enableRewardModulation(True)
+        self.agent.enableCuriosity(True)
+        self.agent.enableStructuralPlasticity(True)
+        self.agent.enableDevelopment(True)
+        
+        # Statistics tracking
+        self.stats = {
+            'total_reward': 0.0,
+            'max_reward': 0.0,
+            'steps': 0,
+            'curiosity_history': [],
+            'reward_history': []
+        }
+    
+    def run_episode(self, max_steps=1000):
+        """Run a complete learning episode"""
+        print(f"Starting learning episode (max {max_steps} steps)...")
+        
+        for self.stats['steps'] in range(max_steps):
+            # Update world and get sensory input
+            self.world.update(0.1)
+            percept = self.world.getSensoryPercept()
+            
+            # Process through agent and brain
+            self.agent.processSensoryInput(percept)
+            self.brain.step(self.stats['steps'])
+            
+            # Get action and execute it
+            action = self.agent.decodeMotorCommand()
+            result = self.world.applyMotorCommand(action, self.world.getSimulationTime())
+            
+            # Learn from experience
+            self.agent.applyRewardModulation(result.reward, 0.0f)
+            
+            # Track statistics
+            self.stats['total_reward'] += result.reward
+            self.stats['reward_history'].append(result.reward)
+            self.stats['curiosity_history'].append(self.agent.getCuriosityLevel())
+            
+            # Log progress every 100 steps
+            if self.stats['steps'] % 100 == 0:
+                self._log_progress()
+            
+            # Check termination conditions
+            if self._should_terminate():
+                print(f"Episode terminated at step {self.stats['steps']}")
+                break
+        
+        self._log_final_stats()
+        return self._get_summary()
+    
+    def _log_progress(self):
+        """Log current episode progress"""
+        avg_reward = self.stats['total_reward'] / (self.stats['steps'] + 1)
+        curiosity = self.agent.getCuriosityLevel()
+        
+        print(f"  Step {self.stats['steps']}:")
+        print(f"    Avg reward: {avg_reward:.3f}")
+        print(f"    Current curiosity: {curiosity:.3f}")
+        print(f"    Neurons firing: {self.brain.getFiringNeuronCount()}")
+        print(f"    Development stage: {self.agent.getDevelopmentalStage()}")
+    
+    def _should_terminate(self):
+        """Determine if episode should end"""
+        # End if adult development reached
+        if self.agent.getDevelopmentalStage() == nlm.DevelopmentalStage::Adult:
+            return True
+        
+        # End if no learning for extended period
+        if self.stats['steps'] > 500 and self.agent.getCuriosityLevel() < 0.01:
+            return True
+            
+        return False
+    
+    def _log_final_stats(self):
+        """Log episode summary"""
+        avg_reward = self.stats['total_reward'] / self.stats['steps']
+        max_curiosity = max(self.stats['curiosity_history'])
+        
+        print(f"\nEpisode completed!")
+        print(f"  Total steps: {self.stats['steps']}")
+        print(f"  Total reward: {self.stats['total_reward']:.3f}")
+        print(f"  Average reward: {avg_reward:.3f}")
+        print(f"  Maximum curiosity: {max_curiosity:.3f}")
+        print(f"  Final development: {self.agent.getDevelopmentalStage()}")
+    
+    def _get_summary(self):
+        """Get episode statistics as dictionary"""
+        avg_reward = self.stats['total_reward'] / max(1, self.stats['steps'])
+        max_curiosity = max(self.stats['curiosity_history'])
+        
+        return {
+            'steps': self.stats['steps'],
+            'total_reward': self.stats['total_reward'],
+            'avg_reward': avg_reward,
+            'max_curiosity': max_curiosity,
+            'final_stage': self.agent.getDevelopmentalStage(),
+            'spikes': self.brain.getTotalSpikeCount(),
+            'firing_rate': self.brain.getAverageFiringRate()
+        }
+
+# Usage example
+if __name__ == "__main__":
+    import nlm
+    
+    print("Creating advanced learning agent...")
+    agent = LearningAgent(neuron_count=800)
+    
+    # Run multiple episodes for comparison
+    all_summaries = []
+    for episode in range(3):
+        print(f"\n{'='*60}")
+        print(f"EPISODE {episode + 1}")
+        print(f"{'='*60}")
+        
+        summary = agent.run_episode(max_steps=1000)
+        all_summaries.append(summary)
+        
+        # Reset for next episode
+        agent.brain.reset()
+        agent.brain.initialize()
+        agent.world.reset()
+        agent.agent.reset()
+    
+    # Compare episodes
+    print(f"\n{'='*60}")
+    print("EPISODE COMPARISON")
+    print(f"{'='*60}")
+    
+    best_episode = max(all_summaries, key=lambda x: x['avg_reward'])
+    
+    for i, summary in enumerate(all_summaries):
+        print(f"Episode {i + 1}:")
+        print(f"  Average reward: {summary['avg_reward']:.3f}")
+        print(f"  Total reward: {summary['total_reward']:.3f}")
+        print(f"  Max curiosity: {summary['max_curiosity']:.3f}")
+        print(f"  Final stage: {summary['final_stage']}")
+        print()
+    
+    print("BEST PERFORMING EPISODE:")
+    print(f"  Average reward: {best_episode['avg_reward']:.3f}")
+    print(f"  Total reward: {best_episode['total_reward']:.3f}")
+    print(f"  Steps: {best_episode['steps']}")
+    print(f"  Development stage: {best_episode['final_stage']}")
 ```
 
 ---

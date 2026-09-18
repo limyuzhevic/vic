@@ -82,6 +82,25 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Python Bindings
+For those who want to use NLM from Python, there are Python bindings available:
+
+```python
+import pynlm
+
+# Create a basic brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Simple test
+for i in range(100):
+    brain.step(i)
+
+print(f"Brain processed {brain.getTotalSpikeCount()} spikes")
+```
+
+See `easy_usage.md` for comprehensive Python usage examples and tutorials.
+
 ## Project Structure
 
 ```
