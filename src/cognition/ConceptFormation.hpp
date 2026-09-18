@@ -134,6 +134,11 @@ public:
     // Get generalization ability (can concept handle variations?)
     float getGeneralizationAbility(size_t conceptId) const;
 
+    // Update concept formation system with new neural activity patterns
+    // This is called from Brain::step() to integrate concept formation
+    void updateConcept(const std::vector<float>& neuralPattern,
+                      const std::vector<NeuronId>& activeNeurons);
+
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }

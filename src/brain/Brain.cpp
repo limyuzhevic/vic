@@ -11,6 +11,8 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/SemanticMemory.hpp"
+#include "../memory/ProceduralMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
@@ -33,23 +35,32 @@ struct Brain::Impl {
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
+    // Semantic memory: abstract knowledge and concepts
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    
+    // Procedural memory: skills and habits
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
+
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
-    
+
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
-    
+
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
-    
+
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
-    
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
+
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
@@ -113,22 +124,29 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
+        // Initialize semantic memory (abstract knowledge)
+        semanticMemory = std::make_unique<SemanticMemory>();
         
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
+        // Initialize procedural memory (skills and habits)
+        proceduralMemory = std::make_unique<ProceduralMemory>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+    // Initialize neuromodulation systems
+    dopamine = std::make_unique<Dopamine>();
+    acetylcholine = std::make_unique<Acetylcholine>();
+    norepinephrine = std::make_unique<Norepinephrine>();
+    serotonin = std::make_unique<Serotonin>();
+    curiosity = std::make_unique<Curiosity>();
+    predictionError = std::make_unique<PredictionError>();
+    novelty = std::make_unique<Novelty>();
+
+    // Configure dopamine effects
+    dopamine->configure(0.1f, 0.012f, 20.0f);
+
+    // Configure novelty detection
+    novelty->configure();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -510,9 +528,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->predictionError) {
+        // Update prediction system with current sensory state
+        // For Phase 6 integration, we need to process sensory input through prediction
+        // Get current neural activity patterns as prediction target
+        std::vector<float> currentActivityPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    float activation = std::abs(state.membranePotential - state.restingPotential) / 20.0f;
+                    currentActivityPattern.push_back(activation);
+                }
+            }
+        }
+        
+        // Update prediction system (if it has an update method)
+        // Note: PredictionSystem would need an update() method to be properly integrated
+        // For now, we'll create a simple prediction error signal
+        if (currentActivityPattern.size() > 0) {
+            float avgActivity = 0.0f;
+            for (float act : currentActivityPattern) avgActivity += act;
+            avgActivity /= currentActivityPattern.size();
+            
+            // Update prediction error based on deviation from expected activity
+            // This would be connected to AgentBrain's prediction error
+            pImpl->predictionError->setPredictionError(std::abs(avgActivity - 0.5f));
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,17 +566,55 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Update attentional selection based on prediction error and novelty
+        if (pImpl->predictionError) {
+            float predError = pImpl->predictionError->getPredictionError();
+            // Apply top-down bias based on prediction error - high error = more attention
+            if (predError > 0.5f) {
+                // Focus attention on prediction errors
+                for (NeuronId neuron : pImpl->sensoryNeurons) {
+                    pImpl->attention->applyTopDownBias(neuron, predError * 2.0f);
+                }
+            }
+        }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // Update attentional selection based on neuromodulation
+    if (pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        float attentionMod = 0.5f + 0.5f * dopamineLevel;  // DA modulates attention
+        pImpl->attention->setInhibitionStrength(attentionMod);
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    if (pImpl->acetylcholine) {
+        float acetylcholineLevel = pImpl->acetylcholine->getLevel();
+        float memoryMod = 1.0f + 2.0f * acetylcholineLevel;  // ACh modulates memory
+        pImpl->attention->setExcitationStrength(memoryMod);
+    }
+    
+    // ========== STEP 11: Apply neuromodulation to neural dynamics ==========
+    // Update all neurons based on neuromodulatory state
+    // Dopamine affects movement and reward processing
+    if (pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        if (dopamineLevel > 0.0f) {
+            // Dopamine enhances motor neuron activity for reward-seeking behavior
+            pImpl->motorNeurons[0]->injectCurrent(dopamineLevel * 2.0f);
+        } else if (dopamineLevel < 0.0f) {
+            // Low dopamine reduces motor activity (behavioral inhibition)
+            pImpl->motorNeurons[0]->injectCurrent(dopamineLevel * 1.0f);
+        }
+    }
+    
+    // Novelty detection for exploration
+    if (pImpl->novelty) {
+        // Novelty increases attention to new stimuli
+        float noveltyLevel = pImpl->novelty->getLevel();
+        if (noveltyLevel > 0.3f) {
+            // High novelty triggers exploratory behavior
+            pImpl->curiosity->setCuriosityLevel(noveltyLevel);
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========
@@ -756,6 +836,8 @@ void Brain::reset() {
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+    if (pImpl->semanticMemory) pImpl->semanticMemory->clear();
+    if (pImpl->proceduralMemory) pImpl->proceduralMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
     
     NLM_LOG_INFO("NLM Brain reset complete");
@@ -1005,16 +1087,20 @@ float Brain::getAverageFiringRate() const {
 
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
-NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
-}
-
-NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
-}
-
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+}
+
+// ========== SEMANTIC MEMORY ==========
+
+SemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+// ========== PROCEDURAL MEMORY ==========
+
+ProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========

@@ -291,12 +291,20 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
     return 1.0f - (totalVariance / concept->instances.size());
 }
 
-void ConceptFormation::clear() {
-    concepts_.clear();
-    nextConceptId_ = 1;
+void ConceptFormation::updateConcept(const std::vector<float>& neuralPattern,
+                                    const std::vector<NeuronId>& activeNeurons) {
+    if (!brain_) return;
+    
+    // Convert neural pattern to features
+    std::vector<float> features = neuralPattern;
+    
+    // Get a reward signal (could be based on prediction error or novelty)
+    float reward = 0.5f;  // Default neutral reward
+    
+    // Present the neural pattern to concept formation system
+    // This creates a new concept if pattern is novel, or updates existing concept
+    presentExperience(neuralPattern, features, reward, 0);
 }
-
-// SpatialRepresentation Implementation
 struct SpatialRepresentation::Impl {
     Brain* brain;
     
