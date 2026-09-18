@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -55,7 +57,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format with backward compatibility)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -75,6 +77,7 @@ public:
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
@@ -100,6 +103,15 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool hasExtension(const std::string& filename, const std::string& ext);
+    
+    // Helper functions for parsing
+    void setFromJsonValue(const std::string& key, const nlohmann::json& value, ConfigSource source);
+    void parseJsonConfig(const nlohmann::json& jsonData, ConfigSource source);
+    void parseYamlConfig(const YAML::Node& node, const std::string& prefix, ConfigSource source);
+    bool parseLegacyConfig(const std::string& filepath, ConfigSource source);
 };
+
+} // namespace nlm
 
 } // namespace nlm
