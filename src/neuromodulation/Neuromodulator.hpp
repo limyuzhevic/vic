@@ -9,26 +9,68 @@ namespace nlm {
 // Neuromodulator: Abstract base for neuromodulatory signals
 // PLACEHOLDER - Phase 2 will implement real neuromodulation effects
 
-class Neuromodulator {
+class NeuromodulatorSystem {
 public:
-    virtual ~Neuromodulator() = default;
+    NeuromodulatorSystem();
+    ~NeuromodulatorSystem();
     
-    // Get modulator name
-    virtual const char* getName() const = 0;
+    // Initialize all neuromodulators with brain reference
+    bool initialize(Brain* brain);
     
-    // Get current concentration/level
-    virtual float getLevel() const = 0;
-    virtual void setLevel(float level) = 0;
+    // Get current level of a specific neuromodulator
+    float getDopamineLevel() const;
+    float getCuriosityLevel() const;
+    float getNoveltyLevel() const;
+    float getPredictionErrorLevel() const;
     
-    // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
-    virtual float getPlasticityFactor() const = 0;
+    // Update all neuromodulators
+    void update(TimestepDuration dt);
     
-    // Update neuromodulator state
-    virtual void update(TimestepDuration dt) = 0;
+    // Apply neuromodulation effects
+    void applyToNeurons();
+    void applyToPlasticity();
     
-protected:
-    Neuromodulator() = default;
+    // Reset neuromodulator state
+    void reset();
+    
+    // Enable/disable individual neuromodulators
+    void enableDopamine(bool enable);
+    void enableCuriosity(bool enable);
+    void enableNovelty(bool enable);
+    void enablePredictionError(bool enable);
+    
+    // Set neuromodulator weights and parameters
+    void setDopamineBaseline(float baseline);
+    void setCuriosityWeight(float noveltyW, float errorW);
+    void setNoveltyThreshold(float threshold);
+    
+    // Get neuromodulator system status
+    bool isDopamineEnabled() const;
+    bool isCuriosityEnabled() const;
+    bool isNoveltyEnabled() const;
+    bool isPredictionErrorEnabled() const;
+    
+private:
+    // Individual neuromodulator instances
+    std::unique_ptr<Dopamine> dopamine_;
+    std::unique_ptr<Curiosity> curiosity_;
+    std::unique_ptr<Novelty> novelty_;
+    std::unique_ptr<PredictionError> predictionError_;
+    
+    // Reference to brain for initialization
+    Brain* brain_;
+    
+    // System-wide neuromodulation state
+    bool dopamineEnabled_;
+    bool curiosityEnabled_;
+    bool noveltyEnabled_;
+    bool predictionErrorEnabled_;
+    
+    // Global neuromodulation parameters
+    float globalDopamineBaseline_;
+    float curiosityNoveltyWeight_;
+    float curiosityErrorWeight_;
+    float noveltyThreshold_;
 };
 
 // Dopamine: Reward and reinforcement learning signal
