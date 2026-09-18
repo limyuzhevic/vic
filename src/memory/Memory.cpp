@@ -16,7 +16,7 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // PHASE 2 COMPLETE: Real storage with capacity limits implemented
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
