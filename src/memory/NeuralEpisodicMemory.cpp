@@ -16,7 +16,7 @@ struct NeuralEpisodicMemory::Impl {
 };
 
 NeuralEpisodicMemory::NeuralEpisodicMemory()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , maxEpisodes_(1000)
     , replayEnabled_(true)
@@ -326,7 +326,7 @@ struct NeuralAssociativeMemory::Impl {
 };
 
 NeuralAssociativeMemory::NeuralAssociativeMemory()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
 {
 }

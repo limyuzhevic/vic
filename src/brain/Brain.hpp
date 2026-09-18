@@ -58,8 +58,8 @@ public:
     // Disable copying, enable moving
     Brain(const Brain&) = delete;
     Brain& operator=(const Brain&) = delete;
-    Brain(Brain&&) noexcept;
-    Brain& operator=(Brain&&) noexcept;
+    Brain(Brain&&) noexcept = default;
+    Brain& operator=(Brain&&) noexcept = default;
     
     // Initialize brain with configuration
     bool initialize();
@@ -195,7 +195,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

@@ -25,8 +25,8 @@ public:
     // Disable copying, enable moving
     NeuralRegion(const NeuralRegion&) = delete;
     NeuralRegion& operator=(const NeuralRegion&) = delete;
-    NeuralRegion(NeuralRegion&&) noexcept;
-    NeuralRegion& operator=(NeuralRegion&&) noexcept;
+    NeuralRegion(NeuralRegion&&) noexcept = default;
+    NeuralRegion& operator=(NeuralRegion&&) noexcept = default;
     
     // Identity
     RegionId getId() const;
@@ -81,7 +81,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

@@ -18,7 +18,7 @@ struct NeuralWorkingMemory::Impl {
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
@@ -28,13 +28,15 @@ NeuralWorkingMemory::NeuralWorkingMemory()
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
+    if (!brain) return;
+    if (!pImpl) return;
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
-    if (pattern.empty() || !brain_) return;
+    if (pattern.empty() || !brain_ || !pImpl) return;
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
@@ -114,7 +116,7 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 }
 
 void NeuralWorkingMemory::update(TimestepDuration dt) {
-    if (!brain_) return;
+    if (!brain_ || !pImpl) return;
     
     // Update maintenance - reinforce active memory neurons
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
@@ -149,7 +151,7 @@ void NeuralWorkingMemory::clear() {
     memoryActivations_.clear();
     memoryTimestamps_.clear();
     activeTraces_.clear();
-    pImpl->maintenanceSynapses.clear();
+    if (pImpl) pImpl->maintenanceSynapses.clear();
 }
 
 void NeuralWorkingMemory::strengthenMemory(float factor) {
@@ -198,6 +200,8 @@ float NeuralWorkingMemory::getMemoryActivity() const {
 }
 
 void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
+    if (!pImpl) return;
+    
     // Check if connection already exists
     for (const auto& conn : pImpl->maintenanceSynapses) {
         if (conn.first == from && conn.second == to) return;
@@ -207,6 +211,8 @@ void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, 
 }
 
 void NeuralWorkingMemory::updateRecurrentConnections() {
+    if (!pImpl || !brain_) return;
+    
     // Apply maintenance currents through recurrent connections
     for (const auto& conn : pImpl->maintenanceSynapses) {
         float fromActivation = 0.0f;
@@ -226,6 +232,8 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
 }
 
 void NeuralWorkingMemory::decayWeakTraces() {
+    if (!pImpl) return;
+    
     std::vector<size_t> toRemove;
     
     for (size_t i = 0; i < memoryActivations_.size(); ++i) {
@@ -254,7 +262,7 @@ struct AttentionalSelection::Impl {
 };
 
 AttentionalSelection::AttentionalSelection()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , inhibitionStrength_(0.5f)
     , excitationStrength_(1.5f)

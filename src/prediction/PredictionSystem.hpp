@@ -14,6 +14,10 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize the prediction system with a brain reference
+    // TODO: Implement real prediction initialization
+    void initialize(class Brain* brain);
+    
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
@@ -37,6 +41,7 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    class Brain* brain_;
 };
 
 } // namespace nlm

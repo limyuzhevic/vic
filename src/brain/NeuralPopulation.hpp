@@ -20,8 +20,8 @@ public:
     // Disable copying, enable moving
     NeuralPopulation(const NeuralPopulation&) = delete;
     NeuralPopulation& operator=(const NeuralPopulation&) = delete;
-    NeuralPopulation(NeuralPopulation&&) noexcept;
-    NeuralPopulation& operator=(NeuralPopulation&&) noexcept;
+    NeuralPopulation(NeuralPopulation&&) noexcept = default;
+    NeuralPopulation& operator=(NeuralPopulation&&) noexcept = default;
     
     // Identity
     PopulationId getId() const;
@@ -69,7 +69,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

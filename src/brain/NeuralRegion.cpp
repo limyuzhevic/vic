@@ -16,23 +16,19 @@ struct NeuralRegion::Impl {
     explicit Impl(RegionId id) : id(id), nextSynapseId(1) {}
 };
 
-NeuralRegion::NeuralRegion(RegionId id) : pImpl(new Impl(id)) {}
+NeuralRegion::NeuralRegion(RegionId id) : pImpl(std::make_unique<Impl>(id)) {}
 
-NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(new Impl(id)) {
+NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(std::make_unique<Impl>(id)) {
     pImpl->name = name;
 }
 
 NeuralRegion::~NeuralRegion() = default;
 
-NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 NeuralRegion& NeuralRegion::operator=(NeuralRegion&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }

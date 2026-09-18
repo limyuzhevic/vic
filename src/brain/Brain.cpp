@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <limits>
 
 namespace nlm {
 
@@ -93,6 +94,7 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
+    {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
@@ -157,19 +159,15 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+Brain::Brain(std::shared_ptr<Config> config) : pImpl(std::make_unique<Impl>(config)) {}
 
 Brain::~Brain() = default;
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Brain::Brain(Brain&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -200,7 +198,7 @@ bool Brain::initialize() {
             auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
             auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
             
-            // Collect sensory and motor neurons for I/O
+                // Collect sensory and motor neurons for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
@@ -242,8 +240,8 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // Initialize prediction system (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -258,6 +256,8 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->predictionError->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -669,16 +669,27 @@ float Brain::getExcitationInhibitionRatio() const {
             float weight = syn->getWeight();
             if (weight > 0) {
                 totalExcitatory += weight;
-            } else {
+            } else if (weight < 0) {
                 totalInhibitory += std::abs(weight);
             }
+            // Note: weight == 0 is ignored (no effect on ratio)
         }
     }
     
-    if (totalInhibitory > 0.0f) {
+    // Handle edge cases with floating point precision
+    const float epsilon = std::numeric_limits<float>::epsilon() * 100.0f;
+    
+    if (totalInhibitory > epsilon) {
         return totalExcitatory / totalInhibitory;
     }
-    return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
+    
+    // If no inhibitory connections or negligible inhibition
+    if (totalExcitatory > epsilon) {
+        return std::numeric_limits<float>::infinity();
+    }
+    
+    // Neither excitatory nor inhibitory connections
+    return 0.0f;
 }
 
 size_t Brain::getTotalSpikeCount() const {
