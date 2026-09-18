@@ -588,6 +588,53 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
 }
 
+void Brain::develop() {
+    if (!pImpl->developmentSystem) return;
+    
+    pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+    
+    // Update developmental stage based on age
+    pImpl->developmentSystem->setStage(pImpl->developmentSystem->getStage());
+}
+
+void Brain::updatePlasticity() {
+    // Calculate neuromodulation factor for plasticity
+    float plasticityMod = 1.0f;
+    if (pImpl->dopamine) {
+        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    for (auto& region : pImpl->regions) {
+        for (auto& syn : region->getSynapses()) {
+            // Apply STDP with neuromodulation
+            if (syn->getPlasticityFlags().stdp) {
+                const auto& preSpikes = syn->getPreSpikeHistory();
+                const auto& postSpikes = syn->getPostSpikeHistory();
+                
+                if (!preSpikes.empty() && !postSpikes.empty()) {
+                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    float weight = syn->getWeight();
+                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    syn->setWeight(weight);
+                }
+            }
+            
+            // Apply Hebbian learning
+            if (syn->getPlasticityFlags().hebbian) {
+                const auto& preSpikes = syn->getPreSpikeHistory();
+                const auto& postSpikes = syn->getPostSpikeHistory();
+                
+                if (!preSpikes.empty() && !postSpikes.empty()) {
+                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                }
+            }
+            
+            // Update synapse state
+            syn->step(pImpl->currentTime);
+        }
+    }
+}
+
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
@@ -823,8 +870,64 @@ bool Brain::save(const std::string& filepath) const {
             }
         }
         
+        // Write synapses
+        SynapseCheckpointData synapseData;
+        size_t i = 0;
+        for (const auto& region : pImpl->regions) {
+            for (const auto* syn : region->getSynapses()) {
+                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                synapseData.weight.push_back(syn->getWeight());
+                synapseData.delay.push_back(syn->getDelay());
+                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                i++;
+            }
+        }
+        
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+            return false;
+        }
+        
+        // Write working memory
+        WorkingMemoryCheckpointData wmData;
+        if (pImpl->workingMemory) {
+            // For now, just write basic working memory data
+            wmData.activeTraceCount = pImpl->workingMemory->getActiveTraces();
+            wmData.capacity = pImpl->workingMemory->getCapacity();
+        }
+        
+        if (!writer.writeWorkingMemory(wmData)) {
+            NLM_LOG_ERROR("Failed to write working memory to checkpoint");
+            return false;
+        }
+        
+        // Write episodic memory
+        EpisodicMemoryCheckpointData emData;
+        if (pImpl->episodicMemory) {
+            emData.episodeCount = pImpl->episodicMemory->getEpisodeCount();
+        }
+        
+        if (!writer.writeEpisodicMemory(emData)) {
+            NLM_LOG_ERROR("Failed to write episodic memory to checkpoint");
+            return false;
+        }
+        
+        // Write neuromodulation systems
+        NeuromodulationCheckpointData nmData;
+        if (pImpl->dopamine) {
+            nmData.dopamineLevel = pImpl->dopamine->getLevel();
+        }
+        if (pImpl->curiosity) {
+            nmData.curiosityLevel = pImpl->curiosity->getLevel();
+        }
+        if (pImpl->novelty) {
+            nmData.noveltyLevel = pImpl->novelty->getLevel();
+        }
+        
+        if (!writer.writeNeuromodulation(nmData)) {
+            NLM_LOG_ERROR("Failed to write neuromodulation data to checkpoint");
             return false;
         }
         
@@ -838,7 +941,7 @@ bool Brain::save(const std::string& filepath) const {
         return true;
         
     } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+        NLM_LOG_ERROR(std::string("Exception during brain save: ") + e.what());
         return false;
     }
 }
@@ -898,6 +1001,34 @@ bool Brain::load(const std::string& filepath) {
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // Read working memory
+        WorkingMemoryCheckpointData wmData;
+        if (!reader.readWorkingMemory(wmData)) {
+            NLM_LOG_ERROR("Failed to read working memory from checkpoint");
+            return false;
+        }
+        
+        // Read episodic memory
+        EpisodicMemoryCheckpointData emData;
+        if (!reader.readEpisodicMemory(emData)) {
+            NLM_LOG_ERROR("Failed to read episodic memory from checkpoint");
+            return false;
+        }
+        
+        // Read neuromodulation
+        NeuromodulationCheckpointData nmData;
+        if (!reader.readNeuromodulation(nmData)) {
+            NLM_LOG_ERROR("Failed to read neuromodulation data from checkpoint");
+            return false;
+        }
+        
+        // Update simulation state from metadata
+        auto metadata = reader.getMetadata();
+        if (metadata) {
+            pImpl->currentStep = metadata->stepCount;
+            pImpl->currentTime = metadata->simulationTime;
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
