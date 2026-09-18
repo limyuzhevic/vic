@@ -1,5 +1,7 @@
 # NLM - Easy Usage Guide for Beginners
 
+**Quick Start Version** - For those who want to get up and running with NLM in minutes
+
 ## What is NLM?
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
@@ -69,6 +71,66 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
+### Example 3: Complete Working Example (Copy & Paste)
+
+```python
+import pynlm
+
+# Setup configuration
+config = pynlm.createDefaultConfig()
+
+# Create and initialize brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create the environment
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+
+# Create agent interface
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable basic learning capabilities
+agent.enableRewardModulation(True)
+agent.enableDevelopment(True)
+
+print("Starting simulation...")
+print(f"Brain created with {brain.getTotalNeuronCount()} neurons")
+print(f"World size: {world.getWidth()}x{world.getHeight()}")
+print()
+
+# Run simulation loop
+for step in range(200):
+    # Update the world (environment changes)
+    world.update(0.1)
+    
+    # Get what the brain sees
+    percept = world.getSensoryPercept()
+    
+    # Tell the brain what it sees
+    agent.processSensoryInput(percept)
+    
+    # Brain thinks and processes
+    brain.step(step)
+    
+    # Brain decides what to do
+    action = agent.decodeMotorCommand()
+    
+    # Execute action in the world
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Log progress occasionally
+    if step % 50 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing, "
+              f"action: {action.getType()}")
+
+print("\nSimulation complete!")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Final developmental stage: {brain.getDevelopmentalStage()}")
 ```
 
 ---
@@ -256,6 +318,27 @@ print("Agent simulation complete!")
 
 ---
 
+### Advanced Configuration Example
+
+```python
+# Even more advanced configuration - save to file and reload
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Save the advanced configuration
+config.saveToFile("my_advanced_config.cfg")
+
+# Create another brain from the saved config
+config2 = pynlm.createDefaultConfig()
+config2.loadFromFile("my_advanced_config.cfg")
+brain2 = pynlm.createBrain(config2)
+brain2.initialize()
+
+print("Configuration saved and reloaded successfully!")
+```
+
+---
+
 ## Quick Reference
 
 | What you want | Code |
@@ -290,8 +373,13 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+1. Read `HOW_TO_USE.md` for more details on building from source and using advanced features
+2. Experiment with different configurations by modifying the default config file
+3. Try creating custom neural architectures using the low-level C++ API
+4. Run the NLM Phase 6 demo to see the complete integrated system
 
 That's it! You're now ready to use NLM.
+
+**For the complete developer documentation including build instructions, configuration reference, and advanced API details, see `HOW_TO_USE.md`**
+
+*(Originally a simpler beginner guide, this file now serves as a quick-start reference with links to comprehensive documentation for deeper exploration)*
