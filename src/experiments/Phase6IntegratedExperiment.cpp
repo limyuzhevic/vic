@@ -9,9 +9,17 @@
 
 namespace nlm {
 
-Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
+Phase6IntegratedExperiment::Phase6IntegratedExperiment() : 
+    verificationCompleted(false),
+    memoryIntegrationTested(false),
+    neuromodulationIntegrationTested(false),
+    checkpointingTested(false),
+    replayTested(false) {
+}
 
-Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
+Phase6IntegratedExperiment::~Phase6IntegratedExperiment() {
+    // Cleanup any remaining resources
+}
 
 Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
     Phase6IntegrationResult result;
@@ -243,6 +251,40 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
+    // Test 6: Brain regions exist and have neurons
+    auto regions = brain->getRegions();
+    if (!regions.empty()) {
+        NLM_LOG_INFO("[PASS] Brain has " + std::to_string(regions.size()) + " region(s)");
+        
+        // Check if first region has neurons
+        if (regions[0] && regions[0]->getTotalNeuronCount() > 0) {
+            NLM_LOG_INFO("[PASS] First region has neurons: " + std::to_string(regions[0]->getTotalNeuronCount()));
+        } else {
+            NLM_LOG_ERROR("[FAIL] First region has no neurons");
+            success = false;
+        }
+    } else {
+        NLM_LOG_ERROR("[FAIL] Brain has no regions");
+        success = false;
+    }
+    
+    // Test 7: Spike system exists
+    if (brain->getSpikeSystem() != nullptr) {
+        NLM_LOG_INFO("[PASS] Spike system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Spike system is NOT integrated");
+        success = false;
+    }
+    
+    // Test 8: Plasticity systems exist
+    if (brain->getSTDP() != nullptr && brain->getHebbian() != nullptr) {
+        NLM_LOG_INFO("[PASS] Plasticity systems (STDP, Hebbian) are integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Plasticity systems are NOT integrated");
+        success = false;
+    }
+    
+    NLM_LOG_INFO("=== Verification Complete: " + std::string(success ? "PASSED" : "FAILED"));
     return success;
 }
 
@@ -400,4 +442,26 @@ bool Phase6IntegratedExperiment::testReplay() {
     return true;
 }
 
-} // namespace nlm
+void Phase6IntegratedExperiment::cleanup() {
+    // Clear all state
+    verificationCompleted = false;
+    memoryIntegrationTested = false;
+    neuromodulationIntegrationTested = false;
+    checkpointingTested = false;
+    replayTested = false;
+    lastProgressUpdateTime = 0.0;
+    metricHistory.clear();
+    
+    // Reset default config
+    defaultConfig.reset();
+}
+
+std::string Phase6IntegratedExperiment::getStatusString() const {
+    std::stringstream ss;
+    ss << "Verification: " << (verificationCompleted ? "✓" : "✗");
+    ss << ", Memory: " << (memoryIntegrationTested ? "✓" : "✗");
+    ss << ", Neuromod: " << (neuromodulationIntegrationTested ? "✓" : "✗");
+    ss << ", Checkpoint: " << (checkpointingTested ? "✓" : "✗");
+    ss << ", Replay: " << (replayTested ? "✓" : "✗");
+    return ss.str();
+}
