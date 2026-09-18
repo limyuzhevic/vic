@@ -41,6 +41,14 @@ void Dopamine::update(TimestepDuration dt) {
     pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
+void Dopamine::reset() {
+    pImpl->level = pImpl->baseline;
+}
+
+bool Dopamine::isActive() const {
+    return pImpl->level > 0.01f;
+}
+
 void Dopamine::signalReward(float reward) {
     // TODO PHASE 2: Implement real reward signaling
     // PLACEHOLDER: Burst of dopamine on reward

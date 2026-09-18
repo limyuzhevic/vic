@@ -65,138 +65,54 @@ Neuromodulators (dopamine, acetylcholine, norepinephrine, serotonin) modulate ne
 - Receptor types, receptor distribution, and second-messenger systems not modeled
 - Effects on neural dynamics are simplified
 
-## Phase 4: Emerging Cognition
-
-### Prediction Systems
-
-#### Biological Inspiration
-The free energy principle and predictive coding suggest that brains are fundamentally prediction machines. Hierarchical predictive models allow organisms to anticipate future states and minimize prediction errors.
-
-#### Computational Implementation
-- **NeuralPrediction**: Learns temporal sequences through repeated experience
-- **ActionConsequencePrediction**: Associates actions with their effects
-- **Multi-step Prediction**: Chains predictions to anticipate distant futures
-
-#### Known Limitations
-- No hierarchical generative model
-- Limited temporal horizon
-- No explicit uncertainty representation
-
-### Working Memory
-
-#### Biological Inspiration
-Working memory in prefrontal cortex maintains information active for seconds to minutes through persistent neural activity and recurrent circuits.
-
-#### Computational Implementation
-- **NeuralWorkingMemory**: Persistent activity in recurrent circuits
-- **Competition**: Winner-take-more dynamics for selective retention
-- **Decay**: Activity decays when not reinforced
-
-#### Known Limitations
-- No complex binding mechanisms
-- Limited capacity
-- Simplified recurrent architecture
-
-### Episodic Memory
-
-#### Biological Inspiration
-Hippocampus stores episodes with temporal, spatial, and contextual information. Pattern completion allows retrieval from partial cues.
-
-#### Computational Implementation
-- **NeuralEpisodicMemory**: Stores experiences as neural activity patterns
-- **Pattern Completion**: Retrieves full episodes from partial cues
-- **Replay**: Reactivates past patterns
-
-#### Known Limitations
-- No hippocampal architecture
-- No pattern separation
-- Limited consolidation mechanisms
-
-### Concept Formation
-
-#### Biological Inspiration
-Cortex forms stable representations through repeated exposure. Similar experiences converge to share representations.
-
-#### Computational Implementation
-- **ConceptFormation**: Clusters similar patterns into stable prototypes
-- **Hebbian Averaging**: Prototype moves toward new instances
-- **Stability Measurement**: Tracks how consistent patterns are
-
-#### Known Limitations
-- No hierarchical concept structure
-- No symbolic representation
-- Limited abstraction
-
-### Attention
-
-#### Biological Inspiration
-Attention involves competitive dynamics where stronger signals inhibit weaker ones. Both bottom-up salience and top-down goals influence selection.
-
-#### Computational Implementation (NOT Transformer)
-- **AttentionalSelection**: Lateral inhibition competition
-- **Winner-Take-More**: Winners receive excitation, losers receive inhibition
-- **Top-Down Bias**: Goals can influence selection
-- **Bottom-Up Salience**: Stimulus strength affects selection
-
-#### IMPORTANT: NOT Transformer Attention
-NLM attention is NOT:
-- Query-Key-Value matrices
-- Softmax attention weights
-- Attention heads
-- Self-attention
-
-NLM attention IS:
-- Competitive dynamics
-- Lateral inhibition
-- Recurrent amplification
-- Neural circuit mechanism
-
-### Planning
-
-#### Biological Inspiration
-Prefrontal cortex uses learned models to simulate future outcomes and select actions that lead to goals.
-
-#### Computational Implementation
-- **NeuralPlanner**: Evaluates action sequences using predictions
-- **Action Quality**: Learns which actions work in which states
-- **Plan Adaptation**: Updates based on success/failure
-
-#### Known Limitations
-- Shallow planning depth
-- No tree search
-- Limited world model
-
-### Self-Model
-
-#### Biological Inspiration
-The brain maintains a model of the body (body schema) and distinguishes self-generated from externally generated events (agency).
-
-#### Computational Implementation
-- **SelfModel**: Learns forward model of sensory consequences
-- **Self-Generated Likeness**: Predicts whether change is self-caused
-- **Action Quality**: Tracks which actions lead to rewards
-
-#### Known Limitations
-- No sophisticated body schema
-- No self-recognition
-- No explicit agency computation
-
-### Social Learning
-
-#### Biological Inspiration
-Mirror neurons and social observation allow learning from others' actions and their consequences.
-
-#### Computational Implementation
-- **SocialLearning**: Observes other agents' actions
-- **Imitation**: Can reproduce observed actions
-- **Communication Signals**: Learns simple associated signals
-
-#### Known Limitations
-- No theory of mind
-- No sophisticated imitation learning
-- No cultural transmission
+## Phase 6: Final Integration
 
 ## The Learning Loop
+
+## Phase 6: Final Integration
+
+### Integration Architecture
+
+The Phase 6 brain loop represents a fully integrated artificial brain where all systems work together:
+
+```
+WORLD
+  ↓
+SENSORY INPUT
+  ↓
+NEURAL PROCESSING (LIF dynamics, spikes)
+  ↓
+INTERNAL STATE (working memory, attention)
+  ↓
+MEMORY / PREDICTION
+  ↓
+MOTIVATION / NEUROMODULATION (dopamine, curiosity)
+  ↓
+ACTION SELECTION
+  ↓
+MOTOR OUTPUT
+  ↓
+WORLD CONSEQUENCE
+  ↓
+REWARD / SURPRISE / ERROR
+  ↓
+PLASTICITY (STDP, Hebbian, structural)
+  ↓
+MEMORY / DEVELOPMENT
+  ↓
+CHANGED BRAIN
+  ↓
+CHANGED FUTURE BEHAVIOR
+```
+
+**Key Integration Features:**
+- **Memory Integration**: Working memory, episodic memory, and associative memory all connected to neural processing
+- **Neuromodulation Integration**: Dopamine affects neural excitability and plasticity; curiosity drives exploration; novelty detection integrated with sensory processing
+- **Prediction Integration**: Prediction system integrated into brain loop; prediction error signals affect learning; confidence tracking implemented
+- **Cognition Integration**: Neural planner with action sequence evaluation; concept formation from experience patterns; attention with competitive selection dynamics
+- **Development Integration**: Developmental stages affect plasticity rates; structural plasticity modulated by age; neural excitability changes with development
+- **Persistence**: Checkpoint save/load implemented; brain state serialization working; can resume from saved checkpoints
+- **Replay and Consolidation**: Episodic memory replay during simulation; memory consolidation for important episodes; integration with sleep/rest cycle
 
 ### Phase 2: Isolated Neural Computation
 ```
@@ -240,7 +156,7 @@ DEVELOPMENTAL CHANGE
 BEHAVIORAL CHANGE
 ```
 
-### Phase 4: Emerging Cognition
+### Phase 6: Final Integration
 ```
 WORLD
       ↓
@@ -322,4 +238,4 @@ We acknowledge that:
 2. Our understanding of the brain is incomplete
 3. Many approximations are necessary for computational tractability
 4. Claims of "brain-like" behavior should be critically examined
-5. Phase 4 does not claim human-like intelligence, consciousness, or genuine understanding
+5. Phase 6 does not claim human-like intelligence, consciousness, or genuine understanding

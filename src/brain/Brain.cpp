@@ -243,7 +243,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // PredictionSystem doesn't have initialize method currently, but is configured elsewhere
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -511,8 +511,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Use sensory neurons' current activity as state for prediction
+        std::vector<float> currentState;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            const auto& state = neuron->getState();
+            currentState.push_back(std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+        }
+        
+        // Convert to SensoryInput for prediction system
+        SensoryInput predicted = SensoryInput(currentState);
+        
+        // Update predictions based on current sensory input
+        pImpl->predictionSystem->updatePredictions(predicted, predicted);
+        
+        // The prediction system provides sensory predictions and error signals
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float confidence = pImpl->predictionSystem->getConfidence();
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +542,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Present current neural activity to concept formation system
+        // For concept formation, we can use the firing neuron activations as input patterns
+        // This would allow concepts to emerge from recurring neural patterns
+        std::vector<float> pattern;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            const auto& state = neuron->getState();
+            pattern.push_back(std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+        }
+        
+        // Convert activation to feature vector for concept formation
+        pImpl->conceptFormation->presentExperience(pattern, pattern, 
+                                                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f, 
+                                                currentStep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

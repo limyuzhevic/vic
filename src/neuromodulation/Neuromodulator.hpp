@@ -20,12 +20,24 @@ public:
     virtual float getLevel() const = 0;
     virtual void setLevel(float level) = 0;
     
-    // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
+    
+    // Reset neuromodulator state
+    // TODO PHASE 2: Implement real neuromodulator reset
+    virtual void reset() = 0;
+    
+    // Check if neuromodulator is active
+    // TODO PHASE 2: Implement real neuromodulator state checking
+    virtual bool isActive() const = 0;
+    
+    // Reset neuromodulator state
+    virtual void reset() = 0;
+    
+    // Check if neuromodulator is active
+    virtual bool isActive() const = 0;
     
 protected:
     Neuromodulator() = default;

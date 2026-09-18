@@ -2,23 +2,28 @@
 
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM is a **brain simulator** that creates artificial brains with integrated cognitive systems. It lets you create virtual brains that can:
+
+- **Process sensory information** from environments
+- **Learn from experience** using multiple plasticity mechanisms
+- **Remember experiences** in working and episodic memory
+- **Make decisions** using attention, planning, and prediction
+- **Evolve over time** through development
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
-- **Learning** = When connections get stronger or weaker based on what happens
-- **Memory** = The brain remembering patterns
+- **Synapses** = Connections between brain cells (strengthen/weaken with learning)
+- **Memory** = The brain remembering patterns (working memory for short-term, episodic memory for long-term)
 
-That's it! NLM simulates all of this.
+That's it! NLM simulates all of this with **fully connected brain systems** working together.
 
 ---
 
 ## The 3 Things You Need to Know
 
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
+1. **Brain** - The virtual brain with neurons, synapses, and cognitive systems
+2. **World** - The environment the brain lives in (simulates physics, rewards, objects)
+3. **Agent** - The interface connecting brain to world (handles sensory processing and action output)
 
 ---
 
@@ -37,7 +42,7 @@ brain.initialize()
 
 # Step 3: Make it think for 100 steps
 for i in range(100):
-    brain.step(i)  # One step of thinking
+    brain.step(i)  # One step of thinking (processes sensory, learns, stores memories)
 
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
@@ -60,8 +65,8 @@ agent.initialize(world)
 
 # Run for 50 steps
 for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
+    world.update(0.1)  # Update world (10ms timestep)
+    percept = world.getSensoryPercept()  # What the agent sees
     agent.processSensoryInput(percept)  # Brain sees it
     brain.step(step)  # Brain thinks
     action = agent.decodeMotorCommand()  # Brain decides action
@@ -120,7 +125,7 @@ def run_simulation(brain, world, agent, num_steps):
         # 3. Tell the brain
         agent.processSensoryInput(percept)
         
-        # 4. Brain thinks
+        # 4. Brain thinks (processes input, learns, stores memories)
         brain.step(step)
         
         # 5. Get action from brain
@@ -168,7 +173,9 @@ Starts up the brain. Always call this before using the brain!
 Makes the brain process one moment in time. The brain:
 - Checks each neuron
 - Sends signals between connected neurons
-- Updates connections based on learning rules
+- Updates connections based on learning rules (STDP, Hebbian)
+- Stores experiences in memory
+- Applies development changes
 
 ### `world.update(time)`
 Updates the virtual world by `time` seconds.
@@ -295,3 +302,4 @@ When you're comfortable:
 3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
+

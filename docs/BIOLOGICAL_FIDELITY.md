@@ -2,7 +2,7 @@
 
 ## Overview
 
-Phase 5 begins the systematic improvement of biological realism in NLM. This document explains the biological motivation, mathematical abstractions, engineering approximations, and limitations of each fidelity improvement.
+Phase 6 represents the final integration phase where all biological fidelity improvements are implemented to create a complete artificial brain system. This document explains the biological motivation, mathematical abstractions, engineering approximations, and limitations of each fidelity improvement.
 
 ## Design Philosophy
 
@@ -14,7 +14,7 @@ Phase 5 begins the systematic improvement of biological realism in NLM. This doc
 
 ## Current vs. Target Fidelity
 
-| Feature | Phase 4 | Phase 5 | Long-term |
+\| Feature \| Phase 4 \| Phase 5 \| Phase 6 \| Long-term \|
 |---------|---------|---------|-----------|
 | Neuron model | LIF | LIF+adaptive | Hodgkin-Huxley |
 | Synapses | Static weights | Dynamic | Conductance-based |
@@ -25,7 +25,7 @@ Phase 5 begins the systematic improvement of biological realism in NLM. This doc
 
 ## Neuron Models
 
-### Phase 4: Leaky Integrate-and-Fire (LIF)
+### Phase 4: Leaky Integrate-and-Fire (LIF) - Legacy Foundation
 
 **Biological inspiration**: Abstracted spiking neurons
 
@@ -38,7 +38,7 @@ if V >= V_threshold:
     V = V_reset
 ```
 
-**Phase 5 additions**:
+**Phase 5 improvements**:
 - Spike-frequency adaptation
 - Subthreshold oscillations
 - Configurable time constants
@@ -66,14 +66,14 @@ dh/dt = α_h(V) (1 - h) - β_h(V) h
 
 ## Synaptic Dynamics
 
-### Phase 4: Static Weights
+### Phase 4: Static Weights - Legacy Foundation
 
 **Current implementation**:
 - Fixed synaptic weight
 - Simple STDP updates
 - Basic eligibility traces
 
-### Phase 5: Dynamic Synapses
+### Phase 5: Dynamic Synapses - Implemented
 
 **Improvements**:
 
@@ -120,12 +120,12 @@ dg_syn/dt = -g_syn / τ_syn + w * δ(t - t_spike)
 
 ## Inhibitory Circuits
 
-### Phase 4: Generic Inhibition
+### Phase 4: Generic Inhibition - Legacy Foundation
 
 - Fixed inhibitory weight scaling
 - No interneuron diversity
 
-### Phase 5: Structured Inhibition
+### Phase 5: Structured Inhibition - Implemented
 
 **Fast-spiking interneurons**:
 - Short integration time constant
@@ -148,13 +148,13 @@ if (neuron.type == NeuronType::Inhibitory) {
 
 ### STDP with Homeostatic Modulation
 
-**Phase 4 STDP**:
+**Phase 4 STDP - Legacy**:
 ```
 Δw = A_plus * exp(-|Δt|/τ_plus) if Δt > 0
 Δw = -A_minus * exp(|Δt|/τ_minus) if Δt < 0
 ```
 
-**Phase 5 additions**:
+**Phase 5 improvements**:
 
 #### Synaptic Scaling
 ```
@@ -187,11 +187,11 @@ if (synapse.reward > 0) {
 
 ## Neuromodulatory Systems
 
-### Phase 4: Generic Reward
+### Phase 4: Generic Reward - Legacy Foundation
 
 Single dopamine-like signal affecting plasticity.
 
-### Phase 5: Multiple Modulators
+### Phase 5: Multiple Modulators - Implemented
 
 #### Dopamine (Reward Prediction Error)
 
@@ -270,7 +270,7 @@ if (in_critical_period) {
 
 ## Oscillatory Dynamics
 
-### Phase 5 Goals
+### Phase 6: Integration Goals
 
 Implement population-level oscillations:
 

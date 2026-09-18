@@ -11,7 +11,7 @@ This document explicitly lists what NLM cannot currently do and where it diverge
 ### 1. Scale
 - Human brain: ~86 billion neurons, ~100 trillion synapses
 - NLM Phase 1 skeleton: ~1,000 neurons (placeholder)
-- Even Phase 5 targets: Millions of neurons (far below biological scale)
+- Even Phase 6 targets: Millions of neurons (far below biological scale)
 
 ### 2. Neural Dynamics
 **Biological Reality:**
@@ -125,7 +125,7 @@ This document explicitly lists what NLM cannot currently do and where it diverge
 - No proprioception
 - No coordination
 
-## Phase 4 Specific Limitations
+## Phase 6 Specific Limitations
 
 ### Prediction
 - No generative model or world simulator
@@ -177,7 +177,7 @@ This document explicitly lists what NLM cannot currently do and where it diverge
 
 ## Claims We Do NOT Make
 
-NLM Phase 4 does NOT claim to have:
+NLM Phase 6 does NOT claim to have:
 1. Human-like intelligence
 2. Consciousness or sentience
 3. Genuine self-awareness
@@ -188,9 +188,9 @@ NLM Phase 4 does NOT claim to have:
 8. Social cognition like humans
 9. Subjective experience
 
-## What NLM Phase 4 IS
+## What NLM Phase 6 IS
 
-NLM Phase 4 IS:
+NLM Phase 6 IS:
 1. A computational exploration of developmental learning principles
 2. An investigation of whether prediction can emerge from spiking dynamics
 3. A test of whether concepts can form without predefined labels
@@ -203,7 +203,7 @@ NLM Phase 4 IS:
 
 ## Measurement vs. Claims
 
-Phase 4 experiments measure:
+Phase 6 experiments measure:
 - Prediction error reduction over time
 - Retention accuracy in working memory tasks
 - Recall accuracy for stored episodes

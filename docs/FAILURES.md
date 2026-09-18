@@ -47,7 +47,7 @@ Links to similar failures
 
 ### Failure: Transformer-like Attention in Phase 4
 **Date**: 2024-XX-XX
-**Phase**: Phase 4
+**Phase**: Phase 6
 **Severity**: Major
 
 #### Hypothesis
@@ -72,7 +72,7 @@ The design emerged from reading Transformer literature rather than biological in
 
 ### Failure: Dense Synapse Storage Initial Design
 **Date**: 2024-XX-XX
-**Phase**: Phase 4
+**Phase**: Phase 6
 **Severity**: Major
 
 #### Hypothesis

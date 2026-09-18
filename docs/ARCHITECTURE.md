@@ -39,7 +39,7 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 │                    └─────────────┘                              │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │              PHASE 4: EMERGING COGNITION                    ││
+│  │              PHASE 6: FINAL INTEGRATION                     ││
 │  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       ││
 │  │  │Attention│  │Planning │  │Self-Model│ │ Social  │       ││
 │  │  │         │  │         │  │         │  │Learning │       ││
@@ -87,49 +87,32 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **Curiosity**: Exploration motivation
 - **PredictionError**: Error signals
 
-### 7. Memory Layer (Phase 4)
-- **NeuralWorkingMemory**: Persistent activity for temporary storage
-- **NeuralEpisodicMemory**: Experience encoding in neural patterns
-- **NeuralAssociativeMemory**: Experience-based associations
-- **ConceptFormation**: Pattern discovery without labels
-- **SpatialRepresentation**: Learned spatial relationships
-- **TemporalRelation**: Before/after/sequence encoding
+### 7. Memory Layer (Phase 6 - Integrated)
+- **Working Memory**: Neural processing with persistent activity for temporary storage
+- **Episodic Memory**: Neural processing with experience encoding and replay
+- **Associative Memory**: Neural processing with Hebbian pattern associations
+- **Concept Formation**: Neural processing for pattern discovery
+- **Spatial Representation**: Neural processing for spatial relationships
+- **Temporal Relation**: Neural processing for sequence encoding
 
-### 8. Prediction Layer (Phase 4)
-- **NeuralPrediction**: Temporal sequence learning
-- **ActionConsequencePredictor**: Action effect prediction
-- **PredictionErrorSignal**: Error computation for learning
+### 8. Prediction Layer (Phase 6 - Integrated)
+- **Next State Prediction**: Neural processing for temporal sequence learning
+- **Action Effect Prediction**: Neural processing for action consequence prediction
+- **Prediction Error**: Neural processing for error computation and learning
 
-### 9. Cognitive Layer (Phase 4)
-- **AttentionalSelection**: Competition-based attention (NOT Transformer QKV)
-- **NeuralPlanner**: Predictive action selection
-- **SelfModel**: Sensorimotor self-awareness
-- **SocialLearning**: Observation and imitation
+### 9. Cognitive Layer (Phase 6 - Integrated)
+- **Attention**: Neural processing for competitive selection
+- **Planning**: Neural processing for action sequence evaluation
+- **Self-Model**: Neural processing for sensorimotor self-awareness
+- **Social Learning**: Neural processing for observation and imitation
 
-### 10. Sensory Layer
-- **SensoryInput**: Base class for sensory data
-- **Vision**: Visual input processing
-- **Audio**: Audio input processing
-- **InternalSignals**: Internal state signals
-
-### 11. Motor Layer
-- **Action**: Action representation
-- **MotorSystem**: Neural-to-action conversion
-
-### 12. Environment Layer
-- **Environment**: Abstract environment interface
-- **Observation**: Sensory observation wrapper
-- **Action**: Action wrapper
-
-### 13. Experiments Layer
+### 10. Experiments Layer (Phase 6 - Integrated)
 - **Experiment**: Single experiment recording
 - **ExperimentRunner**: Experiment execution
 - **Metrics**: Data analysis
-- **Phase4Experiment**: Phase 4 cognitive experiments
+- **Phase6IntegratedExperiment**: Phase 6 integration experiments
 
-## Data Flow
-
-### Phase 2: Neural Computation
+## Phase 2: Neural Computation
 ```
 Sensory Input (test signals)
       ↓
@@ -179,11 +162,9 @@ Structural Plasticity (synaptogenesis/pruning)
 Development System (stage progression)
 ```
 
-### Phase 4: Emerging Cognition
+### Phase 6: Final Integration
 ```
 WORLD (SimpleWorld)
-      ↓
-SENSORY PERCEPT
       ↓
 ATTENTION (competitive selection)
       ↓
@@ -218,7 +199,7 @@ SOCIAL LEARNING (observation/imitation)
 
 ## Agent-Brain Interface
 
-Phase 3/4 introduces the AgentBrain class that connects the NLM brain to the world:
+Phase 3-6 introduces the AgentBrain class that connects the NLM brain to the world:
 
 - **SensoryTransduction**: Converts world percepts to neural input
 - **MotorDecoding**: Converts neural activity to motor commands
