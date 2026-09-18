@@ -221,8 +221,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &WorldObject::value)
         .def_readwrite("active", &WorldObject::active);
 
-    py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
+    py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state - contains physical properties and internal state of the agent in the world)pbdoc")
         .def(py::init<>())
+        .def(py::init<float, float, float, float, float, float, float, float, float, bool, bool, float>(),
+             py::arg("x"), py::arg("y"), py::arg("orientation"), py::arg("velocityX"), py::arg("velocityY"),
+             py::arg("angularVelocity"), py::arg("energy"), py::arg("health"), py::arg("age"), 
+             py::arg("isMoving") = false, py::arg("isTurning") = false, py::arg("lastActionTime") = 0.0f)
         .def_readwrite("x", &AgentBody::x)
         .def_readwrite("y", &AgentBody::y)
         .def_readwrite("orientation", &AgentBody::orientation)
@@ -235,7 +239,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("isMoving", &AgentBody::isMoving)
         .def_readwrite("isTurning", &AgentBody::isTurning)
         .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
-        .def("reset", &AgentBody::reset);
+        .def("reset", &AgentBody::reset, "Reset agent body to initial state");
 
     py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
         .def(py::init<>())

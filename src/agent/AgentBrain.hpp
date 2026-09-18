@@ -69,12 +69,70 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced agent features and commands
+    // History tracking
+    struct ActionHistoryEntry {
+        double timestamp;
+        MotorCommand action;
+        float reward;
+        float curiosity;
+        std::string description;
+    };
+    
+    std::vector<ActionHistoryEntry> actionHistory_;
+    size_t maxActionHistory_;
+    
+    // Advanced processing flags
+    bool enableHistoryTracking_;
+    bool enableAdvancedExploration_;
+    bool enableMultiModalProcessing_;
+    float explorationThreshold_;
+    float confidenceThreshold_;
+    
+    // Performance metrics
+    size_t totalStepsProcessed_;
+    size_t successfulActions_;
+    float averageActionSuccessRate_;
+    double lastActionTime_;
+    
+    // Advanced processing methods
+    bool isNewObservation(const std::vector<float>& currentVision) const;
+    MotorCommand advancedActionSelection(float confidence) const;
+    void updateActionHistory(MotorCommand action, float reward, double timestamp, const std::string& description = "");
+    float calculateActionSuccessRate() const;
+    
+    // Configuration methods
+    void setHistoryTracking(bool enable) { enableHistoryTracking_ = enable; }
+    void setAdvancedExploration(bool enable) { enableAdvancedExploration_ = enable; }
+    void setExplorationThreshold(float threshold) { explorationThreshold_ = std::clamp(threshold, 0.0f, 1.0f); }
+    void setConfidenceThreshold(float threshold) { confidenceThreshold_ = std::clamp(threshold, 0.0f, 1.0f); }
+    
+    // Statistics methods
+    size_t getTotalStepsProcessed() const { return totalStepsProcessed_; }
+    size_t getSuccessfulActions() const { return successfulActions_; }
+    float getActionSuccessRate() const { return averageActionSuccessRate_; }
+    const std::vector<ActionHistoryEntry>& getActionHistory() const { return actionHistory_; }
+    void clearActionHistory() { actionHistory_.clear(); }
+    
+    // Agent state management
+    void incrementStepsProcessed() { totalStepsProcessed_++; }
+    void recordSuccessfulAction() { successfulActions_++; updateSuccessRate(); }
+    void updateSuccessRate();
+    
+    // Advanced processing
+    float calculateBehavioralAdaptation() const;
+    MotorCommand applyAdaptiveBehavior(MotorCommand baseAction, float adaptationScore) const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Advanced processing implementations
+    bool isNewObservation(const std::vector<float>& currentVision) const;
+    MotorCommand advancedActionSelection(float confidence) const;
     
     std::shared_ptr<Brain> brain_;
     
@@ -112,6 +170,19 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Advanced feature flags
+    bool enableHistoryTracking_;
+    bool enableAdvancedExploration_;
+    bool enableMultiModalProcessing_;
+    float explorationThreshold_;
+    float confidenceThreshold_;
+    
+    // Performance tracking
+    size_t totalStepsProcessed_;
+    size_t successfulActions_;
+    float averageActionSuccessRate_;
+    double lastActionTime_;
 };
 
 } // namespace nlm

@@ -5,35 +5,48 @@
 
 namespace nlm {
 
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
-    : brain_(brain)
-    , dopamineLevel_(0.0f)
-    , noveltyLevel_(0.0f)
-    , curiosityLevel_(0.0f)
-    , predictionError_(0.0f)
-    , expectedReward_(0.0f)
-    , developmentalAge_(0.0)
-    , plasticityModifier_(1.0f)
-    , rewardModulationEnabled_(true)
-    , structuralPlasticityEnabled_(true)
-    , developmentEnabled_(true)
-    , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
-{
+    // Validate brain pointer
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain: Cannot initialize with null brain pointer");
+        return;
+    }
+    
+    // Initialize advanced feature flags
+    enableHistoryTracking_ = false;
+    enableAdvancedExploration_ = false;
+    enableMultiModalProcessing_ = false;
+    explorationThreshold_ = 0.3f;
+    confidenceThreshold_ = 0.5f;
+    
+    // Initialize performance tracking
+    totalStepsProcessed_ = 0;
+    successfulActions_ = 0;
+    averageActionSuccessRate_ = 0.0f;
+    lastActionTime_ = 0.0;
+    
+    // Initialize action history capacity
+    maxActionHistory_ = 1000;
+    
     // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            NeuronType type = pop->getNeuronType();
+            
+            if (type == NeuronType::Motor) {
+                for (Neuron* n : pop->getNeurons()) {
+                    // Distribute motor neurons to different action groups using population-based distribution
+                    // This ensures better load balancing across action groups
+                    static std::vector<size_t> motorDistIndexes;
+                    if (motorDistIndexes.empty()) {
+                        // Initialize distribution indexes if empty
+                        for (size_t i = 0; i < pop->getNeurons().size(); ++i) {
+                            motorDistIndexes.push_back(i % 6); // 6 action types
+                        }
+                    }
+                    if (!motorDistIndexes.empty()) {
+                        size_t actionIdx = motorDistIndexes.back();
+                        motorDistIndexes.pop_back();
+                        switch (actionIdx) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
@@ -42,13 +55,22 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                             case 5: motorWait_.push_back(n); break;
                         }
                     }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
+                }
+            } else if (type == NeuronType::Sensory) {
+                for (Neuron* n : pop->getNeurons()) {
+                    // Distribute sensory neurons using population-based distribution
+                    // This ensures better load balancing across sensory modalities
+                    static std::vector<size_t> sensoryDistIndexes;
+                    if (sensoryDistIndexes.empty()) {
+                        // Initialize distribution indexes if empty
+                        for (size_t i = 0; i < pop->getNeurons().size(); ++i) {
+                            sensoryDistIndexes.push_back(i % 4); // 4 sensory modalities
+                        }
+                    }
+                    if (!sensoryDistIndexes.empty()) {
+                        size_t modalityIdx = sensoryDistIndexes.back();
+                        sensoryDistIndexes.pop_back();
+                        switch (modalityIdx) {
                             case 0: sensoryVision_.push_back(n); break;
                             case 1: sensoryTouch_.push_back(n); break;
                             case 2: sensoryInternal_.push_back(n); break;
@@ -64,14 +86,32 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
+    // Validate brain pointer before accessing
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain::initialize: Cannot initialize - brain_ pointer is null");
+        return;
+    }
+    
+    // Validate world pointer
+    if (!&world) {
+        NLM_LOG_ERROR("AgentBrain::initialize: Invalid world pointer");
+        return;
+    }
+    
+    // Initialize vision buffer based on world dimensions
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    // Only log if we have valid neural groups
+    if (!sensoryVision_.empty() || !sensoryTouch_.empty() || !sensoryInternal_.empty()) {
+        NLM_LOG_INFO("AgentBrain initialized with " + 
+                     std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
+                     std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
+                     std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    } else {
+        NLM_LOG_WARN("AgentBrain initialized with empty neural groups - brain may not have populated regions");
+    }
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -85,7 +125,15 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_WARN("AgentBrain::processSensoryInput: brain_ is null, skipping processing");
+        return;
+    }
+    
+    if (!&percept) {
+        NLM_LOG_ERROR("AgentBrain::processSensoryInput: Invalid percept pointer");
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -150,7 +198,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_) {
+        NLM_LOG_WARN("AgentBrain::decodeMotorCommand: brain_ is null, returning Wait command");
+        return MotorCommand::Wait;
+    }
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
@@ -163,13 +214,23 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
+    // Validate that we have motor neurons before proceeding
+    if (motorForward_.empty() && motorBackward_.empty() && motorTurnLeft_.empty() && 
+        motorTurnRight_.empty() && motorInteract_.empty() && motorWait_.empty()) {
+        NLM_LOG_WARN("AgentBrain::decodeFromMotorNeurons: No motor neurons available");
+        return MotorCommand::Wait;
+    }
+    
     // Calculate average activity in each motor group
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
             // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            // Ensure neuron is not null before accessing its state
+            if (n) {
+                sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            }
         }
         return sum / neurons.size();
     };
@@ -334,17 +395,121 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
+    if (!brain_) return DevelopmentalStage::Initial;
+    return brain_->getDevelopmentalStage();
+}
+
+float AgentBrain::getNeuromodulationLevel() const {
+    return dopamineLevel_;
+}
+
+float AgentBrain::getCuriosityLevel() const {
+    return curiosityLevel_;
+}
+
+float AgentBrain::getNoveltyLevel() const {
+    return noveltyLevel_;
+}
+
+float AgentBrain::getPredictionError() const {
+    return predictionError_;
+}
+
 void AgentBrain::reset() {
+    // Reset all neuromodulation state
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
     predictionError_ = 0.0f;
     expectedReward_ = 0.0f;
+    
+    // Reset development state
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Reset performance tracking
+    totalStepsProcessed_ = 0;
+    successfulActions_ = 0;
+    averageActionSuccessRate_ = 0.0f;
+    lastActionTime_ = 0.0;
+    
+    // Clear action history if enabled
+    if (enableHistoryTracking_) {
+        actionHistory_.clear();
+    }
+    
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+// Implementation of advanced processing methods
+bool AgentBrain::isNewObservation(const std::vector<float>& currentVision) const {
+    if (currentVision.empty() || previousVision_.empty()) return true;
+    
+    if (currentVision.size() != previousVision_.size()) return true;
+    
+    float maxDiff = 0.0f;
+    for (size_t i = 0; i < currentVision.size(); ++i) {
+        float diff = std::abs(currentVision[i] - previousVision_[i]);
+        if (diff > maxDiff) maxDiff = diff;
+    }
+    
+    return maxDiff > 0.01f; // Threshold for considering it "new"
+}
+
+MotorCommand AgentBrain::advancedActionSelection(float confidence) const {
+    if (!brain_) return MotorCommand::Wait;
+    
+    // Apply confidence-based filtering
+    if (confidence < confidenceThreshold_ && confidenceThreshold_ > 0.0f) {
+        // Low confidence -> more cautious actions
+        return MotorCommand::Wait;
+    }
+    
+    // Use standard decoding as base
+    MotorCommand baseAction = decodeFromMotorNeurons();
+    
+    // Apply adaptive behavior
+    float adaptationScore = calculateBehavioralAdaptation();
+    MotorCommand adaptiveAction = applyAdaptiveBehavior(baseAction, adaptationScore);
+    
+    return adaptiveAction;
+}
+
+void AgentBrain::updateActionHistory(MotorCommand action, float reward, double timestamp, const std::string& description) {
+    if (!enableHistoryTracking_) return;
+    
+    ActionHistoryEntry entry;
+    entry.timestamp = timestamp;
+    entry.action = action;
+    entry.reward = reward;
+    entry.curiosity = curiosityLevel_;
+    entry.description = description;
+    
+    actionHistory_.push_back(entry);
+    
+    // Limit history size
+    if (actionHistory_.size() > maxActionHistory_) {
+        auto it = actionHistory_.begin();
+        actionHistory_.erase(it, it + (actionHistory_.size() - maxActionHistory_));
+    }
+    
+    updateSuccessRate();
+}
+
+void AgentBrain::updateSuccessRate() {
+    if (actionHistory_.empty()) {
+        averageActionSuccessRate_ = 0.0f;
+        return;
+    }
+    
+    size_t successfulCount = 0;
+    for (const auto& entry : actionHistory_) {
+        if (entry.reward > 0.0f) successfulCount++;
+    }
+    
+    averageActionSuccessRate_ = static_cast<float>(successfulCount) / actionHistory_.size();
 }
 
 } // namespace nlm

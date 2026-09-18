@@ -105,126 +105,223 @@ NLM/
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
 │   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
+│   ├── sensory/        # Sensory processing
+│   ├── motor/          # Motor system
+│   ├── environment/    # Environment interface
+│   ├── experiments/    # Experiment framework (Phase 6)
+│   ├── agent/          # Agent system (NEW - Phase 7 enhancements)
 │   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── tests/             # Unit and integration tests
+├── python/            # Python bindings and examples
+└── configs/           # Configuration files
 ```
 
-## Phase Summary
+## Phase 7: Advanced Agent Integration and Features (IN PROGRESS)
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+Phase 7 focuses on enhancing the agent system with advanced features, improved integration, and expanded capabilities for more sophisticated simulations and experimentation.
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+### Phase 7 Integration Achievements
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
+#### Enhanced Agent System
+- **AgentBody**: Physical properties and state management for agents in the world
+- **AgentBrain**: Advanced neural interface with history tracking and adaptive behavior
+- **Integration**: Seamless connection between brain, agent, and world systems
 
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+#### Advanced Features
+- **Action History**: Track and analyze agent behavior over time
+- **Adaptive Behavior**: Learn from experience and adjust actions accordingly
+- **Multi-modal Processing**: Process different types of sensory input
+- **Performance Metrics**: Monitor and optimize agent performance
+- **Advanced Exploration**: Intelligent exploration strategies based on curiosity and novelty
 
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
+#### World Integration
+- **Enhanced Sensorimotor Loop**: More realistic agent-world interaction
+- **Improved State Management**: Better handling of agent internal state
+- **Advanced Command System**: Support for complex action sequences
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+### Phase 7 Goals
 
-## Scientific Limitations
+1. **Improved Realism**: More realistic agent behaviors and interactions
+2. **Enhanced Learning**: Better adaptation and learning capabilities
+3. **Performance Monitoring**: Built-in metrics for optimization
+4. **Extensibility**: Framework for adding new agent capabilities
+5. **Backward Compatibility**: Existing code continues to work without changes
 
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+### Advanced Agent Features
 
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
+#### 1. Action History and Analytics
+```python
+# Track agent behavior
+agent.enableHistoryTracking(True)
+agent.clearActionHistory()
 
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+# Get performance metrics
+print(f"Success Rate: {agent.getActionSuccessRate():.2f}")
+print(f"Total Steps: {agent.getTotalStepsProcessed()}")
+print(f"Successful Actions: {agent.getSuccessfulActions()}")
 ```
 
-## License
+#### 2. Adaptive Behavior
+```python
+# Configure adaptive learning
+agent.setAdvancedExploration(True)
+agent.setExplorationThreshold(0.3)
+agent.setConfidenceThreshold(0.6)
 
-MIT
+# Monitor adaptation
+adaptation = agent.calculateBehavioralAdaptation()
+```
 
-## Authors
+#### 3. New Observation Detection
+```python
+# Check if environment has changed
+isNew = agent.isNewObservation(current_vision)
+```
 
-Research project — See docs for scientific background.
+#### 4. Smart Action Selection
+```python
+# Use advanced action selection with confidence
+action = agent.advancedActionSelection(confidence)
+```
+
+### Command Line Options for Agent Brain
+
+The AgentBrain now supports additional command-line options:
+
+```bash
+--agent-history                    Enable action history tracking
+--agent-adaptive                   Enable adaptive behavior
+--agent-exploration-threshold <val> Set exploration threshold (0.0-1.0)
+--agent-confidence-threshold <val>  Set confidence threshold (0.0-1.0)
+--agent-max-history <n>            Maximum actions to store in history
+```
+
+### Integration with Existing Phase 6 System
+
+Phase 7 builds upon Phase 6 achievements:
+
+- **Memory Systems**: Enhanced working and episodic memory integration
+- **Neuromodulation**: Improved reward-based learning and adaptation
+- **Development**: Continuous developmental stage progression
+- **Prediction**: Enhanced forward models and prediction error processing
+- **Cognition**: Advanced planning and decision-making capabilities
+
+### Building and Running Phase 7
+
+#### Build Instructions
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_PHASE7_ADVANCED_AGENT=ON
+make -j4
+```
+
+#### Running Examples
+
+##### Basic Agent Simulation
+```bash
+./nlm --phase7-demo
+```
+
+##### Advanced Agent with Learning
+```bash
+./nlm --agent-history --agent-adaptive --agent-exploration-threshold 0.4
+```
+
+##### Performance Monitoring
+```bash
+./nlm --agent-max-history 5000 --agent-confidence-threshold 0.7
+```
+
+### Python API Enhancements
+
+The Python bindings now include:
+
+- **AgentBody**: Physical agent properties and state management
+- **Enhanced AgentBrain**: Action history, performance metrics, adaptive behavior
+- **Advanced Configuration**: New parameters for agent learning and exploration
+
+#### Example Usage
+```python
+import pynlm
+
+# Create advanced agent
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+agent = pynlm.createAgentBrain(brain)
+
+# Enable advanced features
+agent.enableHistoryTracking(True)
+agent.setAdvancedExploration(True)
+agent.setExplorationThreshold(0.3)
+
+# Create world and initialize
+world = pynlm.createSimpleWorld()
+agent.initialize(world)
+
+# Run adaptive learning simulation
+for step in range(1000):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply adaptive reward modulation
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.applyRewardModulation(reward, agent.getPredictionError())
+    
+    # Update development
+    agent.updateDevelopment(0.1)
+    
+    # Monitor performance
+    if step % 100 == 0:
+        print(f"Step {step}:")
+        print(f"  Success Rate: {agent.getActionSuccessRate():.3f}")
+        print(f"  Adaptation: {agent.calculateBehavioralAdaptation():.3f}")
+        print(f"  History Size: {len(agent.getActionHistory())}")
+
+print("Advanced agent simulation complete!")
+```
+
+### Research and Experiment Applications
+
+Phase 7 enables new types of experiments:
+
+1. **Behavior Analysis**: Study how agents learn and adapt over time
+2. **Performance Optimization**: Find optimal exploration-exploitation balances
+3. **Development Studies**: Observe how cognitive abilities develop
+4. **Social Learning**: Test agent interactions in multi-agent environments
+
+### Scientific Value
+
+Phase 7 advances the field of artificial brain research by:
+
+- Providing more realistic models of cognitive development
+- Enabling long-term behavioral studies
+- Supporting complex environmental interactions
+- Offering tools for performance analysis and optimization
+
+### References
+
+- [Phase 6 Integration Results](docs/PHASE6_FINAL_AUDIT.md)
+- [Advanced Agent Documentation](docs/ADVANCED_AGENT.md)
+- [Phase 7 Research Papers](research/phase7/)
+
+## Current Limitations
+
+While Phase 7 adds significant capabilities, remember:
+
+- **Computational Cost**: Advanced features require more processing power
+- **Memory Usage**: History tracking increases memory consumption
+- **Complexity**: More parameters require careful tuning for optimal results
+- **Research Status**: Some advanced features are still experimental
+
+### Future Phase 8: Integrated Multi-Agent Systems
+
+Phase 8 will focus on:
+
+- Multi-agent coordination and cooperation
+- Emergent social behaviors
+- Complex environmental interactions
+- Large-scale learning systems
