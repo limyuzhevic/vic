@@ -78,6 +78,66 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
+bool Config::loadFromFile(const std::string& filepath) {
+    // TODO PHASE 2: Implement proper JSON/YAML parser
+    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromArgs(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        // Handle -key value format
+        else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            set(key, value, ConfigSource::CommandLine);
+        }
+    }
+    return true;
+}
+
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
@@ -92,12 +152,69 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+bool Config::initializeDefaultConfig(std::shared_ptr<Config> config) {
+    // Set default configuration values for Phase 6
+    // Neural parameters
+    config->set("neuron.resting_potential", -70.0);
+    config->set("neuron.threshold", -55.0);
+    config->set("neuron.refractory_period", 5);
+    config->set("neuron.leak_conductance", 10.0);
+    config->set("neuron.membrane_capacitance", 1.0);
     
-    if (it == pImpl->entries.end()) {
+    // Synaptic parameters  
+    config->set("synapse.excitatory_weight", 0.5);
+    config->set("synapse.inhibitory_weight", -0.5);
+    config->set("synapse.delay", 1);
+    config->set("synapse.plasticity.hebbian", 1.0);
+    config->set("synapse.plasticity.stdp_ltp", 0.01);
+    config->set("synapse.plasticity.stdp_ltd", 0.012);
+    
+    // Network parameters
+    config->set("network.region.count", 3);
+    config->set("network.region.vision_neurons", 100);
+    config->set("network.region.motor_neurons", 24);
+    config->set("network.region.internal_neurons", 50);
+    
+    // Simulation parameters
+    config->set("simulation.timestep", 0.001);
+    config->set("simulation.max_steps", 10000);
+    config->set("simulation.random_seed", 42);
+    
+    // Agent parameters
+    config->set("agent.vision_width", 16);
+    config->set("agent.vision_height", 16);
+    config->set("agent.touch_sensors", 8);
+    config->set("agent.internal_sensors", 4);
+    config->set("agent.proprioception_sensors", 6);
+    
+    // Neuromodulation parameters
+    config->set("neuromodulation.dopamine.scale", 1.0);
+    config->set("neuromodulation.curiosity.sensitivity", 0.5);
+    config->set("neuromodulation.novelty.decay_rate", 0.99);
+    
+    // Development parameters
+    config->set("development.initial_plasticity", 1.0);
+    config->set("development.adult_plasticity", 0.2);
+    config->set("development.critical_period_age", 300.0);
+    
+    // Memory parameters
+    config->set("memory.working.capacity", 1000);
+    config->set("memory.episodic.capacity", 100);
+    config->set("memory.consolidation.interval", 1000);
+    
+    // Motor parameters
+    config->set("motor.action.scale", 1.0);
+    config->set("motor.action.decay_rate", 0.9);
+    config->set("motor.curiosity.threshold", 0.5);
+    config->set("motor.curiosity.explore_chance", 0.3);
+    
+    // Exploration parameters
+    config->set("exploration.noise_level", 0.1);
+    config->set("exploration.epsilon_decay", 0.9995);
+    config->set("exploration.epsilon_min", 0.01);
+    
+    return true;
+}
         return std::nullopt;
     }
     

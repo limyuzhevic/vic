@@ -163,15 +163,29 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
+    // Safety check - no brain means no action
+    if (!brain_) {
+        NLM_LOG_WARNING("AgentBrain::decodeFromMotorNeurons called without valid brain");
+        return MotorCommand::Wait;
+    }
+    
     // Calculate average activity in each motor group
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
+        int validNeurons = 0;
         for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            if (!n) continue;  // Skip null neurons
+            validNeurons++;
+            const auto& state = n->getState();
+            // Activity is positive deviation from resting potential (excitatory input)
+            if (state.membranePotential > state.restingPotential) {
+                sum += state.membranePotential - state.restingPotential;
+            }
+            // Repetitive firing indicates higher activity
+            sum += static_cast<float>(state.firingState == FiringState::Active) * 2.0f;
         }
-        return sum / neurons.size();
+        return validNeurons > 0 ? sum / validNeurons : 0.0f;
     };
     
     float forwardAct = calcActivity(motorForward_);
@@ -181,7 +195,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     float interactAct = calcActivity(motorInteract_);
     float waitAct = calcActivity(motorWait_);
     
-    // Find maximum activity
+    // Find maximum activity with better bounds checking
     struct { MotorCommand cmd; float activity; } commands[] = {
         {MotorCommand::MoveForward, forwardAct},
         {MotorCommand::MoveBackward, backwardAct},
@@ -201,8 +215,8 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         }
     }
     
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    // Only act if there's meaningful activity (adjusted threshold)
+    if (bestActivity < 0.1f) {  // Lower threshold since activity is now more realistic
         return MotorCommand::Wait;
     }
     
@@ -217,8 +231,8 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            // Random motor command - extended to cover all available MotorCommand values
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 8);  // 0-8 inclusive (9 values)
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -227,8 +241,15 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
+                case 7: return MotorCommand::Wait;
+                case 8: return MotorCommand::MoveForward;  // Cycle back to first action (8 actions + Wait = 9 total)
                 default: return MotorCommand::Wait;
             }
+        }
+    }
+    
+    return defaultCmd;
+}
         }
     }
     
