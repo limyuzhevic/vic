@@ -24,6 +24,41 @@ NLM IS intended to become:
 
 Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
 
+## Quick Start
+
+### Python API (Recommended for beginners)
+
+If you want to quickly experiment with the brain:
+
+```python
+import pynlm
+
+# Create a brain with default settings
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run for 100 simulation steps
+for step in range(100):
+    brain.step(step)
+
+print("Simulation complete! Your brain simulated", brain.getTotalSpikeCount(), "spikes.")
+```
+
+### Building from Source (Advanced)
+
+For the full C++ version:
+
+```bash
+# Build from source (takes 5-10 minutes)
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+
+# Run the demo
+./nlm
+```
+
 ### Phase 6 Integration Achievements
 
 #### Memory Systems
@@ -64,23 +99,46 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
 
-## Building
+## Building from Source
 
 ```bash
-mkdir build
-cd build
+# Clone the repository
+# See https://github.com/nlm-project/nlm for the repository URL
+
+# Build from source (takes 5-10 minutes)
+mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
+
+# Run the demo
+./nlm
 ```
+## Running Demos
 
-## Running
+### Phase 6 Integration Demo
 
-### Phase 6 Demo (Integration Test)
 ```bash
+# Run the comprehensive integration demo
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Phase 3 Demo
+
+```bash
+./nlm_phase3_demo
+```
+
+This runs the Phase 3 neural computation demo.
+
+### Phase 4 Demo
+
+```bash
+./nlm_phase4_demo
+```
+
+This runs the Phase 4 cognition and learning demo.
 
 ## Project Structure
 
