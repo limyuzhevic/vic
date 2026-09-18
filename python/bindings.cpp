@@ -152,10 +152,32 @@ PYBIND11_MODULE(pynlm, m) {
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
+        .def("batchSet", &Config::batchSet, py::arg("values"),
+             "Set multiple configuration values at once (dict-like mapping)")
+        .def("validate", &Config::validate,
+             "Validate configuration against schema, returns validation report")
+        .def("exportConfig", &Config::exportConfig,
+             "Export configuration to a dictionary")
+        .def("importConfig", &Config::importConfig, py::arg("config"),
+             "Import configuration from a dictionary")
+        .def("setDefault", [](Config& self, const std::string& key, const py::object& value) {
+            self.setDefault(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a value if key doesn't exist (type-safe)")
+        .def("get", [](const Config& self, const std::string& key) {
+            return self.get(key);
+        }, py::arg("key"),
+             "Get configuration value with type inference")
+        .def("getOr", [](const Config& self, const std::string& key, const py::object& defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value with default, type-safe")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
+        .def("getTypes", &Config::getTypes,
+             "Get types of all configuration values")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,

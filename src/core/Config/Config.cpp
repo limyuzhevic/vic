@@ -3,8 +3,24 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <regex>
+
+// Try to include nlohmann/json
+#ifdef __has_include
+#if __has_include("nlohmann/json.hpp")
+#include "nlohmann/json.hpp"
+#define HAS_NLOHMANN_JSON
+#elif __has_include(<nlohmann/json.hpp>)
+#include <nlohmann/json.hpp>
+#define HAS_NLOHMANN_JSON
+#endif
+#endif
 
 namespace nlm {
+
+#ifdef HAS_NLOHMANN_JSON
+using json = nlohmann::json;
+#endif
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -19,16 +35,55 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Detect file format based on extension
+    std::filesystem::path path(filepath);
+    std::string ext = path.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
     
+    ConfigFileFormat format = ConfigFileFormat::Unknown;
+    
+#ifdef HAS_NLOHMANN_JSON
+    if (ext == ".json") {
+        format = ConfigFileFormat::JSON;
+    } else if (ext == ".yaml" || ext == ".yml") {
+        format = ConfigFileFormat::JSON; // For now, treat YAML as JSON since nlohmann handles YAML
+    }
+#endif
+    
+    // Default to simple key=value format for common config extensions
+    if (format == ConfigFileFormat::Unknown) {
+        if (ext == ".cfg" || ext == ".txt" || ext == ".nlm") {
+            format = ConfigFileFormat::SimpleKeyValue;
+        }
+    }
+    
+    // Try to parse based on detected format
+    if (format == ConfigFileFormat::JSON) {
+#ifdef HAS_NLOHMANN_JSON
+        return loadFromJSON(filepath);
+#else
+        return false; // JSON library not available
+#endif
+    } else if (format == ConfigFileFormat::SimpleKeyValue) {
+        return loadFromSimpleKeyValue(filepath);
+    }
+    
+    return false; // Unsupported format
+}
+
+namespace nlm {
+
+bool Config::loadFromSimpleKeyValue(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,7 +103,13 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Convert string to appropriate type
+            try {
+                set(key, stringToValue(value, key), ConfigSource::File);
+            } catch (const std::exception&) {
+                // Skip values that can't be parsed
+                continue;
+            }
         }
     }
     
@@ -78,15 +139,44 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
+bool Config::loadFromSimpleKeyValue(const std::string& filepath) {
+    std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    std::string line;
+    int lineNumber = 0;
+    while (std::getline(file, line)) {
+        ++lineNumber;
+        
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            // Convert string to appropriate type
+            try {
+                set(key, stringToValue(value, key), ConfigSource::File);
+            } catch (const std::exception&) {
+                // Skip values that can't be parsed
+                continue;
+            }
+        }
     }
     
     return true;
