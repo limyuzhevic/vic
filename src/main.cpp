@@ -39,13 +39,42 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics            ║
     ║     - Event-driven spike propagation                          ║
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printUsage() {
+    std::cout << "Usage: nlm [OPTIONS]" << std::endl;
+    std::cout << "Neural Learning Machine - Phase 2: Real Neural Computation" << std::endl << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h                    Show this help message" << std::endl;
+    std::cout << "  --config=<file>               Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --neuron-count=<n>            Override number of neurons" << std::endl;
+    std::cout << "  --region-count=<n>            Override number of regions" << std::endl;
+    std::cout << "  --simulation-timestep=<t>      Override simulation timestep (seconds)" << std::endl;
+    std::cout << "  --random-seed=<s>             Override random seed for reproducibility" << std::endl;
+    std::cout << "  --verbose, -v                 Enable verbose logging" << std::endl;
+    std::cout << "  --log-level=<level>           Set log level (DEBUG, INFO, WARNING, ERROR)" << std::endl;
+    std::cout << "  --experiment-mode             Run built-in learning experiments" << std::endl;
+    std::cout << "  --performance-mode            Enable performance optimizations" << std::endl;
+    std::cout << "  --checkpoint=<file>           Save/load checkpoint at specified step" << std::endl;
+    std::cout << "  --continue-from=<file>        Continue simulation from checkpoint" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Configuration file format:" << std::endl;
+    std::cout << "  key = value                    (simple key=value pairs)" << std::endl;
+    std::cout << "  key = \"quoted value\"" << std::endl;
+    std::cout << "  key = [1, 2, 3]               (vector values)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  ./nlm                          Run with default configuration" << std::endl;
+    std::cout << "  ./nlm --config=myconfig.cfg    Load custom configuration" << std::endl;
+    std::cout << "  ./nlm --neuron-count=2000      Create brain with 2000 neurons" << std::endl;
+    std::cout << "  ./nlm --random-seed=123        Use fixed seed for reproducible results" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience

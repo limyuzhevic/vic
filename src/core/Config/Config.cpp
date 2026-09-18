@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>  // for std::setprecision, std::fixed
+#include <limits>
 
 namespace nlm {
 
@@ -48,7 +50,72 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Try to parse numeric values
+            try {
+                // Try integer
+                size_t posEnd;
+                int intVal = std::stoi(value, &posEnd);
+                if (posEnd == value.size()) {
+                    set(key, intVal, ConfigSource::File);
+                    continue;
+                }
+                
+                // Try float
+                float floatVal = std::stof(value, &posEnd);
+                if (posEnd == value.size()) {
+                    set(key, floatVal, ConfigSource::File);
+                    continue;
+                }
+                
+                // Try boolean
+                if (value == "true") {
+                    set(key, true, ConfigSource::File);
+                    continue;
+                } else if (value == "false") {
+                    set(key, false, ConfigSource::File);
+                    continue;
+                }
+                
+                // Try int64
+                int64_t int64Val = std::stoll(value, &posEnd);
+                if (posEnd == value.size()) {
+                    set(key, int64Val, ConfigSource::File);
+                    continue;
+                }
+                
+                // Try double
+                double doubleVal = std::stod(value, &posEnd);
+                if (posEnd == value.size()) {
+                    set(key, doubleVal, ConfigSource::File);
+                    continue;
+                }
+                
+                // Try vector (simple bracket format)
+                if (value.size() >= 2 && value.front() == '[' && value.back() == ']') {
+                    std::string inner = value.substr(1, value.size() - 2);
+                    std::vector<int> intVec;
+                    std::stringstream ss(inner);
+                    std::string token;
+                    while (std::getline(ss, token, ',')) {
+                        token = trim(token);
+                        try {
+                            intVec.push_back(std::stoi(token));
+                        } catch (...) {
+                            break;
+                        }
+                    }
+                    if (!intVec.empty()) {
+                        set(key, intVec, ConfigSource::File);
+                        continue;
+                    }
+                }
+                
+                // Default to string
+                set(key, value, ConfigSource::File);
+            } catch (const std::exception&) {
+                // If parsing fails, store as string
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -86,7 +153,52 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Format value appropriately based on type
+        std::visit([&file, &entry](auto&& value) {
+            using T = std::decay_t<decltype(value)>;
+            
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Quote strings with special characters
+                if (value.find(' ') != std::string::npos || 
+                    value.find('\t') != std::string::npos ||
+                    value.find('=') != std::string::npos ||
+                    value.find('#') != std::string::npos) {
+                    file << entry.key << " = \"" << value << "\"\n";
+                } else {
+                    file << entry.key << " = " << value << "\n";
+                }
+            } else if constexpr (std::is_same_v<T, int> ||
+                                std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << value << "\n";
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format floats with reasonable precision
+                file << entry.key << " = " << std::fixed << std::setprecision(6) << value << "\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (value ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << std::fixed << std::setprecision(6) << value[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [\"";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << "\", \"";
+                    file << value[i];
+                }
+                file << "\"]\n";
+            }
+        }, entry.value);
     }
     
     return true;
