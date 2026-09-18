@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -55,13 +56,16 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format with fallback to key=value format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from file (simple key=value format for backward compatibility)
+    bool loadFromFileSimpleFormat(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -100,6 +104,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON conversion helpers
+    static ConfigValue jsonToConfigValue(const nlohmann::json& j);
+    static nlohmann::json configValueToJson(const ConfigValue& v);
 };
 
 } // namespace nlm

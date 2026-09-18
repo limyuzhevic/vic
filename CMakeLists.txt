@@ -4,22 +4,16 @@ project(NLM VERSION 0.1.0 LANGUAGES CXX)
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
-
-# Enable warnings
-if(MSVC)
-    add_compile_options(/W4)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
-
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Use FetchContent for nlohmann/json
+include(FetchContent)
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.2
+)
+FetchContent_MakeAvailable(nlohmann_json)
 
 # Core library
 add_library(nlm_core STATIC
@@ -91,6 +85,9 @@ target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+# Link nlohmann_json to nlm_core
+target_link_libraries(nlm_core PUBLIC nlohmann_json)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
