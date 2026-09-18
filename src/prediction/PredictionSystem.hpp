@@ -1,21 +1,25 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
 #include <vector>
 #include <memory>
 
 namespace nlm {
 
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// Implements forward model with neural substrate integration
 
 class PredictionSystem {
 public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize with brain reference for integration
+    void initialize(Brain* brain);
+    
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
+    // TODO PHASE 2: Implement real prediction using neural substrate
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
@@ -33,6 +37,12 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Update with current brain state for integration
+    void updateWithCurrentState();
+    
+    // Get current prediction confidence based on attention
+    float getCurrentConfidence() const;
     
 private:
     struct Impl;
