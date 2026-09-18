@@ -1,7 +1,5 @@
-#include "Neuron.hpp"
-#include "../core/Random/Random.hpp"
-#include <cmath>
-#include <algorithm>
+#include <cstdlib>
+#include <ctime>
 
 namespace nlm {
 
@@ -13,6 +11,8 @@ struct Neuron::Impl {
     PopulationId populationId;
     MembranePotential totalCurrent;  // Total synaptic current input this step
     MembranePotential synapticInput;  // Accumulated synaptic input
+    MembranePotential adaptationCurrent;  // Slow adaptation current (nA)
+    MembranePotential noiseTerm;         // Synaptic noise term (nA)
     std::vector<Timestamp> spikeHistory;
     std::vector<SynapseHandle> incomingSynapses;
     std::vector<SynapseHandle> outgoingSynapses;
@@ -21,10 +21,16 @@ struct Neuron::Impl {
     // LIF parameters
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
+    static constexpr float E_L = -70.0f;  // Resting potential (mV)
+    static constexpr float V_T = -50.0f;  // Threshold potential (mV)
+    static constexpr float Delta_T = 2.0f;  // Sharpness parameter (mV)
+    static constexpr float tau_w = 100.0f;  // Adaptation time constant (ms)
+    static constexpr float g_L = 10.0f;  // Leak conductance (nS)
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f), adaptationCurrent(0.0f), 
+             noiseTerm(0.0f) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -119,22 +125,19 @@ float Neuron::getLastSpikeTime() const {
     return pImpl->state.lastSpikeTime;
 }
 
-void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
-    // Real synaptic input: excitatory currents add to total current
-    // amplitude represents synaptic conductance * reversal potential contribution
-    pImpl->synapticInput += amplitude;
+void Neuron::addExcitatoryConductance(MembranePotential conductance) {
+    // Add excitatory synaptic conductance (conductance-based)
+    pImpl->state.excitatoryConductance += conductance;
 }
 
-void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
-    // Real inhibitory input: subtract from total current
-    // Inhibitory synaptic currents hyperpolarize the neuron
-    pImpl->synapticInput -= amplitude;
+void Neuron::addInhibitoryConductance(MembranePotential conductance) {
+    // Add inhibitory synaptic conductance (conductance-based)
+    pImpl->state.inhibitoryConductance += conductance;
 }
 
-void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
-    // Modulatory input affects plasticity but not directly integrated
-    // Used for neuromodulation (e.g., dopamine, acetylcholine)
-    pImpl->state.adaptationVariable += amplitude * 0.1f;
+void Neuron::addModulatoryConductance(MembranePotential conductance) {
+    // Add modulatory synaptic conductance (neuromodulatory inputs)
+    pImpl->state.modulatoryConductance += conductance;
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
@@ -259,10 +262,249 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     return fired;
 }
 
+// Forward declarations needed for incomplete types
+NeuronId Neuron::getId() const {
+    return pImpl->id;
+}
+
+NeuronType Neuron::getType() const {
+    return pImpl->type;
+}
+
+MembranePotential Neuron::getMembranePotential() const {
+    return pImpl->state.membranePotential;
+}
+
+void Neuron::setMembranePotential(MembranePotential potential) {
+    pImpl->state.membranePotential = potential;
+}
+
+void Neuron::addToMembranePotential(MembranePotential delta) {
+    pImpl->state.membranePotential += delta;
+}
+
+MembranePotential Neuron::getThreshold() const {
+    return pImpl->state.threshold;
+}
+
+void Neuron::setThreshold(MembranePotential threshold) {
+    pImpl->state.threshold = threshold;
+}
+
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
+void Neuron::setFiringState(FiringState state) {
+    pImpl->state.firingState = state;
+}
+
+void Neuron::setRefractoryPeriod(uint32_t steps) {
+    pImpl->state.refractoryPeriod = steps;
+}
+
+void Neuron::decrementRefractory() {
+    if (pImpl->state.refractoryRemaining > 0) {
+        --pImpl->state.refractoryRemaining;
+        if (pImpl->state.refractoryRemaining == 0) {
+            pImpl->state.firingState = FiringState::Resting;
+        }
+    }
+}
+
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
+}
+
+void Neuron::setFiringRate(FiringRate rate) {
+    pImpl->state.firingRate = rate;
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->synapticInput;
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
+}
+
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
+}
+
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
+}
+
+MembranePotential Neuron::getRestingPotential() const {
+    return pImpl->state.restingPotential;
+}
+
+MembranePotential Neuron::getResetPotential() const {
+    return pImpl->state.resetPotential;
+}
+
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
+}
+
+bool Neuron::stepAdEx(Timestamp currentTime, TimestepDuration dt) {
+    bool fired = false;
+    
+    // Handle refractory period with fractional refractory modeling
+    pImpl->state.refractoriness = std::max(0.0f, pImpl->state.refractoriness - dt * 1000.0f / static_cast<float>(pImpl->state.refractoryPeriod));
+    pImpl->state.refractoryFraction = 1.0f - (pImpl->state.refractoriness / pImpl->state.refractoryPeriod);
+    
+    if (pImpl->state.refractoryRemaining > 0) {
+        --pImpl->state.refractoryRemaining;
+        // During refractory period, increase conductance to model refractoriness
+        pImpl->state.inhibitoryConductance += pImpl->state.refractoryConductance * pImpl->state.refractoryFraction;
+        if (pImpl->state.refractoryRemaining == 0) {
+            pImpl->state.firingState = FiringState::Resting;
+            pImpl->state.refractoriness = 0.0f;
+        }
+        return false;
+    }
+    
+    MembranePotential& V = pImpl->state.membranePotential;
+    
+    // Calculate total conductance
+    float g_L = pImpl->state.leakConductance;
+    float g_E = pImpl->state.excitatoryConductance;
+    float g_I = pImpl->state.inhibitoryConductance;
+    float g_M = pImpl->state.modulatoryConductance;
+    
+    // Calculate total current
+    float I_syn = pImpl->synapticInput;
+    
+    // Generate synaptic noise using normal distribution
+    float noise_sample = 0.0f;
+    if (pImpl->state.noiseVariance > 0.0f) {
+        // Generate Gaussian noise using RandomGenerator if available
+        // For now use simple random noise - this will be improved in future versions
+        // In a production system, we would use: pImpl->randomGenerator->normal(0.0f, sqrt(variance))
+        // Using a simple static generator for demonstration
+        static std::mt19937 rng(123456789);  // Fixed seed for reproducibility
+        std::normal_distribution<float> dist(0.0f, std::sqrt(pImpl->state.noiseVariance));
+        noise_sample = dist(rng);
+    }
+    
+    // AdEx dynamics: dV/dt = (V - E_L + \\Delta_V * \\exp((V - V_T)/\\Delta_T) - w + I_syn + I_noise) / C
+    float C = Impl::MEMBRANE_CAPACITANCE;
+    float delta_V = Impl::Delta_T;
+    float V_T = Impl::V_T;
+    
+    float exponential_term = (V > V_T) ? delta_V * std::exp((V - V_T) / delta_V) : 0.0f;
+    
+    // Ion channel dynamics
+    float I_Na = pImpl->state.sodiumConductance * (V - pImpl->state.sodiumReversalPotential);
+    float I_K = pImpl->state.potassiumConductance * (V - pImpl->state.potassiumReversalPotential);
+    float I_L = g_L * (V - pImpl->state.leakReversalPotential);
+    
+    // Total membrane current
+    float I_total = I_syn + noise_sample - pImpl->state.currentAdaptation - I_Na + I_K - I_L;
+    
+    // Update membrane potential using exponential Euler
+    V += dt * 1000.0f * (exponential_term + I_total / C);
+    
+    // Update adaptation current
+    pImpl->state.currentAdaptation += dt * 1000.0f * (0.8f * (V - Impl::E_L) - pImpl->state.currentAdaptation) / Impl::tau_w;
+    
+    // Adaptive threshold
+    pImpl->state.adaptiveThreshold += dt * 1000.0f * (0.02f * pImpl->state.currentAdaptation - pImpl->state.adaptiveThreshold);
+    
+    // Homeostatic plasticity
+    float target_rate = pImpl->state.homeostaticSetpoint;
+    float current_rate = pImpl->state.firingRate;
+    pImpl->state.homeostaticError = target_rate - current_rate;
+    pImpl->state.adaptationVariable += dt * 1000.0f * pImpl->state.homeostaticLearningRate * pImpl->state.homeostaticError;
+    
+    // Calcium dynamics for plasticity
+    float dCa_dt = -0.1f * pImpl->state.calciumConcentration + 0.1f * fired;
+    pImpl->state.calciumConcentration += dt * 1000.0f * dCa_dt;
+    
+    // Clamp to reasonable bounds
+    V = std::clamp(V, -100.0f, 50.0f);
+    pImpl->state.currentAdaptation = std::clamp(pImpl->state.currentAdaptation, -10.0f, 10.0f);
+    pImpl->state.adaptiveThreshold = std::clamp(pImpl->state.adaptiveThreshold, -20.0f, 20.0f);
+    pImpl->state.calciumConcentration = std::clamp(pImpl->state.calciumConcentration, 0.0f, 5.0f);
+    
+    // Check for spike with adaptive threshold
+    if (V >= Impl::V_T + pImpl->state.adaptiveThreshold) {
+        fired = true;
+        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+        
+        recordSpike(currentTime);
+        
+        // Reset with adaptation
+        V = pImpl->state.resetPotential;
+        pImpl->state.currentAdaptation += 2.0f;
+        pImpl->state.adaptiveThreshold += 3.0f;
+        
+        // Increase refractoriness
+        pImpl->state.refractoriness = pImpl->state.refractoryPeriod;
+        
+        // Enter refractory period
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        pImpl->state.firingState = FiringState::Refractory;
+        
+        // Update firing rate
+        pImpl->state.firingRate += 5.0f;
+    } else {
+        pImpl->state.firingState = FiringState::Active;
+    }
+    
+    // Update history buffers
+    size_t idx = pImpl->state.historyIndex;
+    pImpl->state.membranePotentialHistory[idx] = V;
+    pImpl->state.synapticInputHistory[idx] = pImpl->synapticInput;
+    pImpl->state.historyIndex = (idx + 1) % 4;
+    
+    // Decay adaptation variable
+    pImpl->state.adaptationVariable *= 0.99f;
+    
+    // Clear synaptic inputs for next step
+    pImpl->synapticInput = 0.0f;
+    pImpl->state.excitatoryConductance = 0.0f;
+    pImpl->state.inhibitoryConductance = 0.0f;
+    pImpl->state.modulatoryConductance = 0.0f;
+    
+    return fired;
+}
+
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
+    // Default AdEx exponential integrate-and-fire dynamics with standard timestep (1ms)
     TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    stepAdEx(currentTime, dt);
 }
 
 void Neuron::reset() {

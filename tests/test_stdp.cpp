@@ -44,6 +44,25 @@ void testSTDPConfigure() {
     std::cout << "    testSTDPConfigure passed" << std::endl;
 }
 
+void testSTDPTripletWeights() {
+    nlm::STDP stdp;
+    
+    assert(stdp.getTripletLTPWeight() == 0.002f);
+    assert(stdp.getTripletLTDWeight() == 0.002f);
+    assert(stdp.getTripletTimeConstant() == 40.0f);
+    
+    // Test setters
+    stdp.setTripletLTPWeight(0.005f);
+    stdp.setTripletLTDWeight(0.007f);
+    stdp.setTripletTimeConstant(50.0f);
+    
+    assert(stdp.getTripletLTPWeight() == 0.005f);
+    assert(stdp.getTripletLTDWeight() == 0.007f);
+    assert(stdp.getTripletTimeConstant() == 50.0f);
+    
+    std::cout << "    testSTDPTripletWeights passed" << std::endl;
+}
+
 void testSTDPName() {
     nlm::STDP stdp;
     
@@ -150,6 +169,8 @@ void runAll() {
     testSTDPCreation();
     testSTDPConfiguration();
     testSTDPConfigure();
+    testSTDPConfigureWithTriplet();
+    testSTDPTripletWeights();
     testSTDPName();
     testSTDPPotentiation();
     testSTDPDepression();

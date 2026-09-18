@@ -20,15 +20,22 @@ public:
     const char* getName() const override;
     
     // STDP parameters
-    void setLTPWeight(float weight);    // Long-term potentiation weight
+    void setLTPWeight(float weight);           // Long-term potentiation weight
     float getLTPWeight() const;
-    void setLTDWeight(float weight);    // Long-term depression weight
+    void setLTDWeight(float weight);           // Long-term depression weight
     float getLTDWeight() const;
-    void setTimeConstant(float tau);    // STDP time constant (ms)
+    void setTripletLTPWeight(float weight);    // Triplet potentiation weight
+    float getTripletLTPWeight() const;
+    void setTripletLTDWeight(float weight);    // Triplet depression weight
+    float getTripletLTDWeight() const;
+    void setTimeConstant(float tau);           // STDP time constant (ms)
     float getTimeConstant() const;
+    void setTripletTimeConstant(float tau);    // Triplet time constant (ms)
+    float getTripletTimeConstant() const;
     
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
+    void configure(float ltpWeight, float ltdWeight, float tripletLTPWeight, float tripletLTDWeight, float tau, float tripletTau);
     
 private:
     struct Impl;
