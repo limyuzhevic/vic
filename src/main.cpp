@@ -392,6 +392,55 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
+    // Performance optimizations
+    config->set("enable_multithreading", config->getOr<bool>("enable_multithreading", true), ConfigSource::CommandLine);
+    config->set("enable_simd", config->getOr<bool>("enable_simd", true), ConfigSource::CommandLine);
+    config->set("enable_sparse_connectivity", config->getOr<bool>("enable_sparse_connectivity", true), ConfigSource::CommandLine);
+    config->set("enable_event_driven", config->getOr<bool>("enable_event_driven", true), ConfigSource::CommandLine);
+    config->set("thread_count", config->getOr<int64_t>("thread_count", 0), ConfigSource::CommandLine);
+    
+    // Neural recording
+    config->set("enable_neural_recording", config->getOr<bool>("enable_neural_recording", false), ConfigSource::CommandLine);
+    config->set("recording_duration", config->getOr<double>("recording_duration", 100.0), ConfigSource::CommandLine);
+    
+    // State checkpointing
+    config->set("enable_checkpointing", config->getOr<bool>("enable_checkpointing", false), ConfigSource::CommandLine);
+    config->set("checkpoint_interval", config->getOr<double>("checkpoint_interval", 100.0), ConfigSource::CommandLine);
+    
+    // Visualization
+    config->set("enable_visualization", config->getOr<bool>("enable_visualization", false), ConfigSource::CommandLine);
+    config->set("visualization_format", config->getOr<std::string>("visualization_format", "text"), ConfigSource::CommandLine);
+    
+    // Benchmarking
+    config->set("enable_benchmarking", config->getOr<bool>("enable_benchmarking", false), ConfigSource::CommandLine);
+    config->set("benchmark_steps", config->getOr<int64_t>("benchmark_steps", 1000), ConfigSource::CommandLine);
+    
+    // Error: std::string not supported by Config
+    // config->set("visualization_format", config->getOr<std::string>("visualization_format", "text"), ConfigSource::CommandLine);
+    
+    // Logging verbosity
+    std::string logLevel = "INFO";
+    if (argc > 1 && std::string(argv[1]) == "--verbose") {
+        logLevel = "Debug";
+        consoleLogger->setLevel(LogLevel::Debug);
+    } else if (argc > 1 && std::string(argv[1]) == "--quiet") {
+        logLevel = "Warning";
+        consoleLogger->setLevel(LogLevel::Warning);
+    }
+    
+    NLM_LOG_INFO("Performance Settings:");
+    NLM_LOG_INFO("  multithreading: " + std::to_string(config->getOr<bool>("enable_multithreading", true)));
+    NLM_LOG_INFO("  simd: " + std::to_string(config->getOr<bool>("enable_simd", true)));
+    NLM_LOG_INFO("  sparse_connectivity: " + std::to_string(config->getOr<bool>("enable_sparse_connectivity", true)));
+    NLM_LOG_INFO("  event_driven: " + std::to_string(config->getOr<bool>("enable_event_driven", true)));
+    NLM_LOG_INFO("  thread_count: " + std::to_string(config->getOr<int64_t>("thread_count", 0)));
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Neural Recording: " + std::to_string(config->getOr<bool>("enable_neural_recording", false)));
+    NLM_LOG_INFO("Checkpointing: " + std::to_string(config->getOr<bool>("enable_checkpointing", false)));
+    NLM_LOG_INFO("Visualization: " + std::to_string(config->getOr<bool>("enable_visualization", false)));
+    NLM_LOG_INFO("Benchmarking: " + std::to_string(config->getOr<bool>("enable_benchmarking", false)));
+    NLM_LOG_INFO("");
+    
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
