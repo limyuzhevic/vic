@@ -3,11 +3,16 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <map>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::map<std::string, std::string> jsonCache;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,19 +24,129 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Check if file exists
+    if (!std::filesystem::exists(filepath)) {
+        NLM_LOG_WARNING("Config file does not exist: " + filepath);
+        return false;
+    }
     
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file: " + filepath);
+        return false;
+    }
+    
+    // Determine file type based on extension
+    std::string ext = filepath.substr(filepath.find_last_of(".") + 1);
+    
+    if (ext == "json" || ext == "JSON") {
+        return loadFromJSONFile(filepath);
+    } else if (ext == "yaml" || ext == "yml" || ext == "YAML" || ext == "YML") {
+        return loadFromYAMLFile(filepath);
+    } else {
+        // Default to simple key=value format
+        NLM_LOG_INFO("Using simple key=value format for config file: " + filepath);
+        return loadFromSimpleFile(filepath);
+    }
+}
+
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    // For now, implement a simple JSON parser
+    // In a real implementation, would use a proper JSON library
+    std::ifstream file(filepath);
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Simple JSON parsing - looking for key: "value" pairs
+    size_t pos = 0;
+    while (pos < content.length()) {
+        // Find next " key":
+        size_t keyStart = content.find('"', pos);
+        if (keyStart == std::string::npos) break;
+        size_t keyEnd = content.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+        trim(key);
+        
+        // Find colon after key
+        size_t colonPos = content.find(':', keyEnd);
+        if (colonPos == std::string::npos) break;
+        
+        // Find value (could be string, number, boolean, or array)
+        size_t valueStart = content.find_first_not_of(" \t\n\r:", colonPos + 1);
+        if (valueStart == std::string::npos) break;
+        
+        // Handle different value types
+        if (content[valueStart] == '"') {
+            // String value
+            size_t valueEnd = content.find('"', valueStart + 1);
+            if (valueEnd == std::string::npos) break;
+            std::string valueStr = content.substr(valueStart + 1, valueEnd - valueStart - 1);
+            set(key, valueStr, ConfigSource::File);
+        } else if (content[valueStart] == 't' || content[valueStart] == 'f') {
+            // Boolean value
+            if (content.substr(valueStart, 4) == "true" || content.substr(valueStart, 5) == "false") {
+                size_t valueEnd = content.find_first_of(",}\]\", valueStart);
+                if (valueEnd == std::string::npos) break;
+                std::string valueStr = content.substr(valueStart, valueEnd - valueStart);
+                bool valueBool = (valueStr == "true");
+                set(key, valueBool, ConfigSource::File);
+            }
+        } else if (content[valueStart] == '-' || std::isdigit(content[valueStart])) {
+            // Number value (integer or float)
+            size_t valueEnd = content.find_first_of(",}\]\", valueStart);
+            if (valueEnd == std::string::npos) break;
+            std::string valueStr = content.substr(valueStart, valueEnd - valueStart);
+            
+            // Try to parse as double first
+            try {
+                double doubleValue = std::stod(valueStr);
+                // Check if it's actually an integer
+                if (valueStr.find('.') == std::string::npos && valueStr.find('e') == std::string::npos && valueStr.find('E') == std::string::npos) {
+                    set(key, static_cast<int64_t>(doubleValue), ConfigSource::File);
+                } else {
+                    set(key, doubleValue, ConfigSource::File);
+                }
+            } catch (...) {
+                // Fallback to string
+                set(key, valueStr, ConfigSource::File);
+            }
+        } else if (content[valueStart] == '[') {
+            // Array value (simplified - only handles simple arrays of strings/numbers)
+            size_t arrayEnd = content.find(']', valueStart);
+            if (arrayEnd == std::string::npos) break;
+            std::string arrayStr = content.substr(valueStart + 1, arrayEnd - valueStart - 1);
+            
+            // Parse array - for now just store as string
+            set(key, arrayStr, ConfigSource::File);
+        }
+        
+        pos = valueStart + 1;
+    }
+    
+    NLM_LOG_INFO("Loaded " + std::to_string(pImpl->entries.size()) + " entries from JSON file: " + filepath);
+    return true;
+}
+
+bool Config::loadFromYAMLFile(const std::string& filepath) {
+    // For now, use the same implementation as JSON but with YAML-style parsing
+    // YAML is similar to JSON but with more complex syntax
+    return loadFromJSONFile(filepath);  // TODO: Implement proper YAML parsing
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty() || line[0] == '#' || line[0] == '%') {
             continue;
         }
         
@@ -49,9 +164,13 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            // Skip malformed lines with warning
+            NLM_LOG_WARNING("Skipping malformed config line " + std::to_string(lineNumber) + " in " + filepath + ": " + line);
         }
     }
     
+    NLM_LOG_INFO("Loaded " + std::to_string(pImpl->entries.size()) + " entries from simple file: " + filepath);
     return true;
 }
 
@@ -79,16 +198,158 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Auto-detect extension for format
+    std::string ext = filepath.substr(filepath.find_last_of(".") + 1);
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    if (ext == "json" || ext == "JSON") {
+        return saveToJSONFile(filepath);
+    } else if (ext == "yaml" || ext == "yml" || ext == "YAML" || ext == "YML") {
+        return saveToYAMLFile(filepath);
+    } else {
+        // Default to simple key=value format
+        return saveToSimpleFile(filepath);
+    }
+}
+
+bool Config::saveToJSONFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
     }
     
+    file << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": ";
+        
+        // Handle different value types
+        if (std::holds_alternative<int>(entry.value)) {
+            file << std::get<int>(entry.value);
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            file << std::get<int64_t>(entry.value);
+        } else if (std::holds_alternative<double>(entry.value)) {
+            file << std::get<double>(entry.value);
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            file << (std::get<bool>(entry.value) ? "true" : "false");
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            file << "\"" << std::get<std::string>(entry.value) << "\"";
+        } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+            file << "[";
+            const auto& vec = std::get<std::vector<int>>(entry.value);
+            for (size_t j = 0; j < vec.size(); ++j) {
+                if (j > 0) file << ", ";
+                file << vec[j];
+            }
+            file << "]";
+        } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+            file << "[";
+            const auto& vec = std::get<std::vector<double>>(entry.value);
+            for (size_t j = 0; j < vec.size(); ++j) {
+                if (j > 0) file << ", ";
+                file << vec[j];
+            }
+            file << "]";
+        } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+            file << "[";
+            const auto& vec = std::get<std::vector<std::string>>(entry.value);
+            for (size_t j = 0; j < vec.size(); ++j) {
+                if (j > 0) file << ", ";
+                file << "\"" << vec[j] << "\"";
+            }
+            file << "]";
+        }
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",";
+        }
+        file << "\n";
+    }
+    
+    file << "}\n";
+    
+    NLM_LOG_INFO("Saved " + std::to_string(pImpl->entries.size()) + " entries to JSON file: " + filepath);
+    return true;
+}
+
+bool Config::saveToYAMLFile(const std::string& filepath) const {
+    // YAML format is similar to JSON but with different syntax
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "# NLM Configuration\n";
+    file << "# Generated by NLM Config System\n\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << entry.key << ": ";
+        
+        // Handle different value types
+        if (std::holds_alternative<int>(entry.value)) {
+            file << std::get<int>(entry.value);
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            file << std::get<int64_t>(entry.value);
+        } else if (std::holds_alternative<double>(entry.value)) {
+            // Remove trailing zeros for cleaner YAML
+            double val = std::get<double>(entry.value);
+            if (std::abs(val - static_cast<int64_t>(val)) < 0.0001) {
+                file << static_cast<int64_t>(val);
+            } else {
+                file << val;
+            }
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            file << (std::get<bool>(entry.value) ? "true" : "false");
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            file << "\"" << std::get<std::string>(entry.value) << "\"";
+        } else {
+            // For complex types, use string representation
+            file << "# " << entry.key << ": [complex type not easily serializable]";
+        }
+        
+        file << "\n";
+    }
+    
+    NLM_LOG_INFO("Saved " + std::to_string(pImpl->entries.size()) + " entries to YAML file: " + filepath);
+    return true;
+}
+
+bool Config::saveToSimpleFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM Config System\n";
+    file << "# Format: key = value\n\n";
+    
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << entry.key << " = ";
+        
+        // Handle different value types
+        if (std::holds_alternative<int>(entry.value)) {
+            file << std::get<int>(entry.value);
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            file << std::get<int64_t>(entry.value);
+        } else if (std::holds_alternative<double>(entry.value)) {
+            file << std::get<double>(entry.value);
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            file << (std::get<bool>(entry.value) ? "true" : "false");
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            file << "\"" << std::get<std::string>(entry.value) << "\"";
+        }
+        
+        file << "\n\n";
+    }
+    
+    NLM_LOG_INFO("Saved " + std::to_string(pImpl->entries.size()) + " entries to simple file: " + filepath);
     return true;
 }
 

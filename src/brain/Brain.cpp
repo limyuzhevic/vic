@@ -1037,6 +1037,47 @@ AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
+// ========== ENHANCED SYSTEM ACCESSORS ==========
+
+// Connect to neuromodulation systems
+Dopamine* Brain::getDopamine() {
+    return pImpl->dopamine.get();
+}
+
+Curiosity* Brain::getCuriosity() {
+    return pImpl->curiosity.get();
+}
+
+Novelty* Brain::getNovelty() {
+    return pImpl->novelty.get();
+}
+
+PredictionError* Brain::getPredictionErrorSignal() {
+    return pImpl->predictionError.get();
+}
+
+// Connect to development system
+DevelopmentSystem* Brain::getDevelopmentSystem() {
+    return pImpl->developmentSystem.get();
+}
+
+// Connect to plasticity systems
+SpikeSystem* Brain::getSpikeSystem() {
+    return pImpl->spikeSystem.get();
+}
+
+STDP* Brain::getSTDP() {
+    return pImpl->stdp.get();
+}
+
+Hebbian* Brain::getHebbian() {
+    return pImpl->hebbian.get();
+}
+
+StructuralPlasticity* Brain::getStructuralPlasticity() {
+    return pImpl->structuralPlasticity.get();
+}
+
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
