@@ -146,6 +146,7 @@ public:
     NeuralEpisodicMemory* getEpisodicMemory();
     
     // Associative memory - pattern associations
+    NeuralAssociativeMemory* getSemanticMemory();
     NeuralAssociativeMemory* getAssociativeMemory();
     
     // ========== PREDICTION SYSTEM ==========
