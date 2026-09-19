@@ -5,8 +5,11 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
+
+using json = nlohmann::json;
 
 // Forward declarations
 class Config;
@@ -29,6 +32,23 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Configuration schema definition
+struct ConfigSchema {
+    std::string key;
+    std::string type;  // "int", "double", "bool", "string", "int_array", "double_array", "string_array"
+    std::string description;
+    bool required = false;
+    std::variant<int, double, bool, std::string> defaultValue;
+    std::vector<std::variant<int, double, bool, std::string>> allowedValues;
+    double minValue = std::numeric_limits<double>::lowest();
+    double maxValue = std::numeric_limits<double>::max();
+    
+    ConfigSchema() : required(false) {}
+    
+    ConfigSchema(const std::string& k, const std::string& t, const std::string& desc, bool req = false)
+        : key(k), type(t), description(desc), required(req) {}
 };
 
 // Configuration entry
