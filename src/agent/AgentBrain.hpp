@@ -1,13 +1,16 @@
-#pragma once
-
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <unordered_set>
+#include "../core/Error/NLMException.hpp"
 
 namespace nlm {
+
+// Forward declaration
+class Neuron;
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
@@ -76,21 +79,32 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Helper method to clean up expired weak references
+    void cleanExpiredNeuronReferences();
+    
+    // Helper method to lock weak_ptr safely
+    template<typename T>
+    std::shared_ptr<T> safeLock(const std::weak_ptr<T>& weakPtr) const;
+    
     std::shared_ptr<Brain> brain_;
     
+    // Weak references to neurons to avoid circular dependencies and double deletion
     // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    std::vector<std::weak_ptr<Neuron>> motorForward_;
+    std::vector<std::weak_ptr<Neuron>> motorBackward_;
+    std::vector<std::weak_ptr<Neuron>> motorTurnLeft_;
+    std::vector<std::weak_ptr<Neuron>> motorTurnRight_;
+    std::vector<std::weak_ptr<Neuron>> motorInteract_;
+    std::vector<std::weak_ptr<Neuron>> motorWait_;
     
     // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    std::vector<std::weak_ptr<Neuron>> sensoryVision_;
+    std::vector<std::weak_ptr<Neuron>> sensoryTouch_;
+    std::vector<std::weak_ptr<Neuron>> sensoryInternal_;
+    std::vector<std::weak_ptr<Neuron>> sensoryProprioception_;
+    
+    // Track valid neuron pointers to clean up expired weak references
+    std::unordered_set<std::weak_ptr<Neuron>> validNeuronRefs_;
     
     // Neuromodulation state
     float dopamineLevel_;
