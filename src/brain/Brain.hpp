@@ -28,6 +28,8 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;
+class SocialLearning;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -181,11 +183,20 @@ public:
     // Novelty - novelty detection
     Novelty* getNovelty();
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
+    
+    // Self-model - internal representation of body and agency
+    SelfModel* getSelfModel();
+    
+    // Social learning - learning from observing others
+    SocialLearning* getSocialLearning();
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
