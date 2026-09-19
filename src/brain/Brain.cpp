@@ -33,6 +33,11 @@ struct Brain::Impl {
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
+    // Memory integration flags
+    bool workingMemoryEnabled;
+    bool episodicMemoryEnabled;
+    bool associativeMemoryEnabled;
+    
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
     
@@ -92,6 +97,9 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , workingMemoryEnabled(true)
+        , episodicMemoryEnabled(true)
+        , associativeMemoryEnabled(true)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -148,6 +156,56 @@ struct Brain::Impl {
         // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        
+        // Configure working memory integration
+        if (workingMemory) {
+            workingMemory->initialize(this);
+        }
+        
+        // Configure episodic memory integration
+        if (episodicMemory) {
+            episodicMemory->initialize(this);
+        }
+        
+        // Configure associative memory integration
+        if (associativeMemory) {
+            associativeMemory->initialize(this);
+        }
+        
+        // Configure prediction system integration
+        if (predictionSystem) {
+            predictionSystem->initialize(this);
+        }
+        
+        // Configure cognition systems integration
+        if (planner) {
+            planner->initialize(this);
+        }
+        if (conceptFormation) {
+            conceptFormation->initialize(this);
+        }
+        if (attention) {
+            attention->initialize(this);
+        }
+        
+        // Configure development system integration
+        if (developmentSystem) {
+            developmentSystem->initialize(this);
+        }
+        
+        // Configure neuromodulation systems integration
+        if (novelty) {
+            novelty->initialize(this);
+        }
+        if (curiosity) {
+            curiosity->initialize(this);
+        }
+        if (dopamine) {
+            dopamine->initialize(this);
+        }
+        if (predictionError) {
+            predictionError->initialize(this);
+        }
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -401,7 +459,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
+    // ========== WORKING MEMORY UPDATE ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
@@ -415,6 +473,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Update curiosity
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
+    }
+    
+    // Update dopamine (reward prediction error)
+    if (pImpl->dopamine) {
+        pImpl->dopamine->update(pImpl->timestep);
+        
+        // Apply dopamine effects on neural excitability
+        // Dopamine modulates neural excitability by adjusting effective current injection
+        // Higher dopamine increases excitability (lower effective threshold)
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Dopamine modulates excitability by injecting additional current
+                    // Positive dopamine adds excitatory bias
+                    float excitabilityMod = dopamineLevel * 0.5f;
+                    if (excitabilityMod > 0.0f) {
+                        neuron->injectCurrent(excitabilityMod);
+                    }
+                }
+            }
+        }
     }
     
     // Update dopamine (reward prediction error)
@@ -511,8 +591,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural state
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Get prediction error for neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Apply prediction error to dopamine system for reward prediction error
+        if (pImpl->dopamine) {
+            // Update dopamine with prediction error (temporal difference style)
+            float learningRate = 0.01f;
+            float delta = predictionError * learningRate;
+            float currentDopamine = pImpl->dopamine->getLevel();
+            pImpl->dopamine->setLevel(currentDopamine + delta);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,16 +620,31 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This uses working memory patterns to discover recurring structures
+        std::vector<float> currentWorkingMemory = std::vector<float>();
+        if (pImpl->workingMemory) {
+            currentWorkingMemory = pImpl->workingMemory->retrieve();
+        }
+        pImpl->conceptFormation->update(currentWorkingMemory, pImpl->timestep);
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Update neural planner ==========
+    if (pImpl->planner) {
+        // Plan actions based on current goals and working memory content
+        std::vector<float> currentWorkingMemory = std::vector<float>();
+        if (pImpl->workingMemory) {
+            currentWorkingMemory = pImpl->workingMemory->retrieve();
+        }
+        pImpl->planner->update(currentWorkingMemory, pImpl->timestep);
+    }
+    
+    // ========== STEP 12: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
+    // ========== STEP 13: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
@@ -546,7 +653,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // ========== STEP 14: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -576,7 +683,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // ========== STEP 15: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
