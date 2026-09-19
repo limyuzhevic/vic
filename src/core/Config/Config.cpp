@@ -27,6 +27,69 @@ bool Config::loadFromFile(const std::string& filepath) {
         return false;
     }
     
+    // Try JSON parsing first
+    try {
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        if (content.empty()) {
+            return false;
+        }
+        
+        // Remove whitespace for simple parsing
+        std::string stripped;
+        for (char c : content) {
+            if (!std::isspace(c)) {
+                stripped += c;
+            }
+        }
+        
+        // Parse key=value pairs
+        size_t pos = 0;
+        while (pos < stripped.length()) {
+            size_t equalsPos = stripped.find('=', pos);
+            if (equalsPos == std::string::npos) {
+                break;
+            }
+            
+            std::string key = stripped.substr(pos, equalsPos - pos);
+            pos = equalsPos + 1;
+            
+            size_t nextEquals = stripped.find('=', pos);
+            if (nextEquals != std::string::npos) {
+                // Multiple key=value pairs on one line, skip to next
+                continue;
+            }
+            
+            // Find value end (next = or end of string)
+            size_t valueEnd = stripped.find('=', pos);
+            if (valueEnd == std::string::npos) {
+                valueEnd = stripped.length();
+            }
+            
+            std::string value = stripped.substr(pos, valueEnd - pos);
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+            pos = valueEnd + 1;
+            
+            // Skip to next key
+            while (pos < stripped.length() && !std::isalpha(stripped[pos])) {
+                pos++;
+            }
+        }
+        
+        return !pImpl->entries.empty();
+    } catch (...) {
+        // Fall back to simple line-based parsing
+        file.clear();
+        file.seekg(0, std::ios::beg);
+    }
+    
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments

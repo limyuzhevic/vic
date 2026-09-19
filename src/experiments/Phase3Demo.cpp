@@ -34,7 +34,7 @@ public:
         world.configure(20.0f, 20.0f, 16, 16);
         world.setRandomSeed(42);
         
-        // Create brain
+        // Create brain and agent interface in one step
         auto brain = std::make_shared<Brain>(config);
         brain->initialize();
         
@@ -63,6 +63,7 @@ public:
             
             // Reset world
             world.reset();
+            // Reset agent brain interface (brain is shared, agent interface can be reset)
             agentBrain.reset();
             brain->reset();
             
