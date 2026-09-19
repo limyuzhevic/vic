@@ -764,10 +764,10 @@ void Brain::reset() {
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
-    try {
-        CheckpointWriter writer;
+CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+            NLM_LOG_ERROR("Failed to create checkpoint file \"" + filepath + "\": checkpoint writer failed");
+            NLM_LOG_ERROR("  Check if directory exists and is writable");
             return false;
         }
         
@@ -810,7 +810,7 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
-        // Write synapses
+// Write synapses
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
             for (const auto* syn : region->getSynapses()) {
@@ -830,7 +830,7 @@ bool Brain::save(const std::string& filepath) const {
         
         // Finalize
         if (!writer.finalize()) {
-            NLM_LOG_ERROR("Failed to finalize checkpoint");
+            NLM_LOG_ERROR("Failed to finalize checkpoint: file may be corrupted");
             return false;
         }
         
@@ -847,16 +847,18 @@ bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
     try {
-        CheckpointReader reader;
-        if (!reader.open(filepath)) {
-            NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
-            return false;
-        }
-        
-        if (!reader.validate()) {
-            NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
-            return false;
-        }
+            CheckpointReader reader;
+            if (!reader.open(filepath)) {
+                NLM_LOG_ERROR("Failed to open checkpoint file \"" + filepath + "\"");
+                NLM_LOG_ERROR("  Check if file exists and is readable");
+                return false;
+            }
+            
+            if (!reader.validate()) {
+                NLM_LOG_ERROR("Checkpoint validation failed for \"" + filepath + "\": " + reader.getError());
+                NLM_LOG_ERROR("  File may be corrupted or from a different version");
+                return false;
+            }
         
         // Read neurons
         NeuronCheckpointData neuronData;

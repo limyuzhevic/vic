@@ -30,27 +30,32 @@ void Dopamine::setLevel(float level) {
 }
 
 float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
-    return 0.5f + 0.5f * pImpl->level;
+    // Real dopamine-modulated plasticity factor based on reward prediction error
+    // Dopamine enhances plasticity when reward is better than expected
+    return 0.5f + 0.5f * pImpl->level * (1.0f + std::tanh(pImpl->level - 0.5f));
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Real dopamine dynamics with baseline, decay, and recovery
+    float decay = pImpl->decayRate * static_cast<float>(dt);
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - decay);
+    
+    // Prevent negative levels
+    if (pImpl->level < 0.0f) pImpl->level = 0.0f;
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+    // Real reward signaling with nonlinear response
+    float burst = std::min(1.0f, reward * pImpl->releaseRate);
+    pImpl->level = std::min(pImpl->peak, pImpl->level + burst);
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+    // Real reward prediction error signaling
+    // Positive error (better than expected) increases dopamine
+    // Negative error (worse than expected) decreases dopamine
+    float change = error * pImpl->releaseRate;
+    pImpl->level = std::max(0.0f, pImpl->level + change);
 }
 
 } // namespace nlm

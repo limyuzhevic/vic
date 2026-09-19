@@ -146,4 +146,88 @@ void InternalSignals::clearSignals() {
     pImpl->signals.clear();
 }
 
+struct Audio::Impl {
+    size_t sampleRate;
+    size_t numSamples;
+    std::vector<float> data;
+    
+    Impl(size_t rate, size_t samples) : sampleRate(rate), numSamples(samples), data(samples, 0.0f) {}
+};
+
+Audio::Audio() : pImpl(new Impl(0, 0)) {}
+
+Audio::Audio(size_t sampleRate, size_t numSamples) 
+    : pImpl(new Impl(sampleRate, numSamples)) {}
+
+Audio::~Audio() = default;
+
+const char* Audio::getType() const {
+    return "Audio";
+}
+
+const std::vector<float>& Audio::getData() const {
+    return pImpl->data;
+}
+
+size_t Audio::getDimensions() const {
+    return pImpl->numSamples;
+}
+
+std::unique_ptr<SensoryInput> Audio::clone() const {
+    auto audio = std::make_unique<Audio>(pImpl->sampleRate, pImpl->numSamples);
+    audio->setData(pImpl->data);
+    return audio;
+}
+
+void Audio::setData(const std::vector<float>& data) {
+    if (data.size() == pImpl->data.size()) {
+        pImpl->data = data;
+    }
+}
+
+void Audio::setSampleRate(size_t rate) {
+    pImpl->sampleRate = rate;
+}
+
+size_t Audio::getSampleRate() const { return pImpl->sampleRate; }
+size_t Audio::getNumSamples() const { return pImpl->numSamples; }
+
+struct InternalSignals::Impl {
+    std::vector<float> signals;
+    
+    Impl() = default;
+};
+
+InternalSignals::InternalSignals() : pImpl(new Impl) {}
+
+InternalSignals::~InternalSignals() = default;
+
+const char* InternalSignals::getType() const {
+    return "InternalSignals";
+}
+
+const std::vector<float>& InternalSignals::getData() const {
+    return pImpl->signals;
+}
+
+size_t InternalSignals::getDimensions() const {
+    return pImpl->signals.size();
+}
+
+std::unique_ptr<SensoryInput> InternalSignals::clone() const {
+    auto clone = std::make_unique<InternalSignals>();
+    for (float sig : pImpl->signals) {
+        clone->addSignal(sig);
+    }
+    return clone;
+}
+
+void InternalSignals::addSignal(float value) {
+    pImpl->signals.push_back(value);
+}
+
+void InternalSignals::clearSignals() {
+    pImpl->signals.clear();
+}
+
 } // namespace nlm
