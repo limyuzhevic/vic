@@ -155,13 +155,15 @@ void Config::remove(const std::string& key) {
     );
 }
 
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+const ConfigValue& Config::getValue(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        throw ConfigException("Key not found: " + key);
     }
-    return keys;
+    
+    return it->value;
 }
 
 void Config::clear() {
@@ -193,23 +195,74 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+std::vector<std::string> Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    
+    // Check for essential keys if they exist
+    if (has("neuron_count")) {
+        try {
+            auto neurons = std::get<int64_t>(getValue("neuron_count"));
+            if (neurons <= 0) {
+                errors.push_back("neuron_count must be positive, got " + std::to_string(neurons));
+            }
+            if (neurons > 1000000) {
+                errors.push_back("neuron_count seems too large (max recommended: 1000000), got " + std::to_string(neurons));
+            }
+        } catch (...) {
+            errors.push_back("neuron_count has invalid value type");
+        }
+    }
+    
+    if (has("region_count")) {
+        try {
+            auto regions = std::get<int64_t>(getValue("region_count"));
+            if (regions <= 0) {
+                errors.push_back("region_count must be positive, got " + std::to_string(regions));
+            }
+        } catch (...) {
+            errors.push_back("region_count has invalid value type");
+        }
+    }
+    
+    if (has("connection_probability")) {
+        try {
+            auto prob = std::get<double>(getValue("connection_probability"));
+            if (prob < 0.0 || prob > 1.0) {
+                errors.push_back("connection_probability must be between 0.0 and 1.0, got " + std::to_string(prob));
+            }
+        } catch (...) {
+            errors.push_back("connection_probability has invalid value type");
+        }
+    }
+    
+    if (has("simulation_timestep")) {
+        try {
+            auto timestep = std::get<double>(getValue("simulation_timestep"));
+            if (timestep <= 0.0) {
+                errors.push_back("simulation_timestep must be positive, got " + std::to_string(timestep));
+            }
+            if (timestep > 1.0) {
+                errors.push_back("simulation_timestep seems too large (max recommended: 1.0), got " + std::to_string(timestep));
+            }
+        } catch (...) {
+            errors.push_back("simulation_timestep has invalid value type");
+        }
+    }
+    
+    if (has("random_seed")) {
+        try {
+            auto seed = std::get<int64_t>(getValue("random_seed"));
+            if (seed < 0) {
+                errors.push_back("random_seed must be non-negative, got " + std::to_string(seed));
+            }
+        } catch (...) {
+            errors.push_back("random_seed has invalid value type");
+        }
+    }
+    
+    return errors;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm
+bool Config::validate() const {
+    return getValidationErrors().empty();
+}

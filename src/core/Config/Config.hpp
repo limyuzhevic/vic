@@ -64,6 +64,12 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
+    // Validate configuration
+    bool validate() const;
+    
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
+    
     // Get values
     template<typename T>
     std::optional<T> get(const std::string& key) const;
