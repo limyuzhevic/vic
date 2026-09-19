@@ -1003,19 +1003,23 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
-
-NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
-}
-
-NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
-}
-
-NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
-}
+// Working memory - transient active information
+    NeuralWorkingMemory* getWorkingMemory() const
+    {
+        return pImpl->workingMemory.get();
+    }
+    
+    // Episodic memory - experience storage
+    NeuralEpisodicMemory* getEpisodicMemory() const
+    {
+        return pImpl->episodicMemory.get();
+    }
+    
+    // Associative memory - pattern associations
+    NeuralAssociativeMemory* getAssociativeMemory() const
+    {
+        return pImpl->associativeMemory.get();
+    }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
