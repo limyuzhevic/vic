@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <sstream>
+#include <type_traits>
 
 namespace nlm {
 
@@ -31,16 +33,64 @@ enum class ConfigSource {
     Runtime
 };
 
+// Helper function to convert string to appropriate type
+inline ConfigValue stringToConfigValue(const std::string& str) {
+    // Try boolean
+    if (str == "true") return true;
+    if (str == "false") return false;
+    
+    // Try integer types
+    try {
+        size_t pos;
+        int intVal = std::stoi(str, &pos);
+        if (pos == str.size()) return intVal;
+        
+        int64_t int64Val = std::stoll(str, &pos);
+        if (pos == str.size()) return int64Val;
+    } catch (...) {}
+    
+    // Try double
+    try {
+        size_t pos;
+        double doubleVal = std::stod(str, &pos);
+        if (pos == str.size()) return doubleVal;
+    } catch (...) {}
+    
+    // Fall back to string
+    return str;
+}
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    // Track type for proper serialization
+    std::string typeName;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description(), typeName() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+        : key(k), value(v), source(s), description(desc), typeName() {
+        // Auto-detect type name
+        typeName = getTypeName(v);
+    }
+    
+private:
+    static std::string getTypeName(const ConfigValue& value) {
+        return std::visit([](const auto& val) -> std::string {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, int>) return "int";
+            else if constexpr (std::is_same_v<T, int64_t>) return "int64_t";
+            else if constexpr (std::is_same_v<T, double>) return "double";
+            else if constexpr (std::is_same_v<T, bool>) return "bool";
+            else if constexpr (std::is_same_v<T, std::string>) return "string";
+            else if constexpr (std::is_same_v<T, std::vector<int>>) return "vector<int>";
+            else if constexpr (std::is_same_v<T, std::vector<double>>) return "vector<double>";
+            else if constexpr (std::is_same_v<T, std::vector<std::string>>) return "vector<string>";
+            else return "unknown";
+        }, value);
+    }
 };
 
 // Main configuration class

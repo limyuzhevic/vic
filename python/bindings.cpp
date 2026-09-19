@@ -7,6 +7,9 @@
 #include <vector>
 
 #include "../src/brain/Brain.hpp"
+#include "../src/brain/profiling/BrainProfiler.hpp"
+#include "../src/brain/profiling/DebugTools.hpp"
+#include "../src/brain/profiling/PerformanceMetrics.hpp"
 #include "../src/core/Config/Config.hpp"
 #include "../src/core/Types/Types.hpp"
 #include "../src/agent/AgentBrain.hpp"
@@ -299,6 +302,24 @@ PYBIND11_MODULE(pynlm, m) {
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
              "Perform a simulation step with timestamp")
+        .def("step_batch", [](Brain& self, size_t numSteps, Timestamp timestep = 1.0) {
+             for (size_t i = 0; i < numSteps; ++i) {
+                 self.step(i, timestep * i);
+             }
+         }, py::arg("steps"), py::arg("timestep") = 1.0,
+             "Process multiple steps efficiently")
+        .def("processMultipleInputs", [](Brain& self, const std::vector<std::reference_wrapper<const SensoryInput>>& inputs) {
+             for (const auto& input : inputs) {
+                 self.receiveSensoryInput(input.get());
+             }
+         }, py::arg("inputs"),
+             "Batch sensory processing")
+        .def("simulateEpisode", [](Brain& self, size_t maxSteps, Timestamp timestep = 1.0) {
+             for (size_t i = 0; i < maxSteps; ++i) {
+                 self.step(i, timestep * i);
+             }
+         }, py::arg("max_steps"), py::arg("timestep") = 1.0,
+             "Run complete episodes")
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
@@ -351,7 +372,239 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        .def("visualizeConnectivity", [](Brain& self) {
+             py::dict result;
+             auto regions = self.getRegions();
+             for (const auto& region : regions) {
+                 py::dict regionInfo;
+                 auto neurons = region->getNeurons();
+                 for (const auto& neuron : neurons) {
+                     py::dict neuronInfo;
+                     neuronInfo["id"] = neuron->getId();
+                     neuronInfo["type"] = static_cast<int>(neuron->getType());
+                     neuronInfo["firingRate"] = neuron->getFiringRate();
+                     regionInfo["neuron_" + std::to_string(neuron->getId().value())] = neuronInfo;
+                 }
+                 result[region->getName()] = regionInfo;
+             }
+             return result;
+         }, "Get connectivity data as Python structures")
+        .def("getNeuralActivityHistory", [](Brain& self) {
+             auto spikeSystem = self.getSpikeSystem();
+             if (!spikeSystem) return py::list();
+             
+             auto history = spikeSystem->getSpikeHistory();
+             py::list result;
+             for (const auto& entry : history) {
+                 py::dict event;
+                 event["neuron_id"] = entry.first.value();
+                 event["step"] = entry.second.first;
+                 event["time"] = entry.second.second;
+                 result.append(event);
+             }
+             return result;
+         }, "Get firing rate history")
+        .def("plotNeuralHeatmap", [](Brain& self) {
+             auto regions = self.getRegions();
+             py::dict heatmap;
+             for (const auto& region : regions) {
+                 std::vector<std::vector<float>> activityMap;
+                 auto neurons = region->getNeurons();
+                 if (neurons.empty()) continue;
+                 
+                 size_t rows = neurons.size();
+                 size_t cols = 10;  
+                 activityMap.resize(rows, std::vector<float>(cols, 0.0f));
+                 
+                 for (size_t i = 0; i < rows; ++i) {
+                     for (size_t j = 0; j < cols; ++j) {
+                         activityMap[i][j] = neurons[i]->getFiringRate();
+                     }
+                 }
+                 
+                 py::list rowList;
+                 for (const auto& row : activityMap) {
+                     py::list colList;
+                     for (float val : row) {
+                         colList.append(val);
+                     }
+                     rowList.append(colList);
+                 }
+                 heatmap[region->getName()] = rowList;
+             }
+             return heatmap;
+         }, "Generate neural activity maps")
+        .def("benchmarkPerformance", [](Brain& self, size_t numSteps) {
+             auto start = std::chrono::high_resolution_clock::now();
+             
+             for (size_t i = 0; i < numSteps; ++i) {
+                 self.step(i);
+             }
+             
+             auto end = std::chrono::high_resolution_clock::now();
+             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+             
+             py::dict stats;
+             stats["total_time_ms"] = duration.count();
+             stats["steps_per_second"] = numSteps * 1000.0 / duration.count();
+             stats["neurons_per_step"] = self.getTotalNeuronCount() / numSteps;
+             return stats;
+         }, py::arg("steps"), "Performance measurement")
+        .def("getMemoryUsage", [](Brain& self) {
+             auto workingMem = self.getWorkingMemory();
+             auto episodicMem = self.getEpisodicMemory();
+             auto assocMem = self.getAssociativeMemory();
+             
+             py::dict memStats;
+             memStats["working_memory_size"] = workingMem ? workingMem->getTraceCount() : 0;
+             memStats["episodic_memory_count"] = episodicMem ? episodicMem->getEpisodicCount() : 0;
+             memStats["associative_memory_size"] = assocMem ? assocMem->getAssociationCount() : 0;
+             return memStats;
+         }, "Memory profiling")
+        .def("getPerformanceStats", [](Brain& self) {
+             auto spikeSystem = self.getSpikeSystem();
+             py::dict stats;
+             
+             stats["total_neurons"] = self.getTotalNeuronCount();
+             stats["total_synapses"] = self.getTotalSynapseCount();
+             stats["active_neurons"] = self.getActiveNeuronCount();
+             stats["firing_neurons"] = self.getFiringNeuronCount();
+             stats["average_firing_rate"] = self.getAverageFiringRate();
+             stats["excitation_inhibition_ratio"] = self.getExcitationInhibitionRatio();
+             stats["total_spike_count"] = self.getTotalSpikeCount();
+             stats["pending_spike_events"] = spikeSystem ? spikeSystem->getPendingSpikeEventCount() : 0;
+             
+             auto workingMem = self.getWorkingMemory();
+             if (workingMem) {
+                 auto traces = workingMem->getActiveTraces();
+                 stats["active_working_memory_traces"] = traces.size();
+             }
+             
+             return stats;
+         }, "Comprehensive metrics")
+        .def("debugMode", &Brain::logStatus,
+             py::arg("mode") = 1,
+             "Enable/disable debug output")
+        .def("adjustConnectionWeight", [](Brain& self, NeuronId pre, NeuronId post, float weight) {
+             auto regions = self.getRegions();
+             for (auto& region : regions) {
+                 auto neurons = region->getNeurons();
+                 for (auto& neuron : neurons) {
+                     auto synapses = neuron->getOutgoingSynapses();
+                     for (auto& synapse : synapses) {
+                         if (synapse->getPostNeuron() == post && synapse->getPreNeuron() == pre) {
+                             synapse->setWeight(weight);
+                             return;
+                         }
+                     }
+                 }
+             }
+         }, py::arg("pre"), py::arg("post"), py::arg("weight"),
+             "Direct weight control")
+        .def("setPlasticityFlags", [](Brain& self, NeuronId pre, NeuronId post, PlasticityFlags flags) {
+             auto regions = self.getRegions();
+             for (auto& region : regions) {
+                 auto neurons = region->getNeurons();
+                 for (auto& neuron : neurons) {
+                     auto synapses = neuron->getOutgoingSynapses();
+                     for (auto& synapse : synapses) {
+                         if (synapse->getPostNeuron() == post && synapse->getPreNeuron() == pre) {
+                             synapse->setPlasticityFlags(flags);
+                             return;
+                         }
+                     }
+                 }
+             }
+         }, py::arg("pre"), py::arg("post"), py::arg("flags"),
+             "Plasticity control")
+        .def("getConnectionInfo", [](Brain& self) {
+             py::list connections;
+             auto regions = self.getRegions();
+             for (auto& region : regions) {
+                 auto neurons = region->getNeurons();
+                 for (auto& neuron : neurons) {
+                     auto synapses = neuron->getOutgoingSynapses();
+                     for (auto& synapse : synapses) {
+                         py::dict connInfo;
+                         connInfo["pre_neuron"] = synapse->getPreNeuron().value();
+                         connInfo["post_neuron"] = synapse->getPostNeuron().value();
+                         connInfo["weight"] = synapse->getWeight();
+                         connInfo["delay"] = synapse->getDelay();
+                         connInfo["type"] = static_cast<int>(synapse->getType());
+                         connInfo["plasticity_flags"] = static_cast<int>(synapse->getPlasticityFlags());
+                         connections.append(connInfo);
+                     }
+                 }
+             }
+             return connections;
+         }, "Get all connection details")
+        .def("getMemoryStats", [](Brain& self) {
+             auto workingMem = self.getWorkingMemory();
+             auto episodicMem = self.getEpisodicMemory();
+             auto assocMem = self.getAssociativeMemory();
+             
+             py::dict stats;
+             if (workingMem) {
+                 stats["working_memory"] = py::dict({
+                     {"trace_count", workingMem->getTraceCount()},
+                     {"max_capacity", workingMem->getMaxCapacity()},
+                     {"decay_rate", workingMem->getDecayRate()},
+                     {"activation_threshold", workingMem->getActivationThreshold()}
+                 });
+             }
+             
+             if (episodicMem) {
+                 stats["episodic_memory"] = py::dict({
+                     {"episodes_count", episodicMem->getEpisodicCount()},
+                     {"max_episodes", episodicMem->getMaxEpisodicCount()},
+                     {"time_window", episodicMem->getTimeWindow()}
+                 });
+             }
+             
+             if (assocMem) {
+                 stats["associative_memory"] = py::dict({
+                     {"association_count", assocMem->getAssociationCount()},
+                     {"max_associations", assocMem->getMaxAssociationCount()},
+                     {"similarity_threshold", assocMem->getSimilarityThreshold()}
+                 });
+             }
+             
+             return stats;
+         }, "Get detailed memory system status")
+        .def("getActiveTraces", [](Brain& self) {
+             auto workingMem = self.getWorkingMemory();
+             py::list traces;
+             if (!workingMem) return traces;
+             
+             auto activeTraces = workingMem->getActiveTraces();
+             for (auto& trace : activeTraces) {
+                 py::dict traceInfo;
+                 traceInfo["id"] = trace.id;
+                 traceInfo["age"] = trace.age;
+                 traceInfo["strength"] = trace.strength;
+                 traceInfo["pattern_id"] = trace.patternId;
+                 traces.append(traceInfo);
+             }
+             return traces;
+         }, "Working memory analysis")
+        .def("getEpisodicMemory", [](Brain& self) {
+             auto episodicMem = self.getEpisodicMemory();
+             py::list episodes;
+             if (!episodicMem) return episodes;
+             
+             auto episodicList = episodicMem->getEpisodicMemory();
+             for (const auto& episode : episodicList) {
+                 py::dict episodeInfo;
+                 episodeInfo["id"] = episode.id;
+                 episodeInfo["start_time"] = episode.startTime;
+                 episodeInfo["end_time"] = episode.endTime;
+                 episodeInfo["reward"] = episode.reward;
+                 episodeInfo["context_hash"] = episode.contextHash;
+                 episodes.append(episodeInfo);
+             }
+             return episodes;
+         }, "Episodic memory access");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,7 +651,26 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("setCuriosityLevel", [](AgentBrain& self, float level) {
+             self.curiosityLevel_ = level;
+         }, py::arg("level"),
+             "Direct neuromodulation control")
+        .def("setDopamineLevel", [](AgentBrain& self, float level) {
+             self.dopamineLevel_ = level;
+         }, py::arg("level"),
+             "Direct dopamine control")
+        .def("customLearningRate", [](AgentBrain& self, float rate) {
+             self.plasticityModifier_ = rate;
+         }, py::arg("rate"),
+             "Custom plasticity rates")
+        .def("setDevelopmentStage", &AgentBrain::getDevelopmentalStage,
+             py::arg("stage"),
+             "Direct development control")
+        .def("setMaturationRate", [](AgentBrain& self, double rate) {
+             self.developmentalAge_ = 1.0 / rate;  
+         }, py::arg("rate"),
+             "Control developmental timing");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -420,6 +692,133 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // BrainProfiler bindings
+    py::class_<nlm::BrainProfiler>(m, "BrainProfiler", R"pbdoc(NLM Brain Performance Profiler)pbdoc")
+        .def(py::init<>())
+        .def("record_simulation_metrics", &nlm::BrainProfiler::recordSimulationMetrics,
+             py::arg("step"), py::arg("simulation_time"), py::arg("neurons_processed"),
+             py::arg("spikes_processed"), py::arg("memory_stats"), py::arg("firing_stats"),
+             "Record simulation metrics")
+        .def("record_wall_clock_time", &nlm::BrainProfiler::recordWallClockTime,
+             py::arg("operation"), py::arg("time_ns"), "Record wall clock time")
+        .def("record_memory_allocation", &nlm::BrainProfiler::recordMemoryAllocation,
+             py::arg("bytes"), py::arg("context") = "", "Record memory allocation")
+        .def("record_firing_pattern", &nlm::BrainProfiler::recordFiringPattern,
+             py::arg("neuron_id"), py::arg("firing_rate"), py::arg("activation"),
+             "Record neuron firing pattern")
+        .def("get_metrics", &nlm::BrainProfiler::getMetrics,
+             py::arg("name"), "Get performance metrics by name")
+        .def("get_memory_stats", &nlm::BrainProfiler::getMemoryStats, "Get memory statistics")
+        .def("get_firing_stats", &nlm::BrainProfiler::getFiringStats, "Get firing statistics")
+        .def("get_average_benchmark", &nlm::BrainProfiler::getAverageBenchmark,
+             py::arg("scenario"), "Get average benchmark result")
+        .def("generate_report", &nlm::BrainProfiler::generateReport, "Generate performance report")
+        .def("get_performance_time_series", &nlm::BrainProfiler::getPerformanceTimeSeries,
+             py::arg("metric_name"), "Get performance time series data")
+        .def("reset", &nlm::BrainProfiler::reset, "Reset profiler state")
+        .def("export_to_json", &nlm::BrainProfiler::exportToJSON, "Export metrics to JSON")
+        .def("export_to_csv", &nlm::BrainProfiler::exportToCSV, "Export metrics to CSV")
+        .def("detect_bottlenecks", &nlm::BrainProfiler::detectBottlenecks,
+             "Detect performance bottlenecks")
+        .def("get_system_health", &nlm::BrainProfiler::getSystemHealth,
+             "Get system health metrics");
+
+    // DebugTools bindings
+    py::class_<nlm::DebugTools>(m, "DebugTools", R"pbdoc(NLM Brain Debugging Utilities)pbdoc")
+        .def(py::init<>())
+        .def("validate_state", &nlm::DebugTools::validateState,
+             py::arg("brain"), "Validate brain state for consistency")
+        .def("check_memory_leaks", &nlm::DebugTools::checkMemoryLeaks,
+             "Check for memory leaks")
+        .def("analyze_performance", &nlm::DebugTools::analyzePerformance,
+             "Analyze performance for bottlenecks")
+        .def("analyze_step", &nlm::DebugTools::analyzeStep,
+             py::arg("step"), "Analyze a specific simulation step")
+        .def("get_system_health", &nlm::DebugTools::getSystemHealth,
+             "Get system health metrics")
+        .def("take_network_snapshot", &nlm::DebugTools::takeNetworkSnapshot,
+             py::arg("brain"), "Take a snapshot for visualization")
+        .def("get_visualization_data", &nlm::DebugTools::getVisualizationData,
+             py::arg("snapshot"), "Get neural network visualization data")
+        .def("check_connectivity", &nlm::DebugTools::checkConnectivity,
+             py::arg("brain"), "Check neural connectivity")
+        .def("analyze_firing_patterns", &nlm::DebugTools::analyzeFiringPatterns,
+             py::arg("brain"), "Analyze neuron firing patterns")
+        .def("validate_neuromodulation", &nlm::DebugTools::validateNeuromodulation,
+             py::arg("brain"), "Validate neuromodulation signals")
+        .def("get_step_analysis_history", &nlm::DebugTools::getStepAnalysisHistory,
+             py::arg("max_history") = 100, "Get step analysis history")
+        .def("get_performance_history", &nlm::DebugTools::getPerformanceHistory,
+             py::arg("max_history") = 100, "Get performance history")
+        .def("get_memory_leak_history", &nlm::DebugTools::getMemoryLeakHistory,
+             py::arg("max_history") = 100, "Get memory leak history")
+        .def("generate_debug_report", &nlm::DebugTools::generateDebugReport,
+             "Generate debugging report")
+        .def("export_debug_data", &nlm::DebugTools::exportDebugData,
+             py::arg("filepath"), "Export debug data to file")
+        .def("import_debug_data", &nlm::DebugTools::importDebugData,
+             py::arg("filepath"), "Import debug data from file")
+        .def("clear_debug_history", &nlm::DebugTools::clearDebugHistory,
+             "Clear all debug history")
+        .def("get_version", &nlm::DebugTools::getVersion, "Get debug tools version");
+
+    // PerformanceMetrics bindings
+    py::class_<nlm::PerformanceMetrics> performanceMetricsClass(m, "PerformanceMetrics",
+        R"pbdoc(NLM Performance Metrics Collection and Analysis)pbdoc");
+    
+    // Register with pybind11
+    py::class_<nlm::PerformanceMetrics::TimeMetrics> timeMetricsClass(
+        performanceMetricsClass, "TimeMetrics", py::dynamic_attr());
+    
+    py::class_<nlm::PerformanceMetrics::MemoryMetrics> memoryMetricsClass(
+        performanceMetricsClass, "MemoryMetrics", py::dynamic_attr());
+    
+    py::class_<nlm::PerformanceMetrics::NetworkMetrics> networkMetricsClass(
+        performanceMetricsClass, "NetworkMetrics", py::dynamic_attr());
+    
+    py::class_<nlm::PerformanceMetrics::IntegrationMetrics> integrationMetricsClass(
+        performanceMetricsClass, "IntegrationMetrics", py::dynamic_attr());
+    
+    py::class_<nlm::PerformanceMetrics::SystemHealthMetrics> healthMetricsClass(
+        performanceMetricsClass, "SystemHealthMetrics", py::dynamic_attr());
+    
+    py::class_<nlm::PerformanceMetrics::PerformanceReport> reportClass(
+        performanceMetricsClass, "PerformanceReport", py::dynamic_attr());
+    
+    // PerformanceMetrics constructor
+    performanceMetricsClass
+        .def(py::init<>())
+        .def("update_time_metrics", &nlm::PerformanceMetrics::updateTimeMetrics,
+             py::arg("wall_time"), py::arg("sim_time"), py::arg("step_duration"),
+             "Update time metrics")
+        .def("update_memory_metrics", &nlm::PerformanceMetrics::updateMemoryMetrics,
+             py::arg("used"), py::arg("free"), py::arg("allocated_bytes") = 0,
+             "Update memory metrics")
+        .def("update_network_metrics", &nlm::PerformanceMetrics::updateNetworkMetrics,
+             py::arg("total_neurons"), py::arg("active_neurons"), py::arg("firing_neurons"),
+             py::arg("total_synapses"), py::arg("avg_firing"), py::arg("eiratio"),
+             "Update network metrics")
+        .def("update_integration_metrics", &nlm::PerformanceMetrics::updateIntegrationMetrics,
+             py::arg("steps"), py::arg("reward"), py::arg("episodes"),
+             py::arg("dopamine"), py::arg("curiosity"), "Update integration metrics")
+        .def("update_health_metrics", &nlm::PerformanceMetrics::updateHealthMetrics,
+             py::arg("cpu_usage"), py::arg("memory_usage"), py::arg("stability"),
+             py::arg("has_leaks"), py::arg("is_stable"), "Update health metrics")
+        .def("get_performance_report", &nlm::PerformanceMetrics::getPerformanceReport,
+             "Get complete performance report")
+        .def("export_to_json", &nlm::PerformanceMetrics::exportToJSON,
+             "Export metrics to JSON")
+        .def("export_to_csv", &nlm::PerformanceMetrics::exportToCSV,
+             "Export metrics to CSV")
+        .def("reset", &nlm::PerformanceMetrics::reset, "Reset all metrics")
+        .def("merge", &nlm::PerformanceMetrics::merge,
+             py::arg("other"), "Merge metrics from another PerformanceMetrics instance");
+
+    // Initialize submodules
+    auto brainProfiler = std::make_shared<nlm::BrainProfiler>();
+    auto debugTools = std::make_shared<nlm::DebugTools>();
+    debugTools->setProfiler(brainProfiler);
 }
 
 } // namespace nlm
