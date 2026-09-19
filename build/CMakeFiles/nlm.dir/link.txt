@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/nlm.dir/src/main.cpp.o -o nlm  libnlm_core.a libnlm_advanced_performance.a libnlm_core.a 

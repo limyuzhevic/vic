@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_advanced_performance.a CMakeFiles/nlm_advanced_performance.dir/src/core/Performance/MetricsCollector.cpp.o
+/usr/bin/ranlib libnlm_advanced_performance.a
