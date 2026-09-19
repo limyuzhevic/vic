@@ -70,6 +70,9 @@ public:
     // Simulation time step
     void step(SimulationStep currentStep, Timestamp currentTime);
     
+    // Connect neuromodulation systems to learning processes
+    void connectNeuromodulationToLearning();
+    
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern
     void receiveSensoryInput(const class SensoryInput& input);

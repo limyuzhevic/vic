@@ -37,34 +37,202 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Curiosity drives exploration behavior
 - Novelty detection integrated with sensory processing
 - All neuromodulators connected to plasticity rules
+- **Python Support:** `agent.enableRewardModulation()`, `agent.enableCuriosity()`, etc.
 
 #### Prediction System
 - Prediction system integrated into brain loop
 - Prediction error signals affect learning
 - Confidence tracking implemented
+- **Python Support:** `agent.applyRewardModulation()`, `agent.getPredictionError()`
 
 #### Cognition Systems
 - Neural planner with action sequence evaluation
 - Concept formation from experience patterns
 - Attention with competitive selection dynamics
 - All cognition systems connected to perception and action
+- **Python Support:** Via `AgentBrain` class methods
 
 #### Development Integration
 - Developmental stages affect plasticity rates
 - Structural plasticity modulated by age
 - Neural excitability changes with development
+- **Python Support:** `agent.updateDevelopment()`, `agent.getDevelopmentalStage()`
 
 #### Persistence
 - Checkpoint save/load implemented
 - Brain state serialization working
 - Can resume from saved checkpoints
+- **Python Support:** `brain.save()`, `brain.load()`
 
 #### Replay and Consolidation
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
 
-## Building
+#### Python API Integration
+- Complete Python bindings via pybind11
+- Access to all C++ brain systems through Python API
+- `pynlm.createBrain()`, `pynlm.createAgentBrain()` factory functions
+- Full access to neuromodulation, development, and learning systems
+
+## Python Quick Start
+
+For Python users, the NLM package provides:
+
+```python
+import pynlm
+
+# Create and initialize a basic brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for step in range(100):
+    brain.step(step)
+
+print(f"Neurons: {brain.getTotalNeuronCount()}, Spikes: {brain.getTotalSpikeCount()}")
+```
+
+## Python Usage
+
+NLM provides complete Python bindings through the `pynlm` package, making it easy to use the full neural simulation framework from Python.
+
+### Quick Installation
+
+For development or quick setup:
+
+```bash
+# Install from source
+cd /path/to/nlm
+pip install .
+
+# Or in development mode for faster iteration
+pip install -e .
+
+# Verify installation
+python -c "import pynlm; print('NLM version:', pynlm.__version__)"
+```
+
+### Quick Start Examples
+
+```python
+import pynlm
+
+# Create a brain with default configuration
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run a simple simulation
+for i in range(100):
+    brain.step(i)
+
+print(f"Simulation complete: {brain.getTotalSpikeCount()} spikes")
+```
+
+### Core Python APIs
+
+| Function | Description |
+|----------|-------------|
+| `pynlm.createDefaultConfig()` | Creates a new configuration object |
+| `pynlm.createBrain(config)` | Creates a neural brain instance |
+| `pynlm.createSimpleWorld()` | Creates a simulated world environment |
+| `pynlm.createAgentBrain(brain)` | Creates an agent brain interface |
+
+### Agent Brain Features
+
+The `AgentBrain` class provides access to advanced brain features:
+
+```python
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning subsystems
+agent.enableRewardModulation(True)      # Reward-based learning
+agent.enableCuriosity(True)             # Exploration drive
+agent.enableDevelopment(True)           # Brain maturation
+agent.enableStructuralPlasticity(True)  # Connection growth
+
+# Get current state
+print(f"Curiosity: {agent.getCuriosityLevel():.2f}")
+print(f"Novelty: {agent.getNoveltyLevel():.2f}")
+print(f"Dev Stage: {agent.getDevelopmentalStage()}")
+```
+
+### Complete Agent Example
+
+```python
+def run_agent_simulation(num_steps=1000):
+    """Run a complete agent simulation with brain and world."""
+    
+    # 1. Create configuration
+    config = pynlm.createDefaultConfig()
+    
+    # 2. Create brain and initialize
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 3. Create agent brain interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 4. Create and configure world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    
+    # 5. Initialize agent with world
+    agent.initialize(world)
+    
+    # 6. Enable learning
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    
+    # 7. Run simulation loop
+    for step in range(num_steps):
+        world.update(timestep=0.1)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        if step % 100 == 0:
+            print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+    
+    return brain, agent, world
+
+# Run the simulation
+brain, agent, world = run_agent_simulation(1000)
+```
+
+### Configuration Options
+
+Configuration is flexible and can be modified before creating the brain:
+
+```python
+config = pynlm.createDefaultConfig()
+
+# Set brain parameters
+config.set("brain.neuron_count", 2000)
+config.set("plasticity.stdp.enable", True)
+
+# Save/Load configuration
+config.saveToFile("my_config.json")
+
+# Create brain with custom config
+brain = pynlm.createBrain(config)
+```
+
+### Further Resources
+
+- [`HOW_TO_USE.md`](HOW_TO_USE.md) - Comprehensive Python usage guide
+- [`easy_usage.md`](easy_usage.md) - Beginner-friendly examples
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) - System architecture
+- [`docs/SCIENCE.md`](docs/SCIENCE.md) - Scientific background
+
+### Building from Source
+
+If you need to build the Python bindings or modify the C++ code:
 
 ```bash
 mkdir build
@@ -73,16 +241,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
-## Running
-
-### Phase 6 Demo (Integration Test)
-```bash
-./nlm_phase6_demo
-```
-
-This runs a comprehensive integration test verifying all brain systems are connected.
-
-## Project Structure
+For more details on the C++ build system, see the [NLM C++ documentation](docs/ARCHITECTURE.md).
 
 ```
 NLM/

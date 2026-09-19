@@ -24,8 +24,8 @@ public:
     // TODO PHASE 2: Implement real modulation
     virtual float getPlasticityFactor() const = 0;
     
-    // Update neuromodulator state
-    virtual void update(TimestepDuration dt) = 0;
+    // Initialize with brain reference
+    virtual void initialize(Brain* brainPtr) {}
     
 protected:
     Neuromodulator() = default;

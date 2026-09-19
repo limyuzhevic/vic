@@ -12,6 +12,30 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+> **Note**: While easy_usage.md shows `pynlm.createBrain()` etc., the actual Python module is `pynlm` built from the C++ code. The global factory functions are available via pybind11 bindings.
+
+## Installation
+
+The NLM Python bindings are built using scikit-build and pybind11. To install from source:
+
+```bash
+# Clone the repository
+cd /path/to/nlm
+
+# Build and install
+pip install .
+```
+
+For development:
+
+```bash
+# Build in development mode
+pip install -e .
+
+# Then verify installation
+python -c "import pynlm; print('NLM version:', pynlm.__version__)"
+```
+
 ---
 
 ## The 3 Things You Need to Know
@@ -19,6 +43,17 @@ That's it! NLM simulates all of this.
 1. **Brain** - The virtual brain that thinks
 2. **World** - The environment the brain lives in
 3. **Agent** - The bridge connecting brain to world
+
+## Python Module Structure
+
+The NLM Python module is named `pynlm` and is built using pybind11. All C++ classes and functions are exposed through this module. Key factory functions include:
+
+- `pynlm.createDefaultConfig()` - Creates a new default configuration object
+- `pynlm.createBrain(config)` - Creates a neural brain instance
+- `pynlm.createSimpleWorld()` - Creates a simulated world environment
+- `pynlm.createAgentBrain(brain)` - Creates an agent brain interface
+
+> **Note**: While the `easy_usage.md` shows these function calls, they are dynamically exposed by the C++ bindings module at runtime.
 
 ---
 
@@ -268,6 +303,59 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+
+## Advanced Quick Reference
+
+### Neuromodulation and Learning
+
+| Feature | Enable/Disable | Get Status |
+|---------|----------------|------------|
+| Reward modulation | `agent.enableRewardModulation(True/False)` | `agent.isRewardModulationEnabled()` |
+| Structural plasticity | `agent.enableStructuralPlasticity(True/False)` | `agent.isStructuralPlasticityEnabled()` |
+| Development | `agent.enableDevelopment(True/False)` | `agent.isDevelopmentEnabled()` |
+| Curiosity | `agent.enableCuriosity(True/False)` | `agent.isCuriosityEnabled()` |
+
+### More Brain Statistics
+
+| Method | Description |
+|--------|-------------|
+| `brain.getTotalNeuronCount()` | Total neurons in brain |
+| `brain.getTotalSynapseCount()` | Total synapses in brain |
+| `brain.getActiveNeuronCount()` | Neurons currently active |
+| `brain.getFiringNeuronCount()` | Neurons currently firing |
+| `brain.getAverageFiringRate()` | Average firing rate (Hz) |
+| `brain.getExcitationInhibitionRatio()` | E/I balance ratio |
+| `brain.getTotalSpikeCount()` | Total spikes over simulation |
+| `brain.getDevelopmentalStage()` | Current developmental stage |
+
+### Agent Statistics
+
+| Method | Description |
+|--------|-------------|
+| `agent.getNeuromodulationLevel()` | Current neuromodulation signal strength |
+| `agent.getCuriosityLevel()` | Curiosity-driven exploration motivation |
+| `agent.getNoveltyLevel()` | Novelty detection signal |
+| `agent.getPredictionError()` | Prediction error for learning |
+| `agent.getDevelopmentalStage()` | Agent's developmental stage |
+
+### Configuration Options
+
+```python
+# Configuration methods are available on the config object
+config = pynlm.createDefaultConfig()
+
+# Query configuration
+if config.has("brain.neuron_count"):
+    keys = config.getKeys()
+
+# Set configuration values
+config.set("brain.neuron_count", 1000)
+config.set("plasticity.stdp.enable", True)
+
+# Save/Load config
+config.saveToFile("config.json")
+config.loadFromFile("config.json")
+```
 
 ---
 
