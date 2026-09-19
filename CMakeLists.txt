@@ -26,6 +26,12 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/ConfigValidation/ConfigError.cpp
+    src/core/ConfigValidation/ValidationRules.cpp
+    src/core/ConfigValidation/ConfigSchema.cpp
+    src/core/ConfigValidation/ParameterResolver.cpp
+    src/core/ConfigValidation/ConfigValidator.cpp
+    src/core/ComponentFactoryConfigValidator.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -55,11 +61,6 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -71,20 +72,22 @@ add_library(nlm_core STATIC
     src/sensory/Audio.cpp
     src/sensory/InternalSignals.cpp
     # Prediction
-    src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
+    src/prediction/PredictionSystem.cpp
     # Motor
     src/motor/MotorSystem.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
+    src/motor/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Event System
+    src/interfaces/EventSystem.cpp
 )
 
 target_include_directories(nlm_core PUBLIC

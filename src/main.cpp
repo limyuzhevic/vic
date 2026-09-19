@@ -69,6 +69,8 @@ struct LearningExperiment {
             for (const auto& syn : region->getSynapses()) {
                 initialWeights.push_back(syn->getWeight());
             }
+        } else {
+            NLM_LOG_ERROR("Region 1 not found");
         }
         
         NLM_LOG_INFO("Initial state recorded:");
@@ -88,9 +90,16 @@ struct LearningExperiment {
             for (const auto& syn : region->getSynapses()) {
                 finalWeights.push_back(syn->getWeight());
             }
+        } else {
+            NLM_LOG_ERROR("Region 1 not found");
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        // Safe access to spike system
+        if (auto* spikeSystem = brain->getSpikeSystem()) {
+            mostActiveNeurons = spikeSystem->getMostActiveNeurons(10);
+        } else {
+            NLM_LOG_ERROR("Spike system not available");
+        }
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
@@ -177,14 +186,14 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     size_t initialSpikes = brain->getTotalSpikeCount();
     
     // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+    NLM_LOG_INFO("  Injecting current into " << nlm::SENSOR_INPUT_INJECTION_COUNT << " neurons...");
+    for (size_t i = 0; i < std::min(size_t(nlm::SENSOR_INPUT_INJECTION_COUNT), neurons.size()); ++i) {
+        neurons[i]->injectCurrent(nlm::EXCITATORY_INPUT_CURRENT);  // Strong excitatory input
     }
     
     // Run a few steps
-    for (SimulationStep step = 0; step < 50; ++step) {
-        brain->step(step, step * 0.001);
+    for (SimulationStep step = 0; step < nlm::BASIC_CONNECTIVITY_TEST_STEPS; ++step) {
+        brain->step(step, step * nlm::SIMULATION_TIMESTEP_SECONDS);
     }
     
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
@@ -216,6 +225,8 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         for (auto& syn : region->getSynapses()) {
             syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
         }
+    } else {
+        NLM_LOG_ERROR("Region 1 not found for plasticity experiment");
     }
     
     // Apply repeated input pattern to stimulate learning
@@ -250,7 +261,10 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Region 1 not found for STDP verification");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
@@ -267,7 +281,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+                        " before: " + std::to_string(beforeWeights[i]));
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -301,8 +315,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
     }
     
     // Check if weights increased (LTP)
@@ -366,21 +380,20 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    config->set("random_seed", static_cast<int64_t>(nlm::DEFAULT_RANDOM_SEED), ConfigSource::Default);
+    config->set("simulation_timestep", nlm::SIMULATION_TIMESTEP_SECONDS, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(nlm::DEFAULT_NEURON_COUNT), ConfigSource::Default);  // Smaller for faster test
+    config->set("region_count", static_cast<int64_t>(nlm::DEFAULT_REGION_COUNT), ConfigSource::Default);
+    config->set("connection_probability", nlm::DEFAULT_CONNECTION_PROBABILITY, ConfigSource::Default);
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("stdp_ltp_weight", nlm::DEFAULT_STDP_LTP_WEIGHT_CONFIG, ConfigSource::Default);
+    config->set("stdp_ltd_weight", nlm::DEFAULT_STDP_LTD_WEIGHT_CONFIG, ConfigSource::Default);
+    config->set("stdp_tau", nlm::DEFAULT_STDP_TAU_CONFIG, ConfigSource::Default);
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    config->set("synaptogenesis_rate", nlm::DEFAULT_SYNAPTOGENESIS_RATE_CONFIG, ConfigSource::Default);
+    config->set("pruning_rate", nlm::DEFAULT_PRUNING_RATE_CONFIG, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
