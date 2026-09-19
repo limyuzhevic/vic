@@ -1,31 +1,56 @@
 #include "Audio.hpp"
+#include "AudioProcessor.hpp"
+#include <vector>
+#include <algorithm>
 
 namespace nlm {
 
-struct AudioProcessor::Impl {
-    std::vector<float> features;
-    size_t featureDimensions;
+struct Audio::Impl {
+    std::vector<float> data;
+    size_t numSamples;
     
-    Impl() : featureDimensions(0) {}
+    Impl() : numSamples(0) {}
+    Impl(size_t samples) : numSamples(samples) {
+        data.resize(samples, 0.0f);
+    }
 };
 
-AudioProcessor::AudioProcessor() : pImpl(new Impl) {}
+Audio::Audio() : pImpl(std::make_unique<Impl>()) {}
 
-AudioProcessor::~AudioProcessor() = default;
+Audio::Audio(size_t numSamples) : pImpl(std::make_unique<Impl>(numSamples)) {}
 
-void AudioProcessor::process(const Audio& input) {
-    // TODO PHASE 2: Implement real audio processing using NLM's neural machinery
-    // PLACEHOLDER: Just pass through raw data
-    pImpl->features = input.getData();
-    pImpl->featureDimensions = input.getDimensions();
+Audio::~Audio() = default;
+
+const char* Audio::getType() const {
+    return "Audio";
 }
 
-const std::vector<float>& AudioProcessor::getFeatures() const {
-    return pImpl->features;
+const std::vector<float>& Audio::getData() const {
+    return pImpl->data;
 }
 
-size_t AudioProcessor::getFeatureDimensions() const {
-    return pImpl->featureDimensions;
+size_t Audio::getDimensions() const {
+    return pImpl->data.size();
+}
+
+std::unique_ptr<SensoryInput> Audio::clone() const {
+    auto cloned = std::make_unique<Audio>(pImpl->numSamples);
+    cloned->pImpl->data = pImpl->data;
+    return cloned;
+}
+
+void Audio::setData(const std::vector<float>& inputData) {
+    pImpl->data = inputData;
+    pImpl->numSamples = inputData.size();
+}
+
+void Audio::setData(float* data, size_t size) {
+    pImpl->data.assign(data, data + size);
+    pImpl->numSamples = size;
+}
+
+size_t Audio::getNumSamples() const {
+    return pImpl->numSamples;
 }
 
 } // namespace nlm

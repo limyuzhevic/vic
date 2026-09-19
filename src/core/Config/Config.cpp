@@ -8,6 +8,7 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::vector<ValidationConstraints> defaultConstraints;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,36 +20,58 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Check if nlohmann/json is available
+#ifdef NLOHMANN_JSON_HPP
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    try {
+        nlohmann_json j;
+        file >> j;
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Parse JSON object
+        if (j.is_object()) {
+            for (auto& [key, value] : j.items()) {
+                ConfigValue configValue;
+                fromJson(value, configValue);
+                set(key, configValue, ConfigSource::File);
+            }
+            return true;
+        }
+        return false;
+    } catch (const std::exception& e) {
+        // Fall back to legacy key=value format
+        file.clear();
+        file.seekg(0);
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -86,7 +109,9 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        nlohmann_json j;
+        toJson(j, entry.value);
+        file << entry.key << " = " << j.dump() << "\n\n";
     }
     
     return true;
@@ -186,20 +211,159 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+bool Config::validate(const std::vector<ValidationRule>& rules) const {
+    return getValidationErrors(rules).empty();
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+bool Config::validate(const std::string& key, const std::function<bool(const ConfigValue&)>& validator, 
+                      const std::string& errorMessage) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return false;
+    }
+    
+    return validateValue(it->value, validator);
+}
+
+std::vector<ValidationError> Config::getValidationErrors(const std::vector<ValidationRule>& rules) const {
+    std::vector<ValidationError> errors;
+    
+    for (const auto& rule : rules) {
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&rule](const ConfigEntry& e) { return e.key == rule.key; });
+        
+        if (it == pImpl->entries.end()) {
+            if (rule.required) {
+                ValidationError error;
+                error.key = rule.key;
+                error.type = ValidationErrorType::RequiredValueMissing;
+                error.message = "Required configuration value is missing: " + rule.key;
+                errors.push_back(error);
+            }
+            continue;
+        }
+        
+        if (!validateValue(it->value, rule.validator)) {
+            ValidationError error;
+            error.key = rule.key;
+            error.type = ValidationErrorType::InvalidFormat;
+            error.message = rule.errorMessage;
+            error.value = valueToString(it->value);
+            errors.push_back(error);
+        }
+    }
+    
+    // Apply default constraints
+    for (const auto& constraint : pImpl->defaultConstraints) {
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&constraint](const ConfigEntry& e) { return e.key == constraint.key; });
+        
+        if (it != pImpl->entries.end()) {
+            if (!validateValue(it->value, constraint.validator)) {
+                ValidationError error;
+                error.key = constraint.key;
+                error.type = ValidationErrorType::InvalidType;
+                error.message = constraint.errorMessage;
+                error.value = valueToString(it->value);
+                errors.push_back(error);
+            }
+        }
+    }
+    
+    return errors;
+}
+
+void Config::setDefaultConstraints(const std::vector<ValidationConstraints>& constraints) {
+    pImpl->defaultConstraints = constraints;
+}
+
+bool Config::validateValue(const ConfigValue& value, const std::function<bool(const ConfigValue&)>& validator) {
+    return validator(value);
+}
+
+std::string Config::valueToString(const ConfigValue& value) {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
+}
+
+// Internal helper implementations
+
+void Config::fromJson(const nlohmann_json& j, ConfigValue& value) {
+    if (j.is_number_integer()) {
+        value = j.get<int>();
+    } else if (j.is_number_unsigned()) {
+        value = j.get<uint64_t>();
+    } else if (j.is_number()) {
+        value = j.get<double>();
+    } else if (j.is_boolean()) {
+        value = j.get<bool>();
+    } else if (j.is_string()) {
+        value = j.get<std::string>();
+    } else if (j.is_array()) {
+        std::vector<int> intArray;
+        std::vector<double> doubleArray;
+        std::vector<std::string> stringArray;
+        
+        for (const auto& item : j) {
+            if (item.is_number_integer()) {
+                intArray.push_back(item.get<int>());
+                doubleArray.push_back(item.get<double>());
+            } else if (item.is_number()) {
+                doubleArray.push_back(item.get<double>());
+            } else if (item.is_string()) {
+                stringArray.push_back(item.get<std::string>());
+            }
+        }
+        
+        // Choose appropriate type based on content
+        if (!stringArray.empty()) {
+            value = std::move(stringArray);
+        } else if (!doubleArray.empty()) {
+            value = std::move(doubleArray);
+        } else if (!intArray.empty()) {
+            value = std::move(intArray);
+        }
+    } else {
+        // Default to empty string for unknown types
+        value = std::string();
+    }
+}
+
+void Config::toJson(nlohmann_json& j, const ConfigValue& value) {
+    std::visit([&j](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            j = arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            j = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            j = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            j = arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            j = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            j = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            j = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            j = arg;
+        }
+    }, value);
 }
 
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;

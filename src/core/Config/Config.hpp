@@ -5,6 +5,11 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
+
+// Forward declarations
+class nlohmann_json;
 
 namespace nlm {
 
@@ -29,6 +34,38 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Configuration validation error types
+enum class ValidationErrorType {
+    InvalidType,
+    OutOfRange,
+    RequiredValueMissing,
+    InvalidFormat,
+    Custom
+};
+
+// Configuration validation error
+struct ValidationError {
+    std::string key;
+    ValidationErrorType type;
+    std::string message;
+    std::string value;  // String representation of the value that caused the error
+};
+
+// Configuration validation rules
+struct ValidationRule {
+    std::string key;
+    std::function<bool(const ConfigValue&)> validator;
+    std::string errorMessage;
+    bool required;
+};
+
+// Configuration constraints
+struct ValidationConstraints {
+    std::string key;
+    std::function<bool(const ConfigValue&)> validator;
+    std::string errorMessage;
 };
 
 // Configuration entry
@@ -93,13 +130,26 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate(const std::vector<ValidationRule>& rules) const;
+    bool validate(const std::string& key, const std::function<bool(const ConfigValue&)>& validator, 
+                  const std::string& errorMessage) const;
+    std::vector<ValidationError> getValidationErrors(const std::vector<ValidationRule>& rules) const;
+    void setDefaultConstraints(const std::vector<ValidationConstraints>& constraints);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
+    // Validation helper
+    static bool validateValue(const ConfigValue& value, const std::function<bool(const ConfigValue&)>& validator);
+    static std::string valueToString(const ConfigValue& value);
+    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static void fromJson(const nlohmann_json& j, ConfigValue& value);
+    static void toJson(nlohmann_json& j, const ConfigValue& value);
 };
 
 } // namespace nlm
