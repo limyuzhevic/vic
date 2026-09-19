@@ -64,6 +64,11 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
+    // JSON/YAML parsing helpers
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromYAMLFile(const std::string& filepath);
+    bool loadFromSimpleFile(const std::string& filepath);
+    
     // Get values
     template<typename T>
     std::optional<T> get(const std::string& key) const;
@@ -102,4 +107,51 @@ private:
     static std::string toLower(const std::string& str);
 };
 
-} // namespace nlm
+// JSON parsing implementation
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    // Check if nlohmann/json library is available
+    // For now, use simple parser as fallback
+    return loadFromSimpleFile(filepath);
+}
+
+// YAML parsing implementation  
+bool Config::loadFromYAMLFile(const std::string& filepath) {
+    // Check if YAML parser is available
+    // For now, use simple parser as fallback
+    return loadFromSimpleFile(filepath);
+}
+
+// Simple key=value parsing implementation
+bool Config::loadFromSimpleFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
