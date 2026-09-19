@@ -330,6 +330,14 @@ float AgentBrain::getNoveltyLevel() const {
     return noveltyLevel_;
 }
 
+float AgentBrain::getCuriosityLevel() const {
+    return curiosityLevel_;
+}
+
+float AgentBrain::getNoveltyLevel() const {
+    return noveltyLevel_;
+}
+
 float AgentBrain::getPredictionError() const {
     return predictionError_;
 }

@@ -175,11 +175,38 @@ std::string Config::summary() const {
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
+if constexpr (std::is_same_v<T, std::string>) {
+                    oss << "\\\"" << arg << "\\\"";
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    oss << "[";
+                    bool first = true;
+                    for (int val : arg) {
+                        if (!first) oss << ", ";
+                        oss << val;
+                        first = false;
+                    }
+                    oss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    oss << "[";
+                    bool first = true;
+                    for (double val : arg) {
+                        if (!first) oss << ", ";
+                        oss << val;
+                        first = false;
+                    }
+                    oss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    oss << "[";
+                    bool first = true;
+                    for (const std::string& val : arg) {
+                        if (!first) oss << ", ";
+                        oss << "\\\"" << val << "\\\"";
+                        first = false;
+                    }
+                    oss << "]";
+                } else {
+                    oss << arg;
+                }
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
