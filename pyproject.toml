@@ -33,6 +33,9 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=1.0",
+    "m2r>=0.2.1",
 ]
 
 [project.urls]
@@ -47,11 +50,24 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DNLM_BUILD_PYTHON_BINDINGS=ON",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+PYTHON_BINDINGS = "ON"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[tool.scikit-build.cmake.options]
+BUILD_PYTHON_BINDINGS = "ON"
+BUILD_EXAMPLES = "ON"
+BUILD_TESTS = "ON"
+
+[tool.scikit-build.cmake.cache]
+NLM_BUILD_TYPE = "Release"
+NLM_ENABLE_PYTHON = "ON"
+NLM_ENABLE_DOCS = "OFF"
+
