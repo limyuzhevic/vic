@@ -546,6 +546,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 13: Update prediction system ==========
+    if (pImpl->predictionSystem) {
+        // Update prediction system with current state
+        pImpl->predictionSystem->update(currentTime);
+    }
+    
+    // ========== STEP 14: Update concept formation ==========
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->update(currentTime);
+    }
+    
+    // ========== STEP 15: Update cognitive planner ==========
+    if (pImpl->planner) {
+        pImpl->planner->update(currentTime);
+    }
+    
+    // ========== STEP 16: Update attention system ==========
+    if (pImpl->attention) {
+        pImpl->attention->update(pImpl->timestep);
+        
+        // Apply attention to working memory winners
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+        }
+    }
+    
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
