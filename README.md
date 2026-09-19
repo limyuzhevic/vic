@@ -1,230 +1,296 @@
-# NLM — 熙然
+# NLM CLI Interface
 
-**An Experimental Artificial Developmental Brain**
+## Overview
 
-## What is NLM?
+This directory contains the Command Line Interface (CLI) for the Neural Learning Machine (NLM) system. The CLI provides comprehensive control over NLM simulations, configurations, experiments, and monitoring.
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+## Files
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+### Core CLI Interface
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+- **`cli/nlm_cli.cpp`** - Main CLI interface with argument parsing and command dispatch
+- **`cli/nlm_cli.hpp`** - Header file for the main CLI interface
 
-## Current Phase
+### Configuration Management
 
-**PHASE 6: FINAL INTEGRATION**
+- **`cli/config_cli.cpp`** - Configuration management commands (show, set, load, save, validate)
+- **`cli/config_cli.hpp`** - Header file for config CLI
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+### Experiment Management
 
-### Phase 6 Integration Achievements
+- **`cli/experiment_cli.cpp`** - Experiment management commands (run, list, info, compare, track, results)
+- **`cli/experiment_cli.hpp`** - Header file for experiment CLI
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+### Real-time Monitoring
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+- **`cli/monitor_cli.cpp`** - Monitoring commands (live, replay, metrics, log, export)
+- **`cli/monitor_cli.hpp`** - Header file for monitor CLI
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+### Test Framework
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+- **`tests/test_cli_framework.cpp`** - Comprehensive test suite for CLI functionality
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+## CLI Structure
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+The NLM CLI is organized into three main categories of commands:
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+### 1. Basic Control Commands
 
-## Building
+- `nlm run` - Run simulations with configuration options
+- `nlm save <file>` - Save brain state to file
+- `nlm load <file>` - Load brain state from file
+
+### 2. Advanced Features
+
+- `nlm config` - Configuration management
+  - `show` - Display current configuration
+  - `set <key> <value>` - Set configuration values
+  - `load <file>` - Load configuration from file
+  - `save <file>` - Save configuration to file
+  - `validate` - Validate configuration against schema
+  - `export <format>` - Export configuration to various formats
+  - `import <format>` - Import configuration from stdin
+  - `list` - List all configuration keys
+
+- `nlm experiment` - Experiment management
+  - `run` - Run experiments (Phase 3, 4, 5, or 6)
+  - `list` - List registered experiments
+  - `info <name>` - Show experiment information
+  - `compare <name1> <name2>` - Compare two experiments
+  - `track` - Track experiment progress
+  - `results` - Export experiment results
+
+- `nlm monitor` - Real-time monitoring
+  - `live` - Live monitoring with interactive controls
+  - `replay <file>` - Replay monitoring data
+  - `metrics` - Collect and analyze metrics
+  - `log` - Display log files
+  - `export <format>` - Export monitoring data
+
+### 3. Utility Commands
+
+- `nlm benchmark` - Performance benchmarking
+- `nlm profile` - Performance profiling
+
+## Usage Examples
+
+### Basic Simulation
 
 ```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+# Run a simple simulation
+nlm run --steps 1000 --experiment phase3
+
+# Run with custom configuration
+nlm run --config my_config.cfg --steps 5000
+```
+
+### Configuration Management
+
+```bash
+# Show current configuration
+nlm config show
+
+# Set a configuration value
+nlm config set neuron_count 2000
+
+# Load configuration from file
+nlm config load my_config.json
+
+# Save configuration to file
+nlm config save my_config.json
+
+# Validate configuration
+nlm config validate
+```
+
+### Experiment Management
+
+```bash
+# Run a Phase 4 experiment
+nlm experiment run --experiment phase4 --steps 10000 --output-file results.json
+
+# List all experiments
+nlm experiment list
+
+# Show experiment details
+nlm experiment info phase4_demo
+
+# Compare two experiments
+nlm experiment compare phase3 phase4
+```
+
+### Monitoring
+
+```bash
+# Start live monitoring
+nlm monitor live --interval 0.1 --duration 300
+
+# Display log file
+nlm monitor log --log-file nlm.log --level info
+
+# Export monitoring data
+nlm monitor export csv --output-file monitoring.csv
+```
+
+## Building the CLI
+
+The CLI is built as part of the main NLM project. Ensure you have:
+
+1. **CMake 3.16 or higher**
+2. **C++20 compiler**
+3. **pybind11** (for Python bindings)
+4. **nlohmann/json** (for JSON configuration)
+
+### Build Instructions
+
+1. Create a build directory:
+
+```bash
+mkdir build && cd build
+```
+
+2. Configure with CMake:
+
+```bash
+cmake ..
+```
+
+3. Build the project:
+
+```bash
 make -j4
 ```
 
-## Running
+## Testing
 
-### Phase 6 Demo (Integration Test)
+Run the CLI tests to verify functionality:
+
 ```bash
-./nlm_phase6_demo
+g++ -std=c++20 -I../include -I. -c tests/test_cli_framework.cpp -o test_cli_framework.o
+g++ test_cli_framework.o -o test_cli_framework
+./test_cli_framework
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+## Integration with Python
 
-## Project Structure
+The NLM CLI can be used from Python via the following methods:
 
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+1. **Direct Python Integration**: Use the `subprocess` module to call CLI commands
+
+```python
+import subprocess
+import json
+
+# Run a simulation via CLI
+result = subprocess.run(
+    ['nlm', 'run', '--steps', '1000', '--experiment', 'phase3'],
+    capture_output=True,
+    text=True
+)
+
+# Save brain state via CLI
+brain.save('brain.chk')  # This is done via CLI:
+subprocess.run(['nlm', 'save', 'brain.chk'])
+
+# Load brain state via CLI
+brain.load('brain.chk')  # This is done via CLI:
+subprocess.run(['nlm', 'load', 'brain.chk'])
 ```
 
-## Phase Summary
+2. **Jupyter Notebook Integration**: Use the NLM Python bindings with CLI-like interface
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+```python
+import pynlm
+import subprocess
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
+# Run simulation steps
+for i in range(1000):
+    brain.step(i)
 
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+# Save via CLI if needed
+subprocess.run(['nlm', 'save', 'brain.chk'])
+```
 
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
+## Configuration File Formats
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+The NLM system supports multiple configuration file formats:
 
-## Scientific Limitations
+### JSON
 
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+```json
+{
+    "random_seed": 42,
+    "neuron_count": 1000,
+    "region_count": 1,
+    "simulation_timestep": 0.001,
+    "connection_probability": 0.1,
+    "enable_stdp": true,
+    "stdp_ltp_weight": 0.01,
+    "stdp_ltd_weight": 0.012,
+    "stdp_tau": 20.0,
+    "synaptogenesis_rate": 0.0001,
+    "pruning_rate": 0.00001
+}
+```
 
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
+### Legacy Format (key=value)
 
 ```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+# config.cfg
+random_seed=42
+neuron_count=1000
+region_count=1
+simulation_timestep=0.001
+connection_probability=0.1
+enable_stdp=true
+stdp_ltp_weight=0.01
+stdp_ltd_weight=0.012
+stdp_tau=20.0
+synaptogenesis_rate=0.0001
+pruning_rate=0.00001
 ```
+
+## Environment Variables
+
+The NLM CLI respects the following environment variables:
+
+- `NLM_LOG_LEVEL` - Set the logging level (trace, debug, info, warning, error, fatal)
+- `NLM_CONFIG_DIR` - Directory for configuration files
+- `NLM_DATA_DIR` - Directory for data files
+- `NLM_LOG_FILE` - Log file path
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"Command not found" error**
+   - Ensure the CLI is built and installed
+   - Check that the build directory contains the executable
+
+2. **"Configuration file not found"**
+   - Check that the file path is correct
+   - Ensure read permissions
+
+3. **"Unknown command"**
+   - Check command syntax
+   - Use `--help` for command documentation
+
+4. **"Failed to initialize brain"**
+   - Check configuration validity
+   - Ensure required parameters are set
+
+### Getting Help
+
+- `nlm --help` - Show main help
+- `nlm <command> --help` - Show help for specific command
+- `nlm config --help` - Show configuration command help
+- `nlm experiment --help` - Show experiment command help
+- `nlm monitor --help` - Show monitor command help
 
 ## License
 
-MIT
-
-## Authors
-
-Research project — See docs for scientific background.
+This CLI is part of the NLM (Neural Learning Machine) project and is licensed under the MIT License.
