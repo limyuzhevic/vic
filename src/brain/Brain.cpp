@@ -14,11 +14,13 @@
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <vector>
 
 namespace nlm {
 
@@ -511,13 +513,39 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Integrate with episodic memory for temporal predictions
+        if (pImpl->episodicMemory) {
+            auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+            pImpl->predictionSystem->incorporateMemoryContext(recentEpisodes);
+        }
+        
+        // Memory-prediction coupling: use prediction error to update memory
+        if (pImpl->predictionError) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            pImpl->predictionError->update(predictionError, pImpl->timestep);
+            
+            // Update episodic memory based on prediction error
+            if (pImpl->episodicMemory) {
+                pImpl->episodicMemory->updateRelevanceForError(predictionError);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
+        
+        // Process sensory neuron activity
+        if (!pImpl->sensoryNeurons.empty()) {
+            std::vector<float> sensoryActivity;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                sensoryActivity.push_back(neuron->getState().membranePotential);
+            }
+            pImpl->attention->processSensoryInput(sensoryActivity);
+        }
         
         // Apply attention to working memory winners
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
@@ -528,14 +556,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process working memory patterns to form abstract concepts
+        if (pImpl->workingMemory) {
+            pImpl->conceptFormation->processWorkingMemory(pImpl->workingMemory->getMemoryNeurons());
+        }
+        
+        // Integrate with attention system for selective concept formation
+        if (pImpl->attention) {
+            pImpl->conceptFormation->setAttentionFocus(pImpl->attention->getCurrentFocus());
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
-    }
+    // ========== STEP 11: Apply structural plasticity continuously ==========
+    // Structural plasticity should be continuous, not just periodic
+    pImpl->structuralPlasticity->update(this, *pImpl->rng);
     
     // ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
@@ -547,34 +581,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
-            }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
-        }
-    }
+    // Continuous development updates - affects plasticity rates
+    pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep);
     
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
@@ -690,9 +698,71 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Use neural planner for action selection
+    if (pImpl->planner) {
+        // Generate action plans based on current state
+        // We need current sensory state to plan
+        // For now, use a simple representation of current brain state
+        std::vector<float> currentState;
+        
+        // Create a simple state representation based on neuron activations
+        currentState.reserve(10);
+        
+        // Get average activation from different neuron types
+        float sensoryActivation = 0.0f;
+        float internalActivation = 0.0f;
+        float motorActivation = 0.0f;
+        size_t sensoryCount = 0, internalCount = 0, motorCount = 0;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                NeuronType type = pop->getNeuronType();
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    float activation = std::abs(state.membranePotential - state.restingPotential);
+                    
+                    if (type == NeuronType::Sensory) {
+                        sensoryActivation += activation;
+                        ++sensoryCount;
+                    } else if (type == NeuronType::Internal) {
+                        internalActivation += activation;
+                        ++internalCount;
+                    } else if (type == NeuronType::Motor) {
+                        motorActivation += activation;
+                        ++motorCount;
+                    }
+                }
+            }
+        }
+        
+        if (sensoryCount > 0) currentState.push_back(sensoryActivation / sensoryCount);
+        if (internalCount > 0) currentState.push_back(internalActivation / internalCount);
+        if (motorCount > 0) currentState.push_back(motorActivation / motorCount);
+        
+        // Add current goals from episodic memory
+        if (pImpl->episodicMemory) {
+            auto recentRewards = pImpl->episodicMemory->getRecentRewards();
+            if (!recentRewards.empty()) {
+                currentState.push_back(recentRewards.back());
+            }
+        }
+        
+        // Add dopamine level as motivational signal
+        if (pImpl->dopamine) {
+            currentState.push_back(pImpl->dopamine->getLevel());
+        }
+        
+        // Get planning action based on current state and goals
+        float targetReward = 0.5f;  // Default goal
+        if (!pImpl->motorNeurons.empty()) {
+            targetReward = 0.5f;  // Move forward if any motor neurons active
+        }
+        
+        ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        return std::make_unique<Action>(plannedAction);
+    }
     
+    // Fallback to simple action selection if planner not available
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
