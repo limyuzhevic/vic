@@ -190,8 +190,35 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
+        // Logging
     void logStatus() const;
+    
+    // ========== VALIDATION AND HEALTH CHECK ==========
+    
+    // Validate neural network integrity
+    bool validateNeuralNetworkIntegrity();
+    
+    // Validate individual neuron integrity
+    bool validateNeuronIntegrity(const Neuron* neuron) const;
+    
+    // Validate individual synapse integrity
+    bool validateSynapseIntegrity(const Synapse* synapse) const;
+    
+    // ========== STATISTICS AND METRICS ==========
+    
+    // Get total number of neurons across all regions
+    size_t getTotalActiveNeurons() const;
+    
+    // Get average firing rate across all neurons
+    float getNetworkStabilityScore() const;
+    
+    // Get total spike events (current + historical + pending)
+    size_t getTotalSpikeEvents() const;
+    
+    // ========== INTEGRATION TESTING AND DEBUGGING ==========
+    
+    // Run comprehensive integration test on brain systems
+    void runIntegrationTest();
     
 private:
     struct Impl;

@@ -19,7 +19,34 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , moveThreshold_(0.5f)
+    , exploreThreshold_(0.7f)
+    , curiosityThreshold_(0.5f)
 {
+    // Initialize motor command mapping with standard actions
+    motorCommands_ = {
+        MotorCommand::Wait,
+        MotorCommand::MoveForward,
+        MotorCommand::MoveBackward,
+        MotorCommand::TurnLeft,
+        MotorCommand::TurnRight,
+        MotorCommand::LookLeft,
+        MotorCommand::LookRight,
+        MotorCommand::Interact
+    };
+    
+    // Initialize motor command mapping with standard actions
+    motorCommands_ = {
+        MotorCommand::Wait,
+        MotorCommand::MoveForward,
+        MotorCommand::MoveBackward,
+        MotorCommand::TurnLeft,
+        MotorCommand::TurnRight,
+        MotorCommand::LookLeft,
+        MotorCommand::LookRight,
+        MotorCommand::Interact
+    };
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -251,17 +278,19 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
     // Apply to all synapses with eligibility traces
-    for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
-            
-            if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
-                syn->addToWeight(delta);
+    if (brain_ && brain_->getSTDP()) {
+        for (const auto& region : brain_->getRegions()) {
+            for (auto* syn : region->getSynapses()) {
+                float eligibility = syn->getEligibilityTrace();
                 
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+                if (std::abs(eligibility) > 0.001f) {
+                    // Apply reward-modulated weight change
+                    float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                    syn->addToWeight(delta);
+                    
+                    // Decay eligibility trace
+                    syn->decayEligibilityTrace(0.1f);
+                }
             }
         }
     }

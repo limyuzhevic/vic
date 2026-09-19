@@ -69,6 +69,24 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Get motor command mapping for inspection/modification
+    const std::vector<MotorCommand>& getMotorCommands() const { return motorCommands_; }
+    void setMotorCommands(const std::vector<MotorCommand>& commands) { motorCommands_ = commands; }
+    
+    // Get action thresholds for decision making
+    float getMoveThreshold() const { return moveThreshold_; }
+    void setMoveThreshold(float threshold) { moveThreshold_ = threshold; }
+    float getExploreThreshold() const { return exploreThreshold_; }
+    void setExploreThreshold(float threshold) { exploreThreshold_ = threshold; }
+    float getCuriosityThreshold() const { return curiosityThreshold_; }
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = threshold; }
+    
+    // Get development stage duration (configurable)
+    float getDevelopmentStageDuration(DevelopmentalStage stage) const;
+    
+    // Get neural response to motor command
+    float getMotorResponse(MotorCommand cmd) const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -108,6 +126,12 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    
+    // Motor command configuration
+    std::vector<MotorCommand> motorCommands_;  // Configurable motor command mapping
+    float moveThreshold_;  // Threshold for action execution
+    float exploreThreshold_;  // Threshold for exploration behavior
+    float curiosityThreshold_;  // Threshold for curiosity-driven actions
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
