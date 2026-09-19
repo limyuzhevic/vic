@@ -231,21 +231,39 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
+    // Initialize prediction system
+    pImpl->predictionSystem = std::make_unique<PredictionSystem>();
+    
+    // Initialize cognition systems
+    pImpl->planner = std::make_unique<NeuralPlanner>();
+    pImpl->conceptFormation = std::make_unique<ConceptFormation>();
+    pImpl->attention = std::make_unique<AttentionalSelection>();
+    
+    // Initialize development system
+    pImpl->developmentSystem = std::make_unique<DevelopmentSystem>();
+    
+    // Initialize neuromodulation systems
+    pImpl->dopamine = std::make_unique<Dopamine>();
+    pImpl->curiosity = std::make_unique<Curiosity>();
+    pImpl->predictionError = std::make_unique<PredictionError>();
+    pImpl->novelty = std::make_unique<Novelty>();
+    
+    // Initialize all integrated systems with their initialization methods
+    // Working memory
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
+    // Episodic memory
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
+    // Associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
+    // Prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
-    // Initialize cognition systems
+    // Cognition systems
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
     
@@ -255,9 +273,14 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
+    // Development system
+    pImpl->developmentSystem->initialize(this);
+    
+    // Neuromodulation systems
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);
+    pImpl->dopamine->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -412,9 +435,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+    // Update curiosity - get novelty and prediction error levels
+    if (pImpl->curiosity && pImpl->novelty && pImpl->predictionError) {
+        float novelty = pImpl->novelty->getLevel();
+        float predictionError = pImpl->predictionError->getLevel();
+        pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -444,6 +469,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    // Update prediction system with current sensory input and state
+    if (pImpl->predictionSystem) {
+        // Get current working memory content as state prediction
+        std::vector<float> currentState = std::vector<float>();
+        if (pImpl->workingMemory) {
+            currentState = pImpl->workingMemory->retrieve();
+        }
+        pImpl->predictionSystem->update(currentState, pImpl->timestep);
     }
     
     for (auto& region : pImpl->regions) {
@@ -546,7 +581,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // ========= STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -585,6 +620,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+    
+    // ========== STEP 16: Update prediction system with current state ==========
+    if (pImpl->predictionSystem) {
+        // Update prediction system with current working memory content as state prediction
+        std::vector<float> currentState;
+        if (pImpl->workingMemory) {
+            currentState = pImpl->workingMemory->retrieve();
+        }
+        pImpl->predictionSystem->update(currentState, pImpl->timestep);
+    }
+    
+    // ========== STEP 17: Update attention based on prediction error ==========
+    if (pImpl->attention && pImpl->predictionError) {
+        float predictionError = pImpl->predictionError->getLevel();
+        pImpl->attention->setPredictionError(predictionError);
+        pImpl->attention->update(pImpl->timestep);
     }
 }
 
