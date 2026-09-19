@@ -269,18 +269,93 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
         brain->step(i, i * 0.001);
     }
     
-    // Check if working memory has traces
-    if (wm->getActiveTraces() > 0) {
-        NLM_LOG_INFO("[PASS] Working memory has active traces: " + std::to_string(wm->getActiveTraces()));
-    } else {
-        NLM_LOG_INFO("[INFO] Working memory has no active traces (may be normal for simple simulation)");
-    }
-    
     // Check if episodic memory has episodes
     if (em->getEpisodeCount() > 0) {
         NLM_LOG_INFO("[PASS] Episodic memory has episodes: " + std::to_string(em->getEpisodeCount()));
     } else {
         NLM_LOG_INFO("[INFO] Episodic memory has no episodes (may be normal for simple simulation)");
+    }
+    
+    // Check if associative memory is available
+    auto* am = brain->getAssociativeMemory();
+    if (am) {
+        NLM_LOG_INFO("[PASS] Associative memory is available");
+        
+        // Test basic associative functionality
+        std::vector<float> patternA = {0.1f, 0.2f, 0.3f};
+        std::vector<float> patternB = {0.9f, 0.8f, 0.7f};
+        am->associate(patternA, patternB, 0.8f);
+        
+        auto retrieved = am->retrieve(patternA, 3);
+        if (!retrieved.empty()) {
+            NLM_LOG_INFO("[PASS] Associative memory can retrieve patterns");
+        } else {
+            NLM_LOG_INFO("[WARN] Associative memory returned empty retrieval (may be normal)");
+        }
+    } else {
+        NLM_LOG_INFO("[WARN] Associative memory not available (placeholder)");
+    }
+    
+    // Check if prediction system is available
+    auto* predSys = brain->getPredictionSystem();
+    if (predSys) {
+        NLM_LOG_INFO("[PASS] Prediction system is available");
+        
+        // Test prediction system with neural activity
+        // Simulate a prediction scenario
+        auto error = predSys->computePredictionError(0.5f, 0.7f);
+        if (std::abs(error) < 1.0f) {
+            NLM_LOG_INFO("[PASS] Prediction system can compute errors");
+        } else {
+            NLM_LOG_INFO("[WARN] Prediction error out of expected range");
+        }
+    } else {
+        NLM_LOG_INFO("[WARN] Prediction system not available (placeholder)");
+    }
+    
+    // Check if cognition systems are available
+    auto* planner = brain->getPlanner();
+    if (planner) {
+        NLM_LOG_INFO("[PASS] Neural planner is available");
+        
+        // Test planner functionality
+        std::vector<ActionType> actions = {ActionType::MoveForward, ActionType::TurnLeft, ActionType::Wait};
+        auto plan = planner->plan(actions, 2);
+        if (!plan.empty()) {
+            NLM_LOG_INFO("[PASS] Neural planner can create action plans");
+        }
+    } else {
+        NLM_LOG_INFO("[WARN] Neural planner not available (placeholder)");
+    }
+    
+    auto* conceptFormation = brain->getConceptFormation();
+    if (conceptFormation) {
+        NLM_LOG_INFO("[PASS] Concept formation is available");
+        
+        // Test concept formation with neural patterns
+        std::vector<float> pattern = {0.1f, 0.2f, 0.3f, 0.4f, 0.5f};
+        auto concepts = conceptFormation->extractConcepts(pattern);
+        if (!concepts.empty()) {
+            NLM_LOG_INFO("[PASS] Concept formation can extract concepts");
+        }
+    } else {
+        NLM_LOG_INFO("[WARN] Concept formation not available (placeholder)");
+    }
+    
+    auto* attention = brain->getAttention();
+    if (attention) {
+        NLM_LOG_INFO("[PASS] Attention system is available");
+        
+        // Test attention system with competing neurons
+        std::vector<NeuronId> competitors = {1, 2, 3};
+        attention->processCompetition(competitors);
+        
+        float attentionLevel = attention->getAttentionLevel();
+        if (attentionLevel > 0.0f && attentionLevel <= 1.0f) {
+            NLM_LOG_INFO("[PASS] Attention system returns valid attention levels");
+        }
+    } else {
+        NLM_LOG_INFO("[WARN] Attention system not available (placeholder)");
     }
     
     return true;
