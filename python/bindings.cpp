@@ -15,6 +15,15 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/NeuralAssociativeMemory.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -27,19 +36,24 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::class_<Neuromodulator, std::shared_ptr<Neuromodulator>>(m, "Neuromodulator", R"pbdoc(Abstract neuromodulator base class)pbdoc")
+        .def("getName", &Neuromodulator::getName)
+        .def("getLevel", &Neuromodulator::getLevel)
+        .def("setLevel", &Neuromodulator::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Neuromodulator::getPlasticityFactor)
+        .def("update", &Neuromodulator::update, py::arg("dt"));
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
+    // Neuromodulation system bindings
+    // Neuromodulators: Dopamine, Reward, Curiosity, Novelty, PredictionError
+
+    py::class_<Dopamine, Neuromodulator>(m, "Dopamine", R"pbdoc(Dopamine: Reward and reinforcement learning signal)pbdoc")
         .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const NeuronId& id) {
-            return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+        .def("getLevel", &Dopamine::getLevel)
+        .def("setLevel", &Dopamine::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor)
+        .def("signalReward", &Dopamine::signalReward, py::arg("reward"))
+        .def("signalRewardPredictionError", &Dopamine::signalRewardPredictionError, py::arg("error"))
+        .def("update", &Dopamine::update, py::arg("dt"));
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
         .def(py::init<>())
@@ -399,6 +413,349 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    // Neural memory system bindings
+    py::class_<NeuralWorkingMemory>(m, "NeuralWorkingMemory", R"pbdoc(Neural working memory system with persistent activity)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralWorkingMemory::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("store", &NeuralWorkingMemory::store, py::arg("pattern"), py::arg("strength") = 1.0f,
+             "Store information in working memory as neural activity pattern")
+        .def("storeToNeuron", &NeuralWorkingMemory::storeToNeuron, py::arg("neuron"), py::arg("activation"),
+             "Store specific neuron activation")
+        .def("retrieve", &NeuralWorkingMemory::retrieve,
+             "Retrieve current working memory content as activity levels")
+        .def("contains", &NeuralWorkingMemory::contains, py::arg("neuron"),
+             "Check if specific neuron is part of working memory")
+        .def("getNeuronActivation", &NeuralWorkingMemory::getNeuronActivation, py::arg("neuron"),
+             "Get activation level of a specific neuron in working memory")
+        .def("update", &NeuralWorkingMemory::update, py::arg("dt"),
+             "Update working memory (maintenance and decay)")
+        .def("clear", &NeuralWorkingMemory::clear,
+             "Clear working memory")
+        .def("getActiveTraces", &NeuralWorkingMemory::getActiveTraces,
+             "Get number of active memory traces")
+        .def("getCapacity", &NeuralWorkingMemory::getCapacity,
+             "Get capacity")
+        .def("setCapacity", &NeuralWorkingMemory::setCapacity, py::arg("cap"),
+             "Set capacity")
+        .def("getDecayRate", &NeuralWorkingMemory::getDecayRate,
+             "Get decay rate for memory traces")
+        .def("setDecayRate", &NeuralWorkingMemory::setDecayRate, py::arg("rate"),
+             "Set decay rate for memory traces")
+        .def("getMemoryNeurons", &NeuralWorkingMemory::getMemoryNeurons,
+             "Get neurons currently in working memory")
+        .def("strengthenMemory", &NeuralWorkingMemory::strengthenMemory, py::arg("factor"),
+             "Strengthen working memory representation (for rehearsal)")
+        .def("runCompetition", &NeuralWorkingMemory::runCompetition,
+             "Competition between memory traces")
+        .def("isWinning", &NeuralWorkingMemory::isWinning, py::arg("neuron"),
+             "Is this neuron part of the winning population?")
+        .def("getMemoryActivity", &NeuralWorkingMemory::getMemoryActivity,
+             "Get overall memory activity level");
+
+    py::class_<EpisodicMemoryItem>(m, "EpisodicMemoryItem", R"pbdoc(Represents a stored experience)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("timestamp", &EpisodicMemoryItem::timestamp)
+        .def_readwrite("sensoryState", &EpisodicMemoryItem::sensoryState)
+        .def_readwrite("positionX", &EpisodicMemoryItem::positionX)
+        .def_readwrite("positionY", &EpisodicMemoryItem::positionY)
+        .def_readwrite("orientation", &EpisodicMemoryItem::orientation)
+        .def_readwrite("action", &EpisodicMemoryItem::action)
+        .def_readwrite("reward", &EpisodicMemoryItem::reward)
+        .def_readwrite("energy", &EpisodicMemoryItem::energy)
+        .def_readwrite("novelty", &EpisodicMemoryItem::novelty)
+        .def_readwrite("resultingSensoryState", &EpisodicMemoryItem::resultingSensoryState)
+        .def_readwrite("resultingReward", &EpisodicMemoryItem::resultingReward)
+        .def_readwrite("activeNeurons", &EpisodicMemoryItem::activeNeurons)
+        .def_readwrite("neuronActivations", &EpisodicMemoryItem::neuronActivations)
+        .def_readwrite("age", &EpisodicMemoryItem::age);
+
+    py::class_<NeuralEpisodicMemory>(m, "NeuralEpisodicMemory", R"pbdoc(Neural episodic memory with experience storage)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralEpisodicMemory::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("storeEpisode", &NeuralEpisodicMemory::storeEpisode, py::arg("episode"),
+             "Store a new experience")
+        .def("retrieveSimilar", &NeuralEpisodicMemory::retrieveSimilar, py::arg("sensoryPattern"), py::arg("maxResults") = 5,
+             "Retrieve episodes ordered by relevance")
+        .def("retrieveTemporal", &NeuralEpisodicMemory::retrieveTemporal, py::arg("startTime"), py::arg("endTime"), py::arg("maxResults") = 10,
+             "Retrieve episodes from a specific time window")
+        .def("retrieveByLocation", &NeuralEpisodicMemory::retrieveByLocation, py::arg("x"), py::arg("y"), py::arg("radius"), py::arg("maxResults") = 5,
+             "Retrieve episodes by location")
+        .def("retrieveAfterAction", &NeuralEpisodicMemory::retrieveAfterAction, py::arg("action"), py::arg("maxResults") = 5,
+             "Retrieve episodes following a specific action")
+        .def("replayEpisode", &NeuralEpisodicMemory::replayEpisode, py::arg("episode"),
+             "Replay an episode - reactivates the neural patterns")
+        .def("updateRelevance", &NeuralEpisodicMemory::updateRelevance, py::arg("episodeId"), py::arg("relevanceDelta"),
+             "Update episode relevance based on recent use")
+        .def("getEpisode", &NeuralEpisodicMemory::getEpisode, py::arg("index"),
+             "Get episode by index")
+        .def("getEpisodeCount", &NeuralEpisodicMemory::getEpisodeCount,
+             "Get total number of episodes")
+        .def("getRecentEpisodes", &NeuralEpisodicMemory::getRecentEpisodes, py::arg("count"),
+             "Get recent episodes")
+        .def("getAverageReward", &NeuralEpisodicMemory::getAverageReward,
+             "Get average reward from episodes")
+        .def("consolidate", &NeuralEpisodicMemory::consolidate, py::arg("relevanceThreshold"),
+             "Consolidate (clear old episodes)")
+        .def("clear", &NeuralEpisodicMemory::clear,
+             "Clear all episodes")
+        .def("enableReplay", &NeuralEpisodicMemory::enableReplay, py::arg("enable"),
+             "Enable/disable replay")
+        .def("isReplayEnabled", &NeuralEpisodicMemory::isReplayEnabled,
+             "Check if replay is enabled")
+        .def("getEpisodesForReplay", &NeuralEpisodicMemory::getEpisodesForReplay, py::arg("count"),
+             "Get episodes for replay")
+        .def("replaySequence", &NeuralEpisodicMemory::replaySequence, py::arg("episodeIds"),
+             "Replay multiple episodes");
+
+// Development system bindings
+    py::class_<DevelopmentSystem>(m, "DevelopmentSystem", R"pbdoc(Neural development system orchestrating developmental stages and plasticity)pbdoc")
+        .def(py::init<>())
+        .def("getStage", &DevelopmentSystem::getStage, "Get current developmental stage")
+        .def("setStage", &DevelopmentSystem::setStage, py::arg("stage"), "Set developmental stage")
+        .def("advanceStage", &DevelopmentSystem::advanceStage, "Advance to next developmental stage")
+        .def("getStageName", &DevelopmentSystem::getStageName, "Get name of current developmental stage")
+        .def("update", static_cast<void (DevelopmentSystem::*)(Brain*, SimulationStep)>(&DevelopmentSystem::update),
+             py::arg("brain"), py::arg("currentStep"), "Update development with simple parameters")
+        .def("update", static_cast<void (DevelopmentSystem::*)(Brain*, RandomGenerator&, TimestepDuration)>(&DevelopmentSystem::update),
+             py::arg("brain"), py::arg("rng"), py::arg("dt"), "Update development with full parameters")
+        .def("getPlasticityModifier", &DevelopmentSystem::getPlasticityModifier, "Get plasticity modifier for current stage")
+        .def("isCriticalPeriod", &DevelopmentSystem::isCriticalPeriod, "Check if currently in critical period")
+        .def("getCriticalPeriodProgress", &DevelopmentSystem::getCriticalPeriodProgress, "Get critical period progress (0-1)")
+        .def("getDevelopmentalAge", &DevelopmentSystem::getDevelopmentalAge, "Get developmental age in simulation time")
+        .def("setDevelopmentalAge", &DevelopmentSystem::setDevelopmentalAge, py::arg("age"), "Set developmental age");
+
+    // Neural memory system bindings
+    py::class_<NeuralWorkingMemory>(m, "NeuralWorkingMemory", R"pbdoc(Neural working memory system with persistent activity)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralWorkingMemory::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("store", &NeuralWorkingMemory::store, py::arg("pattern"), py::arg("strength") = 1.0f,
+             "Store information in working memory as neural activity pattern")
+        .def("storeToNeuron", &NeuralWorkingMemory::storeToNeuron, py::arg("neuron"), py::arg("activation"),
+             "Store specific neuron activation")
+        .def("retrieve", &NeuralWorkingMemory::retrieve,
+             "Retrieve current working memory content as activity levels")
+        .def("contains", &NeuralWorkingMemory::contains, py::arg("neuron"),
+             "Check if specific neuron is part of working memory")
+        .def("getNeuronActivation", &NeuralWorkingMemory::getNeuronActivation, py::arg("neuron"),
+             "Get activation level of a specific neuron in working memory")
+        .def("update", &NeuralWorkingMemory::update, py::arg("dt"),
+             "Update working memory (maintenance and decay)")
+        .def("clear", &NeuralWorkingMemory::clear,
+             "Clear working memory")
+        .def("getActiveTraces", &NeuralWorkingMemory::getActiveTraces,
+             "Get number of active memory traces")
+        .def("getCapacity", &NeuralWorkingMemory::getCapacity,
+             "Get capacity")
+        .def("setCapacity", &NeuralWorkingMemory::setCapacity, py::arg("cap"),
+             "Set capacity")
+        .def("getDecayRate", &NeuralWorkingMemory::getDecayRate,
+             "Get decay rate for memory traces")
+        .def("setDecayRate", &NeuralWorkingMemory::setDecayRate, py::arg("rate"),
+             "Set decay rate for memory traces")
+        .def("getMemoryNeurons", &NeuralWorkingMemory::getMemoryNeurons,
+             "Get neurons currently in working memory")
+        .def("strengthenMemory", &NeuralWorkingMemory::strengthenMemory, py::arg("factor"),
+             "Strengthen working memory representation (for rehearsal)")
+        .def("runCompetition", &NeuralWorkingMemory::runCompetition,
+             "Competition between memory traces")
+        .def("isWinning", &NeuralWorkingMemory::isWinning, py::arg("neuron"),
+             "Is this neuron part of the winning population?")
+        .def("getMemoryActivity", &NeuralWorkingMemory::getMemoryActivity,
+             "Get overall memory activity level");
+
+    py::class_<EpisodicMemoryItem>(m, "EpisodicMemoryItem", R"pbdoc(Represents a stored experience)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("timestamp", &EpisodicMemoryItem::timestamp)
+        .def_readwrite("sensoryState", &EpisodicMemoryItem::sensoryState)
+        .def_readwrite("positionX", &EpisodicMemoryItem::positionX)
+        .def_readwrite("positionY", &EpisodicMemoryItem::positionY)
+        .def_readwrite("orientation", &EpisodicMemoryItem::orientation)
+        .def_readwrite("action", &EpisodicMemoryItem::action)
+        .def_readwrite("reward", &EpisodicMemoryItem::reward)
+        .def_readwrite("energy", &EpisodicMemoryItem::energy)
+        .def_readwrite("novelty", &EpisodicMemoryItem::novelty)
+        .def_readwrite("resultingSensoryState", &EpisodicMemoryItem::resultingSensoryState)
+        .def_readwrite("resultingReward", &EpisodicMemoryItem::resultingReward)
+        .def_readwrite("activeNeurons", &EpisodicMemoryItem::activeNeurons)
+        .def_readwrite("neuronActivations", &EpisodicMemoryItem::neuronActivations)
+        .def_readwrite("age", &EpisodicMemoryItem::age);
+
+    py::class_<NeuralEpisodicMemory>(m, "NeuralEpisodicMemory", R"pbdoc(Neural episodic memory with experience storage)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralEpisodicMemory::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("storeEpisode", &NeuralEpisodicMemory::storeEpisode, py::arg("episode"),
+             "Store a new experience")
+        .def("retrieveSimilar", &NeuralEpisodicMemory::retrieveSimilar, py::arg("sensoryPattern"), py::arg("maxResults") = 5,
+             "Retrieve episodes ordered by relevance")
+        .def("retrieveTemporal", &NeuralEpisodicMemory::retrieveTemporal, py::arg("startTime"), py::arg("endTime"), py::arg("maxResults") = 10,
+             "Retrieve episodes from a specific time window")
+        .def("retrieveByLocation", &NeuralEpisodicMemory::retrieveByLocation, py::arg("x"), py::arg("y"), py::arg("radius"), py::arg("maxResults") = 5,
+             "Retrieve episodes by location")
+        .def("retrieveAfterAction", &NeuralEpisodicMemory::retrieveAfterAction, py::arg("action"), py::arg("maxResults") = 5,
+             "Retrieve episodes following a specific action")
+        .def("replayEpisode", &NeuralEpisodicMemory::replayEpisode, py::arg("episode"),
+             "Replay an episode - reactivates the neural patterns")
+        .def("updateRelevance", &NeuralEpisodicMemory::updateRelevance, py::arg("episodeId"), py::arg("relevanceDelta"),
+             "Update episode relevance based on recent use")
+        .def("getEpisode", &NeuralEpisodicMemory::getEpisode, py::arg("index"),
+             "Get episode by index")
+        .def("getEpisodeCount", &NeuralEpisodicMemory::getEpisodeCount,
+             "Get total number of episodes")
+        .def("getRecentEpisodes", &NeuralEpisodicMemory::getRecentEpisodes, py::arg("count"),
+             "Get recent episodes")
+        .def("getAverageReward", &NeuralEpisodicMemory::getAverageReward,
+             "Get average reward from episodes")
+        .def("consolidate", &NeuralEpisodicMemory::consolidate, py::arg("relevanceThreshold"),
+             "Consolidate (clear old episodes)")
+        .def("clear", &NeuralEpisodicMemory::clear,
+             "Clear all episodes")
+        .def("enableReplay", &NeuralEpisodicMemory::enableReplay, py::arg("enable"),
+             "Enable/disable replay")
+        .def("isReplayEnabled", &NeuralEpisodicMemory::isReplayEnabled,
+             "Check if replay is enabled")
+        .def("getEpisodesForReplay", &NeuralEpisodicMemory::getEpisodesForReplay, py::arg("count"),
+             "Get episodes for replay")
+        .def("replaySequence", &NeuralEpisodicMemory::replaySequence, py::arg("episodeIds"),
+             "Replay multiple episodes");
+
+    py::class_<NeuralAssociativeMemory>(m, "NeuralAssociativeMemory", R"pbdoc(Neural associative memory for pattern relationships)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralAssociativeMemory::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("associate", &NeuralAssociativeMemory::associate, py::arg("patternA"), py::arg("patternB"), py::arg("strength") = 1.0f,
+             "Create association between two neural patterns")
+        .def("associateFromExperience", &NeuralAssociativeMemory::associateFromExperience, py::arg("episode"),
+             "Create association based on experience")
+        .def("retrieve", &NeuralAssociativeMemory::retrieve, py::arg("queryPattern"), py::arg("maxResults") = 5,
+             "Retrieve patterns associated with a query pattern")
+        .def("getAssociationStrength", &NeuralAssociativeMemory::getAssociationStrength, py::arg("patternA"), py::arg("patternB"),
+             "Get association strength between two patterns")
+        .def("updateAssociation", &NeuralAssociativeMemory::updateAssociation, py::arg("patternA"), py::arg("patternB"), py::arg("delta"),
+             "Update association based on outcome")
+        .def("spreadActivation", &NeuralAssociativeMemory::spreadActivation, py::arg("cuePattern"), py::arg("steps") = 2,
+             "Spread activation from cue pattern")
+        .def("clear", &NeuralAssociativeMemory::clear,
+             "Clear associations")
+        .def("getAssociationCount", &NeuralAssociativeMemory::getAssociationCount,
+             "Get number of associations");
+
+// Neuromodulation system bindings
+    // Neuromodulators: Dopamine, Reward, Curiosity, Novelty, PredictionError
+
+    py::class_<Dopamine, Neuromodulator>(m, "Dopamine", R"pbdoc(Dopamine: Reward and reinforcement learning signal)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Dopamine::getLevel)
+        .def("setLevel", &Dopamine::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor)
+        .def("signalReward", &Dopamine::signalReward, py::arg("reward"))
+        .def("signalRewardPredictionError", &Dopamine::signalRewardPredictionError, py::arg("error"))
+        .def("update", &Dopamine::update, py::arg("dt"));
+
+    py::class_<Reward>(m, "Reward", R"pbdoc(Reward: Reward signal for reinforcement learning)pbdoc")
+        .def(py::init<>())
+        .def("getValue", &Reward::getValue)
+        .def("setValue", &Reward::setValue, py::arg("value"))
+        .def("add", &Reward::add, py::arg("delta"))
+        .def("reset", &Reward::reset)
+        .def("computeReward", &Reward::computeReward, py::arg("observation"))
+        .def("getHistory", &Reward::getHistory)
+        .def("clearHistory", &Reward::clearHistory);
+
+    py::class_<Curiosity>(m, "Curiosity", R"pbdoc(Curiosity: Exploration motivation based on novelty and prediction error)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Curiosity::getLevel)
+        .def("getExplorationDrive", &Curiosity::getExplorationDrive)
+        .def("update", &Curiosity::update, py::arg("novelty"), py::arg("predictionError"), py::arg("dt"))
+        .def("setNoveltyWeight", &Curiosity::setNoveltyWeight, py::arg("weight"))
+        .def("setPredictionErrorWeight", &Curiosity::setPredictionErrorWeight, py::arg("weight"))
+        .def("reset", &Curiosity::reset);
+
+    py::class_<Novelty>(m, "Novelty", R"pbdoc(Novelty: Novelty detection signal from sensory changes)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Novelty::getLevel)
+        .def("setLevel", &Novelty::setLevel, py::arg("level"))
+        .def("detectNovelty", static_cast<void (Novelty::*)(const Observation&, const Observation&)>(&Novelty::detectNovelty),
+              py::arg("observation"), py::arg("previousObservation"))
+        .def("detectNovelty", static_cast<void (Novelty::*)(const std::vector<float>&, const std::vector<float>&)>(&Novelty::detectNovelty),
+              py::arg("currentPattern"), py::arg("previousPattern"))
+        .def("update", &Novelty::update, py::arg("dt"))
+        .def("getHistory", &Novelty::getHistory)
+        .def("clearHistory", &Novelty::clearHistory);
+
+    py::class_<PredictionError>(m, "PredictionError", R"pbdoc(PredictionError: Prediction error signal for learning)pbdoc")
+        .def(py::init<>())
+        .def("getError", &PredictionError::getError)
+        .def("computeError", &PredictionError::computeError, py::arg("predicted"), py::arg("actual"))
+        .def("updatePrediction", &PredictionError::updatePrediction, py::arg("newPrediction"))
+        .def("getMagnitude", &PredictionError::getMagnitude)
+        .def("getHistory", &PredictionError::getHistory)
+        .def("clearHistory", &PredictionError::clearHistory);
+
+    // Neuromodulation factory functions
+    m.def("createDopamine", []() -> std::unique_ptr<Dopamine> {
+        return std::make_unique<Dopamine>();
+    }, "Create a dopamine neuromodulator");
+
+    m.def("createReward", []() -> std::unique_ptr<Reward> {
+        return std::make_unique<Reward>();
+    }, "Create a reward system");
+
+    m.def("createCuriosity", []() -> std::unique_ptr<Curiosity> {
+        return std::make_unique<Curiosity>();
+    }, "Create a curiosity system");
+
+    m.def("createNovelty", []() -> std::unique_ptr<Novelty> {
+        return std::make_unique<Novelty>();
+    }, "Create a novelty detector");
+
+    m.def("createPredictionError", []() -> std::unique_ptr<PredictionError> {
+        return std::make_unique<PredictionError>();
+    }, "Create a prediction error system");
+
+    m.def("createAgentDopamine", [](std::shared_ptr<Brain> brain) -> std::unique_ptr<Dopamine> {
+        auto mod = std::make_unique<Dopamine>();
+        return mod;
+    }, py::arg("brain"), "Create and initialize dopamine neuromodulator with brain reference");
+
+    m.def("createAgentReward", [](std::shared_ptr<Brain> brain) -> std::unique_ptr<Reward> {
+        auto mod = std::make_unique<Reward>();
+        return mod;
+    }, py::arg("brain"), "Create and initialize reward system with brain reference");
+
+    m.def("createAgentCuriosity", [](std::shared_ptr<Brain> brain) -> std::unique_ptr<Curiosity> {
+        auto mod = std::make_unique<Curiosity>();
+        mod->initialize(brain.get());
+        return mod;
+    }, py::arg("brain"), "Create and initialize curiosity system with brain reference");
+
+    m.def("createAgentNovelty", [](std::shared_ptr<Brain> brain) -> std::unique_ptr<Novelty> {
+        auto mod = std::make_unique<Novelty>();
+        mod->initialize(brain.get());
+        return mod;
+    }, py::arg("brain"), "Create and initialize novelty detector with brain reference");
+
+    m.def("createAgentPredictionError", [](std::shared_ptr<Brain> brain) -> std::unique_ptr<PredictionError> {
+        auto mod = std::make_unique<PredictionError>();
+        mod->initialize(brain.get());
+        return mod;
+    }, py::arg("brain"), "Create and initialize prediction error system with brain reference");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

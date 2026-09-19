@@ -1,0 +1,24 @@
+[build-system]
+requires = ["cmake", "ninja"]
+build-backend = "cmake"
+
+[project]
+name = "nlm-python-bindings"
+version = "0.1.0"
+requires-python = ">=3.8"
+
+[tool.cmake]
+source-dir = "."
+build-dir = "build"
+
+[tool.setuptools]
+packages = ["python"]
+
+[tool.pybind11]
+include = "python/bindings.cpp"
+
+[project.optional-dependencies]
+dev = ["cmake", "ninja", "git"]
+
+[project.scripts]
+nlm-python-bindings = "python.__main__:main"
