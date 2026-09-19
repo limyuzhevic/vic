@@ -5,11 +5,49 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <fstream>
+#include <filesystem>
+
+// Forward declarations
+namespace nlohmann {
+    template<typename T> class json;
+}
+
+namespace YAML {
+    class Node;
+    class Emitter;
+}
 
 namespace nlm {
 
-// Forward declarations
-class Config;
+// File format detection
+enum class FileFormat {
+    Unknown,
+    KeyValue,
+    JSON,
+    YAML
+};
+
+// File format detection function
+FileFormat detectFileFormat(const std::string& filepath);
+
+// ConfigValue to JSON conversion
+nlohmann::json configValueToJson(const ConfigValue& value);
+
+// JSON to ConfigValue conversion
+bool jsonToConfigValue(const nlohmann::json& jsonValue, ConfigValue& outValue);
+
+// ConfigValue to YAML conversion
+void configValueToYaml(YAML::Emitter& emitter, const ConfigValue& value);
+
+// YAML to ConfigValue conversion
+bool yamlToConfigValue(const YAML::Node& node, ConfigValue& outValue);
+
+// Get file extension
+std::string getFileExtension(const std::string& filepath);
+
+// Check if file is empty
+bool isFileEmpty(const std::string& filepath);
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -55,13 +93,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (auto-detects format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (defaults to JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
