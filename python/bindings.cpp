@@ -279,6 +279,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
         .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
         .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
+        .def("getObjectAt", &SimpleWorld::getObjectAt, py::arg("x"), py::arg("y"))
         .def("getWidth", &SimpleWorld::getWidth)
         .def("getHeight", &SimpleWorld::getHeight)
         .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
@@ -287,7 +288,149 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        
+        // Batch operations for performance
+        .def("addObjects", [](SimpleWorld& self, const std::vector<WorldObject>& objs) {
+            for (const auto& obj : objs) {
+                self.addObject(obj);
+            }
+        }, py::arg("objects"))
+        .def("setObjectPosition", [](SimpleWorld& self, float x, float y, float newX, float newY) {
+            WorldObject* obj = self.getObjectAt(x, y);
+            if (obj) {
+                obj->x = newX;
+                obj->y = newY;
+            }
+        }, py::arg("x"), py::arg("y"), py::arg("newX"), py::arg("newY"))
+        
+        // Additional batch operations
+        .def("clearObjects", &SimpleWorld::reset)
+        .def("getAllObjects", [](const SimpleWorld& self) {
+            return self.objects_;
+        }, py::return_value_policy::reference_internal)
+        .def("findObjectsByType", [](const SimpleWorld& self, WorldObjectType type) {
+            std::vector<WorldObject> result;
+            for (const auto& obj : self.objects_) {
+                if (obj.type == type) {
+                    result.push_back(obj);
+                }
+            }
+            return result;
+        }, py::arg("type"))
+        
+        // Missing setters for configuration parameters
+        .def("setResourceEnergyGain", &SimpleWorld::setResourceEnergyGain, py::arg("gain"))
+        .def("setHazardDamage", [](SimpleWorld& self, float damage) {
+            // Need to update all hazard objects
+            for (auto& obj : self.objects_) {
+                if (obj.type == WorldObjectType::Hazard) {
+                    obj.value = damage;
+                }
+            }
+        }, py::arg("damage"))
+        .def("setMaxSpeed", [](SimpleWorld& self, float speed) {
+            self.maxSpeed_ = speed;
+        }, py::arg("speed"))
+        .def("setFriction", [](SimpleWorld& self, float friction) {
+            self.friction_ = friction;
+        }, py::arg("friction"))
+        
+        // Helper methods for world inspection
+        .def("getAgentState", [](SimpleWorld& self) {
+            py::dict state;
+            state["x"] = self.agent_.x;
+            state["y"] = self.agent_.y;
+            state["orientation"] = self.agent_.orientation;
+            state["energy"] = self.agent_.energy;
+            state["health"] = self.agent_.health;
+            state["isMoving"] = self.agent_.isMoving;
+            state["isTurning"] = self.agent_.isTurning;
+            return state;
+        })
+        .def("setAgentState", [](SimpleWorld& self, const py::dict& state) {
+            if (state.contains("x")) self.agent_.x = state["x"].cast<float>();
+            if (state.contains("y")) self.agent_.y = state["y"].cast<float>();
+            if (state.contains("orientation")) self.agent_.orientation = state["orientation"].cast<float>();
+            if (state.contains("energy")) self.agent_.energy = state["energy"].cast<float>();
+            if (state.contains("health")) self.agent_.health = state["health"].cast<float>();
+            if (state.contains("isMoving")) self.agent_.isMoving = state["isMoving"].cast<bool>();
+            if (state.contains("isTurning")) self.agent_.isTurning = state["isTurning"].cast<bool>();
+        }, py::arg("state"))
+        
+        // Performance monitoring
+        .def("getPerformanceStats", [](const SimpleWorld& self) {
+            py::dict stats;
+            stats["worldSize"] = py::make_tuple(self.width_, self.height_);
+            stats["visionSize"] = py::make_tuple(self.visionWidth_, self.visionHeight_);
+            stats["agentEnergy"] = self.agent_.energy;
+            stats["agentHealth"] = self.agent_.health;
+            stats["totalObjects"] = static_cast<size_t>(self.objects_.size());
+            stats["simulationTime"] = self.simTime_;
+            return stats;
+        })
+        
+        .def("clearAllObjects", [](SimpleWorld& self) {
+            self.objects_.clear();
+        })
+        
+        .def("getObjectsByType", [](const SimpleWorld& self, WorldObjectType type) {
+            std::vector<WorldObject> result;
+            for (const auto& obj : self.objects_) {
+                if (obj.type == type) {
+                    result.push_back(obj);
+                }
+            }
+            return result;
+        }, py::arg("type"));
+        
+        // Helper methods for world inspection
+        .def("getAgentState", [](SimpleWorld& self) {
+            py::dict state;
+            state["x"] = self.agent_.x;
+            state["y"] = self.agent_.y;
+            state["orientation"] = self.agent_.orientation;
+            state["energy"] = self.agent_.energy;
+            state["health"] = self.agent_.health;
+            state["isMoving"] = self.agent_.isMoving;
+            state["isTurning"] = self.agent_.isTurning;
+            return state;
+        })
+        .def("setAgentState", [](SimpleWorld& self, const py::dict& state) {
+            if (state.contains("x")) self.agent_.x = state["x"].cast<float>();
+            if (state.contains("y")) self.agent_.y = state["y"].cast<float>();
+            if (state.contains("orientation")) self.agent_.orientation = state["orientation"].cast<float>();
+            if (state.contains("energy")) self.agent_.energy = state["energy"].cast<float>();
+            if (state.contains("health")) self.agent_.health = state["health"].cast<float>();
+            if (state.contains("isMoving")) self.agent_.isMoving = state["isMoving"].cast<bool>();
+            if (state.contains("isTurning")) self.agent_.isTurning = state["isTurning"].cast<bool>();
+        }, py::arg("state"))
+        
+        // Performance monitoring
+        .def("getPerformanceStats", [](const SimpleWorld& self) {
+            py::dict stats;
+            stats["worldSize"] = py::make_tuple(self.width_, self.height_);
+            stats["visionSize"] = py::make_tuple(self.visionWidth_, self.visionHeight_);
+            stats["agentEnergy"] = self.agent_.energy;
+            stats["agentHealth"] = self.agent_.health;
+            stats["totalObjects"] = static_cast<size_t>(self.objects_.size());
+            stats["simulationTime"] = self.simTime_;
+            return stats;
+        })
+        
+        .def("clearAllObjects", [](SimpleWorld& self) {
+            self.objects_.clear();
+        })
+        
+        .def("getObjectsByType", [](const SimpleWorld& self, WorldObjectType type) {
+            std::vector<WorldObject> result;
+            for (const auto& obj : self.objects_) {
+                if (obj.type == type) {
+                    result.push_back(obj);
+                }
+            }
+            return result;
+        }, py::arg("type"));
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -351,7 +494,70 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Memory system getters
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        
+        // Prediction system getter
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        
+        // Cognition system getters
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+        
+        // Development system getter
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        
+        // Neuromodulation system getters
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity neuromodulator")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty neuromodulator")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error signal")
+        
+        // Other system getters
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get STDP plasticity system")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get Hebbian plasticity system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get structural plasticity system")
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get spike system")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get random number generator")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

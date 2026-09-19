@@ -25,6 +25,10 @@ SimpleWorld::SimpleWorld()
     , maxEnergy_(100.0f)
     , energyDecayRate_(0.01f)
     , resourceEnergyGain_(30.0f)
+    , maxSpeed_(3.0f)           // Added for physics
+    , friction_(0.9f)           // Added for physics
+    , boundaryCollision_(true)  // Added for physics
+    , damagePerCollision_(0.01f)  // Added for physics
     , simTime_(0.0)
     , rngSeed_(42)
     , rngState_(42)
