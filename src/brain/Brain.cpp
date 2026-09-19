@@ -77,11 +77,9 @@ struct Brain::Impl {
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
-    
+
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
-        , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
         , currentStep(0)
@@ -174,12 +172,18 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
-bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
+    
+    // Safety check: ensure regionCount is at least 1 to avoid division by zero
+    if (regionCount == 0) {
+        NLM_LOG_WARN("Invalid region count 0 in config, using default of 1");
+        regionCount = 1;
+    }
+    
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
@@ -347,9 +351,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             for (auto* neuron : pop->getNeurons()) {
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
+                // Simplified: Check for immediate refractory state with recent spike
+                // Using microseconds to avoid floating point operations
                 bool justFired = (state.firingState == FiringState::Refractory &&
                                  state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+                                 currentTime - state.lastSpikeTime < pImpl->timestep * 2.0f);
 
                 if (justFired) {
                     // Neuron fired this step - queue the spike
