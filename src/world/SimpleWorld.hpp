@@ -33,8 +33,11 @@ public:
     SimpleWorld();
     ~SimpleWorld();
     
-    // Configuration
-    void configure(float width, float height, size_t visionWidth, size_t visionHeight);
+    // Initialize world with default parameters (alternative to configure)
+    void initialize(float width, float height);
+
+    // Initialize world with parameters and vision configuration
+    void initialize(float width, float height, size_t visionWidth, size_t visionHeight);
     
     // Reset world to initial state
     void reset();

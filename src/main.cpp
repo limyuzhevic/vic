@@ -365,13 +365,27 @@ int main(int argc, char** argv) {
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
-    
+
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // Override with explicit command line arguments for advanced usage
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--neurons" && i + 1 < argc) {
+            config->set("neuron_count", std::stoll(argv[++i]), ConfigSource::CommandLine);
+        } else if (arg == "--timestep" && i + 1 < argc) {
+            config->set("simulation_timestep", std::stod(argv[++i]), ConfigSource::CommandLine);
+        } else if (arg == "--steps" && i + 1 < argc) {
+            config->set("max_simulation_steps", std::stoll(argv[++i]), ConfigSource::CommandLine);
+        } else if (arg == "--debug") {
+            config->set("log_level", "DEBUG", ConfigSource::CommandLine);
+        }
+    }
     
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);

@@ -39,6 +39,45 @@ void SimpleWorld::configure(float width, float height, size_t visionWidth, size_
     height_ = height;
     visionWidth_ = visionWidth;
     visionHeight_ = visionHeight;
+    
+    // Regenerate vision with new configuration
+    generateVision();
+}
+
+void SimpleWorld::initialize(float width, float height) {
+    width_ = width;
+    height_ = height;
+    visionWidth_ = 16;  // Default vision
+    visionHeight_ = 16;
+    
+    // Use reasonable defaults for other parameters
+    maxEnergy_ = 100.0f;
+    energyDecayRate_ = 0.01f;
+    resourceEnergyGain_ = 30.0f;
+    simTime_ = 0.0;
+    rngSeed_ = 42;
+    rngState_ = 42;
+    
+    agent_.reset();
+    generateVision();
+}
+
+void SimpleWorld::initialize(float width, float height, size_t visionWidth, size_t visionHeight) {
+    width_ = width;
+    height_ = height;
+    visionWidth_ = visionWidth;
+    visionHeight_ = visionHeight;
+    
+    // Use reasonable defaults for other parameters
+    maxEnergy_ = 100.0f;
+    energyDecayRate_ = 0.01f;
+    resourceEnergyGain_ = 30.0f;
+    simTime_ = 0.0;
+    rngSeed_ = 42;
+    rngState_ = 42;
+    
+    agent_.reset();
+    generateVision();
 }
 
 void SimpleWorld::setRandomSeed(uint64_t seed) {

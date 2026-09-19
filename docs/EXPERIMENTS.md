@@ -4,9 +4,63 @@
 
 NLM uses experiments to evaluate its developmental learning capabilities. This document outlines the experimental framework, expected metrics, and Phase 4 cognitive experiments.
 
-## Phase 3 Experiments
+## Quick Reference
 
-### Phase 3.1: World Interaction Demo
+This project has the following ways to get started:
+
+### Quick Python Usage (see HOW_TO_USE.md for full documentation)
+
+```python
+import pynlm
+
+# Quick start example
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+for step in range(100):
+    brain.step(step)
+    
+print(f"Done! Total spikes: {brain.getTotalSpikeCount()}")
+```
+
+### Building from Source
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+./nlm
+```
+
+### Running Phase 3 Demo
+
+```bash
+./nlm_phase3_demo [num_trials] [steps]
+```
+
+### Running Phase 4 Demo
+
+```bash
+./nlm_phase4_demo [num_trials]
+```
+
+### Running Phase 6 Integration Demo
+
+```bash
+./nlm_phase6_demo
+```
+
+## Complete Experiment Documentation
+
+For detailed experiment information, see the main documentation at the end of this file.
+
+---
+
+# Phase 3 Experiments
+
+## Phase 3.1: World Interaction Demo
 The basic demonstration of the complete loop:
 ```
 NLM brain → actions → world changes → sensory input → reward → plasticity
