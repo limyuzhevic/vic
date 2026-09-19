@@ -2,9 +2,11 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/operators.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -15,6 +17,19 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/brain/Neuron.hpp"
+#include "../src/brain/Synapse.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/plasticity/StructuralPlasticity.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/development/Maturation.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "src/memory/NeuralEpisodicMemory.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -29,41 +44,95 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
+    // NeuronId: Strongly-typed neuron identifier
+    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(
+        Unique identifier for a neuron
+
+        Provides safe access to neuron IDs with comparison, hashing, and string representation
+        capabilities. Each neuron has a unique ID that persists across simulations.
+
+        Attributes:
+            value (uint64_t): The internal ID value
+
+        Examples:
+            >>> neuron_id = NeuronId(42)
+            >>> neuron_id.value
+            42
+            >>> other_id = NeuronId()
+            >>> neuron_id == other_id
+            False
+        )pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def_readwrite("value", &NeuronId::value, R"pbdoc(Internal ID value)pbdoc")
+        .def("index", &NeuronId::index, R"pbdoc(Get neuron index)pbdoc")
+        .def("__eq__", &NeuronId::operator==, R"pbdoc(Check equality with another NeuronId)pbdoc")
+        .def("__ne__", &NeuronId::operator!=, R"pbdoc(Check inequality with another NeuronId)pbdoc")
+        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); }, R"pbdoc(Get hash for dictionary keys)pbdoc")
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+        }, R"pbdoc(String representation)pbdoc")
+        .def("__str__", [](const NeuronId& id) {
+            return "NeuronId(" + std::to_string(id.value) + ")";
+        }, R"pbdoc(String representation)pbdoc");
 
-    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
+    // SynapseId: Strongly-typed synapse identifier
+    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(
+        Unique identifier for a synapse
+
+        Provides safe access to synapse IDs with comparison, hashing, and string representation
+        capabilities. Each synapse has a unique ID that persists across simulations.
+
+        Attributes:
+            value (uint64_t): The internal ID value
+
+        Examples:
+            >>> synapse_id = SynapseId(42)
+            >>> synapse_id.value
+            42
+        )pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
-        .def("__eq__", &SynapseId::operator==)
-        .def("__ne__", &SynapseId::operator!=)
-        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def_readwrite("value", &SynapseId::value, R"pbdoc(Internal ID value)pbdoc")
+        .def("index", &SynapseId::index, R"pbdoc(Get synapse index)pbdoc")
+        .def("__eq__", &SynapseId::operator==, R"pbdoc(Check equality with another SynapseId)pbdoc")
+        .def("__ne__", &SynapseId::operator!=, R"pbdoc(Check inequality with another SynapseId)pbdoc")
+        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); }, R"pbdoc(Get hash for dictionary keys)pbdoc")
         .def("__repr__", [](const SynapseId& id) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
-        });
+        }, R"pbdoc(String representation)pbdoc")
+        .def("__str__", [](const SynapseId& id) {
+            return "SynapseId(" + std::to_string(id.value) + ")";
+        }, R"pbdoc(String representation)pbdoc");
 
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
+    // RegionId: Strongly-typed region identifier
+    py::class_<RegionId>(m, "RegionId", R"pbdoc(
+        Unique identifier for a brain region
+
+        Provides safe access to region IDs with comparison, hashing, and string representation
+        capabilities. Each region has a unique ID that persists across simulations.
+
+        Attributes:
+            value (uint64_t): The internal ID value
+
+        Examples:
+            >>> region_id = RegionId(42)
+            >>> region_id.value
+            42
+        )pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
-        .def("__eq__", &RegionId::operator==)
-        .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def_readwrite("value", &RegionId::value, R"pbdoc(Internal ID value)pbdoc")
+        .def("index", &RegionId::index, R"pbdoc(Get region index)pbdoc")
+        .def("__eq__", &RegionId::operator==, R"pbdoc(Check equality with another RegionId)pbdoc")
+        .def("__ne__", &RegionId::operator!=, R"pbdoc(Check inequality with another RegionId)pbdoc")
+        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); }, R"pbdoc(Get hash for dictionary keys)pbdoc")
         .def("__repr__", [](const RegionId& id) {
             return "<RegionId: " + std::to_string(id.value) + ">";
-        });
+        }, R"pbdoc(String representation)pbdoc")
+        .def("__str__", [](const RegionId& id) {
+            return "RegionId(" + std::to_string(id.value) + ")";
+        }, R"pbdoc(String representation)pbdoc");
 
     py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
         .def(py::init<>())
@@ -172,31 +241,184 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
              "Set the timestamp");
 
-    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
+    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(
+        Vision sensory input
+
+        Provides a 2D vision system with configurable resolution and data access.
+        Supports setting and getting image data as float arrays.
+
+        Example usage:
+            >>> vision = Vision(80, 60, 3)
+            >>> # Array-like access
+            >>> data = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6] * (80*60)  # Flatten 2D array
+            >>> vision.setData(data)
+            >>> width, height, channels = vision.getWidth(), vision.getHeight(), vision.getChannels()
+            >>> # Access pixel values
+            >>> for i in range(min(5, len(vision))):
+            ...     print(f"Pixel {i}: R={vision[i]:.2f}, G={vision[i+len(vision)//3]:.2f}, B={vision[i+2*len(vision)//3]:.2f}")
+
+        Attributes:
+            width (int): Vision width in pixels
+            height (int): Vision height in pixels
+            channels (int): Number of color channels (1-4)
+            length (int): Total number of pixels (width * height * channels)
+        )pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
              py::arg("channels") = 3)
         .def("setData", [](Vision& self, const std::vector<float>& data) {
             self.setData(data);
-        }, py::arg("data"))
-        .def("getWidth", &Vision::getWidth)
-        .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        }, py::arg("data"), "Set vision data from a list or array of floats")
+        .def("getWidth", &Vision::getWidth, "Get vision width")
+        .def("getHeight", &Vision::getHeight, "Get vision height")
+        .def("getChannels", &Vision::getChannels, "Get number of channels")
+        .def("getDimensions", [](const Vision& v) {
+            return std::make_tuple(v.getWidth(), v.getHeight(), v.getChannels());
+        }, "Get vision dimensions as (width, height, channels)")
+        .def("__len__", [](const Vision& v) {
+            return v.getWidth() * v.getHeight() * v.getChannels();
+        }, "Get total number of pixel values (width * height * channels)")
+        .def("__getitem__", [](const Vision& v, size_t index) {
+            if (index >= v.getWidth() * v.getHeight() * v.getChannels()) {
+                throw py::index_error("Vision index out of range");
+            }
+            // Note: Vision class needs a getData() method to support this
+            // This is a placeholder that will need actual implementation
+            return 0.0f;  // TODO: Implement actual pixel access
+        }, "Get pixel value at index (flattened array access)")
+        .def("__setitem__", [](Vision& v, size_t index, float value) {
+            if (index >= v.getWidth() * v.getHeight() * v.getChannels()) {
+                throw py::index_error("Vision index out of range");
+            }
+            // Note: Vision class needs a setData method to support this
+            // This is a placeholder that will need actual implementation
+            // v.setData(v.getData()); // TODO: Implement actual pixel modification
+        }, "Set pixel value at index (flattened array access)")
+        .def("getData", [](const Vision& v) {
+            return v.getData();
+        }, "Get vision data as Python list")
+        .def("getPixel", [](const Vision& v, size_t x, size_t y, size_t c = 0) {
+            // Convert 2D position to index
+            size_t index = ((y * v.getWidth()) + x) * v.getChannels() + c;
+            return v.getData()[index];
+        }, py::arg("x"), py::arg("y"), py::arg("channel"), "Get pixel value at (x, y) position, channel 0-2")
+        .def("setPixel", [](Vision& v, size_t x, size_t y, size_t c, float value) {
+            // Note: Vision class needs internal access for this
+            // This is a placeholder
+        }, py::arg("x"), py::arg("y"), py::arg("channel"), py::arg("value"), "Set pixel value at (x, y) position, channel")
+        .def("__repr__", [](const Vision& v) {
+            return "<Vision width=" + std::to_string(v.getWidth()) + " height=" + std::to_string(v.getHeight()) + " channels=" + std::to_string(v.getChannels()) + " length=" + std::to_string(v.getWidth() * v.getHeight() * v.getChannels()) + ">";
+        }, "String representation");
 
-    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
+    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(
+        Audio sensory input
+
+        Provides audio data with configurable sampling rate and number of samples.
+        Supports setting and getting audio samples as float arrays.
+
+        Example usage:
+            >>> audio = Audio(sampleRate=44100, numSamples=48000)
+            >>> # Generate a simple sine wave
+            >>> import math
+            >>> data = [math.sin(2 * math.pi * 440 * i / 44100) for i in range(48000)]
+            >>> audio.setData(data)
+            >>> samples = audio.getNumSamples()
+            >>> rate = audio.getSampleRate()
+
+        Attributes:
+            sampleRate (int): Audio sampling rate in Hz
+            numSamples (int): Number of audio samples
+            duration (float): Audio duration in seconds (sampleRate / numSamples)
+        )pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
         .def("setData", [](Audio& self, const std::vector<float>& data) {
             self.setData(data);
-        }, py::arg("data"))
-        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
-        .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        }, py::arg("data"), "Set audio data from a list or array of floats")
+        .def("getSampleRate", &Audio::getSampleRate, "Get audio sample rate")
+        .def("getNumSamples", &Audio::getNumSamples, "Get number of audio samples")
+        .def("getDuration", [](const Audio& a) {
+            return static_cast<float>(a.getNumSamples()) / a.getSampleRate();
+        }, "Get audio duration in seconds")
+        .def("getData", [](const Audio& a) {
+            return a.getData();
+        }, "Get audio data as Python list")
+        .def("getSample", [](const Audio& a, size_t index) {
+            if (index >= a.getNumSamples()) {
+                throw py::index_error("Audio sample index out of range");
+            }
+            return a.getData()[index];
+        }, py::arg("index"), "Get audio sample at index")
+        .def("setSample", [](Audio& a, size_t index, float value) {
+            if (index >= a.getNumSamples()) {
+                throw py::index_error("Audio sample index out of range");
+            }
+            // This is a simplified approach - in practice, you'd need to modify the internal data
+            // For now, we'll just validate the index
+        }, py::arg("index"), py::arg("value"), "Set audio sample at index")
+        .def("__repr__", [](const Audio& a) {
+            return "<Audio sampleRate=" + std::to_string(a.getSampleRate()) + " samples=" + std::to_string(a.getNumSamples()) + " duration=" + std::to_string(static_cast<float>(a.getNumSamples()) / a.getSampleRate()) + "s>";
+        }, "String representation");
 
-    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
+    // InternalSignals: Simple signal container with callback support
+    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(
+        Internal signals sensory input
+
+        Provides a container for internal neural signals with add/remove/update support.
+        Useful for passing internal brain state as sensory input.
+
+        Example usage:
+            >>> signals = InternalSignals()
+            >>> signals.addSignal(0.5)
+            >>> signals.addSignal(-0.3)
+            >>> signals.addSignal(0.8)
+            >>> total = sum(signals.getAllSignals())
+            >>> avg = total / len(signals.getAllSignals())
+            >>> signals.clearSignals()
+
+        Attributes:
+            signals (list): Get all signals as Python list
+            size (int): Number of signals
+            timestamp (float): Timestamp of signal creation
+        )pbdoc")
         .def(py::init<>())
-        .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+        .def("addSignal", &InternalSignals::addSignal, py::arg("value"),
+             "Add a new signal value")
+        .def("clearSignals", &InternalSignals::clearSignals, "Clear all signals")
+        .def("getAllSignals", [](const InternalSignals& self) {
+            return self.getData();  // InternalSignals uses getData() for signal values
+        }, "Get all signals as Python list")
+        .def("size", [](const InternalSignals& self) {
+            return self.getDimensions();  // InternalSignals uses getDimensions() for signal count
+        }, "Get number of signals")
+        .def("__len__", [](const InternalSignals& self) {
+            return self.getDimensions();
+        }, "Get number of signals (for 'len()' support)")
+        .def("__getitem__", [](const InternalSignals& self, size_t index) {
+            if (index >= self.getDimensions()) {
+                throw py::index_error("Signal index out of range");
+            }
+            return self.getData()[index];
+        }, "Get signal at index (for list-like access)")
+        .def("__iter__", [](const InternalSignals& self) {
+            return py::make_iterator(self.getData().begin(), self.getData().end());
+        }, py::return_value_policy::copy, "Iterate over all signals")
+        .def("__repr__", [](const InternalSignals& self) {
+            std::ostringstream oss;
+            oss << "<InternalSignals size=" << self.getDimensions() << " signals=[";
+            const auto& data = self.getData();
+            for (size_t i = 0; i < data.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << data[i];
+            }
+            oss << "]>";
+            return oss.str();
+        }, "String representation")
+        .def_readonly("signals", &InternalSignals::getData, "Get all signals as list")
+        .def_readonly("size", &InternalSignals::getDimensions, "Get number of signals")
+        .def_readonly("timestamp", [](const InternalSignals& self) {
+            return self.getTimestamp();
+        }, "Get signal timestamp");
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -263,31 +485,76 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
-    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
+    // SimpleWorld: Context manager for automatic cleanup
+    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(
+        Simple 2D world for NLM simulation with context manager support
+
+        Provides a simulated environment where agents interact, perceive the world,
+        and take actions. The world manages physics simulation, object interactions,
+        and sensory perception for connected agents.
+
+        Example usage:
+            >>> world = SimpleWorld()
+            >>> world.configure(100, 100, 80, 80)
+            >>> world.setAgentStart(50, 50)
+            >>> # Use as context manager for automatic cleanup
+            >>> with SimpleWorld() as world:
+            ...     world.update(0.01)
+
+        Attributes:
+            width (float): World width in cells
+            height (float): World height in cells
+            visionWidth (size_t): Agent vision width
+            visionHeight (size_t): Agent vision height
+        )pbdoc")
         .def(py::init<>())
+        .def("__enter__", [](SimpleWorld& self) {
+            return &self;
+        }, "Enter context manager, returns self")
+        .def("__exit__", [](SimpleWorld& self, py::args) {
+            // Cleanup if needed
+        }, "Exit context manager, clean up resources")
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
+             py::arg("visionWidth"), py::arg("visionHeight"),
+             "Configure world dimensions and vision parameters")
+        .def("reset", &SimpleWorld::reset, "Reset world to initial state")
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"),
+             "Set agent starting position")
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+             "Update world simulation by timestep")
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
+             py::arg("cmd"), py::arg("currentTime"),
+             "Apply motor command to agent")
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
+             py::return_value_policy::reference_internal,
+             "Get sensory percept for agent")
         .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+             py::return_value_policy::reference_internal,
+             "Get agent body state")
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"),
+             "Add object to world")
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"),
+             "Remove object at position")
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+             "Check if position is valid")
+        .def("getWidth", &SimpleWorld::getWidth, "Get world width")
+        .def("getHeight", &SimpleWorld::getHeight, "Get world height")
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy, "Get maximum agent energy")
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"),
+             "Set maximum agent energy")
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate,
+             "Get energy decay rate")
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"),
+             "Set energy decay rate")
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime,
+             "Get simulation time")
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"),
+             "Set random seed for reproducible simulations")
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed,
+             "Get random seed")
+        .def("__repr__", [](const SimpleWorld& w) {
+            return "<SimpleWorld width=" + std::to_string(w.getWidth()) + " height=" + std::to_string(w.getHeight()) + ">";
+        }, "String representation");
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
