@@ -163,8 +163,23 @@ public:
     // Bottom-up attention (stimulus-driven)
     void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
 
+// Top-down attention (goal-directed)
+    void applyTopDownBias(NeuronId neuron, float biasStrength);
+
+    // Bottom-up attention (stimulus-driven)
+    void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
+
     // Reset attention
     void reset();
+
+    // Apply concept-based attention bias
+    void setConceptBasedBias(float bias);
+
+    // Set action preference (goal-directed attention)
+    void setActionPreference(ActionType action, float preference);
+
+    // Clear concept and action biases
+    void clearBiases();
 
 private:
     struct Impl;
@@ -174,11 +189,15 @@ private:
     float inhibitionStrength_;
     float excitationStrength_;
     float competitionThreshold_;
-    
+
     std::vector<RegionId> attendedRegions_;
     std::vector<NeuronId> winners_;
     std::vector<float> neuronSalience_;
-    
+
+    // Concept and action biases for top-down attention
+    float conceptBasedBias_;
+    std::unordered_map<uint64_t, float> actionPreferences_;
+
     // Biases/salience stored by NeuronId for correct lookup in processCompetition
     std::unordered_map<uint64_t, float> topDownBias_;
     std::unordered_map<uint64_t, float> bottomUpSalience_;
