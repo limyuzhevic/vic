@@ -144,13 +144,15 @@ LifetimeExperimentResult Phase5IntegratedExperiment::run(
         currentStep = phaseEnd;
     }
     
-    // Phase 5: Memory Consolidation
-    {
         NLM_LOG_INFO("Phase 5: Memory Consolidation");
         uint64_t phaseEnd = currentStep + config.memoryConsolidationSteps;
         auto phaseResult = runPhase(
             brain.get(), "Memory Consolidation", currentStep, phaseEnd,
-            [](uint64_t step) {}
+            [](uint64_t step) {
+                if (step % 1000 == 0) {
+                    NLM_LOG_DEBUG("  Step " + std::to_string(step));
+                }
+            }
         );
         result.phaseResults.push_back(phaseResult);
         currentStep = phaseEnd;
@@ -162,7 +164,11 @@ LifetimeExperimentResult Phase5IntegratedExperiment::run(
         uint64_t phaseEnd = currentStep + config.socialDevelopmentSteps;
         auto phaseResult = runPhase(
             brain.get(), "Social Development", currentStep, phaseEnd,
-            [](uint64_t step) {}
+            [](uint64_t step) {
+                if (step % 1000 == 0) {
+                    NLM_LOG_DEBUG("  Step " + std::to_string(step));
+                }
+            }
         );
         result.phaseResults.push_back(phaseResult);
         currentStep = phaseEnd;

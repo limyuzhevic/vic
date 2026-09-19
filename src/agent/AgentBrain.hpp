@@ -75,6 +75,8 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    MotorCommand selectWithAlternativeCuriosity(MotorCommand defaultCmd);
+    float calculateActionConfidence(MotorCommand cmd) const;
     
     std::shared_ptr<Brain> brain_;
     
