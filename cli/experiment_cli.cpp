@@ -330,13 +330,43 @@ private:
     }
     
     int handleCompareCommand(int argc, char** argv) {
-        if (argc < 4) {
+        if (argc < 3) {
             std::cerr << "Error: Missing experiment names for compare command" << std::endl;
             return 1;
         }
         
         std::string exp1Name = argv[2];
-        std::string exp2Name = argv[3];
+        std::string exp2Name = "";
+        std::string metricsFormat = "detailed"; // simple, detailed, statistical
+        double confidenceLevel = 0.95;
+        
+        for (int i = 3; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (arg.substr(0, 4) == "--exp2") {
+                if (arg.find('=') != std::string::npos) {
+                    exp2Name = arg.substr(arg.find('=') + 1);
+                } else if (i + 1 < argc) {
+                    exp2Name = argv[++i];
+                }
+            } else if (arg.substr(0, 9) == "--metrics") {
+                if (arg.find('=') != std::string::npos) {
+                    metricsFormat = arg.substr(arg.find('=') + 1);
+                } else if (i + 1 < argc) {
+                    metricsFormat = argv[++i];
+                }
+            } else if (arg.substr(0, 15) == "--confidence") {
+                if (arg.find('=') != std::string::npos) {
+                    confidenceLevel = std::stod(arg.substr(arg.find('=') + 1));
+                } else if (i + 1 < argc) {
+                    confidenceLevel = std::stod(argv[++i]);
+                }
+            }
+        }
+        
+        if (exp2Name.empty()) {
+            std::cerr << "Error: Missing second experiment name for compare command" << std::endl;
+            return 1;
+        }
         
         auto runner = std::make_shared<ExperimentRunner>();
         auto exp1 = runner->getExperiment(exp1Name);
@@ -354,35 +384,59 @@ private:
         
         NLM_LOG_INFO("Comparing experiments: " + exp1Name + " vs " + exp2Name);
         
-        // Compare key metrics
-        auto metrics1 = exp1->getMetrics();
-        auto metrics2 = exp2->getMetrics();
-        
-        NLM_LOG_INFO("Metric comparison:");
-        for (const auto& [key, value1] : metrics1) {
-            auto it = metrics2.find(key);
-            if (it != metrics2.end()) {
-                double diff = value1 - it->second;
-                double percentage = (value1 != 0) ? (diff / value1) * 100.0 : 0.0;
-                NLM_LOG_INFO("  " + key + ": " + std::to_string(value1) + " vs " + 
-                           std::to_string(it->second) + " (diff: " + std::to_string(diff) + ", " +
-                           std::to_string(percentage) + "%)");
-            } else {
-                NLM_LOG_INFO("  " + key + ": " + std::to_string(value1) + " (not present in second)");
-            }
-        }
-        
-        for (const auto& [key, value2] : metrics2) {
-            if (metrics1.find(key) == metrics1.end()) {
-                NLM_LOG_INFO("  " + key + ": (not present in first) " + std::to_string(value2));
-            }
-        }
+        // Perform statistical comparison
+        compareExperimentsStatistical(exp1, exp2, metricsFormat, confidenceLevel);
         
         return 0;
     }
     
     int handleTrackCommand(int argc, char** argv) {
-        NLM_LOG_INFO("Experiment tracking not yet implemented.");
+        std::string experimentName = "";
+        bool followMode = false;
+        double updateInterval = 1.0; // seconds
+        
+        for (int i = 2; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (arg.substr(0, 15) == "--experiment") {
+                if (arg.find('=') != std::string::npos) {
+                    experimentName = arg.substr(arg.find('=') + 1);
+                } else if (i + 1 < argc) {
+                    experimentName = argv[++i];
+                }
+            } else if (arg == "--follow") {
+                followMode = true;
+            } else if (arg.substr(0, 16) == "--interval") {
+                if (arg.find('=') != std::string::npos) {
+                    updateInterval = std::stod(arg.substr(arg.find('=') + 1));
+                } else if (i + 1 < argc) {
+                    updateInterval = std::stod(argv[++i]);
+                }
+            }
+        }
+        
+        if (experimentName.empty()) {
+            std::cerr << "Error: Missing experiment name for experiment track command" << std::endl;
+            return 1;
+        }
+        
+        auto runner = std::make_shared<ExperimentRunner>();
+        auto experiment = runner->getExperiment(experimentName);
+        
+        if (!experiment) {
+            NLM_LOG_ERROR("Experiment not found: " + experimentName);
+            return 1;
+        }
+        
+        NLM_LOG_INFO("Tracking experiment: " + experiment->getName());
+        NLM_LOG_INFO("Follow mode: " + std::string(followMode ? "enabled" : "disabled"));
+        NLM_LOG_INFO("Update interval: " + std::to_string(updateInterval) + "s");
+        
+        if (followMode) {
+            trackExperimentContinuously(experiment, updateInterval);
+        } else {
+            trackExperimentSnapshot(experiment);
+        }
+        
         return 0;
     }
     
@@ -390,6 +444,7 @@ private:
         std::string outputFile = "experiment_results.csv";
         bool includeMetrics = true;
         bool includeRawData = false;
+        std::string format = "csv"; // csv, json, excel
         
         for (int i = 3; i < argc; ++i) {
             std::string arg = argv[i];
@@ -403,6 +458,10 @@ private:
                 includeMetrics = false;
             } else if (arg == "--raw-data") {
                 includeRawData = true;
+            } else if (arg == "--format") {
+                if (i + 1 < argc) {
+                    format = argv[++i];
+                }
             }
         }
         
@@ -411,10 +470,29 @@ private:
         NLM_LOG_INFO("Exporting experiment results to: " + outputFile);
         NLM_LOG_INFO("Include metrics: " + std::string(includeMetrics ? "yes" : "no"));
         NLM_LOG_INFO("Include raw data: " + std::string(includeRawData ? "yes" : "no"));
+        NLM_LOG_INFO("Format: " + format);
         
-        // Placeholder for results export
-        NLM_LOG_WARNING("Results export not yet implemented.");
+        // Get all registered experiments
+        auto experiments = runner->getExperiments();
         
+        if (experiments.empty()) {
+            NLM_LOG_WARNING("No experiments registered for export.");
+            return 0;
+        }
+        
+        // Export to specified format
+        if (format == "csv") {
+            exportResultsToCSV(experiments, outputFile, includeMetrics, includeRawData);
+        } else if (format == "json") {
+            exportResultsToJSON(experiments, outputFile, includeMetrics, includeRawData);
+        } else if (format == "excel") {
+            exportResultsToExcel(experiments, outputFile, includeMetrics, includeRawData);
+        } else {
+            std::cerr << "Unknown format: " << format << std::endl;
+            return 1;
+        }
+        
+        NLM_LOG_INFO("Experiment results exported successfully to: " + outputFile);
         return 0;
     }
     

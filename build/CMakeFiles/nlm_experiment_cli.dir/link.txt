@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_experiment_cli.a CMakeFiles/nlm_experiment_cli.dir/cli/experiment_cli.cpp.o
+/usr/bin/ranlib libnlm_experiment_cli.a

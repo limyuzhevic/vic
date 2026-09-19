@@ -148,8 +148,20 @@ public:
     // Export configuration as JSON
     std::string toJSON() const;
     
+    // Export configuration as YAML
+    std::string toYAML() const;
+    
+    // Export configuration as INI
+    std::string toINI() const;
+    
     // Import configuration from JSON
     bool fromJSON(const std::string& jsonStr);
+    
+    // Import configuration from YAML
+    bool fromYAML(const std::string& yamlStr);
+    
+    // Import configuration from INI
+    bool fromINI(const std::string& iniStr);
     
     // Get all configuration entries
     std::vector<ConfigEntry> getAllEntries() const;
@@ -163,6 +175,26 @@ public:
     // Command line override methods
     void overrideFromArgs(int argc, char** argv);
     bool parseCommandLineArg(const std::string& arg);
+    
+    // Configuration validation with neural-specific schemas
+    bool validateNeuralConfig(const std::vector<ConfigSchema>& schema) const;
+    
+    // Create configuration templates
+    static Config createStandardTemplate();
+    static Config createResearchTemplate();
+    static Config createPerformanceTemplate();
+    
+    // Interactive configuration editor
+    void startInteractiveEditor();
+    
+    // Configuration backup and versioning
+    bool saveBackup(const std::string& filepath) const;
+    bool restoreBackup(const std::string& filepath);
+    bool createVersion(const std::string& comment = "");
+    
+    // Neural-specific configuration methods
+    void applyNeuralDefaults();
+    bool validateNeuralConstraints() const;
     
 private:
     struct Impl;

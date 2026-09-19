@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_monitor_cli.a CMakeFiles/nlm_monitor_cli.dir/cli/monitor_cli.cpp.o
+/usr/bin/ranlib libnlm_monitor_cli.a

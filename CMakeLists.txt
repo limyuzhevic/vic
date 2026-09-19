@@ -51,7 +51,6 @@ add_library(nlm_core STATIC
     src/neuromodulation/Curiosity.cpp
     # Memory
     src/memory/Memory.cpp
-    src/memory/EpisodicMemory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -83,7 +82,7 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
+# Agent system
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
@@ -91,7 +90,7 @@ add_library(nlm_agent STATIC
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-# World system (environment, objects, simple world)
+# World system
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
@@ -141,11 +140,11 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world)
 
-# CLI executables - need to create a test program
-add_executable(nlm_cli_tool
+# CLI test executable
+add_executable(nlm_cli_test
     tests/test_cli_framework.cpp
 )
-target_link_libraries(nlm_cli_tool PUBLIC nlm_core nlm_agent nlm_world nlm_cli nlm_config_cli nlm_experiment_cli nlm_monitor_cli)
+target_link_libraries(nlm_cli_test PUBLIC nlm_core nlm_agent nlm_world nlm_cli nlm_config_cli nlm_experiment_cli nlm_monitor_cli)
 
 # Testing
 enable_testing()

@@ -207,11 +207,14 @@ private:
     int handleExportCommand(int argc, char** argv) {
         if (argc < 3) {
             std::cerr << "Error: Missing format for config export command" << std::endl;
+            printUsage();
             return 1;
         }
         
         std::string format = argv[2];
         std::string configFile = "configs/default.cfg";
+        std::string outputFile = "";
+        bool includeDefaults = false;
         
         // Parse additional arguments
         for (int i = 3; i < argc; ++i) {
@@ -222,6 +225,14 @@ private:
                 } else if (i + 1 < argc) {
                     configFile = argv[++i];
                 }
+            } else if (arg.substr(0, 6) == "--output") {
+                if (arg.find('=') != std::string::npos) {
+                    outputFile = arg.substr(arg.find('=') + 1);
+                } else if (i + 1 < argc) {
+                    outputFile = argv[++i];
+                }
+            } else if (arg == "--include-defaults") {
+                includeDefaults = true;
             }
         }
         
@@ -231,89 +242,210 @@ private:
             NLM_LOG_INFO("Using default configuration.");
         }
         
+        // Get all entries, optionally filtering out defaults
+        auto allEntries = config->getAllEntries();
+        if (!includeDefaults) {
+            allEntries.erase(
+                std::remove_if(allEntries.begin(), allEntries.end(),
+                    [](const ConfigEntry& entry) { return entry.source == ConfigSource::Default; }),
+                allEntries.end()
+            );
+        }
+        
+        // Create a temporary config with the filtered entries
+        auto filteredConfig = std::make_shared<Config>();
+        for (const auto& entry : allEntries) {
+            filteredConfig->set(entry.key, entry.value, entry.source);
+        }
+        
         if (format == "json") {
-            std::cout << config->toJSON() << std::endl;
+            std::string jsonOutput = filteredConfig->toJSON();
+            if (!outputFile.empty()) {
+                std::ofstream file(outputFile);
+                if (file.is_open()) {
+                    file << jsonOutput << std::endl;
+                    NLM_LOG_INFO("Configuration exported to JSON file: " + outputFile);
+                    file.close();
+                } else {
+                    NLM_LOG_ERROR("Failed to open file for writing: " + outputFile);
+                    return 1;
+                }
+            } else {
+                std::cout << jsonOutput << std::endl;
+            }
         } else if (format == "yaml") {
-            NLM_LOG_WARNING("YAML export not yet implemented.");
+            std::string yamlOutput = filteredConfig->toYAML();
+            if (!outputFile.empty()) {
+                std::ofstream file(outputFile);
+                if (file.is_open()) {
+                    file << yamlOutput << std::endl;
+                    NLM_LOG_INFO("Configuration exported to YAML file: " + outputFile);
+                    file.close();
+                } else {
+                    NLM_LOG_ERROR("Failed to open file for writing: " + outputFile);
+                    return 1;
+                }
+            } else {
+                std::cout << yamlOutput << std::endl;
+            }
         } else if (format == "ini") {
-            NLM_LOG_WARNING("INI export not yet implemented.");
+            std::string iniOutput = filteredConfig->toINI();
+            if (!outputFile.empty()) {
+                std::ofstream file(outputFile);
+                if (file.is_open()) {
+                    file << iniOutput << std::endl;
+                    NLM_LOG_INFO("Configuration exported to INI file: " + outputFile);
+                    file.close();
+                } else {
+                    NLM_LOG_ERROR("Failed to open file for writing: " + outputFile);
+                    return 1;
+                }
+            } else {
+                std::cout << iniOutput << std::endl;
+            }
         } else if (format == "env") {
-            std::vector<std::string> keys = config->getKeys();
+            std::vector<std::string> keys = filteredConfig->getKeys();
             for (const auto& key : keys) {
                 std::cout << key << "=";
                 
-                auto entry = getConfigEntry(config, key);
+                auto entry = getConfigEntry(filteredConfig, key);
                 if (entry) {
-                    std::cout << config->configValueToString(entry->value);
+                    std::cout << filteredConfig->configValueToString(entry->value);
                 }
                 
                 std::cout << std::endl;
             }
         } else {
             std::cerr << "Unknown export format: " << format << std::endl;
+            printUsage();
             return 1;
         }
         
         return 0;
     }
     
-    int handleImportCommand(int argc, char** argv) {
+    int handleCompareCommand(int argc, char** argv) {
         if (argc < 3) {
-            std::cerr << "Error: Missing format for config import command" << std::endl;
+            std::cerr << "Error: Missing file path for config compare command" << std::endl;
+            printUsage();
             return 1;
         }
         
-        std::string format = argv[2];
+        std::string configFile1 = argv[2];
+        std::string configFile2 = "configs/default.cfg";
         
-        auto config = std::make_shared<Config>();
-        
-        if (format == "json") {
-            std::string jsonStr;
-            std::string line;
-            while (std::getline(std::cin, line)) {
-                jsonStr += line + "\n";
-            }
-            config->fromJSON(jsonStr);
-        } else if (format == "yaml") {
-            NLM_LOG_WARNING("YAML import not yet implemented.");
-            return 1;
-        } else if (format == "ini") {
-            NLM_LOG_WARNING("INI import not yet implemented.");
-            return 1;
-        } else if (format == "env") {
-            std::string line;
-            while (std::getline(std::cin, line)) {
-                if (line.empty() || line[0] == '#') continue;
-                
-                size_t pos = line.find('=');
-                if (pos != std::string::npos) {
-                    std::string key = line.substr(0, pos);
-                    std::string value = line.substr(pos + 1);
-                    config->set(key, value, ConfigSource::File);
+        // Parse additional arguments
+        for (int i = 3; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (arg.substr(0, 6) == "--file2") {
+                if (arg.find('=') != std::string::npos) {
+                    configFile2 = arg.substr(arg.find('=') + 1);
+                } else if (i + 1 < argc) {
+                    configFile2 = argv[++i];
                 }
             }
-        } else {
-            std::cerr << "Unknown import format: " << format << std::endl;
-            return 1;
         }
         
-        NLM_LOG_INFO("Configuration imported successfully.");
+        auto config1 = std::make_shared<Config>();
+        auto config2 = std::make_shared<Config>();
+        
+        if (configFile1.empty() || !config1->loadFromFile(configFile1)) {
+            NLM_LOG_INFO("Using default configuration for first file.");
+        }
+        
+        if (configFile2.empty() || !config2->loadFromFile(configFile2)) {
+            NLM_LOG_INFO("Using default configuration for second file.");
+        }
+        
+        std::string diff = config1->getDiff(*config2);
+        std::cout << diff << std::endl;
+        
+        NLM_LOG_INFO("Configuration comparison completed.");
         return 0;
     }
     
-    int handleListCommand(int argc, char** argv) {
-        auto config = std::make_shared<Config>();
-        
-        NLM_LOG_INFO("Configuration keys:");
-        std::vector<std::string> keys = config->getKeys();
-        for (const auto& key : keys) {
-            NLM_LOG_INFO("  " + key);
+    int handleDiffCommand(int argc, char** argv) {
+        if (argc < 3) {
+            std::cerr << "Error: Missing file paths for config diff command" << std::endl;
+            printUsage();
+            return 1;
         }
         
-        NLM_LOG_INFO("\nConfiguration sources:");
-        NLM_LOG_INFO(config->summary());
+        std::string configFile1 = argv[2];
+        std::string configFile2 = "configs/default.cfg";
+        
+        // Parse additional arguments
+        for (int i = 3; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (arg.substr(0, 6) == "--file2") {
+                if (arg.find('=') != std::string::npos) {
+                    configFile2 = arg.substr(arg.find('=') + 1);
+                } else if (i + 1 < argc) {
+                    configFile2 = argv[++i];
+                }
+            }
+        }
+        
+        auto config1 = std::make_shared<Config>();
+        auto config2 = std::make_shared<Config>();
+        
+        if (configFile1.empty() || !config1->loadFromFile(configFile1)) {
+            NLM_LOG_INFO("Using default configuration for first file.");
+        }
+        
+        if (configFile2.empty() || !config2->loadFromFile(configFile2)) {
+            NLM_LOG_INFO("Using default configuration for second file.");
+        }
+        
+        std::string diff = config1->getDiff(*config2);
+        
+        // Write diff to a temporary file for better formatting
+        std::string diffFile = "config_diff.txt";
+        std::ofstream diffOut(diffFile);
+        if (diffOut.is_open()) {
+            diffOut << diff;
+            diffOut.close();
+            NLM_LOG_INFO("Configuration diff written to: " + diffFile);
+        }
         
         return 0;
+    }
+    
+    int handleTemplateCommand(int argc, char** argv) {
+        if (argc < 3) {
+            std::cerr << "Error: Missing template type for config template command" << std::endl;
+            printUsage();
+            return 1;
+        }
+        
+        std::string templateType = argv[2];
+        
+        auto config = std::make_shared<Config>();
+        
+        if (templateType == "standard") {
+            NLM_LOG_INFO("Creating standard configuration template...");
+            config = Config::createStandardTemplate();
+        } else if (templateType == "research") {
+            NLM_LOG_INFO("Creating research configuration template...");
+            config = Config::createResearchTemplate();
+        } else if (templateType == "performance") {
+            NLM_LOG_INFO("Creating performance configuration template...");
+            config = Config::createPerformanceTemplate();
+        } else {
+            std::cerr << "Unknown template type: " << templateType << std::endl;
+            printUsage();
+            return 1;
+        }
+        
+        // Save to file
+        std::string outputFile = templateType + "_template.cfg";
+        if (config->saveToFile(outputFile)) {
+            NLM_LOG_INFO("Template saved to: " + outputFile);
+            return 0;
+        } else {
+            NLM_LOG_ERROR("Failed to save template to: " + outputFile);
+            return 1;
+        }
     }
     
     ConfigEntry* getConfigEntry(std::shared_ptr<Config> config, const std::string& key) {

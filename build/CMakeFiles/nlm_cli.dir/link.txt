@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_cli.a CMakeFiles/nlm_cli.dir/cli/nlm_cli.cpp.o
+/usr/bin/ranlib libnlm_cli.a
