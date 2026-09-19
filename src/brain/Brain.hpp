@@ -6,8 +6,11 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../command/MotorAction.hpp"
+#include "../command/ActionSelector.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -28,6 +31,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class AdvancedActionSelector;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
