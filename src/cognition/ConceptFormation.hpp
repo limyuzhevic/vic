@@ -113,30 +113,27 @@ public:
     // Merge two concepts (when discovered they are actually the same)
     void mergeConcepts(size_t conceptA, size_t conceptB);
 
-    // Update concept with new instance
-    void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
-                      const std::vector<float>& features, float reward);
-
-    // Compute similarity between two patterns
-    float computeSimilarity(const std::vector<float>& a,
-                          const std::vector<float>& b) const;
-
-    // Check if pattern is novel (doesn't belong to any existing concept)
-    bool isNovel(const std::vector<float>& pattern,
-                 float similarityThreshold = 0.7f) const;
-
-    // Get concept for a given pattern
-    size_t findConceptForPattern(const std::vector<float>& pattern) const;
-
-    // Clear all concepts
-    void clear();
-
-    // Get generalization ability (can concept handle variations?)
-    float getGeneralizationAbility(size_t conceptId) const;
-
-    // Set parameters
-    void setFormationThreshold(float t) { formationThreshold_ = t; }
-    void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+    // Select action based on active concepts
+    // Returns the action associated with the most relevant concept given current state
+    ActionType selectActionBasedOnConcepts(const std::vector<NeuronId>& activeConceptNeurons,
+                                        const std::vector<float>& currentState) const;
+    
+    // Get the best concept for action planning given a state
+    // Returns concept ID that best matches current state for action selection
+    size_t getBestConceptForAction(const std::vector<float>& state,
+                                 const std::vector<NeuronId>& activeNeurons) const;
+    
+    // Get conceptual category of a concept for action motivation
+    // Returns a hint about what the concept represents (e.g., "approach", "avoid", "explore")
+    std::string getConceptCategoryHint(size_t conceptId) const;
+    
+    // Learn action-concept associations from experience
+    void learnActionConceptAssociation(ActionType action, size_t conceptId,
+                                      const std::vector<float>& context);
+    
+    // Get the most relevant action for a concept given current context
+    ActionType getRelevantActionForConcept(size_t conceptId,
+                                         const std::vector<float>& context) const;
 
 private:
     // Create new concept from pattern

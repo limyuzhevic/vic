@@ -139,27 +139,128 @@ void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>&
     concept->instances.back().stability = newStability;
 }
 
-void ConceptFormation::updatePrototype(size_t conceptId, const std::vector<float>& newInstance) {
-    for (auto& concept : concepts_) {
-        if (concept.id == conceptId) {
-            // Hebbian update: weight prototype towards new instance
-            float alpha = 0.2f;  // Learning rate
+// Get the best concept for action planning given a state
+    size_t ConceptFormation::getBestConceptForAction(const std::vector<float>& state,
+                                                  const std::vector<NeuronId>& activeNeurons) const {
+        if (concepts_.empty()) return 0;
+        
+        size_t bestConcept = 0;
+        float bestScore = 0.0f;
+        
+        for (size_t i = 0; i < concepts_.size(); ++i) {
+            const auto& concept = concepts_[i];
             
-            if (concept.prototype.size() == newInstance.size()) {
-                for (size_t i = 0; i < concept.prototype.size(); ++i) {
-                    concept.prototype[i] = concept.prototype[i] * (1.0f - alpha) + 
-                                          newInstance[i] * alpha;
-                }
+            // Compute concept matching score
+            float matchScore = computeSimilarity(state, concept.prototype);
+            
+            // Boost score if concept has been frequently observed recently
+            if (concept.totalObservations > 0) {
+                matchScore *= (1.0f + concept.avgStability * 0.5f);
             }
-            break;
+            
+            // Consider if concept neurons are currently active
+            float neuronBoost = 1.0f;
+            if (!activeNeurons.empty()) {
+                // Simple check - if concept has been observed by any active neuron
+                neuronBoost = 1.5f;
+            }
+            
+            matchScore *= neuronBoost;
+            
+            if (matchScore > bestScore) {
+                bestScore = matchScore;
+                bestConcept = i;
+            }
+        }
+        
+        return bestConcept;
+    }
+    
+    // Get conceptual category of a concept for action motivation
+    std::string ConceptFormation::getConceptCategoryHint(size_t conceptId) const {
+        const DiscoveredConcept* concept = getConcept(conceptId);
+        if (!concept) return "";
+        
+        // Derive category hint from concept properties
+        std::string category = "";
+        
+        // Check if concept has learned features that suggest category
+        if (!concept->features.empty()) {
+            // Simple heuristic based on feature values
+            float avgFeature = 0.0f;
+            for (float f : concept->features) {
+                avgFeature += f;
+            }
+            avgFeature /= concept->features.size();
+            
+            if (avgFeature > 0.7f) {
+                category = "rewarding";
+            } else if (avgFeature < 0.3f) {
+                category = "avoid";
+            } else {
+                category = "neutral";
+            }
+        } else {
+            category = "unknown";
+        }
+        
+        // Append learned category hint if present
+        if (!concept->categoryHint.empty()) {
+            category = concept->categoryHint;
+        }
+        
+        return category;
+    }
+    
+    // Learn action-concept associations from experience
+    void ConceptFormation::learnActionConceptAssociation(ActionType action, size_t conceptId,
+                                                         const std::vector<float>& context) {
+        const DiscoveredConcept* concept = getConcept(conceptId);
+        if (!concept) {
+            return;
+        }
+        
+        // Store the association for later use in action selection
+        // In a full implementation, this would update action-concept mapping
+        // For now, we just update concept statistics based on action rewards
+        // and context, which will affect concept stability and relevance
+        
+        // Update concept statistics based on action
+        DiscoveredConcept* mutableConcept = const_cast<DiscoveredConcept*>(concept);
+        mutableConcept->totalObservations++;
+        
+        // Update concept stability based on consistent action associations
+        if (mutableConcept->totalObservations > 10) {
+            // Concepts that have stable action associations are more stable
+            mutableConcept->avgStability = std::min(mutableConcept->avgStability + 0.01f, 1.0f);
         }
     }
-}
-
-size_t ConceptFormation::getMatchingConcept(const std::vector<float>& pattern,
-                                           float similarityThreshold) const {
-    return findConceptForPattern(pattern);
-}
+    
+    // Get the most relevant action for a concept given current context
+    ActionType ConceptFormation::getRelevantActionForConcept(size_t conceptId,
+                                                          const std::vector<float>& context) const {
+        const DiscoveredConcept* concept = getConcept(conceptId);
+        if (!concept) {
+            return ActionType::Wait;
+        }
+        
+        // Determine action based on concept category hint
+        std::string category = getConceptCategoryHint(conceptId);
+        
+        if (category == "rewarding") {
+            // For rewarding concepts, recommend approach actions
+            return ActionType::Interact;
+        } else if (category == "avoid") {
+            // For avoid concepts, recommend escape actions
+            return ActionType::MoveBackward;
+        } else if (category == "explore") {
+            // For explore concepts, recommend exploration actions
+            return ActionType::Look;
+        } else {
+            // For neutral or unknown concepts, default to wait
+            return ActionType::Wait;
+        }
+    }
 
 const DiscoveredConcept* ConceptFormation::getConcept(size_t conceptId) const {
     for (const auto& concept : concepts_) {

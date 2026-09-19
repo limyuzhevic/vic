@@ -174,6 +174,104 @@ struct SynapseCheckpointData {
     std::vector<float> shortTermFacilitation;
 };
 
+// Working memory state
+struct WorkingMemoryCheckpointData {
+    std::vector<uint64_t> memoryNeurons;
+    std::vector<float> memoryActivations;
+    std::vector<uint64_t> activeTraces;
+    std::vector<std::pair<uint64_t, uint64_t>> maintenanceConnections;
+    size_t capacity;
+    float decayRate;
+};
+
+// Episodic memory state
+struct EpisodicMemoryCheckpointData {
+    std::deque<EpisodicMemoryItem> episodes;
+    std::vector<NeuronId> episodeNeurons;
+    size_t maxEpisodes;
+    bool replayEnabled;
+};
+
+// Associative memory state
+struct AssociativeMemoryCheckpointData {
+    std::vector<std::tuple<NeuronId, std::vector<float>>> patternNeurons;
+    std::vector<std::tuple<NeuronId, NeuronId, float>> associations;
+};
+
+// Prediction system state
+struct PredictionSystemCheckpointData {
+    std::vector<float> predictionErrors;
+    std::vector<float> confidences;
+    std::vector<std::vector<float>> predictionHistories;
+    float predictionErrorThreshold;
+};
+
+// Neuromodulation system state
+struct NeuromodulationCheckpointData {
+    float dopamineLevel;
+    float curiosityLevel;
+    float noveltyLevel;
+    float predictionErrorLevel;
+    float plasticityFactor;
+};
+
+// Spike history state
+struct SpikeHistoryCheckpointData {
+    std::vector<float> recentSpikes;
+    std::vector<SimulationStep> spikeTimestamps;
+    size_t totalSpikeCount;
+};
+
+// Random generator state
+struct RandomStateCheckpointData {
+    uint64_t currentSeed;
+    uint64_t internalState; // Simplified - would need full state representation
+};
+
+// Development system state
+struct DevelopmentCheckpointData {
+    DevelopmentalStage developmentalStage;
+    float synaptogenesisRate;
+    float pruningRate;
+    size_t regionCount;
+    std::vector<RegionId> regionIds;
+};
+
+// Attention system state
+struct AttentionCheckpointData {
+    std::vector<RegionId> attendedRegions;
+    std::vector<NeuronId> winners;
+    std::vector<float> neuronSalience;
+    std::unordered_map<uint64_t, float> topDownBias;
+    std::unordered_map<uint64_t, float> bottomUpSalience;
+    float inhibitionStrength;
+    float excitationStrength;
+    float competitionThreshold;
+};
+
+// Concept formation state
+struct ConceptFormationCheckpointData {
+    std::vector<DiscoveredConcept> concepts;
+    size_t nextConceptId;
+    Brain* brain; // Note: This would need to be restored separately
+    float formationThreshold;
+    float stabilityThreshold;
+    size_t stabilityWindow;
+};
+
+// Simulation state (beyond neurons/synapses)
+struct SimulationStateCheckpointData {
+    SimulationStep currentStep;
+    Timestamp currentTime;
+    TimestepDuration timestep;
+    size_t totalSpikesThisStep;
+    size_t totalSpikesTotal;
+    size_t stepsSinceLastEpisode;
+    size_t replayInterval;
+    size_t consolidationInterval;
+    bool isResting;
+};
+
 /**
  * Checkpoint reader
  */

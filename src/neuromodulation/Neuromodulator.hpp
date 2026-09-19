@@ -7,7 +7,14 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Core implementation for Phase 6 integration
+
+#include "../core/Types/Types.hpp"
+#include <string>
+#include <vector>
+#include <memory>
+
+namespace nlm {
 
 class Neuromodulator {
 public:
@@ -27,12 +34,19 @@ public:
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
+    // Configure from config
+    virtual void configure(const class Config& config) {}
+    
 protected:
     Neuromodulator() = default;
+    
+    // Baseline levels and decay
+    float baseline_ = 0.0f;
+    float decayRate_ = 0.1f;
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Core implementation for reward prediction error signaling
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -47,43 +61,149 @@ public:
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    void configure(const class Config& config) override;
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
+// Core implementation for attentional modulation
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Attention signaling
+    void signalAttention(float attention);
+    void signalLearning(float learningSignal);
+    void configure(const class Config& config) override;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
+// Core implementation for arousal and stress response
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Arousal signaling
+    void signalArousal(float arousal);
+    void signalAlertness(float alertness);
+    void configure(const class Config& config) override;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
+// Core implementation for mood modulation
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Mood signaling
+    void signalMood(float mood);
+    void signalImpulse(float impulse);
+    void configure(const class Config& config) override;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Novelty: Novelty detection and surprise signaling
+// Core implementation for detecting novel stimuli
+class Novelty : public Neuromodulator {
+public:
+    Novelty();
+    ~Novelty() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Novelty signaling
+    void signalNovelty(float novelty);
+    void configure(const class Config& config) override;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Curiosity: Exploration motivation and goal seeking
+// Core implementation for exploration behavior
+class Curiosity : public Neuromodulator {
+public:
+    Curiosity();
+    ~Curiosity() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Exploration signaling
+    void signalNovelty(float novelty);
+    void signalExplorationOpportunity(float opportunity);
+    void setExplorationBias(float bias);
+    float getExplorationBias() const;
+    void configure(const class Config& config) override;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Prediction Error: Prediction error signaling
+// Core implementation for prediction error-based learning
+class PredictionError : public Neuromodulator {
+public:
+    PredictionError();
+    ~PredictionError() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Prediction error signaling
+    void signalPredictionError(float error);
+    void configure(const class Config& config) override;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

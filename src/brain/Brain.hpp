@@ -106,16 +106,7 @@ public:
     // Apply developmental changes (called automatically in step)
     void develop();
     
-    // Reset brain state
-    void reset();
-    
-    // Save brain state to file (checkpointing)
-    bool save(const std::string& filepath) const;
-    
-    // Load brain state from file
-    bool load(const std::string& filepath);
-    
-    // Region management
+    // ======================== CHECKPOINTING =================================\n\n    // Save brain state to file (checkpointing)\n    bool save(const std::string& filepath) const;\n\n    // Load brain state from file\n    bool load(const std::string& filepath);\n\n    // Checkpoint capture methods for all brain state components\n    bool captureNeuronState(NeuronCheckpointData& data) const;\n    bool captureSynapseState(SynapseCheckpointData& data) const;\n    bool captureWorkingMemoryState(WorkingMemoryCheckpointData& data) const;\n    bool captureEpisodicMemoryState(EpisodicMemoryCheckpointData& data) const;\n    bool captureAssociativeMemoryState(AssociativeMemoryCheckpointData& data) const;\n    bool capturePredictionSystemState(PredictionSystemCheckpointData& data) const;\n    bool captureNeuromodulationState(NeuromodulationCheckpointData& data) const;\n    bool captureSpikeHistoryState(SpikeHistoryCheckpointData& data) const;\n    bool captureRandomState(RandomStateCheckpointData& data) const;\n    bool captureDevelopmentState(DevelopmentCheckpointData& data) const;\n    bool captureAttentionState(AttentionCheckpointData& data) const;\n    bool captureConceptFormationState(ConceptFormationCheckpointData& data) const;\n    bool captureSimulationState(SimulationStateCheckpointData& data) const;\n\n    // Region management
     RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);
     const NeuralRegion* getRegion(RegionId id) const;
@@ -140,43 +131,63 @@ public:
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    NeuralWorkingMemory* getWorkingMemory() {
+        return pImpl->workingMemory.get();
+    }
     
     // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    NeuralEpisodicMemory* getEpisodicMemory() {
+        return pImpl->episodicMemory.get();
+    }
     
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    NeuralAssociativeMemory* getAssociativeMemory() {
+        return pImpl->associativeMemory.get();
+    }
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    PredictionSystem* getPredictionSystem() {
+        return pImpl->predictionSystem.get();
+    }
     
     // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    NeuralPlanner* getPlanner() {
+        return pImpl->planner.get();
+    }
     
     // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    ConceptFormation* getConceptFormation() {
+        return pImpl->conceptFormation.get();
+    }
     
     // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    AttentionalSelection* getAttention() {
+        return pImpl->attention.get();
+    }
     
     // ========== DEVELOPMENT SYSTEM ==========
     
-    DevelopmentSystem* getDevelopmentSystem();
+    DevelopmentSystem* getDevelopmentSystem() {
+        return pImpl->developmentSystem.get();
+    }
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
     // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    Dopamine* getDopamine() {
+        return pImpl->dopamine.get();
+    }
     
     // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    Curiosity* getCuriosity() {
+        return pImpl->curiosity.get();
+    }
     
     // Novelty - novelty detection
     Novelty* getNovelty();
