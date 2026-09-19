@@ -65,6 +65,20 @@ enum class MotorCommand {
     Wait = 7           // No movement
 };
 
+// Helper function to get random motor command (excludes Wait)
+inline MotorCommand getRandomMotorCommand() {
+    static const MotorCommand commands[] = {
+        MotorCommand::MoveForward,
+        MotorCommand::MoveBackward,
+        MotorCommand::TurnLeft,
+        MotorCommand::TurnRight,
+        MotorCommand::LookLeft,
+        MotorCommand::LookRight,
+        MotorCommand::Interact
+    };
+    return commands[rand() % (sizeof(commands) / sizeof(commands[0]))];
+}
+
 // Action result from the world's perspective
 struct ActionResult {
     float reward;

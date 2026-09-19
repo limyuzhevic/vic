@@ -1,14 +1,3 @@
-#pragma once
-
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
-#include <vector>
-
-namespace nlm {
-
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
@@ -114,4 +103,105 @@ private:
     float sensoryNoveltyDecay_;
 };
 
+// Low-level motor commands that the brain can produce
+// These are innate muscle-like signals, not semantic actions
+enum class MotorCommand {
+    MoveForward = 0,   // Propel forward
+    MoveBackward = 1,  // Propel backward  
+    TurnLeft = 2,      // Rotate left
+    TurnRight = 3,     // Rotate right
+    LookLeft = 4,      // Pan sensor left
+    LookRight = 5,     // Pan sensor right
+    Interact = 6,      // Interact with nearby object
+    Wait = 7           // No movement
+};
+
+// Helper function to get random motor command (excludes Wait)
+inline MotorCommand getRandomMotorCommand() {
+    static const MotorCommand commands[] = {
+        MotorCommand::MoveForward,
+        MotorCommand::MoveBackward,
+        MotorCommand::TurnLeft,
+        MotorCommand::TurnRight,
+        MotorCommand::LookLeft,
+        MotorCommand::LookRight,
+        MotorCommand::Interact
+    };
+    return commands[rand() % (sizeof(commands) / sizeof(commands[0]))];
+}
+
+// Forward declarations for factory functions
+std::shared_ptr<Config> createDefaultConfig();
+std::shared_ptr<Brain> createBrain(std::shared_ptr<Config> config);
+std::shared_ptr<SimpleWorld> createSimpleWorld();
+std::shared_ptr<AgentBrain> createAgentBrain(std::shared_ptr<Brain> brain);
+
 } // namespace nlm
+
+// Advanced factory functions
+std::shared_ptr<Brain> createBrainWithSeed(uint64_t seed, std::shared_ptr<Config> config);
+
+// Batch operations for efficiency
+void batchStep(std::vector<std::shared_ptr<AgentBrain>>& agents,
+               std::vector<std::shared_ptr<SimpleWorld>>& worlds,
+               int numSteps);
+
+// Neural network statistics
+struct BrainStats {
+    size_t totalNeurons;
+    size_t activeNeurons;
+    size_t totalSynapses;
+    float avgFiringRate;
+    float excitationInhibitionRatio;
+    float totalSpikeCount;
+};
+
+BrainStats getBrainStats(std::shared_ptr<Brain> brain);
+
+// Configuration validation
+void validateBrainConfig(const std::shared_ptr<Config>& config);
+
+// Performance monitoring
+struct PerformanceMonitor {
+    double startTime;
+    double lastStepTime;
+    size_t stepsCompleted;
+    double totalTime;
+    
+    PerformanceMonitor();
+    
+    void start();
+    void stepComplete();
+    double getAverageStepTime() const;
+    double getTotalTime() const;
+    size_t getStepsCompleted() const;
+};
+
+} // namespace nlm
+
+// Factory function implementations
+namespace nlm {
+
+std::shared_ptr<Config> createDefaultConfig() {
+    return std::make_shared<Config>();
+}
+
+std::shared_ptr<Brain> createBrain(std::shared_ptr<Config> config) {
+    if (!config) {
+        NLM_LOG_ERROR("Cannot create brain with null config");
+        return nullptr;
+    }
+    return std::make_shared<Brain>(config);
+}
+
+std::shared_ptr<SimpleWorld> createSimpleWorld() {
+    return std::make_shared<SimpleWorld>();
+}
+
+std::shared_ptr<AgentBrain> createAgentBrain(std::shared_ptr<Brain> brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot create AgentBrain with null brain");
+        return nullptr;
+    }
+    return std::make_shared<AgentBrain>(brain);
+}
