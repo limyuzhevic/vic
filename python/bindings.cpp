@@ -9,7 +9,7 @@
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
 #include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
+#include "../src/agent/SimulationContext.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
 #include "../src/motor/Action.hpp"
@@ -154,6 +154,24 @@ PYBIND11_MODULE(pynlm, m) {
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", py::overload_cast<const std::string&>(&Config::get<std::string>), py::arg("key"),
+             "Get a configuration value (returns None if not found)")
+        .def("get", py::overload_cast<const std::string&, const std::string&>(&Config::getOr<std::string>), py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value or default if not found")
+        .def("set", static_cast<void (Config::*)(const std::string&, const std::string&)>(&Config::set),
+             py::arg("key"), py::arg("value"),
+             "Set a string configuration value")
+        .def("set", static_cast<void (Config::*)(const std::string&, int)>(&Config::set),
+             py::arg("key"), py::arg("value"),
+             "Set an integer configuration value")
+        .def("set", static_cast<void (Config::*)(const std::string&, double)>(&Config::set),
+             py::arg("key"), py::arg("value"),
+             "Set a float/double configuration value")
+        .def("set", static_cast<void (Config::*)(const std::string&, bool)>(&Config::set),
+             py::arg("key"), py::arg("value"),
+             "Set a boolean configuration value")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -164,7 +182,7 @@ PYBIND11_MODULE(pynlm, m) {
             return "<Config: " + cfg.summary() + ">";
         });
 
-    py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
+    py::class_<SensoryInput, py::polymorphic_type_hook<SensoryInput>>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
@@ -172,7 +190,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
              "Set the timestamp");
 
-    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
+    py::class_<Vision, py::polymorphic_type_hook<Vision>>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
              py::arg("channels") = 3)
@@ -183,7 +201,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getHeight", &Vision::getHeight)
         .def("getChannels", &Vision::getChannels);
 
-    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
+    py::class_<Audio, py::polymorphic_type_hook<Audio>>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
         .def("setData", [](Audio& self, const std::vector<float>& data) {
@@ -193,7 +211,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getSampleRate", &Audio::getSampleRate)
         .def("getNumSamples", &Audio::getNumSamples);
 
-    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
+    py::class_<InternalSignals, py::polymorphic_type_hook<InternalSignals>>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
@@ -400,6 +418,16 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Add exception translation for common C++ errors
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const std::runtime_error& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        }
+    });
+
+    // Add module-level functions for Pythonic API
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,10 +444,121 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Add version information
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Authors";
+    m.attr("__description__") = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework";
 
-} // namespace nlm
+    // Add helper functions for common operations
+    m.def("run_simulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                               std::shared_ptr<AgentBrain> agent, size_t numSteps) {
+        for (size_t i = 0; i < numSteps; ++i) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(static_cast<SimulationStep>(i));
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+       "Run a complete simulation with brain, world, and agent");
+
+    // Add utility functions
+    m.def("validate_config", [](std::shared_ptr<Config> config) {
+        // Basic validation - check for essential keys
+        auto keys = config->getKeys();
+        return !keys.empty();
+    }, py::arg("config"), "Validate configuration");
+
+    m.def("get_simulation_stats", [](std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        stats["neurons"] = brain->getTotalNeuronCount();
+        stats["synapses"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        return stats;
+    }, py::arg("brain"), "Get simulation statistics as a dictionary");
+
+    // Add constants
+    m.def("get_constants", []() {
+        py::dict constants;
+        constants["max_energy"] = 100.0f;
+        constants["vision_width"] = 8;
+        constants["vision_height"] = 8;
+        return constants;
+    }, "Get default simulation constants");
+
+    // Add context manager for simulation resources
+    py::class_<SimulationContext>(m, "SimulationContext", "Context manager for simulation resources")
+        .def(py::init<std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>, std::shared_ptr<Brain>>(),
+             py::arg("world"), py::arg("agent"), py::arg("brain"))
+        .def("__enter__", &SimulationContext::enter)
+        .def("__exit__", &SimulationContext::exit)
+        .def("run", &SimulationContext::run, py::arg("steps"), "Run simulation for specified steps");
+
+    // Add neuron type enums for convenience
+    m.def("get_neuron_types", []() {
+        py::list types;
+        types.append("Excitatory");
+        types.append("Inhibitory");
+        types.append("Modulatory");
+        types.append("Sensory");
+        types.append("Motor");
+        types.append("Internal");
+        return types;
+    }, "Get list of available neuron types");
+
+    m.def("get_action_types", []() {
+        py::list actions;
+        actions.append("MoveForward");
+        actions.append("MoveBackward");
+        actions.append("TurnLeft");
+        actions.append("TurnRight");
+        actions.append("Look");
+        actions.append("Interact");
+        actions.append("Eat");
+        actions.append("Wait");
+        actions.append("Custom");
+        return actions;
+    }, "Get list of available action types");
+
+    m.def("get_world_object_types", []() {
+        py::list objects;
+        objects.append("Empty");
+        objects.append("Resource");
+        objects.append("Hazard");
+        objects.append("Wall");
+        objects.append("Marker");
+        return objects;
+    }, "Get list of available world object types");
+
+    m.def("get_developmental_stages", []() {
+        py::list stages;
+        stages.append("Initial");
+        stages.append("CriticalPeriod");
+        stages.append("Maturation");
+        stages.append("Adult");
+        stages.append("Aging");
+        return stages;
+    }, "Get list of developmental stages");
+
+    // Add configuration validation functions
+    m.def("validate_config", [](std::shared_ptr<Config> config) {
+        // Basic validation - check for essential keys
+        auto keys = config->getKeys();
+        return !keys.empty();
+    }, py::arg("config"), "Validate configuration");
+
+    m.def("apply_config", [](std::shared_ptr<Config> config, std::shared_ptr<Brain> brain) {
+        // Apply configuration to brain
+        if (config->has("brain.neuron_count")) {
+            auto val = config->get<int>("brain.neuron_count");
+            if (val.has_value()) {
+                brain->getConfig()->set("brain.neuron_count", val.value());
+            }
+        }
+        return true;
+    }, py::arg("config"), py::arg("brain"), "Apply configuration to brain");
