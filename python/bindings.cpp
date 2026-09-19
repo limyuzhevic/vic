@@ -416,10 +416,86 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
 
-} // namespace nlm
+    m.def("createNeuromodulator", [](const std::string& name) -> std::shared_ptr<Neuromodulator> {
+        auto neuromod = std::make_shared<Neuromodulator>(name);
+        neuromod->initialize(nullptr);
+        return neuromod;
+    }, py::arg("name"), "Create a neuromodulator");
+
+    m.def("createPredictionSystem", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<PredictionSystem> {
+        auto pred = std::make_shared<PredictionSystem>();
+        pred->initialize(brain.get());
+        return pred;
+    }, py::arg("brain"), "Create a prediction system");
+
+    m.def("createWorkingMemory", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuralWorkingMemory> {
+        auto mem = std::make_shared<NeuralWorkingMemory>();
+        mem->initialize(brain.get());
+        return mem;
+    }, py::arg("brain"), "Create working memory");
+
+    m.def("createEpisodicMemory", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuralEpisodicMemory> {
+        auto mem = std::make_shared<NeuralEpisodicMemory>();
+        mem->initialize(brain.get());
+        return mem;
+    }, py::arg("brain"), "Create episodic memory");
+
+    m.def("createAssociativeMemory", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuralAssociativeMemory> {
+        auto mem = std::make_shared<NeuralAssociativeMemory>();
+        mem->initialize(brain.get());
+        return mem;
+    }, py::arg("brain"), "Create associative memory");
+
+    m.def("createDevelopmentSystem", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<DevelopmentSystem> {
+        auto dev = std::make_shared<DevelopmentSystem>();
+        dev->initialize(brain.get());
+        return dev;
+    }, py::arg("brain"), "Create development system");
+
+    m.def("createConceptFormation", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<ConceptFormation> {
+        auto concept = std::make_shared<ConceptFormation>();
+        concept->initialize(brain.get());
+        return concept;
+    }, py::arg("brain"), "Create concept formation");
+
+    m.def("createNeuralPlanner", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuralPlanner> {
+        auto planner = std::make_shared<NeuralPlanner>();
+        planner->initialize(brain.get());
+        return planner;
+    }, py::arg("brain"), "Create neural planner");
+
+    m.def("createAttentionalSelection", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AttentionalSelection> {
+        auto attention = std::make_shared<AttentionalSelection>();
+        attention->initialize(brain.get());
+        return attention;
+    }, py::arg("brain"), "Create attentional selection");
+
+    m.def("createSTDP", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<STDP> {
+        auto stdp = std::make_shared<STDP>();
+        // Configure with defaults
+        stdp->configure(0.01f, 0.012f, 20.0f);
+        return stdp;
+    }, py::arg("brain"), "Create STDP plasticity");
+
+    m.def("createHebbian", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<Hebbian> {
+        auto hebbian = std::make_shared<Hebbian>();
+        // Configure with defaults
+        hebbian->configure(0.01f, 0.1f);
+        return hebbian;
+    }, py::arg("brain"), "Create Hebbian plasticity");
+
+    m.def("createStructuralPlasticity", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<StructuralPlasticity> {
+        auto structPlasticity = std::make_shared<StructuralPlasticity>();
+        // Configure with defaults
+        structPlasticity->setSynaptogenesisRate(0.0001f);
+        structPlasticity->setPruningRate(0.00001f);
+        return structPlasticity;
+    }, py::arg("brain"), "Create structural plasticity");
+
+    m.def("createSpikeSystem", []() -> std::shared_ptr<SpikeSystem> {
+        return std::make_shared<SpikeSystem>();
+    }, "Create spike system");

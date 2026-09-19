@@ -55,3 +55,15 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+addopts = -v --tb=short
+
+[tool.coverage.run]
+source = ["pynlm"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]
