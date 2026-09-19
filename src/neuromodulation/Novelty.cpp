@@ -1,5 +1,6 @@
 #include "Novelty.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../world/Observation.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -35,6 +36,18 @@ void Novelty::setLevel(float level) {
 
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
+    // Use prediction error for novelty detection
+    if (pImpl->brain) {
+        auto* predictionError = pImpl->brain->getPredictionErrorSignal();
+        if (predictionError) {
+            // Prediction error is a direct indicator of novelty
+            pImpl->level = predictionError->getMagnitude();
+            pImpl->history.push_back(pImpl->level);
+            return;
+        }
+    }
+    
+    // Fallback to pattern comparison
     // Extract features from observations and compare
     // Simple implementation: just set to a placeholder
     pImpl->level = 1.0f;
@@ -43,6 +56,21 @@ void Novelty::detectNovelty(const Observation& observation,
 
 void Novelty::detectNovelty(const std::vector<float>& currentPattern,
                             const std::vector<float>& previousPattern) {
+    // Use prediction error for novelty detection when available
+    if (pImpl->brain) {
+        auto* predictionError = pImpl->brain->getPredictionErrorSignal();
+        if (predictionError) {
+            // Prediction error is a direct indicator of novelty
+            pImpl->level = predictionError->getMagnitude();
+            pImpl->history.push_back(pImpl->level);
+            
+            // Also store pattern for fallback comparison
+            pImpl->lastPattern = currentPattern;
+            return;
+        }
+    }
+    
+    // Fallback to pattern comparison
     if (currentPattern.empty() || previousPattern.empty()) {
         pImpl->level = 0.0f;
         return;

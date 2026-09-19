@@ -20,12 +20,15 @@ public:
     virtual float getLevel() const = 0;
     virtual void setLevel(float level) = 0;
     
-    // Apply neuromodulatory effect to plasticity
+// Apply neuromodulatory effect to plasticity
     // TODO PHASE 2: Implement real modulation
     virtual float getPlasticityFactor() const = 0;
-    
+
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
+
+    // Signal prediction error for learning
+    virtual void signalPredictionError(float error) = 0;
     
 protected:
     Neuromodulator() = default;
@@ -47,6 +50,7 @@ public:
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    void signalPredictionError(float error);
     
 private:
     struct Impl;
@@ -62,6 +66,7 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    void signalPredictionError(float error);
 };
 
 // Norepinephrine: Arousal and vigilance
@@ -73,6 +78,7 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    void signalPredictionError(float error);
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
@@ -84,6 +90,7 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    void signalPredictionError(float error);
 };
 
 } // namespace nlm

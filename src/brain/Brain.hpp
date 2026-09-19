@@ -18,6 +18,8 @@ class SimulationClock;
 class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
+class NeuralSemanticMemory;
+class NeuralProceduralMemory;
 class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
@@ -28,6 +30,10 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
+class TemporalRelation;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -137,13 +143,17 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
-    
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
     
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
+    
+    // Semantic memory - knowledge and facts
+    NeuralSemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - skills and habits
+    NeuralProceduralMemory* getProceduralMemory();
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
@@ -155,14 +165,26 @@ public:
     
     // ========== COGNITION SYSTEMS ==========
     
-    // Neural planner for action planning
+// Neural planner for action planning
     NeuralPlanner* getPlanner();
-    
+
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
-    
+
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+
+    // Self model for action-effect learning
+    SelfModel* getSelfModel();
+
+    // Social learning from observing other agents
+    SocialLearning* getSocialLearning();
+
+    // Spatial representation of environment
+    SpatialRepresentation* getSpatialRepresentation();
+
+    // Temporal relationships between events
+    TemporalRelation* getTemporalRelation();
     
     // ========== DEVELOPMENT SYSTEM ==========
     

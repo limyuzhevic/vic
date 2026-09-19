@@ -47,8 +47,14 @@ struct EpisodicMemoryItem {
     std::vector<NeuronId> neurons;
     std::vector<float> values;
     std::string metadata;
+    float reward;
+    SimulationStep actionStep;
+    std::vector<float> sensoryState;
+    std::vector<float> resultingSensoryState;
+    ActionType action;
+    int age;
     
-    EpisodicMemoryItem() : timestamp(0) {}
+    EpisodicMemoryItem() : timestamp(0), reward(0.0f), actionStep(0), action(ActionType::Wait), age(0) {}
 };
 
 class EpisodicMemory {
