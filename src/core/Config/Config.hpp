@@ -43,6 +43,17 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// File format enum
+enum class ConfigFileFormat {
+    Unknown,
+    KeyValue,
+    YAML,
+    JSON
+};
+
+// Parse configuration file format
+static ConfigFileFormat detectFileFormat(const std::string& filepath);
+
 // Main configuration class
 class Config {
 public:
@@ -93,6 +104,21 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Parse from JSON/YAML file with format detection
+    bool loadFromFile(const std::string& filepath);
+    
+    // Parse from JSON string
+    bool loadFromJSON(const std::string& jsonStr);
+    
+    // Parse from YAML string
+    bool loadFromYAML(const std::string& yamlStr);
+    
+    // Parse from key=value string (backward compatibility)
+    bool loadFromKeyValue(const std::string& content);
+    
+    // Save to file (preserves original format if detected, or saves as YAML)
+    bool saveToFile(const std::string& filepath) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +126,15 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Parsing helpers
+    bool parseKeyValue(std::istream& stream);
+    bool parseJSON(const std::string& content);
+    bool parseYAML(const std::string& content);
+    void convertYAMLToConfig(const YAML::Node& root, const std::string& prefix = "");
+    bool convertToKeyValue(const std::string& key, const ConfigValue& value, std::string& out);
 };
+
+static ConfigFileFormat detectFileFormat(const std::string& filepath);
 
 } // namespace nlm
