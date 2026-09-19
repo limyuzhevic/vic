@@ -184,13 +184,37 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Current Phase 6 Integration Status
+
+**What's WORKING (35.8% of capabilities):**
+
+1. **Neural Core**: LIF neurons with spikes, synaptic transmission, basic plasticity
+2. **Development**: Synaptogenesis and pruning every 100 steps
+3. **Basic Cognition**: Simple prediction and error computation
+4. **Embodiment**: Agent can sense and act in world
+5. **Learning**: Dopamine modulates STDP via eligibility traces
+6. **Curiosity**: Exploration behavior
+
+**What's LIMITED (Systematically disconnected):**
+
+1. **Working Memory**: Defined but not connected to brain loop
+2. **Episodic Memory**: Stores experiences but never replayed or consolidated
+3. **Concept Formation**: Processes patterns but no generalization
+4. **Planning**: Evaluates sequences but never used
+5. **Full Neuromodulation**: Only dopamine (ACh, NE, 5-HT are stubs)
+6. **Persistence**: Checkpoints not connected to Brain::save/load
+
+### Complete Agent Example (With Limitations)
 
 ```python
 import pynlm
 
 def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+    """Run a complete agent simulation with brain and world.
+    
+    Note: Current Phase 6 status is 35.8% integrated. Many cognitive
+    systems are implemented but disconnected from the main brain loop.
+    """
     
     # 1. Create configuration
     config = pynlm.createDefaultConfig()
@@ -211,11 +235,11 @@ def run_agent_simulation(num_steps=1000):
     # 5. Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
+    # 6. Enable subsystems (note limitations)
+    agent.enableRewardModulation(True)      # Works - dopamine affects STDP
+    agent.enableStructuralPlasticity(True)  # Works - basic synaptogenesis
+    agent.enableDevelopment(True)           # Works - limited effect
+    agent.enableCuriosity(True)             # Works - exploration
     
     # 7. Run simulation loop
     for step in range(num_steps):
@@ -228,7 +252,7 @@ def run_agent_simulation(num_steps=1000):
         # Process sensory input in brain
         agent.processSensoryInput(percept)
         
-        # Run brain step
+        # Run brain step (limited integration)
         brain.step(step)
         
         # Decode motor command from brain activity
@@ -237,11 +261,11 @@ def run_agent_simulation(num_steps=1000):
         # Apply motor command to world
         world.applyMotorCommand(motor_cmd, world.getSimulationTime())
         
-        # Apply reward modulation
+        # Apply reward modulation (works but limited)
         reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
         agent.applyRewardModulation(reward, 0.0)
         
-        # Update development
+        # Update development (limited to plasticity rates)
         agent.updateDevelopment(0.1)
         
         # Print progress
@@ -251,7 +275,7 @@ def run_agent_simulation(num_steps=1000):
             print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
             print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
             print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
-
+    
 # Run the simulation
 run_agent_simulation(1000)
 ```
@@ -284,8 +308,8 @@ brain.getAverageFiringRate()      # Average firing rate
 brain.getExcitationInhibitionRatio()  # E/I balance
 
 # State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
+brain.save("checkpoint.bin")       # Save state (stub - not connected)
+brain.load("checkpoint.bin")       # Load state (stub - not connected)
 
 # Regions
 region_id = brain.addRegion("cortex")
@@ -523,6 +547,16 @@ pip install --force-reinstall .
 **Segmentation faults:**
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
+
+**Memory issues / performance problems:**
+- NLM is currently at Phase 6 (35.8% integrated)
+- Most memory systems are disconnected
+- Performance improves with Structural Plasticity enabled
+
+**Limited functionality:**
+- Working memory, episodic memory, and concept formation are disconnected
+- Prediction system doesn't affect attention or planning
+- Limited cognitive capabilities due to integration gaps
 
 ---
 

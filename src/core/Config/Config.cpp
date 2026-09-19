@@ -168,6 +168,44 @@ void Config::clear() {
     pImpl->entries.clear();
 }
 
+std::string Config::toString(const ConfigValue& value) {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            oss << (arg ? "true" : "false");
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            oss << arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            oss << arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << arg[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << arg[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << "\"" << arg[i] << "\"";
+            }
+            oss << "]";
+        }
+    }, value);
+    return oss.str();
+}
+
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
@@ -177,8 +215,10 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
             } else {
-                oss << arg;
+                oss << toString(arg);
             }
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
@@ -211,5 +251,4 @@ template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) cons
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
 } // namespace nlm

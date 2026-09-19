@@ -6,11 +6,42 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <string>
 
 namespace nlm {
 
+// Subsystem types for comprehensive management
+enum class SubsystemType {
+    RewardModulation,
+    StructuralPlasticity,
+    Development,
+    Curiosity,
+    Prediction,
+    ConceptFormation,
+    Planning,
+    All
+};
+
+// System status snapshot for monitoring
+struct SystemStatus {
+    float curiosity;
+    float novelty;
+    float predictionError;
+    float dopamineLevel;
+    float expectedReward;
+    double developmentalAge;
+    DevelopmentalStage developmentalStage;
+    float plasticityModifier;
+    bool isHealthy; // Overall system health check
+    
+    SystemStatus()
+        : curiosity(0.0f), novelty(0.0f), predictionError(0.0f), dopamineLevel(0.0f)
+        , expectedReward(0.0f), developmentalAge(0.0), developmentalStage(DevelopmentalStage::Initial)
+        , plasticityModifier(1.0f), isHealthy(true) {}
+};
+
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding with enhanced functionality
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -52,11 +83,21 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Get expected reward
+    float getExpectedReward() const;
+    
+    // Get developmental age
+    double getDevelopmentalAge() const;
+    
+    // Get plasticity modifier
+    float getPlasticityModifier() const;
+    
     // Reset agent for new episode
     void reset();
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    const Brain* getBrain() const { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -69,6 +110,42 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Enhanced subsystem management
+    void enableSubsystem(SubsystemType type);
+    void disableSubsystem(SubsystemType type);
+    void toggleSubsystem(SubsystemType type);
+    bool isSubsystemEnabled(SubsystemType type) const;
+    
+    // Get comprehensive system status
+    SystemStatus getSystemStatus() const;
+    
+    // Convenience methods for common operations
+    bool isActive() const;
+    std::string getStatusSummary() const;
+    MotorCommand getRecommendedAction() const;
+    
+    // Motor command decoding improvements
+    MotorCommand decodeMotorCommandRobust();
+    float getMotorConflictLevel() const;
+    
+    // Agent-brain integration
+    void syncAgentBrain(const AgentBody& agentBody);
+    const AgentBody& getAgentBody() const;
+    void updateAgentFromWorld(const SimpleWorld& world);
+    
+    // Development and learning control
+    void advanceDevelopment(double timestep);
+    void resetForEpisode();
+    void optimizeForTask(const std::string& taskType);
+    
+    // Health monitoring
+    bool checkSystemHealth() const;
+    std::vector<std::string> getHealthIssues() const;
+    
+    // Serialization/Reset control
+    void checkpoint();
+    void restore();
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -76,7 +153,13 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Enhanced motor decoding with conflict resolution
+    MotorCommand decodeWithConflictResolution();
+    
     std::shared_ptr<Brain> brain_;
+    
+    // Agent body state for integration
+    AgentBody agentBody_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -108,6 +191,11 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    
+    // Individual subsystem states
+    bool predictionEnabled_;
+    bool conceptFormationEnabled_;
+    bool planningEnabled_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;

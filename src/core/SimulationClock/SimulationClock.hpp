@@ -4,9 +4,6 @@
 
 namespace nlm {
 
-// Simulation clock for managing time in the neural simulation
-// Provides deterministic time tracking separate from wall-clock time
-
 class SimulationClock {
 public:
     // Create with specific timestep

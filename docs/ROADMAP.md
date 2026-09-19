@@ -142,17 +142,79 @@
 - [x] docs/RESEARCH_METHODS.md - Scientific methodology
 - [ ] docs/FAILURES.md - Failed experiments (to be created)
 
-## Phase 6 — Future Directions (NOT STARTED)
+## Phase 6 — Partially Integrated - Systems Connected (IN PROGRESS)
 
-### Potential Directions
-- GPU acceleration for large-scale simulations
-- Distributed simulation across machines
-- More detailed neuron models (Hodgkin-Huxley)
-- Calcium-based plasticity mechanisms
+**Status**: IN PROGRESS - INTEGRATION PARTIALLY ACHIEVED (35.8% complete)
+
+**Goal**: CONNECT existing systems rather than add new disconnected components
+
+### Current Integration Status
+
+#### What's Working (Partially Integrated)
+- ✅ **Neural Core**: LIF neurons with spikes and synaptic transmission
+- ✅ **Basic Plasticity**: STDP, Hebbian, and structural plasticity (periodic)
+- ✅ **Embodiment**: Basic sensory-motor loop via SimpleWorld
+- ✅ **Simple Learning**: Reward-modulated STDP via dopamine
+- ✅ **Development**: Age-based plasticity modifiers
+
+#### What's Disconnected (Not Integrated)
+- ❌ **Working Memory**: Defined but not connected to brain loop
+- ❌ **Episodic Memory**: Stores experiences but never replayed or consolidated
+- ❌ **Semantic Memory**: Empty implementation
+- ❌ **Procedural Memory**: Empty implementation
+- ❌ **Associative Memory**: Empty implementation
+- ❌ **Prediction System**: Implemented but never trains
+- ❌ **Neural Planner**: Implemented but never instantiated or used
+- ❌ **Concept Formation**: Implemented but never processes experiences
+- ❌ **Self-Model**: Implemented but never updates
+- ❌ **Social Learning**: Implemented but never observes
+- ❌ **Prediction System**: Implemented but never trains
+- ❌ **Full Neuromodulation**: Only dopamine (ACh, NE, 5-HT are stubs)
+- ❌ **Persistence**: Checkpoints not connected to Brain
+- ❌ **Memory Consolidation**: No experience storage or replay
+- ❌ **Planning**: No goal-directed behavior
+- ❌ **Attention**: Not connected to perception/action
+- ❌ **Development**: Only affects structural plasticity, not broader effects
+
+### Critical Integration Gaps
+
+1. **Memory Integration Gap**: Working memory exists but never receives sensory input or influences action selection
+2. **Cognition Integration Gap**: All cognitive systems (planner, concept formation, self-model) are implemented but never instantiated or used
+3. **Prediction Integration Gap**: Prediction system exists but never processes sensory data or affects learning
+4. **Neuromodulation Integration Gap**: Only dopamine implemented (scales STDP), other modulators are stubs
+5. **Persistence Integration Gap**: Checkpoint system exists but Brain::save/load are stubs
+
+### Phase 6 Priority Actions
+
+#### Immediate (Next Steps)
+1. **Connect WorkingMemory** to sensory processing in Brain::step()
+2. **Connect EpisodicMemory** to experience logging and replay
+3. **Connect PredictionSystem** to sensory processing and learning
+4. **Connect NeuralPlanner** to action selection and motivation
+5. **Connect ConceptFormation** to experience processing and generalization
+
+#### Phase 6 Completion Checklist
+- [ ] Brain::getWorkingMemory() returns functional working memory
+- [ ] Brain::getEpisodicMemory() stores and replays experiences
+- [ ] Brain::getPredictionSystem() trains on sensory data
+- [ ] NeuralPlanner instantiated and connects to action selection
+- [ ] ConceptFormation processes experiences for generalization
+- [ ] Full neuromodulation (ACh, NE, 5-HT) implemented
+- [ ] Brain::save() and Brain::load() connected using CheckpointSystem
+- [ ] Sleep/rest cycle with memory consolidation
+- [ ] Replay mechanism
+- [ ] Development effects on memory and attention
+
+### Future Phase 7 Directions
+
+After Phase 6 completion, Phase 7 could focus on:
+- Advanced neuromodulator interactions
+- Body model learning and prediction
+- Hierarchical planning structures
+- Full reinforcement learning integration
 - Glial cell interactions
 - Anatomically constrained connectivity
-- Reinforcement learning integration
-- Hierarchical planning structures
+- Distributed simulation capabilities
 
 ## Anti-Transformer Reminder
 
@@ -173,10 +235,13 @@ The architecture must always be based on:
 
 If at any point the architecture begins to resemble a transformer, it should be redirected or the project renamed to clarify it is no longer NLM.
 
-## Version History
+### Version History
 
 - v0.1.0 (Phase 1): Initial skeleton release
 - v0.2.0 (Phase 2): Working neural core with real spiking dynamics
 - v0.3.0 (Phase 3): World interaction and developmental mechanisms
 - v0.4.0 (Phase 4): Emerging cognition - prediction, memory, attention, planning, self-model, social learning
 - v0.5.0 (Phase 5): Scaling + Research Platform - performance optimizations, biological fidelity, lifelong learning
+- v0.6.0 (Phase 6): Partial integration - systems connected (35.8% complete)
+
+**Phase 6 Status**: Currently IN PROGRESS - The brain has basic neural dynamics and sensory-motor loops but most cognitive systems remain disconnected. The integration effort continues with focus on connecting existing systems rather than adding more components.

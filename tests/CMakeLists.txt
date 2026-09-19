@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 # Test configuration
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../python)
 
 # Create test executable
 add_executable(nlm_test
@@ -16,7 +17,7 @@ add_executable(nlm_test
     test_brain.cpp
 )
 
-target_link_libraries(nlm_test PRIVATE nlm_core)
+target_link_libraries(nlm_test PRIVATE nlm_core nlm_agent nlm_world)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
 
 # Enable testing
