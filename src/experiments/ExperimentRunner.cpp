@@ -113,7 +113,7 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
+    // TODO PHASE 6+: Implement results saving with JSON or other formats
     return false;
 }
 

@@ -14,8 +14,6 @@ public:
     MotorSystem();
     ~MotorSystem();
     
-    // Select action based on neural activity
-    // TODO PHASE 2: Implement real action selection
     std::unique_ptr<Action> selectAction(const class NeuralRegion& motorRegion);
     
     // Get available actions
@@ -24,9 +22,17 @@ public:
     // Set action preferences (for exploration)
     void setActionPreference(ActionType action, float preference);
     
+    // Add action to history
+    void addActionToHistory(std::unique_ptr<Action> action);
+    
     // Get action history
     const std::vector<const Action*>& getActionHistory() const;
     void clearHistory();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
     
 private:
     struct Impl;
