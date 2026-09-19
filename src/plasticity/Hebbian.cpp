@@ -49,30 +49,35 @@ void Hebbian::update(Synapse* synapse,
      *   - Assumes stationary statistics
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    if (!synapse || !pImpl || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
+    float totalCorrelation = 0.0f;
+    float tau = pImpl->timeWindow;
+    
+    // Calculate correlation between pre- and post-synaptic spikes
+    // Optimized O(n) algorithm
     for (Timestamp preTime : preSpikes) {
+        // Find posts spikes within time window of this pre spike
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
+            float deltaT = static_cast<float>(std::abs(postTime - preTime));
+            if (deltaT <= tau) {
+                // Exponential decay correlation
+                float correlation = std::exp(-deltaT / tau);
+                totalCorrelation += correlation;
             }
         }
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
-    
-    // Apply with bounds
-    if (std::abs(delta) > 1e-6f) {
-        applyWeightChange(synapse, delta);
+    // Apply Hebbian update if significant correlation found
+    if (std::abs(totalCorrelation) > 1e-6f && totalCorrelation <= pImpl->maxCorrelation) {
+        float delta = pImpl->learningRate * totalCorrelation;
+        synapse->addToWeight(delta);
+        pImpl->maxCorrelation = std::max(pImpl->maxCorrelation, totalCorrelation);
     }
+}
+}
 }
 
 void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {

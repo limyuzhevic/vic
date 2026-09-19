@@ -52,29 +52,37 @@ void STDP::update(Synapse* synapse,
      *   - Doesn't account for synaptic eligibility traces
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    if (!synapse || !pImpl || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
-            }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+    // Optimized O(n) algorithm: sort spike times and use two-pointer technique
+    std::vector<Timestamp> sortedPre(preSpikes);
+    std::vector<Timestamp> sortedPost(postSpikes);
+    std::sort(sortedPre.begin(), sortedPre.end());
+    std::sort(sortedPost.begin(), sortedPost.end());
+    
+    // Use two-pointer technique to avoid O(n²) complexity
+    size_t i = 0, j = 0;
+    while (i < sortedPre.size() && j < sortedPost.size()) {
+        float dt = static_cast<float>(sortedPost[j] - sortedPre[i]);  // Δt in ms
+        
+        if (dt > 0) {
+            // Pre before post: POTENTIATION
+            float delta = pImpl->ltpWeight * std::exp(-dt / tau);
+            totalDelta += delta;
+            j++; // Move to next post spike
+        } else if (dt < 0) {
+            // Post before pre: DEPRESSION
+            float delta = -pImpl->ltdWeight * std::exp(dt / tau);
+            totalDelta += delta;
+            i++; // Move to next pre spike
+        } else {
+            // dt == 0: no change (simultaneous spikes)
+            i++; j++;
         }
     }
     
