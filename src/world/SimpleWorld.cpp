@@ -92,11 +92,12 @@ void SimpleWorld::update(double timestep) {
     while (agent_.orientation > M_PI) agent_.orientation -= 2.0f * M_PI;
     while (agent_.orientation < -M_PI) agent_.orientation += 2.0f * M_PI;
     
-    // Boundary collision
-    if (agent_.x < 0.0f) { agent_.x = 0.0f; agent_.velocityX = 0.0f; }
-    if (agent_.x >= width_) { agent_.x = width_ - 0.01f; agent_.velocityX = 0.0f; }
-    if (agent_.y < 0.0f) { agent_.y = 0.0f; agent_.velocityY = 0.0f; }
-    if (agent_.y >= height_) { agent_.y = height_ - 0.01f; agent_.velocityY = 0.0f; }
+    // Boundary collision with epsilon tolerance
+    float epsilon = 0.01f;
+    if (agent_.x < -epsilon) { agent_.x = 0.0f; agent_.velocityX = 0.0f; }
+    if (agent_.x > width_ + epsilon) { agent_.x = width_ - epsilon; agent_.velocityX = 0.0f; }
+    if (agent_.y < -epsilon) { agent_.y = 0.0f; agent_.velocityY = 0.0f; }
+    if (agent_.y > height_ + epsilon) { agent_.y = height_ - epsilon; agent_.velocityY = 0.0f; }
     
     // Energy decay
     agent_.energy -= energyDecayRate_;
@@ -257,8 +258,10 @@ ActionResult SimpleWorld::interact() {
 }
 
 bool SimpleWorld::isValidPosition(float x, float y) const {
-    // Check world boundaries
-    if (x < 0.0f || x >= width_ || y < 0.0f || y >= height_) {
+    // Check world boundaries with small epsilon tolerance
+    // The agent is allowed to move to positions up to width_-0.01f and height_-0.01f
+    float epsilon = 0.01f;
+    if (x < -epsilon || x > width_ + epsilon || y < -epsilon || y > height_ + epsilon) {
         return false;
     }
     return true;

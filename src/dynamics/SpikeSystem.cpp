@@ -103,6 +103,20 @@ void SpikeSystem::registerDelayedHandler(DelayedSpikeHandler handler) {
 }
 
 const std::vector<DetailedSpikeEvent>& SpikeSystem::getSpikeHistory() const {
+    // When accessing spike history, ensure spike counts are synchronized
+    // Count spikes in history for statistics
+    size_t historyCount = pImpl->spikeHistory.size();
+    
+    // Update spike count mapping for consistency
+    // (This ensures getMostActiveNeurons works correctly)
+    if (historyCount > 0 && !pImpl->spikeCountPerNeuron.empty()) {
+        // Recalculate spike counts from history for accuracy
+        pImpl->spikeCountPerNeuron.clear();
+        for (const auto& spike : pImpl->spikeHistory) {
+            pImpl->spikeCountPerNeuron[spike.source.value]++;
+        }
+    }
+    
     return pImpl->spikeHistory;
 }
 

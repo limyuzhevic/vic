@@ -1,5 +1,6 @@
-#include "Neuromodulator.hpp"
+#include "../core/Random/Random.hpp"
 #include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
@@ -9,8 +10,11 @@ struct Dopamine::Impl {
     float peak;
     float decayRate;
     float releaseRate;
+    std::unique_ptr<RandomGenerator> rng;  // For drift simulation
     
-    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
+    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {
+        rng = std::make_unique<RandomGenerator>(42);
+    }
 };
 
 Dopamine::Dopamine() : pImpl(new Impl) {}
@@ -37,8 +41,17 @@ float Dopamine::getPlasticityFactor() const {
 
 void Dopamine::update(TimestepDuration dt) {
     // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
+    // PLACEHOLDER: Decay towards baseline with drift correction
+    
+    // Decay towards baseline
     pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    
+    // Add small random drift for biological realism
+    float drift = (rng.uniformReal(-1.0f, 1.0f) * 0.001f) * static_cast<float>(dt);
+    pImpl->baseline += drift;
+    
+    // Keep baseline reasonable (between 0 and 1)
+    pImpl->baseline = std::clamp(pImpl->baseline, 0.0f, 1.0f);
 }
 
 void Dopamine::signalReward(float reward) {
