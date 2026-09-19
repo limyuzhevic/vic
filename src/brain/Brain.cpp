@@ -1,3 +1,4 @@
+// Include Brain.hpp first
 #include "Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
@@ -97,6 +98,7 @@ struct Brain::Impl {
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
+        }
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
