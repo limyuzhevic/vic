@@ -3,6 +3,7 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include "phase6_integration_tests.cpp"
 
 namespace test_brain {
 
@@ -121,6 +122,26 @@ void testBrainStatus() {
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 
+void runAllPhase6IntegrationTests() {
+    std::cout << "=== Phase 6 Integration Tests ===" << std::endl;
+    
+    test_brain::testMemorySystemIntegration();
+    test_brain::testNeuromodulationIntegration();
+    test_brain::testDevelopmentSystemIntegration();
+    test_brain::testPredictionSystemIntegration();
+    test_brain::testCognitionSystemsIntegration();
+    test_brain::testCheckpointing();
+    test_brain::testReplaySystem();
+    test_brain::testCompleteBrainLoop();
+    test_brain::testMemoryRetention();
+    test_brain::testNeuromodulationEffectsOnBehavior();
+    test_brain::testDevelopmentProgression();
+    test_brain::testIndividualIntegrationPoints();
+    
+    std::cout << std::endl;
+    std::cout << "=== All Phase 6 Integration Tests Completed Successfully ===" << std::endl;
+}
+
 void runAll() {
     testBrainCreation();
     testBrainInitialization();
@@ -129,6 +150,9 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    
+    std::cout << "=== Running Phase 6 Integration Tests ===" << std::endl;
+    runAllPhase6IntegrationTests();
 }
 
 } // namespace test_brain

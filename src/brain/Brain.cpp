@@ -6,15 +6,7 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
+#include "../neuromodulation/NeuromodulatorManager.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -61,19 +53,22 @@ struct Brain::Impl {
     SimulationStep currentStep;
     Timestamp currentTime;
     
-    // Statistics
-    size_t totalSpikesThisStep;
-    size_t totalSpikesTotal;
+    // Store active neurons for working memory processing
+    std::vector<Neuron*> activeNeurons;
+    activeNeurons.reserve(neuronCount);
     
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
+    // Store synapses for plasticity processing
+    std::vector<Synapse*> activeSynapses;
+    activeSynapses.reserve(neuronCount * 10);  // Rough estimate
     
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
-    size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
+    // Store spike events for spike system processing
+    std::vector<SpikeEvent> queuedSpikes;
+    queuedSpikes.reserve(1000);  // Buffer for spike events
+    
+    // Store delayed spike events for delivery
+    std::vector<DelayedSpikeEvent> queuedDelayedSpikes;
+    queuedDelayedSpikes.reserve(1000);  // Buffer for delayed events
+}
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
@@ -129,6 +124,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize additional neuromodulation systems (missing in current implementation)
+        // TODO: Add acetylcholine, serotonin, norepinephrine systems
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -330,16 +328,48 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->totalSpikesThisStep = 0;
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
-    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    #ifdef NLM_USE_EVENT_QUEUE
+        // Use optimized event queue for spike delivery
+        auto dueSpikes = pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+        
+        // Process spikes through optimized ring buffer
+        for (const auto& spikeEvent : dueSpikes) {
+            #ifdef NLM_USE_SIMD
+                // SIMD-accelerated spike processing
+                pImpl->processSpikesSIMD(spikeEvent, region);
+            #else
+                // Standard spike processing
+                pImpl->processSpikesStandard(spikeEvent, region);
+            #endif
+        }
+    #else
+        // Traditional spike processing
+        pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    #endif
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
-            }
+    #ifdef NLM_USE_MULTITHREADING
+        // Parallel neural population updates with optimized memory access
+        if (pImpl->regions.size() >= 2) {
+            #ifdef NLM_USE_SOA
+                pImpl->updateNeuronsParallelSOA(currentStep, currentTime);
+            #else
+                pImpl->updateNeuronsParallelStandard(currentStep, currentTime);
+            #endif
+        } else {
+            #ifdef NLM_USE_SOA
+                pImpl->updateNeuronsSOA(currentStep, currentTime);
+            #else
+                pImpl->updateNeuronsStandard(currentStep, currentTime);
+            #endif
         }
-    }
+    #else
+        #ifdef NLM_USE_SOA
+            pImpl->updateNeuronsSOA(currentStep, currentTime);
+        #else
+            pImpl->updateNeuronsStandard(currentStep, currentTime);
+        #endif
+    #endif
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
     for (auto& region : pImpl->regions) {

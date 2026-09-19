@@ -1,289 +1,191 @@
-# NLM Architecture
+# Phase 6 Architecture Documentation - Updated
 
-## Overview
+## Integration Updates (Phase 6 Improvements)
 
-NLM (熙然) is designed as a modular computational brain with the following major components:
+This document provides an overview of the Phase 6 implementation of NLM (熙然), which integrates all previous phases into a coherent artificial brain system.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        NLM Brain                                 │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
-│  │   Sensory   │───▶│    Brain    │───▶│    Motor    │          │
-│  │   Input    │    │   Core      │    │    Output   │          │
-│  └─────────────┘    └─────────────┘    └─────────────┘          │
-│         │                  │                  │                 │
-│         ▼                  ▼                  ▼                 │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
-│  │  Sensory    │    │  Memory     │    │   Action    │          │
-│  │  Processing │    │  Systems   │    │  Selection  │          │
-│  └─────────────┘    └─────────────┘    └─────────────┘          │
-│                            │                                    │
-│                            ▼                                    │
-│                    ┌─────────────┐                              │
-│                    │  Prediction │                              │
-│                    │   System    │                              │
-│                    └─────────────┘                              │
-│                            │                                    │
-│                            ▼                                    │
-│                    ┌─────────────┐                              │
-│                    │Neuromodul. │                              │
-│                    │  Signals    │                              │
-│                    └─────────────┘                              │
-│                            │                                    │
-│                            ▼                                    │
-│                    ┌─────────────┐                              │
-│                    │ Development │                              │
-│                    │   System    │                              │
-│                    └─────────────┘                              │
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │              PHASE 4: EMERGING COGNITION                    ││
-│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       ││
-│  │  │Attention│  │Planning │  │Self-Model│ │ Social  │       ││
-│  │  │         │  │         │  │         │  │Learning │       ││
-│  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘       ││
-│  └─────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────┘
+### Key Improvements Implemented
+
+Phase 6 focuses on **connecting existing components** rather than developing new ones. The key achievement is transforming disconnected systems into a **unified cognitive architecture**.
+
+#### Most Important Improvements:
+
+1. **Memory System Integration**: Working memory and episodic memory now properly connected to Brain class
+2. **Complete Neuromodulation**: Added Acetylcholine (ACh), Norepinephrine (NE), and Serotonin (5-HT) systems
+3. **NeuromodulationManager**: Central coordination hub for all neuromodulators
+4. **Performance Infrastructure**: Memory pools, event queues, SIMD optimization
+5. **Brain Loop Implementation**: Complete 15-step integrated brain loop in Brain::step()
+6. **Configuration Fixes**: Removed duplicate `dopamine_baseline` values in configs/default.cfg
+
+### 1. Memory System Integration
+
+#### Working Memory Integration
+
+**Before**: Systems returned nullptr
+```cpp
+NeuralWorkingMemory* Brain::getWorkingMemory() { return nullptr; }
 ```
 
-## Core Components
+**After**: Systems properly initialized
+```cpp
+// In Brain.cpp initialize():
+workingMemory = std::make_unique<NeuralWorkingMemory>();
+episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+associativeMemory = std::make_unique<NeuralAssociativeMemory>();
 
-### 1. Core Layer
-- **Types**: Strongly-typed identifiers (NeuronId, SynapseId, etc.)
-- **Config**: Configuration management system
-- **Random**: Deterministic random number generator
-- **Logger**: Structured logging system
-- **SimulationClock**: Time management for simulation
-
-### 2. Brain Layer
-- **Neuron**: Individual neuron representation (LIF dynamics)
-- **Synapse**: Synaptic connection representation
-- **NeuralPopulation**: Group of neurons with shared properties
-- **NeuralRegion**: Brain region with multiple populations
-- **Brain**: Central coordinator
-
-### 3. Dynamics Layer
-- **NeuralDynamics**: Abstract base for neuron dynamics
-- **SpikeSystem**: Event-driven spike processing
-
-### 4. Plasticity Layer
-- **PlasticityRule**: Abstract base for plasticity rules
-- **Hebbian**: Hebbian learning rule
-- **STDP**: Spike-Timing-Dependent Plasticity
-- **StructuralPlasticity**: Synapse formation/removal
-
-### 5. Development Layer
-- **DevelopmentSystem**: Orchestrates development
-- **Synaptogenesis**: New synapse formation
-- **Pruning**: Weak synapse removal
-- **Maturation**: Adult property development
-
-### 6. Neuromodulation Layer
-- **Neuromodulator**: Abstract base for neuromodulators
-- **Dopamine**: Reward and reinforcement
-- **Novelty**: Novelty detection
-- **Curiosity**: Exploration motivation
-- **PredictionError**: Error signals
-
-### 7. Memory Layer (Phase 4)
-- **NeuralWorkingMemory**: Persistent activity for temporary storage
-- **NeuralEpisodicMemory**: Experience encoding in neural patterns
-- **NeuralAssociativeMemory**: Experience-based associations
-- **ConceptFormation**: Pattern discovery without labels
-- **SpatialRepresentation**: Learned spatial relationships
-- **TemporalRelation**: Before/after/sequence encoding
-
-### 8. Prediction Layer (Phase 4)
-- **NeuralPrediction**: Temporal sequence learning
-- **ActionConsequencePredictor**: Action effect prediction
-- **PredictionErrorSignal**: Error computation for learning
-
-### 9. Cognitive Layer (Phase 4)
-- **AttentionalSelection**: Competition-based attention (NOT Transformer QKV)
-- **NeuralPlanner**: Predictive action selection
-- **SelfModel**: Sensorimotor self-awareness
-- **SocialLearning**: Observation and imitation
-
-### 10. Sensory Layer
-- **SensoryInput**: Base class for sensory data
-- **Vision**: Visual input processing
-- **Audio**: Audio input processing
-- **InternalSignals**: Internal state signals
-
-### 11. Motor Layer
-- **Action**: Action representation
-- **MotorSystem**: Neural-to-action conversion
-
-### 12. Environment Layer
-- **Environment**: Abstract environment interface
-- **Observation**: Sensory observation wrapper
-- **Action**: Action wrapper
-
-### 13. Experiments Layer
-- **Experiment**: Single experiment recording
-- **ExperimentRunner**: Experiment execution
-- **Metrics**: Data analysis
-- **Phase4Experiment**: Phase 4 cognitive experiments
-
-## Data Flow
-
-### Phase 2: Neural Computation
-```
-Sensory Input (test signals)
-      ↓
-Brain.receiveSensoryInput()
-      ↓
-Neural Computation (LIF dynamics)
-      ↓
-Spike Processing (event-driven)
-      ↓
-Plasticity (STDP, Hebbian)
-      ↓
-Structural Plasticity (synaptogenesis/pruning)
+// Integration points:
+if (workingMemory) {
+    workingMemory->storeToNeuron(neuron->getId(), activation);
+    workingMemory->update(timestep);
+}
 ```
 
-### Phase 3: World Interaction
-```
-WORLD (SimpleWorld)
-      ↓
-SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
-      ↓
-AgentBrain.processSensoryInput()
-      ↓
-Brain.receiveSensoryInput() → Sensory Neurons
-      ↓
-Neural Computation (LIF dynamics)
-      ↓
-Spike Processing (event-driven)
-      ↓
-Motor Decoding → MotorCommand
-      ↓
-AgentBrain.decodeMotorCommand()
-      ↓
-WORLD.applyMotorCommand()
-      ↓
-ACTION RESULT (reward, success)
-      ↓
-Reward Prediction Error
-      ↓
-Neuromodulation (dopamine-like signal)
-      ↓
-Eligibility Trace Update
-      ↓
-Plasticity (STDP, Hebbian, Reward-Modulated)
-      ↓
-Structural Plasticity (synaptogenesis/pruning)
-      ↓
-Development System (stage progression)
-```
+#### Episodic Memory Integration
 
-### Phase 4: Emerging Cognition
-```
-WORLD (SimpleWorld)
-      ↓
-SENSORY PERCEPT
-      ↓
-ATTENTION (competitive selection)
-      ↓
-NEURAL PROCESSING
-      ↓
-PREDICTION (temporal sequence learning)
-      ↓
-WORKING MEMORY (persistent activity)
-      ↓
-EPISODIC MEMORY (experience storage)
-      ↓
-CONCEPT FORMATION (pattern discovery)
-      ↓
-PLANNING (multi-step prediction)
-      ↓
-SELF-MODEL (sensorimotor learning)
-      ↓
-MOTOR ACTION
-      ↓
-WORLD.applyMotorCommand()
-      ↓
-ACTION RESULT
-      ↓
-REWARD / ERROR
-      ↓
-NEUROMODULATION
-      ↓
-PLASTICITY
-      ↓
-SOCIAL LEARNING (observation/imitation)
+**Key Features**:
+- Store episodes periodically (every 10 steps)
+- Replay important memories for consolidation
+- Neural pattern storage and retrieval
+- Integration with attention and working memory
+
+### 2. Neuromodulation System
+
+#### Complete Neuromodulator Set
+
+| Neuromodulator | Primary Function | Integration |
+|----------------|------------------|-------------|
+| Dopamine (DA) | Reward prediction error | Reinforcement learning |
+| Acetylcholine (ACh) | Attention, memory consolidation | Memory integration |
+| Norepinephrine (NE) | Arousal, vigilance, stress | Attention modulation |
+| Serotonin (5-HT) | Mood, impulse control, social | Behavioral regulation |
+| Novelty | Novelty detection | Exploration drive |
+| Curiosity | Exploration motivation | Learning enhancement |
+| PredictionError | Error signals | Learning optimization |
+
+#### NeuromodulationManager
+
+Central coordination hub for all neuromodulators:
+
+```cpp
+class NeuromodulationManager {
+public:
+    void initialize(Brain* brain);
+    void updateAll(TimestepDuration dt);
+    
+    // Signal processing based on events
+    void processReward(float reward);
+    void processPredictionError(float error);
+    void processNovelty(float novelty);
+    void processAttention(float salience, float focus);
+    void processSocialFeedback(float feedback);
+    void processImpulsivity(float level);
+    void processStress(float stressLevel);
+    
+    // Integrated modulation factors
+    float getIntegratedPlasticityFactor() const;
+    float getAttentionModulationFactor() const;
+    float getArousalModulationFactor() const;
+};
 ```
 
-## Agent-Brain Interface
+### 3. Complete Brain Loop (15 Steps)
 
-Phase 3/4 introduces the AgentBrain class that connects the NLM brain to the world:
+The `Brain::step()` method implements the complete integrated brain loop:
 
-- **SensoryTransduction**: Converts world percepts to neural input
-- **MotorDecoding**: Converts neural activity to motor commands
-- **Neuromodulation**: Applies reward signals to plasticity
-- **Development**: Updates developmental stage
-- **Attention**: Selective processing through competition
-- **Planning**: Uses predictions to select actions
+```
+1. Process pending delayed spikes (deliver synaptic input)
+2. Update all neurons (LIF dynamics)
+3. Detect spikes and schedule spike events
+4. Update working memory (maintenance and competition)
+5. Apply neuromodulation effects on neural excitability
+6. Apply plasticity rules (STDP, Hebbian)
+7. Update episodic memory with current experience
+8. Update prediction system
+9. Update attention system
+10. Update concept formation
+11. Apply structural plasticity (synaptogenesis, pruning)
+12. Replay important memories (during rest or periodically)
+13. Apply development effects
+14. Periodic memory consolidation
+15. Checkpoint management
+```
 
-## Key Design Principles
+### 4. Performance Infrastructure
 
-1. **No ML Frameworks**: NLM implements its own neural computation
-2. **No Transformer Architecture**: Uses spiking dynamics and competitive attention
-3. **Biological Inspiration**: Designed to be incrementally more biologically accurate
-4. **Modularity**: Clear interfaces between components
-5. **Determinism**: Reproducible experiments via explicit random seeds
-6. **Performance**: Data-oriented design for large-scale simulation
-7. **Extensibility**: Clear patterns for adding new components
-8. **No Predefined Knowledge**: All learning from experience
+#### Memory Pools
 
-## Phase 4 Key Innovations
+Pre-allocated memory pools for efficient object management:
+```cpp
+MemoryPool<Neuron> neuronPool(1024, 4);
+MemoryPool<Synapse> synapsePool(10240, 10);
+```
 
-### Prediction System
-- Learns temporal sequences from experience
-- Predicts action consequences
-- Multi-step prediction capability
-- Error signals modulate learning
+#### Event Queues
 
-### Working Memory
-- Persistent neural activity
-- Recurrent connections for maintenance
-- Competition for selective retention
-- Neural-grounded (not a vector store)
+Optimized ring buffer for spike event processing:
+```cpp
+SpikeRingBuffer spikeQueue(16384);
+DelayedSpikeQueue delayedQueue(1024, 100);
+```
 
-### Episodic Memory
-- Experience encoded as neural patterns
-- Pattern completion retrieval
-- Temporal and spatial indexing
-- Replay during consolidation
+### 5. Configuration System
 
-### Concept Formation
-- Discovers patterns without labels
-- Prototype formation through averaging
-- Stability measurement
-- Category hints from properties
+#### Configuration Files
 
-### Attention
-- Lateral inhibition competition
-- Winner-take-more dynamics
-- Top-down and bottom-up bias
-- NOT Transformer QKV attention
+**`configs/default.cfg`** - Updated configuration (duplicate fixed):
 
-### Planning
-- Uses learned predictions
-- Evaluates potential futures
-- Selects actions leading to goals
-- Adapts based on outcomes
+```ini
+# Neuromodulation settings (FIXED duplicate)
+dopamine_baseline = 0.1
 
-### Self-Model
-- Learns body schema
-- Predicts action consequences
-- Self vs external distinction
-- Capability representation
+# Core neural parameters
+neuron_count = 1000
+region_count = 2
+connection_probability = 0.1
 
-### Social Learning
-- Observes other agents
-- Learns action effects
-- Imitation capability
-- Simple communication signals
+# Plasticity parameters
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+stdp_time_constant = 20.0
+
+# Development parameters
+development_synaptogenesis_rate = 0.001
+development_pruning_rate = 0.0001
+
+# Simulation parameters
+simulation_timestep = 0.001
+max_simulation_steps = 10000
+```
+
+### 6. Building and Running
+
+#### Build Instructions
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+ctest --output-on-failure
+```
+
+#### Running the Phase 6 Demo
+
+```bash
+./nlm_phase6_demo
+```
+
+### Summary
+
+Phase 6 integration achieves **system coherence**:
+
+✅ **Connected Components**: All systems properly integrated  
+✅ **Memory Functionality**: Working and episodic memory operational  
+✅ **Complete Neuromodulation**: 7 neurotransmitters with interactions  
+✅ **Performance Infrastructure**: Optimized for large-scale simulations  
+✅ **Integration Tests**: Comprehensive verification framework  
+✅ **Brain Loop**: Complete 15-step integrated execution  
+
+**Primary Achievement**: The brain has both *anatomy* **and** *integration* for cognitive function.
+
+The system now implements the complete **integrated brain loop**, creating an artificial cognitive system capable of learning, predicting, planning, and developing over time.

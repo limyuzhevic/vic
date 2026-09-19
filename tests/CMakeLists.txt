@@ -19,6 +19,15 @@ add_executable(nlm_test
 target_link_libraries(nlm_test PRIVATE nlm_core)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
 
+# Add Phase 6 integration tests
+add_executable(nlm_phase6_tests
+    phase6_integration_tests.cpp
+)
+
+target_link_libraries(nlm_phase6_tests PRIVATE nlm_core)
+target_compile_features(nlm_phase6_tests PRIVATE cxx_std_20)
+
 # Enable testing
 enable_testing()
 add_test(NAME nlm_test COMMAND nlm_test)
+add_test(NAME nlm_phase6_tests COMMAND nlm_phase6_tests)
