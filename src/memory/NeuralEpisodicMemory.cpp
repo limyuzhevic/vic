@@ -574,4 +574,78 @@ float NeuralAssociativeMemory::computeSimilarity(const std::vector<float>& a,
     return dot / (std::sqrt(normA) * std::sqrt(normB));
 }
 
-} // namespace nlm
+void NeuralAssociativeMemory::updateAssociations(Brain& brain, TimestepDuration dt) {
+    // Update associations based on current neural activity patterns
+    // This simulates how co-active neurons strengthen their connections via Hebbian learning
+    
+    // Get current active neurons
+    std::vector<NeuronId> activeNeurons;
+    for (auto& region : brain.getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                if (neuron->isFiring()) {
+                    activeNeurons.push_back(neuron->getId());
+                }
+            }
+        }
+    }
+    
+    if (activeNeurons.size() < 2) {
+        return;
+    }
+    
+    // Create associations between co-active neurons
+    // This simulates the Hebbian principle: neurons that fire together wire together
+    for (size_t i = 0; i < activeNeurons.size(); ++i) {
+        for (size_t j = i + 1; j < activeNeurons.size(); ++j) {
+            NeuronId neuronA = activeNeurons[i];
+            NeuronId neuronB = activeNeurons[j];
+            
+            // Check if this pair is already associated
+            bool isAssociated = false;
+            for (const auto& assoc : associations_) {
+                if ((std::get<0>(assoc) == neuronA && std::get<1>(assoc) == neuronB) ||
+                    (std::get<0>(assoc) == neuronB && std::get<1>(assoc) == neuronA)) {
+                    isAssociated = true;
+                    break;
+                }
+            }
+            
+            if (!isAssociated) {
+                // Create new association with initial strength
+                // Strength is based on activity correlation (simplified: just max firing rate)
+                float strength = 0.3f + (0.7f * dt / 0.001f);  // Gradually strengthen over time
+                strength = std::min(strength, 1.0f);  // Cap at 1.0
+                
+                associations_.emplace_back(neuronA, neuronB, strength);
+            } else {
+                // Strengthen existing association
+                for (auto& assoc : associations_) {
+                    if ((std::get<0>(assoc) == neuronA && std::get<1>(assoc) == neuronB) ||
+                        (std::get<0>(assoc) == neuronB && std::get<1>(assoc) == neuronA)) {
+                        std::get<2>(assoc) = std::min(std::get<2>(assoc) + 0.1f * (dt / 0.001f), 1.0f);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Decay weak associations over time
+    std::vector<std::tuple<NeuronId, NeuronId, float>> newAssociations;
+    for (const auto& assoc : associations_) {
+        float strength = std::get<2>(assoc);
+        // Natural decay over time
+        strength *= (1.0f - 0.05f * (dt / 0.001f));
+        
+        if (strength > 0.05f) {  // Keep associations above threshold
+            newAssociations.push_back(assoc);
+        }
+    }
+    associations_ = std::move(newAssociations);
+}
+
+void NeuralAssociativeMemory::reset() {
+    patternNeurons_.clear();
+    associations_.clear();
+}

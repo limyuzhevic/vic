@@ -505,17 +505,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Store episode in episodic memory system
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+    // ========== STEP 8: Update associative memory ==========
+    if (pImpl->associativeMemory) {
+        // Update associative memory based on current neural activity
+        pImpl->associativeMemory->updateAssociations(*this, pImpl->timestep);
+    }
+    
+    // ========== STEP 9: Update prediction system ==========
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
     }
     
-    // ========== STEP 9: Update attention system ==========
+    // ========== STEP 10: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -526,18 +533,83 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
-    }
-    
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
+    // ========== STEP 12: Update concept formation ==========
+    if (pImpl->conceptFormation) {
+        // Process current neural activity patterns for concept formation
+        // Convert neural state to pattern for concept learning
+        std::vector<float> currentPattern;
+        currentPattern.reserve(pImpl->regions.size() * 100);  // Estimate neurons per region
+        
+        // Collect neural activity from all neurons
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    currentPattern.push_back(state.membranePotential);
+                    // Store additional features for concept formation
+                    currentPattern.push_back(state.firingState == FiringState::Refractory ? 1.0f : 0.0f);
+                }
+            }
+        }
+        
+        // Present to concept formation if pattern is meaningful
+        if (!currentPattern.empty() && 
+            *std::max_element(currentPattern.begin(), currentPattern.end()) > 0.1f) {
+            pImpl->conceptFormation->presentExperience(
+                currentPattern, 
+                currentPattern,  // Use same for features for now
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                currentStep
+            );
+        }
+    }
+    
+    // ========== STEP 13: Neural planning for action selection ==========
+    if (pImpl->planner) {
+        // Generate action plan based on current brain state
+        std::vector<float> currentState;
+        currentState.reserve(pImpl->regions.size() * 100);
+        
+        // Collect current neural state for planning
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    currentState.push_back(state.membranePotential);
+                }
+            }
+        }
+        
+        // Plan next action based on current state and goal
+        if (!currentState.empty()) {
+            ActionType plannedAction = pImpl->planner->planAction(
+                currentState,
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f
+            );
+            
+            // Update action production with planned action
+            // The planning system influences motor neuron activity
+            if (plannedAction != ActionType::Wait) {
+                // Inject current into motor neurons based on planned action
+                // This is a simplified mapping - real implementation would be more sophisticated
+                for (auto* neuron : pImpl->motorNeurons) {
+                    float current = 1.0f; // Base planning signal
+                    if (plannedAction == ActionType::MoveForward) current = 2.0f;
+                    else if (plannedAction == ActionType::MoveBackward) current = -2.0f;
+                    else if (plannedAction == ActionType::TurnLeft) current = 0.5f;
+                    else if (plannedAction == ActionType::TurnRight) current = -0.5f;
+                    neuron->injectCurrent(current);
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 14: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
@@ -546,7 +618,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // ========== STEP 15: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -576,13 +648,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // ========== STEP 16: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 17: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }

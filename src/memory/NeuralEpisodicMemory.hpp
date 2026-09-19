@@ -189,11 +189,11 @@ public:
     std::vector<std::vector<float>> spreadActivation(const std::vector<float>& cuePattern,
                                                      size_t steps = 2) const;
 
-    // Clear associations
-    void clear();
-
-    // Get number of associations
-    size_t getAssociationCount() const { return associations_.size(); }
+// Update associative memory based on current brain state
+    void updateAssociations(Brain& brain, TimestepDuration dt);
+    
+    // Reset all associative memory
+    void reset();
 
 private:
     // Find pattern neuron or create one
