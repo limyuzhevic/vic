@@ -3,8 +3,29 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <cctype>
+#include <vector>
+#include <unordered_map>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
+
+// Helper functions - moved before first use
+static std::string trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
+
+static std::string toLower(const std::string& str) {
+    std::string result = str;
+    for (char& c : result) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return result;
+}
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -41,11 +62,16 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Improved quote removal logic with better validation
+            if (!value.empty()) {
+                if ((value.front() == '"' && value.back() == '"') || 
+                    (value.front() == '\'' && value.back() == '\'')) {
+                    if (value.size() >= 3) { // Ensure at least one character inside quotes
+                        value = value.substr(1, value.size() - 2);
+                    } else { // Empty quoted string
+                        value = "";
+                    }
+                }
             }
             
             set(key, value, ConfigSource::File);
@@ -86,7 +112,19 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Save the actual value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -186,20 +224,8 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
