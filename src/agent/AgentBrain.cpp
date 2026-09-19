@@ -18,6 +18,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , planningEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
     // Initialize motor and sensory neuron groups
@@ -63,15 +64,15 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 
 AgentBrain::~AgentBrain() = default;
 
-void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+void AgentBrain::initializePlanner(const SimpleWorld& world) {
+    if (!brain_) return;
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    // Create and initialize neural planner
+    planner_ = std::make_unique<NeuralPlanner>();
+    planner_->initialize(brain_.get());
+    planner_->setPlanningDepth(5);
+    
+    NLM_LOG_INFO("NeuralPlanner initialized with world integration");
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -319,7 +320,27 @@ DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
 }
 
 float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
+    // Aggregate neuromodulation level from all neuromodulators
+    // Weighted average of dopamine, novelty, and curiosity levels
+    float totalLevel = 0.0f;
+    float totalWeight = 0.0f;
+    
+    if (dopamineLevel_ != 0.0f) {
+        totalLevel += dopamineLevel_ * 0.5f;  // Dopamine most important
+        totalWeight += 0.5f;
+    }
+    
+    if (noveltyLevel_ != 0.0f) {
+        totalLevel += noveltyLevel_ * 0.3f;  // Novelty important for exploration
+        totalWeight += 0.3f;
+    }
+    
+    if (curiosityLevel_ != 0.0f) {
+        totalLevel += curiosityLevel_ * 0.2f;  // Curiosity for exploration
+        totalWeight += 0.2f;
+    }
+    
+    return totalWeight > 0.0f ? totalLevel / totalWeight : 0.0f;
 }
 
 float AgentBrain::getCuriosityLevel() const {

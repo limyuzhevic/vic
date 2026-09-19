@@ -184,6 +184,9 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
+    // Get overall neuromodulation level (aggregated from all neuromodulators)
+    float getNeuromodulationLevel() const;
+    
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     

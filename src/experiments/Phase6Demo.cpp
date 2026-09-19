@@ -67,6 +67,8 @@ int main(int argc, char* argv[]) {
     std::cout << "Total reward: " << result.totalReward << std::endl;
     std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
     std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
+    std::cout << "Novelty level: " << result.noveltyLevel << std::endl;
+    std::cout << "Curiosity level: " << result.curiosityLevel << std::endl;
     std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
     std::cout << std::endl;
     
@@ -77,6 +79,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Prediction: " << (result.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
     std::cout << "Development: " << (result.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
     std::cout << "Checkpointing: " << (result.checkpointingWorks ? "WORKING" : "NOT WORKING") << std::endl;
+    std::cout << "Replay: " << (result.replayWorks ? "WORKING" : "NOT WORKING") << std::endl;
     std::cout << std::endl;
     
     std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;

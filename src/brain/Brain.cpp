@@ -243,7 +243,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -1017,12 +1017,6 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
-
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
-}
-
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
@@ -1051,6 +1045,12 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;
 }
 
+// ========== PREDICTION SYSTEM ==========
+
+PredictionSystem* Brain::getPredictionSystem() {
+    return pImpl->predictionSystem.get();
+}
+
 // ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
@@ -1069,8 +1069,28 @@ PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
 
-std::shared_ptr<const Config> Brain::getConfig() const {
-    return pImpl->config;
+float Brain::getNeuromodulationLevel() const {
+    // Aggregate neuromodulation level from all neuromodulators
+    // Weighted average of dopamine, novelty, and curiosity levels
+    float totalLevel = 0.0f;
+    float totalWeight = 0.0f;
+    
+    if (pImpl->dopamine) {
+        totalLevel += pImpl->dopamine->getLevel() * 0.5f;  // Dopamine most important
+        totalWeight += 0.5f;
+    }
+    
+    if (pImpl->novelty) {
+        totalLevel += pImpl->novelty->getLevel() * 0.3f;  // Novelty important for exploration
+        totalWeight += 0.3f;
+    }
+    
+    if (pImpl->curiosity) {
+        totalLevel += pImpl->curiosity->getLevel() * 0.2f;  // Curiosity for exploration
+        totalWeight += 0.2f;
+    }
+    
+    return totalWeight > 0.0f ? totalLevel / totalWeight : 0.0f;
 }
 
 RandomGenerator* Brain::getRandomGenerator() {

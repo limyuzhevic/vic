@@ -1,8 +1,7 @@
-#pragma once
-
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
+#include "../cognition/NeuralPlanner.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
@@ -11,6 +10,8 @@ namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// NOW ALSO CONNECTS NEURAL PLANNER FOR ACTION PLANNING
+
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -63,11 +64,25 @@ public:
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void enablePlanning(bool enable) { planningEnabled_ = enable; }
     
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    bool isPlanningEnabled() const { return planningEnabled_; }
+    
+    // NeuralPlanner integration
+    void initializePlanner(const SimpleWorld& world);
+    ActionType planAction(const std::vector<float>& currentState, float targetReward = 0.5f);
+    bool updatePlanQuality(const std::vector<ActionType>& plannedActions,
+                          const std::vector<ActionType>& actualActions,
+                          float actualReward);
+    
+    // Get planning statistics
+    bool wasRecentPlanSuccessful() const;
+    float getPlanningConfidence() const;
+    size_t getPlanningDepth() const;
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -77,6 +92,10 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    
+    // NeuralPlanner integration
+    std::unique_ptr<NeuralPlanner> planner_;
+    bool planningEnabled_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
