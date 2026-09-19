@@ -20,7 +20,8 @@ using ConfigValue = std::variant<
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<std::string>,
+    std::vector<bool>
 >;
 
 // Configuration source
@@ -77,6 +78,7 @@ public:
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<bool>& value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -93,6 +95,19 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    
+    // Set custom validation function
+    using ValidationFunction = std::function<bool(const std::string&, const ConfigValue&)>;
+    void setValidationFunction(ValidationFunction validator);
+    
+    // Error handling
+    std::string getLastError() const;
+    
+    // Initialize with default values
+    void initializeDefaults();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +115,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation and error handling
+    ValidationFunction validationFunction_;
+    std::string lastError_;
 };
 
 } // namespace nlm

@@ -86,7 +86,58 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Serialize key=value based on type
+        std::visit([&file, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [\"";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << "\", \";
+                }
+                file << "\"]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<bool>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << (arg[i] ? "true" : "false");
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else {
+                // Handle numeric and boolean types
+                file << entry.key << " = ";
+                if constexpr (std::is_same_v<T, bool>) {
+                    file << (arg ? "true" : "false");
+                } else if constexpr (std::is_same_v<T, double> || 
+                                   std::is_same_v<T, float> ||
+                                   std::is_same_v<T, long double> ||
+                                   std::is_same_v<T, int> ||
+                                   std::is_same_v<T, int64_t>) {
+                    file << arg;
+                }
+                file << "\n";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -107,6 +158,9 @@ std::optional<T> Config::get(const std::string& key) const {
         return std::nullopt;
     }
 }
+
+// Template for vector<bool>
+template std::optional<std::vector<bool>> Config::get<std::vector<bool>>(const std::string&) const;
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
@@ -138,7 +192,7 @@ void Config::set(const std::string& key, double value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
-void Config::set(const std::string& key, bool value, ConfigSource source) {
+void Config::set(const std::string& key, const std::vector<bool>& value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
@@ -198,13 +252,14 @@ std::string Config::toLower(const std::string& str) {
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
 }
-
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+template std::optional<std::vector<bool>> Config::get<std::vector<bool>>(const std::string&) const;
 
 template int Config::getOr<int>(const std::string&, const int&) const;
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
@@ -212,4 +267,56 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
-} // namespace nlm
+// Explicit template instantiations
+
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+template std::optional<std::vector<bool>> Config::get<std::vector<bool>>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// TODO: Add validation and error handling implementations
+
+// Example validation function (can be overridden)
+bool Config::validate() const {
+    for (const auto& entry : pImpl->entries) {
+        // Basic validation: no empty keys
+        if (entry.key.empty()) {
+            lastError_ = "Configuration entry has empty key";
+            return false;
+        }
+        
+        // Apply custom validation if set
+        if (validationFunction_) {
+            if (!validationFunction_(entry.key, entry.value)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+void Config::setValidationFunction(ValidationFunction validator) {
+    validationFunction_ = std::move(validator);
+}
+
+std::string Config::getLastError() const {
+    return lastError_;
+}
+
+void Config::initializeDefaults() {
+    // TODO: Add default configuration values based on expected parameters
+    clear();
+    // Example defaults:
+    set("neuron_count", 1000);
+    set("connection_probability", 0.1f);
+    set("stdp_ltp_weight", 0.01f);
+    set("stdp_ltd_weight", 0.012f);
+}

@@ -61,7 +61,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
+        // Get observation - safely handle empty regions
+        if (agent.getBrain()->getRegions().empty()) {
+            NLM_LOG_ERROR("Brain has no regions, cannot continue simulation");
+            break;
+        }
         SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
         
         // Process sensory input
@@ -73,10 +77,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
+        // Apply action to world - safely handle empty regions
         world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
         
-        // Compute reward
+        // Compute reward - safely handle empty regions
         float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
         totalReward += reward;
         
