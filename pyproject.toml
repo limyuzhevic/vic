@@ -12,10 +12,11 @@ requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "neuroscience"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,20 +26,31 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Topic :: Software Development :: Libraries",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",  # For array operations and data processing
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "scipy>=1.7",  # For scientific computing
+    "matplotlib>=3.3",  # For visualization
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Bug Tracker" = "https://github.com/nlm-project/nlm/issues"
+"Discussion Forum" = "https://github.com/nlm-project/nlm/discussions"
+
+[project.scripts]
+"nlm-python" = "pynlm.__main__:main"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +59,61 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DBUILD_SHARED_LIBS=OFF",  # Build static libraries
+    "-DNLM_BUILD_TESTS=OFF",   # Disable tests in Python package build
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+NLM_ENABLE_PYTHON_BINDINGS = true
+NLM_ENABLE_EXAMPLES = false
+
+[tool.scikit-build.cmake
+    build-type = "Release"
+    strip = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+]
+
+[tool.coverage.run]
+source = ["pynlm"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == \"__main__\":",
+]
+
+[build.wheel]
+build-backend = "scikit_build_core.wheel"
+
+[build.sdist]
+include = [
+    "/src",
+    "/python",
+    "/docs",
+    "/examples",
+    "/tests",
+    "/configs",
+]
+exclude = [
+    "/.*",
+    "/build",
+    "/dist",
+    "/*.egg-info",
+]
+

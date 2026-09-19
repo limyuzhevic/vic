@@ -11,6 +11,7 @@ namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Provides interface for agent-environment interaction with neuromodulation and development
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -75,6 +76,36 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Validate neural populations for safe operation
+    bool validateNeuralPopulations() const;
+    
+    // Validate sensory inputs for proper dimensions
+    bool validateSensoryInput(const SensoryPercept& percept) const;
+    
+    // Validate motor output capabilities
+    bool validateMotorOutput() const;
+    
+    // Configure motor neuron groups safely
+    void configureMotorNeuronGroups();
+    
+    // Configure sensory neuron groups safely
+    void configureSensoryNeuronGroups();
+    
+    // Sanitize neuromodulation values
+    void sanitizeNeuromodulation();
+    
+    // Initialize development state
+    void initializeDevelopmentState();
+    
+    // Calculate developmental age with bounds checking
+    void updateDevelopmentalAge(double timestep);
+    
+    // Check for developmental stage transitions
+    void checkDevelopmentalTransitions();
+    
+    // Apply developmental constraints
+    void applyDevelopmentalConstraints();
     
     std::shared_ptr<Brain> brain_;
     

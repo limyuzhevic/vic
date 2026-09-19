@@ -217,18 +217,17 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+            // Random motor command with bias toward movement when curious
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 100);
+            
+            // Weighted selection: movement (40%), turning (30%), interaction (20%), wait (10%)
+            if (choice < 40) return MotorCommand::MoveForward;
+            if (choice < 70) {
+                if (r < 0.5f) return MotorCommand::TurnLeft;
+                return MotorCommand::TurnRight;
             }
+            if (choice < 90) return MotorCommand::Interact;
+            return MotorCommand::Wait;
         }
     }
     
@@ -236,9 +235,10 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
+    // Apply reward-based neuromodulation to the brain
     if (!brain_ || !rewardModulationEnabled_) return;
     
-    // Compute prediction error
+    // Compute prediction error (dopamine signal)
     predictionError_ = reward - predictedReward;
     
     // Update expected reward (exponential moving average)

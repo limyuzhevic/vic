@@ -153,6 +153,94 @@ agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
 ```
 
+### Pattern 4: Advanced Agent Configuration
+
+```python
+# Create and configure complete agent system
+import pynlm
+
+# Create configuration with custom parameters
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2000)  # More neurons for complex behavior
+config.set("brain.connection_probability", 0.08)
+
+# Create brain with configuration
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create agent interface
+agent = pynlm.createAgentBrain(brain)
+
+# Create and configure world
+world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=16, visionHeight=16)
+world.reset()
+agent.initialize(world)
+
+# Enable all learning subsystems for sophisticated behavior
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)  # Neural growth and pruning
+agent.enableDevelopment(True)           # Developmental stages
+agent.enableCuriosity(True)             # Intrinsic motivation
+
+# Run complex simulation with advanced monitoring
+def run_advanced_simulation(num_steps=500):
+    for step in range(num_steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input
+        agent.processSensoryInput(percept)
+        
+        # Brain computation
+        brain.step(step)
+        
+        # Motor action
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Reward-based learning
+        reward = 0.0
+        if world.getAgentBody().energy > 50:
+            reward = 0.1  # Positive for energy maintenance
+        elif world.getAgentBody().health < 20:
+            reward = -0.5  # Negative for low health
+        
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Track development
+        agent.updateDevelopment(0.1)
+        
+        # Print advanced metrics every 50 steps
+        if step % 50 == 0:
+            print(f"Step {step}:")
+            print(f"  Brain stats: {brain.getFiringNeuronCount()} firing, "
+                  f"{brain.getTotalSpikeCount()} total spikes")
+            print(f"  Development: {agent.getDevelopmentalStage()}, "
+                  f"Age: {agent.getBrain().getDevelopmentalStage()}")
+            print(f"  Neuromodulation: Dopamine={agent.getNeuromodulationLevel():.2f}, "
+                  f"Curiosity={agent.getCuriosityLevel():.2f}, "
+                  f"Novelty={agent.getNoveltyLevel():.2f}")
+            print(f"  Agent state: Energy={world.getAgentBody().energy:.1f}, "
+                  f"Health={world.getAgentBody().health:.1f}")
+
+# Run the advanced simulation
+run_advanced_simulation()
+```
+
+### Pattern 4: Get Brain Stats
+
+```python
+# Just add these inside your loop:
+print("Neurons firing:", brain.getFiringNeuronCount())
+print("Total spikes:", brain.getTotalSpikeCount())
+print("Avg firing rate:", brain.getAverageFiringRate())
+print("Development stage:", brain.getDevelopmentalStage())
+```
+
 ---
 
 ## What Each Part Does
@@ -178,6 +266,8 @@ Gives sensory information (vision, touch, etc.) to the brain.
 
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
+
+---
 
 ---
 
@@ -253,6 +343,17 @@ for step in range(100):
 
 print("Agent simulation complete!")
 ```
+
+---
+
+## Next Steps
+
+When you're comfortable:
+1. Read `HOW_TO_USE.md` for more details
+2. Read `docs/ARCHITECTURE.md` to understand how it all works
+3. Experiment with different configurations!
+
+That's it! You're now ready to use NLM.
 
 ---
 
