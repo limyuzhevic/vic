@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -18,17 +19,66 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+ValidationResult Config::validateKey(const std::string& key) noexcept {
+    if (key.empty()) {
+        return ValidationResult(false, "Configuration key cannot be empty");
+    }
+    if (key.find('=') != std::string::npos || key.find(' ') != std::string::npos) {
+        return ValidationResult(false, "Configuration key cannot contain '=' or spaces: " + key);
+    }
+    return ValidationResult(true);
+}
+
+ValidationResult Config::validateValue(const ConfigValue& value, const std::type_info& expectedType) noexcept {
+    // Check if the value type matches the expected type
+    if (std::any_of(value.index(), value.index() + 1, [&](size_t i) {
+        const auto& actualType = std::variant_alternative_t<i, ConfigValue>::type_id();
+        return actualType == expectedType;
+    })) {
+        return ValidationResult(true);
+    }
+    return ValidationResult(false, "Configuration value type mismatch");
+}
+
+ValidationResult Config::validateFilepath(const std::string& filepath) noexcept {
+    if (filepath.empty()) {
+        return ValidationResult(false, "Filepath cannot be empty");
+    }
+    if (!std::filesystem::path(filepath).is_absolute() && filepath.find('/') == std::string::npos && filepath.find('\\') == std::string::npos) {
+        return ValidationResult(false, "Filepath must be absolute or relative with path separator: " + filepath);
+    }
+    return ValidationResult(true);
+}
+
+void Config::validateSetOperation(const std::string& key, const ConfigValue& value) const {
+    auto keyValidation = validateKey(key);
+    if (!keyValidation.isValid()) {
+        throw NLMError(keyValidation.getMessage(), ErrorSeverity::Error, ErrorCategory::Parameter, __FILE__, __LINE__, __func__);
+    }
+}
+
 bool Config::loadFromFile(const std::string& filepath) {
+    NLM_LOG_INFO("Loading configuration from file: " + filepath);
+    
+    auto filepathValidation = validateFilepath(filepath);
+    if (!filepathValidation.isValid()) {
+        NLM_LOG_ERROR("Invalid filepath: " + filepathValidation.getMessage());
+        return false;
+    }
+    
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +91,13 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key before setting
+            auto keyValidation = validateKey(key);
+            if (!keyValidation.isValid()) {
+                NLM_LOG_WARNING(std::string("Invalid configuration key on line ") + std::to_string(lineNumber) + ": " + keyValidation.getMessage());
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -52,10 +109,13 @@ bool Config::loadFromFile(const std::string& filepath) {
         }
     }
     
+    NLM_LOG_INFO(std::string("Loaded ") + std::to_string(pImpl->entries.size()) + " configuration entries from " + filepath);
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    NLM_LOG_INFO(std::string("Loading configuration from command line arguments (argc=") + std::to_string(argc) + ")");
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,22 +125,49 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                auto keyValidation = validateKey(key);
+                if (!keyValidation.isValid()) {
+                    NLM_LOG_WARNING(std::string("Invalid command line argument key: ") + keyValidation.getMessage());
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_WARNING(std::string("Invalid command line argument format: --") + arg);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            auto keyValidation = validateKey(key);
+            if (!keyValidation.isValid()) {
+                NLM_LOG_WARNING(std::string("Invalid command line argument key: ") + keyValidation.getMessage());
+                continue;
+            }
+            
             set(key, value, ConfigSource::CommandLine);
         }
     }
+    
+    NLM_LOG_INFO(std::string("Loaded ") + std::to_string(pImpl->entries.size()) + " configuration entries from command line");
     return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    NLM_LOG_INFO("Saving configuration to file: " + filepath);
+    
+    auto filepathValidation = validateFilepath(filepath);
+    if (!filepathValidation.isValid()) {
+        NLM_LOG_ERROR("Invalid filepath for saving: " + filepathValidation.getMessage());
+        return false;
+    }
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to create configuration file: " + filepath);
         return false;
     }
     
@@ -89,32 +176,30 @@ bool Config::saveToFile(const std::string& filepath) const {
         file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
     }
     
+    NLM_LOG_INFO(std::string("Saved ") + std::to_string(pImpl->entries.size()) + " configuration entries to " + filepath);
     return true;
 }
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    // Validate parameter first
+    VALIDATE_PARAM(key, validateKey);
     
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
+    return getImpl<T>(key);
 }
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
+    // Validate parameter first
+    VALIDATE_PARAM(key, validateKey);
+    
+    auto val = getImpl<T>(key);
     return val.has_value() ? val.value() : defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    validateSetOperation(key, value);
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -143,11 +228,15 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
+    VALIDATE_PARAM(key, validateKey);
+    
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
+    VALIDATE_PARAM(key, validateKey);
+    
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
@@ -166,6 +255,7 @@ std::vector<std::string> Config::getKeys() const {
 
 void Config::clear() {
     pImpl->entries.clear();
+    NLM_LOG_INFO("Configuration cleared");
 }
 
 std::string Config::summary() const {

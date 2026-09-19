@@ -1,5 +1,7 @@
 #include "NeuralWorkingMemory.hpp"
+#include "MemorySystem.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/ErrorHandling/ErrorHandling.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -28,13 +30,24 @@ NeuralWorkingMemory::NeuralWorkingMemory()
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
+    VALIDATE_PARAM(brain, ParameterValidator::validatePointer);
+    
     pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("NeuralWorkingMemory initialized");
+    MemorySystem::initialize(brain);
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
-    if (pattern.empty() || !brain_) return;
+    VALIDATE_PARAM(pattern, [&](const std::vector<float>& p, const std::string& name) {
+        if (p.empty()) {
+            return ValidationResult(false, "Pattern cannot be empty");
+        }
+        return ParameterValidator::validateRange(strength, 0.0, 10.0, "strength");
+    });
+    
+    if (!brain_) {
+        ErrorHandler::reportWarning("Brain not initialized for working memory storage", "NeuralWorkingMemory::store");
+        return;
+    }
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
@@ -44,23 +57,7 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
-        
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
-        }
+        storeToNeuron(neuron, activation);
     }
     
     // Create maintenance connections if needed
@@ -70,6 +67,13 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
+    VALIDATE_PARAM(activation, [&](float act, const std::string& name) {
+        if (act < 0.0f || act > 1.0f) {
+            return ValidationResult(false, "Neuron activation must be in range [0.0, 1.0]");
+        }
+        return ValidationResult(true);
+    });
+    
     // Find or add this neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     
@@ -101,10 +105,18 @@ std::vector<float> NeuralWorkingMemory::retrieve() const {
 }
 
 bool NeuralWorkingMemory::contains(NeuronId neuron) const {
+    VALIDATE_PARAM(neuron, [&](NeuronId n, const std::string& name) {
+        return ParameterValidator::validateNeuronId(n.value);
+    });
+    
     return std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) != memoryNeurons_.end();
 }
 
 float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
+    VALIDATE_PARAM(neuron, [&](NeuronId n, const std::string& name) {
+        return ParameterValidator::validateNeuronId(n.value);
+    });
+    
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
@@ -115,6 +127,13 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 
 void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
+    
+    // Validate parameter
+    auto dtValidation = ParameterValidator::validatePositive(dt, "Timestep duration");
+    if (!dtValidation.isValid()) {
+        ErrorHandler::reportWarning("Invalid timestep duration: " + dtValidation.getMessage(), "NeuralWorkingMemory::update");
+        return;
+    }
     
     // Update maintenance - reinforce active memory neurons
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
@@ -150,9 +169,19 @@ void NeuralWorkingMemory::clear() {
     memoryTimestamps_.clear();
     activeTraces_.clear();
     pImpl->maintenanceSynapses.clear();
+    
+    NLM_LOG_INFO("Working memory cleared");
 }
 
+// updateStats() is now inherited from MemorySystem
+
 void NeuralWorkingMemory::strengthenMemory(float factor) {
+    auto validation = ParameterValidator::validateRange(factor, 1.0f, 10.0f, "memory strengthening factor");
+    if (!validation.isValid()) {
+        ErrorHandler::reportWarning("Invalid strengthening factor: " + validation.getMessage(), "NeuralWorkingMemory::strengthenMemory");
+        return;
+    }
+    
     for (auto& activation : memoryActivations_) {
         activation = std::min(1.0f, activation * factor);
     }
@@ -184,6 +213,10 @@ void NeuralWorkingMemory::runCompetition() {
 }
 
 bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
+    VALIDATE_PARAM(neuron, [&](NeuronId n, const std::string& name) {
+        return ParameterValidator::validateNeuronId(n.value);
+    });
+    
     return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
 }
 
@@ -198,6 +231,19 @@ float NeuralWorkingMemory::getMemoryActivity() const {
 }
 
 void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
+    VALIDATE_PARAM(from, [&](NeuronId n, const std::string& name) {
+        return ParameterValidator::validateNeuronId(n.value);
+    });
+    VALIDATE_PARAM(to, [&](NeuronId n, const std::string& name) {
+        return ParameterValidator::validateNeuronId(n.value);
+    });
+    
+    auto strengthValidation = ParameterValidator::validateRange(strength, 0.0f, 10.0f, "connection strength");
+    if (!strengthValidation.isValid()) {
+        ErrorHandler::reportWarning("Invalid connection strength: " + strengthValidation.getMessage(), "NeuralWorkingMemory::createRecurrentConnection");
+        return;
+    }
+    
     // Check if connection already exists
     for (const auto& conn : pImpl->maintenanceSynapses) {
         if (conn.first == from && conn.second == to) return;
@@ -265,6 +311,8 @@ AttentionalSelection::AttentionalSelection()
 AttentionalSelection::~AttentionalSelection() = default;
 
 void AttentionalSelection::initialize(Brain* brain) {
+    VALIDATE_PARAM(brain, ParameterValidator::validatePointer);
+    
     pImpl = std::make_unique<Impl>();
     brain_ = brain;
     NLM_LOG_INFO("AttentionalSelection initialized");
@@ -272,6 +320,13 @@ void AttentionalSelection::initialize(Brain* brain) {
 
 std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector<NeuronId>& competitors,
                                                               float globalInhibition) {
+    VALIDATE_PARAM(competitors, [&](const std::vector<NeuronId>& c, const std::string& name) {
+        if (c.empty()) {
+            return ValidationResult(false, "Competitors list cannot be empty");
+        }
+        return ParameterValidator::validateRange(globalInhibition, 0.0f, 10.0f, "global inhibition");
+    });
+    
     winners_.clear();
     
     if (competitors.empty()) return winners_;
@@ -333,6 +388,10 @@ std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector
 }
 
 void AttentionalSelection::focusOnRegion(RegionId region) {
+    VALIDATE_PARAM(region, [&](RegionId r, const std::string& name) {
+        return ParameterValidator::validateRegionId(r.value);
+    });
+    
     if (std::find(attendedRegions_.begin(), attendedRegions_.end(), region) == attendedRegions_.end()) {
         attendedRegions_.push_back(region);
     }
@@ -347,18 +406,40 @@ std::vector<RegionId> AttentionalSelection::getAttendedRegions() const {
 }
 
 void AttentionalSelection::setInhibitionStrength(float strength) {
+    auto validation = ParameterValidator::validateRange(strength, 0.0f, 10.0f, "inhibition strength");
+    if (!validation.isValid()) {
+        ErrorHandler::reportWarning("Invalid inhibition strength: " + validation.getMessage(), "AttentionalSelection::setInhibitionStrength");
+        return;
+    }
+    
     inhibitionStrength_ = strength;
 }
 
 void AttentionalSelection::setExcitationStrength(float strength) {
+    auto validation = ParameterValidator::validateRange(strength, 0.0f, 10.0f, "excitation strength");
+    if (!validation.isValid()) {
+        ErrorHandler::reportWarning("Invalid excitation strength: " + validation.getMessage(), "AttentionalSelection::setExcitationStrength");
+        return;
+    }
+    
     excitationStrength_ = strength;
 }
 
 void AttentionalSelection::setCompetitionThreshold(float threshold) {
+    auto validation = ParameterValidator::validateRange(threshold, 0.0f, 1.0f, "competition threshold");
+    if (!validation.isValid()) {
+        ErrorHandler::reportWarning("Invalid competition threshold: " + validation.getMessage(), "AttentionalSelection::setCompetitionThreshold");
+        return;
+    }
+    
     competitionThreshold_ = threshold;
 }
 
 float AttentionalSelection::getInhibitionFor(NeuronId neuron) const {
+    VALIDATE_PARAM(neuron, [&](NeuronId n, const std::string& name) {
+        return ParameterValidator::validateNeuronId(n.value);
+    });
+    
     auto it = std::find(winners_.begin(), winners_.end(), neuron);
     if (it != winners_.end()) {
         return 0.0f;  // Winners don't receive inhibition
@@ -367,6 +448,10 @@ float AttentionalSelection::getInhibitionFor(NeuronId neuron) const {
 }
 
 float AttentionalSelection::getExcitationFor(NeuronId neuron) const {
+    VALIDATE_PARAM(neuron, [&](NeuronId n, const std::string& name) {
+        return ParameterValidator::validateNeuronId(n.value);
+    });
+    
     auto it = std::find(winners_.begin(), winners_.end(), neuron);
     if (it != winners_.end()) {
         return excitationStrength_;
@@ -375,6 +460,13 @@ float AttentionalSelection::getExcitationFor(NeuronId neuron) const {
 }
 
 void AttentionalSelection::update(TimestepDuration dt) {
+    // Validate parameter
+    auto dtValidation = ParameterValidator::validatePositive(dt, "Timestep duration");
+    if (!dtValidation.isValid()) {
+        ErrorHandler::reportWarning("Invalid timestep duration: " + dtValidation.getMessage(), "AttentionalSelection::update");
+        return;
+    }
+    
     // Decay salience and bias over time
     for (auto& s : bottomUpSalience_) {
         s *= 0.95f;
@@ -391,10 +483,24 @@ void AttentionalSelection::update(TimestepDuration dt) {
 }
 
 bool AttentionalSelection::isAttended(NeuronId neuron) const {
+    VALIDATE_PARAM(neuron, [&](NeuronId n, const std::string& name) {
+        return ParameterValidator::validateNeuronId(n.value);
+    });
+    
     return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
 }
 
 void AttentionalSelection::applyTopDownBias(NeuronId neuron, float biasStrength) {
+    VALIDATE_PARAM(neuron, [&](NeuronId n, const std::string& name) {
+        return ParameterValidator::validateNeuronId(n.value);
+    });
+    
+    auto biasValidation = ParameterValidator::validateRange(biasStrength, -10.0f, 10.0f, "top-down bias");
+    if (!biasValidation.isValid()) {
+        ErrorHandler::reportWarning("Invalid top-down bias: " + biasValidation.getMessage(), "AttentionalSelection::applyTopDownBias");
+        return;
+    }
+    
     // Store bias in map keyed by NeuronId
     auto it = topDownBias_.find(neuron.value);
     if (it != topDownBias_.end()) {
@@ -405,6 +511,16 @@ void AttentionalSelection::applyTopDownBias(NeuronId neuron, float biasStrength)
 }
 
 void AttentionalSelection::applyBottomUpSalience(NeuronId neuron, float salienceStrength) {
+    VALIDATE_PARAM(neuron, [&](NeuronId n, const std::string& name) {
+        return ParameterValidator::validateNeuronId(n.value);
+    });
+    
+    auto salienceValidation = ParameterValidator::validateRange(salienceStrength, 0.0f, 10.0f, "bottom-up salience");
+    if (!salienceValidation.isValid()) {
+        ErrorHandler::reportWarning("Invalid bottom-up salience: " + salienceValidation.getMessage(), "AttentionalSelection::applyBottomUpSalience");
+        return;
+    }
+    
     // Store salience in map keyed by NeuronId
     auto it = bottomUpSalience_.find(neuron.value);
     if (it != bottomUpSalience_.end()) {

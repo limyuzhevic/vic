@@ -48,17 +48,7 @@ struct EpisodicMemoryItem {
         , resultingReward(0), age(0) {}
 };
 
-// NeuralEpisodicMemory: Stores experiences in a way that interacts with neural substrate
-// NOT a database - episodes are encoded as synaptic patterns and can influence neural activity
-//
-// Key mechanisms:
-// - Episodes stored as neural activity patterns
-// - Retrieval via pattern completion (Hopfield-like)
-// - Temporal ordering through timestamps
-// - Relevance-weighted recall
-// - Replay during offline periods
-
-class NeuralEpisodicMemory {
+class NeuralEpisodicMemory : public MemorySystem {
 public:
     NeuralEpisodicMemory();
     ~NeuralEpisodicMemory();
@@ -77,17 +67,17 @@ public:
 
     // Retrieve episodes from a specific time window
     std::vector<const EpisodicMemoryItem*> retrieveTemporal(SimulationStep startTime,
-                                                            SimulationStep endTime,
-                                                            size_t maxResults = 10) const;
+                                                             SimulationStep endTime,
+                                                             size_t maxResults = 10) const;
 
     // Retrieve episodes by location
     std::vector<const EpisodicMemoryItem*> retrieveByLocation(float x, float y,
-                                                             float radius,
-                                                             size_t maxResults = 5) const;
+                                                              float radius,
+                                                              size_t maxResults = 5) const;
 
     // Retrieve episodes following a specific action
     std::vector<const EpisodicMemoryItem*> retrieveAfterAction(ActionType action,
-                                                              size_t maxResults = 5) const;
+                                                               size_t maxResults = 5) const;
 
     // Replay an episode - reactivates the neural patterns associated with it
     // This allows the brain to "relive" the experience
@@ -127,7 +117,7 @@ public:
 private:
     // Compute similarity between query and stored episode
     float computeSimilarity(const std::vector<float>& query,
-                          const EpisodicMemoryItem& episode) const;
+                           const EpisodicMemoryItem& episode) const;
 
     // Check if episode matches criteria
     bool matchesCriteria(const EpisodicMemoryItem& episode,
@@ -145,7 +135,85 @@ private:
     bool replayEnabled_;
 };
 
-// AssociativeMemory: Creates and retrieves relationships between experiences
+// AttentionalSelection: Neural attention through competition
+// NOT Transformer attention - uses lateral inhibition and gain modulation
+//
+// Mechanisms:
+// - Competition between neural populations
+// - Salience-based selection
+// - Recurrent amplification of winners
+// - Inhibitory surround suppression
+
+class AttentionalSelection {
+public:
+    AttentionalSelection();
+    ~AttentionalSelection();
+
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+
+    // Process competing sensory inputs and select winners
+    // Returns IDs of winning neural populations
+    std::vector<NeuronId> processCompetition(const std::vector<NeuronId>& competitors,
+                                              float globalInhibition = 0.5f);
+
+    // Apply attention to a specific region (focus processing there)
+    void focusOnRegion(RegionId region);
+
+    // Release attention (allow all regions equal processing)
+    void releaseAttention();
+
+    // Get current attention focus
+    std::vector<RegionId> getAttendedRegions() const;
+
+    // Set attention parameters
+    void setInhibitionStrength(float strength);
+    void setExcitationStrength(float strength);
+    void setCompetitionThreshold(float threshold);
+
+    // Get inhibition level for a neuron
+    float getInhibitionFor(NeuronId neuron) const;
+
+    // Get excitation level for a neuron
+    float getExcitationFor(NeuronId neuron) const;
+
+    // Update attention dynamics
+    void update(TimestepDuration dt);
+
+    // Is this neuron currently attended?
+    bool isAttended(NeuronId neuron) const;
+
+    // Get attention winners
+    const std::vector<NeuronId>& getWinners() const { return winners_; }
+
+    // Top-down attention (goal-directed)
+    void applyTopDownBias(NeuronId neuron, float biasStrength);
+
+    // Bottom-up attention (stimulus-driven)
+    void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
+
+    // Reset attention
+    void reset();
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+
+    Brain* brain_;
+    float inhibitionStrength_;
+    float excitationStrength_;
+    float competitionThreshold_;
+
+    std::vector<RegionId> attendedRegions_;
+    std::vector<NeuronId> winners_;
+    std::vector<float> neuronSalience_;
+
+    // Biases/salience stored by NeuronId for correct lookup in processCompetition
+    std::unordered_map<uint64_t, float> topDownBias_;
+    std::unordered_map<uint64_t, float> bottomUpSalience_;
+};
+
+// NeuralAssociativeMemory: Creates and retrieves relationships between experiences
 // NOT a lookup table - associations are encoded in synaptic connectivity
 //
 // Key mechanisms:
@@ -154,7 +222,7 @@ private:
 // - Can retrieve related items given a partial cue
 // - Spreading activation for associative recall
 
-class NeuralAssociativeMemory {
+class NeuralAssociativeMemory : public MemorySystem {
 public:
     NeuralAssociativeMemory();
     ~NeuralAssociativeMemory();
@@ -173,16 +241,16 @@ public:
 
     // Retrieve patterns associated with a query pattern
     std::vector<std::vector<float>> retrieve(const std::vector<float>& queryPattern,
-                                            size_t maxResults = 5) const;
+                                             size_t maxResults = 5) const;
 
     // Get association strength between two patterns
     float getAssociationStrength(const std::vector<float>& patternA,
-                                const std::vector<float>& patternB) const;
+                                 const std::vector<float>& patternB) const;
 
     // Update association based on outcome
     void updateAssociation(const std::vector<float>& patternA,
-                          const std::vector<float>& patternB,
-                          float delta);
+                           const std::vector<float>& patternB,
+                           float delta);
 
     // Spread activation from cue pattern
     // Returns patterns that become activated through association chains
@@ -201,7 +269,7 @@ private:
 
     // Compute pattern similarity
     float computeSimilarity(const std::vector<float>& a,
-                            const std::vector<float>& b) const;
+                           const std::vector<float>& b) const;
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;

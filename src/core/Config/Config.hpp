@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include "ErrorHandling.hpp"
 
 namespace nlm {
 
@@ -64,14 +65,14 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get values with parameter validation
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with parameter validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
@@ -93,6 +94,11 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Parameter validation helpers
+    static ValidationResult validateKey(const std::string& key) noexcept;
+    static ValidationResult validateValue(const ConfigValue& value, const std::type_info& expectedType) noexcept;
+    static ValidationResult validateFilepath(const std::string& filepath) noexcept;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +106,13 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper methods for template instantiation
+    template<typename T>
+    std::optional<T> getImpl(const std::string& key) const;
+    
+    // Configuration validation during set operations
+    void validateSetOperation(const std::string& key, const ConfigValue& value) const;
 };
 
 } // namespace nlm

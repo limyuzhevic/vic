@@ -318,12 +318,10 @@ bool NeuralEpisodicMemory::matchesCriteria(
     return true;
 }
 
-// NeuralAssociativeMemory Implementation
-struct NeuralAssociativeMemory::Impl {
-    Brain* brain;
-    
-    Impl() : brain(nullptr) {}
-};
+void NeuralAssociativeMemory::initialize(Brain* brain) {
+    pImpl->brain = brain;
+    MemorySystem::initialize(brain);
+}
 
 NeuralAssociativeMemory::NeuralAssociativeMemory()
     : pImpl(new Impl)

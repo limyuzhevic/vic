@@ -1,30 +1,24 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
-#include <vector>
+#include "../core/ErrorHandling/ErrorHandling.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/Config/Config.hpp"
 #include <memory>
-#include <functional>
-#include <unordered_map>
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
-// NeuralWorkingMemory: Implements working memory using neural dynamics
-// NOT a simple storage vector - uses persistent activity and recurrent connections
-//
-// Key mechanisms:
-// - Persistent neural activity (reverberating activity)
-// - Recurrent synaptic connections for maintaining information
-// - Activity-dependent short-term plasticity
-// - Neural competition for selective retention
-
-class NeuralWorkingMemory {
+class NeuralWorkingMemory : public MemorySystem {
 public:
     NeuralWorkingMemory();
     ~NeuralWorkingMemory();
 
     // Initialize with brain reference
-    void initialize(Brain* brain);
+    void initialize(Brain* brain) override;
 
     // Store information in working memory
     // The information is encoded as neural activity pattern
@@ -43,10 +37,10 @@ public:
     float getNeuronActivation(NeuronId neuron) const;
 
     // Update working memory (maintenance and decay)
-    void update(TimestepDuration dt);
+    void update(TimestepDuration dt) override;
 
     // Clear working memory
-    void clear();
+    void clear() override;
 
     // Get number of active memory traces
     size_t getActiveTraces() const { return activeTraces_.size(); }
@@ -74,6 +68,18 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // Memory statistics
+    void updateStats() override {
+        memoryUsage_ = calculateMemoryUsage();
+    }
+    
+    size_t getMemoryUsage() const override { return memoryUsage_; }
+    size_t getMaxMemoryUsage() const override { return maxMemoryUsage_; }
+    float getUsagePercentage() const override {
+        if (maxMemoryUsage_ == 0) return 0.0f;
+        return static_cast<float>(memoryUsage_) / static_cast<float>(maxMemoryUsage_) * 100.0f;
+    }
+
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
@@ -83,6 +89,18 @@ private:
 
     // Decay weak memory traces
     void decayWeakTraces();
+
+    // Calculate memory usage in bytes
+    size_t calculateMemoryUsage() const {
+        size_t usage = 0;
+        usage += memoryNeurons_.size() * sizeof(NeuronId);
+        usage += memoryActivations_.size() * sizeof(float);
+        usage += memoryTimestamps_.size() * sizeof(SimulationStep);
+        usage += activeTraces_.size() * sizeof(size_t);
+        usage += recurrentConnections_.size() * sizeof(std::pair<NeuronId, NeuronId>);
+        usage += winners_.size() * sizeof(NeuronId);
+        return usage;
+    }
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -104,84 +122,10 @@ private:
     
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;
-};
-
-// AttentionalSelection: Neural attention through competition
-// NOT Transformer attention - uses lateral inhibition and gain modulation
-//
-// Mechanisms:
-// - Competition between neural populations
-// - Salience-based selection
-// - Recurrent amplification of winners
-// - Inhibitory surround suppression
-
-class AttentionalSelection {
-public:
-    AttentionalSelection();
-    ~AttentionalSelection();
-
-    // Initialize with brain reference
-    void initialize(Brain* brain);
-
-    // Process competing sensory inputs and select winners
-    // Returns IDs of winning neural populations
-    std::vector<NeuronId> processCompetition(const std::vector<NeuronId>& competitors,
-                                              float globalInhibition = 0.5f);
-
-    // Apply attention to a specific region (focus processing there)
-    void focusOnRegion(RegionId region);
-
-    // Release attention (allow all regions equal processing)
-    void releaseAttention();
-
-    // Get current attention focus
-    std::vector<RegionId> getAttendedRegions() const;
-
-    // Set attention parameters
-    void setInhibitionStrength(float strength);
-    void setExcitationStrength(float strength);
-    void setCompetitionThreshold(float threshold);
-
-    // Get inhibition level for a neuron
-    float getInhibitionFor(NeuronId neuron) const;
-
-    // Get excitation level for a neuron
-    float getExcitationFor(NeuronId neuron) const;
-
-    // Update attention dynamics
-    void update(TimestepDuration dt);
-
-    // Is this neuron currently attended?
-    bool isAttended(NeuronId neuron) const;
-
-    // Get attention winners
-    const std::vector<NeuronId>& getWinners() const { return winners_; }
-
-    // Top-down attention (goal-directed)
-    void applyTopDownBias(NeuronId neuron, float biasStrength);
-
-    // Bottom-up attention (stimulus-driven)
-    void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
-
-    // Reset attention
-    void reset();
-
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    float inhibitionStrength_;
-    float excitationStrength_;
-    float competitionThreshold_;
     
-    std::vector<RegionId> attendedRegions_;
-    std::vector<NeuronId> winners_;
-    std::vector<float> neuronSalience_;
-    
-    // Biases/salience stored by NeuronId for correct lookup in processCompetition
-    std::unordered_map<uint64_t, float> topDownBias_;
-    std::unordered_map<uint64_t, float> bottomUpSalience_;
+    // Memory statistics
+    size_t memoryUsage_;
+    size_t maxMemoryUsage_;
 };
 
 } // namespace nlm
