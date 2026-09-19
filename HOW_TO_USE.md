@@ -237,8 +237,8 @@ def run_agent_simulation(num_steps=1000):
         # Apply motor command to world
         world.applyMotorCommand(motor_cmd, world.getSimulationTime())
         
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+        # Apply reward modulation using brain's output
+        reward = agent.getNeuromodulationLevel()  # Get reward from agent
         agent.applyRewardModulation(reward, 0.0)
         
         # Update development

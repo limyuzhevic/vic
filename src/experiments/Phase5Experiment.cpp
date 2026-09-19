@@ -250,6 +250,19 @@ LifetimeExperimentResult Phase5IntegratedExperiment::runDamageRecovery(
     // Note: Actual damage application would be done through the brain interface
     // This is a placeholder for the experiment framework
     
+    // Pre-damage baseline
+    {
+        auto phaseResult = runPhase(
+            brain.get(), "Pre-Damage Baseline",
+            0, damageStep,
+            [](uint64_t step) {}
+        );
+        result.phaseResults.push_back(phaseResult);
+    }
+    
+    // Note: Actual damage application would be done through the brain interface
+    // This is a placeholder for the experiment framework
+    
     // Post-damage recovery
     {
         auto phaseResult = runPhase(

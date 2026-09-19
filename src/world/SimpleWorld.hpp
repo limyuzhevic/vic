@@ -51,6 +51,10 @@ public:
     // Get current sensory percept for the agent
     const SensoryPercept& getSensoryPercept() const { return sensory_; }
     
+    // Update brain with sensory percept and get motor command
+    // This combines the sensing and acting cycle into one method for convenience
+    MotorCommand updateBrain(std::shared_ptr<Brain> brain, float timestep);
+    
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
     

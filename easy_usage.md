@@ -12,6 +12,297 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+## Quick Installation
+
+### Build from Source (C++ Core)
+
+```bash
+# Clone the repository
+# (assuming you're already in the repo directory)
+
+# Create build directory
+mkdir -p build
+cd build
+
+# Configure with CMake (Release build recommended for performance)
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build all targets (parallel build for speed)
+make -j$(nproc)
+
+# Optional: Run tests
+ctest --output-on-failure
+```
+
+### Install Python Bindings
+
+```bash
+# Install pybind11 dependencies
+pip install pybind11 scikit-build-core pytest numpy
+
+# Install Python bindings
+pip install .  # From source
+# or pip install -e .  # In development mode
+```
+
+## Important: Memory Management for C++
+
+When working with NLM in C++, remember these key principles:
+
+### 1. Use Shared Pointers for Brain Ownership
+```cpp
+#include <memory>
+#include "brain/Brain.hpp"
+#include "core/Config/Config.hpp"
+
+// Create configuration
+auto config = std::make_shared<Config>();
+config->set("neuron_count", 1000);
+config->set("region_count", 2);
+
+// Create brain (takes shared ownership of config)
+auto brain = std::make_shared<Brain>(config);
+
+// Initialize brain
+if (brain->initialize()) {
+    std::cout << "Brain created successfully with " 
+              << brain->getTotalNeuronCount() << " neurons" << std::endl;
+}
+```
+
+### 2. Brain Cleanup - Automatic Destruction
+```cpp
+{
+    // Create brain in scope
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
+    
+    // Run simulation
+    for (int step = 0; step < 1000; ++step) {
+        brain->step(step);
+    }
+    
+    // Brain is automatically destroyed here!
+    // All memory is properly cleaned up
+} // <- brain and config destroyed here
+```
+
+### 3. Raw Pointers Only for Brain Access
+```cpp
+// Safe: Use smart pointers for ownership
+auto brain = std::make_shared<Brain>(config);
+brain->initialize();
+
+// Access neurons through brain interface
+if (auto* region = brain->getRegion(RegionId(1))) {
+    for (auto* neuron : region->getAllNeurons()) {
+        // Use neuron pointers for temporary operations
+        float potential = neuron->getMembranePotential();
+    }
+}
+// No manual memory management needed!
+```
+
+## Why This Pattern Matters
+
+NLM uses the **pImpl pattern** (Pointer to Implementation) where:
+
+1. **Brain class has private implementation** (struct Impl)
+2. **Brain manages all internal memory** (neurons, synapses, connections)
+3. **Proper cleanup requires unique_ptr in the implementation**
+
+Using `std::shared_ptr<Brain>` ensures that:
+- Brain's internal memory is automatically cleaned up
+- Multiple parts of code can safely share brain ownership
+- Config is properly managed alongside brain
+
+## Common Bugs to Avoid
+
+### Bug 1: Manual Brain Destruction
+```cpp
+// BAD - Manual deletion leads to crashes
+Brain* brain = new Brain(config);  // Wrong!
+brain->initialize();
+delete brain;  // Wrong - internal Impl not deleted!
+```
+
+### Bug 2: Brain Expired While Still in Use
+```cpp
+// BAD - Brain destroyed while iterators still hold references
+auto brain = std::make_shared<Brain>(config);
+brain->initialize();
+
+std::vector<NeuronId> activeNeurons;
+for (SimulationStep step = 0; step < 1000; ++step) {
+    brain->step(step);
+    activeNeurons = brain->getMostActiveNeurons(10);  // Safe
+}
+
+// Now 'brain' goes out of scope and is destroyed
+```
+
+## Advanced Usage: Event-Driven Brain
+
+NLM supports event-driven programming for efficient large-scale simulations:
+
+```cpp
+#include "brain/Brain.hpp"
+#include "brain/SpikeSystem.hpp"
+
+// Create brain with event-driven capabilities
+auto brain = std::make_shared<Brain>(config);
+brain->initialize();
+
+// Get spike system for event handling
+if (auto* spikeSystem = brain->getSpikeSystem()) {
+    // Register spike handler
+    spikeSystem->registerHandler([](const SpikeEvent& event) {
+        std::cout << "Neuron " << event.neuronId 
+                  << " fired at time " << event.time << std::endl;
+    });
+    
+    // Register delayed spike handler
+    spikeSystem->registerDelayedHandler([](const DelayedSpikeEvent& event) {
+        std::cout << "Delayed spike from neuron " 
+                  << event.sourceNeuronId << " to neuron " 
+                  << event.destinationNeuronId << std::endl;
+    });
+}
+
+// Run simulation with event-driven processing
+for (int step = 0; step < 1000; ++step) {
+    brain->step(step);
+}
+```
+
+## Complete Example: Production-Ready Brain
+
+```cpp
+#include <memory>
+#include <iostream>
+#include "brain/Brain.hpp"
+#include "core/Config/Config.hpp"
+#include "core/Logger/Logger.hpp"
+
+class Simulation {
+public:
+    Simulation(const std::string& configPath = "configs/default.cfg") {
+        // Initialize logging
+        auto logger = std::make_shared<Logger>();
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+        logger->addLogger(consoleLogger);
+        Logger::setGlobal(logger);
+        
+        // Load configuration
+        config_ = std::make_shared<Config>();
+        if (config_->loadFromFile(configPath)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configPath);
+        }
+        
+        // Set defaults if needed
+        config_->set("neuron_count", 1000);
+        config_->set("region_count", 2);
+        config_->set("random_seed", 42);
+        
+        // Create brain
+        brain_ = std::make_shared<Brain>(config_);
+        if (!brain_->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        
+        NLM_LOG_INFO("Simulation initialized successfully");
+    }
+    
+    void runSteps(size_t steps) {
+        if (!brain_) {
+            throw std::runtime_error("Brain not initialized");
+        }
+        
+        for (size_t step = 0; step < steps; ++step) {
+            // Check for early termination (e.g., stop condition)
+            if (shouldStop(step)) {
+                break;
+            }
+            
+            brain_->step(step, step * 0.001);
+            
+            // Log statistics periodically
+            if (step % 100 == 0) {
+                logStatus(step);
+            }
+        }
+    }
+    
+    void saveState(const std::string& path) {
+        if (brain_) {
+            if (brain_->save(path)) {
+                NLM_LOG_INFO("State saved to: " + path);
+            } else {
+                NLM_LOG_ERROR("Failed to save state to: " + path);
+            }
+        }
+    }
+    
+    void loadState(const std::string& path) {
+        // Reload configuration
+        config_ = std::make_shared<Config>();
+        config_->loadFromFile("configs/default.cfg");
+        
+        // Create new brain
+        brain_ = std::make_shared<Brain>(config_);
+        if (brain_->load(path)) {
+            brain_->initialize();
+            NLM_LOG_INFO("State loaded from: " + path);
+        } else {
+            NLM_LOG_ERROR("Failed to load state from: " + path);
+        }
+    }
+    
+    std::shared_ptr<Brain> getBrain() const { return brain_; }
+    std::shared_ptr<const Config> getConfig() const { return config_; }
+    
+private:
+    void logStatus(size_t step) {
+        if (!brain_) return;
+        
+        NLM_LOG_INFO("=== Step " + std::to_string(step) + " ===");
+        NLM_LOG_INFO("  Total neurons: " + std::to_string(brain_->getTotalNeuronCount()));
+        NLM_LOG_INFO("  Total synapses: " + std::to_string(brain_->getTotalSynapseCount()));
+        NLM_LOG_INFO("  Firing neurons: " + std::to_string(brain_->getFiringNeuronCount()));
+        NLM_LOG_INFO("  Average firing rate: " + std::to_string(brain_->getAverageFiringRate()));
+        NLM_LOG_INFO("  E/I ratio: " + std::to_string(brain_->getExcitationInhibitionRatio()));
+    }
+    
+    bool shouldStop(size_t step) {
+        // Example stop condition: after reaching target steps
+        return (step >= 10000);
+    }
+    
+    std::shared_ptr<Config> config_;
+    std::shared_ptr<Brain> brain_;
+};
+
+int main() {
+    try {
+        // Create simulation
+        Simulation sim("configs/default.cfg");
+        
+        // Run simulation
+        sim.runSteps(5000);
+        
+        // Save final state
+        sim.saveState("final_brain_state.bin");
+        
+        std::cout << "Simulation completed successfully!" << std::endl;
+        
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    }
+}
+```
+
 ---
 
 ## The 3 Things You Need to Know
