@@ -7,16 +7,23 @@
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
+#include "core/Errors/Errors.hpp"
 #include <iostream>
+#include <stdexcept>
 
 using namespace nlm;
 
 int main(int argc, char* argv[]) {
-    std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
-    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
-    
-    // Initialize logging
-    Logger::getInstance().setLevel(Logger::Level::Info);
+    try {
+        std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
+        std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+        
+        // Initialize error handling
+        initializeErrorHandling();
+        
+        // Initialize logging
+        Logger::getGlobal().setLevel(LogLevel::Info);
+        NLM_LOG_INFO("Phase 6 Integration Demo started");
     
     // Create experiment
     Phase6IntegratedExperiment experiment;

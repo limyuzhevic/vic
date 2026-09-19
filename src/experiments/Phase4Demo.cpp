@@ -13,7 +13,7 @@
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
 #include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
+#include "core/Errors/Errors.hpp"
 
 using namespace nlm;
 
@@ -37,34 +37,131 @@ void printSection(const std::string& title) {
 }
 
 int main(int argc, char* argv[]) {
-    std::cout << "NLM Phase 4: Emerging Cognition\n";
-    std::cout << "================================\n\n";
-    
-    // Parse command line arguments
-    size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
-    }
-    
-    // Create configuration
-    auto config = std::make_shared<Config>();
-    config->set("neuron_count", size_t(1000));
-    config->set("region_count", size_t(2));
-    config->set("connection_probability", 0.1f);
-    config->set("random_seed", uint64_t(42));
-    config->set("simulation_timestep", 0.001);
-    config->set("stdp_ltp_weight", 0.01f);
-    config->set("stdp_ltd_weight", 0.012f);
-    
-    // Create brain
-    std::cout << "Initializing brain...\n";
-    auto brain = std::make_shared<Brain>(config);
-    if (!brain->initialize()) {
-        std::cerr << "Failed to initialize brain!\n";
+    try {
+        // Initialize error handling
+        initializeErrorHandling();
+        
+        std::cout << "NLM Phase 4: Emerging Cognition\n";
+        std::cout << "================================\n\n";
+        
+        // Parse command line arguments
+        size_t numTrials = 50;
+        if (argc > 1) {
+            numTrials = std::stoul(argv[1]);
+        }
+        
+        // Create configuration with error recovery
+        std::cout << "Creating configuration..." << std::flush;
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", size_t(1000));
+        config->set("region_count", size_t(2));
+        config->set("connection_probability", 0.1f);
+        config->set("random_seed", uint64_t(42));
+        config->set("simulation_timestep", 0.001);
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        std::cout << " Done!" << std::endl;
+        
+        // Create brain with error recovery
+        std::cout << "Creating brain..." << std::flush;
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            NLM_THROW(NLMOperationException, "Failed to initialize brain");
+        }
+        std::cout << " Done!" << std::endl;
+        
+        printHeader("PHASE 4 EXPERIMENTS");
+        
+        // Run Temporal Prediction Experiment
+        printSection("1. Temporal Prediction Learning");
+        {
+            TemporalPredictionExperiment experiment;
+            Phase4Results results = experiment.run(brain.get(), numTrials);
+            
+            printResult("Initial Prediction Error", results.predictionErrorInitial);
+            printResult("Final Prediction Error", results.predictionErrorFinal);
+            printResult("Improvement", results.predictionAccuracyImprovement);
+            
+            float improvement = results.predictionErrorInitial - results.predictionErrorFinal;
+            if (improvement > 0) {
+                std::cout << "  [SUCCESS] Prediction improved through experience!\n";
+            } else {
+                std::cout << "  [INFO] No significant prediction improvement yet.\n";
+            }
+        }
+        
+        // Run Working Memory Experiment
+        printSection("2. Working Memory");
+        {
+            WorkingMemoryExperiment experiment;
+            Phase4Results results = experiment.run(brain.get(), numTrials);
+            
+            printResult("Initial Retention", results.workingMemoryRetentionInitial);
+            printResult("Final Retention", results.workingMemoryRetentionFinal);
+            printResult("Capacity", results.workingMemoryCapacity, 100.0f);
+        }
+        
+        // Run Episodic Recall Experiment
+        printSection("3. Episodic Memory");
+        {
+            EpisodicRecallExperiment experiment;
+            Phase4Results results = experiment.run(brain.get(), numTrials);
+            
+            printResult("Initial Recall", results.episodicRecallInitial);
+            printResult("Final Recall", results.episodicRecallFinal);
+            printResult("Temporal Order", results.episodicTemporalOrder, 1.0f);
+        }
+        
+        // Run Concept Formation Experiment
+        printSection("4. Concept Formation");
+        {
+            ConceptFormationExperiment experiment;
+            Phase4Results results = experiment.run(brain.get(), numTrials);
+            
+            printResult("Initial Concepts", results.conceptFormationInitial);
+            printResult("Final Concepts", results.conceptFormationFinal);
+            printResult("Concept Stability", results.conceptFormationStability, 1.0f);
+        }
+        
+        // Run Planning Experiment
+        printSection("5. Neural Planning");
+        {
+            NeuralPlanningExperiment experiment;
+            Phase4Results results = experiment.run(brain.get(), numTrials);
+            
+            printResult("Planning Accuracy", results.planningAccuracy);
+            printResult("Plan Generation Time", results.planningGenerationTime);
+            printResult("Action Effectiveness", results.planningActionEffectiveness, 1.0f);
+        }
+        
+        // Run Integration Experiment
+        printSection("6. System Integration");
+        {
+            IntegrationExperiment experiment;
+            Phase4Results results = experiment.run(brain.get(), numTrials);
+            
+            printResult("Memory Integration", results.memoryIntegration);
+            printResult("Prediction Integration", results.predictionIntegration);
+            printResult("Planning Integration", results.planningIntegration);
+            printResult("Overall Integration", results.overallIntegration);
+        }
+        
+        printHeader("EXPERIMENT COMPLETE");
+        NLM_LOG_INFO(std::string("Phase 4 experiments completed successfully for ") + 
+                   std::to_string(numTrials) + " trials");
+        
+        return 0;
+        
+    } catch (const NLMException& e) {
+        NLM_LOG_CRITICAL(std::string("Phase 4 Error: ") + e.what());
+        std::cerr << "ERROR: " << e.what() << std::endl;
+        return 1;
+    } catch (const std::exception& e) {
+        NLM_LOG_CRITICAL(std::string("Unexpected error in Phase 4: ") + e.what());
+        std::cerr << "ERROR: Unexpected error: " << e.what() << std::endl;
         return 1;
     }
-    
-    printHeader("PHASE 4 EXPERIMENTS");
+}
     
     // Run Temporal Prediction Experiment
     printSection("1. Temporal Prediction Learning");
