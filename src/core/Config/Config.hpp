@@ -5,6 +5,15 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
+
+// nlohmann/json for modern JSON parsing
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -43,6 +52,19 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Type for validation functions
+using ValidationFunc = std::function<bool(const ConfigValue&)>;
+
+// Type for configuration schema
+struct ConfigSchema {
+    std::string key;
+    std::string type;  // "int", "double", "string", "bool", "vector"
+    ValidationFunc validator;
+    std::string description;
+    bool required;
+    std::string defaultValue;
+};
+
 // Main configuration class
 class Config {
 public:
@@ -55,11 +77,23 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON, YAML, and legacy key=value format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON file
+    bool loadFromJSONFile(const std::string& filepath);
+    
+    // Load from YAML file
+    bool loadFromYAMLFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
+    
+    // Load from JSON string
+    bool loadFromJSON(const std::string& jsonStr);
+    
+    // Load from YAML string
+    bool loadFromYAML(const std::string& yamlStr);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -87,11 +121,48 @@ public:
     // Get all keys
     std::vector<std::string> getKeys() const;
     
+    // Get all keys by source
+    std::vector<std::string> getKeysBySource(ConfigSource source) const;
+    
     // Clear all
     void clear();
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Validate configuration against schema
+    bool validate(const std::vector<ConfigSchema>& schema) const;
+    
+    // Add validation rule for a key
+    void addValidation(const std::string& key, const ValidationFunc& validator);
+    
+    // Check if key has a specific source
+    bool hasSource(const std::string& key, ConfigSource source) const;
+    
+    // Compare two configurations
+    bool equals(const Config& other) const;
+    
+    // Get configuration diff
+    std::string getDiff(const Config& other) const;
+    
+    // Export configuration as JSON
+    std::string toJSON() const;
+    
+    // Import configuration from JSON
+    bool fromJSON(const std::string& jsonStr);
+    
+    // Get all configuration entries
+    std::vector<ConfigEntry> getAllEntries() const;
+    
+    // Set description for a key
+    void setDescription(const std::string& key, const std::string& description);
+    
+    // Get description for a key
+    std::string getDescription(const std::string& key) const;
+    
+    // Command line override methods
+    void overrideFromArgs(int argc, char** argv);
+    bool parseCommandLineArg(const std::string& arg);
     
 private:
     struct Impl;
@@ -100,6 +171,24 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
-};
-
-} // namespace nlm
+    
+    // JSON parsing helpers
+    void parseJSON(const nlohmann::json& json, const std::string& prefix, ConfigSource source);
+    ConfigValue jsonToConfigValue(const nlohmann::json& value);
+    std::string configValueToString(const ConfigValue& value) const;
+    
+    // Validation helpers
+    bool validateValue(const ConfigEntry& entry, const ValidationFunc& validator) const;
+    
+    // Comparison helpers
+    static bool compareValues(const ConfigValue& a, const ConfigValue& b);
+    
+    // Error handling helpers
+    void logError(const std::string& message) const;
+    void logWarning(const std::string& message) const;
+    void logInfo(const std::string& message) const;
+    
+    // JSON conversion helpers
+    nlohmann::json configValueToJSON(const ConfigValue& value) const;
+    ConfigValue jsonToConfigValue(const nlohmann::json& value);
+}; // namespace nlm
