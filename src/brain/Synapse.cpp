@@ -22,13 +22,16 @@ struct Synapse::Impl {
     // Plasticity state
     PlasticityFlags plasticityFlags;
     
+    // Thread safety
+    std::mutex mutex;
+    
     // Short-term plasticity state
     float shortTermDepression;  // Utilization factor (0-1)
     float shortTermFacilitation;  // Facilitation factor
     float lastPreSpikeTime;  // For short-term dynamics
     float lastPostSpikeTime;
     
-    // Eligibility trace for reward-modulated learning
+    // Eligibility trace (for reward-modulated learning)
     float eligibilityTrace;
     
     // Synaptic efficacy (use-dependent modulation)
@@ -97,18 +100,29 @@ void Synapse::setWeight(SynapticWeight weight) {
     pImpl->weight = weight;
 }
 
+std::mutex& Synapse::getMutex() {
+    return pImpl->mutex;
+}
+
+const std::mutex& Synapse::getMutex() const {
+    return pImpl->mutex;
+}
+
+SynapticWeight Synapse::getWeight() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    return pImpl->weight;
+}
+
+void Synapse::setWeight(SynapticWeight weight) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->weight = weight;
+}
+
 void Synapse::addToWeight(SynapticWeight delta) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->weight += delta;
     // Clamp to reasonable bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
-}
-
-Delay Synapse::getDelay() const {
-    return pImpl->delay;
-}
-
-void Synapse::setDelay(Delay delay) {
-    pImpl->delay = delay;
 }
 
 SynapseType Synapse::getType() const {

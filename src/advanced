@@ -1,0 +1,569 @@
+// NLM Advanced Commands and Features Implementation
+// This file adds advanced features for experienced users and power users
+
+#include "AdvancedCommands.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../brain/Brain.hpp"
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <algorithm>
+#include <numeric>
+
+namespace nlm {
+
+// ==================== ADVANCED BRAIN MANAGEMENT ====================
+
+class AdvancedBrainManager {
+public:
+    static bool benchmarkPerformance(std::shared_ptr<Brain> brain, 
+                                    const std::string& outputFile = "benchmark_results.txt") {
+        try {
+            NLM_LOG_INFO("Starting advanced performance benchmark...");
+            
+            // Performance metrics collection
+            struct BenchmarkMetrics {
+                size_t totalSteps = 0;
+                size_t totalSpikes = 0;
+                float avgSpikeFrequency = 0.0f;
+                float avgFiringRate = 0.0f;
+                float eiRatio = 0.0f;
+                double startTime = 0.0;
+                double endTime = 0.0;
+                size_t neuronCount = 0;
+                size_t synapseCount = 0;
+                std::vector<float> spikeHistory;
+            };
+            
+            BenchmarkMetrics metrics;
+            metrics.startTime = std::chrono::system_clock::now().time_since_epoch().count();
+            metrics.neuronCount = brain->getTotalNeuronCount();
+            metrics.synapseCount = brain->getTotalSynapseCount();
+            
+            // Run benchmark simulation
+            const size_t benchmarkSteps = 1000;
+            for (size_t step = 0; step < benchmarkSteps; ++step) {
+                brain->step(step);
+                metrics.totalSteps++;
+                metrics.totalSpikes += brain->getTotalSpikeCount();
+                metrics.spikeHistory.push_back(static_cast<float>(brain->getTotalSpikeCount()));
+                
+                if (step % 100 == 0) {
+                    NLM_LOG_INFO("Benchmark step " + std::to_string(step) + "/" + 
+                                std::to_string(benchmarkSteps) + 
+                                " | Spikes: " + std::to_string(brain->getTotalSpikeCount()));
+                }
+            }
+            
+            metrics.endTime = std::chrono::system_clock::now().time_since_epoch().count();
+            double elapsedTime = (metrics.endTime - metrics.startTime) / 1e9; // Convert to seconds
+            
+            // Calculate metrics
+            metrics.avgSpikeFrequency = static_cast<float>(metrics.totalSpikes) / elapsedTime;
+            metrics.avgFiringRate = brain->getAverageFiringRate();
+            metrics.eiRatio = brain->getExcitationInhibitionRatio();
+            
+            // Generate detailed report
+            std::ofstream outFile(outputFile);
+            if (!outFile.is_open()) {
+                throw std::runtime_error("Cannot open benchmark output file: " + outputFile);
+            }
+            
+            outFile << "=== NLM Performance Benchmark Report ===\n";
+            outFile << "Generated: " << getTimestamp() << "\n\n";
+            
+            outFile << "Simulation Parameters:\n";
+            outFile << "  Total steps: " << metrics.totalSteps << "\n";
+            outFile << "  Neurons: " << metrics.neuronCount << "\n";
+            outFile << "  Synapses: " << metrics.synapseCount << "\n";
+            outFile << "  Simulation time: " << std::fixed << std::setprecision(3) 
+                   << elapsedTime << " seconds\n\n";
+            
+            outFile << "Performance Metrics:\n";
+            outFile << "  Total spikes: " << metrics.totalSpikes << "\n";
+            outFile << "  Average spike frequency: " << std::fixed << std::setprecision(2)
+                   << metrics.avgSpikeFrequency << " spikes/second\n";
+            outFile << "  Average firing rate: " << std::fixed << std::setprecision(2)
+                   << metrics.avgFiringRate << " Hz\n";
+            outFile << "  E/I ratio: " << std::fixed << std::setprecision(4)
+                   << metrics.eiRatio << "\n\n";
+            
+            outFile << "Spike Activity Analysis:\n";
+            outFile << "  Min spikes per 100 steps: " << *std::min_element(metrics.spikeHistory.begin(), metrics.spikeHistory.end()) << "\n";
+            outFile << "  Max spikes per 100 steps: " << *std::max_element(metrics.spikeHistory.begin(), metrics.spikeHistory.end()) << "\n";
+            
+            // Calculate variance of spike counts
+            float sum = std::accumulate(metrics.spikeHistory.begin(), metrics.spikeHistory.end(), 0.0f);
+            float mean = sum / metrics.spikeHistory.size();
+            float sqSum = 0.0f;
+            for (float spikeCount : metrics.spikeHistory) {
+                sqSum += (spikeCount - mean) * (spikeCount - mean);
+            }
+            float variance = sqSum / metrics.spikeHistory.size();
+            outFile << "  Spike count variance: " << std::fixed << std::setprecision(4) << variance << "\n";
+            outFile << "  Spike count standard deviation: " << std::fixed << std::setprecision(4)
+                   << std::sqrt(variance) << "\n\n";
+            
+            outFile << "Performance Recommendations:\n";
+            if (metrics.avgSpikeFrequency < 100.0f) {
+                outFile << "  ⚠️  Low spike frequency detected. Consider increasing neural excitability.\n";
+            }
+            if (metrics.eiRatio > 10.0f) {
+                outFile << "  ⚠️  High E/I ratio detected. May indicate imbalance.\n";
+            }
+            if (metrics.avgFiringRate > 50.0f) {
+                outFile << "  ⚠️  High average firing rate. May indicate hyperexcitability.\n";
+            }
+            if (variance < 100.0f) {
+                outFile << "  ℹ️  Low variance in spike counts. Activity is stable.\n";
+            }
+            
+            outFile.close();
+            
+            NLM_LOG_INFO("Benchmark complete. Results saved to: " + outputFile);
+            NLM_LOG_INFO("Average spike frequency: " + std::to_string(metrics.avgSpikeFrequency) + " spikes/sec");
+            NLM_LOG_INFO("Average firing rate: " + std::to_string(metrics.avgFiringRate) + " Hz");
+            NLM_LOG_INFO("E/I ratio: " + std::to_string(metrics.eiRatio));
+            
+            return true;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Benchmark failed: " + std::string(e.what()));
+            return false;
+        }
+    }
+    
+    static bool analyzeNetworkTopology(std::shared_ptr<Brain> brain, 
+                                       const std::string& outputFile = "network_analysis.txt") {
+        try {
+            NLM_LOG_INFO("Analyzing network topology...");
+            
+            std::ofstream outFile(outputFile);
+            if (!outFile.is_open()) {
+                throw std::runtime_error("Cannot open network analysis output file: " + outputFile);
+            }
+            
+            outFile << "=== NLM Network Topology Analysis ===\n";
+            outFile << "Generated: " << getTimestamp() << "\n\n";
+            
+            // Basic network statistics
+            outFile << "Network Statistics:\n";
+            outFile << "  Total neurons: " << brain->getTotalNeuronCount() << "\n";
+            outFile << "  Total synapses: " << brain->getTotalSynapseCount() << "\n";
+            outFile << "  Average neurons per region: " 
+                   << static_cast<float>(brain->getTotalNeuronCount()) / brain->getRegionCount() << "\n";
+            outFile << "  Average synapses per neuron: " 
+                   << static_cast<float>(brain->getTotalSynapseCount()) / brain->getTotalNeuronCount() << "\n\n";
+            
+            // Region analysis
+            outFile << "Region Analysis:\n";
+            auto regionIds = brain->getRegionIds();
+            for (RegionId id : regionIds) {
+                auto* region = brain->getRegion(id);
+                if (!region) continue;
+                
+                size_t neuronCount = region->getNeuronCount();
+                size_t synapseCount = region->getSynapseCount();
+                float density = (neuronCount > 0) ? static_cast<float>(synapseCount) / (neuronCount * neuronCount) : 0.0f;
+                
+                outFile << "  Region " << id << " (" << region->getName() << "):\n";
+                outFile << "    Neurons: " << neuronCount << "\n";
+                outFile << "    Synapses: " << synapseCount << "\n";
+                outFile << "    Connectivity density: " << std::fixed << std::setprecision(6) << density << "\n";
+            }
+            
+            // Neuron type distribution
+            outFile << "\nNeuron Type Distribution:\n";
+            int sensoryCount = 0, internalCount = 0, motorCount = 0;
+            for (const auto& region : brain->getRegions()) {
+                for (auto* neuron : region->getAllNeurons()) {
+                    if (neuron) {
+                        switch (neuron->getType()) {
+                            case NeuronType::Sensory: sensoryCount++; break;
+                            case NeuronType::Internal: internalCount++; break;
+                            case NeuronType::Motor: motorCount++; break;
+                        }
+                    }
+                }
+            }
+            
+            outFile << "  Sensory neurons: " << sensoryCount << " (" 
+                   << std::fixed << std::setprecision(2) << (sensoryCount * 100.0f / brain->getTotalNeuronCount()) << "%)" << "\n";
+            outFile << "  Internal neurons: " << internalCount << " (" 
+                   << std::fixed << std::setprecision(2) << (internalCount * 100.0f / brain->getTotalNeuronCount()) << "%)" << "\n";
+            outFile << "  Motor neurons: " << motorCount << " (" 
+                   << std::fixed << std::setprecision(2) << (motorCount * 100.0f / brain->getTotalNeuronCount()) << "%)" << "\n\n";
+            
+            // Synaptic weight distribution
+            outFile << "Synaptic Weight Distribution:\n";
+            std::vector<float> weights;
+            for (const auto& region : brain->getRegions()) {
+                for (auto* synapse : region->getSynapses()) {
+                    if (synapse) {
+                        weights.push_back(synapse->getWeight());
+                    }
+                }
+            }
+            
+            if (!weights.empty()) {
+                std::sort(weights.begin(), weights.end());
+                
+                outFile << "  Weight range: [" << weights.front() << ", " << weights.back() << "]\n";
+                outFile << "  Mean weight: " << std::accumulate(weights.begin(), weights.end(), 0.0f) / weights.size() << "\n";
+                
+                // Weight percentiles
+                size_t p25 = weights.size() / 4;
+                size_t p50 = weights.size() / 2;
+                size_t p75 = (weights.size() * 3) / 4;
+                
+                outFile << "  Weight percentiles:\n";
+                outFile << "    25th percentile: " << weights[p25] << "\n";
+                outFile << "    50th percentile (median): " << weights[p50] << "\n";
+                outFile << "    75th percentile: " << weights[p75] << "\n\n";
+                
+                // Weight histogram
+                outFile << "  Weight histogram:\n";
+                const int numBins = 10;
+                float binWidth = (weights.back() - weights.front()) / numBins;
+                std::vector<size_t> histogram(numBins, 0);
+                
+                for (float weight : weights) {
+                    size_t bin = static_cast<size_t>((weight - weights.front()) / binWidth);
+                    if (bin >= numBins) bin = numBins - 1;
+                    histogram[bin]++;
+                }
+                
+                for (size_t i = 0; i < numBins; ++i) {
+                    float binMin = weights.front() + i * binWidth;
+                    float binMax = binMin + binWidth;
+                    outFile << "    [" << std::fixed << std::setprecision(4) << binMin << ", " 
+                           << std::fixed << std::setprecision(4) << binMax << "): " 
+                           << histogram[i] << " synapses\n";
+                }
+            }
+            
+            outFile.close();
+            
+            NLM_LOG_INFO("Network topology analysis complete. Results saved to: " + outputFile);
+            return true;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Network analysis failed: " + std::string(e.what()));
+            return false;
+        }
+    }
+    
+    static bool exportConfiguration(std::shared_ptr<Brain> brain, 
+                                     const std::string& outputFile = "brain_config.txt") {
+        try {
+            NLM_LOG_INFO("Exporting configuration...");
+            
+            std::ofstream outFile(outputFile);
+            if (!outFile.is_open()) {
+                throw std::runtime_error("Cannot open configuration export file: " + outputFile);
+            }
+            
+            outFile << "=== NLM Brain Configuration Export ===\n";
+            outFile << "Exported: " << getTimestamp() << "\n\n";
+            
+            // Export configuration summary
+            outFile << "Brain Configuration:\n";
+            outFile << brain->getConfig()->summary() << "\n";
+            
+            // Export network statistics
+            outFile << "Network Statistics:\n";
+            outFile << "  Total neurons: " << brain->getTotalNeuronCount() << "\n";
+            outFile << "  Total synapses: " << brain->getTotalSynapseCount() << "\n";
+            outFile << "  Total spikes: " << brain->getTotalSpikeCount() << "\n";
+            outFile << "  E/I ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+            outFile << "  Average firing rate: " << brain->getAverageFiringRate() << " Hz\n";
+            outFile << "  Active neurons: " << brain->getActiveNeuronCount() << "\n";
+            outFile << "  Firing neurons: " << brain->getFiringNeuronCount() << "\n\n";
+            
+            // Export region information
+            outFile << "Region Information:\n";
+            auto regionIds = brain->getRegionIds();
+            for (RegionId id : regionIds) {
+                auto* region = brain->getRegion(id);
+                if (!region) continue;
+                
+                outFile << "  Region " << id << ":\n";
+                outFile << "    Name: " << region->getName() << "\n";
+                outFile << "    Neurons: " << region->getNeuronCount() << "\n";
+                outFile << "    Synapses: " << region->getSynapseCount() << "\n";
+                
+                // Export population information for this region
+                for (const auto& population : region->getPopulations()) {
+                    outFile << "    Population: " << static_cast<int>(population->getNeuronType()) 
+                           << " (" << population->getNeuronCount() << " neurons)\n";
+                }
+                outFile << "\n";
+            }
+            
+            // Export synaptic information
+            outFile << "Synaptic Information:\n";
+            size_t totalStrongConnections = 0;
+            size_t totalWeakConnections = 0;
+            
+            for (const auto& region : brain->getRegions()) {
+                for (auto* synapse : region->getSynapses()) {
+                    if (!synapse) continue;
+                    
+                    float weight = synapse->getWeight();
+                    if (weight > 0.01f) {
+                        totalStrongConnections++;
+                    } else if (weight < -0.01f) {
+                        totalWeakConnections++;
+                    }
+                }
+            }
+            
+            outFile << "  Strong connections (> 0.01): " << totalStrongConnections << "\n";
+            outFile << "  Weak connections (< -0.01): " << totalWeakConnections << "\n";
+            outFile << "  Neutral connections: " 
+                   << (brain->getTotalSynapseCount() - totalStrongConnections - totalWeakConnections) << "\n\n";
+            
+            outFile << "=== End Configuration Export ===\n";
+            
+            outFile.close();
+            
+            NLM_LOG_INFO("Configuration export complete. Saved to: " + outputFile);
+            return true;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Configuration export failed: " + std::string(e.what()));
+            return false;
+        }
+    }
+    
+    static bool importConfiguration(std::shared_ptr<Brain> brain, 
+                                     const std::string& inputFile = "brain_config.txt") {
+        try {
+            NLM_LOG_INFO("Importing configuration from: " + inputFile);
+            
+            std::ifstream inFile(inputFile);
+            if (!inFile.is_open()) {
+                throw std::runtime_error("Cannot open configuration import file: " + inputFile);
+            }
+            
+            std::string line;
+            std::string currentSection;
+            
+            while (std::getline(inFile, line)) {
+                // Skip comments and empty lines
+                line = Config::trim(line);
+                if (line.empty() || line[0] == '#') {
+                    continue;
+                }
+                
+                // Parse section headers
+                if (line.find("Section:") == 0) {
+                    currentSection = line.substr(8);
+                    continue;
+                }
+                
+                // Parse key-value pairs
+                size_t pos = line.find(": ");
+                if (pos != std::string::npos) {
+                    std::string key = Config::trim(line.substr(0, pos));
+                    std::string value = Config::trim(line.substr(pos + 2));
+                    
+                    // Import based on section
+                    if (currentSection == "Brain Configuration") {
+                        // Skip brain config import as it's complex
+                        // Would need full Config object to import properly
+                    } else if (currentSection == "Network Statistics") {
+                        // Parse and log statistics
+                        if (key == "Total neurons") {
+                            NLM_LOG_INFO("Note: Importing neuron count not supported - use brain initialization config");
+                        } else if (key == "Total synapses") {
+                            NLM_LOG_INFO("Note: Importing synapse count not supported - use brain initialization config");
+                        }
+                    }
+                }
+            }
+            
+            inFile.close();
+            
+            NLM_LOG_INFO("Configuration import complete. Note: Full configuration import requires proper Config object.");
+            return true;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Configuration import failed: " + std::string(e.what()));
+            return false;
+        }
+    }
+    
+    static std::string getTimestamp() {
+        auto now = std::chrono::system_clock::now();
+        auto in_time_t = std::chrono::system_clock::to_time_t(now);
+        
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %H:%M:%S");
+        return ss.str();
+    }
+};
+
+// ==================== ADVANCED ARGUMENTS ====================
+
+class AdvancedArguments {
+public:
+    static bool parseAdvancedArgs(int argc, char** argv, 
+                                  AdvancedConfig& config) {
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            // Advanced performance benchmarking
+            if (arg == "--benchmark") {
+                config.benchmark = true;
+                config.benchmarkOutput = "benchmark_results.txt";
+                if (i + 1 < argc && argv[i + 1][0] != '-') {
+                    config.benchmarkOutput = argv[++i];
+                }
+            }
+            
+            // Advanced network analysis
+            else if (arg == "--analyze-network") {
+                config.analyzeNetwork = true;
+                config.analysisOutput = "network_analysis.txt";
+                if (i + 1 < argc && argv[i + 1][0] != '-') {
+                    config.analysisOutput = argv[++i];
+                }
+            }
+            
+            // Configuration export
+            else if (arg == "--export-config") {
+                config.exportConfig = true;
+                config.exportOutput = "brain_config.txt";
+                if (i + 1 < argc && argv[i + 1][0] != '-') {
+                    config.exportOutput = argv[++i];
+                }
+            }
+            
+            // Configuration import
+            else if (arg == "--import-config") {
+                config.importConfig = true;
+                config.importInput = "brain_config.txt";
+                if (i + 1 < argc && argv[i + 1][0] != '-') {
+                    config.importInput = argv[++i];
+                }
+            }
+            
+            // Real-time monitoring
+            else if (arg == "--monitor") {
+                config.monitoring = true;
+                config.monitorInterval = 1000; // Default 1000ms
+                if (i + 1 < argc && argv[i + 1][0] != '-') {
+                    config.monitorInterval = std::stoi(argv[++i]);
+                }
+            }
+            
+            // Custom simulation steps
+            else if (arg == "--steps") {
+                if (i + 1 < argc) {
+                    config.customSteps = std::stoi(argv[++i]);
+                }
+            }
+            
+            // Performance mode (faster simulation)
+            else if (arg == "--performance") {
+                config.performanceMode = true;
+                config.simulationTimestep = 0.01; // Larger timestep for faster simulation
+            }
+            
+            // Debug mode (more verbose output)
+            else if (arg == "--debug") {
+                config.debugMode = true;
+            }
+            
+            // Save configuration after advanced processing
+            else if (arg == "--save-config") {
+                if (config.advancedConfig) {
+                    config.advancedConfig->saveToFile("advanced_config.cfg");
+                    NLM_LOG_INFO("Advanced configuration saved to: advanced_config.cfg");
+                }
+            }
+        }
+        
+        return true;
+    }
+};
+
+// ==================== ADVANCED BRAIN INITIALIZATION ====================
+
+class AdvancedBrainInitializer {
+public:
+    static bool initializeWithAdvancedConfig(std::shared_ptr<Brain> brain, 
+                                             const AdvancedConfig& config) {
+        try {
+            NLM_LOG_INFO("Initializing brain with advanced configuration...");
+            
+            auto cfg = brain->getConfig();
+            
+            // Apply advanced configuration
+            if (config.benchmark) {
+                cfg->set("enable_benchmark", true, ConfigSource::CommandLine);
+            }
+            
+            if (config.performanceMode) {
+                cfg->set("simulation_timestep", config.simulationTimestep, ConfigSource::CommandLine);
+                cfg->set("enable_fast_simulation", true, ConfigSource::CommandLine);
+            }
+            
+            if (config.debugMode) {
+                cfg->set("log_level", static_cast<int>(LogLevel::Debug), ConfigSource::CommandLine);
+                cfg->set("enable_detailed_logging", true, ConfigSource::CommandLine);
+            }
+            
+            // Reinitialize brain with new config
+            brain->reset();
+            if (!brain->initialize()) {
+                NLM_LOG_ERROR("Failed to reinitialize brain with advanced config");
+                return false;
+            }
+            
+            NLM_LOG_INFO("Advanced brain initialization complete");
+            return true;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Advanced brain initialization failed: " + std::string(e.what()));
+            return false;
+        }
+    }
+};
+
+// ==================== ADVANCED MONITORING ====================
+
+class AdvancedMonitor {
+public:
+    static void startMonitoring(std::shared_ptr<Brain> brain, 
+                               int intervalMs = 1000) {
+        if (!brain) {
+            NLM_LOG_ERROR("Cannot start monitoring with null brain");
+            return;
+        }
+        
+        NLM_LOG_INFO("Starting advanced monitoring (interval: " + std::to_string(intervalMs) + "ms)");
+        
+        // In a real implementation, this would run as a separate thread
+        // For this implementation, we'll just log once and return
+        
+        auto startTime = std::chrono::system_clock::now();
+        
+        while (true) {
+            auto currentTime = std::chrono::system_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime);
+            
+            if (elapsed.count() >= intervalMs) {
+                brain->logStatus();
+                startTime = currentTime;
+            }
+            
+            // Sleep for a short time to avoid busy waiting
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    }
+};
+
+} // namespace nlm

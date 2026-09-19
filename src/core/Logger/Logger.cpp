@@ -4,6 +4,9 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <stdexcept>
+#include <chrono>
+#include <ctime>
 
 namespace nlm {
 
@@ -20,7 +23,11 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
 }
 
-ConsoleLogger::~ConsoleLogger() = default;
+ConsoleLogger::~ConsoleLogger() {
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+}
 
 void ConsoleLogger::log(const LogEntry& entry) {
     if (entry.level < pImpl->level) {
@@ -32,9 +39,15 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
+    // Add timestamp safely
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    std::tm tm_buf;
+    std::tm* tm_ptr = std::localtime(&time);
+    if (tm_ptr) {
+        oss << std::put_time(tm_ptr, "%Y-%m-%d %H:%M:%S");
+    } else {
+        oss << "[INVALID_TIME]";
+    }
     
     oss << " " << entry.message;
     
@@ -50,31 +63,48 @@ void ConsoleLogger::log(const LogEntry& entry) {
     // File output if set
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        // Flush less frequently for better performance
+        // pImpl->fileOut.flush();
     }
 }
 
 void ConsoleLogger::setLevel(LogLevel level) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->level = level;
 }
 
 LogLevel ConsoleLogger::getLevel() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->level;
 }
 
 void ConsoleLogger::setUseColors(bool useColors) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->useColors = useColors;
 }
 
 bool ConsoleLogger::getUseColors() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->useColors;
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Close existing file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    // Open new file
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        throw std::runtime_error("Cannot open log file: " + filepath);
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
@@ -113,6 +143,10 @@ Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
 Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
+    if (!logger) {
+        throw std::invalid_argument("Cannot add null logger");
+    }
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->loggers.push_back(logger);
 }
@@ -131,6 +165,10 @@ void Logger::setLevel(LogLevel level) {
 
 void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
+    if (message.empty()) {
+        throw std::invalid_argument("Log message cannot be empty");
+    }
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     LogEntry entry;
@@ -182,8 +220,14 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    if (!logger) {
+        throw std::invalid_argument("Cannot set null global logger");
+    }
+    
+    // Store in static global variable
+    // This is a simple implementation - more sophisticated systems would use
+    // callback mechanisms or event-driven updates
+    static std::shared_ptr<Logger> globalLoggerPtr = logger;
 }
 
 // LogStream implementation

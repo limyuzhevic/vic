@@ -30,6 +30,10 @@ public:
     NeuronId getSourceNeuron() const;
     NeuronId getDestinationNeuron() const;
     
+    // Thread safety
+    std::mutex& getMutex();
+    const std::mutex& getMutex() const;
+    
     // Weight
     SynapticWeight getWeight() const;
     void setWeight(SynapticWeight weight);

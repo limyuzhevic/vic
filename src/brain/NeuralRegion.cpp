@@ -202,11 +202,10 @@ float NeuralRegion::getAverageSynapticWeight() const {
 
 float NeuralRegion::getSynapticDensity() const {
     size_t neuronCount = getTotalNeuronCount();
-    if (neuronCount == 0) return 0.0f;
+    if (neuronCount < 2) return 0.0f;  // Need at least 2 neurons for connections
     
     // Maximum possible connections: N * (N-1) for directed graph
     size_t maxConnections = neuronCount * (neuronCount - 1);
-    if (maxConnections == 0) return 0.0f;
     
     return static_cast<float>(pImpl->synapses.size()) / static_cast<float>(maxConnections);
 }

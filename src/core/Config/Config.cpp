@@ -3,11 +3,14 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
+#include <mutex>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    mutable std::mutex mutex;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -28,7 +31,9 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +46,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key is not empty
+            if (key.empty()) {
+                throw std::runtime_error("Config file parsing error at line " + 
+                    std::to_string(lineNumber) + ": Empty key");
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -49,6 +60,9 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            // Line without '=' is invalid but we'll skip it with a warning
+            // In production, this would be logged
         }
     }
     
@@ -56,20 +70,30 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc < 2) {
+        return true; // No arguments, use defaults
+    }
+    
     for (int i = 1; i < argc; ++i) {
+        if (!argv[i]) {
+            continue; // Skip null pointer
+        }
         std::string arg(argv[i]);
         
         // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
+        if (arg.size() >= 2 && arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
+                if (pos <= 2) {
+                    throw std::runtime_error("Config argument error: Invalid --key=value format");
+                }
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (!arg.empty() && arg[0] == '-' && i + 1 < argc && argv[i + 1]) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
@@ -86,7 +110,24 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Proper type-based serialization
+        std::visit([&file](const auto& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << '"' << arg << '"';
+            } else if constexpr (std::is_same_v<T, int> || 
+                                std::is_same_v<T, int64_t> ||
+                                std::is_same_v<T, double> ||
+                                std::is_same_v<T, bool>) {
+                file << arg;
+            } else {
+                file << "UNKNOWN_TYPE";  // Should not happen
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -94,6 +135,8 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -115,6 +158,13 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Validate key
+    if (key.empty()) {
+        throw std::invalid_argument("Config key cannot be empty");
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -126,28 +176,16 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     }
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
 bool Config::has(const std::string& key) const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
@@ -156,6 +194,8 @@ void Config::remove(const std::string& key) {
 }
 
 std::vector<std::string> Config::getKeys() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     std::vector<std::string> keys;
     keys.reserve(pImpl->entries.size());
     for (const auto& entry : pImpl->entries) {
@@ -165,15 +205,18 @@ std::vector<std::string> Config::getKeys() const {
 }
 
 void Config::clear() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->entries.clear();
 }
 
 std::string Config::summary() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
+        std::visit([&oss](const auto& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
