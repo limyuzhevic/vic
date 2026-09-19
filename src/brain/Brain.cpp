@@ -32,6 +32,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -112,6 +114,8 @@ struct Brain::Impl {
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        semanticMemory = std::make_unique<SemanticMemory>();
+        proceduralMemory = std::make_unique<ProceduralMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -242,6 +246,12 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
+    // Initialize semantic memory
+    pImpl->semanticMemory->initialize(this);
+    
+    // Initialize procedural memory
+    pImpl->proceduralMemory->initialize(this);
+    
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
@@ -255,9 +265,15 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
+    // Initialize remaining neuromodulation systems
+    pImpl->predictionError->initialize(this);
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    
+    // Initialize attention-based neuromodulators (if they exist)
+    // pImpl->serotonin->initialize(this);  // Not implemented yet
+    // pImpl->noradrenaline->initialize(this);  // Not implemented yet
+    // pImpl->acetylcholine->initialize(this);  // Not implemented yet
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
