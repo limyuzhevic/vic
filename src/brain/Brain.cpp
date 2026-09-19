@@ -717,17 +717,84 @@ std::unique_ptr<class Action> Brain::produceAction() {
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
-    float modulation = signal.getLevel();
+    // Apply neuromodulatory signals to plasticity systems
+    // Neuromodulators like dopamine, curiosity, novelty, and prediction error
+    // affect all forms of plasticity in the brain
     
-    // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
+    if (!pImpl->dopamine && !pImpl->curiosity && !pImpl->novelty && !pImpl->predictionError) {
+        // If no neuromodulators exist, return early
+        return;
+    }
+    
+    // Calculate overall neuromodulation factor from all systems
+    float plasticityFactor = 1.0f;
+    
+    // Dopamine affects plasticity and neural excitability
+    if (pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Dopamine modulates plasticity: positive -> LTP enhancement, negative -> LTD enhancement
+        float dopaminePlasticityFactor = 0.5f + 0.5f * dopamineLevel;
+        plasticityFactor *= dopaminePlasticityFactor;
+        
+        // Apply dopamine effects on neural excitability - increases firing threshold
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Dopamine modulates excitability by injecting additional current
+                    float excitabilityMod = dopamineLevel * 0.5f;
+                    if (excitabilityMod > 0.0f) {
+                        neuron->injectCurrent(excitabilityMod);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Curiosity drives exploration-based learning
+    if (pImpl->curiosity) {
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        // Higher curiosity increases exploration plasticity
+        float curiosityPlasticityFactor = 0.5f + 0.5f * curiosityLevel;
+        plasticityFactor *= curiosityPlasticityFactor;
+    }
+    
+    // Novelty detection encourages processing of new information
+    if (pImpl->novelty) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        float noveltyPlasticityFactor = 0.5f + 0.5f * noveltyLevel;
+        plasticityFactor *= noveltyPlasticityFactor;
+    }
+    
+    // Prediction error drives learning through credit assignment
+    if (pImpl->predictionError) {
+        float predictionErrorLevel = pImpl->predictionError->getMagnitude();
+        float errorPlasticityFactor = 0.5f + predictionErrorLevel;
+        plasticityFactor *= errorPlasticityFactor;
+    }
+    
+    // Apply neuromodulated plasticity factors to all plasticity systems
+    pImpl->stdp->setLTPWeight(0.01f * plasticityFactor);
+    pImpl->stdp->setLTDWeight(0.012f * plasticityFactor);
+    
+    // Hebbian learning should also be scaled by neuromodulation
+    if (pImpl->hebbian) {
+        pImpl->hebbian->setLearningRate(0.01f * plasticityFactor);
+    }
+    
+    // Structural plasticity (synaptogenesis and pruning) should be modulated
+    if (pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->setSynaptogenesisRate(0.0001f * plasticityFactor);
+        pImpl->structuralPlasticity->setPruningRate(0.00001f * plasticityFactor);
+    }
 }
 
 void Brain::updatePlasticity() {
-    // Plasticity is now applied during each step
+    // Plasticity is now applied during each step, not here
     // This method is kept for API compatibility
+    // All plasticity is now integrated into the step() method
+    
+    NLM_LOG_INFO("Note: Plasticity is now applied automatically during step()");
 }
 
 void Brain::develop() {
@@ -1073,8 +1140,11 @@ std::shared_ptr<const Config> Brain::getConfig() const {
     return pImpl->config;
 }
 
-RandomGenerator* Brain::getRandomGenerator() {
-    return pImpl->rng.get();
+float Brain::getPredictionError() const {
+    if (pImpl->predictionError) {
+        return pImpl->predictionError->getError();
+    }
+    return 0.0f;
 }
 
 void Brain::logStatus() const {

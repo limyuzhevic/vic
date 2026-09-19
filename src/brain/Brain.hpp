@@ -181,11 +181,10 @@ public:
     // Novelty - novelty detection
     Novelty* getNovelty();
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    float getPredictionError() const;
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Get overall neuromodulation level
+    float getNeuromodulationLevel() const;
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
