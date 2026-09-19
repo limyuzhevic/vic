@@ -300,6 +300,8 @@ bool Brain::initialize() {
 }
 
 void Brain::step(SimulationStep currentStep) {
+    // Convert to timestamp and call the main step method with time
+    // This maintains backward compatibility while supporting time-based simulation
     step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
 }
 
