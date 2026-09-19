@@ -29,6 +29,7 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
+    // Unique ID classes - simplified with factory functions
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -39,7 +40,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+        })
+        .def("__str__", [](const NeuronId& id) { return std::to_string(id.value); });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
         .def(py::init<>())
@@ -51,7 +53,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const SynapseId& id) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
-        });
+        })
+        .def("__str__", [](const SynapseId& id) { return std::to_string(id.value); });
 
     py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
         .def(py::init<>())
@@ -63,7 +66,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const RegionId& id) {
             return "<RegionId: " + std::to_string(id.value) + ">";
-        });
+        })
+        .def("__str__", [](const RegionId& id) { return std::to_string(id.value); });
 
     py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
         .def(py::init<>())
@@ -71,7 +75,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &PopulationId::value)
         .def("index", &PopulationId::index)
         .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def("__ne__", &PopulationId::operator!=)
+        .def("__hash__", [](const PopulationId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const PopulationId& id) {
+            return "<PopulationId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const PopulationId& id) { return std::to_string(id.value); });
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -144,24 +153,38 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+        .def("loadFromFile", py::overload_cast<const std::string&>(&Config::loadFromFile),
+             py::arg("filepath"), "Load configuration from a JSON file")
+        .def("saveToFile", py::overload_cast<const std::string&>(&Config::saveToFile),
+             py::arg("filepath"), "Save configuration to a JSON file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+        .def("has", [](Config& self, const std::string& key) {
+            return self.has(key);
+        }, py::arg("key"), "Check if a configuration key exists")
+        .def("getOr", [](Config& self, const std::string& key, auto defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("default"), 
+           "Get configuration value with default fallback")
+        .def("set", [](Config& self, const std::string& key, auto value) {
+            return self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value")
+        .def("getKeys", &Config::getKeys, "Get all configuration keys")
+        .def("clear", &Config::clear, "Clear all configuration entries")
+        .def("summary", &Config::summary, "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
+        })
+        .def("__contains__", [](const Config& cfg, const std::string& key) {
+            return cfg.has(key);
+        })
+        .def("__getitem__", [](Config& self, const std::string& key) {
+            return self.getOr(key, std::string());
+        })
+        .def("__setitem__", [](Config& self, const std::string& key, auto value) {
+            self.set(key, value);
         });
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
@@ -207,7 +230,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        .def("to_string", &Action::getName)
+        .def("__repr__", [](const Action& action) {
+            return "<Action type=" + std::to_string(static_cast<int>(action.getType())) + 
+                   " params=" + std::to_string(action.getParameters().size()) + ">";
+        });
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())

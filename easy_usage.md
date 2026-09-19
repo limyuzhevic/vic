@@ -256,18 +256,29 @@ print("Agent simulation complete!")
 
 ---
 
+The agent brain interface connects the NLM brain to the world:
+
+- **Sensory transduction**: Converts world data into neural signals
+- **Motor decoding**: Converts neural activity into actions  
+- **Neuromodulation**: Applies learning signals based on rewards
+- **Development**: Manages brain maturation over time
+- **Memory integration**: Links to working and episodic memory
+- **Curiosity & exploration**: Drives exploration of novel experiences
+
 ## Quick Reference
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+| NLM Method | Python Equivalent | Purpose |
+|------------|------------------|---------|
+| `pynlm.createAgentBrain(brain)` | `agent = pynlm.createAgentBrain(brain)` | Create agent brain interface |
+| `agent.initialize(world)` | `agent.initialize(world)` | Connect agent to world |
+| `agent.processSensoryInput(percept)` | `agent.processSensoryInput(percept)` | Feed sensory data to brain |
+| `agent.decodeMotorCommand()` | `agent.decodeMotorCommand()` | Get action from brain |
+| `world.applyMotorCommand(action, time)` | `world.applyMotorCommand(action, time)` | Execute action |
+| `agent.applyRewardModulation(reward, predicted)` | `agent.applyRewardModulation(reward, predicted)` | Learn from rewards |
+| `agent.updateDevelopment(timestep)` | `agent.updateDevelopment(timestep)` | Brain development |
+| `agent.getCuriosityLevel()` | `agent.getCuriosityLevel()` | Exploration drive |
+| `agent.getNoveltyLevel()` | `agent.getNoveltyLevel()` | Novelty detection |
+| `agent.getPredictionError()` | `agent.getPredictionError()` | Learning error signal |
 
 ---
 

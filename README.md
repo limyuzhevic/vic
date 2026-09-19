@@ -63,104 +63,304 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
+## Quick Start
 
-## Building
+### Building (Recommended Method)
+
+The easiest way to build and install NLM is using the modern Python packaging system:
 
 ```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+# Install build dependencies
+pip install pybind11 scikit-build-core pytest numpy
+
+# Build and install (this will compile all C++ code and create the Python bindings)
+pip install .
+
+# Or install in development mode for easier editing
+pip install -e .
 ```
 
-## Running
+### Building from C++ Source
 
-### Phase 6 Demo (Integration Test)
+If you want to build just the C++ components or build with custom settings:
+
 ```bash
+# Navigate to the project directory
+mkdir -p build
+cd build
+
+# Configure with CMake (Release build for best performance)
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build all targets
+make -j$(nproc)
+
+# Build and install the Python module
+pip install python/
+```
+
+### Running the Project
+
+After installation, you can run NLM demonstrations:
+
+```bash
+# Run the main C++ demo
+./nlm
+
+# Or the Phase 6 integration demo
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+Or use the Python bindings:
+
+```python
+import pynlm
+
+# Create a simple brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run simulation
+for i in range(100):
+    brain.step(i)
+
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+```
 
 ## Project Structure
 
+NLM has a clean, modular structure:
+
 ```
 NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── src/                # All C++ source code
+│   ├── core/           # Core utilities and base classes
+│   ├── brain/          # Neural computation components
+│   ├── agent/          # Agent brain interface
+│   ├── world/          # World simulation
+│   └── ...             # Other modules
+├── python/             # Python bindings
+│   ├── bindings.cpp    # Pybind11 bindings
+│   └── CMakeLists.txt  # Python module build
+├── tests/             # Unit tests
+├── configs/           # Configuration files
+└── docs/              # Documentation
 ```
 
-## Phase Summary
+## Key Components
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+### Core Brain Systems
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+- **Neurons**: Leaky Integrate-and-Fire (LIF) models with event-driven dynamics
+- **Synapses**: Excitatory, inhibitory, and modulatory connections with STDP
+- **Memory Systems**: Working, episodic, and associative memory
+- **Neuromodulation**: Dopamine, curiosity, and novelty detection
+- **Development**: Plasticity that changes with brain age
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
+### Agent-World Interface
 
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+- **AgentBrain**: Connects brain activity to world actions
+- **SimpleWorld**: 2D environment with sensory input and motor output
+- **SensoryPercept**: Multimodal input (vision, touch, internal signals)
+- **Action**: Motor commands with parameters
 
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
+### Advanced Features
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+- **Prediction System**: Forward models and prediction errors
+- **Cognitive Systems**: Planning, concept formation, attention
+- **Structural Plasticity**: Synaptogenesis and pruning
+- **Curiosity & Exploration**: Drives exploration of novel experiences
+
+## Python API Highlights
+
+### Basic Usage
+
+```python
+import pynlm
+
+# Create a brain with default settings
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run simulation
+for step in range(1000):
+    brain.step(step)
+
+# Get statistics
+print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Spikes: {brain.getTotalSpikeCount()}")
+print(f"Firing rate: {brain.getAverageFiringRate():.4f}")
+```
+
+### Advanced Usage
+
+```python
+import pynlm
+
+# Create agent in world environment
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+agent.initialize(world)
+
+# Enable learning systems
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Run complete episode
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+```
+
+### Configuration Management
+
+```python
+import pynlm
+
+# Create and customize configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 5000)
+config.set("brain.synapse_density", 0.2)
+config.set("plasticity.stdp.learning_rate", 0.005)
+
+# Save and load configurations
+config.saveToFile("my_config.json")
+new_config = pynlm.createDefaultConfig()
+new_config.loadFromFile("my_config.json")
+```
+
+## Development Setup
+
+### Prerequisites
+
+- **C++ Compiler**: GCC 10+, Clang 12+, or MSVC 2019+
+- **CMake**: Version 3.16 or higher
+- **Python**: 3.8+ (for Python bindings)
+- **Build Tools**: make, ninja, or Visual Studio
+
+### Building with Different Configurations
+
+#### Debug Build
+
+```bash
+mkdir -p build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+make -j$(nproc)
+```
+
+#### Installation
+
+```bash
+# Install to custom location
+cmake .. -DCMAKE_INSTALL_PREFIX=/opt/nlm
+make install
+```
+
+#### Python Development
+
+```bash
+# Install Python dependencies
+pip install -r requirements-dev.txt
+
+# Build Python module in development mode
+pip install -e .
+
+# Run tests
+pytest test_pynlm.py
+```
+
+## Testing
+
+### Unit Tests
+
+Run the C++ unit tests:
+
+```bash
+cd build
+ctest --output-on-failure
+```
+
+### Python Tests
+
+Run the Python bindings test suite:
+
+```bash
+python test_pynlm.py
+```
+
+### Integration Tests
+
+The project includes demonstration executables:
+
+```bash
+# Phase 3 demonstration (basic neural computation)
+./nlm_phase3_demo
+
+# Phase 4 demonstration (advanced cognition)
+./nlm_phase4_demo
+
+# Phase 6 demonstration (complete integration)
+./nlm_phase6_demo
+```
+
+## Performance Considerations
+
+### C++ Performance
+
+- Event-driven spike propagation for efficient simulation
+- SIMD optimizations for neural computations
+- Parallel processing for large networks
+- Memory pools for reduced allocation overhead
+
+### Python Interface
+
+- Minimal overhead through pybind11
+- Direct access to C++ data structures
+- No Python GIL limitations for core computations
+
+## Contributing
+
+### Building from Source
+
+1. Clone the repository
+2. Install dependencies: `pip install pybind11 scikit-build-core pytest numpy`
+3. Build: `pip install .`
+4. Run tests: `python test_pynlm.py` and `cd build && ctest`
+
+### Adding New Features
+
+NLM follows a modular architecture. New features should be added as separate modules in:
+- `src/` for new C++ components
+- `python/` for Python bindings
+- `docs/` for documentation
+
+### Python API Improvements
+
+When adding Python functionality:
+- Maintain consistency with existing API patterns
+- Add comprehensive docstrings and examples
+- Include test cases in `test_pynlm.py`
+- Update documentation in `easy_usage.md` and `HOW_TO_USE.md`
+
+## License
+
+MIT License. See LICENSE file for details.
+
+## Support
+
+For questions and issues:
+1. Check documentation in `docs/`
+2. Read `easy_usage.md` for quick start guide
+3. Read `HOW_TO_USE.md` for comprehensive API reference
+4. Search existing issues and examples
+
+The NLM project welcomes contributions and feedback from the research community!
 
 ## Scientific Limitations
 
