@@ -94,8 +94,13 @@ target_include_directories(nlm_core PUBLIC
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
+    src/agent/Agent.hpp
+    src/agent/Agent.cpp
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
+    src/agent/AgentBody.hpp
+    src/agent/SensoryPercept.hpp
+    src/agent/AgentBrain.hpp
 )
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)

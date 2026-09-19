@@ -313,6 +313,16 @@ void AgentBrain::updateDevelopment(double timestep) {
     }
 }
 
+void AgentBrain::executeCommand(const AgentCommands::Command& cmd) {
+    if (!commandInterpreter_) {
+        NLM_LOG_ERROR("AgentBrain: No command interpreter available");
+        return;
+    }
+    
+    // Execute the command through the interpreter
+    commandInterpreter_->executeCommand(cmd);
+}
+
 DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
     if (!brain_) return DevelopmentalStage::Initial;
     return brain_->getDevelopmentalStage();
