@@ -1,7 +1,13 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/AttentionalSelection.hpp"
+#include "../neuromodulation/Curiosity.hpp"
 #include <algorithm>
 #include <cmath>
+#include <random>
 
 namespace nlm {
 
@@ -19,6 +25,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , lastStep_(0)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -65,6 +72,7 @@ AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    lastSensoryState_.resize(getSensoryInputSize(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
@@ -235,6 +243,8 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     return defaultCmd;
 }
 
+}
+
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     
@@ -342,9 +352,183 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    lastStep_ = 0;
+    lastSensoryState_.clear();
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+// Cognitive system integration methods
+std::vector<float> AgentBrain::getWorkingMemoryState() const {
+    if (!brain_) return std::vector<float>();
+    auto* wmem = brain_->getWorkingMemory();
+    if (!wmem) return std::vector<float>();
+    return wmem->retrieve();
+}
+
+size_t AgentBrain::getMatchingConcept(const std::vector<float>& pattern) const {
+    if (!brain_) return 0;
+    auto* conceptForm = brain_->getConceptFormation();
+    if (!conceptForm) return 0;
+    return conceptForm->getMatchingConcept(pattern);
+}
+
+std::vector<float> AgentBrain::getCurrentGoal() const {
+    if (!brain_) return std::vector<float>();
+    auto* planner = brain_->getPlanner();
+    if (!planner) return std::vector<float>();
+    return planner->getCurrentGoal();
+}
+
+std::vector<NeuronId> AgentBrain::getAttentionFocus(const std::vector<NeuronId>& competitors) const {
+    if (!brain_) return std::vector<NeuronId>();
+    auto* attention = brain_->getAttention();
+    if (!attention) return std::vector<NeuronId>();
+    return attention->processCompetition(competitors);
+}
+
+float AgentBrain::getExplorationBoost() const {
+    // Combine curiosity and novelty for exploration drive
+    float boost = curiosityLevel_ * 0.6f + noveltyLevel_ * 0.4f;
+    return std::clamp(boost, 0.0f, 1.0f);
+}
+
+void AgentBrain::updateWithCognition(float timestep, const MotorCommand& lastAction, float reward) {
+    // Integrate cognitive systems with neural processing
+    if (!brain_) return;
+    
+    // Get current sensory state from working memory
+    std::vector<float> currentState = getWorkingMemoryState();
+    
+    // Update concept formation with current state and reward
+    auto* conceptForm = brain_->getConceptFormation();
+    if (conceptForm) {
+        size_t conceptId = conceptForm->presentExperience(
+            currentState, 
+            std::vector<float>(currentState.size(), 0.0f), // Simple features for now
+            reward,
+            lastStep_
+        );
+    }
+    
+    // Update neural planner with last action and reward
+    auto* planner = brain_->getPlanner();
+    if (planner) {
+        std::vector<ActionType> actionVec(1, static_cast<ActionType>(lastAction));
+        planner->updatePlanQuality(actionVec, actionVec, reward);
+        
+        // Set goal based on current state and concept matching
+        if (!currentState.empty()) {
+            size_t conceptId = getMatchingConcept(currentState);
+            if (conceptId > 0) {
+                // Could use concept to guide goal formation
+            }
+        }
+    }
+    
+    // Apply neuromodulation based on prediction error
+    applyRewardModulation(reward, expectedReward_);
+    
+    // Update development
+    updateDevelopment(timestep);
+    
+    // Track last state
+    lastStep_++;
+    lastSensoryState_ = currentState;
+}
+
+MotorCommand AgentBrain::planActionWithCognition(const std::vector<float>& state) {
+    if (!brain_) return MotorCommand::Wait;
+    
+    // Get action from neural planner
+    auto* planner = brain_->getPlanner();
+    if (!planner) return MotorCommand::Wait;
+    
+    ActionType plannedAction = planner->planAction(state, 0.5f);
+    
+    // Convert ActionType to MotorCommand
+    switch (plannedAction) {
+        case ActionType::MoveForward: return MotorCommand::MoveForward;
+        case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+        case ActionType::MoveLeft: return MotorCommand::TurnLeft;
+        case ActionType::MoveRight: return MotorCommand::TurnRight;
+        case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+        case ActionType::TurnRight: return MotorCommand::TurnRight;
+        case ActionType::Look: return MotorCommand::MoveForward; // Default mapping
+        case ActionType::LookUp: return MotorCommand::MoveForward;
+        case ActionType::LookDown: return MotorCommand::MoveForward;
+        case ActionType::Interact: return MotorCommand::Interact;
+        case ActionType::Eat: return MotorCommand::Interact;
+        case ActionType::Drink: return MotorCommand::Interact;
+        case ActionType::Rest: return MotorCommand::Wait;
+        case ActionType::Wait: return MotorCommand::Wait;
+        case ActionType::Custom: return MotorCommand::Wait;
+        default: return MotorCommand::Wait;
+    }
+}
+
+MotorCommand AgentBrain::selectActionWithConceptGuidance(const std::vector<float>& state) {
+    if (!brain_) return MotorCommand::Wait;
+    
+    // Check for matching concept that should guide attention
+    size_t conceptId = getMatchingConcept(state);
+    
+    if (conceptId > 0) {
+        auto* conceptForm = brain_->getConceptFormation();
+        if (conceptForm) {
+            const auto& concepts = conceptForm->getConcepts();
+            if (conceptId - 1 < concepts.size()) {
+                const auto& concept = concepts[conceptId - 1];
+                
+                // Use category hint to guide action selection
+                if (concept.categoryHint == "rewarding") {
+                    // Prioritize actions that lead to reward
+                    return MotorCommand::MoveForward;
+                } else if (concept.categoryHint == "harmful") {
+                    // Avoid harmful actions
+                    return MotorCommand::Wait;
+                } else if (concept.categoryHint == "neutral") {
+                    // Balanced exploration
+                    return exploreWithCuriosity(MotorCommand::MoveForward, state);
+                }
+            }
+        }
+    }
+    
+    // No concept guidance, fall back to default
+    return MotorCommand::MoveForward;
+}
+
+MotorCommand AgentBrain::exploreWithCuriosity(MotorCommand defaultCmd, const std::vector<float>& state) {
+    // Enhance exploration when curiosity is high
+    float explorationBoost = getExplorationBoost();
+    
+    if (curiosityEnabled_ && explorationBoost > 0.3f) {
+        // Increase chance of exploration
+        float exploreChance = explorationBoost * 0.5f;  // Up to 50% random
+        
+        static std::mt19937 rng(std::chrono::steady_clock::now().time_since_epoch().count());
+        std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+        
+        float r = dist(rng);
+        if (r < exploreChance) {
+            // Random motor command for exploration
+            int choice = std::uniform_int_distribution<int>(0, 7)(rng);
+            switch (choice) {
+                case 0: return MotorCommand::MoveForward;
+                case 1: return MotorCommand::MoveBackward;
+                case 2: return MotorCommand::TurnLeft;
+                case 3: return MotorCommand::TurnRight;
+                case 4: return MotorCommand::LookLeft;
+                case 5: return MotorCommand::LookRight;
+                case 6: return MotorCommand::Interact;
+                default: return MotorCommand::Wait;
+            }
+        }
+    }
+    
+    return defaultCmd;
 }
 
 } // namespace nlm

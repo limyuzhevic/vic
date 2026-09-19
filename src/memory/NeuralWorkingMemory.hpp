@@ -64,9 +64,11 @@ public:
 
     // Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);
-
-    // Competition between memory traces
-    void runCompetition();
+    
+    // Boost all memory traces (equivalent to strengthenMemory)
+    void boostAllTraces(float factor) {
+        strengthenMemory(factor);
+    }
 
     // Is this neuron part of the winning population?
     bool isWinning(NeuronId neuron) const;

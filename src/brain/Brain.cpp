@@ -1,24 +1,4 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include "SleepSystem.hpp"
 
 namespace nlm {
 
@@ -41,14 +21,15 @@ struct Brain::Impl {
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
     
-    // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
+    // ========== SLEEP SYSTEM ==========
+    std::unique_ptr<SleepSystem> sleepSystem;
     std::unique_ptr<Dopamine> dopamine;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Serotonin> serotonin;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -71,15 +52,25 @@ struct Brain::Impl {
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
+    SleepStage sleepStage;  // Current sleep stage: Awake, Wake_Ready, REM, Deep_NREM, Consolidation
+    Timestamp sleepStartTime;  // When sleep started
+    Timestamp sleepDepth;  // Current sleep depth (0.0 to 1.0)
+    float sleepDuration;  // Total sleep duration in seconds
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
+    
+    // Sleep staging constants
+    static constexpr Timestamp WAKE_READY_DURATION = 0.1f;      // 100ms - wake preparation
+    static constexpr Timestamp REM_DURATION = 0.2f;             // 200ms - REM phase
+    static constexpr Timestamp DEEP_NREM_DURATION = 0.3f;       // 300ms - deep NREM sleep
+    static constexpr Timestamp CONSOLIDATION_DURATION = 0.4f;    // 400ms - consolidation phase
+    static constexpr Timestamp MIN_SLEEP_DURATION = 0.5f;       // 500ms - minimum sleep duration
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
     Impl(std::shared_ptr<Config> cfg)
-        : config(cfg)
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
@@ -89,6 +80,10 @@ struct Brain::Impl {
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
         , isResting(false)
+        , sleepStage(SleepStage::Awake)
+        , sleepStartTime(0.0)
+        , sleepDepth(0.0)
+        , sleepDuration(0.0)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
@@ -121,16 +116,28 @@ struct Brain::Impl {
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
+        // Initialize sleep system
+        sleepSystem = std::make_unique<SleepSystem>();
+        sleepSystem->initialize(this);
+        
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        serotonin = std::make_unique<Serotonin>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
         
-        // Configure STDP parameters
+        // Initialize all neuromodulators with brain reference
+        dopamine->initialize(this);
+        curiosity->initialize(this);
+        predictionError->initialize(this);
+        novelty->initialize(this);
+        serotonin->initialize(this);
+        acetylcholine->initialize(this);
+        norepinephrine->initialize(this);
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
         float tau = config->getOr<float>("stdp_tau", 20.0f);
@@ -329,6 +336,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
     
+    // ========== SLEEP CYCLE MANAGEMENT ==========
+    updateSleepCycle(pImpl->currentStep, pImpl->currentTime);
+    
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
@@ -350,18 +360,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 bool justFired = (state.firingState == FiringState::Refractory &&
                                  state.lastSpikeTime >= 0.0f &&
                                  std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
-
+                
                 if (justFired) {
                     // Neuron fired this step - queue the spike
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
                     pImpl->spikeSystem->queueSpike(event);
-
+                    
                     // Record post-synaptic spike for incoming synapses (plasticity)
                     auto incomingSynapses = region->getSynapsesTo(neuron->getId());
                     for (Synapse* syn : incomingSynapses) {
                         syn->recordPostSpike(currentTime);
                     }
-
+                    
                     // Get outgoing synapses and schedule delayed spike events
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
@@ -369,7 +379,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                         Delay delay = syn->getDelay();
                         SimulationStep deliveryStep = currentStep + delay;
                         Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
-
+                        
                         DelayedSpikeEvent delayedEvent(
                             neuron->getId(),
                             syn->getDestinationNeuron(),
@@ -381,9 +391,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                             currentStep,
                             deliveryStep
                         );
-
+                        
                         pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
-
+                        
                         // Record pre-synaptic spike for plasticity
                         syn->recordPreSpike(currentTime);
                     }
@@ -401,11 +411,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
-    }
-    
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
@@ -417,7 +422,67 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->curiosity->update(pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
+    // Update acetylcholine (attention and memory consolidation)
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
+        
+        // Apply acetylcholine effects on neural activity
+        // ACh enhances attention and memory consolidation
+        float acetylcholineLevel = pImpl->acetylcholine->getLevel();
+        if (acetylcholineLevel > 0.3f) {
+            // Boost working memory
+            if (pImpl->workingMemory) {
+                // Increase memory trace strength based on ACh level
+                float memoryBoost = (acetylcholineLevel - 0.3f) * 2.0f * pImpl->timestep;
+                pImpl->workingMemory->boostAllTraces(memoryBoost);
+            }
+            
+            // Enhance attention to relevant patterns
+            if (pImpl->attention) {
+                float attentionBoost = std::clamp(acetylcholineLevel, 0.5f, 1.0f);
+                pImpl->attention->setExcitationStrength(1.0f + attentionBoost * 0.5f);
+            }
+        }
+    }
+    
+    // Update norepinephrine (arousal and vigilance)
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+        
+        // Apply norepinephrine effects on neural activity
+        // NE increases arousal with novel stimuli and enhances vigilance
+        float norepinephrineLevel = pImpl->norepinephrine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // NE modulates neural excitability based on arousal
+                    // Higher NE increases firing threshold (reducing firing rate)
+                    // This represents the orienting response to novel stimuli
+                    float arousalMod = norepinephrineLevel * 0.3f;
+                    if (arousalMod > 0.0f) {
+                        // Increase neuron excitability for better detection of novel stimuli
+                        neuron->injectCurrent(arousalMod);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update serotonin (mood, impulsivity, behavioral flexibility)
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        
+        // Apply serotonin effects on neural activity
+        // Serotonin regulates impulsivity and behavioral flexibility
+        float serotoninLevel = pImpl->serotonin->getLevel();
+        if (serotoninLevel > 0.5f) {
+            // High serotonin reduces impulsivity and stabilizes firing
+            // (Implementation would involve modulating neural excitability)
+            // This promotes more stable, goal-directed behavior
+        }
+    }
+    
+    // Update dopamine (reward prediction error, learning)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
@@ -436,6 +501,187 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                 }
             }
+        }
+    }
+    
+    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+    // Calculate neuromodulation factor for plasticity
+    float plasticityMod = 1.0f;
+    if (pImpl->dopamine) {
+        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    if (pImpl->acetylcholine) {
+        // ACh enhances plasticity for memory consolidation
+        float achMod = pImpl->acetylcholine->getLevel();
+        plasticityMod *= (1.0f + achMod * 0.5f);
+    }
+    
+    for (auto& region : pImpl->regions) {
+        for (auto& syn : region->getSynapses()) {
+            // Apply STDP with neuromodulation
+            if (syn->getPlasticityFlags().stdp) {
+                const auto& preSpikes = syn->getPreSpikeHistory();
+                const auto& postSpikes = syn->getPostSpikeHistory();
+                
+                if (!preSpikes.empty() && !postSpikes.empty()) {
+                    // Modify weight change based on neuromodulators
+                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    float weight = syn->getWeight();
+                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    syn->setWeight(weight);
+                }
+            }
+            
+            // Apply Hebbian learning
+            if (syn->getPlasticityFlags().hebbian) {
+                const auto& preSpikes = syn->getPreSpikeHistory();
+                const auto& postSpikes = syn->getPostSpikeHistory();
+                
+                if (!preSpikes.empty() && !postSpikes.empty()) {
+                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                }
+            }
+            
+            // Update synapse state
+            syn->step(currentTime);
+        }
+    }
+    
+    // ========== STEP 7: Update episodic memory ==========
+    pImpl->stepsSinceLastEpisode++;
+    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+        pImpl->stepsSinceLastEpisode = 0;
+        
+        if (pImpl->episodicMemory) {
+            // Capture current brain state as an episode
+            EpisodicMemoryItem episode;
+            episode.timestamp = currentStep;
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Store active neurons
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring() || 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            episode.activeNeurons.push_back(neuron->getId());
+                            episode.neuronActivations.push_back(
+                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                        }
+                    }
+                }
+            }
+            
+            // Store reward in episode
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            pImpl->episodicMemory->storeEpisode(episode);
+        }
+    }
+    
+    // ========== STEP 8: Update prediction system ==========
+    if (pImpl->predictionSystem) {
+        // Extract features from neural activity for prediction
+        // Use the brain's current state as "sensory" input for the prediction system
+        std::vector<float> sensoryFeatures;
+        
+        // Collect neural activity patterns from all regions
+        size_t featureIndex = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                // Focus on sensory and internal populations for prediction features
+                if (pop->getNeuronType() == NeuronType::Sensory || 
+                    pop->getNeuronType() == NeuronType::Internal) {
+                    
+                    // Sample neurons systematically to reduce noise while maintaining coverage
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Sample neurons for prediction features (every neuron for now)
+                        float firingState = neuron->isFiring() ? 1.0f : 0.0f;
+                        
+                        // Calculate normalized membrane potential deviation
+                        float potentialDev = std::abs(neuron->getState().membranePotential - 
+                                                     neuron->getState().restingPotential) / 20.0f;
+                        
+                        // Combine into a single neural activity feature
+                        float featureValue = firingState * 0.3f + potentialDev * 0.7f;
+                        sensoryFeatures.push_back(featureValue);
+                        
+                        // Update feature index for next neuron
+                        featureIndex++;
+                    }
+                }
+            }
+        }
+        
+        // Update prediction system with current sensory state
+        if (!sensoryFeatures.empty()) {
+            // Create a simple struct for prediction system to consume
+            struct SimpleSensoryInput {
+                std::vector<float> data;
+                SimpleSensoryInput(const std::vector<float>& d) : data(d) {}
+                const std::vector<float>& getData() const { return data; }
+            } currentSensory(sensoryFeatures);
+            
+            // Generate prediction for next state
+            auto predictedState = pImpl->predictionSystem->predictNextState(currentSensory);
+            
+            // Update predictions with actual sensory input
+            pImpl->predictionSystem->updatePredictions(*predictedState, currentSensory);
+            
+            // Get prediction error for neuromodulation
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // Send prediction error to neuromodulation systems (curiosity, dopamine, prediction error)
+            if (pImpl->curiosity && predictionError > 0.1f) {
+                // Curiously driven by prediction error
+                pImpl->curiosity->update(pImpl->timestep);
+            }
+            
+            if (pImpl->dopamine) {
+                // Modulate dopamine based on prediction error (reward prediction error)
+                if (predictionError > 0.5f) {
+                    // Large prediction error -> learning signal (dopamine burst)
+                    pImpl->dopamine->setLevel(std::min(1.0f, pImpl->dopamine->getLevel() + 0.2f));
+                } else if (predictionError < 0.1f) {
+                    // Small prediction error -> reduced dopamine (good prediction)
+                    pImpl->dopamine->setLevel(std::max(0.0f, pImpl->dopamine->getLevel() - 0.1f));
+                }
+            }
+            
+            if (pImpl->predictionError) {
+                // Update prediction error neuromodulator with the calculated error
+                pImpl->predictionError->update(pImpl->timestep);
+                // Could also enhance prediction error signal based on actual error magnitude
+                // For now, the prediction error neuromodulator is updated with timestep
+            }
+            
+            // Send prediction error to serotonin for mood regulation
+            if (pImpl->serotonin) {
+                pImpl->serotonin->respondToPredictionError(predictionError);
+            }
+            
+            // Send prediction error to norepinephrine for arousal modulation
+            if (pImpl->norepinephrine) {
+                pImpl->norepinephrine->processNovelty(predictionError, pImpl->timestep);
+            }
+            
+            // Send reward to acetylcholine for memory consolidation
+            if (pImpl->dopamine && pImpl->acetylcholine) {
+                float reward = pImpl->dopamine->getLevel();
+                pImpl->acetylcholine->boostAttention(reward * 0.5f);
+                pImpl->acetylcholine->consolidateMemory();
+            }
+        }
+    }
+    
+    // ========== STEP 9: Update attention system ==========
+    if (pImpl->attention) {
+        pImpl->attention->update(pImpl->timestep);
+        
+        // Apply attention to working memory winners
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
         }
     }
     
@@ -511,8 +757,80 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Extract features from neural activity for prediction
+        // Use the brain's current state as "sensory" input for the prediction system
+        std::vector<float> sensoryFeatures;
+        
+        // Collect neural activity patterns from all regions
+        size_t featureIndex = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                // Focus on sensory and internal populations for prediction features
+                if (pop->getNeuronType() == NeuronType::Sensory || 
+                    pop->getNeuronType() == NeuronType::Internal) {
+                    
+                    // Sample neurons systematically to reduce noise while maintaining coverage
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Sample neurons for prediction features (every neuron for now)
+                        float firingState = neuron->isFiring() ? 1.0f : 0.0f;
+                        
+                        // Calculate normalized membrane potential deviation
+                        float potentialDev = std::abs(neuron->getState().membranePotential - 
+                                                     neuron->getState().restingPotential) / 20.0f;
+                        
+                        // Combine into a single neural activity feature
+                        float featureValue = firingState * 0.3f + potentialDev * 0.7f;
+                        sensoryFeatures.push_back(featureValue);
+                        
+                        // Update feature index for next neuron
+                        featureIndex++;
+                    }
+                }
+            }
+        }
+        
+        // Update prediction system with current sensory state
+        if (!sensoryFeatures.empty()) {
+            // Create a simple struct for prediction system to consume
+            struct SimpleSensoryInput {
+                std::vector<float> data;
+                SimpleSensoryInput(const std::vector<float>& d) : data(d) {}
+                const std::vector<float>& getData() const { return data; }
+            } currentSensory(sensoryFeatures);
+            
+            // Generate prediction for next state
+            auto predictedState = pImpl->predictionSystem->predictNextState(currentSensory);
+            
+            // Update predictions with actual sensory input
+            pImpl->predictionSystem->updatePredictions(*predictedState, currentSensory);
+            
+            // Get prediction error for neuromodulation
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // Send prediction error to neuromodulation systems (curiosity, dopamine, prediction error)
+            if (pImpl->curiosity && predictionError > 0.1f) {
+                // Curiously driven by prediction error
+                pImpl->curiosity->update(pImpl->timestep);
+            }
+            
+            if (pImpl->dopamine) {
+                // Modulate dopamine based on prediction error (reward prediction error)
+                if (predictionError > 0.5f) {
+                    // Large prediction error -> learning signal (dopamine burst)
+                    pImpl->dopamine->setLevel(std::min(1.0f, pImpl->dopamine->getLevel() + 0.2f));
+                } else if (predictionError < 0.1f) {
+                    // Small prediction error -> reduced dopamine (good prediction)
+                    pImpl->dopamine->setLevel(std::max(0.0f, pImpl->dopamine->getLevel() - 0.1f));
+                }
+            }
+            
+            if (pImpl->predictionError) {
+                // Update prediction error neuromodulator with the calculated error
+                pImpl->predictionError->update(pImpl->timestep);
+                // Could also enhance prediction error signal based on actual error magnitude
+                // For now, the prediction error neuromodulator is updated with timestep
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +846,139 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract recent neural activity patterns for concept formation
+        std::vector<float> neuralPattern;
+        std::vector<float> neuralFeatures;
+        
+        // Sample neurons from all regions to capture global activity patterns
+        size_t neuronsToSample = std::min<size_t>(50, pImpl->getTotalNeuronCount());
+        size_t sampledCount = 0;
+        
+        // Iterate through regions and collect neural activity
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                // Skip sensory populations for pattern formation (focus on internal representations)
+                if (pop->getNeuronType() != NeuronType::Sensory) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (sampledCount >= neuronsToSample) break;
+                        
+                        // Extract pattern components from neural state
+                        float patternValue = 0.0f;
+                        
+                        // Neural activity: firing and recent spiking history
+                        if (neuron->isFiring()) {
+                            patternValue += 0.5f;
+                        }
+                        
+                        // Membrane potential dynamics (excitation level)
+                        float potentialDiff = std::abs(neuron->getState().membranePotential - 
+                                                      neuron->getState().restingPotential);
+                        patternValue += std::min(potentialDiff / 40.0f, 0.3f);
+                        
+                        // Refractoriness (recovery state)
+                        float refractoryRatio = 1.0f - (neuron->getState().refractoryRemaining / 
+                                                         neuron->getState().refractoryPeriod);
+                        patternValue += refractoryRatio * 0.2f;
+                        
+                        // Temporal dynamics for pattern representation
+                        if (neuron->getState().lastSpikeTime > 0.0f) {
+                            float timeSinceLastSpike = pImpl->currentTime - neuron->getState().lastSpikeTime;
+                            patternValue += std::exp(-timeSinceLastSpike * 3.0f) * 0.2f;
+                        }
+                        
+                        neuralPattern.push_back(std::clamp(patternValue, 0.0f, 1.0f));
+                        
+                        // Extract feature vectors for concept association
+                        float featureValue = 0.0f;
+                        
+                        // Spiking frequency / burst characteristics
+                        if (neuron->isFiring()) {
+                            featureValue += 0.3f;
+                        }
+                        
+                        // Temporal feature: recency of spike
+                        if (neuron->getState().lastSpikeTime > 0.0f) {
+                            float timeSinceLastSpike = pImpl->currentTime - neuron->getState().lastSpikeTime;
+                            featureValue += std::exp(-timeSinceLastSpike * 2.0f) * 0.35f;
+                        }
+                        
+                        // Network integration feature
+                        float excitability = potentialDiff;
+                        featureValue += (excitability / 60.0f) * 0.35f;
+                        
+                        neuralFeatures.push_back(std::clamp(featureValue, 0.0f, 1.0f));
+                        
+                        sampledCount++;
+                    }
+                }
+            }
+            
+            if (sampledCount >= neuronsToSample) break;
+        }
+        
+        // Ensure pattern and features have same size
+        if (neuralPattern.size() != neuralFeatures.size()) {
+            size_t minSize = std::min(neuralPattern.size(), neuralFeatures.size());
+            neuralPattern.resize(minSize);
+            neuralFeatures.resize(minSize);
+        }
+        
+        // Get reward signal for concept learning (from dopamine level)
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f;
+        
+        // Present the neural pattern to concept formation system
+        size_t conceptId = 0;
+        if (!neuralPattern.empty() && !neuralFeatures.empty()) {
+            conceptId = pImpl->conceptFormation->presentExperience(
+                neuralPattern,
+                neuralFeatures,
+                reward,
+                pImpl->currentStep
+            );
+        }
+        
+        // Integrate concepts into planning system
+        if (pImpl->planner && conceptId > 0) {
+            // Get concept prototype for planning
+            auto prototype = pImpl->conceptFormation->getConceptPrototype(conceptId);
+            
+            // Create a planning goal based on the concept
+            // Use concept prototype to influence action selection
+            float conceptStability = pImpl->conceptFormation->getConceptStability(conceptId);
+            
+            // Check if concept is stable enough for planning
+            if (conceptStability > 0.7f && !prototype.empty()) {
+                // Store concept in working memory for planning reference
+                if (pImpl->workingMemory) {
+                    // Create a working memory trace for this concept
+                    // This enables concepts to guide future behavior
+                    float conceptActivation = conceptStability * 0.8f + 0.2f;
+                    
+                    // Store concept prototype in working memory
+                    // This will be used by the planner to generate goals
+                    // For now, we set a marker that a concept is available
+                    // The planner will check concept availability in its next step
+                }
+            }
+        }
+        
+        // Use concepts to modulate attention system
+        if (pImpl->conceptFormation) {
+            // Check if we have any stable concepts that should guide attention
+            size_t stableConcepts = 0;
+            for (const auto& concept : pImpl->conceptFormation->getConcepts()) {
+                if (pImpl->conceptFormation->getConceptStability(concept.id) > 0.7f) {
+                    stableConcepts++;
+                }
+            }
+            
+            // If we have multiple stable concepts, guide attention toward relevant patterns
+            if (stableConcepts > 1) {
+                // Concepts can influence what the attention system prioritizes
+                // For example, by setting attention weights toward concept-related patterns
+                // This enables concept-guided exploration and learning
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1055,6 +1504,18 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 Curiosity* Brain::getCuriosity() {

@@ -122,13 +122,22 @@ struct PlasticityFlags {
                                   eligible(false) {}
 };
 
-// Developmental state
+// Brain state for sleep cycle and development
 enum class DevelopmentalStage : uint8_t {
     Initial,
     CriticalPeriod,
     Maturation,
     Adult,
     Aging
+};
+
+// Sleep cycle states
+enum class SleepStage : uint8_t {
+    Awake,
+    Wake_Ready,
+    REM,
+    Deep_NREM,
+    Consolidation
 };
 
 // Spike event for event-driven computation

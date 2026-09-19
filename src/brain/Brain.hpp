@@ -12,22 +12,20 @@
 namespace nlm {
 
 // Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Dopamine;
 class Curiosity;
-class Novelty;
 class PredictionError;
+class Novelty;
+class Dopamine;
+class Curiosity;
+class PredictionError;
+class Novelty;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -67,8 +65,11 @@ public:
     // Main simulation step
     void step(SimulationStep currentStep);
     
-    // Simulation time step
+    // Simulation time step with sleep support
     void step(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Sleep cycle management
+    void updateSleepCycle(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern
@@ -170,10 +171,35 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
+    // ========== SLEEP SYSTEM ==========
+    
+    // Sleep cycle management
+    bool startSleep();
+    void endSleep();
+    SleepStage getSleepStage() const;
+    float getSleepDepth() const;
+    float getSleepDuration() const;
+    
+    // Sleep staging constants
+    static constexpr Timestamp WAKE_READY_DURATION = 0.1f;      // 100ms - wake preparation
+    static constexpr Timestamp REM_DURATION = 0.2f;             // 200ms - REM phase
+    static constexpr Timestamp DEEP_NREM_DURATION = 0.3f;       // 300ms - deep NREM sleep
+    static constexpr Timestamp CONSOLIDATION_DURATION = 0.4f;    // 400ms - consolidation phase
+    static constexpr Timestamp MIN_SLEEP_DURATION = 0.5f;       // 500ms - minimum sleep duration
+    
     // ========== NEUROMODULATION SYSTEMS ==========
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and impulsivity
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
@@ -183,15 +209,6 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
-    
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
-    
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
-    void logStatus() const;
     
 private:
     struct Impl;

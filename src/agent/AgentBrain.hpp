@@ -11,6 +11,7 @@ namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Acts as integration layer between sensory input and cognitive processing
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -29,6 +30,7 @@ public:
     void processSensoryInput(const SensoryPercept& percept);
     
     // Decode brain motor activity into motor command
+    // Now uses cognitive systems for action planning
     MotorCommand decodeMotorCommand();
     
     // Apply neuromodulation based on reward
@@ -69,12 +71,43 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Cognitive system integration methods
+    // Get current state from working memory
+    std::vector<float> getWorkingMemoryState() const;
+    
+    // Get concept matching for current sensory input
+    size_t getMatchingConcept(const std::vector<float>& pattern) const;
+    
+    // Get current goal from neural planner
+    std::vector<float> getCurrentGoal() const;
+    
+    // Get attention focus based on concepts and goals
+    std::vector<NeuronId> getAttentionFocus(const std::vector<NeuronId>& competitors) const;
+    
+    // Get curiosity-driven exploration boost
+    float getExplorationBoost() const;
+    
+    // Update brain with cognitive guidance
+    void updateWithCognition(float timestep, const MotorCommand& lastAction, float reward);
+    
+    // Plan action using neural planner
+    ActionType planAction(const std::vector<float>& state, float targetReward = 0.5f);
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Action planning with cognitive integration
+    MotorCommand planActionWithCognition(const std::vector<float>& state);
+    
+    // Concept-guided attention
+    MotorCommand selectActionWithConceptGuidance(const std::vector<float>& state);
+    
+    // Curiosity-driven exploration
+    MotorCommand exploreWithCuriosity(MotorCommand defaultCmd, const std::vector<float>& state);
     
     std::shared_ptr<Brain> brain_;
     
@@ -112,6 +145,10 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Cognitive system integration
+    SimulationStep lastStep_;
+    std::vector<float> lastSensoryState_;
 };
 
 } // namespace nlm
