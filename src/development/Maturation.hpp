@@ -5,8 +5,6 @@
 namespace nlm {
 
 // Neural maturation: development of adult-level properties
-// PLACEHOLDER - Phase 2 will implement real maturation
-
 class Maturation {
 public:
     Maturation();
@@ -16,6 +14,10 @@ public:
     float getProgress() const;
     void setProgress(float progress);
     
+    // Get maturation stage
+    bool isCriticalPeriod() const;
+    float getCriticalPeriodProgress() const;
+    
     // Update maturation
     void update(class Brain* brain, SimulationStep currentStep);
     
@@ -24,9 +26,26 @@ public:
     MembranePotential getMatureRestingPotential() const;
     float getMatureTimeConstant() const;
     
+    // Get mature potential state
+    MaturationPotential getMaturePotential() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
+};
+
+// Mature neuron potential state
+struct MaturationPotential {
+    MembranePotential restingPotential;
+    MembranePotential firingThreshold;
+    float timeConstant;
+    float plasticityFactor;
+    
+    MaturationPotential()
+        : restingPotential(-70.0f)
+        , firingThreshold(-55.0f)
+        , timeConstant(20.0f)
+        , plasticityFactor(1.0f) {}
 };
 
 } // namespace nlm

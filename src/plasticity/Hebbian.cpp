@@ -22,52 +22,56 @@ void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& preSpikes,
                       const std::vector<Timestamp>& postSpikes,
                       TimestepDuration dt) {
-    /*
-     * Real Hebbian learning implementation
-     * 
-     * Mathematical formulation (Covariance rule):
-     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
-     * 
-     * Simplified version for spike-based systems:
-     * Δw = η * (coactivity - baseline)
-     * 
-     * Where:
-     *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
-     * 
-     * Biological inspiration:
-     *   - Reflects AMPA receptor trafficking
-     *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
-     *   - Correlation-based learning in visual cortex
-     *   
-     * Limitations:
-     *   - Doesn't account for STDP timing details
-     *   - Single learning rate (no separate potentiation/depression rates)
-     *   - Assumes stationary statistics
-     */
+    // Real Hebbian learning implementation based on spike covariance
+    // 
+    // Mathematical formulation (Covariance rule):
+    // Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
+    // 
+    // For spike-based systems:
+    // Δw = η * (coactivity - baseline)
+    // 
+    // Where:
+    //   coactivity = number of correlated pre/post spikes
+    //   baseline = learningRate * mean activity
+    // 
+    // This implements "neurons that fire together, wire together"
+    // but with a threshold to prevent runaway potentiation.
     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
+    // Calculate spike statistics
+    float preRate = static_cast<float>(preSpikes.size()) / dt;
+    float postRate = static_cast<float>(postSpikes.size()) / dt;
+    
+    // Count correlated spike pairs using precise timing
     size_t correlationCount = 0;
+    float totalCorrelation = 0.0f;
+    
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
+            float dt_spike = std::abs(postTime - preTime);
+            // Count spikes within 20ms as correlated (biological window)
+            if (dt_spike < 20.0f) {
+                correlationCount++;
+                // Weight by inverse distance (closer spikes = stronger correlation)
+                totalCorrelation += 1.0f / (1.0f + dt_spike / 10.0f);
             }
         }
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    // Compute covariance-based weight change
+    // Δw = η * (correlation - baseline)
+    // where baseline = η * preRate * postRate * timeWindow
+    
+    float baseline = pImpl->learningRate * preRate * postRate * 0.02f;  // 20ms window
+    
+    // More sophisticated: use actual correlation strength
+    float delta = pImpl->learningRate * totalCorrelation;
+    
+    // Subtract baseline to get covariance
+    delta -= baseline * static_cast<float>(correlationCount);
     
     // Apply with bounds
     if (std::abs(delta) > 1e-6f) {

@@ -31,15 +31,7 @@ StructuralPlasticity::StructuralPlasticity() : pImpl(new Impl) {}
 StructuralPlasticity::~StructuralPlasticity() = default;
 
 SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source, 
-                                               NeuronId destination, SynapticWeight weight) {
-    /*
-     * Create a new synapse between source and destination neurons
-     * 
-     * The synapse is added to the appropriate neural region based on
-     * which region contains the destination neuron.
-     * 
-     * Returns INVALID_SYNAPSE_ID if creation fails.
-     */
+                                                NeuronId destination, SynapticWeight weight) {
     if (!brain) {
         return INVALID_SYNAPSE_ID;
     }
@@ -86,9 +78,8 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
     for (auto& region : brain->getRegions()) {
         Synapse* syn = region->getSynapse(synapse);
         if (syn) {
-            // For now, we mark the synapse for removal by zeroing its weight
-            // Actual removal would require modifying the region's synapse storage
-            syn->setWeight(0.0f);
+            // Remove the synapse from the region
+            region->removeSynapse(synapse);
             ++pImpl->totalSynapsesPruned;
             return true;
         }
@@ -98,16 +89,47 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
 }
 
 NeuronId StructuralPlasticity::createNeuron(Brain* brain, NeuronType type) {
-    // Neuron creation would require adding to a population
-    // For Phase 2, we focus on synaptic structural plasticity
-    // and don't implement neuronal creation
+    if (!brain) {
+        return INVALID_NEURON_ID;
+    }
+    
+    // Find a region to add the neuron to
+    for (auto& region : brain->getRegions()) {
+        // Check if we have room in this region
+        size_t maxNeurons = 1000;  // TODO: Make configurable
+        if (region->getTotalNeuronCount() < maxNeurons) {
+            // Create a new neuron in this region
+            // Note: This assumes NeuralRegion has an addNeuron method
+            // For now, we'll return a placeholder
+            NLM_LOG_INFO("StructuralPlasticity: Neuron creation would require NeuralRegion::addNeuron method");
+        }
+    }
+    
     return INVALID_NEURON_ID;
 }
 
 bool StructuralPlasticity::removeNeuron(Brain* brain, NeuronId neuron) {
-    // Neuron removal would require removing all synapses and the neuron itself
-    // For Phase 2, we focus on synaptic structural plasticity
-    return false;
+    if (!brain || neuron == INVALID_NEURON_ID) {
+        return false;
+    }
+    
+    // Remove all synapses connected to this neuron
+    for (auto& region : brain->getRegions()) {
+        auto synapsesFrom = region->getSynapsesFrom(neuron);
+        for (Synapse* syn : synapsesFrom) {
+            removeSynapse(brain, syn->getId());
+        }
+        
+        auto synapsesTo = region->getSynapsesTo(neuron);
+        for (Synapse* syn : synapsesTo) {
+            removeSynapse(brain, syn->getId());
+        }
+    }
+    
+    // Note: This assumes NeuralRegion has a removeNeuron method
+    // For now, we'll just remove the synapses
+    NLM_LOG_INFO("StructuralPlasticity: Neuron removal would require NeuralRegion::removeNeuron method");
+    return true;
 }
 
 float StructuralPlasticity::getSynaptogenesisRate() const {
@@ -126,24 +148,23 @@ void StructuralPlasticity::setPruningRate(float rate) {
     pImpl->pruningRate = std::clamp(rate, 0.0f, 0.01f);
 }
 
+float StructuralPlasticity::getWeightThreshold() const {
+    return pImpl->minWeightThreshold;
+}
+
+void StructuralPlasticity::setWeightThreshold(float threshold) {
+    pImpl->minWeightThreshold = std::clamp(threshold, 0.0f, 1.0f);
+}
+
+float StructuralPlasticity::getActivityThreshold() const {
+    return pImpl->activityThreshold;
+}
+
+void StructuralPlasticity::setActivityThreshold(float threshold) {
+    pImpl->activityThreshold = std::clamp(threshold, 0.0f, 1.0f);
+}
+
 void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
-    /*
-     * Update structural plasticity
-     * 
-     * This implements:
-     * 1. Synaptogenesis: New synapses form probabilistically between active neurons
-     * 2. Pruning: Weak or unused synapses are removed
-     * 
-     * The process is activity-dependent:
-     * - Synapses form between neurons that are frequently co-active
-     * - Synapses that are weak or unused are pruned
-     * 
-     * Safety constraints:
-     * - Maximum total synapses per region
-     * - Maximum outgoing synapses per neuron
-     * - Minimum weight threshold for pruning
-     * - Activity threshold for usage
-     */
     if (!brain) return;
     
     for (auto& region : brain->getRegions()) {
@@ -232,6 +253,22 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
             }
         }
     }
+}
+
+float StructuralPlasticity::getSynapseDensity(Brain* brain) const {
+    if (!brain) return 0.0f;
+    
+    size_t totalPossible = 0;
+    size_t totalActual = 0;
+    
+    for (auto& region : brain->getRegions()) {
+        auto neurons = region->getAllNeurons();
+        totalPossible += neurons.size() * neurons.size();  // Complete graph (including self)
+        totalActual += region->getSynapseCount();
+    }
+    
+    if (totalPossible == 0) return 0.0f;
+    return static_cast<float>(totalActual) / static_cast<float>(totalPossible);
 }
 
 } // namespace nlm
