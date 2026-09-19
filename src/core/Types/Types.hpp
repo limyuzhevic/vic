@@ -63,14 +63,11 @@ struct PopulationId {
     constexpr uint64_t index() const { return value; }
 };
 
-// Simulation step counter
-using SimulationStep = uint64_t;
-
-// Simulation time in seconds (floating point)
-using Timestamp = double;
+    // Simulation time in seconds (floating point)
+using Timestamp = float;
 
 // Timestep duration in seconds
-using TimestepDuration = double;
+using TimestepDuration = float;
 
 // Index types for arrays
 using NeuronIndex = uint64_t;
@@ -158,7 +155,7 @@ struct DelayedSpikeEvent {
     DelayedSpikeEvent()
         : source_neuron(), destination_neuron(), synapse_id()
         , weight(0.0f), synapse_type(SynapseType::Excitatory)
-        , timestamp(0.0), delivery_time(0.0), step(0), delivery_step(0)
+        , timestamp(0.0f), delivery_time(0.0f), step(0), delivery_step(0)
         , is_excitatory(true) {}
     
     DelayedSpikeEvent(NeuronId src, NeuronId dst, SynapseId syn,

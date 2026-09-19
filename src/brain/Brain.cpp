@@ -143,7 +143,7 @@ struct Brain::Impl {
         structuralPlasticity->setPruningRate(pruningRate);
         
         // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        timestep = config->getOr<float>("simulation_timestep", 0.001f);
         
         // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
@@ -409,17 +409,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
+        pImpl->novelty->update(static_cast<float>(pImpl->timestep));
     }
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        pImpl->curiosity->update(static_cast<float>(pImpl->timestep));
     }
     
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
+        pImpl->dopamine->update(static_cast<float>(pImpl->timestep));
         
         // Apply dopamine effects on neural excitability
         // Dopamine modulates neural excitability by adjusting effective current injection
