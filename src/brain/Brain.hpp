@@ -184,6 +184,20 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
+    // ========== STATISTICS AND MONITORING ==========
+    
+    // Get comprehensive brain statistics
+    std::unordered_map<std::string, double> getStats() const;
+    
+    // Get working memory and episodic memory statistics
+    std::unordered_map<std::string, double> getMemoryStats() const;
+    
+    // Get prediction, planning, concept formation statistics
+    std::unordered_map<std::string, double> getCognitionStats() const;
+    
+    // Get neuromodulation statistics
+    std::unordered_map<std::string, double> getNeuromodulationStats() const;
+    
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     

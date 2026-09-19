@@ -44,8 +44,10 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+        auto region = brain_->getRegion(neuron.getId() / 1000);
+        if (region) {
+            auto neurons = region->getAllNeurons();
+            for (auto* nn : neurons) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
                     break;
@@ -75,10 +77,14 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
-        memoryActivations_[idx] = activation;
-        memoryTimestamps_[idx] = 0;
+        // Fix: Check bounds before accessing vectors
+        if (idx < memoryActivations_.size() && idx < memoryTimestamps_.size()) {
+            memoryActivations_[idx] = activation;
+            memoryTimestamps_[idx] = 0;
+        }
     } else if (memoryNeurons_.size() < capacity_) {
         memoryNeurons_.push_back(neuron);
+        // Fix: Ensure all vectors grow together
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
     }

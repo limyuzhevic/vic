@@ -90,6 +90,75 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
     } else if (pImpl->stage == DevelopmentalStage::Maturation && age_ > 960.0) {
         advanceStage();
     }
+    
+    // Integrate with brain systems based on developmental stage
+    if (brain) {
+        // Critical period: enhanced plasticity and memory encoding
+        if (pImpl->stage == DevelopmentalStage::CriticalPeriod) {
+            // Enhance working memory encoding and consolidation
+            auto* workingMemory = brain->getWorkingMemory();
+            if (workingMemory) {
+                // Strengthen working memory traces during critical period
+                workingMemory->strengthenMemory(1.5f);  // Boost memory strength by 50%
+                
+                // Enable faster memory consolidation
+                // Working memory should consolidate to episodic memory more quickly
+            }
+            
+            // Enhance attentional selection for learning
+            auto* attention = brain->getAttention();
+            if (attention) {
+                attention->setInhibitionStrength(0.3f);  // Less inhibition, more exploration
+                attention->setExcitationStrength(2.0f); // Higher excitation for novel inputs
+            }
+            
+            // Enhance novelty detection for exploration
+            auto* novelty = brain->getNovelty();
+            if (novelty) {
+                // Critical period increases exploratory behavior
+                // Novelty system should be more sensitive
+            }
+        }
+        
+        // Maturation: pruning and refinement
+        else if (pImpl->stage == DevelopmentalStage::Maturation) {
+            // Prune weak connections and memories
+            auto* episodicMemory = brain->getEpisodicMemory();
+            if (episodicMemory) {
+                // Consolidate and prune episodic memories
+                episodicMemory->consolidate(0.5f);  // Medium consolidation threshold
+            }
+            
+            // Refine concept formation
+            auto* conceptFormation = brain->getConceptFormation();
+            if (conceptFormation) {
+                // Concepts become more stable and selective
+            }
+            
+            // Refine planning system
+            auto* planner = brain->getPlanner();
+            if (planner) {
+                // Plans become more efficient and goal-directed
+            }
+        }
+        
+        // Adult: stabilization and efficiency
+        else if (pImpl->stage == DevelopmentalStage::Adult) {
+            // Stabilize learned behaviors and memories
+            auto* workingMemory = brain->getWorkingMemory();
+            if (workingMemory) {
+                // Working memory becomes more efficient
+                workingMemory->strengthenMemory(1.2f);  // Maintain strong traces
+            }
+            
+            // Optimize action selection
+            auto* attention = brain->getAttention();
+            if (attention) {
+                attention->setInhibitionStrength(0.7f);  // More selective attention
+                attention->setExcitationStrength(1.2f); // Balanced excitation
+            }
+        }
+    }
 }
 
 float DevelopmentSystem::getPlasticityModifier() const {
