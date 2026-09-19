@@ -78,12 +78,83 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigCommandLineParsing() {
+    nlm::Config config;
+    
+    // Test --key=value format
+    const char* args[] = {"test", "--int_value=42", "--string_value=hello"};
+    int argc = 3;
+    config.loadFromArgs(argc, const_cast<char**>(args));
+    
+    auto intVal = config.get<int>("int_value");
+    assert(intVal.has_value());
+    assert(*intVal == 42);
+    
+    auto stringVal = config.get<std::string>("string_value");
+    assert(stringVal.has_value());
+    assert(*stringVal == "hello");
+    
+    // Test -key value format
+    nlm::Config config2;
+    const char* args2[] = {"test", "-bool_value", "true", "-double_value", "3.14159"};
+    int argc2 = 5;
+    config2.loadFromArgs(argc2, const_cast<char**>(args2));
+    
+    auto boolVal = config2.get<bool>("bool_value");
+    assert(boolVal.has_value());
+    assert(*boolVal == true);
+    
+    auto doubleVal = config2.get<double>("double_value");
+    assert(doubleVal.has_value());
+    assert(*doubleVal > 3.14158 && *doubleVal < 3.14160);
+    
+    std::cout << "    testConfigCommandLineParsing passed" << std::endl;
+}
+
+void testConfigValueTypes() {
+    nlm::Config config;
+    
+    // Test integer types
+    config.set("int8", static_cast<int8_t>(100), nlm::ConfigSource::Runtime);
+    config.set("int16", static_cast<int16_t>(1000), nlm::ConfigSource::Runtime);
+    config.set("int32", static_cast<int32_t>(10000), nlm::ConfigSource::Runtime);
+    config.set("int64", static_cast<int64_t>(100000), nlm::ConfigSource::Runtime);
+    
+    auto int8Val = config.get<int8_t>("int8");
+    assert(int8Val.has_value());
+    assert(*int8Val == 100);
+    
+    auto int16Val = config.get<int16_t>("int16");
+    assert(int16Val.has_value());
+    assert(*int16Val == 1000);
+    
+    auto int32Val = config.get<int32_t>("int32");
+    assert(int32Val.has_value());
+    assert(*int32Val == 10000);
+    
+    auto int64Val = config.get<int64_t>("int64");
+    assert(int64Val.has_value());
+    assert(*int64Val == 100000);
+    
+    // Test string vector
+    std::vector<std::string> strVec = {"apple", "banana", "cherry"};
+    config.set("str_vec", strVec, nlm::ConfigSource::Runtime);
+    auto vecVal = config.get<std::vector<std::string>>("str_vec");
+    assert(vecVal.has_value());
+    assert(vecVal->size() == 3);
+    assert((*vecVal)[0] == "apple");
+    
+    std::cout << "    testConfigValueTypes passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigCommandLineParsing();
+    testConfigValueTypes();
 }
 
 } // namespace test_config

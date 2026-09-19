@@ -56,6 +56,24 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // File rotation support
+    void setFileRotation(bool enable, size_t maxSizeMB = 10, size_t maxFiles = 5);
+    bool getFileRotation() const;
+    
+    // Structured logging support
+    void setStructuredLogging(bool enable);
+    bool getStructuredLogging() const;
+    
+    // Custom log format
+    void setLogFormat(const std::string& format);
+    std::string getLogFormat() const;
+    
+    // Color configuration
+    void setColorScheme(const std::string& scheme);
+    
+    // Timestamp format
+    void setTimestampFormat(const std::string& format);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -103,7 +121,11 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
+    // Global configuration methods
+    void setGlobalTimestampFormat(const std::string& format);
+    void setGlobalLogFormat(const std::string& format);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

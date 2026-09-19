@@ -64,15 +64,93 @@ bool Config::loadFromArgs(int argc, char** argv) {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                std::string valueStr = arg.substr(pos + 1);
+                
+                // Try to parse value as int, then double, then bool, then string
+                bool parsed = false;
+                
+                // Try int
+                try {
+                    size_t pos2;
+                    int intVal = std::stoi(valueStr, &pos2);
+                    if (pos2 == valueStr.size()) {
+                        set(key, intVal, ConfigSource::CommandLine);
+                        parsed = true;
+                    }
+                } catch (...) {}
+                
+                // Try double
+                if (!parsed) {
+                    try {
+                        size_t pos2;
+                        double doubleVal = std::stod(valueStr, &pos2);
+                        if (pos2 == valueStr.size()) {
+                            set(key, doubleVal, ConfigSource::CommandLine);
+                            parsed = true;
+                        }
+                    } catch (...) {}
+                }
+                
+                // Try bool
+                if (!parsed) {
+                    std::string lower = toLower(valueStr);
+                    if (lower == "true" || lower == "false") {
+                        bool boolVal = (lower == "true");
+                        set(key, boolVal, ConfigSource::CommandLine);
+                        parsed = true;
+                    }
+                }
+                
+                // Fallback to string
+                if (!parsed) {
+                    set(key, valueStr, ConfigSource::CommandLine);
+                }
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            
+            // Try to parse value as int, then double, then bool, then string
+            bool parsed = false;
+            
+            // Try int
+            try {
+                size_t pos2;
+                int intVal = std::stoi(value, &pos2);
+                if (pos2 == value.size()) {
+                    set(key, intVal, ConfigSource::CommandLine);
+                    parsed = true;
+                }
+            } catch (...) {}
+            
+            // Try double
+            if (!parsed) {
+                try {
+                    size_t pos2;
+                    double doubleVal = std::stod(value, &pos2);
+                    if (pos2 == value.size()) {
+                        set(key, doubleVal, ConfigSource::CommandLine);
+                        parsed = true;
+                    }
+                } catch (...) {}
+            }
+            
+            // Try bool
+            if (!parsed) {
+                std::string lower = toLower(value);
+                if (lower == "true" || lower == "false") {
+                    bool boolVal = (lower == "true");
+                    set(key, boolVal, ConfigSource::CommandLine);
+                    parsed = true;
+                }
+            }
+            
+            // Fallback to string
+            if (!parsed) {
+                set(key, value, ConfigSource::CommandLine);
+            }
         }
     }
     return true;
@@ -117,12 +195,22 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
-    
+
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        ConfigEntry entry(key, value, source);
+        // Try to get description from key if possible
+        if (key.find('.') != std::string::npos) {
+            size_t dotPos = key.find('.');
+            std::string category = key.substr(0, dotPos);
+            std::string param = key.substr(dotPos + 1);
+            entry.description = "Parameter: " + param + " for " + category;
+        } else {
+            entry.description = "Unknown parameter: " + key;
+        }
+        pImpl->entries.push_back(entry);
     }
 }
 
@@ -131,6 +219,10 @@ void Config::set(const std::string& key, const std::string& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, int64_t value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
