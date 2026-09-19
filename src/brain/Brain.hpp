@@ -29,6 +29,16 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Additional Phase 2 cognitive systems that were defined inline in NeuralPlanner.cpp
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
+
+// Additional cognitive systems (Phase 2)
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;

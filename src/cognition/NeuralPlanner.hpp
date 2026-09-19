@@ -6,6 +6,13 @@
 #include <memory>
 #include <functional>
 
+// Forward declaration for Phase 2 cognitive systems (extracted from NeuralPlanner.cpp)
+namespace nlm {
+    class SelfModel;
+    class SocialLearning;
+    class SpatialRepresentation;
+}
+
 namespace nlm {
 
 // PlanningCandidate: A possible action sequence considered during planning
@@ -129,7 +136,7 @@ public:
     float getSelfModelConfidence(ActionType action) const;
 
     // Is this change likely caused by self (action) vs external?
-    float computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+    float computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                        const std::vector<float>& afterState,
                                        ActionType action) const;
 

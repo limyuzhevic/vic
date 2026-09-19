@@ -14,6 +14,9 @@
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
+#include "../cognition/SpatialRepresentation.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -40,6 +43,11 @@ struct Brain::Impl {
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    
+    // ========== PHASE 2: MISSING COGNITIVE SYSTEMS ==========
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
+    std::unique_ptr<SpatialRepresentation> spatialRepresentation;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -120,6 +128,14 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        
+        // Initialize disconnected cognitive systems (Phase 2)
+        // SelfModel - internal model of agent's self
+        selfModel = std::make_unique<SelfModel>();
+        // SocialLearning - learning from observing other agents
+        socialLearning = std::make_unique<SocialLearning>();
+        // SpatialRepresentation - spatial relationships and place cells
+        spatialRepresentation = std::make_unique<SpatialRepresentation>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -511,8 +527,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Create a simple sensory observation for prediction system
+        // Convert sensory neuron activity to a simple prediction target
+        std::vector<float> currentSensoryActivity;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+            currentSensoryActivity.push_back(activity);
+        }
+        
+        // Train the prediction system with current sensory state
+        SensoryInput sensoryObservation;
+        sensoryObservation.setData(currentSensoryActivity);
+        sensoryObservation.setTimestamp(static_cast<float>(currentTime));
+        
+        pImpl->predictionSystem->train(sensoryObservation);
+        
+        // Get prediction for next state
+        auto predictedState = pImpl->predictionSystem->predictNextState(sensoryObservation);
+        
+        // Use prediction to modulate attention and curiosity
+        if (pImpl->curiosity) {
+            pImpl->curiosity->update(pImpl->timestep);
+        }
+        
+        // Apply prediction to working memory rehearsal
+        if (pImpl->workingMemory) {
+            // Rehearse memory patterns that predict current state
+            pImpl->workingMemory->strengthenMemory(1.2f);  // Boost activity
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,17 +569,63 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Extract pattern from working memory and form concepts
+        std::vector<float> workingPattern = pImpl->workingMemory->retrieve();
+        if (!workingPattern.empty()) {
+            pImpl->conceptFormation->presentExperience(workingPattern, workingPattern, 
+                                                     pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                                                     currentStep);
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Update SelfModel ==========
+    if (pImpl->selfModel && pImpl->workingMemory) {
+        // SelfModel learns from working memory to build internal model
+        std::vector<float> selfPattern = pImpl->workingMemory->retrieve();
+        if (!selfPattern.empty()) {
+            // Use neural activity as self-perception
+            for (size_t i = 0; i < pImpl->motorNeurons.size() && i < selfPattern.size(); ++i) {
+                if (selfPattern[i] > 0.5f) {
+                    pImpl->selfModel->recordSelfAction(ActionType::Wait,
+                                                      selfPattern,
+                                                      selfPattern);
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 12: Update SocialLearning ==========
+    if (pImpl->socialLearning && pImpl->workingMemory) {
+        // SocialLearning can observe working memory patterns as social behaviors
+        std::vector<float> socialPattern = pImpl->workingMemory->retrieve();
+        if (!socialPattern.empty()) {
+            pImpl->socialLearning->observeAgentAction(ActionType::Wait,
+                                                    socialPattern,
+                                                    socialPattern);
+        }
+    }
+    
+    // ========== STEP 13: Update SpatialRepresentation ==========
+    if (pImpl->spatialRepresentation && !pImpl->motorNeurons.empty()) {
+        // Track agent position based on motor neuron activity
+        float movement = 0.0f;
+        for (auto* neuron : pImpl->motorNeurons) {
+            if (neuron->isFiring()) {
+                movement += 1.0f;
+            }
+        }
+        
+        // Update spatial representation
+        pImpl->spatialRepresentation->integrateMovement(movement * 0.1f, movement * 0.1f);
+    }
+    
+    // ========== STEP 14: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
+    // ========== STEP 15: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
@@ -546,7 +634,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // ========== STEP 16: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -576,13 +664,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // ========== STEP 17: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 18: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
