@@ -6,6 +6,9 @@
 #include <variant>
 #include <optional>
 
+// nlohmann/json for modern JSON parsing
+#include <nlohmann/json.hpp>
+
 namespace nlm {
 
 // Forward declarations

@@ -1,13 +1,16 @@
+#pragma once
+
 #include "Logger.hpp"
-#include <iostream>
+#include "../core/SimulationClock/SimulationClock.hpp"
 #include <fstream>
-#include <iomanip>
 #include <sstream>
+#include <ctime>
+#include <iomanip>
 #include <mutex>
 
 namespace nlm {
 
-struct ConsoleLogger::Impl {
+struct Logger::Impl {
     LogLevel level = LogLevel::Info;
     bool useColors = true;
     std::ofstream fileOut;
@@ -71,10 +74,12 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->fileOut.open(filepath, std::ios::app);
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
@@ -102,7 +107,6 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
     }
 }
 
-// Logger class implementation
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
@@ -129,10 +133,9 @@ void Logger::setLevel(LogLevel level) {
     }
 }
 
-void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
+void Logger::log(LogLevel level, const std::string& message, 
+                 const std::string& file, int line, 
+                 const std::string& function) {
     LogEntry entry;
     entry.level = level;
     entry.message = message;
@@ -141,6 +144,7 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
     
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
     }
@@ -168,7 +172,7 @@ void Logger::critical(const std::string& message, const std::string& file, int l
 
 bool Logger::isEnabled(LogLevel level) const {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
+    for (const auto& logger : pImpl->loggers) {
         if (logger->getLevel() <= level) {
             return true;
         }
@@ -177,16 +181,16 @@ bool Logger::isEnabled(LogLevel level) const {
 }
 
 Logger& Logger::getGlobal() {
-    static Logger globalLogger;
-    return globalLogger;
+    static Logger instance;
+    return instance;
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    std::lock_guard<std::mutex> lock(getGlobal().pImpl->mutex);
+    getGlobal().pImpl->loggers.clear();
+    getGlobal().pImpl->loggers.push_back(logger);
 }
 
-// LogStream implementation
 LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
     : level_(level), file_(file), line_(line), function_(function) {}
 

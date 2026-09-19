@@ -1,86 +1,127 @@
 #pragma once
 
-/**
- * Performance Infrastructure
- * 
- * Phase 5 introduces comprehensive performance optimization for large-scale neural simulation:
- * 
- * 1. Memory Pool Allocators
- *    - Pre-allocated neuron and synapse pools
- *    - Reduced allocation overhead
- *    - Better cache locality
- * 
- * 2. Event Queue Optimization
- *    - Lock-free ring buffers for spike events
- *    - Time-bucketed delayed spikes
- *    - Priority queues for time-sensitive events
- * 
- * 3. Structure-of-Arrays (SoA) Data Layout
- *    - Contiguous memory for neuron states
- *    - Better SIMD vectorization
- *    - Improved cache utilization
- * 
- * 4. Sparse Connectivity
- *    - Adjacency lists instead of dense matrices
- *    - Efficient synapse lookup
- *    - Memory-efficient storage for large networks
- * 
- * 5. Multithreading Support
- *    - Parallel neural population updates
- *    - Thread-local neuron processing
- *    - Synchronized spike processing
- * 
- * This infrastructure is designed to scale from 10k to 100M+ neurons.
- */
-
-#ifndef NLM_PERFORMANCE_HPP
-#define NLM_PERFORMANCE_HPP
-
-// Configure performance features based on build settings
-#ifdef NLM_PERFORMANCE_ENABLED
-    #define NLM_USE_MEMORY_POOL 1
-    #define NLM_USE_SOA 1
-    #define NLM_USE_EVENT_QUEUE 1
-    #define NLM_USE_SPARE_CONNECTIVITY 1
-    #define NLM_USE_MULTITHREADING 1
-    #define NLM_USE_SIMD 1
-#else
-    #define NLM_USE_MEMORY_POOL 0
-    #define NLM_USE_SOA 0
-    #define NLM_USE_EVENT_QUEUE 0
-    #define NLM_USE_SPARE_CONNECTIVITY 0
-    #define NLM_USE_MULTITHREADING 0
-    #define NLM_USE_SIMD 0
-#endif
-
-// SIMD configuration
-#ifdef NLM_SIMD_AVX2
-    #define NLM_SIMD_WIDTH 8  // AVX2: 8 float32
-#elif defined(NLM_SIMD_AVX512)
-    #define NLM_SIMD_WIDTH 16 // AVX512: 16 float32
-#elif defined(NLM_SIMD_SSE)
-    #define NLM_SIMD_WIDTH 4  // SSE: 4 float32
-#else
-    #define NLM_SIMD_WIDTH 1  // Scalar
-#endif
-
-// Multithreading configuration
-#ifdef NLM_THREAD_COUNT
-    #define NLM_NUM_THREADS NLM_THREAD_COUNT
-#else
-    #define NLM_NUM_THREADS 1
-#endif
-
-// Memory pool configuration
-#define NLM_MEMORY_POOL_PAGE_SIZE 4096
-#define NLM_MAX_POOL_SIZE (1024 * 1024)  // Max objects per pool
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <memory>
+#include <algorithm>
 
 namespace nlm {
 
-// Forward declarations
-class Neuron;
-class Synapse;
+// Performance metrics collector
+class PerformanceCollector {
+public:
+    PerformanceCollector();
+    ~PerformanceCollector();
+    
+    // Record timing information
+    void recordEvent(const std::string& name, double duration);
+    
+    // Record memory usage
+    void recordMemoryUsage(size_t memoryBytes);
+    
+    // Record CPU usage
+    void recordCpuUsage(double cpuPercent);
+    
+    // Get average execution time for an event
+    double getAverageTime(const std::string& name) const;
+    
+    // Get minimum execution time for an event
+    double getMinTime(const std::string& name) const;
+    
+    // Get maximum execution time for an event
+    double getMaxTime(const std::string& name) const;
+    
+    // Get number of executions for an event
+    size_t getExecutionCount(const std::string& name) const;
+    
+    // Generate performance report
+    std::string generateReport() const;
+    
+    // Save report to file
+    bool saveReport(const std::string& filepath) const;
+    
+    // Clear all collected data
+    void clear();
+    
+    // Get global collector instance
+    static PerformanceCollector& getGlobal();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Performance event marker for scoped timing
+class PerformanceEvent {
+public:
+    PerformanceEvent(const std::string& name);
+    ~PerformanceEvent();
+    
+    // Mark event as completed
+    void complete();
+    
+    // Get event name
+    const std::string& getName() const;
+    
+    // Get event duration
+    double getDuration() const;
+    
+private:
+    std::string name_;
+    std::chrono::high_resolution_clock::time_point startTime_;
+    double duration_ = 0.0;
+    bool completed_ = false;
+};
+
+// Performance benchmark utilities
+class PerformanceBenchmark {
+public:
+    // Benchmark brain simulation performance
+    static double benchmarkBrainSimulation(std::shared_ptr<Brain> brain, size_t steps);
+    
+    // Benchmark memory usage
+    static size_t benchmarkMemoryUsage(std::shared_ptr<Brain> brain);
+    
+    // Benchmark spike processing performance
+    static double benchmarkSpikeProcessing(std::shared_ptr<Brain> brain, size_t steps);
+    
+    // Run comprehensive benchmark suite
+    static std::string runBenchmarkSuite(std::shared_ptr<Brain> brain, const std::string& configName = "");
+};
+
+// Performance profiler for detailed analysis
+class PerformanceProfiler {
+public:
+    PerformanceProfiler();
+    ~PerformanceProfiler();
+    
+    // Start profiling a function
+    void startProfile(const std::string& functionName);
+    
+    // Stop profiling and record results
+    void stopProfile();
+    
+    // Get total time spent in a function
+    double getTotalTime(const std::string& functionName) const;
+    
+    // Get number of calls to a function
+    size_t getCallCount(const std::string& functionName) const;
+    
+    // Generate detailed profiling report
+    std::string generateProfileReport() const;
+    
+    // Reset profiler data
+    void reset();
+    
+    // Get global profiler instance
+    static PerformanceProfiler& getGlobal();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
 
 } // namespace nlm
-
-#endif // NLM_PERFORMANCE_HPP

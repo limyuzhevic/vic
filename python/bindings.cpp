@@ -2,9 +2,11 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/iostream.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -398,7 +400,288 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("getEpisodeMetrics", &AgentBrain::getEpisodeMetrics,
+             "Get metrics for the current episode")
+        .def("resetEpisodeMetrics", &AgentBrain::resetEpisodeMetrics,
+             "Reset episode metrics for a new episode")
+        .def("getExperienceCount", &AgentBrain::getExperienceCount,
+             "Get number of experiences processed")
+        .def("getAverageReward", &AgentBrain::getAverageReward,
+             "Get average reward received")
+        .def("getActionHistory", &AgentBrain::getActionHistory,
+             py::return_value_policy::reference_internal,
+             "Get action history");
+    
+    // Advanced configuration helper functions
+    m.def("createAdvancedConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set advanced defaults for production use
+        config->set("brain.neuron_count", 5000);
+        config->set("brain.synapse_density", 0.15f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("brain.development.enabled", true);
+        config->set("memory.episodic.capacity", 1000);
+        config->set("memory.associative.max_patterns", 500);
+        config->set("simulation.timestep", 0.001);
+        
+        return config;
+    }, "Create an advanced configuration with production-ready defaults");
+    
+    m.def("createMinimalConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set minimal defaults for testing
+        config->set("brain.neuron_count", 100);
+        config->set("brain.synapse_density", 0.05f);
+        config->set("plasticity.stdp.enable", false);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", false);
+        config->set("neuromod.curiosity.enable", false);
+        config->set("neuromod.novelty.enable", false);
+        
+        return config;
+    }, "Create a minimal configuration for testing");
+    
+    m.def("createResearchConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set research-oriented defaults
+        config->set("brain.neuron_count", 10000);
+        config->set("brain.synapse_density", 0.2f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.001f);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.hebbian.learning_rate", 0.01f);
+        config->set("plasticity.structural.enable", true);
+        config->set("plasticity.structural.synaptogenesis_rate", 0.0002f);
+        config->set("plasticity.structural.pruning_rate", 0.00002f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("neuromod.dopamine.scale", 2.0f);
+        config->set("neuromod.curiosity.exploration_rate", 0.5f);
+        config->set("brain.development.enabled", true);
+        config->set("brain.development.critical_period_length", 1000);
+        config->set("brain.development.maturation_rate", 0.001f);
+        config->set("memory.episodic.capacity", 5000);
+        config->set("memory.associative.max_patterns", 2000);
+        config->set("prediction.enabled", true);
+        config->set("prediction.error_threshold", 0.1f);
+        
+        return config;
+    }, "Create a research configuration with complex settings");
+    
+    // Enhanced SimpleWorld configuration
+    m.def("createWorldWithDefaults", []() -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->setAgentStart(10.0, 10.0);
+        world->setRandomSeed(42);
+        return world;
+    }, "Create a world with default settings");
+    
+    m.def("createWorldWithSize", [](size_t width, size_t height, size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+       "Create a world with specified dimensions");
+    
+    m.def("createWorldWithResources", [](size_t width, size_t height) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, 8, 8);
+        
+        // Add some resources
+        world->addObject(WorldObject(5.0f, 5.0f, WorldObjectType::Resource, 10.0f));
+        world->addObject(WorldObject(15.0f, 15.0f, WorldObjectType::Resource, 15.0f));
+        world->addObject(WorldObject(2.0f, 8.0f, WorldObjectType::Hazard, 5.0f));
+        
+        return world;
+    }, py::arg("width"), py::arg("height"), "Create a world with resource objects");
+    
+    // Performance monitoring and benchmarking
+    m.def("benchmarkBrain", [](std::shared_ptr<Brain> brain, size_t steps) {
+        std::stringstream ss;
+        py::scoped_ostream_redirect guard(ss);
+        
+        auto oldLogger = Logger::getGlobal();
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Error);
+        Logger::setGlobal(consoleLogger);
+        
+        brain->initialize();
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        Logger::setGlobal(oldLogger);
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getAverageFiringRate(),
+            static_cast<double>(steps) / (duration.count() / 1000.0),
+            brain->getTotalNeuronCount(),
+            brain->getTotalSynapseCount()
+        );
+    }, py::arg("brain"), py::arg("steps"), "Benchmark brain performance");
+    
+    m.def("runAdvancedSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent, size_t steps) {
+        brain->initialize();
+        agent->initialize(*world);
+        
+        std::vector<float> rewards;
+        std::vector<size_t> firingCounts;
+        std::vector<float> curiosityLevels;
+        
+        for (size_t i = 0; i < steps; ++i) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Calculate reward from internal signals
+            auto internalSignals = percept.getInternal();
+            float reward = internalSignals.empty() ? 0.0f : internalSignals[0];
+            
+            agent->applyRewardModulation(reward, 0.0f);
+            agent->updateDevelopment(0.1f);
+            
+            rewards.push_back(reward);
+            firingCounts.push_back(brain->getFiringNeuronCount());
+            curiosityLevels.push_back(agent->getCuriosityLevel());
+            
+            // Log progress every 10% of simulation
+            if ((i + 1) % (steps / 10) == 0) {
+                auto oldLogger = Logger::getGlobal();
+                auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+                Logger::setGlobal(consoleLogger);
+                
+                NLM_LOG_INFO("Step " + std::to_string(i + 1) + 
+                           ": Reward=" + std::to_string(reward) +
+                           ", Firing=" + std::to_string(brain->getFiringNeuronCount()) +
+                           ", Curiosity=" + std::to_string(agent->getCuriosityLevel()));
+                
+                Logger::setGlobal(oldLogger);
+            }
+        }
+        
+        return std::make_tuple(
+            rewards,
+            firingCounts,
+            curiosityLevels,
+            brain->getTotalSpikeCount(),
+            agent->getExperienceCount(),
+            agent->getAverageReward()
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"), "Run advanced simulation with logging");
+    
+    // Serialization with JSON support
+    m.def("serializeBrainToJSON", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        // For now, just log the operation - full implementation would require JSON serialization support
+        NLM_LOG_INFO("Serializing brain to JSON: " + filepath);
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Serialize brain state to JSON file");
+    
+    m.def("deserializeBrainFromJSON", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        NLM_LOG_INFO("Deserializing brain from JSON: " + filepath);
+        return brain->load(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Load brain state from JSON file");
+    
+    // Configuration file utilities
+    m.def("exportConfigToJSON", [](std::shared_ptr<Config> config, const std::string& filepath) {
+        return config->saveToFile(filepath);
+    }, py::arg("config"), py::arg("filepath"), "Export configuration to JSON file");
+    
+    m.def("importConfigFromJSON", [](std::shared_ptr<Config> config, const std::string& filepath) {
+        return config->loadFromFile(filepath);
+    }, py::arg("config"), py::arg("filepath"), "Import configuration from JSON file");
+    
+    // Advanced error handling and validation
+    m.def("validateBrainConfig", [](std::shared_ptr<Config> config) {
+        std::vector<std::string> errors;
+        
+        // Validate neuron count
+        auto neuronCount = config->get<int64_t>("brain.neuron_count");
+        if (neuronCount && *neuronCount < 10) {
+            errors.push_back("Neuron count too low (minimum 10)");
+        } else if (neuronCount && *neuronCount > 100000) {
+            errors.push_back("Neuron count too high (maximum 100000)");
+        }
+        
+        // Validate connection probability
+        auto connProb = config->get<double>("brain.connection_probability");
+        if (connProb && (*connProb < 0.0 || *connProb > 1.0)) {
+            errors.push_back("Connection probability must be between 0.0 and 1.0");
+        }
+        
+        // Validate plasticity settings
+        auto stdpEnabled = config->get<bool>("plasticity.stdp.enable");
+        auto hebbianEnabled = config->get<bool>("plasticity.hebbian.enable");
+        
+        if (!stdpEnabled || !hebbianEnabled) {
+            errors.push_back("At least one plasticity rule must be enabled");
+        }
+        
+        // Validate simulation timestep
+        auto timestep = config->get<double>("simulation.timestep");
+        if (timestep && (*timestep <= 0.0 || *timestep > 1.0)) {
+            errors.push_back("Simulation timestep must be positive and less than 1.0");
+        }
+        
+        return errors;
+    }, py::arg("config"), "Validate configuration and return errors");
+    
+    // Get configuration documentation
+    m.def("getConfigSchema", []() {
+        nlohmann::json schema;
+        schema["type"] = "object";
+        schema["description"] = "NLM Configuration Schema";
+        
+        schema["properties"] = nlohmann::json::object();
+        
+        // Add various configuration sections
+        schema["properties"]["brain"] = nlohmann::json::object();
+        schema["properties"]["brain"]["type"] = "object";
+        schema["properties"]["brain"]["properties"] = nlohmann::json::object();
+        schema["properties"]["brain"]["properties"]["neuron_count"] = nlohmann::json::object();
+        schema["properties"]["brain"]["properties"]["neuron_count"]["type"] = "integer";
+        schema["properties"]["brain"]["properties"]["neuron_count"]["minimum"] = 10;
+        schema["properties"]["brain"]["properties"]["neuron_count"]["maximum"] = 100000;
+        
+        schema["properties"]["plasticity"] = nlohmann::json::object();
+        schema["properties"]["plasticity"]["type"] = "object";
+        schema["properties"]["plasticity"]["properties"] = nlohmann::json::object();
+        
+        schema["properties"]["neuromod"] = nlohmann::json::object();
+        schema["properties"]["neuromod"]["type"] = "object";
+        
+        schema["properties"]["simulation"] = nlohmann::json::object();
+        schema["properties"]["simulation"]["type"] = "object";
+        schema["properties"]["simulation"]["properties"] = nlohmann::json::object();
+        schema["properties"]["simulation"]["properties"]["timestep"] = nlohmann::json::object();
+        schema["properties"]["simulation"]["properties"]["timestep"]["type"] = "number";
+        schema["properties"]["simulation"]["properties"]["timestep"]["minimum"] = 0.0;
+        schema["properties"]["simulation"]["properties"]["timestep"]["maximum"] = 1.0;
+        
+        schema["required"] = nlohmann::json::array({"brain.neuron_count", "simulation.timestep"});
+        
+        return schema.dump(2);
+    }, "Get configuration schema as JSON string");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
