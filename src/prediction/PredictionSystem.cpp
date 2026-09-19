@@ -55,6 +55,22 @@ void PredictionSystem::clearHistory() {
 
 void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
+    // Placeholder: Update confidence based on observation complexity
+    float complexity = 0.0f;
+    const auto& data = observation.getData();
+    if (!data.empty()) {
+        float sum = std::accumulate(data.begin(), data.end(), 0.0f);
+        float mean = sum / data.size();
+        float variance = 0.0f;
+        for (float val : data) {
+            variance += (val - mean) * (val - mean);
+        }
+        variance /= data.size();
+        complexity = std::sqrt(variance);
+    }
+    
+    // Confidence increases with training
+    pImpl->confidence = std::min(1.0f, pImpl->confidence + 0.01f * complexity);
 }
 
 } // namespace nlm

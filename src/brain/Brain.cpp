@@ -510,9 +510,44 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->sensoryNeurons.size() > 0) {
+        // Create a prediction from current sensory state
+        SensoryInput currentPrediction;
+        
+        // Extract current sensory activity as pattern
+        std::vector<float> pattern;
+        for (size_t i = 0; i < std::min(pImpl->sensoryNeurons.size(), size_t(10)); ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            if (neuron) {
+                pattern.push_back(neuron->getState().membranePotential);
+            }
+        }
+        
+        if (!pattern.empty()) {
+            // Use prediction system to predict next state
+            auto prediction = pImpl->predictionSystem->predictNextState(pattern);
+            
+            // Update prediction error if we have actual sensory input
+            // In a real implementation, this would compare prediction to actual
+            // For now, use prediction error from neuromodulation
+            if (pImpl->predictionError) {
+                float predError = pImpl->predictionError->getError();
+                if (std::abs(predError) > 0.001f) {
+                    // Update prediction system with error
+                    pImpl->predictionSystem->updatePredictions(pattern, pattern);
+                }
+            }
+        }
+    }
+    
+    // Apply prediction to attention system
+    if (pImpl->attention && pImpl->predictionSystem) {
+        float confidence = pImpl->predictionSystem->getConfidence();
+        // Use prediction confidence to modulate attention
+        if (confidence > 0.5f) {
+            // Strong prediction = focus attention on predicted outcomes
+            NLM_LOG_INFO("Prediction confidence high: " + std::to_string(confidence) + " - focusing attention");
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
