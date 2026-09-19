@@ -37,6 +37,20 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
     }
 }
 
+void PredictionSystem::update(const SensoryInput& currentState) {
+    // Update prediction system based on current sensory input
+    // This is a simplified implementation - Phase 2 would have real predictive coding
+    if (currentState.getType()) {
+        // Store prediction error from last update
+        // In a real system, this would use backpropagation through time
+        // For now, just maintain error history
+        if (!pImpl->errorHistory.empty()) {
+            // Simple error decay
+            pImpl->confidence = std::max(0.1f, pImpl->confidence * 0.99f);
+        }
+    }
+}
+
 float PredictionSystem::getPredictionError() const {
     return pImpl->predictionError;
 }

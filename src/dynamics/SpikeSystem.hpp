@@ -69,12 +69,25 @@ public:
     float getAverageSpikeRate() const;
     std::vector<NeuronId> getMostActiveNeurons(size_t count) const;
     
-    // Reset
-    void reset();
-    
+// Register brain regions for spike delivery
+    void registerBrainRegions(const std::vector<NeuralRegion*>& regions);
+
+    // Update neuron membrane potentials (LIF dynamics)
+    void updateNeurons(Timestamp currentTime, TimestepDuration dt);
+
+    // Set simulation timestep
+    void setTimestep(TimestepDuration timestep) {
+        timestep_ = timestep;
+    }
+
 private:
     struct Impl;
     Impl* pImpl;
-};
+    
+    // Store brain regions for spike delivery
+    std::vector<NeuralRegion*> regions;
+    
+    // Simulation timestep
+    TimestepDuration timestep_;
 
 } // namespace nlm
