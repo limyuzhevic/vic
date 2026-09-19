@@ -57,14 +57,16 @@ struct EpisodicMemoryItem {
 // - Temporal ordering through timestamps
 // - Relevance-weighted recall
 // - Replay during offline periods
+// - Sleep/rest cycle for memory consolidation
 
 class NeuralEpisodicMemory {
 public:
     NeuralEpisodicMemory();
+    NeuralEpisodicMemory(std::shared_ptr<Config> config);
     ~NeuralEpisodicMemory();
-
-    // Initialize with brain reference
-    void initialize(Brain* brain);
+    
+    // Initialize with brain reference and config
+    void initialize(Brain* brain, std::shared_ptr<Config> config);
 
     // Store a new experience
     // The experience is encoded as neural activity and can influence future processing
@@ -77,17 +79,17 @@ public:
 
     // Retrieve episodes from a specific time window
     std::vector<const EpisodicMemoryItem*> retrieveTemporal(SimulationStep startTime,
-                                                            SimulationStep endTime,
-                                                            size_t maxResults = 10) const;
+                                                             SimulationStep endTime,
+                                                             size_t maxResults = 10) const;
 
     // Retrieve episodes by location
     std::vector<const EpisodicMemoryItem*> retrieveByLocation(float x, float y,
-                                                             float radius,
-                                                             size_t maxResults = 5) const;
+                                                              float radius,
+                                                              size_t maxResults = 5) const;
 
     // Retrieve episodes following a specific action
     std::vector<const EpisodicMemoryItem*> retrieveAfterAction(ActionType action,
-                                                              size_t maxResults = 5) const;
+                                                               size_t maxResults = 5) const;
 
     // Replay an episode - reactivates the neural patterns associated with it
     // This allows the brain to "relive" the experience
@@ -124,6 +126,14 @@ public:
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
 
+    // Update sleep/rest cycle management
+    void updateSleepRestCycle(SimulationStep currentStep);
+    bool isResting() const { return pImpl->isResting; }
+    void startRestCycle();
+    
+    // Replay during sleep for consolidation
+    void replayConsolidationMemory();
+
 private:
     // Compute similarity between query and stored episode
     float computeSimilarity(const std::vector<float>& query,
@@ -136,10 +146,14 @@ private:
                         SimulationStep* endTime,
                         ActionType* actionQuery) const;
 
+    // Compute episode relevance for consolidation
+    float computeRelevance(const EpisodicMemoryItem& episode) const;
+
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
+    std::shared_ptr<Config> config_;
     std::deque<EpisodicMemoryItem> episodes_;
     size_t maxEpisodes_;
     bool replayEnabled_;

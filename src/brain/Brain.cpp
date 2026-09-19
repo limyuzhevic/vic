@@ -11,6 +11,7 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
@@ -19,6 +20,8 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <chrono>
+#include <random>
 
 namespace nlm {
 
@@ -46,6 +49,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -110,7 +116,7 @@ struct Brain::Impl {
         
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        episodicMemory = std::make_unique<NeuralEpisodicMemory>(config);
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
         // Initialize prediction system
@@ -126,6 +132,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -229,14 +238,12 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
+    // Initialize episodic memory with config for sleep/rest cycle
+    pImpl->episodicMemory->initialize(this, config);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
     // Initialize associative memory
@@ -258,6 +265,9 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -511,8 +521,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with sensory input
+        // Use sensory data to predict next state
+        
+        // Get current sensory input as prediction target
+        std::vector<float> sensoryPattern;
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Gather activity from sensory neurons
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                float activation = neuron->getState().membranePotential - neuron->getState().restingPotential;
+                sensoryPattern.push_back(activation * 0.1f);  // Normalize to [0, 1]
+            }
+        }
+        
+        // Update prediction system with current state
+        pImpl->predictionSystem->updatePredictions(sensoryPattern, sensoryPattern);
+        
+        // Get prediction error for neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Apply prediction error to neuromodulation systems
+        if (predictionError > 0.0f) {
+            if (pImpl->predictionError) {
+                pImpl->predictionError->computeError(predictionError, predictionError);
+            }
+            if (pImpl->curiosity) {
+                pImpl->curiosity->increaseExploration(predictionError);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +564,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Form concepts from neural activity patterns
+        std::vector<float> conceptPattern;
+        
+        // Collect current neural activity patterns
+        float totalActivity = 0.0f;
+        size_t neuronCount = 0;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    float activation = neuron->getState().membranePotential - neuron->getState().restingPotential;
+                    conceptPattern.push_back(std::max(0.0f, activation * 0.01f));  // Normalize
+                    totalActivity += std::max(0.0f, activation);
+                    neuronCount++;
+                }
+            }
+        }
+        
+        if (!conceptPattern.empty() && pImpl->conceptFormation) {
+            // Get current reward from dopamine system
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Present pattern to concept formation system
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                conceptPattern, conceptPattern, reward, currentStep);
+            
+            // If concept was formed or matched, update the brain's concept index
+            if (conceptId > 0) {
+                // Track which concepts are active
+                if (auto* brain = this) {
+                    // The concept formation system already has the concept stored
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1051,33 +1119,27 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;
 }
 
-// ========== NEUROMODULATION SYSTEMS ==========
-
-Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
+void Brain::updateSleepRestCycle(SimulationStep currentStep) {
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->updateSleepRestCycle(currentStep);
+    }
 }
 
-Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
+bool Brain::isResting() const {
+    return pImpl->isResting;
 }
 
-Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
+void Brain::startRestCycle() {
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->startRestCycle();
+    }
 }
 
-PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
+void Brain::replayConsolidationMemory() {
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->replayConsolidationMemory();
+    }
 }
-
-std::shared_ptr<const Config> Brain::getConfig() const {
-    return pImpl->config;
-}
-
-RandomGenerator* Brain::getRandomGenerator() {
-    return pImpl->rng.get();
-}
-
-void Brain::logStatus() const {
     NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
     NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));

@@ -25,6 +25,9 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
@@ -69,6 +72,14 @@ public:
     
     // Simulation time step
     void step(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Sleep/rest cycle management
+    void updateSleepRestCycle(SimulationStep currentStep);
+    bool isResting() const;
+    void startRestCycle();
+    
+    // Replay during sleep for consolidation
+    void replayConsolidationMemory();
     
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern
@@ -174,6 +185,15 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood regulation and motivation
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();

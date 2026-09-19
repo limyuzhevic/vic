@@ -46,6 +46,29 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // Integrate development effects with brain systems
+    void integrateWithBrain(Brain* brain);
+    
+    // Update attention development
+    void updateAttentionDevelopment(Brain* brain);
+    
+    // Update memory development  
+    void updateMemoryDevelopment(Brain* brain);
+    
+    // Update neuromodulation development
+    void updateNeuromodulationDevelopment(Brain* brain);
+    
+    // Update plasticity rule development
+    void updatePlasticityDevelopment(Brain* brain);
+    
+    // Check if development should trigger structural changes
+    bool shouldTriggerStructuralChanges() const;
+    
+    // Get stage-appropriate parameters
+    float getAttentionStrengthModifier() const;
+    float getMemoryConsolidationModifier() const;
+    float getNeuromodulationSensitivity() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

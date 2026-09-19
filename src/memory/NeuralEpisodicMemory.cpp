@@ -1,8 +1,12 @@
 #include "NeuralEpisodicMemory.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Config/Config.hpp"
+#include "../brain/Brain.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <random>
+#include <chrono>
 
 namespace nlm {
 
@@ -15,20 +19,81 @@ struct NeuralEpisodicMemory::Impl {
     Impl() : brain(nullptr) {}
 };
 
-NeuralEpisodicMemory::NeuralEpisodicMemory()
-    : pImpl(new Impl)
+NeuralEpisodicMemory::NeuralEpisodicMemory(std::shared_ptr<Config> config)
+    : pImpl(new Impl(config))
     , brain_(nullptr)
     , maxEpisodes_(1000)
     , replayEnabled_(true)
 {
 }
 
+NeuralEpisodicMemory::NeuralEpisodicMemory()
+    : NeuralEpisodicMemory(nullptr) {}
+
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
 
-void NeuralEpisodicMemory::initialize(Brain* brain) {
+NeuralEpisodicMemory::NeuralEpisodicMemory(std::shared_ptr<Config> config)
+    : pImpl(new Impl(config))
+    , brain_(nullptr)
+    , maxEpisodes_(1000)
+    , replayEnabled_(true)
+{
+}
+
+NeuralEpisodicMemory::NeuralEpisodicMemory()
+    : NeuralEpisodicMemory(nullptr) {}
+
+NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
+
+void NeuralEpisodicMemory::initialize(Brain* brain, std::shared_ptr<Config> config) {
     pImpl->brain = brain;
     brain_ = brain;
+    
+    // Store config for sleep management
+    pImpl->config = config;
+    
     NLM_LOG_INFO("NeuralEpisodicMemory initialized");
+    
+    // Initialize sleep/rest cycle
+    startRestCycle();
+}
+
+void NeuralEpisodicMemory::startRestCycle() {
+    if (!pImpl->brain) return;
+    
+    // Check if we should enter rest based on low activity
+    float avgActivation = 0.0f;
+    size_t neuronCount = 0;
+    
+    for (const auto& region : pImpl->brain->getRegions()) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                float activation = neuron->getState().membranePotential - neuron->getState().restingPotential;
+                if (activation > 0.0f) {
+                    avgActivation += activation;
+                    neuronCount++;
+                }
+            }
+        }
+    }
+    
+    if (neuronCount > 0) {
+        avgActivation /= neuronCount;
+    }
+    
+    // Enter rest if average activation is low
+    if (avgActivation < pImpl->restThreshold) {
+        pImpl->isResting = true;
+        pImpl->restStartTime = pImpl->brain->getCurrentTime();
+        pImpl->timeSinceLastRest = 0;
+        
+        // Reduce metabolic demand during rest
+        pImpl->brain->injectCurrentToNeurons(NeuronType::Internal, -0.5f);
+        pImpl->brain->injectCurrentToNeurons(NeuronType::Sensory, -0.5f);
+        pImpl->brain->injectCurrentToNeurons(NeuronType::Motor, -0.5f);
+        
+        NLM_LOG_INFO("Entering rest cycle - low average neural activity");
+    }
 }
 
 void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
@@ -218,13 +283,125 @@ float NeuralEpisodicMemory::getAverageReward() const {
     return sum / episodes_.size();
 }
 
+void NeuralEpisodicMemory::updateSleepRestCycle(SimulationStep currentStep) {
+    if (!pImpl->brain) return;
+    
+    pImpl->timeSinceLastRest++;
+    
+    if (pImpl->isResting) {
+        // Check if rest period should end
+        Timestamp elapsed = pImpl->brain->getCurrentTime() - pImpl->restStartTime;
+        if (elapsed >= pImpl->sleepDuration * pImpl->brain->getTimestep()) {
+            // End rest period
+            pImpl->isResting = false;
+            pImpl->sleepCycles++;
+            
+            // Restore normal activity levels
+            pImpl->brain->injectCurrentToNeurons(NeuronType::Internal, 1.0f);
+            pImpl->brain->injectCurrentToNeurons(NeuronType::Sensory, 1.0f);
+            pImpl->brain->injectCurrentToNeurons(NeuronType::Motor, 1.0f);
+            
+            NLM_LOG_INFO("Rest cycle completed - waking up");
+        }
+        
+        // During rest, replay important memories
+        if (pImpl->replayDuringSleep && currentStep % 10 == 0) {
+            replayConsolidationMemory();
+        }
+    } else {
+        // Check if we should enter rest
+        startRestCycle();
+    }
+}
+
+void NeuralEpisodicMemory::replayConsolidationMemory() {
+    if (!pImpl->brain || !pImpl->replayDuringSleep) return;
+    
+    // Select episodes for replay based on importance
+    std::vector<const EpisodicMemoryItem*> episodesToReplay;
+    
+    // First, prioritize recent episodes
+    size_t recentCount = std::min<size_t>(5, episodes_.size());
+    for (size_t i = 0; i < recentCount; ++i) {
+        size_t idx = episodes_.size() - 1 - i;
+        episodesToReplay.push_back(&episodes_[idx]);
+    }
+    
+    // Then, add high-reward episodes if not already included
+    std::vector<std::pair<float, size_t>> scored;
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        float score = episodes_[i].reward * episodes_[i].age;
+        scored.emplace_back(score, i);
+    }
+    
+    std::sort(scored.begin(), scored.end(),
+              [](const auto& a, const auto& b) { return a.first > b.first; });
+    
+    for (size_t i = 0; i < std::min<size_t>(3, scored.size()); ++i) {
+        size_t idx = scored[i].second;
+        bool alreadySelected = false;
+        for (const auto* ep : episodesToReplay) {
+            if (std::distance(episodes_.data(), ep) == static_cast<ptrdiff_t>(idx)) {
+                alreadySelected = true;
+                break;
+            }
+        }
+        if (!alreadySelected) {
+            episodesToReplay.push_back(&episodes_[idx]);
+        }
+    }
+    
+    // Replay selected episodes
+    for (const auto* episode : episodesToReplay) {
+        replayEpisode(episode);
+    }
+    
+    NLM_LOG_INFO("Replayed " + std::to_string(episodesToReplay.size()) + " episodes for consolidation");
+}
+
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
     // Remove episodes below relevance threshold
-    // In a full implementation, episodes would have relevance scores
-    // For now, just enforce max capacity
-    while (episodes_.size() > maxEpisodes_ * 0.8f) {
-        episodes_.erase(episodes_.begin());
+    // Episodes accumulate relevance over time through replay
+    std::vector<size_t> toRemove;
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        // Compute episode relevance based on:
+        // 1. Reward magnitude
+        // 2. Recency
+        // 3. Number of replays (implicit via age)
+        float relevance = computeRelevance(episodes_[i]);
+        
+        if (relevance < relevanceThreshold && episodes_[i].age > 100) {
+            toRemove.push_back(i);
+        }
     }
+    
+    // Remove old episodes
+    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+        episodes_.erase(episodes_.begin() + *it);
+        
+        // Also remove corresponding episode neuron
+        auto neuronIt = std::find(pImpl->episodeNeurons.begin(), pImpl->episodeNeurons.end(),
+                                 NeuronId(20000 + *it));
+        if (neuronIt != pImpl->episodeNeurons.end()) {
+            pImpl->episodeNeurons.erase(neuronIt);
+        }
+    }
+    
+    if (!toRemove.empty()) {
+        NLM_LOG_INFO("Consolidated " + std::to_string(toRemove.size()) + " weak episodes");
+    }
+}
+
+float NeuralEpisodicMemory::computeRelevance(const EpisodicMemoryItem& episode) const {
+    // Base relevance on reward and recency
+    float rewardComponent = episode.reward * 0.4f;
+    float recencyComponent = 1.0f / (episode.age + 1) * 0.3f;
+    
+    // Add novelty component
+    float noveltyComponent = episode.novelty * 0.3f;
+    
+    return rewardComponent + recencyComponent + noveltyComponent;
 }
 
 void NeuralEpisodicMemory::clear() {
