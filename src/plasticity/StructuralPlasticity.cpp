@@ -1,6 +1,8 @@
 #include "StructuralPlasticity.hpp"
 #include "../../brain/Brain.hpp"
 #include "../../brain/NeuralRegion.hpp"
+#include "../../brain/Neuron.hpp"
+#include "../../core/Random/Random.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -98,15 +100,114 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
 }
 
 NeuronId StructuralPlasticity::createNeuron(Brain* brain, NeuronType type) {
-    // Neuron creation would require adding to a population
-    // For Phase 2, we focus on synaptic structural plasticity
-    // and don't implement neuronal creation
+    if (!brain) {
+        return INVALID_NEURON_ID;
+    }
+    
+    // Choose a region for the new neuron (prefer regions with capacity)
+    for (auto& region : brain->getRegions()) {
+        auto population = region->getPopulation(0);  // Use first population
+        if (population) {
+            size_t currentCount = population->getNeuronCount();
+            if (currentCount < population->getCapacity()) {
+                // Create new neuron with unique ID
+                NeuronId neuronId(static_cast<uint64_t>(brain->getTotalNeuronCount()));
+                
+                // Create the neuron
+                auto* neuron = new Neuron(neuronId);
+                neuron->setType(type);
+                
+                // Initialize with random parameters
+                RandomGenerator rng(42);  // Fixed seed for reproducibility
+                neuron->initializeRandom(rng);
+                
+                // Add to population
+                population->addNeuron(neuron);
+                
+                // Register neuron with region
+                region->registerNeuron(neuron);
+                
+                // Set up synaptic connections based on neuron type
+                if (type == NeuronType::Sensory) {
+                    // Sensory neurons connect to internal neurons
+                    auto neurons = region->getAllNeurons();
+                    for (size_t i = 0; i < std::min(neurons.size() / 10, size_t(3)); ++i) {
+                        if (neurons[i] != neuron) {
+                            SynapseId synId = createSynapse(brain, neuronId, neurons[i]->getId(), 0.2f);
+                            if (synId != INVALID_SYNAPSE_ID) {
+                                neurons[i]->addIncomingSynapse(synId);
+                            }
+                        }
+                    }
+                } else if (type == NeuronType::Motor) {
+                    // Motor neurons receive input from internal neurons
+                    auto neurons = region->getAllNeurons();
+                    for (size_t i = 0; i < std::min(neurons.size() / 10, size_t(2)); ++i) {
+                        if (neurons[i] != neuron && neurons[i]->getType() != NeuronType::Motor) {
+                            SynapseId synId = createSynapse(brain, neurons[i]->getId(), neuronId, 0.3f);
+                            if (synId != INVALID_SYNAPSE_ID) {
+                                neurons[i]->addOutgoingSynapse(synId);
+                            }
+                        }
+                    }
+                } else {
+                    // Internal neurons: random connections
+                    auto neurons = region->getAllNeurons();
+                    for (size_t i = 0; i < std::min(neurons.size() / 5, size_t(2)); ++i) {
+                        if (neurons[i] != neuron) {
+                            SynapseId synId = createSynapse(brain, neurons[i]->getId(), neuronId, 
+                                                           rng.uniformReal(0.1f, 0.3f));
+                            if (synId != INVALID_SYNAPSE_ID) {
+                                neurons[i]->addOutgoingSynapse(synId);
+                            }
+                        }
+                    }
+                }
+                
+                return neuronId;
+            }
+        }
+    }
+    
     return INVALID_NEURON_ID;
 }
 
 bool StructuralPlasticity::removeNeuron(Brain* brain, NeuronId neuron) {
-    // Neuron removal would require removing all synapses and the neuron itself
-    // For Phase 2, we focus on synaptic structural plasticity
+    if (!brain || neuron == INVALID_NEURON_ID) {
+        return false;
+    }
+    
+    // Search all regions for the neuron
+    for (auto& region : brain->getRegions()) {
+        auto neurons = region->getAllNeurons();
+        for (auto* n : neurons) {
+            if (n->getId() == neuron) {
+                // Remove all incoming synapses
+                auto incoming = region->getSynapsesTo(neuron);
+                for (Synapse* syn : incoming) {
+                    removeSynapse(brain, syn->getId());
+                }
+                
+                // Remove all outgoing synapses
+                auto outgoing = region->getSynapsesFrom(neuron);
+                for (Synapse* syn : outgoing) {
+                    removeSynapse(brain, syn->getId());
+                }
+                
+                // Remove the neuron from the region
+                region->removeNeuron(neuron);
+                
+                // Also remove from population
+                region->getPopulation(0)->removeNeuron(neuron);
+                
+                // Delete the neuron object
+                delete n;
+                
+                return true;
+            }
+        }
+    }
+    
     return false;
 }
 
