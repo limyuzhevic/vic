@@ -47,11 +47,23 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DNLM_BUILD_TESTS=ON",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+NLM_ENABLE_PYTHON_BINDINGS = true
+NLM_ENABLE_TESTS = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = "Test"
+python_functions = "test_"
+
+[tool.pytest.ini_options.mplst]
+markers = [
+    "slow: marks tests as slow (deselect by default)",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
