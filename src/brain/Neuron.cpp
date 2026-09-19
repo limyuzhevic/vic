@@ -282,6 +282,12 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Resting potential typically -70mV
     pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
     
+    // Resting potential typically -70mV
+    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    
+// Resting potential typically -70mV
+    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    
     // Reset potential is usually close to resting
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
     

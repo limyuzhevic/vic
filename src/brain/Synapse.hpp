@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include "../core/Types/Types.hpp"
 
 namespace nlm {
