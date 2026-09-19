@@ -10,6 +10,7 @@ struct PredictionError::Impl {
     float predictedValue;
     float actualValue;
     std::vector<float> history;
+    static constexpr size_t MAX_HISTORY_SIZE = 1000;
     
     Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
 };
@@ -19,6 +20,10 @@ PredictionError::PredictionError() : pImpl(new Impl) {}
 PredictionError::~PredictionError() = default;
 
 void PredictionError::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Invalid brain pointer for PredictionError initialization");
+        return;
+    }
     pImpl->brain = brain;
     NLM_LOG_INFO("PredictionError system initialized");
 }
@@ -31,7 +36,11 @@ void PredictionError::computeError(float predicted, float actual) {
     pImpl->predictedValue = predicted;
     pImpl->actualValue = actual;
     pImpl->error = actual - predicted;
-    pImpl->history.push_back(pImpl->error);
+    
+    // Add error to history with capacity check
+    if (pImpl->history.size() < pImpl->MAX_HISTORY_SIZE) {
+        pImpl->history.push_back(pImpl->error);
+    }
 }
 
 void PredictionError::updatePrediction(float newPrediction) {

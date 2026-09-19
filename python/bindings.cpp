@@ -423,3 +423,225 @@ PYBIND11_MODULE(pynlm, m) {
 }
 
 } // namespace nlm
+
+    // Neuromodulator base class bindings
+    py::class_<Neuromodulator, std::shared_ptr<Neuromodulator>>(
+        m, "Neuromodulator", R"pbdoc(Abstract base class for all neuromodulators)pbdoc")
+        .def("getName", &Neuromodulator::getName, "Get the name of the neuromodulator")
+        .def("getLevel", &Neuromodulator::getLevel, "Get the current level (0.0 to 1.0)")
+        .def("setLevel", &Neuromodulator::setLevel, py::arg("level"),
+             "Set the neuromodulator level (0.0 to 1.0)")
+        .def("getPlasticityFactor", &Neuromodulator::getPlasticityFactor,
+             "Get the plasticity factor (1.0 = normal, >1.0 = enhanced, <1.0 = reduced)")
+        .def("update", &Neuromodulator::update, py::arg("dt"),
+             "Update neuromodulator state with timestep dt");
+
+    // Dopamine specific bindings
+    py::class_<Dopamine, std::shared_ptr<Dopamine>, py::class_<Neuromodulator>>(
+        m, "Dopamine", R"pbdoc(Dopamine neuromodulator for reward and reinforcement learning)pbdoc")
+        .def(py::init<>())
+        .def("signalReward", &Dopamine::signalReward, py::arg("reward"),
+             "Signal reward reception (increases dopamine level)")
+        .def("signalRewardPredictionError", &Dopamine::signalRewardPredictionError,
+             py::arg("error"), "Signal reward prediction error (modulates dopamine level)")
+        .def("getBaseline", &Dopamine::getBaseline, "Get baseline dopamine level")
+        .def("getPeak", &Dopamine::getPeak, "Get peak dopamine level")
+        .def("reset", &Dopamine::reset, "Reset dopamine to baseline level");
+
+    // Acetylcholine specific bindings
+    py::class_<Acetylcholine, std::shared_ptr<Acetylcholine>, py::class_<Neuromodulator>>(
+        m, "Acetylcholine", R"pbdoc(Acetylcholine neuromodulator for attention and memory consolidation)pbdoc")
+        .def(py::init<>())
+        .def("enhanceMemory", &Acetylcholine::enhanceMemory, py::arg("strength"),
+             "Enhance memory encoding with given strength")
+        .def("regulateAttention", &Acetylcholine::regulateAttention, py::arg("focus"),
+             "Regulate attention level (0.0 to 1.0)")
+        .def("getAttentionLevel", &Acetylcholine::getAttentionLevel, "Get current attention level")
+        .def("reset", &Acetylcholine::reset, "Reset acetylcholine to baseline");
+
+    // Norepinephrine specific bindings
+    py::class_<Norepinephrine, std::shared_ptr<Norepinephrine>, py::class_<Neuromodulator>>(
+        m, "Norepinephrine", R"pbdoc(Norepinephrine neuromodulator for arousal and vigilance)pbdoc")
+        .def(py::init<>())
+        .def("increaseAlertness", &Norepinephrine::increaseAlertness, py::arg("amount"),
+             "Increase alertness level (0.0 to 1.0)")
+        .def("decreaseStress", &Norepinephrine::decreaseStress, py::arg("amount"),
+             "Decrease stress level (0.0 to 1.0)")
+        .def("getArousalLevel", &Norepinephrine::getArousalLevel, "Get current arousal level")
+        .def("getStressLevel", &Norepinephrine::getStressLevel, "Get current stress level")
+        .def("reset", &Norepinephrine::reset, "Reset norepinephrine to baseline");
+
+    // Serotonin specific bindings
+    py::class_<Serotonin, std::shared_ptr<Serotonin>, py::class_<Neuromodulator>>(
+        m, "Serotonin", R"pbdoc(Serotonin neuromodulator for mood, impulsivity, and social behavior)pbdoc")
+        .def(py::init<>())
+        .def("improveMood", &Serotonin::improveMood, py::arg("amount"),
+             "Improve mood level (0.0 to 1.0)")
+        .def("reduceImpulsivity", &Serotonin::reduceImpulsivity, py::arg("amount"),
+             "Reduce impulsivity level (0.0 to 1.0)")
+        .def("getMoodLevel", &Serotonin::getMoodLevel, "Get current mood level")
+        .def("getImpulsivity", &Serotonin::getImpulsivity, "Get current impulsivity level")
+        .def("reset", &Serotonin::reset, "Reset serotonin to baseline");
+
+    // Reward signal bindings
+    py::class_<Reward, std::shared_ptr<Reward>>(m, "Reward", R"pbdoc(Reward signal for reinforcement learning)pbdoc")
+        .def(py::init<>())
+        .def("getValue", &Reward::getValue, "Get current reward value")
+        .def("setValue", &Reward::setValue, py::arg("value"), "Set current reward value")
+        .def("add", &Reward::add, py::arg("delta"), "Add delta to current reward")
+        .def("reset", &Reward::reset, "Reset reward to zero")
+        .def("computeReward", &Reward::computeReward, py::arg("observation"),
+             "Compute reward from environment observation")
+        .def("getAverageReward", &Reward::getAverageReward, py::arg("window") = 100,
+             "Get average reward over last window entries")
+        .def("isPositive", &Reward::isPositive, "Check if reward is positive")
+        .def("getMagnitude", &Reward::getMagnitude, "Get absolute value of reward")
+        .def("getHistory", &Reward::getHistory, "Get reward history as list")
+        .def("clearHistory", &Reward::clearHistory, "Clear reward history");
+
+    // Novelty detection bindings
+    py::class_<Novelty, std::shared_ptr<Novelty>>(m, "Novelty", R"pbdoc(Novelty detection signal for surprise and change)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &Novelty::initialize, py::arg("brain"), "Initialize novelty detector with brain reference")
+        .def("getLevel", &Novelty::getLevel, "Get current novelty level (0.0 to 1.0)")
+        .def("setLevel", &Novelty::setLevel, py::arg("level"), "Set novelty level")
+        .def("detectNovelty", py::overload_cast<const Observation&, const Observation&>(&Novelty::detectNovelty),
+             py::arg("observation"), py::arg("previousObservation"),
+             "Detect novelty from two observations")
+        .def("detectNovelty", py::overload_cast<const std::vector<float>&, const std::vector<float>&>(&Novelty::detectNovelty),
+             py::arg("currentPattern"), py::arg("previousPattern"),
+             "Detect novelty from two pattern vectors")
+        .def("update", &Novelty::update, py::arg("dt"), "Update novelty with timestep dt")
+        .def("getHistory", &Novelty::getHistory, "Get novelty history as list")
+        .def("clearHistory", &Novelty::clearHistory, "Clear novelty history");
+
+    // Curiosity bindings
+    py::class_<Curiosity, std::shared_ptr<Curiosity>>(m, "Curiosity", R"pbdoc(Curiosity drive for exploration and learning)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &Curiosity::initialize, py::arg("brain"), "Initialize curiosity system with brain reference")
+        .def("getLevel", &Curiosity::getLevel, "Get current curiosity level (0.0 to 1.0)")
+        .def("update", &Curiosity::update, py::arg("novelty"), py::arg("predictionError"), py::arg("dt"),
+             "Update curiosity based on novelty and prediction error")
+        .def("getExplorationDrive", &Curiosity::getExplorationDrive, "Get exploration drive (same as level)")
+        .def("getHistory", &Curiosity::getHistory, "Get curiosity history as list")
+        .def("clearHistory", &Curiosity::clearHistory, "Clear curiosity history")
+        .def("setNoveltyWeight", &Curiosity::setNoveltyWeight, py::arg("weight"), "Set novelty weight for curiosity")
+        .def("setPredictionErrorWeight", &Curiosity::setPredictionErrorWeight, py::arg("weight"),
+             "Set prediction error weight for curiosity")
+        .def("reset", &Curiosity::reset, "Reset curiosity system");
+
+    // Prediction error bindings
+    py::class_<PredictionError, std::shared_ptr<PredictionError>>(
+        m, "PredictionError", R"pbdoc(Prediction error signal for curiosity and learning)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &PredictionError::initialize, py::arg("brain"), "Initialize prediction error system with brain reference")
+        .def("getError", &PredictionError::getError, "Get current error value")
+        .def("computeError", &PredictionError::computeError, py::arg("predicted"), py::arg("actual"),
+             "Compute prediction error (actual - predicted)")
+        .def("updatePrediction", &PredictionError::updatePrediction, py::arg("newPrediction"),
+             "Update prediction with new value")
+        .def("getMagnitude", &PredictionError::getMagnitude, "Get absolute value of error")
+        .def("getHistory", &PredictionError::getHistory, "Get error history as list")
+        .def("clearHistory", &PredictionError::clearHistory, "Clear error history");
+
+    // Configuration helper functions
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.plasticity.stdp.enable", true);
+        config->set("brain.plasticity.hebbian.enable", true);
+        config->set("brain.development.enabled", true);
+        config->set("brain.motivation.dopamine.weight", 0.7);
+        config->set("brain.motivation.curiosity.weight", 0.3);
+        config->set("brain.sensory.vision.enabled", true);
+        config->set("brain.sensory.audio.enabled", true);
+        config->set("brain.sensory.internal.enabled", true);
+        return config;
+    }, "Create a default configuration with recommended settings");
+
+    // Utility functions for creating common setups
+    m.def("createDefaultAgentSetup", []() -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto config = createDefaultConfig();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(10, 10, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create a complete default agent setup (brain, world, agent)");
+
+    // Convenience functions
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with the given configuration");
+
+    m.def("createWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create an agent brain interface");
+
+    // Error types
+    py::register_exception<std::runtime_error>(m, "NLMError");
+    py::register_exception<std::invalid_argument>(m, "InvalidArgumentError");
+    py::register_exception<std::out_of_range>(m, "OutOfRangeError");
+
+    // Module attributes
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Research Team";
+    m.attr("__description__") = "Neural Learning Machine - Experimental artificial developmental brain";
+    m.attr("__license__") = "MIT";
+
+    // Example demonstration function (for documentation)
+    m.def("example_simple_agent", []() {
+        // This is an example of how to use NLM, documented for users
+        auto config = createDefaultConfig();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(8, 8, 6, 6);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        // Simple agent loop
+        for (int step = 0; step < 20; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Example function demonstrating basic NLM usage");
+
+    // Add Python-style string representation for better user experience
+    py::class_<Config>(m, "Config")
+        .def(py::init<>())
+        .def("__repr__", [](const Config& cfg) {
+            return "<Config: " + cfg.summary() + ">";
+        });
+
+    py::class_<Action>(m, "Action")
+        .def(py::init<>())
+        .def("__repr__", [](const Action& action) {
+            return "<Action: " + action.getName() + ">";
+        });
+
+    py::class_<WorldObject>(m, "WorldObject")
+        .def(py::init<>())
+        .def("__repr__", [](const WorldObject& obj) {
+            return "<WorldObject: " + std::to_string(obj.x) + ", " + std::to_string(obj.y) + ">";
+        });
+
+} // namespace nlm

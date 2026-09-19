@@ -11,7 +11,7 @@ struct WorkingMemory::Impl {
     Impl(size_t cap) : capacity(cap) {}
 };
 
-WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
+WorkingMemory::WorkingMemory() : pImpl(std::make_unique<Impl>(100)) {}
 
 WorkingMemory::~WorkingMemory() = default;
 
@@ -24,6 +24,10 @@ void WorkingMemory::store(NeuronId neuron, float value) {
         }
     }
     if (pImpl->items.size() < pImpl->capacity) {
+        pImpl->items.emplace_back(neuron, value);
+    } else {
+        // Apply LRU eviction when at capacity
+        pImpl->items.erase(pImpl->items.begin());
         pImpl->items.emplace_back(neuron, value);
     }
 }
@@ -72,7 +76,7 @@ struct EpisodicMemory::Impl {
     Impl(size_t max) : maxEpisodes(max) {}
 };
 
-EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {}
+EpisodicMemory::EpisodicMemory() : pImpl(std::make_unique<Impl>(1000)) {}
 
 EpisodicMemory::~EpisodicMemory() = default;
 
@@ -109,14 +113,32 @@ void EpisodicMemory::clear() {
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
     // TODO PHASE 2: Implement real consolidation
+    // For now, implement basic consolidation with relevance filtering
+    size_t targetSize = static_cast<size_t>(pImpl->maxEpisodes * 0.8f);  // Keep 80% of capacity
+    
+    if (pImpl->episodes.size() > targetSize) {
+        // Sort episodes by age (oldest first) and remove oldest
+        // TODO: Implement proper relevance-based selection
+        std::sort(pImpl->episodes.begin(), pImpl->episodes.end(),
+                  [](const EpisodicMemoryItem& a, const EpisodicMemoryItem& b) {
+                      return a.timestamp < b.timestamp;
+                  });
+        
+        size_t toRemove = pImpl->episodes.size() - targetSize;
+        pImpl->episodes.erase(pImpl->episodes.begin(), 
+                            pImpl->episodes.begin() + toRemove);
+    }
 }
 
 // Semantic Memory Implementation
 struct SemanticMemory::Impl {
     std::vector<std::pair<std::string, std::string>> facts;
+    size_t capacity;
+    
+    Impl(size_t cap = 1000) : capacity(cap) {}
 };
 
-SemanticMemory::SemanticMemory() : pImpl(new Impl) {}
+SemanticMemory::SemanticMemory() : pImpl(std::make_unique<Impl>(1000)) {}
 
 SemanticMemory::~SemanticMemory() = default;
 
@@ -127,6 +149,12 @@ void SemanticMemory::storeFact(const std::string& key, const std::string& value)
             return;
         }
     }
+    
+    // Apply LRU eviction when at capacity
+    if (pImpl->facts.size() >= pImpl->capacity) {
+        pImpl->facts.erase(pImpl->facts.begin());
+    }
+    
     pImpl->facts.emplace_back(key, value);
 }
 
@@ -159,9 +187,12 @@ void SemanticMemory::clear() {
 // Procedural Memory Implementation
 struct ProceduralMemory::Impl {
     std::vector<Skill> skills;
+    size_t capacity;
+    
+    Impl(size_t cap = 500) : capacity(cap) {}
 };
 
-ProceduralMemory::ProceduralMemory() : pImpl(new Impl) {}
+ProceduralMemory::ProceduralMemory() : pImpl(std::make_unique<Impl>(500)) {}
 
 ProceduralMemory::~ProceduralMemory() = default;
 
@@ -172,6 +203,12 @@ void ProceduralMemory::learnSkill(const std::string& name, const std::vector<Neu
             return;
         }
     }
+    
+    // Apply LRU eviction when at capacity
+    if (pImpl->skills.size() >= pImpl->capacity) {
+        pImpl->skills.erase(pImpl->skills.begin());
+    }
+    
     Skill skill;
     skill.name = name;
     skill.neuralPattern = pattern;
@@ -212,9 +249,12 @@ void ProceduralMemory::clear() {
 struct AssociativeMemory::Impl {
     // Pairs of (a, b) associations with strength
     std::vector<std::tuple<NeuronId, NeuronId, float>> associations;
+    size_t capacity;
+    
+    Impl(size_t cap = 2000) : capacity(cap) {}
 };
 
-AssociativeMemory::AssociativeMemory() : pImpl(new Impl) {}
+AssociativeMemory::AssociativeMemory() : pImpl(std::make_unique<Impl>(2000)) {}
 
 AssociativeMemory::~AssociativeMemory() = default;
 
@@ -222,10 +262,16 @@ void AssociativeMemory::associate(NeuronId a, NeuronId b, float strength) {
     for (auto& assoc : pImpl->associations) {
         if ((std::get<0>(assoc) == a && std::get<1>(assoc) == b) ||
             (std::get<0>(assoc) == b && std::get<1>(assoc) == a)) {
-            std::get<2>(assoc) = strength;
+            std::get<2>(assoc) = std::clamp(std::get<2>(assoc) + strength * 0.1f, 0.0f, 1.0f);
             return;
         }
     }
+    
+    // Apply LRU eviction when at capacity
+    if (pImpl->associations.size() >= pImpl->capacity) {
+        pImpl->associations.erase(pImpl->associations.begin());
+    }
+    
     pImpl->associations.emplace_back(a, b, strength);
 }
 

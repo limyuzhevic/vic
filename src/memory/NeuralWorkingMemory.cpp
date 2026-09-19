@@ -15,13 +15,19 @@ struct NeuralWorkingMemory::Impl {
     std::vector<SimulationStep> traceAges;
     
     Impl() : brain(nullptr) {}
+    ~Impl() {
+        // No dynamic allocations to clean up
+    }
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , memoryNeurons_(100)  // Pre-allocate for efficiency
+    , memoryActivations_(100)
+    , memoryTimestamps_(100)
 {
 }
 
@@ -251,10 +257,13 @@ struct AttentionalSelection::Impl {
     std::vector<float> inhibitionLevel;
     
     Impl() {}
+    ~Impl() {
+        // No dynamic allocations to clean up
+    }
 };
 
 AttentionalSelection::AttentionalSelection()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , inhibitionStrength_(0.5f)
     , excitationStrength_(1.5f)

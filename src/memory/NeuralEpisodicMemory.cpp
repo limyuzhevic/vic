@@ -13,10 +13,13 @@ struct NeuralEpisodicMemory::Impl {
     std::vector<NeuronId> episodeNeurons;
     
     Impl() : brain(nullptr) {}
+    ~Impl() {
+        // No dynamic allocations to clean up
+    }
 };
 
 NeuralEpisodicMemory::NeuralEpisodicMemory()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , maxEpisodes_(1000)
     , replayEnabled_(true)
@@ -323,10 +326,13 @@ struct NeuralAssociativeMemory::Impl {
     Brain* brain;
     
     Impl() : brain(nullptr) {}
+    ~Impl() {
+        // No dynamic allocations to clean up
+    }
 };
 
 NeuralAssociativeMemory::NeuralAssociativeMemory()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
 {
 }

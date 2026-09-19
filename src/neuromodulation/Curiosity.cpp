@@ -9,6 +9,8 @@ struct Curiosity::Impl {
     float noveltyWeight;
     float predictionErrorWeight;
     float decayRate;
+    std::vector<float> history;
+    static constexpr size_t MAX_HISTORY_SIZE = 1000;
     
     Impl() 
         : brain(nullptr)
@@ -23,6 +25,10 @@ Curiosity::Curiosity() : pImpl(new Impl) {}
 Curiosity::~Curiosity() = default;
 
 void Curiosity::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Invalid brain pointer for Curiosity initialization");
+        return;
+    }
     pImpl->brain = brain;
     NLM_LOG_INFO("Curiosity system initialized");
 }
@@ -32,6 +38,10 @@ float Curiosity::getLevel() const {
 }
 
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
+    if (!pImpl->brain) {
+        return;
+    }
+    
     // Curiosity increases with novelty and prediction error
     float target = pImpl->noveltyWeight * novelty + 
                    pImpl->predictionErrorWeight * predictionError;
@@ -41,6 +51,11 @@ void Curiosity::update(float novelty, float predictionError, TimestepDuration dt
     
     // Decay
     pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    
+    // Add to history with capacity check
+    if (pImpl->history.size() < pImpl->MAX_HISTORY_SIZE) {
+        pImpl->history.push_back(pImpl->level);
+    }
 }
 
 float Curiosity::getExplorationDrive() const {

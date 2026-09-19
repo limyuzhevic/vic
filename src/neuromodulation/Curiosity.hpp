@@ -24,6 +24,10 @@ public:
     // Get exploration drive (same as level)
     float getExplorationDrive() const;
     
+    // Get curiosity history
+    const std::vector<float>& getHistory() const;
+    void clearHistory();
+    
     // Set curiosity parameters
     void setNoveltyWeight(float weight);
     void setPredictionErrorWeight(float weight);
