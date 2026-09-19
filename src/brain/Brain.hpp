@@ -8,6 +8,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -25,6 +26,9 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
@@ -170,10 +174,19 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
+// ========== NEUROMODULATION SYSTEMS ==========
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and behavioral flexibility
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
@@ -192,6 +205,18 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // Helper function to extract current neural state for planning
+    // This creates a state vector representing the current brain configuration
+    // used by the NeuralPlanner to evaluate action sequences
+    std::vector<float> extractCurrentState() const;
+    
+    // Get planned action for this step
+    // Returns the action planned by the NeuralPlanner, or ActionType::Wait if none
+    ActionType getPlannedAction() const { return pImpl->plannedAction; }
+    
+    // Has a planned action for this step?
+    bool hasPlannedAction() const { return pImpl->hasPlannedAction; }
     
 private:
     struct Impl;

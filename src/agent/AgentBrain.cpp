@@ -97,6 +97,57 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
+    // Store vision in working memory
+    if (brain_->getWorkingMemory() && !vision.empty()) {
+        // Create working memory pattern from vision
+        std::vector<float> visionPattern = vision;
+        // Normalize pattern
+        float maxVal = *std::max_element(vision.begin(), vision.end());
+        float minVal = *std::min_element(vision.begin(), vision.end());
+        float range = maxVal - minVal;
+        if (range > 0.001f) {
+            for (size_t i = 0; i < visionPattern.size(); ++i) {
+                visionPattern[i] = (visionPattern[i] - minVal) / range;
+            }
+        }
+        // Store in working memory
+        brain_->getWorkingMemory()->store(visionPattern, 1.0f);
+    }
+    
+    // Store percept in episodic memory for experience recording
+    if (brain_->getEpisodicMemory()) {
+        // Create an episodic memory item from current percept
+        EpisodicMemoryItem episode;
+        episode.timestamp = 0;  // Will be set in storeEpisode
+        episode.positionX = 0.0f;  // TODO: Get from AgentBody
+        episode.positionY = 0.0f;  // TODO: Get from AgentBody
+        episode.orientation = 0.0f;  // TODO: Get from AgentBody
+        episode.action = ActionType::Wait;  // Will be updated when action is selected
+        episode.reward = 0.0f;  // Will be updated in applyRewardModulation
+        episode.energy = 0.0f;  // TODO: Get from AgentBody
+        episode.novelty = noveltyLevel_;
+        
+        // Store sensory state
+        episode.sensoryState = vision;
+        
+        // Record current neural activity as active neurons
+        for (const auto& region : brain_->getRegions()) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        episode.activeNeurons.push_back(neuron->getId());
+                        episode.neuronActivations.push_back(
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+        }
+        
+        // Store in episodic memory
+        brain_->getEpisodicMemory()->storeEpisode(episode);
+    }
+    
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {

@@ -54,36 +54,120 @@ private:
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
+// Modulates attention to relevant stimuli, strengthens working memory,
+// promotes memory consolidation, and modulates plasticity rules
 class Acetylcholine : public Neuromodulator {
 public:
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
     const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
+    // Get attention modulation factor
+    float getAttentionModulation() const;
+    
+    // Get working memory modulation factor
+    float getWorkingMemoryModulation() const;
+    
+    // Set attention strength
+    void setAttentionStrength(float strength);
+    
+    // Set memory consolidation rate
+    void setConsolidationRate(float rate);
+    
+    // Reset
+    void reset();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
+// Modulates arousal, improves signal-to-noise ratio,
+// affects stress response and memory encoding
 class Norepinephrine : public Neuromodulator {
 public:
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
     const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
+    // Get arousal modulation factor
+    float getArousalModulation() const;
+    
+    // Get signal detection enhancement factor
+    float getSignalDetectionModulation() const;
+    
+    // Get memory encoding enhancement factor
+    float getMemoryEncodingModulation() const;
+    
+    // Set arousal sensitivity
+    void setArousalSensitivity(float sensitivity);
+    
+    // Set stress sensitivity
+    void setStressSensitivity(float sensitivity);
+    
+    // Reset
+    void reset();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
+// Modulates mood, allows behavioral flexibility,
+// regulates sleep/wake cycle, and promotes forgetting of irrelevant info
 class Serotonin : public Neuromodulator {
 public:
+    Serotonin();
+    ~Serotonin() override;
+    
     const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
+    // Get mood modulation factor
+    float getMoodModulation() const;
+    
+    // Get behavioral flexibility modulation factor
+    float getBehavioralFlexibilityModulation() const;
+    
+    // Get memory consolidation (forgetting) factor
+    float getMemoryConsolidationModulation() const;
+    
+    // Set mood sensitivity
+    void setMoodSensitivity(float sensitivity);
+    
+    // Set flexibility sensitivity
+    void setFlexibilitySensitivity(float sensitivity);
+    
+    // Reset
+    void reset();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

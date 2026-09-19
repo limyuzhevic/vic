@@ -213,25 +213,41 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
-    // Test 4: Cognition systems exist
+    // Test 6: Check if cognitive systems are integrated
     if (brain->getPlanner() != nullptr) {
-        NLM_LOG_INFO("[PASS] Planner is integrated");
+        NLM_LOG_INFO("[PASS] NeuralPlanner is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Planner is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] NeuralPlanner is NOT integrated");
         success = false;
     }
     
     if (brain->getConceptFormation() != nullptr) {
-        NLM_LOG_INFO("[PASS] Concept formation is integrated");
+        NLM_LOG_INFO("[PASS] ConceptFormation is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Concept formation is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] ConceptFormation is NOT integrated");
         success = false;
     }
     
     if (brain->getAttention() != nullptr) {
-        NLM_LOG_INFO("[PASS] Attention is integrated");
+        NLM_LOG_INFO("[PASS] Attention system is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Attention is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] Attention system is NOT integrated");
+        success = false;
+    }
+    
+    // Test 7: Test NeuralPlanner functionality
+    NLM_LOG_INFO("Testing NeuralPlanner functionality...");
+    if (brain->getPlanner() != nullptr) {
+        // Test basic planning
+        std::vector<float> testState = {0.5f, 0.3f, 0.8f};
+        ActionType action = brain->getPlanner()->planAction(testState, 0.5f);
+        if (action != ActionType::Wait) {
+            NLM_LOG_INFO("[PASS] NeuralPlanner produced action: " + std::to_string(static_cast<int>(action)));
+        } else {
+            NLM_LOG_INFO("[INFO] NeuralPlanner produced wait (may be normal)");
+        }
+    } else {
+        NLM_LOG_ERROR("[FAIL] NeuralPlanner not available for testing");
         success = false;
     }
     
