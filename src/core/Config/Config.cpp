@@ -3,6 +3,17 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
+
+// Include these only if available
+#ifdef HAVE_NLOHMANN_JSON
+#include <nlohmann/json.hpp>
+#endif
+
+#ifdef HAVE_YAML_CPP
+#include <yaml-cpp/yaml.h>
+#endif
 
 namespace nlm {
 
@@ -19,9 +30,121 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Check file extension to determine format
+    std::string ext = ".";
+    size_t dot_pos = filepath.find_last_of('.');
+    if (dot_pos != std::string::npos) {
+        ext = filepath.substr(dot_pos);
+    }
     
+    // Try JSON first
+    if (ext == ".json" || ext == ".JSON") {
+        #ifdef HAVE_NLOHMANN_JSON
+        try {
+            std::ifstream file(filepath);
+            if (!file.is_open()) {
+                return false;
+            }
+            
+            nlohmann::json json;
+            file >> json;
+            
+            // Convert JSON to config entries
+            for (auto it = json.begin(); it != json.end(); ++it) {
+                std::string key = it.key();
+                ConfigValue value;
+                
+                if (it->is_string()) {
+                    value = it->get<std::string>();
+                } else if (it->is_number_integer()) {
+                    value = it->get<int64_t>();
+                } else if (it->is_number_float()) {
+                    value = it->get<double>();
+                } else if (it->is_boolean()) {
+                    value = it->get<bool>();
+                } else if (it->is_array()) {
+                    // Convert array to vector
+                    std::vector<double> arr = it->get<std::vector<double>>();
+                    value = arr;
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
+            
+            return true;
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("JSON parsing error: " + std::string(e.what()));
+            return false;
+        }
+        #else
+        NLM_LOG_ERROR("JSON parser not available. Install nlohmann/json or recompile with JSON support.");
+        return false;
+        #endif
+    }
+    
+    // Try YAML next
+    if (ext == ".yaml" || ext == ".yml" || ext == ".YAML" || ext == ".YML") {
+        #ifdef HAVE_YAML_CPP
+        try {
+            YAML::Node doc = YAML::LoadFile(filepath);
+            
+            // Convert YAML to config entries
+            for (auto it = doc.begin(); it != doc.end(); ++it) {
+                std::string key = it->first.as<std::string>();
+                ConfigValue value;
+                
+                if (it->IsScalar()) {
+                    std::string str_val = it->as<std::string>();
+                    // Try to parse as number or boolean
+                    try {
+                        if (str_val.find('.') != std::string::npos) {
+                            value = std::stod(str_val);
+                        } else {
+                            value = std::stoll(str_val);
+                        }
+                    } catch (...) {
+                        // Try boolean
+                        if (str_val == "true" || str_val == "false") {
+                            value = (str_val == "true");
+                        } else {
+                            value = str_val;
+                        }
+                    }
+                } else if (it->IsSequence()) {
+                    // Convert sequence to vector
+                    std::vector<double> arr;
+                    for (const auto& item : *it) {
+                        if (item.IsScalar()) {
+                            std::string str_val = item.as<std::string>();
+                            try {
+                                if (str_val.find('.') != std::string::npos) {
+                                    arr.push_back(std::stod(str_val));
+                                } else {
+                                    arr.push_back(std::stoll(str_val));
+                                }
+                            } catch (...) {
+                                // Keep as string if can't parse
+                            }
+                        }
+                    }
+                    value = arr;
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
+            
+            return true;
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("YAML parsing error: " + std::string(e.what()));
+            return false;
+        }
+        #else
+        NLM_LOG_ERROR("YAML parser not available. Install yaml-cpp or recompile with YAML support.");
+        return false;
+        #endif
+    }
+    
+    // Fallback to simple key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
