@@ -1,52 +1,52 @@
 #pragma once
 
+#include "../core/Types/Types.hpp"
 #include <string>
-#include <vector>
 #include <memory>
 
 namespace nlm {
 
-// Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
+// VisualizationInterface: Interface for all visualization systems
+// Provides visualization of neural activity, agent behavior, and world state
 class VisualizationInterface {
 public:
-    VisualizationInterface();
-    ~VisualizationInterface();
+    virtual ~VisualizationInterface() = default;
     
-    // Initialize visualization
-    bool initialize();
+    // Initialize visualization system
+    virtual bool initialize() = 0;
     
-    // Update visualization data
-    void update();
+    // Update visualization with current state
+    virtual void update(float timestep) = 0;
     
-    // Render current state
-    void render();
+    // Render current scene
+    virtual void render() = 0;
     
-    // Close visualization
-    void close();
+    // Start recording visualization
+    virtual void startRecording(const std::string& filepath) = 0;
     
-    // Check if visualization is active
-    bool isActive() const;
+    // Stop recording visualization
+    virtual void stopRecording() = 0;
     
-    // Set update rate
-    void setUpdateRate(double hz);
-    double getUpdateRate() const;
+    // Toggle pause state
+    virtual void togglePause() = 0;
     
-    // Network visualization
-    void visualizeNetwork(const class Brain& brain);
+    // Check if visualization is paused
+    virtual bool isPaused() const = 0;
     
-    // Activity visualization
-    void visualizeActivity(const class Brain& brain);
+    // Get visualization FPS
+    virtual float getFPS() const = 0;
     
-    // Spike raster plot
-    void visualizeSpikes(const std::vector<class SpikeEvent>& spikes);
+    // Enable/disable specific visualization components
+    virtual void enableVision(bool enable) = 0;
+    virtual void enableWorld(bool enable) = 0;
+    virtual void enableBrain(bool enable) = 0;
+    virtual void enableAgent(bool enable) = 0;
     
-    // Weight matrix visualization
-    void visualizeWeights(const class Brain& brain);
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Check if visualization components are enabled
+    virtual bool isVisionEnabled() const = 0;
+    virtual bool isWorldEnabled() const = 0;
+    virtual bool isBrainEnabled() const = 0;
+    virtual bool isAgentEnabled() const = 0;
 };
 
 } // namespace nlm

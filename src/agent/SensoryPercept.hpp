@@ -1,58 +1,61 @@
 #pragma once
 
-#include "AgentBody.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include <memory>
+#include "../core/Types/Types.hpp"
 #include <vector>
+#include <string>
 
 namespace nlm {
 
-// Sensory data packet - what the agent perceives
-// Contains only low-level sensory signals, NO semantic labels
+// SensoryPercept: Container for sensory data from the world
+// Holds vision, touch, proprioception, internal signals, and audio
 class SensoryPercept {
 public:
+    // Default constructor
     SensoryPercept();
-    ~SensoryPercept() = default;
     
-    // Vision: simple grayscale intensity grid (no RGB, no object labels)
-    // Format: row-major, values 0.0-1.0
-    const std::vector<float>& getVision() const { return vision_; }
-    void setVision(const std::vector<float>& v) { vision_ = v; }
-    size_t getVisionWidth() const { return visionWidth_; }
-    size_t getVisionHeight() const { return visionHeight_; }
+    // Get vision data
+    const Vision& getVision() const;
+    void setVision(const Vision& vision);
     
-    // Touch/proximity sensors (binary collision signals)
-    const std::vector<float>& getTouch() const { return touch_; }
-    void setTouch(const std::vector<float>& t) { touch_ = t; }
+    // Get touch data
+    const Audio& getTouch() const;
+    void setTouch(const Audio& touch);
     
-    // Internal state signals (homeostatic signals)
-    const std::vector<float>& getInternal() const { return internal_; }
-    void setInternal(const std::vector<float>& i) { internal_ = i; }
+    // Get internal signals (neuromodulation, prediction error, etc.)
+    const InternalSignals& getInternal() const;
+    void setInternal(const InternalSignals& internal);
     
-    // Proprioception: body position/velocity signals
-    const std::vector<float>& getProprioception() const { return proprioception_; }
-    void setProprioception(const std::vector<float>& p) { proprioception_ = p; }
+    // Get proprioception (body position, velocity)
+    const std::vector<float>& getProprioception() const;
+    void setProprioception(const std::vector<float>& proprioception);
     
-    // Audio-like signals (if enabled)
-    const std::vector<float>& getAudio() const { return audio_; }
-    void setAudio(const std::vector<float>& a) { audio_ = a; }
+    // Get audio data
+    const Audio& getAudio() const;
+    void setAudio(const Audio& audio);
     
-    // Get all signals concatenated (for brain input)
+    // Get all signal values as vector
     std::vector<float> getAllSignals() const;
     
-    // Timestamp
-    double getTimestamp() const { return timestamp_; }
-    void setTimestamp(double t) { timestamp_ = t; }
+    // Get timestamp
+    Timestamp getTimestamp() const;
+    void setTimestamp(Timestamp timestamp);
+    
+    // Reset all sensory data
+    void reset();
+    
+    // Get vision width
+    size_t getVisionWidth() const;
+    
+    // Get vision height
+    size_t getVisionHeight() const;
     
 private:
-    std::vector<float> vision_;
-    size_t visionWidth_;
-    size_t visionHeight_;
-    std::vector<float> touch_;
-    std::vector<float> internal_;
+    Vision vision_;
+    Audio touch_;
+    InternalSignals internal_;
     std::vector<float> proprioception_;
-    std::vector<float> audio_;
-    double timestamp_;
+    Audio audio_;
+    Timestamp timestamp_;
 };
 
 } // namespace nlm

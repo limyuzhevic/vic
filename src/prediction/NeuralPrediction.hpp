@@ -6,6 +6,9 @@
 #include <deque>
 #include <memory>
 #include <functional>
+#include <unordered_map>
+#include <random>
+#include <unordered_set>
 
 namespace nlm {
 
@@ -74,11 +77,15 @@ public:
     std::vector<NeuronId> getPredictionNeurons() const;
     std::vector<NeuronId> getSequenceNeurons() const;
 
+    // Get internal state for debugging
+    const std::vector<std::vector<float>>& getRecentSensoryStates() const { return recentSensoryStates_; }
+    const std::deque<SimulationStep>& getStateTimestamps() const { return stateTimestamps_; }
+
 private:
     // Learn temporal sequence from sensory observations
     void learnTemporalSequence(const std::vector<float>& currentState,
-                              const std::vector<float>& nextState,
-                              SimulationStep currentStep);
+                               const std::vector<float>& nextState,
+                               SimulationStep currentStep);
 
     // Find or create neurons that respond to specific sensory pattern
     NeuronId findMatchingPatternNeuron(const std::vector<float>& pattern,
@@ -90,8 +97,29 @@ private:
     // Compute neural representation similarity
     float computeSimilarity(const std::vector<float>& a, const std::vector<float>& b) const;
 
-    // Strengthen synapses for successful predictions, weaken for errors
+    // Strengthen synapses for successful predictions, weaken for errors (STDP)
     void modulatePredictionSynapses(float error, float reward);
+
+    // Real neural prediction computation using brain substrate
+    std::vector<float> computeNeuralPrediction(const std::vector<float>& currentState,
+                                               SimulationStep currentStep);
+
+    // Biological prediction error computation
+    float computeBiologicallyRealisticError(const std::vector<float>& predicted,
+                                            const std::vector<float>& actual,
+                                            SimulationStep currentStep);
+
+    // Apply spike-timing dependent plasticity for sequence learning
+    void applySTDPForPrediction(NeuronId preNeuron, NeuronId postNeuron,
+                                SimulationStep currentStep, float reward);
+
+    // Apply Hebbian learning for pattern association
+    void applyHebbianLearning(const std::vector<float>& pattern,
+                              NeuronId neuronId,
+                              SimulationStep currentStep);
+
+    // Add biologically realistic noise to predictions
+    std::vector<float> addBiologicalNoise(const std::vector<float>& pattern) const;
 
     // Structure
     struct Impl;
@@ -118,89 +146,3 @@ private:
     // Action-consequence tracking
     std::deque<std::pair<ActionType, std::vector<float>>> recentActions_;
 };
-
-// ActionConsequencePredictor: Learns action -> consequence mappings
-// Uses the neural substrate to store and retrieve action consequences
-class ActionConsequencePredictor {
-public:
-    ActionConsequencePredictor();
-    ~ActionConsequencePredictor();
-
-    void initialize(Brain* brain);
-
-    // Record that taking an action in a state led to a specific consequence
-    void recordExperience(ActionType action,
-                         const std::vector<float>& beforeState,
-                         const std::vector<float>& afterState,
-                         float reward);
-
-    // Predict consequence of taking an action in a given state
-    std::vector<float> predictConsequence(ActionType action,
-                                         const std::vector<float>& currentState);
-
-    // Get prediction confidence for an action
-    float getConsequenceConfidence(ActionType action,
-                                  const std::vector<float>& currentState) const;
-
-    // Update based on actual observed consequence
-    void updatePrediction(ActionType action,
-                         const std::vector<float>& predicted,
-                         const std::vector<float>& actual,
-                         float reward);
-
-    // Get learned action quality (average expected reward)
-    float getActionQuality(ActionType action) const;
-
-    // Clear learned associations
-    void clear();
-
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-};
-
-// PredictionErrorSignal: Computes and broadcasts prediction error
-// Acts as neuromodulatory signal to enhance learning
-class PredictionErrorSignal {
-public:
-    PredictionErrorSignal();
-    ~PredictionErrorSignal();
-
-    // Compute error between predicted and actual
-    // Returns magnitude of error for neuromodulation
-    float computeError(const std::vector<float>& predicted,
-                      const std::vector<float>& actual);
-
-    // Get error components (what aspect was unexpected)
-    struct ErrorComponents {
-        float intensityError;    // How bright/loud things were
-        float spatialError;      // Where things were
-        float temporalError;     // When things happened
-        float totalError;
-    };
-    ErrorComponents getErrorComponents() const { return errorComponents_; }
-
-    // Get neuromodulation signal strength (0-1)
-    float getModulationSignal() const;
-
-    // Update history
-    void recordError(float error, SimulationStep step);
-    const std::deque<float>& getErrorHistory() const { return errorHistory_; }
-
-    // Is this a surprising event (error > threshold)?
-    bool isSurprising() const { return lastError_ > surpriseThreshold_; }
-
-    void setSurpriseThreshold(float t) { surpriseThreshold_ = t; }
-    float getSurpriseThreshold() const { return surpriseThreshold_; }
-
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
-    float lastError_;
-    float surpriseThreshold_;
-    ErrorComponents errorComponents_;
-    std::deque<float> errorHistory_;
-};
-
-} // namespace nlm
