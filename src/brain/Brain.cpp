@@ -509,12 +509,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+// ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current state
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Apply prediction error to neuromodulation
+        if (pImpl->predictionError) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            pImpl->predictionError->update(predictionError);
+        }
     }
-    
+
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
@@ -524,13 +530,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Apply attention effects to neural processing
+        if (pImpl->attention->getAttentionLevel() > 0.1f) {
+            // Boost activity of attended neurons
+            float attentionBoost = pImpl->attention->getAttentionLevel() * 2.0f;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->getType() == NeuronType::Internal) {
+                            neuron->injectCurrent(attentionBoost * 0.1f);
+                        }
+                    }
+                }
+            }
+        }
     }
-    
+
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        pImpl->conceptFormation->update(pImpl->timestep);
+        
+        // Extract patterns from working memory for concept formation
+        if (pImpl->workingMemory) {
+            auto workingMemoryItems = pImpl->workingMemory->getMemoryItems();
+            for (const auto& item : workingMemoryItems) {
+                pImpl->conceptFormation->processPattern(item.neuronId, item.activationStrength);
+            }
+        }
     }
+
+    // ========== STEP 11: Apply structural plasticity periodically ==========
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
@@ -1009,7 +1040,15 @@ NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
 }
 
+const NeuralWorkingMemory* Brain::getWorkingMemory() const {
+    return pImpl->workingMemory.get();
+}
+
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    return pImpl->episodicMemory.get();
+}
+
+const NeuralEpisodicMemory* Brain::getEpisodicMemory() const {
     return pImpl->episodicMemory.get();
 }
 
@@ -1017,9 +1056,17 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
+const NeuralAssociativeMemory* Brain::getAssociativeMemory() const {
+    return pImpl->associativeMemory.get();
+}
+
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
+    return pImpl->predictionSystem.get();
+}
+
+const PredictionSystem* Brain::getPredictionSystem() const {
     return pImpl->predictionSystem.get();
 }
 

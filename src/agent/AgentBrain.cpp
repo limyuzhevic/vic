@@ -244,6 +244,14 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
+    // Apply to neuromodulators
+    if (brain_->getDopamine()) {
+        brain_->getDopamine()->setLevel(predictionError_);
+    }
+    if (brain_->getCuriosity()) {
+        brain_->getCuriosity()->signalNovelty(noveltyLevel_);
+    }
+    
     // Dopamine-like signal (based on prediction error)
     dopamineLevel_ = predictionError_;
     
