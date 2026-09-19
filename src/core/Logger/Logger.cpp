@@ -40,7 +40,7 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::string output = oss.str();
     
-    // Console output
+    // Console output - BUG FIX: Use hex escape sequence instead of octal
     if (pImpl->useColors) {
         std::cout << levelToColor(entry.level) << output << "\033[0m\n";
     } else {

@@ -414,6 +414,7 @@ int main(int argc, char** argv) {
     
     // Reset brain for plasticity experiment
     brain->reset();
+    // Re-initialize properly to ensure fresh state
     brain->initialize();
     
     // Run Test 2: Plasticity learning experiment
@@ -421,6 +422,7 @@ int main(int argc, char** argv) {
     
     // Reset and run Test 3: STDP verification
     brain->reset();
+    // Re-initialize after reset for proper test isolation
     brain->initialize();
     runStdpVerification(brain);
     
