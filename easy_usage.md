@@ -20,6 +20,132 @@ That's it! NLM simulates all of this.
 2. **World** - The environment the brain lives in
 3. **Agent** - The bridge connecting brain to world
 
+### Configuration System
+
+NLM now includes an enhanced configuration system that supports:
+
+- **JSON/YAML Configuration Files**: Load and save configurations in standard formats
+- **Configuration Categories**: Organize parameters (Brain, Dynamics, Plasticity, Development, Neuromodulation, Memory, Cognition, Sensory, Motor, Environment)
+- **Configuration Validation**: Validate configuration values with custom rules
+- **Default Values**: Set and use default configuration values
+
+Example configuration files:
+
+**JSON Configuration**:
+```json
+{
+  "brain": {
+    "neuron_count": 1000,
+    "region_count": 1,
+    "connection_probability": 0.05
+  },
+  "plasticity": {
+    "stdp": {
+      "enable": true,
+      "learning_rate": 0.001
+    }
+  }
+}
+```
+
+**YAML Configuration**:
+```yaml
+brain:
+  neuron_count: 1000
+  region_count: 1
+  connection_probability: 0.05
+plasticity:
+  stdp:
+    enable: true
+    learning_rate: 0.001
+  hebbian:
+    enable: true
+    learning_rate: 0.0005
+```
+
+### Configuration Examples
+
+#### Example 3: Using Configuration Files
+
+```python
+import pynlm
+
+# Load configuration from JSON file
+config = pynlm.createDefaultConfig()
+success = config.loadFromFile("brain_config.json")
+
+if success:
+    # Print configuration summary
+    print("Configuration loaded successfully:")
+    print(config.summary())
+    
+    # Create brain with loaded configuration
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+else:
+    print("Failed to load configuration file")
+```
+
+#### Example 4: Configuration Validation
+
+```python
+import pynlm
+
+# Create configuration with validation
+config = pynlm.createDefaultConfig()
+
+# Set values with validation
+config.set("brain.neuron_count", 1000)  # Int value
+config.set("brain.connection_probability", 0.05)  # Double value
+config.set("brain.description", "Test brain")  # String value
+
+# Check if values are valid
+assert config.has("brain.neuron_count")
+assert config.has("brain.connection_probability")
+assert config.has("brain.description")
+
+# Get values with type safety
+neuron_count = config.get<int>("brain.neuron_count")
+if neuron_count:
+    print(f"Neuron count: {neuron_count.value()}")
+
+# Get with default value
+max_neurons = config.getOr<int>("brain.neuron_count", 1000)
+print(f"Neuron count: {max_neurons}")
+```
+
+#### Example 5: Advanced Configuration with Categories
+
+```python
+import pynlm
+
+# Create configuration with metadata
+config = pynlm.createDefaultConfig()
+
+# Add entries with descriptions and categories
+config.addEntry("brain.neuron_count", 1000, 
+               "Total number of neurons in the brain",
+               "Brain")
+config.addEntry("brain.region_count", 1,
+               "Number of neural regions",
+               "Brain")
+config.addEntry("plasticity.stdp.enable", true,
+               "Enable Spike-Timing-Dependent Plasticity",
+               "Plasticity")
+config.addEntry("plasticity.hebbian.enable", true,
+               "Enable Hebbian plasticity",
+               "Plasticity")
+config.addEntry("development.critical_period", 100,
+               "Critical period duration",
+               "Development")
+
+# Print categorized summary
+print("Configuration by category:")
+print(config.summary())
+```
+
 ---
 
 ## Quick Start (Copy & Paste)

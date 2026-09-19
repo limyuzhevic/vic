@@ -1,7 +1,3 @@
-# NLM — 熙然
-
-**An Experimental Artificial Developmental Brain**
-
 ## What is NLM?
 
 NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
@@ -17,6 +13,94 @@ NLM IS intended to become:
 - A brain-inspired architecture with neurons and synapses
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
+
+## Configuration System
+
+NLM includes a powerful and flexible configuration system that supports:
+
+### Key Features
+
+- **JSON/YAML Configuration Files**: Load and save configurations in standard formats with full nested structure support
+- **Configuration Categories**: Organize parameters into logical groups (Brain, Dynamics, Plasticity, Development, Neuromodulation, Memory, Cognition, Sensory, Motor, Environment)
+- **Configuration Validation**: Validate configuration values with custom validation functions
+- **Default Values**: Set and use default configuration values with validation
+- **Metadata Support**: Store descriptions and documentation for each configuration parameter
+
+### Configuration Examples
+
+**JSON Configuration**:
+```json
+{
+  "brain": {
+    "neuron_count": 1000,
+    "region_count": 1,
+    "connection_probability": 0.05,
+    "v_thresh": -50.0,
+    "v_rest": -70.0
+  },
+  "plasticity": {
+    "stdp": {
+      "enable": true,
+      "learning_rate": 0.001,
+      "tau_plus": 20.0,
+      "tau_minus": 20.0
+    },
+    "hebbian": {
+      "enable": true,
+      "learning_rate": 0.0005
+    }
+  },
+  "development": {
+    "critical_period": 100,
+    "structural_plasticity_rate": 0.01
+  }
+}
+```
+
+**YAML Configuration**:
+```yaml
+brain:
+  neuron_count: 1000
+  region_count: 1
+  connection_probability: 0.05
+  v_thresh: -50.0
+  v_rest: -70.0
+plasticity:
+  stdp:
+    enable: true
+    learning_rate: 0.001
+    tau_plus: 20.0
+    tau_minus: 20.0
+  hebbian:
+    enable: true
+    learning_rate: 0.0005
+development:
+  critical_period: 100
+  structural_plasticity_rate: 0.01
+```
+
+### Python Configuration Examples
+
+```python
+import pynlm
+
+# Create default configuration
+config = pynlm.createDefaultConfig()
+
+# Load from JSON file
+config.loadFromFile("config.json")
+
+# Set individual values with validation
+config.set("brain.neuron_count", 1000)
+config.set("brain.connection_probability", 0.05)
+
+# Save configuration
+config.saveToFile("my_config.json", "json")
+
+# Create brain with configuration
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
 
 ## Current Phase
 
@@ -76,11 +160,57 @@ make -j4
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Python Examples
+
+**Basic Usage**:
+```python
+import pynlm
+
+# Create a simple brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for step in range(100):
+    brain.step(step)
+
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+```
+
+**Complete Agent Example**:
+```python
+import pynlm
+
+# Setup complete agent with world
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Run agent
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+```
 
 ## Project Structure
 
@@ -95,6 +225,9 @@ NLM/
 │   ├── EXPERIMENTS.md
 │   ├── LIMITATIONS.md
 │   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+├── python/                        # Python bindings
+│   ├── bindings.cpp
+│   └── CMakeLists.txt
 ├── src/
 │   ├── core/           # Core utilities
 │   ├── brain/          # Neural components (integrated)
@@ -104,14 +237,15 @@ NLM/
 │   ├── neuromodulation/# Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
+│   ├── cognition/     # Cognitive mechanisms (integrated)
+│   ├── sensory/        # Sensory processing
 │   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
+│   ├── environment/    # Environment interface
+│   ├── experiments/    # Experiment framework (Phase 6)
 │   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── tests/                     # Test suite
+├── configs/                   # Configuration files
+└── docs/                      # Documentation
 ```
 
 ## Phase Summary
@@ -220,6 +354,45 @@ CHANGED BRAIN
   ↓
 CHANGED FUTURE BEHAVIOR
 ```
+
+## Advanced Configuration Options
+
+The configuration system supports advanced features:
+
+### Configuration Categories
+- **Brain**: Neuron properties, network topology
+- **Dynamics**: Neural simulation parameters
+- **Plasticity**: Learning rules and mechanisms
+- **Development**: Growth and maturation processes
+- **Neuromodulation**: Chemical regulation systems
+- **Memory**: Storage and retrieval mechanisms
+- **Cognition**: Thought and reasoning processes
+- **Sensory**: Perception and input processing
+- **Motor**: Action and output systems
+- **Environment**: Simulation and interaction parameters
+
+### Validation Functions
+Custom validation for configuration values:
+
+```cpp
+// Range validation
+auto validator = config_utils::validateIntRange(1, 10000);
+auto doubleValidator = config_utils::validateDoubleRange(0.0, 1.0);
+
+// Length validation
+auto stringValidator = config_utils::validateStringLength(1, 100);
+
+// Positive validation
+auto positiveValidator = config_utils::validatePositive();
+```
+
+### Configuration Options
+Each configuration entry can have:
+- Description: Human-readable explanation
+- Validator: Function to validate the value
+- Default: Fallback value if not specified
+- Category: Logical grouping
+- Required: Whether the parameter must be set
 
 ## License
 
