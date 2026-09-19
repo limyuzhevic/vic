@@ -65,6 +65,9 @@ struct Brain::Impl {
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
     
+    // Neuron ID to neuron pointer registry for fast lookup
+    std::unordered_map<NeuronId, Neuron*> neuronRegistry;
+    
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
@@ -92,13 +95,25 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
-    {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
+    // Build registry on first call or after reset
+    void buildNeuronRegistry() {
+        neuronRegistry.clear();
+        for (auto& region : regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    neuronRegistry[neuron->getId()] = neuron;
+                }
+            }
         }
-        rng = std::make_unique<RandomGenerator>(seed);
+    }
+    
+    // Called after structural changes to regions
+    void updateNeuronRegistry() {
+        buildNeuronRegistry();
+    }
+    
+    // Initialize registry
+    buildNeuronRegistry();
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
@@ -617,12 +632,19 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
-    for (auto& region : pImpl->regions) {
-        auto neurons = region->getAllNeurons();
-        for (auto* n : neurons) {
-            if (n->getId() == neuron) {
-                n->injectCurrent(current);
-                return;
+    // Use registry for O(1) lookup instead of O(n²) scan
+    auto it = pImpl->neuronRegistry.find(neuron);
+    if (it != pImpl->neuronRegistry.end()) {
+        it->second->injectCurrent(current);
+    } else {
+        // Fallback to linear scan for backward compatibility
+        for (auto& region : pImpl->regions) {
+            auto neurons = region->getAllNeurons();
+            for (auto* n : neurons) {
+                if (n->getId() == neuron) {
+                    n->injectCurrent(current);
+                    return;
+                }
             }
         }
     }
@@ -757,6 +779,10 @@ void Brain::reset() {
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    
+    // Clear neuron lists to avoid accumulating stale pointers
+    pImpl->sensoryNeurons.clear();
+    pImpl->motorNeurons.clear();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }

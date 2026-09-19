@@ -62,22 +62,36 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get brain pointer safely
+        Brain* brainPtr = agent.getBrain();
+        if (!brainPtr) {
+            NLM_LOG_ERROR("Agent brain is null!");
+            return result;
+        }
+        
+        // Get first region safely
+        const auto& regions = brainPtr->getRegions();
+        if (regions.empty()) {
+            NLM_LOG_ERROR("No regions in brain!");
+            return result;
+        }
+        
+        SensoryPercept percept = world.observe(regions[0].get());
         
         // Process sensory input
         agent.processSensoryInput(percept);
         
         // Brain step
-        brain->step(step, step * 0.001);
+        brainPtr->step(step, step * 0.001);
         
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyAction(regions[0].get(), cmd);
         
         // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        float reward = world.computeReward(regions[0].get());
         totalReward += reward;
         
         // Apply reward modulation
@@ -89,16 +103,16 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         }
         
         // Collect metrics
-        totalFiringRate += brain->getAverageFiringRate();
-        if (brain->getFiringNeuronCount() > 0) firingCount++;
+        totalFiringRate += brainPtr->getAverageFiringRate();
+        if (brainPtr->getFiringNeuronCount() > 0) firingCount++;
         
         // Periodic status
         if (step % 1000 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 
                         " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+                        " | Firing: " + std::to_string(brainPtr->getAverageFiringRate()) +
+                        " | WorkingMem: " + std::to_string(brainPtr->getWorkingMemory() ? 
+                            brainPtr->getWorkingMemory()->getActiveTraces() : 0));
         }
     }
     
