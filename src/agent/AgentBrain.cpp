@@ -334,6 +334,69 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+void AgentBrain::replay() {
+    // Get the episodic memory from the brain
+    auto* episodicMem = brain_->getEpisodicMemory();
+    if (!episodicMem) {
+        NLM_LOG_WARNING("No episodic memory available for replay");
+        return;
+    }
+    
+    // Get episodes for replay
+    auto episodes = episodicMem->getEpisodesForReplay(3);
+    if (episodes.empty()) {
+        NLM_LOG_INFO("No episodes available for replay");
+        return;
+    }
+    
+    NLM_LOG_INFO("Replaying " + std::to_string(episodes.size()) + " episodes...");
+    
+    // Replay each episode
+    for (size_t episodeIdx = 0; episodeIdx < episodes.size(); ++episodeIdx) {
+        const auto* episode = episodes[episodeIdx];
+        
+        // For each neuron in the episode, restore activation levels
+        for (size_t neuronIdx = 0; neuronIdx < episode->activeNeurons.size(); ++neuronIdx) {
+            NeuronId neuronId = episode->activeNeurons[neuronIdx];
+            float activation = episode->neuronActivations[neuronIdx];
+            
+            // Find the neuron and restore its activation
+            for (auto& region : brain_->getRegions()) {
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron->getId() == neuronId) {
+                        // Restore membrane potential based on activation
+                        float currentMembranePot = neuron->getState().membranePotential;
+                        float restingPot = neuron->getState().restingPotential;
+                        float newPot = restingPot + activation * 10.0f;  // Scale activation to potential
+                        neuron->setMembranePotential(newPot);
+                        
+                        // Also inject current to enhance the effect
+                        if (activation > 0.1f) {
+                            float current = activation * 5.0f;
+                            neuron->injectCurrent(current);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        
+        NLM_LOG_INFO("  Replayed episode " + std::to_string(episodeIdx + 1) + 
+                     ": " + std::to_string(episode->activeNeurons.size()) + " neurons, " +
+                     std::to_string(static_cast<int>(episode->reward)) + " reward");
+    }
+    
+    NLM_LOG_INFO("Replay complete: Restored " + std::to_string(episodes.size() * 
+             (episodes.empty() ? 0 : episodes[0]->activeNeurons.size())) + " neuron activations");
+}
+
+void AgentBrain::consolidateReplay() {
+    // Simple replay consolidation - just log for now
+    NLM_LOG_INFO("Replay consolidation: Consolidating memory traces from replayed episodes");
+    // TODO: Implement actual consolidation mechanisms
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;

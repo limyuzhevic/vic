@@ -74,6 +74,7 @@ struct Brain::Impl {
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
+    bool isInitialized;  // Added for initialization state tracking
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
@@ -92,6 +93,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , isInitialized(false)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -177,10 +179,36 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
+    // Check if already initialized
+    if (pImpl->isInitialized) {
+        NLM_LOG_WARNING("Brain already initialized! Call reset() before re-initializing.");
+        return false;
+    }
+    
+    // Validate configuration parameters
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid configuration: neuron_count must be > 0");
+        return false;
+    }
+    
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Invalid configuration: region_count must be > 0");
+        return false;
+    }
+    
+    // Check if we have essential systems configured
+    if (neuronCount < 100) {
+        NLM_LOG_WARNING("Small network detected: " + std::to_string(neuronCount) + " neurons. For full functionality, consider using at least 1000 neurons.");
+    }
+    
+    // Get configuration values
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_WARNING("Invalid connection_probability: " + std::to_string(connectionProbability) + ". Clamping to [0, 1].");
+        connectionProbability = std::clamp(connectionProbability, 0.0f, 1.0f);
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
@@ -215,8 +243,8 @@ bool Brain::initialize() {
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
     
@@ -289,6 +317,9 @@ bool Brain::initialize() {
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    
+    // Mark as initialized
+    pImpl->isInitialized = true;
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
@@ -744,6 +775,7 @@ void Brain::reset() {
     pImpl->totalSpikesTotal = 0;
     pImpl->isResting = false;
     pImpl->stepsSinceLastEpisode = 0;
+    pImpl->isInitialized = false;  // Reset initialization state
     
     for (auto& region : pImpl->regions) {
         region->reset();

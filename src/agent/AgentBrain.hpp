@@ -52,11 +52,11 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
-    // Reset agent for new episode
-    void reset();
+    // Replay and consolidation
+    void replay();  // Replay stored episodes to reinforce learning
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Replay consolidation
+    void consolidateReplay();  // Consolidate replayed memories
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
