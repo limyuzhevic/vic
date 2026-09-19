@@ -3,17 +3,17 @@
 
 namespace nlm {
 
-Observation::Observation() {}
+WorldObservation::WorldObservation() {}
 
-const std::vector<float>& Observation::getData() const {
+const std::vector<float>& WorldObservation::getData() const {
     return data_;
 }
 
-size_t Observation::getDimensions() const {
+size_t WorldObservation::getDimensions() const {
     return data_.size();
 }
 
-void Observation::setFromPercept(const SensoryPercept& percept) {
+void WorldObservation::setFromPercept(const SensoryPercept& percept) {
     data_ = percept.getAllSignals();
 }
 

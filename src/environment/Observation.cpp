@@ -2,27 +2,27 @@
 
 namespace nlm {
 
-Observation::Observation() = default;
+EnvironmentObservation::EnvironmentObservation() = default;
 
-Observation::Observation(const SensoryInput& input) {
+EnvironmentObservation::EnvironmentObservation(const SensoryInput& input) {
     sensoryInput_ = input.clone();
 }
 
-Observation::~Observation() = default;
+EnvironmentObservation::~EnvironmentObservation() = default;
 
-const SensoryInput* Observation::getSensoryInput() const {
+const SensoryInput* EnvironmentObservation::getSensoryInput() const {
     return sensoryInput_.get();
 }
 
-bool Observation::isValid() const {
+bool EnvironmentObservation::isValid() const {
     return sensoryInput_ != nullptr;
 }
 
-std::unique_ptr<Observation> Observation::clone() const {
+std::unique_ptr<EnvironmentObservation> EnvironmentObservation::clone() const {
     if (!sensoryInput_) {
-        return std::make_unique<Observation>();
+        return std::make_unique<EnvironmentObservation>();
     }
-    auto obs = std::make_unique<Observation>(*sensoryInput_);
+    auto obs = std::make_unique<EnvironmentObservation>(*sensoryInput_);
     return obs;
 }
 

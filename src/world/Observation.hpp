@@ -10,10 +10,10 @@ class AgentBody;
 class SensoryPercept;
 
 // Sensory observation wrapper (simplified for compatibility)
-class Observation {
+class WorldObservation {
 public:
-    Observation();
-    ~Observation() = default;
+    WorldObservation();
+    ~WorldObservation() = default;
     
     // Get data
     const std::vector<float>& getData() const;
