@@ -19,6 +19,8 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class SemanticMemory;
+class ProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
@@ -147,6 +149,45 @@ public:
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    
+    // ========== PREDICTION SYSTEM ==========
+    
+    // Prediction system for sensory prediction and error computation
+    PredictionSystem* getPredictionSystem();
+    
+    // ========== COGNITION SYSTEMS ==========
+    
+    // Neural planner for action planning
+    NeuralPlanner* getPlanner();
+    
+    // Concept formation for pattern discovery
+    ConceptFormation* getConceptFormation();
+    
+    // Attentional selection for focus
+    AttentionalSelection* getAttention();
+    
+    // ========== DEVELOPMENT SYSTEM ==========
+    
+    DevelopmentSystem* getDevelopmentSystem();
+    DevelopmentalStage getDevelopmentalStage() const;
+    void setDevelopmentalStage(DevelopmentalStage stage);
+    
+    // ========== MEMORY SYSTEMS ==========
+    
+    // Working memory - transient active information
+    NeuralWorkingMemory* getWorkingMemory();
+    
+    // Episodic memory - experience storage
+    NeuralEpisodicMemory* getEpisodicMemory();
+    
+    // Associative memory - pattern associations
+NeuralAssociativeMemory* getAssociativeMemory();
+
+    // Semantic memory - conceptual knowledge
+    SemanticMemory* getSemanticMemory();
+
+    // Procedural memory - skills and habits
+    ProceduralMemory* getProceduralMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
