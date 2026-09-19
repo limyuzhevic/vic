@@ -187,15 +187,24 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
-    void logStatus() const;
-    
+// ================ BRAIN STEP IMPLEMENTATION ============
+
+    // Implementation forwarding methods
+    void processDelayedSpikes(SimulationStep step, Timestamp time) { pImpl->processDelayedSpikes(step, time); }
+    void updateNeurons(SimulationStep step, Timestamp time) { pImpl->updateNeurons(step, time); }
+    void detectAndScheduleSpikes(SimulationStep step, Timestamp time) { pImpl->detectAndScheduleSpikes(step, time); }
+    void processImmediateSpikes(SimulationStep step) { pImpl->processImmediateSpikes(step); }
+    void updateMemorySystems(SimulationStep step, Timestamp time) { pImpl->updateMemorySystems(step, time); }
+    void applyNeuromodulationEffects() { pImpl->applyNeuromodulationEffects(); }
+    void applyPlasticityRules(float plasticityMod) { pImpl->applyPlasticityRules(plasticityMod); }
+    void updateCognitiveSystems() { pImpl->updateCognitiveSystems(); }
+    void applyStructuralPlasticity(SimulationStep step) { pImpl->applyStructuralPlasticity(step); }
+    void replayMemories(SimulationStep step) { pImpl->replayMemories(step); }
+    void applyDevelopmentEffects(SimulationStep step) { pImpl->applyDevelopmentEffects(step); }
+    void consolidateMemories(SimulationStep step) { pImpl->consolidateMemories(step); }
+    void manageCheckpoints(SimulationStep step, Timestamp time) { pImpl->manageCheckpoints(step, time); }
+
 private:
     struct Impl;
     Impl* pImpl;
 };
-
-} // namespace nlm
