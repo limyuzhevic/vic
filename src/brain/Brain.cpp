@@ -78,9 +78,13 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    DevelopmentalStage developmentalStage;
+    RegionId nextRegionId;
+    
+    // Use proper initialization order with designated initializers
     Impl(std::shared_ptr<Config> cfg)
-        : config(cfg)
-        , rng(nullptr)
+        : config(std::move(cfg))  // Move ownership
+        , rng(nullptr)  // Default-initialized, set later
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -90,8 +94,8 @@ struct Brain::Impl {
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(100)
+        , consolidationInterval(1000)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -152,9 +156,6 @@ struct Brain::Impl {
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
     }
-    
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
 };
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}

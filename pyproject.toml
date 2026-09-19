@@ -27,7 +27,13 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-dependencies = []
+dependencies = ["numpy>=1.20"]
+
+[tool.scikit-build]
+require-runtime-env = ["python>=3.8", "numpy>=1.20"]
+
+[tool.scikit-build.cmake.define]
+NLM_SOURCE_DIR = "src"
 
 [project.optional-dependencies]
 dev = [
