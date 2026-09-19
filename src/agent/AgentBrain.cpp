@@ -74,6 +74,46 @@ void AgentBrain::initialize(const SimpleWorld& world) {
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
 }
 
+void AgentBrain::initializePerformanceOptimizations() {
+    // Pre-allocate neuron vectors for better performance
+    // These vectors will be populated during construction based on actual brain neurons
+    // Clearing them now ensures consistent behavior
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    
+    NLM_LOG_DEBUG("AgentBrain performance optimizations initialized");
+}
+
+void AgentBrain::updatePerformanceMetrics(double timestep) {
+    // Track performance metrics for debugging
+    static double lastUpdateTime = 0.0;
+    static size_t updateCount = 0;
+    
+    updateCount++;
+    
+    if (timestep > 0.0) {
+        double updateFreq = 1.0 / timestep;
+        NLM_LOG_DEBUG(std::to_string(updateFreq) + " Hz simulation frequency, " +
+                     std::to_string(updateCount) + " updates processed");
+    }
+    
+    // Log neuron activity summary periodically
+    if (updateCount % 100 == 0) {
+        NLM_LOG_INFO(std::to_string(motorForward_.size()) + " motor forward neurons, " +
+                     std::to_string(motorBackward_.size()) + " motor backward neurons, " +
+                     std::to_string(motorTurnLeft_.size()) + " motor turn left neurons");
+    }
+}
+
 size_t AgentBrain::getSensoryInputSize() const {
     // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
     return 256 + 8 + 4 + 6;
@@ -161,6 +201,9 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     
     return decoded;
 }
+    
+    return decoded;
+}
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
     // Calculate average activity in each motor group
@@ -168,18 +211,22 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
+            if (!n) return 0.0f; // Null check
             // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
         }
         return sum / neurons.size();
     };
     
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
+    float forwardAct = 0.0f, backwardAct = 0.0f, leftAct = 0.0f, rightAct = 0.0f, 
+          interactAct = 0.0f, waitAct = 0.0f;
+    
+    if (!motorForward_.empty()) forwardAct = calcActivity(motorForward_);
+    if (!motorBackward_.empty()) backwardAct = calcActivity(motorBackward_);
+    if (!motorTurnLeft_.empty()) leftAct = calcActivity(motorTurnLeft_);
+    if (!motorTurnRight_.empty()) rightAct = calcActivity(motorTurnRight_);
+    if (!motorInteract_.empty()) interactAct = calcActivity(motorInteract_);
+    if (!motorWait_.empty()) waitAct = calcActivity(motorWait_);
     
     // Find maximum activity
     struct { MotorCommand cmd; float activity; } commands[] = {
@@ -211,23 +258,26 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
+    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        float exploreChance = 0.2f + (curiosityLevel_ * 0.3f);  // 20-50% range
+        exploreChance = std::min(exploreChance, 0.5f);  // Cap at 50%
         
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+        RandomGenerator* rng = brain_ ? brain_->getRandomGenerator() : nullptr;
+        if (rng) {
+            float r = rng->uniformReal(0.0f, 1.0f);
+            if (r < exploreChance) {
+                // Random motor command from the 6 valid actions (0-5)
+                uint32_t choice = rng->uniformInt(0, 5);  // 0-5 for 6 commands
+                switch (choice) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::MoveBackward;
+                    case 2: return MotorCommand::TurnLeft;
+                    case 3: return MotorCommand::TurnRight;
+                    case 4: return MotorCommand::Interact;
+                    case 5: return MotorCommand::Wait;
+                    default: return defaultCmd;
+                }
             }
         }
     }
@@ -345,6 +395,28 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    NLM_LOG_DEBUG("AgentBrain reset completed");
+}
+
+void AgentBrain::logPerformanceStats() const {
+    if (!brain_) return;
+    
+    NLM_LOG_INFO("=== AgentBrain Performance Stats ===");
+    NLM_LOG_INFO("Brain neurons: " + std::to_string(brain_->getTotalNeuronCount()));
+    NLM_LOG_INFO("Brain synapses: " + std::to_string(brain_->getTotalSynapseCount()));
+    NLM_LOG_INFO("Firing neurons: " + std::to_string(brain_->getFiringNeuronCount()));
+    NLM_LOG_INFO("Active neurons: " + std::to_string(brain_->getActiveNeuronCount()));
+    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(getDevelopmentalStage())));
+    NLM_LOG_INFO("Current timestep: " + std::to_string(developmentalAge_));
+    
+    // Log curiosity and novelty levels
+    NLM_LOG_INFO("Curiosity level: " + std::to_string(curiosityLevel_));
+    NLM_LOG_INFO("Novelty level: " + std::to_string(noveltyLevel_));
+    NLM_LOG_INFO("Neuromodulation level: " + std::to_string(dopamineLevel_));
+    NLM_LOG_INFO("Prediction error: " + std::to_string(predictionError_));
+    
+    NLM_LOG_INFO("=== End Performance Stats ===");
 }
 
 } // namespace nlm

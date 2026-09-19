@@ -19,6 +19,11 @@ public:
     // Initialize with world
     void initialize(const SimpleWorld& world);
     
+    // Performance optimization and logging methods
+    void initializePerformanceOptimizations();
+    void updatePerformanceMetrics(double timestep);
+    void logPerformanceStats() const;
+    
     // Get sensory input size expected by brain
     size_t getSensoryInputSize() const;
     
