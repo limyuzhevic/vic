@@ -1,5 +1,7 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../prediction/PredictionSystem.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -87,41 +89,79 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
+    // Get sensory patterns from world
+    auto& brain = *brain_;
+    
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
+    std::vector<float> visionPattern(vision.begin(), vision.end());
+    visionPattern.resize(256, 0.0f); // Normalize to 256
+    
+    // Create neural pattern from vision for concept formation
+    // This represents the raw sensory input that the brain will process
+    std::vector<float> sensoryPattern = visionPattern;
+    
+    // Add other sensory modalities to pattern
+    const auto& touch = percept.getTouch();
+    std::copy(touch.begin(), touch.end(), std::back_inserter(sensoryPattern));
+    
+    const auto& internal = percept.getInternal();
+    std::copy(internal.begin(), internal.end(), std::back_inserter(sensoryPattern));
+    
+    const auto& proprio = percept.getProprioception();
+    std::copy(proprio.begin(), proprio.end(), std::back_inserter(sensoryPattern));
+    
+    // Process through neural computation
+    brain.receiveSensoryInput(SensoryInput(visionPattern));
+    
+    // Inject into sensory neurons as before
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            float current = vision[i] * 5.0f;
             sensoryVision_[i]->injectCurrent(current);
         }
     }
     
-    // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = touch[i] * 8.0f;
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
     
-    // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+    for (size_t i = 0; i < sensoryInternal_.size() && i < internal.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            float current = (internal[i] * 2.0f - 1.0f) * 5.0f;
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
     
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;
             sensoryProprioception_[i]->injectCurrent(current);
         }
+    }
+    
+        // Extract features for concept formation (every 4th value)
+    std::vector<float> features;
+    features.reserve(sensoryPattern.size() / 4);
+    for (size_t i = 0; i < sensoryPattern.size(); i += 4) {
+        if (i < sensoryPattern.size()) {
+            features.push_back(sensoryPattern[i]);
+        }
+    }
+    
+    // NEW: Send to concept formation for pattern discovery
+    auto* conceptFormation = brain.getConceptFormation();
+    if (conceptFormation && conceptFormation->getConceptCount() > 0) {
+        conceptFormation->presentExperience(sensoryPattern, features, predictionError_, brain.getTotalSpikeCount());
+    }
+    
+    // NEW: Send to prediction system for training
+    auto* predictionSystem = brain.getPredictionSystem();
+    if (predictionSystem) {
+        predictionSystem->train(SensoryInput(visionPattern));
     }
     
     // Compute novelty (difference from previous vision)
@@ -149,10 +189,72 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
 }
 
-MotorCommand AgentBrain::decodeMotorCommand() {
+void AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
     MotorCommand decoded = decodeFromMotorNeurons();
+    
+    // NEW: Use neural planner for better action selection
+    auto* planner = brain_->getPlanner();
+    if (planner) {
+        // Create state vector from current neural activity
+        std::vector<float> currentState;
+        float totalActivity = 0.0f;
+        
+        for (auto* neuron : motorForward_) {
+            totalActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+        }
+        for (auto* neuron : motorBackward_) {
+            totalActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+        }
+        for (auto* neuron : motorTurnLeft_) {
+            totalActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+        }
+        for (auto* neuron : motorTurnRight_) {
+            totalActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+        }
+        
+        // Normalize to [0,1]
+        currentState.push_back(std::clamp(totalActivity / 10.0f, 0.0f, 1.0f));
+        
+        // Set goal based on current action quality
+        auto* cf = brain_->getConceptFormation();
+        if (cf) {
+            // Use highest quality action as goal
+            float bestQuality = -1.0f;
+            ActionType bestAction = ActionType::Wait;
+            
+            for (size_t i = 0; i < cf->getConceptCount(); ++i) {
+                const auto* concept = cf->getConcept(i);
+                if (concept) {
+                    // This is simplified - real implementation would use action planning
+                    float quality = concept->avgStability * concept->avgReward;
+                    if (quality > bestQuality) {
+                        bestQuality = quality;
+                        bestAction = concept->categoryHint == "rewarding" ? ActionType::MoveForward : ActionType::Wait;
+                    }
+                }
+            }
+            
+            if (bestQuality > 0.3f) {
+                currentState.push_back(bestQuality);
+            } else {
+                currentState.push_back(0.5f); // Default to neutral goal
+            }
+        } else {
+            currentState.push_back(0.5f); // Default goal
+        }
+        
+        // Plan action using neural planner
+        ActionType plannedAction = planner->planAction(currentState, 0.5f);
+        
+        // Use planner's action if it's different from basic decoding
+        // This allows planning to override reflexive responses
+        if (plannedAction != ActionType::Wait && plannedAction != decoded) {
+            // Log planning override
+            return plannedAction;
+        }
+    }
     
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {

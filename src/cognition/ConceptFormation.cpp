@@ -30,6 +30,23 @@ void ConceptFormation::initialize(Brain* brain) {
     NLM_LOG_INFO("ConceptFormation initialized");
 }
 
+void ConceptFormation::processCurrentActivity(const std::vector<float>& sensoryPattern, float reward) {
+    if (!brain_ || sensoryPattern.empty()) return;
+    
+    // Extract features from sensory pattern for concept formation
+    // This is a simplified approach - in practice would use learned feature extraction
+    std::vector<float> features;
+    features.reserve(sensoryPattern.size() / 4); // Take every 4th value as feature
+    for (size_t i = 0; i < sensoryPattern.size(); i += 4) {
+        if (i < sensoryPattern.size()) {
+            features.push_back(sensoryPattern[i]);
+        }
+    }
+    
+    // Present to concept formation system
+    presentExperience(sensoryPattern, features, reward, pImpl->brain->getTotalSpikeCount());
+}
+
 size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
                                           const std::vector<float>& features,
                                           float reward,
