@@ -116,9 +116,6 @@ public:
     const std::vector<Timestamp>& getSpikeHistory() const;
     void clearSpikeHistory();
     
-    // Synapse management (incoming and outgoing)
-    void addIncomingSynapse(SynapseHandle handle);
-    void addOutgoingSynapse(SynapseHandle handle);
     const std::vector<SynapseHandle>& getIncomingSynapses() const;
     const std::vector<SynapseHandle>& getOutgoingSynapses() const;
     
