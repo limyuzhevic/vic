@@ -58,6 +58,34 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
+    // Get memory system access
+    NeuralWorkingMemory* getWorkingMemory() const;
+    NeuralEpisodicMemory* getEpisodicMemory() const;
+    
+    // Store in working memory
+    void storeInWorkingMemory(NeuronId neuronId, float activation);
+    
+    // Get working memory trace
+    float getWorkingMemoryTrace(NeuronId neuronId) const;
+    
+    // Get all active memory neurons
+    std::vector<NeuronId> getActiveMemoryNeurons() const;
+    
+    // Get memory activity statistics
+    float getMemoryActivity() const;
+    
+    // Store episodic memory
+    void storeEpisode(const std::vector<float>& sensoryState, 
+                     ActionType action,
+                     float reward, 
+                     float novelty);
+    
+    // Get recent episodes
+    std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t maxCount) const;
+    
+    // Find similar episodes
+    std::vector<EpisodicMemoryItem> findSimilarEpisodes(const std::vector<float>& sensoryState, float threshold) const;
+    
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }

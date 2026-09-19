@@ -345,6 +345,116 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset all memory systems
+    updateResetState();
 }
 
-} // namespace nlm
+NeuralWorkingMemory* AgentBrain::getWorkingMemory() const {
+    if (!brain_) return nullptr;
+    return brain_->getWorkingMemory();
+}
+
+NeuralEpisodicMemory* AgentBrain::getEpisodicMemory() const {
+    if (!brain_) return nullptr;
+    return brain_->getEpisodicMemory();
+}
+
+void AgentBrain::storeInWorkingMemory(NeuronId neuronId, float activation) {
+    if (auto* wm = getWorkingMemory()) {
+        wm->storeToNeuron(neuronId, activation);
+    }
+}
+
+float AgentBrain::getWorkingMemoryTrace(NeuronId neuronId) const {
+    if (auto* wm = getWorkingMemory()) {
+        return wm->getMemoryTrace(neuronId);
+    }
+    return 0.0f;
+}
+
+std::vector<NeuronId> AgentBrain::getActiveMemoryNeurons() const {
+    if (auto* wm = getWorkingMemory()) {
+        return wm->getMemoryNeurons();
+    }
+    return std::vector<NeuronId>();
+}
+
+float AgentBrain::getMemoryActivity() const {
+    if (auto* wm = getWorkingMemory()) {
+        return wm->getActivityLevel();
+    }
+    return 0.0f;
+}
+
+void AgentBrain::storeEpisode(const std::vector<float>& sensoryState, 
+                             ActionType action,
+                             float reward, 
+                             float novelty) {
+    if (auto* em = getEpisodicMemory()) {
+        EpisodicMemoryItem episode;
+        episode.sensoryState = sensoryState;
+        episode.action = action;
+        episode.reward = reward;
+        episode.novelty = novelty;
+        episode.timestamp = static_cast<size_t>(developmentalAge_);
+        
+        // Store related working memory traces
+        auto memoryNeurons = getActiveMemoryNeurons();
+        for (size_t i = 0; i < std::min<size_t>(memoryNeurons.size(), 50); ++i) {
+            float trace = getWorkingMemoryTrace(memoryNeurons[i]);
+            if (trace > 0.1f) {
+                episode.memoryTrails.push_back(std::make_pair(memoryNeurons[i], trace));
+            }
+        }
+        
+        em->storeEpisode(episode);
+    }
+}
+
+std::vector<EpisodicMemoryItem> AgentBrain::getRecentEpisodes(size_t maxCount) const {
+    if (auto* em = getEpisodicMemory()) {
+        return em->getEpisodesForReplay(static_cast<int>(maxCount));
+    }
+    return std::vector<EpisodicMemoryItem>();
+}
+
+std::vector<EpisodicMemoryItem> AgentBrain::findSimilarEpisodes(const std::vector<float>& sensoryState, float threshold) const {
+    if (auto* em = getEpisodicMemory()) {
+        auto similar = em->retrieveSimilar(sensoryState, 10);
+        std::vector<EpisodicMemoryItem> result;
+        for (auto* item : similar) {
+            if (item && std::abs(item->novelty - threshold) < 0.1f) {
+                result.push_back(*item);
+            }
+        }
+        return result;
+    }
+    return std::vector<EpisodicMemoryItem>();
+}
+
+void AgentBrain::updateResetState() {
+    // Reset all memory systems
+    if (auto* wm = getWorkingMemory()) {
+        wm->clear();
+    }
+    if (auto* em = getEpisodicMemory()) {
+        em->clear();
+    }
+    if (auto* am = brain_->getAssociativeMemory()) {
+        am->clear();
+    }
+}
+
+actionType MotorCommandToActionType(MotorCommand cmd) {
+    switch (cmd) {
+        case MotorCommand::MoveForward: return ActionType::MoveForward;
+        case MotorCommand::MoveBackward: return ActionType::MoveBackward;
+        case MotorCommand::TurnLeft: return ActionType::TurnLeft;
+        case MotorCommand::TurnRight: return ActionType::TurnRight;
+        case MotorCommand::LookLeft: return ActionType::Look;
+        case MotorCommand::LookRight: return ActionType::Look;
+        case MotorCommand::Interact: return ActionType::Interact;
+        default: return ActionType::Wait;
+    }
+}
