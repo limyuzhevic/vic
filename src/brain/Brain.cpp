@@ -622,6 +622,153 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
         for (auto* n : neurons) {
             if (n->getId() == neuron) {
                 n->injectCurrent(current);
+                NLM_LOG_DEBUG("Injected " + std::to_string(current) + " into neuron " + std::to_string(neuron.index()));
+                return;
+            }
+        }
+    }
+    NLM_LOG_WARNING("Neuron " + std::to_string(neuron.index()) + " not found for current injection");
+}
+
+void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    size_t injectedCount = 0;
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == type) {
+                for (auto* neuron : pop->getNeurons()) {
+                    neuron->injectCurrent(current);
+                    ++injectedCount;
+                }
+            }
+        }
+    }
+    if (injectedCount > 0) {
+        NLM_LOG_DEBUG("Injected " + std::to_string(current) + " into " + std::to_string(injectedCount) + 
+                     " neurons of type " + std::to_string(static_cast<int>(type)));
+    }
+}
+
+std::unique_ptr<class Action> Brain::produceAction() {
+    // Enhanced action selection based on motor neuron activity and neuromodulation
+    if (pImpl->motorNeurons.empty()) {
+        NLM_LOG_DEBUG("No motor neurons available, returning Wait action");
+        return std::make_unique<Action>(ActionType::Wait);
+    }
+    
+    // Calculate activity of motor neuron groups
+    size_t firingMotor = 0;
+    float totalActivity = 0.0f;
+    for (auto* neuron : pImpl->motorNeurons) {
+        if (neuron->isFiring()) {
+            ++firingMotor;
+        }
+        totalActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+    }
+    
+    // Apply neuromodulation effects on action selection
+    float explorationBias = 0.5f;
+    if (pImpl->dopamine) {
+        explorationBias = std::clamp(pImpl->dopamine->getLevel() * 0.5f + 0.5f, 0.1f, 1.0f);
+    }
+    
+    // Simple action selection with exploration bias
+    ActionType type = ActionType::Wait;
+    if (firingMotor > 0) {
+        type = ActionType::MoveForward;
+    }
+    
+    // Random exploration based on neuromodulation
+    auto* rng = getRandomGenerator();
+    if (rng && explorationBias > 0.0f) {
+        float r = rng->uniformReal(0.0f, 1.0f);
+        if (r < explorationBias * 0.1f) {  // 10% base exploration rate
+            int choice = rng->uniformInt(0, 8);
+            switch (choice) {
+                case 0: type = ActionType::MoveForward; break;
+                case 1: type = ActionType::MoveBackward; break;
+                case 2: type = ActionType::TurnLeft; break;
+                case 3: type = ActionType::TurnRight; break;
+                case 4: type = ActionType::Look; break;
+                case 5: type = ActionType::Interact; break;
+                case 6: type = ActionType::Eat; break;
+                case 7: type = ActionType::Rest; break;
+            }
+        }
+    }
+    
+    auto action = std::make_unique<Action>(type);
+    
+    // Add contextual parameters based on available systems
+    if (pImpl->attention) {
+        auto attentionNeurons = pImpl->attention->getAttentionWeights();
+        if (!attentionNeurons.empty()) {
+            // Add parameters based on attention
+            std::vector<float> params = {attentionNeurons[0]};
+            action->setParameters(params);
+        }
+    }
+    
+    NLM_LOG_DEBUG("Producing action: " + action->getName() + " (firing motors: " + 
+                 std::to_string(firingMotor) + "/" + std::to_string(pImpl->motorNeurons.size()) + ")");
+    
+    return action;
+}
+
+void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
+    // Apply neuromodulation effects on plasticity and neural dynamics
+    float modulation = signal.getLevel();
+    
+    // Apply to all neurons - neuromodulators affect excitability
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                // Neuromodulators affect neural excitability
+                // Positive signals increase excitability (lower threshold)
+                // Negative signals decrease excitability (raise threshold)
+                float excitabilityMod = modulation * 0.5f;
+                if (excitabilityMod > 0.0f) {
+                    neuron->setThreshold(neuron->getThreshold() - excitabilityMod * 5.0f);
+                } else {
+                    neuron->setThreshold(neuron->getThreshold() - excitabilityMod * 5.0f);
+                }
+            }
+        }
+    }
+    
+    // Scale STDP learning rates
+    if (pImpl->stdp) {
+        pImpl->stdp->setLTPWeight(0.01f * (1.0f + modulation));
+        pImpl->stdp->setLTDWeight(0.012f * (1.0f + modulation));
+    }
+    
+    NLM_LOG_DEBUG("Applied neuromodulation: level " + std::to_string(modulation));
+}
+
+void Brain::updatePlasticity() {
+    // Plasticity is now applied during each step in the main step function
+    // This method is kept for API compatibility but logs that automatic updates occur
+    NLM_LOG_DEBUG("Plasticity updates are automatically applied in step() function");
+}
+
+void Brain::develop() {
+    // Development updates structural plasticity and neural properties
+    if (pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    }
+    
+    // Update developmental stage
+    pImpl->developmentalStage = 
+        static_cast<DevelopmentalStage>((static_cast<int>(pImpl->developmentalStage) + 1) % 5);
+    
+    NLM_LOG_DEBUG("Development update: stage changed to " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+}
+
+void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    for (auto& region : pImpl->regions) {
+        auto neurons = region->getAllNeurons();
+        for (auto* n : neurons) {
+            if (n->getId() == neuron) {
+                n->injectCurrent(current);
                 return;
             }
         }

@@ -36,12 +36,12 @@ private:
     bool enabled_;
 };
 
-// Hebbian plasticity rule: "neurons that fire together, wire together"
-// PLACEHOLDER - Phase 2 will implement real Hebbian learning
-class HebbianRule : public PlasticityRule {
+// Bienenstock-Cooper-Munro (BCM) synaptic plasticity rule
+// Homeostatic learning that maintains average activity near threshold
+class BCMRule : public PlasticityRule {
 public:
-    HebbianRule();
-    ~HebbianRule() override;
+    BCMRule();
+    ~BCMRule() override;
     
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
@@ -51,6 +51,8 @@ public:
     const char* getName() const override;
     
     // Parameters
+    void setTheta(float theta);  // BCM threshold
+    float getTheta() const;
     void setLearningRate(float rate);
     float getLearningRate() const;
     
@@ -63,24 +65,67 @@ private:
 // PLACEHOLDER - Phase 2
 class AntiHebbianRule : public PlasticityRule {
 public:
+    AntiHebbianRule();
+    ~AntiHebbianRule() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override { return "AntiHebbian"; }
+    
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
-// Bienenstock-Cooper-Munro (BCM) rule
+// Oja's rule for competitive synaptic normalization
 // PLACEHOLDER - Phase 2
-class BCMRule : public PlasticityRule {
+class OjaRule : public PlasticityRule {
 public:
+    OjaRule();
+    ~OjaRule() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "BCM"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override { return "Oja"; }
+    
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Reward-modulated spike-timing dependent plasticity (R-STDP)
+// PLACEHOLDER - Phase 2
+class RewardModulatedSTDP : public PlasticityRule {
+public:
+    RewardModulatedSTDP();
+    ~RewardModulatedSTDP() override;
+    
+    void update(Synapse* synapse,
+                 const std::vector<Timestamp>& preSpikes,
+                 const std::vector<Timestamp>& postSpikes,
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override { return "RewardModulatedSTDP"; }
+    
+    // Reward modulation parameters
+    void setPredictionError(float error);
+    void setDopamineLevel(float level);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

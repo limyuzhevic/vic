@@ -7,7 +7,7 @@
 #include <chrono>
 #include <cmath>
 
-namespace nlm {
+using namespace nlm;
 
 Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
 

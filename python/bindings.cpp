@@ -400,21 +400,215 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
+m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set sensible defaults for typical use
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        
+        // Plasticity parameters
+        config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+        
+        // Memory system parameters
+        config->set("working_memory_capacity", static_cast<int64_t>(100), ConfigSource::Default);
+        config->set("episodic_memory_max_episodes", static_cast<int64_t>(1000), ConfigSource::Default);
+        
+        // Development parameters
+        config->set("replay_interval", static_cast<size_t>(100), ConfigSource::Default);
+        config->set("consolidation_interval", static_cast<size_t>(1000), ConfigSource::Default);
+        
+        return config;
+    }, "Create a default configuration with sensible settings for beginners and researchers")
+    
+    // Convenience function to create a brain with default settings
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        if (!config) {
+            config = std::make_shared<Config>();
+        }
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("config"), "Create a brain with the given configuration or default if None")
+    
+    // Convenience function for quick testing
+    m.def("createQuickBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        
+        // Small brain for quick testing
+        config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.2f, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        
+        return brain;
+    }, "Create a small brain for quick testing")
+    
+    // Simulation helper
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                             std::shared_ptr<AgentBrain> agent, int numSteps) {
+        if (!brain || !world || !agent) {
+            throw std::invalid_argument("Brain, world, and agent must not be None");
+        }
+        
+        agent->initialize(*world);
+        
+        for (int step = 0; step < numSteps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input
+            const SensoryPercept& percept = world->getSensoryPercept();
+            
+            // Process through agent
+            agent->processSensoryInput(percept);
+            
+            // Brain thinks
+            brain->step(step);
+            
+            // Get action
+            MotorCommand cmd = agent->decodeMotorCommand();
+            
+            // Apply action
+            world->applyMotorCommand(cmd, world->getSimulationTime());
+        }
+        
+        return numSteps;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+        "Run a complete simulation with brain, world, and agent")
+    
+    // Configuration convenience functions
+    m.def("configureForDevelopment", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Configuration optimized for developmental studies
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(123), ConfigSource::Default);
+        
+        // High plasticity for development
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.0002f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00002f, ConfigSource::Default);
+        
+        // Development-focused settings
+        config->set("replay_interval", static_cast<size_t>(50), ConfigSource::Default);
+        config->set("consolidation_interval", static_cast<size_t>(500), ConfigSource::Default);
+        
+        return config;
+    }, "Create configuration optimized for developmental studies")
+    
+    m.def("configureForLearning", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Configuration optimized for learning and memory
+        config->set("neuron_count", static_cast<int64_t>(800), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.08f, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(456), ConfigSource::Default);
+        
+        // Moderate plasticity for learning
+        config->set("stdp_ltp_weight", 0.015f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.01f, ConfigSource::Default);
+        
+        // Larger memory systems
+        config->set("working_memory_capacity", static_cast<int64_t>(200), ConfigSource::Default);
+        config->set("episodic_memory_max_episodes", static_cast<int64_t>(2000), ConfigSource::Default);
+        
+        return config;
+    }, "Create configuration optimized for learning and memory")
+    
+    m.def("configureForRealTime", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Configuration optimized for real-time applications
+        config->set("neuron_count", static_cast<int64_t>(200), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.25f, ConfigSource::Default);
+        config->set("simulation_timestep", 0.0005, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(789), ConfigSource::Default);
+        
+        // Faster, more reactive learning
+        config->set("stdp_ltp_weight", 0.008f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.006f, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.00005f, ConfigSource::Default);
+        
+        return config;
+    }, "Create configuration optimized for real-time applications")
+    
+    // Export useful constants
+    m.attr("DEFAULT_NEURON_COUNT") = 1000;
+    m.attr("DEFAULT_REGION_COUNT") = 1;
+    m.attr("DEFAULT_SIMULATION_TIMESTEP") = 0.001;
+    m.attr("DEFAULT_RANDOM_SEED") = 42;
+    
+    // Export helper functions for debugging and analysis
+    m.def("printBrainStats", [](std::shared_ptr<Brain> brain) {
+        if (brain) {
+            brain->logStatus();
+        }
+    }, "Log detailed brain statistics to console")
+    
+    m.def("getBrainSummary", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            return std::string("Brain is None");
+        }
+        
+        std::stringstream ss;
+        ss << "Brain Summary:" << std::endl;
+        ss << "  Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        ss << "  Synapses: " << brain->getTotalSynapseCount() << std::endl;
+        ss << "  Regions: " << brain->getRegionCount() << std::endl;
+        ss << "  Total Spikes: " << brain->getTotalSpikeCount() << std::endl;
+        ss << "  Avg Firing Rate: " << brain->getAverageFiringRate() << std::endl;
+        ss << "  E/I Ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+        
+        return ss.str();
+    }, "Get a human-readable summary of brain statistics")
+    
+    // Enhanced Action class with convenience methods
+    py::class_<Action>(m, "Action")
+        .def(py::init<>())
+        .def(py::init<ActionType>(), py::arg("type"))
+        .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
+        .def("getType", &Action::getType)
+        .def("setType", &Action::setType, py::arg("type"))
+        .def("getParameters", &Action::getParameters)
+        .def("setParameters", &Action::setParameters, py::arg("params"))
+        .def("getName", &Action::getName)
+        .def("clone", &Action::clone)
+        // Add convenience properties
+        .def_readwrite("x", &Action::x)
+        .def_readwrite("y", &Action::y)
+        .def_readwrite("rotation", &Action::rotation)
+        .def_readwrite("energy_cost", &Action::energy_cost)
+        .def_readwrite("success_probability", &Action::success_probability)
+        .def("isMovement", [](const Action& a) {
+            return a.type == ActionType::MoveForward || 
+                   a.type == ActionType::MoveBackward ||
+                   a.type == ActionType::TurnLeft ||
+                   a.type == ActionType::TurnRight ||
+                   a.type == ActionType::Look ||
+                   a.type == ActionType::LookUp ||
+                   a.type == ActionType::LookDown;
+        })
+        .def("isInteraction", [](const Action& a) {
+            return a.type == ActionType::Interact ||
+                   a.type == ActionType::Eat ||
+                   a.type == ActionType::Drink ||
+                   a.type == ActionType::Rest;
+        });
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
