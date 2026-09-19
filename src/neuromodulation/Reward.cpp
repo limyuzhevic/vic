@@ -10,7 +10,7 @@ struct Reward::Impl {
     Impl() : currentValue(0.0f), accumulatedReward(0.0f) {}
 };
 
-Reward::Reward() : pImpl(new Impl) {}
+Reward::Reward() : pImpl(std::make_unique<Impl>()) {}
 
 Reward::~Reward() = default;
 
@@ -30,6 +30,11 @@ void Reward::add(float delta) {
 void Reward::reset() {
     pImpl->currentValue = 0.0f;
     pImpl->accumulatedReward = 0.0f;
+}
+
+void Reward::update(TimestepDuration dt) {
+    // TODO PHASE 2: Implement reward decay and temporal dynamics
+    // PLACEHOLDER: Just maintain current value
 }
 
 float Reward::computeReward(const Observation& observation) const {

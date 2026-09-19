@@ -27,6 +27,12 @@ public:
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
+    // Get exploration drive for curiosity-based behavior
+    virtual float getExplorationDrive() const { return 0.0f; }
+    
+    // Get novelty detection level
+    virtual float getNoveltyLevel() const { return 0.0f; }
+    
 protected:
     Neuromodulator() = default;
 };

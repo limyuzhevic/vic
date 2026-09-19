@@ -6,9 +6,7 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -44,11 +42,8 @@ struct Brain::Impl {
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
+    // ========== INTEGRATED REWARD SYSTEM ==========
+    std::unique_ptr<Reward> reward;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -106,8 +101,8 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
+    // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+    
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
@@ -129,6 +124,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize reward system
+        reward = std::make_unique<Reward>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -417,6 +415,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->curiosity->update(pImpl->timestep);
     }
     
+    // Update reward system
+    if (pImpl->reward) {
+        pImpl->reward->update(pImpl->timestep);
+    }
+    
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
@@ -436,6 +439,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                 }
             }
+        }
+        
+        // Apply dopamine effects on plasticity
+        float plasticityFactor = pImpl->dopamine->getPlasticityFactor();
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                if (syn->getPlasticityFlags().stdp) {
+                    // Modulate STDP based on dopamine
+                    float currentWeight = syn->getWeight();
+                    float weightChange = (plasticityFactor - 1.0f) * 0.001f;
+                    float newWeight = currentWeight + weightChange;
+                    syn->setWeight(newWeight);
+                }
+            }
+        }
+        
+        // Apply dopamine effects on working memory
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->strengthenMemory(pImpl->dopamine->getLevel());
         }
     }
     

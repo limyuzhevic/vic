@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Neuromodulator.hpp"
+#include "../core/Types/Types.hpp"
+#include <vector>
 
 namespace nlm {
 
@@ -22,9 +24,18 @@ public:
     // Reset accumulated reward
     void reset();
     
+    // Update reward system
+    void update(TimestepDuration dt);
+    
     // Compute reward from environment state
     // TODO PHASE 2: Implement real reward computation
     float computeReward(const class Observation& observation) const;
+    
+    // Get exploration drive for curiosity-based behavior
+    float getExplorationDrive() const { return 0.0f; }
+    
+    // Get novelty detection level
+    float getNoveltyLevel() const { return 0.0f; }
     
     // Reward history
     const std::vector<float>& getHistory() const;
@@ -32,7 +43,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
