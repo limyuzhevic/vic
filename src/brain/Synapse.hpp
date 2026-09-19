@@ -1,6 +1,10 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <vector>
+#include <cmath>
+#include <algorithm>
+#include "../core/Random/Random.hpp"
 
 namespace nlm {
 
@@ -71,14 +75,13 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state
     void reset();
     
     // Initialize with random parameters
-    void initializeRandom(class RandomGenerator& rng);
+    void initializeRandom(RandomGenerator& rng);
     
 private:
     struct Impl;
