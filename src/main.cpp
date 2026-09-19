@@ -401,9 +401,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
-    
+
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_LOG_ERROR("Check configuration parameters and dependencies.");
         return 1;
     }
     

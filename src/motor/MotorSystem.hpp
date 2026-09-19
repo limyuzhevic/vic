@@ -14,9 +14,8 @@ public:
     MotorSystem();
     ~MotorSystem();
     
-    // Select action based on neural activity
-    // TODO PHASE 2: Implement real action selection
-    std::unique_ptr<Action> selectAction(const class NeuralRegion& motorRegion);
+    // Select action based on neural activity in motor region
+    std::unique_ptr<Action> selectAction(const NeuralRegion& motorRegion);
     
     // Get available actions
     const std::vector<ActionType>& getAvailableActions() const;
@@ -28,9 +27,17 @@ public:
     const std::vector<const Action*>& getActionHistory() const;
     void clearHistory();
     
+    // Calculate action preference score based on neural activity
+    float calculateActionScore(const ActionType& action, const NeuralRegion& motorRegion) const;
+    
+    // Enable/disable action selection strategies
+    void enableActionSelectionStrategy(bool enable) { actionSelectionEnabled_ = enable; }
+    bool isActionSelectionEnabled() const { return actionSelectionEnabled_; }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    bool actionSelectionEnabled_;
 };
 
 } // namespace nlm

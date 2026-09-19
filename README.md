@@ -104,8 +104,8 @@ NLM/
 │   ├── neuromodulation/# Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
+│   ├── cognition/     # Cognitive mechanisms (integrated)
+│   ├── sensory/        # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
@@ -114,117 +114,327 @@ NLM/
 └── configs/
 ```
 
-## Phase Summary
+## Python Bindings (pynlm)
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+The project includes Python bindings via pybind11 for easy Python integration:
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+### Installation
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+```bash
+pip install .
 ```
 
-## License
+### Basic Usage
 
-MIT
+```python
+from pynlm import Brain, Config
 
-## Authors
+# Create brain with configuration
+config = Config()
+config.set("neuron_count", 1000)
+brain = Brain(config)
+
+# Initialize and run simulation
+if brain.initialize():
+    brain.step(0, 0.001)
+    brain.reset()
+```
+
+### Python API Functions
+
+#### Brain Class
+- `initialize()`: Initialize the neural brain system
+- `step(step, time)`: Run one simulation step
+- `reset()`: Reset brain state
+- `save(filename)`: Save brain state to checkpoint
+- `load(filename)`: Load brain state from checkpoint
+
+#### Configuration Management
+- `Config()`: Create new configuration
+- `config.set(key, value)`: Set configuration values
+- `config.get(key)`: Get configuration values
+- `config.loadFromFile(filename)`: Load configuration from file
+
+#### Neural Components
+- `Brain`: Core neural processing unit
+- `Neuron`: Spiking neuron model
+- `Synapse`: Neural connection between neurons
+- `NeuralRegion`: Group of neurons with shared properties
+
+#### Memory Systems
+- `WorkingMemory`: Short-term memory for active neurons
+- `EpisodicMemory`: Event-based memory for experiences
+- `AssociativeMemory`: Pattern-based memory associations
+
+#### Neuromodulation
+- `Dopamine`: Reward prediction error signal
+- `Curiosity`: Exploration drive
+- `Novelty`: Change detection
+- `PredictionError`: Prediction accuracy monitoring
+
+#### Cognitive Systems
+- `NeuralPlanner`: Action sequence evaluation
+- `ConceptFormation`: Pattern abstraction and categorization
+- `Attention`: Competitive selection of neural representations
+
+#### Development
+- `DevelopmentSystem`: Age-dependent neural changes
+- `Synaptogenesis`: Formation of new connections
+- `Pruning`: Elimination of weak connections
+- `Maturation`: Neural development and refinement
+
+### Available Configuration Keys
+
+#### Core Simulation
+- `neuron_count`: Total number of neurons (default: 1000)
+- `region_count`: Number of neural regions (default: 1)
+- `simulation_timestep`: Time step for simulation (default: 0.001)
+- `random_seed`: Random seed for reproducibility
+
+#### Neural Properties
+- `neuron_resting_potential`: Neuron's resting voltage
+- `neuron_threshold`: Spike threshold voltage
+- `neuron_refractory_period`: Refractory period duration
+- `connection_probability`: Probability of synaptic connections
+
+#### Plasticity Rules
+- `stdp_ltp_weight`: STDP long-term potentiation weight
+- `stdp_ltd_weight`: STDP long-term depression weight
+- `stdp_tau`: STDP time constant
+- `synaptogenesis_rate`: Rate of new synapse formation
+- `pruning_rate`: Rate of synapse elimination
+
+#### Neuromodulation
+- `dopamine_level`: Baseline dopamine level
+- `curiosity_threshold`: Novelty detection threshold
+- `novelty_decay_rate`: Rate of novelty signal decay
+
+#### Memory Systems
+- `working_memory_capacity`: Capacity of working memory
+- `episodic_memory_max_episodes`: Maximum stored episodes
+- `associative_memory_patterns`: Number of pattern associations
+
+#### Advanced Features
+- `enable_checkpointing`: Enable/disable checkpoint saving
+- `checkpoint_dir`: Directory for checkpoint files
+- `checkpoint_interval`: Interval between automatic checkpoints
+- `replay_interval`: Memory replay frequency
+- `consolidation_interval`: Memory consolidation frequency
+
+### Performance Configuration
+
+#### Memory Pools and Optimization
+- `enable_memory_pools`: Enable memory pool allocation
+- `enable_simd`: Enable SIMD vectorization
+- `enable_multithreading`: Enable parallel processing
+- `thread_count`: Number of worker threads
+
+#### Visualization
+- `enable_visualization`: Enable real-time visualization
+- `visualization_update_rate`: Visualization refresh rate (Hz)
+
+### Command Line Arguments
+
+```bash
+./nlm [options]
+
+options:
+  --config=file.cfg      Load configuration from file
+  --neuron-count=N       Set number of neurons
+  --timestep=T           Set simulation time step
+  --random-seed=S        Set random seed for reproducibility
+  --checkpoint-dir=D      Set checkpoint directory
+  --help                 Show help message
+```
+
+### Example Scripts
+
+#### Simple Learning Example
+
+```python
+#!/usr/bin/env python3
+"""Example: Simple neural learning demonstration"""
+
+from pynlm import Brain, Config
+import time
+
+def main():
+    # Create and configure brain
+    config = Config()
+    config.set("neuron_count", 500)
+    config.set("random_seed", 42)
+    config.set("enable_checkpointing", True)
+    
+    brain = Brain(config)
+    
+    if not brain.initialize():
+        print("Failed to initialize brain")
+        return 1
+    
+    print("Brain initialized successfully")
+    print(f"Total neurons: {brain.getTotalNeuronCount()}")
+    print(f"Total synapses: {brain.getTotalSynapseCount()}")
+    
+    # Run simulation for 1000 steps
+    for step in range(1000):
+        brain.step(step, step * 0.001)
+        
+        # Apply sensory input every 100 steps
+        if step % 100 == 0:
+            # Simple input pattern
+            input_data = [0.1, 0.2, 0.3, 0.4, 0.5]
+            brain.receiveSensoryInput(input_data)
+        
+        # Log progress
+        if step % 100 == 0:
+            print(f"Step {step}: Spikes={brain.getTotalSpikeCount()}, "
+                  f"Firing={brain.getFiringNeuronCount()}")
+    
+    # Save final brain state
+    brain.save("final_brain_state.checkpoint")
+    print("Brain state saved to final_brain_state.checkpoint")
+    
+    # Reset and run plasticity experiment
+    brain.reset()
+    brain.initialize()
+    
+    print("\nPlasticity experiment completed")
+    
+    return 0
+
+if __name__ == "__main__":
+    exit(main())
+```
+
+#### Advanced Configuration Example
+
+```python
+from pynlm import Config
+import json
+
+# Create advanced configuration
+config = Config()
+
+# Core simulation parameters
+config.set("neuron_count", 2000)
+config.set("region_count", 4)
+config.set("simulation_timestep", 0.0005)
+
+# Connectivity and structure
+config.set("connection_probability", 0.15)
+config.set("neuron_resting_potential", -65.0)
+config.set("neuron_threshold", -50.0)
+config.set("neuron_refractory_period", 2.0)
+
+# Plasticity rules (STDP)
+config.set("stdp_ltp_weight", 0.02)
+config.set("stdp_ltd_weight", 0.015)
+config.set("stdp_tau", 20.0)
+
+# Structural plasticity
+config.set("synaptogenesis_rate", 0.0001)
+config.set("pruning_rate", 0.00005)
+
+# Neuromodulation
+config.set("dopamine_level", 0.1)
+config.set("curiosity_threshold", 0.3)
+config.set("novelty_decay_rate", 0.99)
+
+# Memory systems
+config.set("working_memory_capacity", 100)
+config.set("episodic_memory_max_episodes", 5000)
+config.set("associative_memory_patterns", 1000)
+
+# Advanced features
+config.set("enable_checkpointing", True)
+config.set("checkpoint_dir", "./checkpoints")
+config.set("checkpoint_interval", 1000)
+config.set("replay_interval", 50)
+config.set("consolidation_interval", 5000)
+
+# Performance optimization
+config.set("enable_memory_pools", True)
+config.set("enable_simd", True)
+config.set("enable_multithreading", True)
+config.set("thread_count", 4)
+
+# Visualization
+config.set("enable_visualization", True)
+config.set("visualization_update_rate", 60.0)
+
+# Save to file
+config.saveToFile("advanced_config.cfg")
+
+# Load from file
+config2 = Config()
+config2.loadFromFile("advanced_config.cfg")
+
+print(config2.summary())
+```
+
+### Error Handling and Troubleshooting
+
+#### Common Issues
+
+**1. Brain Initialization Failure**
+```python
+# Check configuration
+if not brain.initialize():
+    print("Brain initialization failed")
+    # Check config for invalid values
+    if config.get("neuron_count") < 100:
+        config.set("neuron_count", 100)
+        brain.initialize()
+```
+
+**2. Checkpoint Issues**
+```python
+# Ensure checkpoint directory exists
+import os
+os.makedirs("checkpoints", exist_ok=True)
+
+# Save with error handling
+try:
+    brain.save("test.checkpoint")
+    print("Checkpoint saved successfully")
+except Exception as e:
+    print(f"Checkpoint save failed: {e}")
+```
+
+**3. Memory Issues**
+```python
+# Monitor memory usage
+import psutil
+process = psutil.Process()
+memory_mb = process.memory_info().rss / 1024 / 1024
+print(f"Memory usage: {memory_mb:.1f} MB")
+
+# Clear memory when done
+brain.reset()
+del brain
+import gc
+gc.collect()
+```
+
+### Performance Tips
+
+1. **Use larger simulation timesteps** for faster but less accurate simulations
+2. **Limit neuron count** for smaller systems
+3. **Enable memory pools** for better performance
+4. **Use multithreading** for parallel processing
+5. **Configure checkpoint intervals** to balance memory and persistence
+
+### Getting Help
+
+1. **Documentation**: See `docs/` directory for detailed architecture and scientific background
+2. **API Reference**: Generated documentation available online
+3. **Community**: Join the NLM community for support and discussions
+4. **Examples**: Check `examples/` directory for more use cases
+
+### License
+
+MIT License
+
+### Authors
 
 Research project — See docs for scientific background.
