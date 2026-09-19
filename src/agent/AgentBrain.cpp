@@ -19,6 +19,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , lastState_(256, 0.0f)  // Vision size
+    , lastReward_(0.0f)
+    , lastAction_(ActionType::Wait)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -64,9 +67,13 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+    // Initialize neural planner if enabled
+    if (developmentEnabled_) {
+        neuralPlanner_ = std::make_unique<NeuralPlanner>();
+        neuralPlanner_->initialize(brain_.get());
+        neuralPlanner_->setPlanningDepth(3);
+        NLM_LOG_INFO("NeuralPlanner initialized for action selection");
+    }
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -152,14 +159,20 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
-    
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+    // Get action from planning
+    ActionType plannedAction = ActionType::Wait;
+    if (pImpl->neuralPlanner) {
+        plannedAction = pImpl->neuralPlanner->planAction(
+            pImpl->lastState, pImpl->lastReward
+        );
     }
     
-    return decoded;
+    // Apply curiosity-based exploration
+    if (pImpl->neuralPlanner && curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+        plannedAction = selectWithCuriosity(plannedAction);
+    }
+    
+    return plannedAction;
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {

@@ -58,23 +58,18 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
-    
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
-    
-private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    // Motor decoding: convert neural activity to motor command using planning
+    MotorCommand decodeMotorCommand();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Neural planner for action selection
+    std::unique_ptr<NeuralPlanner> neuralPlanner_;
+    
+private:
+    // Old methods replaced by neural planner-based approach
+    MotorCommand decodeFromMotorNeurons();
     
     std::shared_ptr<Brain> brain_;
     
@@ -112,6 +107,13 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // State tracking for planning
+    std::vector<float> lastState_;
+    float lastReward_;
+    
+    // Last action taken
+    ActionType lastAction_;
 };
 
 } // namespace nlm

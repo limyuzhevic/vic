@@ -148,6 +148,12 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
+    // Semantic memory - conceptual associations (synonym for associative memory)
+    NeuralAssociativeMemory* getSemanticMemory();
+    
+    // Procedural memory - learned behaviors and skills (not implemented)
+    NeuralAssociativeMemory* getProceduralMemory();
+    
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation

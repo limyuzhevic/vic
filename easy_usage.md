@@ -42,33 +42,53 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+ 3. Make it think for 100 steps
+    for i in range(100):
+        brain.step(i)  # One step of thinking
+
+print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+
+### Advanced: Using Memory Systems
 
 ```python
 import pynlm
 
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Create brain with memory capabilities
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
 brain.initialize()
 
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-
+# Enable subsystems
 agent = pynlm.createAgentBrain(brain)
+agent.enableRewardModulation(True)      # Learn from rewards
+agent.enableCuriosity(True)             # Explore new things
+agent.enableDevelopment(True)           # Brain matures over time
+agent.enableStructuralPlasticity(True)  # Grow new connections
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
 agent.initialize(world)
 
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+# Run advanced simulation
+for step in range(1000):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 100 == 0:
+        # Check memory systems
+        print(f"Step {step}:")
+        print(f"  Working memory traces: {brain.getWorkingMemory().getActiveTraces()}")
+        print(f"  Episodic memory episodes: {brain.getEpisodicMemory().getEpisodeCount()}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
 
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
+print("Advanced simulation complete!")
 ```
 
 ---
