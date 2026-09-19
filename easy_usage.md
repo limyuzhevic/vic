@@ -12,6 +12,8 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+**Note:** NLM is in Phase 6 - Final Integration Work. Core functionality is operational, but continuous development is ongoing.
+
 ---
 
 ## The 3 Things You Need to Know
@@ -258,8 +260,6 @@ print("Agent simulation complete!")
 
 ## Quick Reference
 
-| What you want | Code |
-|--------------|------|
 | Create brain | `pynlm.createBrain(config)` |
 | Start brain | `brain.initialize()` |
 | Make brain think | `brain.step(step)` |
@@ -268,6 +268,8 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Save state | `brain.save("checkpoint.bin")` |
+| Load state | `brain.load("checkpoint.bin")` |
 
 ---
 

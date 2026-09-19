@@ -283,9 +283,9 @@ brain.getFiringNeuronCount()     # Currently firing
 brain.getAverageFiringRate()      # Average firing rate
 brain.getExcitationInhibitionRatio()  # E/I balance
 
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
+# Persistence
+brain.save("checkpoint.bin")       # Save state (Phase 6 - Checkpoint System)
+brain.load("checkpoint.bin")       # Load state (Phase 6 - Checkpoint System)
 
 # Regions
 region_id = brain.addRegion("cortex")

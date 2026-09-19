@@ -61,6 +61,22 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     }
 }
 
+const EpisodicMemoryItem* NeuralEpisodicMemory::getEpisode(size_t index) const {
+    if (index < episodes_.size()) {
+        return &episodes_[index];
+    }
+    return nullptr;
+}
+
+void NeuralEpisodicMemory::removeEpisode(size_t index) {
+    if (index < episodes_.size()) {
+        episodes_.erase(episodes_.begin() + index);
+        if (!pImpl->episodeNeurons.empty() && index < pImpl->episodeNeurons.size()) {
+            pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin() + index);
+        }
+    }
+}
+
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveSimilar(
     const std::vector<float>& sensoryPattern,
     size_t maxResults) const {

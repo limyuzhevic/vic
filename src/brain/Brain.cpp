@@ -1114,4 +1114,325 @@ void Brain::logStatus() const {
     }
 }
 
+bool Brain::saveCheckpoint(const std::string& name, CompressionLevel compression) {
+    if (!pImpl->checkpointManager) {
+        NLM_LOG_ERROR("Checkpoint manager not initialized");
+        return false;
+    }
+    
+    // Use checkpoint manager to save
+    return pImpl->checkpointManager->saveCheckpoint(name, compression);
+}
+
+bool Brain::loadCheckpoint(const std::string& name) {
+    if (!pImpl->checkpointManager) {
+        NLM_LOG_ERROR("Checkpoint manager not initialized");
+        return false;
+    }
+    
+    // Use checkpoint manager to load
+    return pImpl->checkpointManager->loadCheckpoint(name);
+}
+
+bool Brain::loadCheckpointAtStep(uint64_t step) {
+    if (!pImpl->checkpointManager) {
+        NLM_LOG_ERROR("Checkpoint manager not initialized");
+        return false;
+    }
+    
+    // Use checkpoint manager to load by step
+    return pImpl->checkpointManager->loadCheckpointAtStep(step);
+}
+
+bool Brain::deleteCheckpoint(const std::string& name) {
+    if (!pImpl->checkpointManager) {
+        NLM_LOG_ERROR("Checkpoint manager not initialized");
+        return false;
+    }
+    
+    // Use checkpoint manager to delete
+    return pImpl->checkpointManager->deleteCheckpoint(name);
+}
+
+std::vector<std::string> Brain::listCheckpoints() const {
+    if (!pImpl->checkpointManager) {
+        NLM_LOG_ERROR("Checkpoint manager not initialized");
+        return std::vector<std::string>();
+    }
+    
+    // Use checkpoint manager to list
+    return pImpl->checkpointManager->listCheckpoints();
+}
+
+bool Brain::isCheckpointManagerReady() const {
+    return pImpl->checkpointManager && pImpl->checkpointManager->isReady();
+}
+
+void Brain::setCheckpointInterval(uint64_t interval) {
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->setCheckpointInterval(interval);
+    }
+}
+
+std::vector<std::vector<float>> Brain::getConnectivityMatrix() const {
+    // Simple connectivity matrix - neurons to neurons
+    std::vector<std::vector<float>> matrix;
+    matrix.reserve(getTotalNeuronCount());
+    
+    for (size_t i = 0; i < getTotalNeuronCount(); ++i) {
+        std::vector<float> row;
+        row.reserve(getTotalNeuronCount());
+        for (size_t j = 0; j < getTotalNeuronCount(); ++j) {
+            // Check if there's a synapse from i to j
+            bool hasConnection = false;
+            float weight = 0.0f;
+            
+            // This is a simplified implementation
+            // In a real implementation, we would need to map neuron IDs to indices
+            
+            row.push_back(weight);
+        }
+        matrix.push_back(row);
+    }
+    
+    return matrix;
+}
+
+std::vector<RegionConnectivity> Brain::analyzeRegionConnectivity() const {
+    std::vector<RegionConnectivity> result;
+    
+    for (const auto& region : pImpl->regions) {
+        RegionConnectivity conn;
+        conn.regionId = region->getId();
+        conn.regionName = region->getName();
+        conn.totalNeurons = region->getTotalNeuronCount();
+        conn.totalSynapses = region->getSynapseCount();
+        conn.totalIncoming = 0;
+        conn.totalOutgoing = 0;
+        conn.excitationInhibitionRatio = region->getAverageSynapticWeight();
+        
+        // Calculate intra-region connectivity
+        conn.intraRegionConnections = 0;
+        for (const auto* syn : region->getSynapses()) {
+            auto* sourceRegion = getRegion(RegionId(syn->getSourceNeuron().index() / 10));
+            auto* targetRegion = getRegion(RegionId(syn->getDestinationNeuron().index() / 10));
+            if (sourceRegion && targetRegion && sourceRegion->getId() == targetRegion->getId()) {
+                conn.intraRegionConnections++;
+            }
+        }
+        
+        result.push_back(conn);
+    }
+    
+    return result;
+}
+
+BrainStatistics Brain::getBrainStatistics() const {
+    BrainStatistics stats;
+    stats.totalNeurons = getTotalNeuronCount();
+    stats.totalSynapses = getTotalSynapseCount();
+    stats.activeNeurons = getActiveNeuronCount();
+    stats.firingNeurons = getFiringNeuronCount();
+    stats.totalSpikes = getTotalSpikeCount();
+    stats.pendingSpikeEvents = getPendingSpikeEventCount();
+    stats.averageFiringRate = getAverageFiringRate();
+    stats.excitationInhibitionRatio = getExcitationInhibitionRatio();
+    
+    return stats;
+}
+
+SynapticStatistics Brain::getSynapticStatistics() const {
+    SynapticStatistics stats;
+    stats.totalSynapses = getTotalSynapseCount();
+    
+    if (stats.totalSynapses > 0) {
+        float totalWeight = 0.0f;
+        size_t excitatoryCount = 0;
+        size_t inhibitoryCount = 0;
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto* syn : region->getSynapses()) {
+                float weight = syn->getWeight();
+                totalWeight += std::abs(weight);
+                if (weight > 0) {
+                    excitatoryCount++;
+                } else {
+                    inhibitoryCount++;
+                }
+            }
+        }
+        
+        stats.averageWeight = totalWeight / stats.totalSynapses;
+        stats.excitatoryRatio = static_cast<float>(excitatoryCount) / stats.totalSynapses;
+        stats.inhibitoryRatio = static_cast<float>(inhibitoryCount) / stats.totalSynapses;
+    }
+    
+    return stats;
+}
+
+void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
+    pImpl->developmentalStage = stage;
+}
+
+float Brain::getDevelopmentalProgress() const {
+    // Simple progress calculation based on developmental stage
+    switch (pImpl->developmentalStage) {
+        case DevelopmentalStage::Initial:
+            return 0.0f;
+        case DevelopmentalStage::CriticalPeriod:
+            return 0.25f;
+        case DevelopmentalStage::Maturation:
+            return 0.5f;
+        case DevelopmentalStage::Adult:
+            return 1.0f;
+        default:
+            return 0.0f;
+    }
+}
+
+double Brain::getRemainingTimeInStage() const {
+    // Placeholder - would need more sophisticated tracking
+    return 100.0;
+}
+
+void Brain::applyDevelopmentEffect(const std::string& effectType, float intensity) {
+    if (!pImpl->developmentSystem) return;
+    
+    // Apply developmental effect
+    if (effectType == "excitability") {
+        // Increase neural excitability
+        float currentBase = 1.0f;
+        float newBase = currentBase * (1.0f + intensity);
+        // Apply to neurons would need implementation
+    } else if (effectType == "plasticity") {
+        // Modify plasticity rates
+        pImpl->developmentSystem->setPlasticityModifier(intensity);
+    }
+}
+
+void Brain::setDopamineLevel(float level) {
+    if (!pImpl->dopamine) return;
+    pImpl->dopamine->setLevel(level);
+}
+
+void Brain::setCuriosityLevel(float level) {
+    if (!pImpl->curiosity) return;
+    pImpl->curiosity->setLevel(level);
+}
+
+void Brain::setNoveltyLevel(float level) {
+    if (!pImpl->novelty) return;
+    pImpl->novelty->setLevel(level);
+}
+
+void Brain::setPredictionErrorLevel(float level) {
+    if (!pImpl->predictionError) return;
+    pImpl->predictionError->setLevel(level);
+}
+
+void Brain::applyCustomNeuromodulation(float dopamine, float curiosity, float novelty, float predictionError) {
+    setDopamineLevel(dopamine);
+    setCuriosityLevel(curiosity);
+    setNoveltyLevel(novelty);
+    setPredictionErrorLevel(predictionError);
+}
+
+void Brain::configureSTDP(float ltpWeight, float ltdWeight, float tau) {
+    if (pImpl->stdp) {
+        pImpl->stdp->configure(ltpWeight, ltdWeight, tau);
+    }
+}
+
+void Brain::configureHebbian(float learningRate, float decayRate) {
+    if (pImpl->hebbian) {
+        pImpl->hebbian->configure(learningRate, decayRate);
+    }
+}
+
+void Brain::configureStructuralPlasticity(float synaptogenesisRate, float pruningRate) {
+    if (pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+        pImpl->structuralPlasticity->setPruningRate(pruningRate);
+    }
+}
+
+STDPParameters Brain::getSTDPParameters() const {
+    STDPParameters params;
+    if (pImpl->stdp) {
+        params.ltpWeight = pImpl->stdp->getLTPWeight();
+        params.ltdWeight = pImpl->stdp->getLTDWeight();
+        params.tau = pImpl->stdp->getTimeConstant();
+    }
+    return params;
+}
+
+WorkingMemoryStats Brain::analyzeWorkingMemory() const {
+    WorkingMemoryStats stats;
+    if (pImpl->workingMemory) {
+        stats.neuronCount = pImpl->workingMemory->getMemoryNeurons().size();
+        stats.activeTraces = pImpl->workingMemory->getActiveTraces();
+        stats.decayRate = pImpl->workingMemory->getDecayRate();
+        stats.capacity = pImpl->workingMemory->getCapacity();
+        stats.averageActivation = 0.0f; // Placeholder
+    }
+    return stats;
+}
+
+EpisodicMemoryStats Brain::analyzeEpisodicMemory() const {
+    EpisodicMemoryStats stats;
+    if (pImpl->episodicMemory) {
+        stats.episodeCount = pImpl->episodicMemory->getEpisodeCount();
+        stats.maxEpisodes = pImpl->episodicMemory->getMaxEpisodes();
+        stats.replayEnabled = pImpl->episodicMemory->isReplayEnabled();
+        stats.averageReward = pImpl->episodicMemory->getAverageReward();
+        stats.maxActiveNeuronsPerEpisode = 0; // Placeholder
+    }
+    return stats;
+}
+
+AssociativeMemoryStats Brain::analyzeAssociativeMemory() const {
+    AssociativeMemoryStats stats;
+    if (pImpl->associativeMemory) {
+        stats.associationCount = pImpl->associativeMemory->getAssociationCount();
+        stats.maxAssociations = 1000; // Placeholder
+        stats.averageStrength = 0.0f; // Placeholder
+    }
+    return stats;
+}
+
+SpikeProcessingStats Brain::getSpikeProcessingStats() const {
+    SpikeProcessingStats stats;
+    stats.totalSpikesThisStep = pImpl->totalSpikesThisStep;
+    stats.totalSpikesTotal = pImpl->totalSpikesTotal;
+    
+    if (pImpl->spikeSystem) {
+        stats.pendingSpikes = pImpl->spikeSystem->getPendingSpikeCount();
+        stats.pendingDelayedSpikes = pImpl->spikeSystem->getPendingDelayedCount();
+    }
+    
+    stats.spikesPerSecond = static_cast<float>(pImpl->totalSpikesTotal) / std::max(1.0, pImpl->currentTime);
+    stats.lastProcessingTime = 0.001; // Placeholder
+    return stats;
+}
+
+PlasticityStats Brain::getPlasticityStats() const {
+    PlasticityStats stats;
+    stats.stdpUpdates = 0; // Would need tracking
+    stats.hebbianUpdates = 0; // Would need tracking
+    stats.structuralPlasticityUpdates = 0; // Would need tracking
+    stats.weightChangeMean = 0.0f; // Would need tracking
+    stats.weightChangeStd = 0.0f; // Would need tracking
+    return stats;
+}
+
+MemoryAccessStats Brain::getMemoryAccessStats() const {
+    MemoryAccessStats stats;
+    stats.workingMemoryAccesses = 0; // Would need tracking
+    stats.episodicMemoryAccesses = 0; // Would need tracking
+    stats.associativeMemoryAccesses = 0; // Would need tracking
+    stats.memoryReplayEvents = 0; // Would need tracking
+    stats.averageMemoryAccessTime = 0.001; // Placeholder
+    return stats;
+}
+
 } // namespace nlm

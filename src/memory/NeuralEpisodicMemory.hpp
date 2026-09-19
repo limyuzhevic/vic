@@ -99,6 +99,9 @@ public:
     // Get episode by index
     const EpisodicMemoryItem* getEpisode(size_t index) const;
 
+    // Remove episode by index
+    void removeEpisode(size_t index);
+
     // Get total number of episodes
     size_t getEpisodeCount() const { return episodes_.size(); }
 

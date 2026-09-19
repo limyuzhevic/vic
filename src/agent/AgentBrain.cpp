@@ -334,17 +334,236 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
-    
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    return noveltyLevel_;
 }
 
-} // namespace nlm
+float AgentBrain::getPredictionError() const {
+    return predictionError_;
+}
+
+// ========== DEVELOPMENT CONTROL ============
+
+void AgentBrain::setDevelopmentalStage(DevelopmentalStage stage) {
+    if (brain_) {
+        brain_->setDevelopmentalStage(stage);
+    }
+}
+
+float AgentBrain::getDevelopmentalProgress() const {
+    if (brain_) {
+        return brain_->getDevelopmentalProgress();
+    }
+    return 0.0f;
+}
+
+double AgentBrain::getRemainingTimeInStage() const {
+    if (brain_) {
+        return brain_->getRemainingTimeInStage();
+    }
+    return 0.0;
+}
+
+void AgentBrain::applyDevelopmentEffect(const std::string& effectType, float intensity) {
+    if (brain_) {
+        brain_->applyDevelopmentEffect(effectType, intensity);
+    }
+}
+
+// ================ NEUROMODULATION CONTROL ============
+
+void AgentBrain::setDopamineLevel(float level) {
+    dopamineLevel_ = std::clamp(level, 0.0f, 1.0f);
+    if (brain_) {
+        brain_->setDopamineLevel(dopamineLevel_);
+    }
+}
+
+void AgentBrain::setCuriosityLevel(float level) {
+    curiosityLevel_ = std::clamp(level, 0.0f, 1.0f);
+    if (brain_) {
+        brain_->setCuriosityLevel(curiosityLevel_);
+    }
+}
+
+void AgentBrain::setNoveltyLevel(float level) {
+    noveltyLevel_ = std::clamp(level, 0.0f, 1.0f);
+    if (brain_) {
+        brain_->setNoveltyLevel(noveltyLevel_);
+    }
+}
+
+void AgentBrain::setPredictionErrorLevel(float level) {
+    predictionError_ = std::clamp(level, 0.0f, 1.0f);
+    if (brain_) {
+        brain_->setPredictionErrorLevel(predictionError_);
+    }
+}
+
+float AgentBrain::getDopamineLevel() const {
+    return dopamineLevel_;
+}
+
+float AgentBrain::getCuriosityLevel() const {
+    return curiosityLevel_;
+}
+
+float AgentBrain::getNoveltyLevel() const {
+    return noveltyLevel_;
+}
+
+float AgentBrain::getPredictionErrorLevel() const {
+    return predictionError_;
+}
+
+void AgentBrain::applyCustomNeuromodulation(float dopamine, float curiosity, float novelty, float predictionError) {
+    setDopamineLevel(dopamine);
+    setCuriosityLevel(curiosity);
+    setNoveltyLevel(novelty);
+    setPredictionErrorLevel(predictionError);
+}
+
+// ========== PLASTICITY CONTROL ==========
+
+void AgentBrain::configureSTDP(float ltpWeight, float ltdWeight, float tau) {
+    if (brain_) {
+        brain_->configureSTDP(ltpWeight, ltdWeight, tau);
+    }
+}
+
+void AgentBrain::configureHebbian(float learningRate, float decayRate) {
+    if (brain_) {
+        brain_->configureHebbian(learningRate, decayRate);
+    }
+}
+
+void AgentBrain::configureStructuralPlasticity(float synaptogenesisRate, float pruningRate) {
+    if (brain_) {
+        brain_->configureStructuralPlasticity(synaptogenesisRate, pruningRate);
+    }
+}
+
+void AgentBrain::applyPlasticityEffect(const std::string& effectType, float intensity) {
+    if (!brain_) return;
+    
+    auto* stdp = brain_->getSTDP();
+    auto* hebbian = brain_->getHebbian();
+    
+    if (effectType == "stdp" && stdp) {
+        float currentLTP = stdp->getLTPWeight();
+        float currentLTD = stdp->getLTDWeight();
+        stdp->configure(currentLTP * (1.0f + intensity), currentLTD * (1.0f + intensity), 20.0f);
+    } else if (effectType == "hebbian" && hebbian) {
+        float currentLR = hebbian->getLearningRate();
+        float currentDR = hebbian->getDecayRate();
+        hebbian->configure(currentLR * (1.0f + intensity), currentDR * (1.0f + intensity));
+    } else if (effectType == "structural" && brain_->getStructuralPlasticity()) {
+        auto* sp = brain_->getStructuralPlasticity();
+        float currentSynRate = sp->getSynaptogenesisRate();
+        float currentPruneRate = sp->getPruningRate();
+        sp->setSynaptogenesisRate(currentSynRate * (1.0f + intensity));
+        sp->setPruningRate(currentPruneRate * (1.0f + intensity));
+    }
+}
+
+// ================ MEMORY SYSTEM ACCESS =========
+
+AgentBrain::WorkingMemoryStats AgentBrain::analyzeWorkingMemory() const {
+    WorkingMemoryStats stats;
+    
+    if (brain_) {
+        auto* workingMemory = brain_->getWorkingMemory();
+        if (workingMemory) {
+            stats.neuronCount = workingMemory->getMemoryNeurons().size();
+            stats.activeTraces = workingMemory->getActiveTraces();
+            stats.decayRate = workingMemory->getDecayRate();
+            stats.capacity = workingMemory->getCapacity();
+            stats.averageActivation = 0.0f;  // Would need implementation
+        }
+    }
+    
+    return stats;
+}
+
+AgentBrain::EpisodicMemoryStats AgentBrain::analyzeEpisodicMemory() const {
+    EpisodicMemoryStats stats;
+    
+    if (brain_) {
+        auto* episodicMemory = brain_->getEpisodicMemory();
+        if (episodicMemory) {
+            stats.episodeCount = episodicMemory->getEpisodeCount();
+            stats.maxEpisodes = episodicMemory->getMaxEpisodes();
+            stats.replayEnabled = episodicMemory->isReplayEnabled();
+            stats.averageReward = episodicMemory->getAverageReward();
+            stats.maxActiveNeuronsPerEpisode = 0;  // Would need implementation
+        }
+    }
+    
+    return stats;
+}
+
+AgentBrain::AssociativeMemoryStats AgentBrain::analyzeAssociativeMemory() const {
+    AssociativeMemoryStats stats;
+    
+    if (brain_) {
+        auto* associativeMemory = brain_->getAssociativeMemory();
+        if (associativeMemory) {
+            stats.associationCount = associativeMemory->getAssociationCount();
+            stats.maxAssociations = 1000;  // Would need method to get max
+            stats.averageStrength = 0.0f;  // Would need implementation
+        }
+    }
+    
+    return stats;
+}
+
+// ================ PERFORMANCE PROFILING =========
+
+AgentBrain::SpikeProcessingStats AgentBrain::getSpikeProcessingStats() const {
+    SpikeProcessingStats stats;
+    
+    stats.totalSpikesThisStep = 0;
+    stats.totalSpikesTotal = 0;
+    
+    if (brain_) {
+        stats.totalSpikesThisStep = brain_->getTotalSpikeCount();
+        stats.totalSpikesTotal = brain_->getTotalSpikeCount();
+        
+        auto* spikeSystem = brain_->getSpikeSystem();
+        if (spikeSystem) {
+            stats.pendingSpikes = spikeSystem->getPendingSpikeCount();
+            stats.pendingDelayedSpikes = spikeSystem->getPendingDelayedCount();
+        }
+        
+        stats.spikesPerSecond = static_cast<float>(stats.totalSpikesTotal) / std::max(1.0, developmentalAge_);
+        stats.lastProcessingTime = 0.001;  // Placeholder
+    }
+    
+    return stats;
+}
+
+AgentBrain::PlasticityStats AgentBrain::getPlasticityStats() const {
+    PlasticityStats stats;
+    stats.stdpUpdates = 0;
+    stats.hebbianUpdates = 0;
+    stats.structuralPlasticityUpdates = 0;
+    stats.weightChangeMean = 0.0f;
+    stats.weightChangeStd = 0.0f;
+    
+    // These would need to be tracked separately
+    // For now, placeholder implementation
+    
+    return stats;
+}
+
+AgentBrain::MemoryAccessStats AgentBrain::getMemoryAccessStats() const {
+    MemoryAccessStats stats;
+    stats.workingMemoryAccesses = 0;
+    stats.episodicMemoryAccesses = 0;
+    stats.associativeMemoryAccesses = 0;
+    stats.memoryReplayEvents = 0;
+    stats.averageMemoryAccessTime = 0.001;  // Placeholder
+    
+    // These would need to be tracked separately
+    
+    return stats;
+}
