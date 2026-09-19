@@ -93,6 +93,17 @@ size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
     return concept.id;
 }
 
+void ConceptFormation::updateConceptFormation(const std::vector<float>& pattern) {
+    // Update concept formation with new pattern from working memory
+    if (!pattern.empty()) {
+        // Convert to features - for now, just use the pattern itself
+        std::vector<float> features = pattern;
+        
+        // Present this pattern to concept formation system
+        presentExperience(pattern, features, 0.0f, 0);
+    }
+}
+
 void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>& newPattern,
                                     const std::vector<float>& features, float reward) {
     DiscoveredConcept* concept = nullptr;

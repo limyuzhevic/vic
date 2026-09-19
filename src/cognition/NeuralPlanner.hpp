@@ -51,7 +51,6 @@ public:
     size_t getPlanningDepth() const { return planningDepth_; }
     void setPlanningDepth(size_t depth) { planningDepth_ = depth; }
 
-    // Get planning confidence
     float getPlanningConfidence() const { return planningConfidence_; }
 
     // Update plans based on actual outcome
@@ -73,6 +72,14 @@ public:
 
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
+
+    // Connect prediction system to planner
+    void setPredictionSystem(PredictionSystem* predictionSystem) {
+        predictionSystem_ = predictionSystem;
+    }
+
+    // Get prediction system for planning
+    PredictionSystem* getPredictionSystem() { return predictionSystem_; }
 
 private:
     // Generate possible action sequences
@@ -96,6 +103,10 @@ private:
     
     // Recent plan success history
     std::deque<bool> recentPlanSuccess_;
+    
+    // Prediction system for planning
+    PredictionSystem* predictionSystem_;
+};
 };
 
 // SelfModel: Represents the agent's internal model of itself

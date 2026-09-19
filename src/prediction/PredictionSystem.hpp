@@ -21,19 +21,20 @@ public:
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
-    // Get prediction error
+// Get prediction error
     float getPredictionError() const;
-    
-    // Get prediction confidence
+
+    // Get prediction confidence (alias for getConfidence() for clarity)
     float getConfidence() const;
-    
+    float getPredictionConfidence() const { return getConfidence(); }
+
     // Get prediction history
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
-    
+
     // Train prediction model
     void train(const SensoryInput& observation);
-    
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
