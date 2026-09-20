@@ -193,6 +193,58 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== MEMORY SYSTEM ACCESSORS ==========
+    
+    // Working memory - transient active information
+    NeuralWorkingMemory* getWorkingMemory();
+    
+    // Episodic memory - experience storage
+    NeuralEpisodicMemory* getEpisodicMemory();
+    
+    // Associative memory - pattern associations
+    NeuralAssociativeMemory* getAssociativeMemory();
+    
+    // ========== PREDICTION SYSTEM ==========
+    
+    // Prediction system for sensory prediction and error computation
+    PredictionSystem* getPredictionSystem();
+    
+    // ========== COGNITION SYSTEMS ==========
+    
+    // Neural planner for action planning
+    NeuralPlanner* getPlanner();
+    
+    // Concept formation for pattern discovery
+    ConceptFormation* getConceptFormation();
+    
+    // Attentional selection for focus
+    AttentionalSelection* getAttention();
+    
+    // ========== DEVELOPMENT SYSTEM ==========
+    
+    DevelopmentSystem* getDevelopmentSystem();
+    DevelopmentalStage getDevelopmentalStage() const;
+    void setDevelopmentalStage(DevelopmentalStage stage);
+    
+    // ========== NEUROMODULATION SYSTEMS ==========
+    
+    // Dopamine - reward and reinforcement
+    Dopamine* getDopamine();
+    
+    // Curiosity - exploration motivation
+    Curiosity* getCuriosity();
+    
+    // Novelty - novelty detection
+    Novelty* getNovelty();
+    
+    // Prediction error signal
+    PredictionError* getPredictionErrorSignal();
+    
+    // ========== DEVELOPMENT EFFECTS ==========
+    
+    // Update development system
+    void updateDevelopment(double timestep);
+    
 private:
     struct Impl;
     Impl* pImpl;

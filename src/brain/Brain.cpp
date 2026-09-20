@@ -231,16 +231,16 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
-    
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -404,6 +404,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Connect working memory to attention system
+        if (pImpl->attention && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -509,12 +515,46 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+// ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // This would typically involve:
+        // 1. Using current sensory state to predict next state
+        // 2. Computing prediction error
+        // 3. Learning from prediction errors
+        // 4. Updating working memory with predictions
+        
+        // For now, implement basic integration
+        // Get sensory input (if available)
+        // Note: Brain doesn't have direct access to current sensory input in step()
+        // This would be provided through receiveSensoryInput()
+        
+        // Update prediction error based on brain state changes
+        float predictionError = 0.0f;
+        if (pImpl->predictionError) {
+            // Update prediction error based on unexpected activity
+            float unexpectedActivity = 0.0f;
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring()) {
+                            unexpectedActivity += std::abs(
+                                neuron->getState().membranePotential - neuron->getState().restingPotential
+                            ) / neuron->getState().threshold;
+                        }
+                    }
+                }
+            }
+            predictionError = unexpectedActivity / std::max<size_t>(1, getTotalNeuronCount());
+            
+            // Let prediction error system update
+            pImpl->predictionError->update(predictionError, pImpl->timestep);
+        }
+        
+        // Store prediction error for neuromodulation
+        pImpl->predictionErrorLevel = predictionError;
     }
-    
+
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
@@ -524,12 +564,45 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Attention can modulate neural excitability
+        float attentionFocus = 1.0f;  // Simplified - would use actual attention modulation
+        if (attentionFocus > 1.0f) {
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Attention increases excitability of attended neurons
+                        neuron->injectCurrent(attentionFocus * 0.1f - 0.1f);
+                    }
+                }
+            }
+        }
     }
-    
+
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation processes experiences to extract patterns
+        // This would typically involve:
+        // 1. Taking current sensory state (would need to be stored)
+        // 2. Comparing with existing concepts
+        // 3. Creating new concepts for novel patterns
+        // 4. Updating concept weights
+        
+        // Store current state for concept formation
+        // This requires access to sensory input, which isn't directly available here
+        // In a full integration, sensory input would be passed to concept formation
+        
+        // For now, just update concept formation with available brain state
+        pImpl->conceptFormation->update(pImpl->timestep);
+        
+        // Concepts can influence attention and memory
+        auto conceptInfluences = pImpl->conceptFormation->getInfluences();
+        for (const auto& influence : conceptInfluences) {
+            // Apply concept-based biases to attention
+            if (pImpl->attention) {
+                pImpl->attention->applyTopDownBias(influence.neuronId, influence.biasStrength);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -730,9 +803,38 @@ void Brain::updatePlasticity() {
     // This method is kept for API compatibility
 }
 
-void Brain::develop() {
-    // Development updates structural plasticity
-    pImpl->structuralPlasticity->update(this, *pImpl->rng);
+void Brain::updateDevelopment(double timestep) {
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->update(this, timestep);
+        
+        // Development affects plasticity rates
+        auto* sp = pImpl->structuralPlasticity;
+        if (sp) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            float plasticityMod = 1.0f;
+            
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    plasticityMod = 1.0f;  // High plasticity
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    plasticityMod = 0.8f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    plasticityMod = 0.5f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    plasticityMod = 0.2f;  // Stable
+                    break;
+                case DevelopmentalStage::Aging:
+                    plasticityMod = 0.1f;  // Even lower in old age
+                    break;
+            }
+            
+            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+    }
 }
 
 void Brain::reset() {
