@@ -1,16 +1,25 @@
 #include "Config.hpp"
+#include "ConfigParser.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    bool jsonSupport;
+    bool yamlSupport;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    pImpl->jsonSupport = true;  // Enable JSON support by default
+    pImpl->yamlSupport = true;  // Enable YAML support by default
+}
 
 Config::~Config() = default;
 
@@ -19,40 +28,56 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
+    // Detect file type and parse accordingly
+    if (!std::filesystem::exists(filepath)) {
+        NLM_LOG_ERROR("Config file does not exist: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+    std::string extension = toLower(getFileExtension(filepath));
+    
+    // Try JSON first if supported
+    if (pImpl->jsonSupport && (extension == ".json" || extension.empty())) {
+        NLM_LOG_INFO("Loading JSON config file: " + filepath);
+        std::map<std::string, ConfigValue> entries;
+        if (ConfigParser::parseJsonFile(filepath, entries)) {
+            // Convert map to vector
+            pImpl->entries.clear();
+            for (const auto& pair : entries) {
+                pImpl->entries.emplace_back(pair.first, pair.second, ConfigSource::File);
             }
-            
-            set(key, value, ConfigSource::File);
+            return true;
         }
     }
     
-    return true;
+    // Try YAML next if supported
+    if (pImpl->yamlSupport && (extension == ".yaml" || extension == ".yml")) {
+        NLM_LOG_INFO("Loading YAML config file: " + filepath);
+        std::map<std::string, ConfigValue> entries;
+        if (ConfigParser::parseYamlFile(filepath, entries)) {
+            // Convert map to vector
+            pImpl->entries.clear();
+            for (const auto& pair : entries) {
+                pImpl->entries.emplace_back(pair.first, pair.second, ConfigSource::File);
+            }
+            return true;
+        }
+    }
+    
+    // Fallback to key=value format for all other files
+    NLM_LOG_INFO("Loading key=value config file: " + filepath);
+    std::map<std::string, ConfigValue> entries;
+    if (ConfigParser::parseKeyValueFile(filepath, entries)) {
+        // Convert map to vector
+        pImpl->entries.clear();
+        for (const auto& pair : entries) {
+            pImpl->entries.emplace_back(pair.first, pair.second, ConfigSource::File);
+        }
+        return true;
+    }
+    
+    NLM_LOG_ERROR("Failed to parse config file: " + filepath);
+    return false;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,11 +109,22 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Add JSON header comment
+    file << "# NLM Configuration File (JSON format)\n";
+    file << "{\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\" : " << ConfigParser::configValueToString(entry.value);
+        
+        // Add trailing comma for all but last entry
+        if (i < pImpl->entries.size() - 1) {
+            file << ",";
+        }
+        file << "\n";
     }
     
+    file << "}\n";
     return true;
 }
 
@@ -104,6 +140,7 @@ std::optional<T> Config::get(const std::string& key) const {
     try {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        NLM_LOG_WARNING("Type mismatch for config key: " + key);
         return std::nullopt;
     }
 }
@@ -170,18 +207,18 @@ void Config::clear() {
 
 std::string Config::summary() const {
     std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "Configuration (" << pImpl->entries.size() << " entries, ";
+    oss << "JSON support: " << (pImpl->jsonSupport ? "enabled" : "disabled") << ", ";
+    oss << "YAML support: " << (pImpl->yamlSupport ? "enabled" : "disabled") << ")\n";
+    oss << "Format: JSON/YAML/key=value\n";
+    oss << "Sources: " << static_cast<int>(ConfigSource::Default) << " (Default), "
+        << static_cast<int>(ConfigSource::File) << " (File), "
+        << static_cast<int>(ConfigSource::CommandLine) << " (CommandLine), "
+        << static_cast<int>(ConfigSource::Runtime) << " (Runtime)\n";
+    
     for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << "  " << entry.key << " = [" << ConfigParser::configValueToString(entry.value) << "]";
+        oss << " (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
 }
@@ -197,6 +234,12 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+std::string Config::getFileExtension(const std::string& filepath) {
+    size_t pos = filepath.rfind('.');
+    if (pos == std::string::npos) return "";
+    return filepath.substr(pos);
 }
 
 // Explicit template instantiations

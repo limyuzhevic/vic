@@ -50,36 +50,36 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
-// Acetylcholine: Attention and memory consolidation
+// Novelty: Novelty detection for exploration
 // PLACEHOLDER - Phase 2
-class Acetylcholine : public Neuromodulator {
+class Novelty : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
+    const char* getName() const override { return "NOVELTY"; }
     float getLevel() const override { return 0.0f; }
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
 };
 
-// Norepinephrine: Arousal and vigilance
+// Curiosity: Intrinsic motivation for exploration
 // PLACEHOLDER - Phase 2
-class Norepinephrine : public Neuromodulator {
+class Curiosity : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
+    const char* getName() const override { return "CURIOSITY"; }
     float getLevel() const override { return 0.0f; }
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
 };
 
-// Serotonin: Mood, impulsivity, and social behavior
+// Prediction Error: Bayesian surprise
 // PLACEHOLDER - Phase 2
-class Serotonin : public Neuromodulator {
+class PredictionError : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
+    const char* getName() const override { return "PREDICTION_ERROR"; }
     float getLevel() const override { return 0.0f; }
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }

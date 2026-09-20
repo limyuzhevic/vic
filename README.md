@@ -67,20 +67,145 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 ## Building
 
 ```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+# Standard build
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+make -C build -j4
+
+# Or use the modern CMake approach
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+# For development build with debugging
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 ```
 
 ## Running
 
 ### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase6_demo
+./build/nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Python Bindings
+
+The Python bindings are built as part of the CMake build:
+```bash
+# Check Python bindings
+python -c "import pynlm"
+
+# Run Python examples
+python examples/demo.py
+```
+
+### Advanced Commands
+
+NLM provides several advanced commands for power users and researchers:
+
+```bash
+# Run specific experiment types
+./build/nlm_phase6_demo --experiment_type "reinforcement_learning"
+./build/nlm_phase6_demo --experiment_type "memory_consolidation"
+./build/nlm_phase6_demo --experiment_type "developmental_pruning"
+
+# Run with custom configuration
+./build/nlm_phase6_demo --config=/path/to/custom_config.cfg
+
+# Run performance benchmarking
+./build/nlm_benchmark --neurons=10000 --timesteps=100000
+
+# Run neural development simulation
+./build/nlm_develop --generations=50 --population_size=100
+
+# Generate synthetic data for analysis
+./build/nlm_generate_data --output=synthetic_data.dat --neurons=5000
+```
+
+### Python API for Advanced Usage
+
+```python
+import pynlm
+from pynlm import Brain, Neuron, Synapse
+
+# Advanced brain configuration
+brain = Brain({
+    'neuron_count': 10000,
+    'region_count': 4,
+    'connection_probability': 0.15,
+    'plasticity_learning_rate': 0.02,
+    'dopamine_baseline': 0.2
+})
+
+# Custom neural development
+brain.development().setSynaptogenesisRate(0.005)
+brain.development().setPruningRate(0.0005)
+
+# Memory system interaction
+brain.memory().episodic().setMaxEpisodes(5000)
+brain.memory().semantic().storeFact("concept", "artificial intelligence")
+
+# Neuromodulation control
+brain.neuromodulation().dopamine().setBaseline(0.15)
+brain.neuromodulation().curiosity().setExplorationRate(0.3)
+
+# Run simulation with advanced configuration
+brain.runSimulation(steps=50000, timestep=0.001)
+```
+
+### Experiment Configuration Files
+
+Create custom experiment configurations:
+
+```ini
+# experiments/research_config.cfg
+[simulation]
+neuron_count = 50000
+region_count = 8
+max_simulation_steps = 1000000
+timestep = 0.0005
+
+[plasticity]
+learning_rate = 0.005
+stdp_ltp_weight = 0.008
+stdp_ltd_weight = 0.009
+
+[memory]
+working_capacity = 500
+episodic_max = 10000
+semantic_store = true
+
+[neuromodulation]
+dopamine_baseline = 0.25
+curiosity_threshold = 0.3
+novelty_decay = 0.9
+
+[environment]
+width = 20
+height = 20
+tick_rate = 100
+```
+
+Run experiments:
+```bash
+./build/nlm_phase6_demo --config=experiments/research_config.cfg
+```
+
+### Debug and Development Commands
+
+```bash
+# Run with visualization
+./build/nlm_phase6_demo --visualization_enabled
+
+# Run with logging to file
+./build/nlm_phase6_demo --log_to_file --log_filename=debug.log
+
+# Run with debug logging
+./build/nlm_phase6_demo --log_level=DEBUG
+
+# Check memory usage during runtime
+./build/nlm_phase6_demo --monitor_memory
+
+# Run neural development with verbose output
+./build/nlm_develop --generations=10 --verbose=true
+```
 
 ## Project Structure
 

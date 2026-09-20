@@ -1,14 +1,3 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
-#include <vector>
-#include <memory>
-#include <functional>
-#include <unordered_map>
-
-namespace nlm {
-
 // NeuralWorkingMemory: Implements working memory using neural dynamics
 // NOT a simple storage vector - uses persistent activity and recurrent connections
 //
@@ -106,82 +95,129 @@ private:
     std::vector<NeuronId> winners_;
 };
 
-// AttentionalSelection: Neural attention through competition
-// NOT Transformer attention - uses lateral inhibition and gain modulation
-//
-// Mechanisms:
-// - Competition between neural populations
-// - Salience-based selection
-// - Recurrent amplification of winners
-// - Inhibitory surround suppression
+// NeuralEpisodicMemory: Storage of events and experiences
+// Implements episode storage with replay capability
 
-class AttentionalSelection {
+class NeuralEpisodicMemory {
 public:
-    AttentionalSelection();
-    ~AttentionalSelection();
+    NeuralEpisodicMemory();
+    ~NeuralEpisodicMemory();
 
     // Initialize with brain reference
     void initialize(Brain* brain);
 
-    // Process competing sensory inputs and select winners
-    // Returns IDs of winning neural populations
-    std::vector<NeuronId> processCompetition(const std::vector<NeuronId>& competitors,
-                                              float globalInhibition = 0.5f);
+    // Store episode
+    void storeEpisode(const EpisodicMemoryItem& episode);
 
-    // Apply attention to a specific region (focus processing there)
-    void focusOnRegion(RegionId region);
+    // Retrieve episode
+    EpisodicMemoryItem retrieveEpisode(size_t index) const;
 
-    // Release attention (allow all regions equal processing)
-    void releaseAttention();
+    // Get episode count
+    size_t getEpisodeCount() const;
 
-    // Get current attention focus
-    std::vector<RegionId> getAttendedRegions() const;
+    // Get recent episodes
+    std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
 
-    // Set attention parameters
-    void setInhibitionStrength(float strength);
-    void setExcitationStrength(float strength);
-    void setCompetitionThreshold(float threshold);
+    // Clear all
+    void clear();
 
-    // Get inhibition level for a neuron
-    float getInhibitionFor(NeuronId neuron) const;
+    // Memory consolidation (move to long-term)
+    void consolidate(float relevanceThreshold);
 
-    // Get excitation level for a neuron
-    float getExcitationFor(NeuronId neuron) const;
+    // Get episodes for replay
+    std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
 
-    // Update attention dynamics
-    void update(TimestepDuration dt);
+    // Replay episode
+    void replayEpisode(const EpisodicMemoryItem* episode);
 
-    // Is this neuron currently attended?
-    bool isAttended(NeuronId neuron) const;
-
-    // Get attention winners
-    const std::vector<NeuronId>& getWinners() const { return winners_; }
-
-    // Top-down attention (goal-directed)
-    void applyTopDownBias(NeuronId neuron, float biasStrength);
-
-    // Bottom-up attention (stimulus-driven)
-    void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
-
-    // Reset attention
-    void reset();
+    // Get max episodes
+    void setMaxEpisodes(size_t max) { maxEpisodes_ = max; }
 
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
-    float inhibitionStrength_;
-    float excitationStrength_;
-    float competitionThreshold_;
-    
-    std::vector<RegionId> attendedRegions_;
-    std::vector<NeuronId> winners_;
-    std::vector<float> neuronSalience_;
-    
-    // Biases/salience stored by NeuronId for correct lookup in processCompetition
-    std::unordered_map<uint64_t, float> topDownBias_;
-    std::unordered_map<uint64_t, float> bottomUpSalience_;
+    size_t maxEpisodes_;
+    std::vector<EpisodicMemoryItem> episodes_;
 };
+
+// NeuralAssociativeMemory: Relationships between representations
+// Implements Hebbian and activity-dependent associations
+
+class NeuralAssociativeMemory {
+public:
+    NeuralAssociativeMemory();
+    ~NeuralAssociativeMemory();
+
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+
+    // Create association
+    void associate(NeuronId a, NeuronId b, float strength);
+
+    // Get associated neurons
+    std::vector<NeuronId> getAssociations(NeuronId neuron) const;
+
+    // Get association strength
+    float getAssociationStrength(NeuronId a, NeuronId b) const;
+
+    // Update association
+    void updateAssociation(NeuronId a, NeuronId b, float delta);
+
+    // Clear all
+    void clear();
+
+    // Get all associations
+    const std::vector<std::tuple<NeuronId, NeuronId, float>>& getAllAssociations() const;
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+
+    Brain* brain_;
+    std::vector<std::tuple<NeuronId, NeuronId, float>> associations_;
+};
+
+// NeuralEpisodicMemory for replay support
+void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
+    if (!brain_ || !episode) return;
+    
+    // Restore neural activity patterns from episode
+    for (size_t i = 0; i < episode->neurons.size() && i < episode->values.size(); ++i) {
+        NeuronId neuronId = episode->neurons[i];
+        float activation = episode->values[i];
+        
+        // Find the neuron and set its membrane potential to reflect episode activity
+        for (auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->getId() == neuronId) {
+                        // Set membrane potential proportional to activation
+                        neuron->setMembranePotential(activation * neuron->getThreshold());
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// NeuralAssociativeMemory association helper
+void NeuralAssociativeMemory::associate(NeuronId a, NeuronId b, float strength) {
+    // Check if association already exists
+    for (auto& assoc : associations_) {
+        if ((std::get<0>(assoc) == a && std::get<1>(assoc) == b) ||
+            (std::get<0>(assoc) == b && std::get<1>(assoc) == a)) {
+            std::get<2>(assoc) = strength;
+            return;
+        }
+    }
+    associations_.emplace_back(a, b, strength);
+}
+
+const std::vector<std::tuple<NeuronId, NeuronId, float>>& NeuralAssociativeMemory::getAllAssociations() const {
+    return associations_;
+}
 
 } // namespace nlm
