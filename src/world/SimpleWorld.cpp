@@ -30,6 +30,8 @@ SimpleWorld::SimpleWorld()
     , rngState_(42)
 {
     agent_.reset();
+    // Configure with default values
+    configure(width_, height_, visionWidth_, visionHeight_);
 }
 
 SimpleWorld::~SimpleWorld() = default;

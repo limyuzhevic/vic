@@ -4,8 +4,10 @@
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../agent/AgentBrain.hpp"
+#include "../core/Utilities/Utilities.hpp"
 #include <chrono>
 #include <cmath>
+#include <algorithm>
 
 namespace nlm {
 
@@ -43,7 +45,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create simple world
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.configure(16, 16, 8, 8);  // width, height, visionWidth, visionHeight
+    world.reset();  // Initialize world state
+    world.setAgentStart(8.0f, 8.0f);  // Center of world
     
     // Create agent
     AgentBrain agent(brain);
@@ -61,8 +65,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get observation (sensory percept)
+        const SensoryPercept& percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -74,10 +78,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyMotorCommand(cmd, world.getSimulationTime());
         
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Get reward from agent's neuromodulation (dopamine)
+        float reward = agent.getNeuromodulationLevel();
         totalReward += reward;
         
         // Apply reward modulation

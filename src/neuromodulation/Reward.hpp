@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Neuromodulator.hpp"
+#include "../environment/Observation.hpp"
+#include <vector>
 
 namespace nlm {
 
