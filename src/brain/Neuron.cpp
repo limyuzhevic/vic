@@ -261,8 +261,17 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    // This is a placeholder implementation - real implementation should use
+    // configurable timestep from simulation clock or config
+    TimestepDuration dt = 0.001f;  // 1ms default timestep
+    
+    // Use the LIF step implementation with proper integration
+    bool fired = stepLIF(currentTime, dt);
+    
+    if (fired) {
+        // Record the spike
+        recordSpike(currentTime);
+    }
 }
 
 void Neuron::reset() {

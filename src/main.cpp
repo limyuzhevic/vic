@@ -206,16 +206,25 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
     
+    // Safe null check for brain pointer
+    if (!brain) {
+        NLM_LOG_ERROR("Brain is null - cannot run plasticity experiment");
+        return;
+    }
+    
     LearningExperiment experiment(brain, 42);
     
     // Record initial state
     experiment.recordInitialState();
     
     // Enable plasticity on synapses
-    if (auto* region = brain->getRegion(RegionId(1))) {
+    auto* region = brain->getRegion(RegionId(1));
+    if (region) {
         for (auto& syn : region->getSynapses()) {
             syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
         }
+    } else {
+        NLM_LOG_ERROR("Region 1 not found - skipping synapse plasticity");
     }
     
     // Apply repeated input pattern to stimulate learning
@@ -249,8 +258,17 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
+    // Safe null check for brain pointer
+    if (!brain) {
+        NLM_LOG_ERROR("Brain is null - cannot run STDP verification");
+        return;
+    }
+    
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Region 1 not found - cannot run STDP test");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
@@ -404,6 +422,12 @@ int main(int argc, char** argv) {
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
+        return 1;
+    }
+    
+    // Safe null check for brain
+    if (!brain) {
+        NLM_LOG_ERROR("Brain creation failed - memory allocation error");
         return 1;
     }
     
