@@ -12,6 +12,32 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+## Quick Start: Python vs C++
+
+NLM has two ways to use it:
+
+### Python (Easiest - Recommended for beginners)
+```python
+import pynlm
+
+# Create a simple brain in one line:
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+brain.step(0)
+
+print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+```
+
+### C++ (More flexible, but verbose)
+```bash
+# Build and run the C++ demo
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+./nlm
+```
+
 ---
 
 ## The 3 Things You Need to Know
