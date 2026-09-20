@@ -229,11 +229,10 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
+    pImpl->workingMemory->setDecayRate(0.005f);
     
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
@@ -242,30 +241,66 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
+    // Register spike handlers for event-driven processing
+    // Working memory: neurons that fire become part of working memory
+    if (pImpl->spikeSystem) {
+        // Primary handler: count spikes, update working memory, and record episodic experiences
+        pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+            // Count spikes
+            ++pImpl->totalSpikesThisStep;
+            ++pImpl->totalSpikesTotal;
+            
+            // Store to working memory - neurons that fire become part of working memory
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->storeToNeuron(event.neuron_id, 1.0f);
+            }
+            
+            // Update episodic memory with spiking experience
+            if (pImpl->episodicMemory) {
+                EpisodicMemoryItem episode;
+                episode.timestamp = pImpl->currentStep;
+                episode.action = ActionType::Wait;
+                episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                
+                // Record the fired neuron
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron->getId() == event.neuron_id) {
+                                episode.activeNeurons.push_back(neuron->getId());
+                                episode.neuronActivations.push_back(
+                                    std::abs(neuron->getState().membranePotential - 
+                                            neuron->getState().restingPotential) / 20.0f);
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (!episode.activeNeurons.empty()) {
+                    pImpl->episodicMemory->storeEpisode(episode);
+                }
+            }
+        });
+    }
+
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
-    
+
     // Initialize cognition systems
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
-    
+
     pImpl->conceptFormation->initialize(this);
-    
+
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
-    
+
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
-    
-    // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
-    
+
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
         // Find destination neuron and deliver synaptic input
@@ -285,18 +320,19 @@ bool Brain::initialize() {
             }
         }
     });
-    
+
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
-    
+
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
     NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
-    
+
     return true;
+}
 }
 
 void Brain::step(SimulationStep currentStep) {
