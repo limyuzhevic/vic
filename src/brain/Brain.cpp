@@ -598,6 +598,22 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
+    // Store sensory input in episodic memory for experience recording
+    if (pImpl->episodicMemory && currentStep > 0) {
+        // Create sensory experience record
+        SensoryExperience experience;
+        experience.step = currentStep;
+        experience.time = currentTime;
+        
+        // Store each sensory value with timestamp
+        for (size_t i = 0; i < std::min(values.size(), static_cast<size_t>(256)); ++i) {
+            experience.sensoryValues.push_back(static_cast<float>(values[i]));
+        }
+        
+        // Store in episodic memory for later replay/consolidation
+        pImpl->episodicMemory->recordSensoryInput(experience);
+    }
+    
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
         // Normalize input value to range [-10, 10] mV
@@ -609,9 +625,27 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
+        // Also store in working memory for short-term processing
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        }
+    }
+    
+    // Update prediction system with new sensory input
+    if (pImpl->predictionSystem) {
+        // Store sensory input for prediction training
+        pImpl->predictionSystem->updateWithSensoryInput(currentStep, currentTime, values);
+    }
+    
+    // Update attention system based on sensory content
+    if (pImpl->attention) {
+        // Simple attention allocation based on sensory intensity
+        float totalIntensity = 0.0f;
+        for (float val : values) {
+            totalIntensity += std::abs(val);
+        }
+        if (totalIntensity > 0.1f) {
+            pImpl->attention->update(currentTime, totalIntensity);
         }
     }
 }
