@@ -19,6 +19,10 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , sensoryVision_()
+    , sensoryTouch_()
+    , sensoryInternal_()
+    , sensoryProprioception_()
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -85,11 +89,14 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (brain_ == nullptr) return;
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+    
+    // Bounds checking for vision input
+    const size_t visionLimit = std::min(sensoryVision_.size(), vision.size());
+    for (size_t i = 0; i < visionLimit; ++i) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
@@ -99,7 +106,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
+    
+    // Bounds checking for touch input
+    const size_t touchLimit = std::min(sensoryTouch_.size(), touch.size());
+    for (size_t i = 0; i < touchLimit; ++i) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
@@ -108,7 +118,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+    
+    // Bounds checking for internal signals
+    const size_t internLimit = std::min(sensoryInternal_.size(), intern.size());
+    for (size_t i = 0; i < internLimit; ++i) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
@@ -117,7 +130,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
+    
+    // Bounds checking for proprioception
+    const size_t proprioLimit = std::min(sensoryProprioception_.size(), proprio.size());
+    for (size_t i = 0; i < proprioLimit; ++i) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
@@ -135,11 +151,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         // Normalize
         noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
         
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
+        // Store previous vision FIRST
         previousVision_ = vision;
+        
+        // Then apply decay
+        noveltyLevel_ *= sensoryNoveltyDecay_;
     }
     
     // Update curiosity based on novelty
@@ -150,7 +166,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (brain_ == nullptr) return MotorCommand::Wait;
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
@@ -210,7 +226,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
+    if (brain_ == nullptr) return defaultCmd;
     if (curiosityLevel_ > 0.5f) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
@@ -218,15 +234,13 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
             // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 5);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
                 case 2: return MotorCommand::TurnLeft;
                 case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
+                case 4: return MotorCommand::Interact;
                 default: return MotorCommand::Wait;
             }
         }
@@ -236,7 +250,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    if (brain_ == nullptr || !rewardModulationEnabled_) return;
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -280,7 +294,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+    if (brain_ == nullptr || !developmentEnabled_) return;
     
     developmentalAge_ += timestep;
     
@@ -314,7 +328,7 @@ void AgentBrain::updateDevelopment(double timestep) {
 }
 
 DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
-    if (!brain_) return DevelopmentalStage::Initial;
+    if (brain_ == nullptr) return DevelopmentalStage::Initial;
     return brain_->getDevelopmentalStage();
 }
 
