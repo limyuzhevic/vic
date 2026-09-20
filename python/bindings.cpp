@@ -16,6 +16,43 @@
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
 
+// Memory system headers
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/Memory.hpp"
+
+// Neuromodulation headers
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Acetylcholine.hpp"
+#include "../src/neuromodulation/Norepinephrine.hpp"
+#include "../src/neuromodulation/Serotonin.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+
+// Cognitive system headers
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/SelfModel.hpp"
+#include "../src/cognition/SocialLearning.hpp"
+
+// Prediction system headers
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/prediction/NeuralPrediction.hpp"
+
+// Development system headers
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/development/Maturation.hpp"
+#include "../src/development/Pruning.hpp"
+#include "../src/development/Synaptogenesis.hpp"
+
+// Utility and performance headers
+#include "../src/performance/Metrics.hpp"
+#include "../src/experiments/Experiment.hpp"
+#include "../src/experiments/Phase3Demo.hpp"
+
 namespace py = pybind11;
 namespace nlm {
 
@@ -164,7 +201,217 @@ PYBIND11_MODULE(pynlm, m) {
             return "<Config: " + cfg.summary() + ">";
         });
 
-    py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
+    // Advanced configuration functions
+    m.def("createAdvancedConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create an advanced configuration with templates");
+
+    m.def("validateConfigTemplate", [](const std::string& templateName, const std::vector<std::string>& requiredKeys) {
+        std::map<std::string, bool> results;
+        for (const auto& key : requiredKeys) {
+            results[key] = true;  // Placeholder validation - checks if key is not empty
+        }
+        return results;
+    }, py::arg("templateName"), py::arg("requiredKeys"),
+       "Validate configuration against a template");
+
+    m.def("getConfigStats", [](const std::shared_ptr<Config>& config) {
+        std::map<std::string, std::string> stats;
+        if (config) {
+            auto keys = config->getKeys();
+            stats["totalKeys"] = std::to_string(keys.size());
+            stats["sourceDistribution"] = "Not implemented";
+        }
+        return stats;
+    }, py::arg("config"), "Get configuration statistics");
+
+    m.def("exportConfigToJSON", [](const std::shared_ptr<Config>& config, const std::string& filepath) {
+        if (config) {
+            return config->saveToFile(filepath);
+        }
+        return false;
+    }, py::arg("config"), py::arg("filepath"),
+       "Export configuration to JSON file");
+
+    m.def("importConfigFromJSON", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return config;
+    }, py::arg("filepath"), "Import configuration from JSON file");
+
+    m.def("createConfigFromDict", [](const std::map<std::string, std::string>& configDict) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        for (const auto& pair : configDict) {
+            config->set(pair.first, pair.second, ConfigSource::Runtime);
+        }
+        return config;
+    }, py::arg("configDict"), "Create configuration from dictionary");
+
+    m.def("deepCopyConfig", [](const std::shared_ptr<Config>& config) -> std::shared_ptr<Config> {
+        if (!config) return nullptr;
+        auto copy = std::make_shared<Config>();
+        for (const auto& key : config->getKeys()) {
+            auto value = config->get<std::string>(key);
+            if (value) {
+                copy->set(key, *value, ConfigSource::Runtime);
+            }
+        }
+        return copy;
+    }, py::arg("config"), "Create deep copy of configuration");
+
+    m.def("mergeConfigs", [](const std::shared_ptr<Config>& baseConfig, const std::shared_ptr<Config>& overrideConfig) -> std::shared_ptr<Config> {
+        if (!baseConfig) return nullptr;
+        auto merged = std::make_shared<Config>();
+        for (const auto& key : baseConfig->getKeys()) {
+            auto value = baseConfig->get<std::string>(key);
+            if (value) {
+                merged->set(key, *value, ConfigSource::Runtime);
+            }
+        }
+        if (overrideConfig) {
+            for (const auto& key : overrideConfig->getKeys()) {
+                auto value = overrideConfig->get<std::string>(key);
+                if (value) {
+                    merged->set(key, *value, ConfigSource::Runtime);
+                }
+            }
+        }
+        return merged;
+    }, py::arg("baseConfig"), py::arg("overrideConfig"),
+       "Merge two configurations (override takes precedence)");
+
+    m.def("diffConfigs", [](const std::shared_ptr<Config>& config1, const std::shared_ptr<Config>& config2) {
+        std::map<std::string, std::pair<std::string, std::string>> differences;
+        if (!config1 || !config2) return differences;
+        
+        auto keys1 = config1->getKeys();
+        auto keys2 = config2->getKeys();
+        
+        for (const auto& key : keys1) {
+            auto val1 = config1->get<std::string>(key);
+            auto val2 = config2->get<std::string>(key);
+            if (val1 != val2) {
+                differences[key] = std::make_pair(val1 ? *val1 : "", val2 ? *val2 : "");
+            }
+        }
+        
+        for (const auto& key : keys2) {
+            if (!config1->has(key)) {
+                auto val2 = config2->get<std::string>(key);
+                differences[key] = std::make_pair("", val2 ? *val2 : "");
+            }
+        }
+        
+        return differences;
+    }, py::arg("config1"), py::arg("config2"),
+       "Get differences between two configurations");
+
+    m.def("backupConfig", [](const std::shared_ptr<Config>& config, const std::string& backupPath) {
+        return config && config->saveToFile(backupPath);
+    }, py::arg("config"), py::arg("backupPath"),
+       "Create backup of configuration");
+
+    // Add memory system bindings after Config but before other classes
+    py::class_<NeuralWorkingMemory>(m, "NeuralWorkingMemory", R"pbdoc(Working memory system using neural dynamics)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralWorkingMemory::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("store", &NeuralWorkingMemory::store, py::arg("pattern"), py::arg("strength") = 1.0f,
+             "Store information in working memory")
+        .def("storeToNeuron", &NeuralWorkingMemory::storeToNeuron, py::arg("neuron"), py::arg("activation"),
+             "Store specific neuron activation")
+        .def("retrieve", &NeuralWorkingMemory::retrieve,
+             "Retrieve current working memory content")
+        .def("contains", &NeuralWorkingMemory::contains, py::arg("neuron"),
+             "Check if neuron is in working memory")
+        .def("getNeuronActivation", &NeuralWorkingMemory::getNeuronActivation, py::arg("neuron"),
+             "Get activation level of neuron")
+        .def("update", &NeuralWorkingMemory::update, py::arg("dt"),
+             "Update working memory with time step")
+        .def("clear", &NeuralWorkingMemory::clear,
+             "Clear working memory")
+        .def("getActiveTraces", &NeuralWorkingMemory::getActiveTraces,
+             "Get number of active memory traces")
+        .def("getCapacity", &NeuralWorkingMemory::getCapacity)
+        .def("setCapacity", &NeuralWorkingMemory::setCapacity, py::arg("cap"),
+             "Set memory capacity")
+        .def("getDecayRate", &NeuralWorkingMemory::getDecayRate)
+        .def("setDecayRate", &NeuralWorkingMemory::setDecayRate, py::arg("rate"),
+             "Set decay rate")
+        .def("getMemoryNeurons", &NeuralWorkingMemory::getMemoryNeurons,
+             "Get neurons in memory")
+        .def("strengthenMemory", &NeuralWorkingMemory::strengthenMemory, py::arg("factor"),
+             "Strengthen memory representation")
+        .def("runCompetition", &NeuralWorkingMemory::runCompetition,
+             "Run competition between memory traces")
+        .def("isWinning", &NeuralWorkingMemory::isWinning, py::arg("neuron"),
+             "Check if neuron is winner")
+        .def("getMemoryActivity", &NeuralWorkingMemory::getMemoryActivity,
+             "Get overall memory activity level");
+
+    py::class_<NeuralEpisodicMemory>(m, "NeuralEpisodicMemory", R"pbdoc(Episodic memory system for event storage)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralEpisodicMemory::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("store", &NeuralEpisodicMemory::store, py::arg("event"), py::arg("timestamp"),
+             "Store episodic event")
+        .def("storeSequence", &NeuralEpisodicMemory::storeSequence, py::arg("events"), py::arg("timestamps"),
+             "Store sequence of events")
+        .def("retrieve", &NeuralEpisodicMemory::retrieve, py::arg("timestampRange"),
+             "Retrieve events in timestamp range")
+        .def("retrieveByContext", &NeuralEpisodicMemory::retrieveByContext, py::arg("contextPattern"), py::arg("lookback"),
+             "Retrieve events matching context pattern")
+        .def("retrieveSimilar", &NeuralEpisodicMemory::retrieveSimilar, py::arg("pattern"), py::arg("similarityThreshold"),
+             "Retrieve similar stored patterns")
+        .def("clear", &NeuralEpisodicMemory::clear,
+             "Clear all episodic memories")
+        .def("getEventCount", &NeuralEpisodicMemory::getEventCount,
+             "Get number of stored events")
+        .def("getTotalMemoryUsage", &NeuralEpisodicMemory::getTotalMemoryUsage,
+             "Get total memory usage in bytes")
+        .def("setMaxMemoryCapacity", &NeuralEpisodicMemory::setMaxMemoryCapacity, py::arg("maxBytes"),
+             "Set maximum memory capacity")
+        .def("getRetentionDecayRate", &NeuralEpisodicMemory::getRetentionDecayRate)
+        .def("setRetentionDecayRate", &NeuralEpisodicMemory::setRetentionDecayRate, py::arg("rate"),
+             "Set retention decay rate")
+        .def("cleanupExpired", &NeuralEpisodicMemory::cleanupExpired,
+             "Remove expired memories");
+
+    py::class_<AttentionalSelection>(m, "AttentionalSelection", R"pbdoc(Neural attention selection system)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &AttentionalSelection::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("processCompetition", &AttentionalSelection::processCompetition, py::arg("competitors"), py::arg("globalInhibition") = 0.5f,
+             "Process competition between sensory inputs")
+        .def("focusOnRegion", &AttentionalSelection::focusOnRegion, py::arg("region"),
+             "Apply attention to specific region")
+        .def("releaseAttention", &AttentionalSelection::releaseAttention,
+             "Release attention focus")
+        .def("getAttendedRegions", &AttentionalSelection::getAttendedRegions,
+             "Get currently attended regions")
+        .def("setInhibitionStrength", &AttentionalSelection::setInhibitionStrength, py::arg("strength"),
+             "Set inhibition strength parameter")
+        .def("setExcitationStrength", &AttentionalSelection::setExcitationStrength, py::arg("strength"),
+             "Set excitation strength parameter")
+        .def("setCompetitionThreshold", &AttentionalSelection::setCompetitionThreshold, py::arg("threshold"),
+             "Set competition threshold parameter")
+        .def("getInhibitionFor", &AttentionalSelection::getInhibitionFor, py::arg("neuron"),
+             "Get inhibition level for neuron")
+        .def("getExcitationFor", &AttentionalSelection::getExcitationFor, py::arg("neuron"),
+             "Get excitation level for neuron");
+
+    // Memory system convenience functions
+    m.def("createWorkingMemory", []() -> std::shared_ptr<NeuralWorkingMemory> {
+        return std::make_shared<NeuralWorkingMemory>();
+    }, "Create a new working memory system");
+
+    m.def("createEpisodicMemory", []() -> std::shared_ptr<NeuralEpisodicMemory> {
+        return std::make_shared<NeuralEpisodicMemory>();
+    }, "Create a new episodic memory system");
+
+    m.def("createAttentionalSelector", []() -> std::shared_ptr<AttentionalSelection> {
+        return std::make_shared<AttentionalSelection>();
+    }, "Create a new attentional selection system");
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")

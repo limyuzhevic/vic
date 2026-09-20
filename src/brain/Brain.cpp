@@ -45,7 +45,11 @@ struct Brain::Impl {
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
     // ========== NEUROMODULATION SYSTEMS ==========
+    
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -129,6 +133,11 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // TODO PHASE 2: Initialize other neuromodulators
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -406,35 +415,76 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
-    
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
+    // ========== STEP 5.5: Apply acetylcholine effects ==========
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+        // Acetylcholine enhances attention and memory consolidation
+        // Higher ACh increases focus on salient stimuli
+        float achLevel = pImpl->acetylcholine->getLevel();
+        if (achLevel > 0.0f) {
+            // Modify attention system
+            if (pImpl->attention) {
+                // ACh increases attention focus
+                pImpl->attention->setInhibitionStrength(0.3f + achLevel * 0.4f);
+                pImpl->attention->setExcitationStrength(1.5f + achLevel * 0.5f);
+            }
+            
+            // Enhance working memory consolidation
+            if (pImpl->workingMemory) {
+                // ACh strengthens working memory traces
+                pImpl->workingMemory->strengthenMemory(1.0f + achLevel * 0.5f);
+            }
+        }
+    }
+    
+    // ========== STEP 5.6: Apply norepinephrine effects ==========
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+        
+        // Norepinephrine enhances arousal and vigilance
+        float neLevel = pImpl->norepinephrine->getLevel();
+        if (neLevel > 0.0f) {
+            // Modify neural excitability
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // NE increases neural gain/excitability
+                        float arousalMod = neLevel * 0.3f;
+                        if (arousalMod > 0.0f) {
+                            neuron->injectCurrent(arousalMod);
+                        }
                     }
                 }
+            }
+            
+            // Enhance attention
+            if (pImpl->attention) {
+                pImpl->attention->setCompetitionThreshold(0.3f - neLevel * 0.2f);
+            }
+        }
+    }
+    
+    // ========== STEP 5.7: Apply serotonin effects ==========
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        
+        // Serotonin modulates mood and impulsivity
+        float serotoninLevel = pImpl->serotonin->getLevel();
+        if (serotoninLevel > 0.0f) {
+            // Modulate plasticity rates
+            float moodMod = 0.5f + serotoninLevel * 0.5f;  // Higher serotonin = more stable plasticity
+            
+            // Apply to structural plasticity
+            if (pImpl->structuralPlasticity) {
+                float currentSynaptogenesis = pImpl->structuralPlasticity->getSynaptogenesisRate();
+                float currentPruning = pImpl->structuralPlasticity->getPruningRate();
+                
+                // Reduce synaptogenesis (more stable)
+                pImpl->structuralPlasticity->setSynaptogenesisRate(currentSynaptogenesis * moodMod);
+                
+                // Enhance pruning (more pruning = less connections)
+                pImpl->structuralPlasticity->setPruningRate(currentPruning * (2.0f - moodMod));
             }
         }
     }
@@ -1055,6 +1105,21 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    // TODO PHASE 2: Initialize acetylcholine
+    return nullptr;
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    // TODO PHASE 2: Initialize norepinephrine
+    return nullptr;
+}
+
+Serotonin* Brain::getSerotonin() {
+    // TODO PHASE 2: Initialize serotonin
+    return nullptr;
 }
 
 Curiosity* Brain::getCuriosity() {
