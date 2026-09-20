@@ -20,6 +20,12 @@ std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryIn
     return currentState.clone();
 }
 
+void PredictionSystem::updateSensoryInput(SimulationStep step, Timestamp time) {
+    // TODO PHASE 2: Connect to brain neural activity patterns
+    // PLACEHOLDER: Track prediction error from historical data
+    pImpl->confidence = 0.7f + (pImpl->errorHistory.empty() ? 0.0f : (pImpl->errorHistory.back() / 100.0f));
+}
+
 void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
     // TODO PHASE 2: Implement real prediction error computation
     // PLACEHOLDER: Calculate simple error
@@ -34,6 +40,9 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
         }
         pImpl->predictionError = sumError / predData.size();
         pImpl->errorHistory.push_back(pImpl->predictionError);
+        if (pImpl->errorHistory.size() > 100) {
+            pImpl->errorHistory.erase(pImpl->errorHistory.begin());
+        }
     }
 }
 

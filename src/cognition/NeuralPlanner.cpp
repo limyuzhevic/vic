@@ -195,7 +195,7 @@ std::vector<float> NeuralPlanner::predictNextState(ActionType action,
             }
             break;
         case ActionType::TurnLeft:
-        case ActionType::TurnRight:
+        case ActionType::TurnRight:  // fallthrough - both turn actions rotate
             // Rotate pattern
             // Simplified: just add some noise
             for (auto& v : nextState) {
