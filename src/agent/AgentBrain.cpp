@@ -147,6 +147,13 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // Apply curiosity to neural activities if curiosity system exists
+    if (brain_ && curiosityEnabled_) {
+        if (auto* curiositySystem = brain_->getCuriosity()) {
+            curiositySystem->update(noveltyLevel_, predictionError_, 0.001f);
+        }
+    }
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {

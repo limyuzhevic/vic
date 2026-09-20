@@ -242,6 +242,10 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
+    // Connect associative memory to working memory and episodic memory
+    pImpl->associativeMemory->setWorkingMemory(pImpl->workingMemory.get());
+    pImpl->associativeMemory->setEpisodicMemory(pImpl->episodicMemory.get());
+    
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
@@ -478,36 +482,46 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 7: Update episodic memory ==========
-    pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
-        pImpl->stepsSinceLastEpisode = 0;
-        
-        if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
-            EpisodicMemoryItem episode;
-            episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        pImpl->stepsSinceLastEpisode++;
+        if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+            pImpl->stepsSinceLastEpisode = 0;
             
-            // Store active neurons
-            for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
-                        if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
-                            episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+            if (pImpl->episodicMemory) {
+                // Capture current brain state as an episode
+                EpisodicMemoryItem episode;
+                episode.timestamp = currentStep;
+                episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                
+                // Store active neurons
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron->isFiring() || 
+                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                                episode.activeNeurons.push_back(neuron->getId());
+                                episode.neuronActivations.push_back(
+                                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                            }
                         }
                     }
                 }
+                
+                // Store reward in episode
+                episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                
+                // Integrate with associative memory - store pattern associations
+                if (pImpl->associativeMemory) {
+                    // Create associations between active neurons and reward
+                    std::vector<float> pattern;
+                    for (NeuronId neuronId : episode.activeNeurons) {
+                        pattern.push_back(1.0f);  // Simple binary pattern
+                    }
+                    pImpl->associativeMemory->associate(pattern, pattern, episode.reward);
+                }
+                
+                pImpl->episodicMemory->storeEpisode(episode);
             }
-            
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            pImpl->episodicMemory->storeEpisode(episode);
         }
-    }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
