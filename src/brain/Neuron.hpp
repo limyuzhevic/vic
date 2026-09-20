@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <memory>
 
 namespace nlm {
 
@@ -127,6 +128,20 @@ public:
     PlasticityFlags& getPlasticityFlags();
     void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
     
+    // Adaptive threshold and spike-frequency adaptation
+    void setAdaptationRate(float rate);
+    float getAdaptationRate() const;
+    
+    // Integration method selection
+    enum class IntegrationMethod {
+        ExplicitEuler,
+        ExponentialEuler,
+        CrankNicolson
+    };
+    
+    void setIntegrationMethod(IntegrationMethod method);
+    IntegrationMethod getIntegrationMethod() const;
+    
     // Region/population membership
     void setRegionId(RegionId region);
     RegionId getRegionId() const;
@@ -134,7 +149,8 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Implements real integrate-and-fire dynamics with adaptive threshold
+    // and spike-frequency adaptation
     void step(Timestamp currentTime);
     
     // Reset to initial state

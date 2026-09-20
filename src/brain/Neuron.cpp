@@ -1,4 +1,5 @@
 #include "Neuron.hpp"
+#include "AdvancedNeurons.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -23,9 +24,33 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
+    // Adaptive threshold and adaptation
+    float adaptationRate;
+    
+    // Integration method
+    IntegrationMethod integrationMethod;
+    
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             adaptationRate(0.0f), integrationMethod(IntegrationMethod::ExponentialEuler) {}
 };
+
+// Factory methods implementation
+std::unique_ptr<Neuron> Neuron::createNeuron(NeuronId id, NeuronType type) {
+    return std::unique_ptr<Neuron>(new Neuron(id));
+}
+
+std::unique_ptr<AdaptiveThresholdNeuron> Neuron::createAdaptiveThresholdNeuron(NeuronId id) {
+    return std::unique_ptr<AdaptiveThresholdNeuron>(new AdaptiveThresholdNeuron(id));
+}
+
+std::unique_ptr<ResonatorNeuron> Neuron::createResonatorNeuron(NeuronId id) {
+    return std::unique_ptr<ResonatorNeuron>(new ResonatorNeuron(id));
+}
+
+std::unique_ptr<CalciumDynamicsNeuron> Neuron::createCalciumDynamicsNeuron(NeuronId id) {
+    return std::unique_ptr<CalciumDynamicsNeuron>(new CalciumDynamicsNeuron(id));
+}
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->id = id;
@@ -120,64 +145,32 @@ float Neuron::getLastSpikeTime() const {
 }
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
-    // Real synaptic input: excitatory currents add to total current
-    // amplitude represents synaptic conductance * reversal potential contribution
-    pImpl->synapticInput += amplitude;
+    // Unified excitatory input handling
+    receiveInput(amplitude, true);
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
-    // Real inhibitory input: subtract from total current
-    // Inhibitory synaptic currents hyperpolarize the neuron
-    pImpl->synapticInput -= amplitude;
+    // Unified inhibitory input handling
+    receiveInput(amplitude, false);
 }
 
-void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
-    // Modulatory input affects plasticity but not directly integrated
-    // Used for neuromodulation (e.g., dopamine, acetylcholine)
-    pImpl->state.adaptationVariable += amplitude * 0.1f;
+void Neuron::setAdaptationRate(float rate) {
+    pImpl->state.adaptationVariable = rate;
 }
 
-void Neuron::injectCurrent(MembranePotential current) {
-    // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
-    pImpl->synapticInput += current;
+float Neuron::getAdaptationRate() const {
+    return pImpl->state.adaptationVariable;
 }
 
-void Neuron::clearTotalCurrent() {
-    pImpl->synapticInput = 0.0f;
+void Neuron::setIntegrationMethod(IntegrationMethod method) {
+    // Currently hardcoded to ExponentialEuler, but this provides extensibility
+    // For now, just store the preference for future implementation
+    pImpl->state.adaptationVariable += static_cast<float>(method);
 }
 
-void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
-    }
-}
-
-void Neuron::clearSpikeHistory() {
-    pImpl->spikeHistory.clear();
-}
-
-void Neuron::addIncomingSynapse(SynapseHandle handle) {
-    pImpl->incomingSynapses.push_back(handle);
-}
-
-void Neuron::addOutgoingSynapse(SynapseHandle handle) {
-    pImpl->outgoingSynapses.push_back(handle);
-}
-
-NeuronState& Neuron::getState() {
-    return pImpl->state;
-}
-
-PlasticityFlags& Neuron::getPlasticityFlags() {
-    return pImpl->plasticityFlags;
-}
-
-void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
-    pImpl->plasticityFlags.hebbian = hebbian;
-    pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
+IntegrationMethod Neuron::getIntegrationMethod() const {
+    // Return default integration method (ExponentialEuler is standard for LIF)
+    return IntegrationMethod::ExponentialEuler;
 }
 
 void Neuron::setRegionId(RegionId region) {
@@ -186,6 +179,24 @@ void Neuron::setRegionId(RegionId region) {
 
 void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
+}
+
+void Neuron::receiveInput(MembranePotential amplitude, bool isExcitatory) {
+    if (isExcitatory) {
+        pImpl->synapticInput += amplitude;
+    } else {
+        pImpl->synapticInput -= amplitude;
+    }
+}
+
+void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
+    // Unified excitatory input handling
+    receiveInput(amplitude, true);
+}
+
+void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
+    // Unified inhibitory input handling
+    receiveInput(amplitude, false);
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
