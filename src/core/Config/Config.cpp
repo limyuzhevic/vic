@@ -3,11 +3,15 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, std::string> jsonDescriptions;  // Store descriptions from JSON files
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,14 +23,126 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try JSON first, then fallback to simple key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Check if file appears to be JSON (starts with { or [)
+    file.seekg(0, std::ios::beg);
+    char firstChar;
+    if (file.get(firstChar)) {
+        file.seekg(0, std::ios::beg);
+        // Simple JSON detection - check if file starts with { or contains key-value pairs in JSON format
+        std::string firstLine;
+        if (std::getline(file, firstLine)) {
+            file.seekg(0, std::ios::beg);
+            
+            bool isJson = false;
+            if (firstLine.find('{') != std::string::npos || firstLine.find('[') != std::string::npos) {
+                // Try to parse as JSON
+                try {
+                    auto json = nlohmann::json::parse(file);
+                    
+                    // Clear existing entries before loading JSON
+                    pImpl->entries.clear();
+                    pImpl->jsonDescriptions.clear();
+                    
+                    // Helper function to convert JSON value to ConfigValue
+                    auto jsonToConfigValue = [](const nlohmann::json& j) -> ConfigValue {
+                        if (j.is_string()) {
+                            return j.get<std::string>();
+                        } else if (j.is_number_integer()) {
+                            return j.get<int64_t>();
+                        } else if (j.is_number_unsigned()) {
+                            return j.get<uint64_t>();
+                        } else if (j.is_number_float()) {
+                            return j.get<double>();
+                        } else if (j.is_boolean()) {
+                            return j.get<bool>();
+                        } else if (j.is_array()) {
+                            // Convert array to std::vector
+                            if (!j.empty() && j[0].is_number_integer()) {
+                                std::vector<int64_t> vec;
+                                vec.reserve(j.size());
+                                for (const auto& item : j) {
+                                    vec.push_back(item.get<int64_t>());
+                                }
+                                return vec;
+                            } else if (!j.empty() && j[0].is_number_float()) {
+                                std::vector<double> vec;
+                                vec.reserve(j.size());
+                                for (const auto& item : j) {
+                                    vec.push_back(item.get<double>());
+                                }
+                                return vec;
+                            } else if (!j.empty() && j[0].is_string()) {
+                                std::vector<std::string> vec;
+                                vec.reserve(j.size());
+                                for (const auto& item : j) {
+                                    vec.push_back(item.get<std::string>());
+                                }
+                                return vec;
+                            }
+                            // Default empty vector for unknown array types
+                            return std::vector<double>();
+                        }
+                        // Default to empty string for unknown types
+                        return std::string();
+                    };
+                    
+                    // Recursively load JSON data
+                    auto loadJsonData = [&jsonToConfigValue, this](const nlohmann::json& j, const std::string& prefix = "") {
+                        if (j.is_object()) {
+                            for (const auto& [key, value] : j.items()) {
+                                std::string fullKey = prefix.empty() ? key : prefix + "." + key;
+                                ConfigSource source = ConfigSource::File;
+                                
+                                // Extract description from JSON comments (not supported in nlohmann::json directly)
+                                // For now, use default description
+                                std::string description = "Configuration parameter from JSON file";
+                                
+                                ConfigValue configValue = jsonToConfigValue(value);
+                                pImpl->entries.emplace_back(fullKey, configValue, source, description);
+                                
+                                // Recursively process nested objects
+                                if (value.is_object()) {
+                                    loadJsonData(value, fullKey);
+                                }
+                            }
+                        } else if (j.is_array()) {
+                            // Handle arrays as a single parameter (JSON arrays as values)
+                            // This is a design choice - arrays can be individual config values
+                            ConfigValue configValue = jsonToConfigValue(j);
+                            std::string key = prefix.empty() ? "array_data" : prefix + ".array";
+                            pImpl->entries.emplace_back(key, configValue, ConfigSource::File, "Array parameter from JSON file");
+                        }
+                    };
+                    
+                    loadJsonData(json);
+                    
+                    // Store descriptions for later use
+                    for (const auto& entry : pImpl->entries) {
+                        pImpl->jsonDescriptions[entry.key] = "JSON parameter: " + entry.key;
+                    }
+                    
+                    return true;
+                    
+                } catch (const nlohmann::json::parse_error& e) {
+                    // JSON parsing failed, fallback to simple format
+                    file.clear();
+                    file.seekg(0, std::ios::beg);
+                } catch (const std::exception&) {
+                    // Other error, fallback to simple format
+                    file.clear();
+                    file.seekg(0, std::ios::beg);
+                }
+            }
+        }
+    }
+    
+    // Fallback to simple key=value format
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -48,7 +164,35 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Determine description based on key pattern
+            std::string description = "Configuration parameter";
+            if (key.find("random_seed") != std::string::npos) {
+                description = "Random seed for reproducible experiments";
+            } else if (key.find("neuron_count") != std::string::npos) {
+                description = "Number of neurons in the brain";
+            } else if (key.find("region_count") != std::string::npos) {
+                description = "Number of brain regions";
+            } else if (key.find("connection_probability") != std::string::npos) {
+                description = "Connection probability for random connectivity";
+            } else if (key.find("stdp_") != std::string::npos) {
+                description = "Spike-Timing-Dependent Plasticity parameters";
+            } else if (key.find("synaptogenesis") != std::string::npos) {
+                description = "Synaptogenesis rate (structural plasticity)";
+            } else if (key.find("pruning_rate") != std::string::npos) {
+                description = "Pruning rate (structural plasticity)";
+            } else if (key.find("dopamine") != std::string::npos) {
+                description = "Dopamine neuromodulation level";
+            } else if (key.find("curiosity") != std::string::npos) {
+                description = "Curiosity neuromodulation level";
+            } else if (key.find("novelty") != std::string::npos) {
+                description = "Novelty detection signal";
+            } else if (key.find("simulation_timestep") != std::string::npos) {
+                description = "Simulation timestep in seconds";
+            } else if (key.find("log_level") != std::string::npos) {
+                description = "Logging verbosity level";
+            }
+            
+            set(key, value, ConfigSource::File, description);
         }
     }
     

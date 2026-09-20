@@ -55,13 +55,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format preferred, then key=value)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (in JSON format for interoperability)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -71,12 +71,15 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with optional description
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Advanced set with custom description
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source, const std::string& description);
     
     // Check existence
     bool has(const std::string& key) const;
