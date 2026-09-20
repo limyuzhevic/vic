@@ -398,7 +398,46 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+
+        // New configuration methods for enhanced functionality
+        .def("getOptimalMotorGroupCount", &AgentBrain::getOptimalMotorGroupCount)
+        
+        // Enhanced configuration getters
+        .def("getNeuromodulationGain", &AgentBrain::getNeuromodulationGain)
+        .def("setNeuromodulationGain", &AgentBrain::setNeuromodulationGain,
+             py::arg("gain"))
+        .def("getExplorationRate", &AgentBrain::getExplorationRate)
+        .def("setExplorationRate", &AgentBrain::setExplorationRate,
+             py::arg("rate"))
+        .def("getMaxCuriosityThreshold", &AgentBrain::getMaxCuriosityThreshold)
+        .def("setMaxCuriosityThreshold", &AgentBrain::setMaxCuriosityThreshold,
+             py::arg("threshold"))
+        
+        // Vision configuration
+        .def("getVisionWidth", &AgentBrain::getVisionWidth)
+        .def("getVisionHeight", &AgentBrain::getVisionHeight)
+        .def("setVisionDimensions", &AgentBrain::setVisionDimensions,
+             py::arg("width"), py::arg("height"))
+        
+        // Validation
+        .def("enableValidation", &AgentBrain::enableValidation,
+             py::arg("enable"))
+        .def("isValidationEnabled", &AgentBrain::isValidationEnabled)
+        
+        // Error handling helpers
+        .def("checkState", &AgentBrain::checkState)
+        .def("getErrorCount", &AgentBrain::getErrorCount)
+        .def("resetErrorCount", &AgentBrain::resetErrorCount)
+        
+        // Performance monitoring
+        .def("getPerformanceStats", &AgentBrain::getPerformanceStats)
+        .def("getLastUpdateTime", &AgentBrain::getLastUpdateTime)
+        .def("getStepCount", &AgentBrain::getStepCount)
+        
+        // Debug information
+        .def("getDebugInfo", &AgentBrain::getDebugInfo)
+        .def("logStatus", &AgentBrain::logStatus);
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

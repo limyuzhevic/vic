@@ -63,7 +63,6 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
-
 ## Building
 
 ```bash
@@ -76,43 +75,188 @@ make -j4
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
-## Project Structure
+## Key Improvements
 
+### Enhanced Configuration System
+
+- **JSON/YAML Support**: `Config::loadFromFile()` now supports JSON format in addition to the simple key=value format
+- **Better Serialization**: `Config::saveToFile()` provides readable output with source information and proper type formatting
+- **Flexible Value Types**: Supports int, double, string, bool, and arrays of these types
+
+### Advanced AgentBrain Features
+
+The AgentBrain now includes enhanced functionality:
+
+#### Configurable Parameters:
+- `maxCuriosityThreshold`: Controls when curiosity drives exploration (default: 0.8)
+- `explorationRate`: Base rate of random exploration (default: 0.1)
+- `neuromodulationGain`: Scales neuromodulatory signals (default: 1.0)
+- `validationEnabled`: Whether to validate sensory input dimensions (default: true)
+
+#### Enhanced Capabilities:
+- **Look Commands**: Added `LookLeft` and `LookRight` motor commands for sensor panning
+- **Audio Processing**: Support for auditory sensory input
+- **Better Motor Distribution**: 8 motor groups instead of 6 for more flexible control
+- **Enhanced Sensory Categorization**: 5 sensory groups instead of 4 (adding audio)
+- **Advanced Novelty Detection**: Spatially weighted novelty computation
+- **Better Error Handling**: Validation and logging of input mismatches
+- **Adaptive Scaling**: Novelty amplifies sensory sensitivity
+
+#### New Methods:
+- `getOptimalMotorGroupCount()`: Returns expected motor groups
+- `setNeuromodulationGain()`: Configure neuromodulation strength
+- `setExplorationRate()`: Configure exploration behavior
+- `setMaxCuriosityThreshold()`: Set curiosity threshold
+- `setVisionDimensions()`: Configure vision grid for coordinate weighting
+- `enableValidation()`: Toggle input validation
+
+### Improved Documentation
+
+The `easy_usage.md` file has been completely rewritten with:
+
+1. **Enhanced Examples**: Including error handling, advanced configurations, and debugging patterns
+2. **Complete Pattern Library**: 3 comprehensive patterns for different use cases
+3. **Mini Projects**: 3 practical examples from simple to complex
+4. **Advanced Features**: Development simulation, reward learning, and neuro-debugging
+5. **Configuration Examples**: Custom brain setup and state persistence
+6. **Performance Monitoring**: Brain performance metrics and debugging tools
+7. **Comprehensive Troubleshooting**: Common issues and solutions
+
+### Better Error Handling
+
+- **Null Pointer Checks**: All methods check for null brain pointers
+- **Input Validation**: Validate sensory input dimensions when enabled
+- **Comprehensive Logging**: Detailed logging for debugging and monitoring
+- **Graceful Degradation**: Fail gracefully with informative error messages
+- **Range Clamping**: All parameters are clamped to valid ranges
+
+### Python Bindings Enhancements
+
+The `bindings.cpp` provides:
+
+- **Complete API**: Full access to all AgentBrain configuration and state methods
+- **Error Handling**: Better error propagation from C++ to Python
+- **Documentation**: Enhanced docstrings for all bindings
+- **Type Safety**: Proper type conversions and safety checks
+
+## Performance Improvements
+
+1. **Reduced Copying**: Using move semantics for brain pointer
+2. **Optimized Memory Access**: Better locality with grouped neuron vectors
+3. **Adaptive Processing**: Weighted novelties and adaptive scaling
+4. **Configurable Validation**: Can disable validation for performance-critical scenarios
+
+## Usage Examples
+
+### Basic Usage
+
+```python
+import pynlm
+
+# Simple setup
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+print(f"Sensory input size: {agent.getSensoryInputSize()}")
+print(f"Motor output size: {agent.getMotorOutputSize()}")
 ```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+
+### Advanced Configuration
+
+```python
+import pynlm
+
+# Create and configure agent
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+agent = pynlm.createAgentBrain(brain)
+
+# Configure behavior
+agent.setNeuromodulationGain(1.5f)  # Stronger neuromodulation
+agent.setExplorationRate(0.2f)      # More exploration
+agent.setMaxCuriosityThreshold(0.9f) # Higher curiosity threshold
+agent.enableValidation(True)        # Enable input validation
+
+# Setup world
+world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=12, visionHeight=12)
+world.reset()
+agent.initialize(world)
 ```
+
+### Debugging and Monitoring
+
+```python
+import pynlm
+
+# Create agent with debugging
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+agent = pynlm.createAgentBrain(brain)
+agent.enableValidation(True)  # Enable input validation
+agent.enableDevelopment(True)
+
+# Setup world
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=4, visionHeight=4)
+world.reset()
+agent.initialize(world)
+
+# Debug output
+print(f"Initial state: {brain.getDevelopmentalStage()}")
+print(f"Expected input size: {agent.getSensoryInputSize()}")
+print(f"Expected output size: {agent.getMotorOutputSize()}")
+
+# Run with monitoring
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    
+    if step % 20 == 0:
+        print(f"Step {step}:")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Development stage: {agent.getDevelopmentalStage()}")
+        print(f"  Neuromodulation: {agent.getNeuromodulationLevel():.4f}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.4f}")
+```
+
+## Testing and Validation
+
+The system includes comprehensive validation:
+
+1. **Input Size Validation**: Ensures sensory input matches expected dimensions
+2. **Range Checking**: All parameters are clamped to valid ranges
+3. **Null Pointer Protection**: Safe handling of null brain pointers
+4. **State Validation**: Brain state consistency checks
+5. **Performance Monitoring**: Brain activity metrics and statistics
+
+## Future Enhancements
+
+The improved codebase provides a solid foundation for:
+
+1. **More Complex Sensory Modalities**: Additional sensory types (smell, taste, etc.)
+2. **Advanced Motor Control**: More nuanced action selection and sequencing
+3. **Better Memory Integration**: Enhanced memory systems with temporal dynamics
+4. **Learning Algorithms**: More sophisticated learning rules and plasticity
+5. **Multi-Agent Systems**: Coordination between multiple agent brains
+6. **External Interfaces**: Integration with other AI systems and environments
+7. **Visualization Tools**: Better debugging and visualization capabilities
+
+The NLM Phase 6 system now provides a more robust, configurable, and extensible platform for research in brain-like architectures and artificial developmental systems.
+
 
 ## Phase Summary
 

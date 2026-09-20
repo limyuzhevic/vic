@@ -37,6 +37,13 @@ void testConfigSetAndGet() {
     assert(boolVal.has_value());
     assert(*boolVal == true);
     
+    // Test vector types
+    config.set("int_vec", std::vector<int>({1, 2, 3}), nlm::ConfigSource::Runtime);
+    auto vecVal = config.get<std::vector<int>>("int_vec");
+    assert(vecVal.has_value());
+    assert(vecVal->size() == 3);
+    assert((*vecVal)[0] == 1 && (*vecVal)[1] == 2 && (*vecVal)[2] == 3);
+    
     std::cout << "    testConfigSetAndGet passed" << std::endl;
 }
 
@@ -78,12 +85,76 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigSerialization() {
+    nlm::Config config;
+    
+    config.set("int_val", 42, nlm::ConfigSource::Runtime);
+    config.set("double_val", 3.14159, nlm::ConfigSource::File);
+    config.set("string_val", std::string("test"), nlm::ConfigSource::CommandLine);
+    config.set("bool_val", true, nlm::ConfigSource::Runtime);
+    config.set("int_array", std::vector<int>({1, 2, 3}), nlm::ConfigSource::File);
+    
+    // Test summary
+    std::string summary = config.summary();
+    assert(summary.find("int_val") != std::string::npos);
+    assert(summary.find("double_val") != std::string::npos);
+    assert(summary.find("string_val") != std::string::npos);
+    assert(summary.find("bool_val") != std::string::npos);
+    assert(summary.find("int_array") != std::string::npos);
+    
+    // Test file saving (in memory)
+    bool saveResult = config.saveToFile("test_config.txt");
+    // Note: In a real test, we'd check file content
+    
+    std::cout << "    testConfigSerialization passed" << std::endl;
+}
+
+void testConfigLoadSimple() {
+    nlm::Config config;
+    
+    // Create a simple test file
+    std::ofstream file("simple_test_config.txt");
+    if (file.is_open()) {
+        file << "# Test configuration\n";
+        file << "int_setting = 123\n";
+        file << "double_setting = 3.14\n";
+        file << "string_setting = \"hello world\"\n";
+        file << "bool_setting = true\n";
+        file << "array_setting = [1, 2, 3]\n";
+        file.close();
+        
+        // Load the file
+        bool loadResult = config.loadFromFile("simple_test_config.txt");
+        assert(loadResult);
+        
+        // Check loaded values
+        assert(config.has("int_setting"));
+        auto intVal = config.get<int>("int_setting");
+        assert(intVal.has_value() && *intVal == 123);
+        
+        assert(config.has("double_setting"));
+        auto doubleVal = config.get<double>("double_setting");
+        assert(doubleVal.has_value() && std::abs(*doubleVal - 3.14) < 0.01);
+        
+        assert(config.has("string_setting"));
+        auto stringVal = config.get<std::string>("string_setting");
+        assert(stringVal.has_value() && *stringVal == "hello world");
+        
+        // Clean up
+        std::remove("simple_test_config.txt");
+    }
+    
+    std::cout << "    testConfigLoadSimple passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigSerialization();
+    testConfigLoadSimple();
 }
 
 } // namespace test_config

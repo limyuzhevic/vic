@@ -19,36 +19,113 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // First, try to parse as JSON
+    {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Simple JSON parsing - look for braces and parse key=value pairs
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        file.close();
+        
+        // Look for JSON-like content: { "key": "value", "key2": "value2" }
+        size_t start = content.find('{');
+        size_t end = content.rfind('}');
+        if (start != std::string::npos && end != std::string::npos && end > start) {
+            std::string jsonContent = content.substr(start + 1, end - start - 1);
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Simple parsing of key-value pairs (without nested objects)
+            size_t pos = 0;
+            while (pos < jsonContent.size()) {
+                // Find next key
+                size_t keyStart = jsonContent.find('"', pos);
+                if (keyStart == std::string::npos) break;
+                size_t keyEnd = jsonContent.find('"', keyStart + 1);
+                if (keyEnd == std::string::npos) break;
+                
+                std::string key = jsonContent.substr(keyStart + 1, keyEnd - keyStart - 1);
+                
+                // Find value
+                size_t colonPos = jsonContent.find(':', keyEnd);
+                if (colonPos == std::string::npos) break;
+                size_t valueStart = jsonContent.find_first_not_of(" \t:\",", colonPos);
+                if (valueStart == std::string::npos) break;
+                
+                // Find end of value (could be string, number, or array)
+                char quoteChar = '\0';
+                size_t valueEnd;
+                
+                if (jsonContent[valueStart] == '"' || jsonContent[valueStart] == '\'') {
+                    quoteChar = jsonContent[valueStart];
+                    valueEnd = jsonContent.find(quoteChar, valueStart + 1);
+                } else if (jsonContent[valueStart] == '[') {
+                    // Array - find matching bracket
+                    int bracketDepth = 1;
+                    valueEnd = valueStart + 1;
+                    while (valueEnd < jsonContent.size() && bracketDepth > 0) {
+                        if (jsonContent[valueEnd] == '[') bracketDepth++;
+                        else if (jsonContent[valueEnd] == ']') bracketDepth--;
+                        valueEnd++;
+                    }
+                } else {
+                    // Number or boolean
+                    valueEnd = jsonContent.find_first_of(" ,}\n\r", valueStart);
+                    if (valueEnd == std::string::npos) valueEnd = jsonContent.size();
+                }
+                
+                if (valueEnd == std::string::npos) break;
+                
+                std::string value = jsonContent.substr(valueStart, valueEnd - valueStart);
+                
+                // Clean up the value
+                value = trim(value);
+                if (!value.empty()) {
+                    set(key, value, ConfigSource::File);
+                }
+                
+                pos = valueEnd;
+                // Skip comma and whitespace
+                while (pos < jsonContent.size() && (jsonContent[pos] == ',' || jsonContent[pos] == ' ' || jsonContent[pos] == '\t' || jsonContent[pos] == '\n')) {
+                    pos++;
+                }
             }
             
-            set(key, value, ConfigSource::File);
+            return true; // Successfully parsed JSON
+        }
+    }
+    
+    // If not JSON format, try the simple key=value format
+    {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -84,9 +161,44 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write entries in a readable format
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << "# Source: " << static_cast<int>(entry.source) << "\n";
+        
+        // Format the value based on its type
+        std::visit([&](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << value << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    file << value[i];
+                    if (i < value.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    file << value[i];
+                    if (i < value.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [\"";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    file << value[i];
+                    if (i < value.size() - 1) file << "\", \";
+                }
+                file << "\"]\n";
+            } else {
+                // For basic types
+                file << entry.key << " = " << value << "\n";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
