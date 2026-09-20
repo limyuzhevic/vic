@@ -82,6 +82,21 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Phase 2 Demo (Real Neural Computation)
+```bash
+./nlm
+```
+
+This runs the Phase 2 demonstration of real neural computation with LIF neurons, STDP, and Hebbian learning.
+
+### Build
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
 ## Project Structure
 
 ```
