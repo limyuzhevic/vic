@@ -404,6 +404,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Connect working memory to sensory processing
+        // Working memory stores recent neural activity patterns for short-term retention
+        // This happens after sensory input is processed and before higher cognitive functions
+        if (pImpl->sensoryNeurons.size() > 0) {
+            // Extract neural activity from sensory neurons for working memory storage
+            for (size_t i = 0; i < std::min(pImpl->sensoryNeurons.size(), size_t(10)); ++i) {
+                if (pImpl->sensoryNeurons[i] && pImpl->sensoryNeurons[i]->isFiring()) {
+                    float activation = std::abs(pImpl->sensoryNeurons[i]->getState().membranePotential - 
+                                              pImpl->sensoryNeurons[i]->getState().restingPotential) / 20.0f;
+                    if (activation > 0.1f) {
+                        pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), activation);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -488,7 +504,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store neural activity patterns for pattern completion
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,10 +518,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Store neuromodulation state for emotional context
+            if (pImpl->dopamine) {
+                episode.dopamineLevel = pImpl->dopamine->getLevel();
+            }
+            if (pImpl->curiosity) {
+                episode.curiosityLevel = pImpl->curiosity->getLevel();
+            }
+            if (pImpl->novelty) {
+                episode.noveltyLevel = pImpl->novelty->getLevel();
+            }
+            
+            // Store prediction error for learning context
+            if (pImpl->predictionError) {
+                episode.predictionError = pImpl->predictionError->getLevel();
+            }
+            
+            // Connect to working memory - episodic memory enriches working memory
+            if (pImpl->workingMemory && !episode.activeNeurons.empty()) {
+                // Integrate episodic memory with working memory
+                // Working memory can now access temporal context from episodic memory
+                pImpl->workingMemory->setTemporalContext(episode.activeNeurons);
+            }
             
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // Log episodic memory integration
+            NLM_LOG_INFO("Episodic memory integrated: " + 
+                        std::to_string(episode.activeNeurons.size()) + " active neurons, " +
+                        std::to_string(episode.neuronActivations.size()) + " activity samples");
         }
     }
     
@@ -530,11 +571,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
-    }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
     // ========== STEP 12: Replay important memories ==========
@@ -586,6 +622,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+}
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {

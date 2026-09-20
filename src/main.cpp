@@ -345,15 +345,34 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool showHelp = false;
+    bool showVersion = false;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--version" || arg == "-v") {
+            showVersion = true;
+        } else if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
         }
+    }
+    
+    // Show help if requested
+    if (showHelp) {
+        printHelp();
+        return 0;
+    }
+    
+    // Show version if requested
+    if (showVersion) {
+        printVersion();
+        return 0;
     }
     
     // Load config from file (ignore if not found)
