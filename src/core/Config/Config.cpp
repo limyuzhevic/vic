@@ -24,11 +24,14 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,6 +52,9 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+            NLM_LOG_DEBUG("Config loaded from file: " + key + " = " + value);
+        } else {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNumber) + ": " + line);
         }
     }
     
@@ -81,6 +87,7 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file for writing: " + filepath);
         return false;
     }
     
@@ -89,6 +96,7 @@ bool Config::saveToFile(const std::string& filepath) const {
         file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
     }
     
+    NLM_LOG_INFO("Configuration saved to file: " + filepath);
     return true;
 }
 

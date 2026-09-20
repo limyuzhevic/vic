@@ -1,9 +1,58 @@
-#include "AgentBrain.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
+template<typename T>
+void distributeNeurons(const std::vector<std::unique_ptr<NeuralRegion>>& regions,
+                      std::vector<Neuron*>& vision,
+                      std::vector<Neuron*>& touch,
+                      std::vector<Neuron*>& internal,
+                      std::vector<Neuron*>& proprioception,
+                      NeuronType neuronType) {
+    for (const auto& region : regions) {
+        for (auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == neuronType) {
+                for (Neuron* n : pop->getNeurons()) {
+                    size_t idx = vision.size() + touch.size() + internal.size() + proprioception.size();
+                    
+                    switch (idx % 4) {
+                        case 0: vision.push_back(n); break;
+                        case 1: touch.push_back(n); break;
+                        case 2: internal.push_back(n); break;
+                        case 3: proprioception.push_back(n); break;
+                    }
+                }
+            }
+        }
+    }
+}
 
-namespace nlm {
+template<typename T>
+void distributeNeurons(const std::vector<std::unique_ptr<NeuralRegion>>& regions,
+                      std::vector<Neuron*>& forward,
+                      std::vector<Neuron*>& backward,
+                      std::vector<Neuron*>& turnLeft,
+                      std::vector<Neuron*>& turnRight,
+                      std::vector<Neuron*>& interact,
+                      std::vector<Neuron*>& wait,
+                      NeuronType neuronType) {
+    for (const auto& region : regions) {
+        for (auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == neuronType) {
+                for (Neuron* n : pop->getNeurons()) {
+                    size_t idx = forward.size() + backward.size() + 
+                                turnLeft.size() + turnRight.size() +
+                                interact.size() + wait.size();
+                    
+                    switch (idx % 6) {
+                        case 0: forward.push_back(n); break;
+                        case 1: backward.push_back(n); break;
+                        case 2: turnLeft.push_back(n); break;
+                        case 3: turnRight.push_back(n); break;
+                        case 4: interact.push_back(n); break;
+                        case 5: wait.push_back(n); break;
+                    }
+                }
+            }
+        }
+    }
+}
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
@@ -22,42 +71,13 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
-        }
+        // Distribute motor neurons to different action groups
+        distributeNeurons(brain_->getRegions(), motorForward_, motorBackward_, motorTurnLeft_,
+                         motorTurnRight_, motorInteract_, motorWait_, NeuronType::Motor);
+        
+        // Distribute sensory neurons
+        distributeNeurons(brain_->getRegions(), sensoryVision_, sensoryTouch_,
+                         sensoryInternal_, sensoryProprioception_, NeuronType::Sensory);
     }
 }
 

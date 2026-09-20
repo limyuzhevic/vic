@@ -3,6 +3,8 @@
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
+#include "../brain/NeuralRegion.hpp"
+#include "../brain/Neuron.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
@@ -75,6 +77,22 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Helper methods to reduce code duplication
+    template<typename T>
+    void distributeNeurons(const std::vector<std::unique_ptr<NeuralRegion>>& regions,
+                          std::vector<Neuron*>& vision,
+                          std::vector<Neuron*>& touch,
+                          std::vector<Neuron*>& internal,
+                          std::vector<Neuron*>& proprioception);
+    template<typename T>
+    void distributeNeurons(const std::vector<std::unique_ptr<NeuralRegion>>& regions,
+                          std::vector<Neuron*>& forward,
+                          std::vector<Neuron*>& backward,
+                          std::vector<Neuron*>& turnLeft,
+                          std::vector<Neuron*>& turnRight,
+                          std::vector<Neuron*>& interact,
+                          std::vector<Neuron*>& wait);
     
     std::shared_ptr<Brain> brain_;
     
