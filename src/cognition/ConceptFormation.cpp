@@ -417,6 +417,7 @@ TemporalRelation::~TemporalRelation() = default;
 void TemporalRelation::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
+    NLM_LOG_INFO("ConceptFormation initialized");
 }
 
 void TemporalRelation::recordSequence(const std::vector<float>& eventA,

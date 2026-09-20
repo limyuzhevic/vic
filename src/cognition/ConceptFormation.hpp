@@ -137,6 +137,9 @@ public:
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+    
+    // Set current goal for concept-guided planning
+    void setGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
 
 private:
     // Create new concept from pattern
@@ -156,6 +159,9 @@ private:
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
+    
+    // Current goal for concept-guided planning
+    std::vector<float> currentGoal_;
     
     // Parameters
     float formationThreshold_;  // Similarity threshold for forming new concept

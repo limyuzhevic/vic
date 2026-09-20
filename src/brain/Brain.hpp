@@ -25,9 +25,14 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class NeuralSemanticMemory;
+class NeuralProceduralMemory;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -148,21 +153,42 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
+    // Semantic memory - knowledge storage
+    NeuralSemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - skill memory
+    NeuralProceduralMemory* getProceduralMemory();
+    
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
     
     // ========== COGNITION SYSTEMS ==========
-    
+
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
-    
+
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
-    
+
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+    
+    // Get current planned action (0 indicates no plan yet)
+    ActionType getCurrentPlannedAction() const;
+    
+    // Update planning with prediction error and outcomes
+    void updatePlanning(float predictionError, const class SensoryInput& sensoryInput);
+    
+    // Process sensory input through concept formation
+    void processSensoryThroughConceptFormation(const class SensoryInput& input);
+    
+    // Set concept formation goal for planning
+    void setConceptFormationGoal(const std::vector<float>& goal);
+    
+    // Check if goal-directed planning is active
+    bool isGoalDirectedPlanning() const;
     
     // ========== DEVELOPMENT SYSTEM ==========
     
@@ -174,6 +200,15 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and social behavior
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
