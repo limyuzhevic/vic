@@ -18,8 +18,12 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# CLI components
+add_library(nlm_cli STATIC
+    src/cli/CommandLineParser.cpp
+    src/cli/CommandRegistry.cpp
+    src/cli/AdvancedCLIStructures.cpp
+)
 
 # Core library
 add_library(nlm_core STATIC
@@ -86,6 +90,37 @@ add_library(nlm_core STATIC
     # Visualization
     src/visualization/VisualizationInterface.cpp
 )
+
+# Advanced features (Phase 7)
+add_library(nlm_advanced STATIC
+    src/advanced/AdvancedSimulationController.cpp
+    src/advanced/PerformanceProfiler.cpp
+    src/advanced/NetworkVisualizer.cpp
+    src/advanced/AdvancedDebugger.cpp
+    src/advanced/ConfigurationTemplateManager.cpp
+    src/advanced/PowerUserAPI.cpp
+)
+
+target_include_directories(nlm_advanced PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/advanced>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(nlm_advanced PUBLIC nlm_core)
+
+# Advanced features (Phase 7)
+add_library(nlm_advanced STATIC
+    src/advanced/AdvancedSimulationController.cpp
+    src/advanced/PerformanceProfiler.cpp
+    src/advanced/NetworkVisualizer.cpp
+    src/advanced/AdvancedDebugger.cpp
+    src/advanced/ConfigurationTemplateManager.cpp
+)
+
+target_include_directories(nlm_advanced PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/advanced>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(nlm_advanced PUBLIC nlm_core)
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>

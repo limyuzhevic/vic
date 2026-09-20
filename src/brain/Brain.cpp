@@ -161,14 +161,17 @@ Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
 Brain::~Brain() = default;
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Brain::Brain(Brain&& other) noexcept : pImpl(std::move(other.pImpl)) {
+    // Use std::move to properly transfer ownership of the unique_ptr
+    // The moved-from object (other) will have its pImpl set to nullptr
+    // This is exception-safe and prevents double deletion
+    // Note: The regions and neurons are owned by pImpl, so they're properly transferred
 }
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
+        // Use std::move for proper transfer of unique_ptr ownership
+        pImpl = std::move(other.pImpl);
         other.pImpl = nullptr;
     }
     return *this;
@@ -764,8 +767,10 @@ void Brain::reset() {
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
+    CheckpointWriter writer;
+    bool success = false;
+    
     try {
-        CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
             return false;
@@ -834,17 +839,22 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        success = true;
         NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
-        return true;
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
-        return false;
+        // Ensure writer is properly cleaned up if an exception occurred
+        // The CheckpointWriter destructor should handle cleanup
     }
+    
+    return success;
 }
 
 bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
+    
+    bool success = false;
     
     try {
         CheckpointReader reader;
@@ -899,13 +909,16 @@ bool Brain::load(const std::string& filepath) {
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         
+        success = true;
         NLM_LOG_INFO("Brain state loaded successfully");
-        return true;
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
-        return false;
+        // Ensure reader is properly cleaned up if an exception occurred
+        // The CheckpointReader destructor should handle cleanup
     }
+    
+    return success;
 }
 
 RegionId Brain::addRegion(const std::string& name) {

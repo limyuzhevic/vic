@@ -64,14 +64,15 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
 
 Synapse::~Synapse() = default;
 
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Synapse::Synapse(Synapse&& other) noexcept : pImpl(std::move(other.pImpl)) {
+    // Use std::move to properly transfer ownership of the unique_ptr
+    // This prevents double deletion and ensures proper resource management
 }
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
+        // Use std::move for proper transfer of unique_ptr ownership
+        pImpl = std::move(other.pImpl);
         other.pImpl = nullptr;
     }
     return *this;
@@ -208,9 +209,12 @@ void Synapse::step(Timestamp currentTime) {
     // Decay short-term depression
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
+            static_cast<float>(currentTime - pImpl->lastPostSpikeTime),
+            static_cast<float>(currentTime - pImpl->lastPreSpikeTime)
         );
+        if (pImpl->lastPostSpikeTime < 0.0f) timeSinceActivity = std::max(timeSinceActivity, 0.0f);
+        if (pImpl->lastPreSpikeTime < 0.0f) timeSinceActivity = std::max(timeSinceActivity, 0.0f);
+        
         // Recovery from depression toward 1.0
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
@@ -218,7 +222,7 @@ void Synapse::step(Timestamp currentTime) {
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
-    // Clamp weight bounds
+    // Clamp weight bounds (kept for safety, but redundant with addToWeight)
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 

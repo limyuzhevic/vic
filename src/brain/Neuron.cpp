@@ -37,14 +37,15 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(std::move(other.pImpl)) {
+    // Use std::move to properly transfer ownership of the unique_ptr
+    // This prevents double deletion and ensures proper resource management
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
+        // Use std::move for proper transfer of unique_ptr ownership
+        pImpl = std::move(other.pImpl);
         other.pImpl = nullptr;
     }
     return *this;
@@ -191,17 +192,6 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
-    if (pImpl->state.refractoryRemaining > 0) {
-        --pImpl->state.refractoryRemaining;
-        // During refractory period, clear synaptic input but don't integrate
-        pImpl->synapticInput = 0.0f;
-        if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
-        }
-        return false;
-    }
-    
     // LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
@@ -213,19 +203,24 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // Convert dt from seconds to milliseconds for consistency with tau (ms)
+    float dt_ms = static_cast<float>(dt) * 1000.0f;
     
-    // Leak contribution
+    // Synaptic input contributes to membrane potential change
+    float synapticContribution = pImpl->synapticInput / C;  // units: mV/ms
+    
+    // Leak contribution: (V_rest - V)/tau (units: mV/ms)
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V = V + dt_ms * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        // Adaptation hyperpolarizes the neuron: V -= adaptation * factor
+        V -= pImpl->state.adaptationVariable * 0.01f;  // 1% per adaptation unit
+        // Decay adaptation proportionally to time step
+        pImpl->state.adaptationVariable *= (1.0f - dt_ms / 1000.0f);  // Decay over 1 second time constant
     }
     
     // Clamp membrane potential to prevent instability
@@ -248,7 +243,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        pImpl->state.adaptationVariable += 1.0f * dt_ms / 1000.0f;  // Scale by dt
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
