@@ -22,96 +22,36 @@
 
 namespace nlm {
 
-struct Brain::Impl {
-    std::shared_ptr<Config> config;
-    std::unique_ptr<RandomGenerator> rng;
-    std::vector<std::unique_ptr<NeuralRegion>> regions;
-    std::vector<InterRegionConnection> interRegionConnections;
-    
     // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    pImpl->workingMemory = std::make_unique<NeuralWorkingMemory>();
+    pImpl->episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+    pImpl->associativeMemory = std::make_unique<NeuralAssociativeMemory>();
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
+    pImpl->predictionSystem = std::make_unique<PredictionSystem>();
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
-    std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
+    pImpl->planner = std::make_unique<NeuralPlanner>();
+    pImpl->conceptFormation = std::make_unique<ConceptFormation>();
+    pImpl->attention = std::make_unique<AttentionalSelection>();
     
     // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
+    pImpl->developmentSystem = std::make_unique<DevelopmentSystem>();
     
     // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
+    pImpl->dopamine = std::make_unique<Dopamine>();
+    pImpl->curiosity = std::make_unique<Curiosity>();
+    pImpl->predictionError = std::make_unique<PredictionError>();
+    pImpl->novelty = std::make_unique<Novelty>();
     
-    // Phase 2: Real neural computation components
-    std::unique_ptr<SpikeSystem> spikeSystem;
-    std::unique_ptr<STDP> stdp;
-    std::unique_ptr<Hebbian> hebbian;
-    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    // Initialize memory systems (continued)
+    pImpl->workingMemory->initialize(this);
+    pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Simulation parameters
-    TimestepDuration timestep;
-    SimulationStep currentStep;
-    Timestamp currentTime;
+    pImpl->episodicMemory->initialize(this);
+    pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Statistics
-    size_t totalSpikesThisStep;
-    size_t totalSpikesTotal;
-    
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
-    
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
-    size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
-    
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
-    
-    Impl(std::shared_ptr<Config> cfg)
-        : config(cfg)
-        , rng(nullptr)
-        , developmentalStage(DevelopmentalStage::Initial)
-        , nextRegionId(1)
-        , timestep(0.001)
-        , currentStep(0)
-        , currentTime(0.0)
-        , totalSpikesThisStep(0)
-        , totalSpikesTotal(0)
-        , isResting(false)
-        , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
-    {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
-        
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+    pImpl->associativeMemory->initialize(this);
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -229,17 +169,13 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
-    // Initialize working memory
+        // Initialize working memory
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
@@ -511,25 +447,54 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory observations
+        // This enables predictive coding and error-based learning
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Apply prediction error to neuromodulation
+        if (pImpl->dopamine) {
+            float predictionError = pImpl->predictionError ? pImpl->predictionError->getLevel() : 0.0f;
+            pImpl->dopamine->setPredictionError(predictionError);
+        }
     }
     
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
-        pImpl->attention->update(pImpl->timestep);
+    // ========== STEP 9: Integration with cognitive systems ==========
+    if (pImpl->planner) {
+        // Update neural planner for action sequence generation
+        // This integrates predictive planning into the brain loop
+        pImpl->planner->update(pImpl->timestep);
         
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+        // Apply planning to attention and action selection
+        if (pImpl->attention) {
+            auto plan = pImpl->planner->getCurrentPlan();
+            pImpl->attention->applyPlan(plan);
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Update concept formation with current neural activity
+        // This identifies abstract patterns and categories from sensory input
+        pImpl->conceptFormation->update(pImpl->timestep);
+        
+        // Apply learned concepts to attention system
+        if (pImpl->attention) {
+            auto concepts = pImpl->conceptFormation->getCurrentConcepts();
+            pImpl->attention->applyConcepts(concepts);
+        }
+    }
+    
+    // ========== STEP 10: Update concept formation ==========
+    if (pImpl->conceptFormation) {
+        // Update concept formation with current neural activity
+        // This identifies abstract patterns and categories from sensory input
+        pImpl->conceptFormation->update(pImpl->timestep);
+        
+        // Apply learned concepts to attention system
+        if (pImpl->attention) {
+            auto concepts = pImpl->conceptFormation->getCurrentConcepts();
+            pImpl->attention->applyConcepts(concepts);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
