@@ -347,11 +347,43 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+              "Get the working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+              "Get the episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+              "Get the associative memory system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+              "Get the prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+              "Get the neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+              "Get the concept formation system")
+        .def("getAttention", &Brain::getAttention,
+              "Get the attentional selection system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+              "Get the development system")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+              "Get current developmental stage")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+              py::arg("stage"),
+              "Set developmental stage")
+        .def("getDopamine", &Brain::getDopamine,
+              "Get the dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+              "Get the curiosity neuromodulator")
+        .def("getNovelty", &Brain::getNovelty,
+              "Get the novelty detector")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+              "Get the prediction error signal")
+        .def("getCheckpointManager", &Brain::getCheckpointManager,
+              "Get the checkpoint manager for saving/loading brain state")
+        .def("systemInitialized", &Brain::systemInitialized,
+              "Check if a system is initialized and working")
+        .def("getSystemNames", &Brain::getSystemNames,
+              "Get list of all initialized system names")
+        .def("areAllSystemsInitialized", &Brain::areAllSystemsInitialized,
+              "Check if all critical systems are initialized")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

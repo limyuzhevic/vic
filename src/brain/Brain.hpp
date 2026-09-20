@@ -28,6 +28,11 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class CheckpointManager;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -184,14 +189,17 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
-    
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
-    void logStatus() const;
+    // Get checkpoint manager for saving/loading brain state
+    CheckpointManager* getCheckpointManager();
+
+    // Check if a system is initialized and working
+    bool systemInitialized(const std::string& systemName) const;
+
+    // Get list of all initialized system names
+    std::vector<std::string> getSystemNames() const;
+
+    // Check if all critical systems are initialized
+    bool areAllSystemsInitialized() const;
     
 private:
     struct Impl;
