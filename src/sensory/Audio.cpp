@@ -1,17 +1,15 @@
-#include "Audio.hpp"
-
-namespace nlm {
-
-struct AudioProcessor::Impl {
-    std::vector<float> features;
-    size_t featureDimensions;
-    
-    Impl() : featureDimensions(0) {}
-};
-
-AudioProcessor::AudioProcessor() : pImpl(new Impl) {}
+AudioProcessor::AudioProcessor() : pImpl(std::make_unique<Impl>()) {}
 
 AudioProcessor::~AudioProcessor() = default;
+
+AudioProcessor::AudioProcessor(AudioProcessor&& other) noexcept : pImpl(std::move(other.pImpl)) {}
+
+AudioProcessor& AudioProcessor::operator=(AudioProcessor&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 void AudioProcessor::process(const Audio& input) {
     // TODO PHASE 2: Implement real audio processing using NLM's neural machinery
@@ -24,7 +22,7 @@ const std::vector<float>& AudioProcessor::getFeatures() const {
     return pImpl->features;
 }
 
-size_t AudioProcessor::getFeatureDimensions() const {
+ size_t AudioProcessor::getFeatureDimensions() const {
     return pImpl->featureDimensions;
 }
 

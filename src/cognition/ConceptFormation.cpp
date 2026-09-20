@@ -13,7 +13,7 @@ struct ConceptFormation::Impl {
 };
 
 ConceptFormation::ConceptFormation()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , nextConceptId_(1)
     , formationThreshold_(0.75f)
@@ -25,7 +25,9 @@ ConceptFormation::ConceptFormation()
 ConceptFormation::~ConceptFormation() = default;
 
 void ConceptFormation::initialize(Brain* brain) {
-    pImpl->brain = brain;
+    if (pImpl) {
+        pImpl->brain = brain;
+    }
     brain_ = brain;
     NLM_LOG_INFO("ConceptFormation initialized");
 }
@@ -304,7 +306,7 @@ struct SpatialRepresentation::Impl {
 };
 
 SpatialRepresentation::SpatialRepresentation()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , currentX_(0)
     , currentY_(0)
@@ -315,7 +317,9 @@ SpatialRepresentation::SpatialRepresentation()
 SpatialRepresentation::~SpatialRepresentation() = default;
 
 void SpatialRepresentation::initialize(Brain* brain) {
-    pImpl->brain = brain;
+    if (pImpl) {
+        pImpl->brain = brain;
+    }
     brain_ = brain;
     NLM_LOG_INFO("SpatialRepresentation initialized");
 }

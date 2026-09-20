@@ -4,22 +4,23 @@
 
 namespace nlm {
 
-struct PredictionError::Impl {
-    class Brain* brain;
-    float error;
-    float predictedValue;
-    float actualValue;
-    std::vector<float> history;
-    
-    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
-};
-
-PredictionError::PredictionError() : pImpl(new Impl) {}
+PredictionError::PredictionError() : pImpl(std::make_unique<Impl>()) {}
 
 PredictionError::~PredictionError() = default;
 
+PredictionError::PredictionError(PredictionError&& other) noexcept : pImpl(std::move(other.pImpl)) {}
+
+PredictionError& PredictionError::operator=(PredictionError&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
+
 void PredictionError::initialize(Brain* brain) {
-    pImpl->brain = brain;
+    if (pImpl) {
+        pImpl->brain = brain;
+    }
     NLM_LOG_INFO("PredictionError system initialized");
 }
 
@@ -32,6 +33,17 @@ void PredictionError::computeError(float predicted, float actual) {
     pImpl->actualValue = actual;
     pImpl->error = actual - predicted;
     pImpl->history.push_back(pImpl->error);
+    
+    // Keep history bounded
+    if (pImpl->history.size() > 100) {
+        pImpl->history.erase(pImpl->history.begin());
+    }
+    
+    NLM_LOG_DEBUG(std::string("Prediction error computed: ") + 
+                 std::to_string(pImpl->error) + 
+                 std::string(" (predicted: ") + 
+                 std::to_string(predicted) + 
+                 std::string(", actual: ") + std::to_string(actual) + ")");
 }
 
 void PredictionError::updatePrediction(float newPrediction) {

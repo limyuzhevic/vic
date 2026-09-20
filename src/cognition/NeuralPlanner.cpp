@@ -12,7 +12,7 @@ struct NeuralPlanner::Impl {
 };
 
 NeuralPlanner::NeuralPlanner()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , planningDepth_(3)
     , planningConfidence_(0.5f)
@@ -23,7 +23,9 @@ NeuralPlanner::NeuralPlanner()
 NeuralPlanner::~NeuralPlanner() = default;
 
 void NeuralPlanner::initialize(Brain* brain) {
-    pImpl->brain = brain;
+    if (pImpl) {
+        pImpl->brain = brain;
+    }
     brain_ = brain;
     NLM_LOG_INFO("NeuralPlanner initialized");
 }
@@ -260,7 +262,7 @@ struct SelfModel::Impl {
 };
 
 SelfModel::SelfModel()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , capabilityLevel_(0.5f)
 {
@@ -270,7 +272,9 @@ SelfModel::SelfModel()
 SelfModel::~SelfModel() = default;
 
 void SelfModel::initialize(Brain* brain) {
-    pImpl->brain = brain;
+    if (pImpl) {
+        pImpl->brain = brain;
+    }
     brain_ = brain;
     NLM_LOG_INFO("SelfModel initialized");
 }
@@ -445,7 +449,7 @@ struct SocialLearning::Impl {
 };
 
 SocialLearning::SocialLearning()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , observationCount_(0)
     , signalMeaning_(0.0f)
@@ -455,7 +459,9 @@ SocialLearning::SocialLearning()
 SocialLearning::~SocialLearning() = default;
 
 void SocialLearning::initialize(Brain* brain) {
-    pImpl->brain = brain;
+    if (pImpl) {
+        pImpl->brain = brain;
+    }
     brain_ = brain;
     NLM_LOG_INFO("SocialLearning initialized");
 }

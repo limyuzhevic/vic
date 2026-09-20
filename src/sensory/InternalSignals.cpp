@@ -1,17 +1,15 @@
-#include "InternalSignals.hpp"
-
-namespace nlm {
-
-struct InternalSignalsProcessor::Impl {
-    std::vector<float> processedSignals;
-    std::vector<float> homeostaticSignals;
-    
-    Impl() = default;
-};
-
-InternalSignalsProcessor::InternalSignalsProcessor() : pImpl(new Impl) {}
+InternalSignalsProcessor::InternalSignalsProcessor() : pImpl(std::make_unique<Impl>()) {}
 
 InternalSignalsProcessor::~InternalSignalsProcessor() = default;
+
+InternalSignalsProcessor::InternalSignalsProcessor(InternalSignalsProcessor&& other) noexcept : pImpl(std::move(other.pImpl)) {}
+
+InternalSignalsProcessor& InternalSignalsProcessor::operator=(InternalSignalsProcessor&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 void InternalSignalsProcessor::process(const InternalSignals& signals) {
     // TODO PHASE 2: Implement real internal signal processing
@@ -28,7 +26,7 @@ const std::vector<float>& InternalSignalsProcessor::getProcessedSignals() const 
     return pImpl->processedSignals;
 }
 
-const std::vector<float>& InternalSignalsProcessor::getHomeostaticSignals() const {
+ const std::vector<float>& InternalSignalsProcessor::getHomeostaticSignals() const {
     return pImpl->homeostaticSignals;
 }
 
