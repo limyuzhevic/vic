@@ -44,8 +44,7 @@ struct ConfigEntry {
 };
 
 // Main configuration class
-class Config {
-public:
+    // Create
     Config();
     ~Config();
     
@@ -71,12 +70,16 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Validate configuration values
+    bool validate(const std::string& key, const ConfigValue& value) const;
+    bool validateAll() const;
     
     // Check existence
     bool has(const std::string& key) const;
@@ -92,6 +95,10 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Get configuration statistics
+    size_t getEntryCount() const;
+    std::vector<std::pair<std::string, ConfigSource>> getEntriesWithSource() const;
     
 private:
     struct Impl;

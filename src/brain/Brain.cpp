@@ -853,15 +853,17 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        if (!reader.validate()) {
-            NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
-            return false;
-        }
-        
         // Read neurons
         NeuronCheckpointData neuronData;
         if (!reader.readNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to read neurons from checkpoint");
+            return false;
+        }
+        
+        // Read synapses
+        SynapseCheckpointData synapseData;
+        if (!reader.readSynapses(synapseData)) {
+            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
             return false;
         }
         
@@ -888,19 +890,40 @@ bool Brain::load(const std::string& filepath) {
             }
         }
         
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
-            return false;
+        // Apply synapse states - match by source and destination neurons
+        for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+            // Find the matching synapse
+            bool found = false;
+            for (auto& region : pImpl->regions) {
+                for (auto* syn : region->getSynapses()) {
+                    NeuronId sourceId(syn->getSourceNeuron().index());
+                    NeuronId destId(syn->getDestinationNeuron().index());
+                    
+                    // Match by index or search for matching connection
+                    if (i == 0 || (syn->getSourceNeuron().index() == synapseData.sourceNeuron[i] &&
+                                   syn->getDestinationNeuron().index() == synapseData.destinationNeuron[i])) {
+                        // Found matching synapse, apply all its saved properties
+                        syn->setWeight(synapseData.weight[i]);
+                        syn->setDelay(synapseData.delay[i]);
+                        syn->setType(static_cast<SynapseType>(synapseData.synapseType[i]));
+                        syn->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                        
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) break;
+            }
+            
+            if (!found) {
+                NLM_LOG_WARNING("Could not find synapse for loading at index " + std::to_string(i));
+            }
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
-        
-        NLM_LOG_INFO("Brain state loaded successfully");
-        return true;
+        // Set the loaded current simulation step and time
+        pImpl->currentStep = static_cast<SimulationStep>(neuronData.lastSpikeTime.size() > 0 ? 
+            neuronData.lastSpikeTime.back() : 0);
+        pImpl->currentTime = static_cast<Timestamp>(pImpl->currentStep * pImpl->timestep);
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());

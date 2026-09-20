@@ -24,11 +24,15 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNum = 0;
     while (std::getline(file, line)) {
+        lineNum++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +45,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key format
+            if (key.empty()) {
+                NLM_LOG_WARNING(std::string("Empty key at line ") + std::to_string(lineNum));
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -48,10 +58,42 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Validate before setting
+            ConfigValue configValue;
+            
+            // Try to infer type
+            if (value.find('.') != std::string::npos) {
+                try {
+                    double doubleVal = std::stod(value);
+                    configValue = doubleVal;
+                } catch (...) {
+                    configValue = value;
+                }
+            } else if (value == "true" || value == "false") {
+                configValue = (value == "true");
+            } else {
+                try {
+                    int intVal = std::stoi(value);
+                    configValue = intVal;
+                } catch (...) {
+                    configValue = value;
+                }
+            }
+            
+            // Validate and set
+            if (!validate(key, configValue)) {
+                NLM_LOG_WARNING(std::string("Invalid value for key ") + key + std::string(" at line ") + std::to_string(lineNum));
+            }
+            
+            set(key, configValue, ConfigSource::File);
+            
+            NLM_LOG_DEBUG(std::string("Loaded config: ") + key + std::string(" = ") + (std::holds_alternative<std::string>(configValue) ? "\"" + std::get<std::string>(configValue) + "\"" : std::visit([](auto&& arg) { return std::to_string(arg); }, configValue)));
+        } else {
+            NLM_LOG_WARNING(std::string("Invalid line format at ") + std::to_string(lineNum) + std::string(": ") + line);
         }
     }
     
+    NLM_LOG_INFO(std::string("Loaded ") + std::to_string(pImpl->entries.size()) + std::string(" configuration entries from ") + filepath);
     return true;
 }
 
@@ -86,7 +128,44 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Write the actual value based on its type
+        std::visit([&file, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            
+            if constexpr (std::is_same_v<T, int>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -193,23 +272,55 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+bool Config::validate(const std::string& key, const ConfigValue& value) const {
+    // Basic validation - could be extended with more sophisticated checks
+    if (key.empty()) {
+        return false;
+    }
+    
+    // Validate based on value type
+    std::visit([this](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        
+        if constexpr (std::is_same_v<T, int>) {
+            // Could add validation for int range, etc.
+            return;
+        } else if constexpr (std::is_same_v<T, double>) {
+            // Could add validation for double range, NaN checks, etc.
+            return;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            // Boolean validation is straightforward
+            return;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            // Could add validation for string content
+            return;
+        }
+    }, value);
+    
+    return true;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+bool Config::validateAll() const {
+    for (const auto& entry : pImpl->entries) {
+        if (!validate(entry.key, entry.value)) {
+            NLM_LOG_WARNING("Invalid configuration key-value pair: " + entry.key);
+            return false;
+        }
+    }
+    return true;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+size_t Config::getEntryCount() const {
+    return pImpl->entries.size();
+}
 
-} // namespace nlm
+std::vector<std::pair<std::string, ConfigSource>> Config::getEntriesWithSource() const {
+    std::vector<std::pair<std::string, ConfigSource>> result;
+    result.reserve(pImpl->entries.size());
+    
+    for (const auto& entry : pImpl->entries) {
+        result.emplace_back(entry.key, entry.source);
+    }
+    
+    return result;
+}

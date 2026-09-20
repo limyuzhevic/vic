@@ -400,21 +400,116 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Add helper function to create config from Python dict
+    m.def("createConfigFromDict", [](py::dict configDict) {
+        auto config = std::make_shared<Config>();
+        for (auto item : configDict) {
+            std::string key = py::cast<std::string>(item.first);
+            py::object value = item.second;
+            
+            // Try to infer type from Python type
+            if (value.is(py::int_())) {
+                config->set(key, py::cast<int>(value));
+            } else if (value.is(py::float_())) {
+                config->set(key, py::cast<double>(value));
+            } else if (value.is(py::bool_())) {
+                config->set(key, py::cast<bool>(value));
+            } else {
+                // Default to string
+                config->set(key, py::cast<std::string>(value));
+            }
+        }
+        return config;
+    }, "Create configuration from Python dictionary");
+    
+    // Add helper function for batch operations
+    m.def("batchBrainSteps", [](std::shared_ptr<Brain> brain, size_t numSteps) {
+        for (size_t i = 0; i < numSteps; ++i) {
+            brain->step(i);
+        }
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("numSteps"), "Run brain steps in batch");
+    
+    // Add performance benchmarking functions
+    m.def("benchmarkBrain", [](std::shared_ptr<Brain> brain, size_t steps, size_t iterations) {
+        double totalTime = 0.0;
+        size_t totalSpikes = 0;
+        
+        for (size_t iter = 0; iter < iterations; ++iter) {
+            brain->reset();
+            auto startTime = std::chrono::high_resolution_clock::now();
+            
+            for (size_t step = 0; step < steps; ++step) {
+                brain->step(step);
+            }
+            
+            auto endTime = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+            totalTime += duration.count() / 1000.0; // Convert to milliseconds
+            totalSpikes += brain->getTotalSpikeCount();
+        }
+        
+        return py::make_tuple(
+            totalTime / iterations,
+            totalSpikes / iterations,
+            static_cast<double>(steps) / (totalTime / iterations / 1000.0) // steps per second
+        );
+    }, py::arg("brain"), py::arg("steps"), py::arg("iterations") = 10, "Benchmark brain performance");
+    
+    // Add brain state analysis functions
+    m.def("analyzeBrainState", [](std::shared_ptr<Brain> brain) {
+        py::dict analysis;
+        
+        analysis["total_neurons"] = brain->getTotalNeuronCount();
+        analysis["total_synapses"] = brain->getTotalSynapseCount();
+        analysis["active_neurons"] = brain->getActiveNeuronCount();
+        analysis["firing_neurons"] = brain->getFiringNeuronCount();
+        analysis["average_firing_rate"] = brain->getAverageFiringRate();
+        analysis["excitatory_inhibitory_ratio"] = brain->getExcitationInhibitionRatio();
+        analysis["total_spikes"] = brain->getTotalSpikeCount();
+        
+        // Get development stage
+        auto developmentSystem = brain->getDevelopmentSystem();
+        if (developmentSystem) {
+            analysis["development_stage"] = static_cast<int>(developmentSystem->getStage());
+        }
+        
+        // Get memory statistics
+        auto workingMemory = brain->getWorkingMemory();
+        if (workingMemory) {
+            analysis["working_memory_size"] = workingMemory->getCapacity();
+            analysis["working_memory_active"] = workingMemory->getActiveTraces();
+        }
+        
+        auto episodicMemory = brain->getEpisodicMemory();
+        if (episodicMemory) {
+            analysis["episodic_memory_episodes"] = episodicMemory->getEpisodeCount();
+        }
+        
+        return analysis;
+    }, "Analyze brain state and return statistics dictionary");
+    
+    // Add configuration validation function
+    m.def("validateConfig", [](std::shared_ptr<Config> config) {
+        py::dict results;
+        
+        // Check for required keys
+        std::vector<std::string> requiredKeys = {"neuron_count", "region_count", "connection_probability"};
+        py::list missingKeys;
+        py::list invalidValues;
+        
+        for (const auto& key : requiredKeys) {
+            if (!config->has(key)) {
+                missingKeys.append(key);
+            }
+        }
+        
+        results["missing_keys"] = missingKeys;
+        results["invalid_values"] = invalidValues;
+        results["valid"] = missingKeys.size() == 0 && invalidValues.size() == 0;
+        
+        return results;
+    }, "Validate configuration and return validation results");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

@@ -116,25 +116,71 @@ private:
 #define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
 
-// Stream-style logging helper
-class LogStream {
-public:
-    LogStream(LogLevel level, const std::string& file, int line, const std::string& function);
-    ~LogStream();
-    
-    template<typename T>
-    LogStream& operator<<(const T& value) {
-        oss_ << value;
-        return *this;
-    }
-    
-private:
-    LogLevel level_;
-    std::ostringstream oss_;
-    std::string file_;
-    int line_;
-    std::string function_;
-};
+    // Stream-style logging helper
+    class LogStream {
+    public:
+        LogStream(LogLevel level, const std::string& file, int line, const std::string& function);
+        ~LogStream();
+        
+        // Basic types
+        template<typename T>
+        LogStream& operator<<(const T& value) {
+            oss_ << value;
+            return *this;
+        }
+        
+        // String handling for better type safety
+        LogStream& operator<<(const char* str) {
+            if (str) {
+                oss_ << str;
+            } else {
+                oss_ << "(null)";
+            }
+            return *this;
+        }
+        
+        // Const string handling
+        LogStream& operator<<(const std::string& str) {
+            oss_ << str;
+            return *this;
+        }
+        
+        // Pointer handling with null check
+        template<typename T>
+        LogStream& operator<<(T* ptr) {
+            if (ptr) {
+                oss_ << "0x" << std::hex << std::uintptr_t(ptr) << std::dec;
+            } else {
+                oss_ << "(null)";
+            }
+            return *this;
+        }
+        
+        // Boolean handling for clearer output
+        LogStream& operator<<(bool value) {
+            oss_ << (value ? "true" : "false");
+            return *this;
+        }
+        
+        // Enum handling
+        template<typename Enum>
+        LogStream& operator<<(Enum value) {
+            oss_ << static_cast<int>(value);
+            return *this;
+        }
+        
+        // Get the formatted message
+        std::string getMessage() const {
+            return oss_.str();
+        }
+        
+    private:
+        LogLevel level_;
+        std::ostringstream oss_;
+        std::string file_;
+        int line_;
+        std::string function_;
+    };
 
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
 

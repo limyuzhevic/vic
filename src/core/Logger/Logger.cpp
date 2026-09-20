@@ -146,6 +146,32 @@ void Logger::log(LogLevel level, const std::string& message,
     }
 }
 
+void Logger::log(LogLevel level, const std::string& message,
+                const std::string& file, int line, const std::string& function,
+                const std::string& additionalContext) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    LogEntry entry;
+    entry.level = level;
+    entry.message = message + " " + additionalContext;
+    entry.file = file;
+    entry.line = line;
+    entry.function = function;
+    entry.timestamp = std::chrono::system_clock::now();
+    
+    for (auto& logger : pImpl->loggers) {
+        logger->log(entry);
+    }
+}
+
+void Logger::logWithPerformance(const std::string& operation, 
+                               const std::chrono::duration<double>& duration,
+                               LogLevel level, const std::string& message) {
+    std::ostringstream oss;
+    oss << message << " (took " << duration.count() * 1000 << "ms)";
+    log(level, oss.str(), "", 0, "", "");
+}
+
 void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
     log(LogLevel::Debug, message, file, line, function);
 }
