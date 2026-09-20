@@ -133,11 +133,7 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
-    
-    // Reset to initial state
+void step(Timestamp currentTime);
     void reset();
     
     // Initialize with random parameters

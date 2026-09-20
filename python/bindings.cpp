@@ -401,20 +401,234 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+        auto config = std::make_shared<Config>();
+        // Set reasonable defaults for Phase 6 integration
+        config->set("neuron_count", static_cast<int64_t>(1000));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", 0.1f);
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        config->set("synaptogenesis_rate", 0.0001f);
+        config->set("pruning_rate", 0.00001f);
+        config->set("simulation_timestep", 0.001);
+        config->set("replay_interval", 100);
+        config->set("consolidation_interval", 1000);
+        return config;
+    }, "Create a default configuration with Phase 6 settings");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("config"), "Create and initialize a brain with configuration");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+        auto world = std::make_shared<SimpleWorld>();
+        // Set reasonable defaults
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        return world;
+    }, "Create a simple world with default dimensions");
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create an agent brain interface");
+
+    // Complex configuration methods for Python
+    m.def("configureBrainDefaults", []() {
+        auto config = std::make_shared<Config>();
+        // Enhanced defaults for better simulation
+        config->set("neuron_count", static_cast<int64_t>(2000));
+        config->set("region_count", static_cast<int64_t>(2));
+        config->set("connection_probability", 0.15f);
+        config->set("stdp_ltp_weight", 0.02f);
+        config->set("stdp_ltd_weight", 0.018f);
+        config->set("stdp_tau", 25.0f);
+        config->set("synaptogenesis_rate", 0.0002f);
+        config->set("pruning_rate", 0.00002f);
+        config->set("simulation_timestep", 0.0005);
+        config->set("replay_interval", 50);
+        config->set("consolidation_interval", 500);
+        config->set("development_enabled", true);
+        config->set("curiosity_enabled", true);
+        config->set("novelty_detection_enabled", true);
+        return config;
+    }, "Create a comprehensive default configuration for advanced simulations");
+
+    m.def("createAdvancedSimulation", [](std::shared_ptr<Config> config, 
+                                         std::shared_ptr<SimpleWorld> world,
+                                         std::shared_ptr<AgentBrain> agent) {
+        // Run a complete simulation cycle
+        world->reset();
+        agent->initialize(*world);
+        
+        // Enable all subsystems for advanced behavior
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        // Run simulation
+        for (int step = 0; step < 1000; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            auto* brain = agent->getBrain();
+            if (brain) {
+                brain->step(step, step * 0.001);
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+            }
+        }
+        
+        return std::make_tuple(
+            agent->getBrain() ? agent->getBrain()->getTotalSpikeCount() : 0,
+            agent->getBrain() ? agent->getBrain()->getAverageFiringRate() : 0.0f,
+            agent->getCuriosityLevel(),
+            agent->getNoveltyLevel()
+        );
+    }, py::arg("config"), py::arg("world"), py::arg("agent"),
+        "Run an advanced simulation and return statistics");
+
+    // Statistics and analysis functions
+    m.def("analyzeBrainStats", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null");
+        }
+        
+        py::dict stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["development_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        auto config = brain->getConfig();
+        if (config) {
+            stats["neuron_count"] = config->getOr<int64_t>("neuron_count", 1000);
+            stats["simulation_timestep"] = config->getOr<double>("simulation_timestep", 0.001);
+        }
+        
+        return stats;
+    }, py::arg("brain"), "Analyze and return brain statistics");
+
+    m.def("compareBrains", [](std::shared_ptr<Brain> brain1, std::shared_ptr<Brain> brain2) {
+        py::dict comparison;
+        
+        if (brain1) {
+            comparison["brain1_spikes"] = brain1->getTotalSpikeCount();
+            comparison["brain1_firing_rate"] = brain1->getAverageFiringRate();
+            comparison["brain1_neurons"] = brain1->getTotalNeuronCount();
+        }
+        
+        if (brain2) {
+            comparison["brain2_spikes"] = brain2->getTotalSpikeCount();
+            comparison["brain2_firing_rate"] = brain2->getAverageFiringRate();
+            comparison["brain2_neurons"] = brain2->getTotalNeuronCount();
+        }
+        
+        if (brain1 && brain2) {
+            comparison["spike_difference"] = static_cast<int>(std::abs(
+                static_cast<int>(brain1->getTotalSpikeCount()) - 
+                static_cast<int>(brain2->getTotalSpikeCount())));
+            comparison["firing_rate_diff"] = std::abs(
+                brain1->getAverageFiringRate() - brain2->getAverageFiringRate());
+        }
+        
+        return comparison;
+    }, py::arg("brain1"), py::arg("brain2"), "Compare two brains and return comparison metrics");
+
+    // Utility functions
+    m.def("createRandomConfig", [](uint64_t seed) {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(seed));
+        config->set("neuron_count", static_cast<int64_t>(1000 + (seed % 1000)));
+        config->set("connection_probability", 0.05f + (seed % 100) * 0.001f);
+        return config;
+    }, py::arg("seed"), "Create a configuration with random parameters");
+
+    m.def("saveBrainToFile", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null");
+        }
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state to file");
+
+    m.def("loadBrainFromFile", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        if (brain->load(filepath)) {
+            return brain;
+        } else {
+            throw std::runtime_error("Failed to load brain from file: " + filepath);
+        }
+    }, py::arg("filepath"), "Load brain state from file");
+
+    // Convenience factory functions
+    m.def("createTestSetup", []() {
+        py::dict setup;
+        
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(500));
+        config->set("simulation_timestep", 0.001);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(10, 10, 4, 4);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        setup["config"] = config;
+        setup["brain"] = brain;
+        setup["world"] = world;
+        setup["agent"] = agent;
+        
+        return setup;
+    }, "Create a test setup with pre-configured components");
+
+    m.def("runQuickTest", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                            std::shared_ptr<AgentBrain> agent, int steps) {
+        if (!brain || !world || !agent) {
+            throw std::runtime_error("One or more components are null");
+        }
+        
+        world->reset();
+        agent->initialize(*world);
+        
+        int maxSteps = std::max(10, steps);
+        
+        for (int step = 0; step < maxSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step, step * 0.001);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            if (step % 100 == 0) {
+                NLM_LOG_INFO("Step " + std::to_string(step) + 
+                             " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                             " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+            }
+        }
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getAverageFiringRate(),
+            agent->getCuriosityLevel()
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps") = 1000,
+        "Run a quick test simulation and return results");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

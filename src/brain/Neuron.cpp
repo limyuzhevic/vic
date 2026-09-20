@@ -1,4 +1,5 @@
 #include "Neuron.hpp"
+#include "Synapse.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -259,10 +260,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     return fired;
 }
 
-void Neuron::step(Timestamp currentTime) {
+bool Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
     TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    return stepLIF(currentTime, dt);
 }
 
 void Neuron::reset() {

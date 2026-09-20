@@ -3,83 +3,197 @@
 
 namespace nlm {
 
-struct IntegrateAndFireDynamics::Impl {
-    float membraneTimeConstant;  // ms
-    float membraneResistance;     // MOhm
+struct LIFNeuralDynamics::Impl {
+    NeuronState params;
+    Timestamp lastSpikeTime;
+    float adaptiveExcitability;  // For spike-frequency adaptation
     
-    Impl() : membraneTimeConstant(20.0f), membraneResistance(10.0f) {}
+    Impl() : lastSpikeTime(-1.0f), adaptiveExcitability(0.0f) {
+        // Initialize with default LIF parameters
+        params.threshold = -55.0f;
+        params.resetPotential = -70.0f;
+        params.restingPotential = -70.0f;
+        params.leakConductance = 10.0f;
+        params.membranePotential = params.restingPotential;
+        params.firingState = FiringState::Resting;
+    }
 };
 
-IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
+LIFNeuralDynamics::LIFNeuralDynamics() : pImpl(new Impl) {}
 
-IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
+LIFNeuralDynamics::~LIFNeuralDynamics() = default;
 
-void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
-    
-    const auto& state = neuron->getState();
-    
-    // Leaky integration: dV/dt = -(V - V_rest) / tau + I / C
-    // For simplicity using explicit Euler:
-    // V_new = V_old + dt * (-(V_old - V_rest) / tau + I / C)
-    
-    float V = neuron->getMembranePotential();
-    float V_rest = state.restingPotential;
-    float I = neuron->getTotalCurrent();
-    float tau = pImpl->membraneTimeConstant;
-    float R = pImpl->membraneResistance;
-    
-    // Simple Euler integration
-    float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
-    neuron->setMembranePotential(V + dV);
-    
-    // Check for firing
-    if (shouldFire(neuron)) {
-        neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
-    }
-    
-    // Refractory mechanism
-    if (neuron->isRefractory()) {
-        neuron->setMembranePotential(state.resetPotential);
-    }
-    
-    // Clear current for next step
-    neuron->clearTotalCurrent();
+void LIFNeuralDynamics::initialize(const NeuronState& params) {
+    pImpl->params = params;
+    reset();
 }
 
-void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real synaptic dynamics
-    // PLACEHOLDER: Synapse decay
-    synapse->step(0.0);
-}
-
-void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
-    // TODO PHASE 2: Implement real synaptic input
-    // PLACEHOLDER: Simple additive input
-    SynapticWeight weight = synapse->getWeight();
-    if (synapse->isExcitatory()) {
-        neuron->receiveExcitatoryInput(weight);
-    } else {
-        neuron->receiveInhibitoryInput(std::abs(weight));
+void LIFNeuralDynamics::update(Timestamp currentTime, TimestepDuration dt) {
+    // LIF dynamics: dV/dt = (V_rest - V)/tau + I/C
+    float& V = pImpl->params.membranePotential;
+    float V_rest = pImpl->params.restingPotential;
+    float threshold = pImpl->params.threshold;
+    float reset = pImpl->params.resetPotential;
+    
+    float tau = pImpl->params.leakConductance;  // Time constant in ms
+    float C = 1.0f;  // Membrane capacitance (normalized)
+    
+    // Get synaptic input - this should come from Synapse class
+    // For now, we simulate some input
+    float I_synaptic = 0.0f;  // Placeholder
+    
+    // Update membrane potential using Euler integration
+    float dV_dt = (V_rest - V) / tau + I_synaptic / C;
+    V += dV_dt * dt * 1000.0f; // Convert dt from seconds to milliseconds
+    
+    // Apply spike-frequency adaptation
+    if (pImpl->adaptiveExcitability > 0.0f) {
+        V -= pImpl->adaptiveExcitability * 0.01f;
+        pImpl->adaptiveExcitability *= 0.95f; // Decay adaptation
+    }
+    
+    // Check for spike
+    if (V >= threshold) {
+        pImpl->params.firingState = FiringState::Active;
+        pImpl->params.lastSpikeTime = static_cast<float>(currentTime);
+        pImpl->params.membranePotential = reset;
+        
+        // Record spike for plasticity
+        // Should be handled by Neuron class
+        
+        // Increase adaptation after spike
+        pImpl->adaptiveExcitability += 0.5f;
     }
 }
 
-bool IntegrateAndFireDynamics::shouldFire(const Neuron* neuron) const {
-    return neuron->getMembranePotential() >= neuron->getThreshold();
+MembranePotential LIFNeuralDynamics::getMembranePotential() const {
+    return pImpl->params.membranePotential;
 }
 
-void IntegrateAndFireDynamics::reset() {
-    // No internal state to reset
+FiringState LIFNeuralDynamics::getFiringState() const {
+    return pImpl->params.firingState;
 }
 
-void IntegrateAndFireDynamics::setMembraneTimeConstant(float tau) {
-    pImpl->membraneTimeConstant = tau;
+bool LIFNeuralDynamics::shouldFire() const {
+    return pImpl->params.membranePotential >= pImpl->params.threshold;
 }
 
-float IntegrateAndFireDynamics::getMembraneTimeConstant() const {
-    return pImpl->membraneTimeConstant;
+void LIFNeuralDynamics::reset() {
+    pImpl->params.membranePotential = pImpl->params.restingPotential;
+    pImpl->params.firingState = FiringState::Resting;
+    pImpl->params.lastSpikeTime = -1.0f;
+    pImpl->adaptiveExcitability = 0.0f;
+}
+
+NeuronType LIFNeuralDynamics::getType() const {
+    return NeuronType::Internal;
+}
+
+void LIFNeuralDynamics::setThreshold(MembranePotential threshold) {
+    pImpl->params.threshold = threshold;
+}
+
+void LIFNeuralDynamics::setResetPotential(MembranePotential reset) {
+    pImpl->params.resetPotential = reset;
+}
+
+void LIFNeuralDynamics::setLeakConductance(MembranePotential conductance) {
+    pImpl->params.leakConductance = conductance;
+}
+
+void LIFNeuralDynamics::setRestingPotential(MembranePotential resting) {
+    pImpl->params.restingPotential = resting;
+}
+
+FiringRate LIFNeuralDynamics::getFiringRate() const {
+    // Simple firing rate estimation based on spike history
+    // This should be handled by Neuron class
+    return 0.0f;
+}
+
+} // namespace nlm
+
+void LIFNeuralDynamics::update(Timestamp currentTime, TimestepDuration dt) {
+    // LIF dynamics: dV/dt = (V_rest - V)/tau + I/C
+    float& V = pImpl->params.membranePotential;
+    float V_rest = pImpl->params.restingPotential;
+    float threshold = pImpl->params.threshold;
+    float reset = pImpl->params.resetPotential;
+    
+    float tau = pImpl->params.leakConductance;  // Time constant in ms
+    float C = 1.0f;  // Membrane capacitance (normalized)
+    
+    // Get synaptic input - this should come from Synapse class
+    // For now, we simulate some input
+    float I_synaptic = 0.0f;  // Placeholder
+    
+    // Update membrane potential using Euler integration
+    float dV_dt = (V_rest - V) / tau + I_synaptic / C;
+    V += dV_dt * dt * 1000.0f; // Convert dt from seconds to milliseconds
+    
+    // Apply spike-frequency adaptation
+    if (pImpl->adaptiveExcitability > 0.0f) {
+        V -= pImpl->adaptiveExcitability * 0.01f;
+        pImpl->adaptiveExcitability *= 0.95f; // Decay adaptation
+    }
+    
+    // Check for spike
+    if (V >= threshold) {
+        pImpl->params.firingState = FiringState::Active;
+        pImpl->params.lastSpikeTime = static_cast<float>(currentTime);
+        pImpl->params.membranePotential = reset;
+        
+        // Record spike for plasticity
+        // Should be handled by Neuron class
+        
+        // Increase adaptation after spike
+        pImpl->adaptiveExcitability += 0.5f;
+    }
+}
+
+MembranePotential LIFNeuralDynamics::getMembranePotential() const {
+    return pImpl->params.membranePotential;
+}
+
+FiringState LIFNeuralDynamics::getFiringState() const {
+    return pImpl->params.firingState;
+}
+
+bool LIFNeuralDynamics::shouldFire() const {
+    return pImpl->params.membranePotential >= pImpl->params.threshold;
+}
+
+void LIFNeuralDynamics::reset() {
+    pImpl->params.membranePotential = pImpl->params.restingPotential;
+    pImpl->params.firingState = FiringState::Resting;
+    pImpl->params.lastSpikeTime = -1.0f;
+    pImpl->adaptiveExcitability = 0.0f;
+}
+
+NeuronType LIFNeuralDynamics::getType() const {
+    return NeuronType::Internal;
+}
+
+void LIFNeuralDynamics::setThreshold(MembranePotential threshold) {
+    pImpl->params.threshold = threshold;
+}
+
+void LIFNeuralDynamics::setResetPotential(MembranePotential reset) {
+    pImpl->params.resetPotential = reset;
+}
+
+void LIFNeuralDynamics::setLeakConductance(MembranePotential conductance) {
+    pImpl->params.leakConductance = conductance;
+}
+
+void LIFNeuralDynamics::setRestingPotential(MembranePotential resting) {
+    pImpl->params.restingPotential = resting;
+}
+
+FiringRate LIFNeuralDynamics::getFiringRate() const {
+    // Simple firing rate estimation based on spike history
+    // This should be handled by Neuron class
+    return 0.0f;
 }
 
 } // namespace nlm

@@ -165,7 +165,10 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Region 1 not found");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {

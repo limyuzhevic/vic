@@ -1,79 +1,96 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/SimulationClock/SimulationClock.hpp"
 #include "../brain/Neuron.hpp"
 #include "../brain/Synapse.hpp"
+#include "../brain/NeuralPopulation.hpp"
+#include "../brain/NeuralRegion.hpp"
+#include "../brain/Brain.hpp"
+#include <vector>
+#include <memory>
+#include <string>
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
-// Abstract base class for neural dynamics
-// PLACEHOLDER - Phase 2 will implement various dynamics models
-
+// NeuralDynamics: Abstract base for neuron dynamics models
+// Provides interface for different neuron dynamics implementations
 class NeuralDynamics {
 public:
     virtual ~NeuralDynamics() = default;
     
-    // Update neuron state for one step
-    // TODO PHASE 2: Implement real dynamics
-    virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
+    // Initialize with neuron parameters
+    virtual void initialize(const NeuronState& params) = 0;
     
-    // Update synapse state for one step
-    // TODO PHASE 2: Implement real synaptic dynamics
-    virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
+    // Update dynamics for one timestep
+    virtual void update(Timestamp currentTime, TimestepDuration dt) = 0;
     
-    // Apply synaptic input from spike
-    virtual void applySpikeInput(Neuron* neuron, const Synapse* synapse) = 0;
+    // Get current membrane potential
+    virtual MembranePotential getMembranePotential() const = 0;
+    
+    // Get firing state
+    virtual FiringState getFiringState() const = 0;
     
     // Check if neuron should fire
-    virtual bool shouldFire(const Neuron* neuron) const = 0;
+    virtual bool shouldFire() const = 0;
     
-    // Reset dynamics state
+    // Reset to resting state
     virtual void reset() = 0;
+    
+    // Get neuron type
+    virtual NeuronType getType() const = 0;
 };
 
-// Integrate-and-fire dynamics (simple model)
-class IntegrateAndFireDynamics : public NeuralDynamics {
+// Integrate-and-Fire (LIF) neuron dynamics - most commonly used model
+class LIFNeuralDynamics : public NeuralDynamics {
 public:
-    IntegrateAndFireDynamics();
-    ~IntegrateAndFireDynamics() override;
+    LIFNeuralDynamics();
+    ~LIFNeuralDynamics() override;
     
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
-    bool shouldFire(const Neuron* neuron) const override;
+    void initialize(const NeuronState& params) override;
+    void update(Timestamp currentTime, TimestepDuration dt) override;
+    MembranePotential getMembranePotential() const override;
+    FiringState getFiringState() const override;
+    bool shouldFire() const override;
     void reset() override;
+    NeuronType getType() const override;
     
-    // Parameters
-    void setMembraneTimeConstant(float tau);
-    float getMembraneTimeConstant() const;
+    // Additional LIF-specific methods
+    void setThreshold(MembranePotential threshold);
+    void setResetPotential(MembranePotential reset);
+    void setLeakConductance(MembranePotential conductance);
+    void setRestingPotential(MembranePotential resting);
+    
+    // Get firing rate
+    FiringRate getFiringRate() const;
     
 private:
     struct Impl;
     Impl* pImpl;
 };
 
-// Hodgkin-Huxley dynamics (detailed model)
-// TODO PHASE 2: Implement Hodgkin-Huxley
-class HodgkinHuxleyDynamics : public NeuralDynamics {
+// Hindmarsh-Rose neuron dynamics - for oscillatory activity
+class FHNNeuralDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement HH dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
-};
-
-// FitzHugh-Nagumo dynamics (simplified兴奋性模型)
-// TODO PHASE 2: Implement FHN dynamics
-class FitzHughNagumoDynamics : public NeuralDynamics {
-public:
-    // PLACEHOLDER - Phase 2 will implement FHN dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    FHNNeuralDynamics();
+    ~FHNNeuralDynamics() override;
+    
+    void initialize(const NeuronState& params) override;
+    void update(Timestamp currentTime, TimestepDuration dt) override;
+    MembranePotential getMembranePotential() const override;
+    FiringState getFiringState() const override;
+    bool shouldFire() const override;
+    void reset() override;
+    NeuronType getType() const override;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm
