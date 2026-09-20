@@ -61,7 +61,23 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::~AgentBrain()
+{
+    // Clean up vectors to avoid dangling pointers
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    
+    previousVision_.clear();
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
@@ -181,7 +197,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     float interactAct = calcActivity(motorInteract_);
     float waitAct = calcActivity(motorWait_);
     
-    // Find maximum activity
+    // Use efficient single-pass maximum finding (better than sorting/lin/quad)
     struct { MotorCommand cmd; float activity; } commands[] = {
         {MotorCommand::MoveForward, forwardAct},
         {MotorCommand::MoveBackward, backwardAct},
@@ -192,12 +208,13 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     };
     
     MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
+    float bestActivity = waitAct;
     
-    for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
-            best = c.cmd;
+    // Single pass to find maximum
+    for (size_t i = 1; i < sizeof(commands) / sizeof(commands[0]); ++i) {
+        if (commands[i].activity > bestActivity) {
+            bestActivity = commands[i].activity;
+            best = commands[i].cmd;
         }
     }
     
@@ -218,7 +235,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
             // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 6);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -266,6 +283,27 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
+    dopamineLevel_ = predictionError_;
+    
+    // Clamp to reasonable range
+    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    
+    // Apply to all synapses with eligibility traces
+    for (const auto& region : brain_->getRegions()) {
+        for (auto* syn : region->getSynapses()) {
+            float eligibility = syn->getEligibilityTrace();
+            
+            if (std::abs(eligibility) > 0.001f) {
+                // Apply reward-modulated weight change
+                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                syn->addToWeight(delta);
+                
+                // Decay eligibility trace
+                syn->decayEligibilityTrace(0.1f);
+            }
+        }
+    }
+    
     // Modulate plasticity based on dopamine
     // Positive dopamine increases plasticity, negative decreases
     float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
@@ -276,6 +314,23 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (stdp) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
+    }
+    
+    // Apply to Hebbian plasticity
+    auto* hebbian = brain_->getHebbian();
+    if (hebbian) {
+        hebbian->setLTPWeight(0.01f * plasticityFactor);
+        hebbian->setLTDWeight(0.012f * plasticityFactor);
+    }
+    
+    // Apply to Structural Plasticity
+    auto* sp = brain_->getStructuralPlasticity();
+    if (sp) {
+        // Higher synaptogenesis in early development
+        float synRate = 0.0001f * plasticityModifier_;
+        float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
+        sp->setSynaptogenesisRate(synRate);
+        sp->setPruningRate(pruneRate);
     }
 }
 

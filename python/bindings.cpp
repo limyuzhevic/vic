@@ -12,9 +12,18 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/SensoryPercept.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/dynamics/SpikeSystem.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/performance/CheckpointSystem.hpp"
+#include "../src/core/Logger/Logger.hpp"
+#include "../src/core/Random/Random.hpp"
+#include "../src/core/SimulationClock/SimulationClock.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -24,11 +33,13 @@ PYBIND11_MODULE(pynlm, m) {
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        Provides comprehensive bindings for neural computation, memory, attention,
+        prediction, plasticity, logging, and system utilities.
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
+    // Core identifier types
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -73,6 +84,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
 
+    // Enumeration types
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
         .value("Inhibitory", NeuronType::Inhibitory)
@@ -132,6 +144,8 @@ PYBIND11_MODULE(pynlm, m) {
         .value("LookRight", MotorCommand::LookRight)
         .value("Interact", MotorCommand::Interact)
         .value("Wait", MotorCommand::Wait)
+        .value("Rest", MotorCommand::Rest)
+        .value("Custom", MotorCommand::Custom)
         .export_values();
 
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
@@ -142,6 +156,289 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Logger and logging system
+    py::enum_<LogLevel>(m, "LogLevel", R"pbdoc(Log severity level enumeration)pbdoc")
+        .value("Debug", LogLevel::Debug)
+        .value("Info", LogLevel::Info)
+        .value("Warning", LogLevel::Warning)
+        .value("Error", LogLevel::Error)
+        .value("Critical", LogLevel::Critical)
+        .export_values();
+
+    py::class_<LogEntry>(m, "LogEntry", R"pbdoc(Log entry structure)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("level", &LogEntry::level)
+        .def_readwrite("message", &LogEntry::message)
+        .def_readwrite("file", &LogEntry::file)
+        .def_readwrite("line", &LogEntry::line)
+        .def_readwrite("function", &LogEntry::function)
+        .def_readwrite("timestamp", &LogEntry::timestamp);
+
+    py::class_<Logger>(m, "Logger", R"pbdoc(Main Logger class)pbdoc")
+        .def(py::init<>())
+        .def("addLogger", &Logger::addLogger)
+        .def("clearLoggers", &Logger::clearLoggers)
+        .def("setLevel", &Logger::setLevel)
+        .def("log", &Logger::log)
+        .def("debug", &Logger::debug)
+        .def("info", &Logger::info)
+        .def("warning", &Logger::warning)
+        .def("error", &Logger::error)
+        .def("critical", &Logger::critical)
+        .def("isEnabled", &Logger::isEnabled)
+        .def_static("getGlobal", &Logger::getGlobal)
+        .def_static("setGlobal", &Logger::setGlobal);
+
+    // ConsoleLogger bindings
+    py::class_<ConsoleLogger, ILogger>(m, "ConsoleLogger", R"pbdoc(Console logger implementation)pbdoc")
+        .def(py::init<>())
+        .def(py::init<LogLevel>(), py::arg("level"))
+        .def("log", &ConsoleLogger::log)
+        .def("setLevel", &ConsoleLogger::setLevel)
+        .def("getLevel", &ConsoleLogger::getLevel)
+        .def("setUseColors", &ConsoleLogger::setUseColors)
+        .def("getUseColors", &ConsoleLogger::getUseColors)
+        .def("setOutputFile", &ConsoleLogger::setOutputFile)
+        .def("closeOutputFile", &ConsoleLogger::closeOutputFile);
+
+    // Memory systems
+    // NeuralEpisodicMemory bindings
+    py::class_<NeuralEpisodicMemory>(m, "NeuralEpisodicMemory", R"pbdoc(Episodic memory storage)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralEpisodicMemory::initialize)
+        .def("storeEpisode", &NeuralEpisodicMemory::storeEpisode)
+        .def("retrieveSimilar", &NeuralEpisodicMemory::retrieveSimilar,
+             py::arg("queryPattern"), py::arg("maxResults") = 5)
+        .def("retrieveTemporal", &NeuralEpisodicMemory::retrieveTemporal,
+             py::arg("startTime"), py::arg("endTime"), py::arg("maxResults") = 10)
+        .def("retrieveByLocation", &NeuralEpisodicMemory::retrieveByLocation,
+             py::arg("x"), py::arg("y"), py::arg("radius"), py::arg("maxResults") = 5)
+        .def("retrieveAfterAction", &NeuralEpisodicMemory::retrieveAfterAction,
+             py::arg("action"), py::arg("maxResults") = 5)
+        .def("replayEpisode", &NeuralEpisodicMemory::replayEpisode)
+        .def("updateRelevance", &NeuralEpisodicMemory::updateRelevance,
+             py::arg("episodeId"), py::arg("relevanceDelta"))
+        .def("getEpisode", &NeuralEpisodicMemory::getEpisode)
+        .def("getEpisodeCount", &NeuralEpisodicMemory::getEpisodeCount)
+        .def("getRecentEpisodes", &NeuralEpisodicMemory::getRecentEpisodes,
+             py::arg("count") = 5)
+        .def("getAverageReward", &NeuralEpisodicMemory::getAverageReward)
+        .def("consolidate", &NeuralEpisodicMemory::consolidate,
+             py::arg("relevanceThreshold") = 0.5f)
+        .def("clear", &NeuralEpisodicMemory::clear)
+        .def("enableReplay", &NeuralEpisodicMemory::enableReplay)
+        .def("isReplayEnabled", &NeuralEpisodicMemory::isReplayEnabled)
+        .def("getEpisodesForReplay", &NeuralEpisodicMemory::getEpisodesForReplay,
+             py::arg("count") = 5)
+        .def("replaySequence", &NeuralEpisodicMemory::replaySequence,
+             py::arg("episodeIds"));
+
+    py::class_<EpisodicMemoryItem>(m, "EpisodicMemoryItem", R"pbdoc(Episodic memory item)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("timestamp", &EpisodicMemoryItem::timestamp)
+        .def_readwrite("sensoryState", &EpisodicMemoryItem::sensoryState)
+        .def_readwrite("positionX", &EpisodicMemoryItem::positionX)
+        .def_readwrite("positionY", &EpisodicMemoryItem::positionY)
+        .def_readwrite("orientation", &EpisodicMemoryItem::orientation)
+        .def_readwrite("action", &EpisodicMemoryItem::action)
+        .def_readwrite("reward", &EpisodicMemoryItem::reward)
+        .def_readwrite("energy", &EpisodicMemoryItem::energy)
+        .def_readwrite("novelty", &EpisodicMemoryItem::novelty)
+        .def_readwrite("resultingSensoryState", &EpisodicMemoryItem::resultingSensoryState)
+        .def_readwrite("resultingReward", &EpisodicMemoryItem::resultingReward)
+        .def_readwrite("activeNeurons", &EpisodicMemoryItem::activeNeurons)
+        .def_readwrite("neuronActivations", &EpisodicMemoryItem::neuronActivations)
+        .def_readwrite("age", &EpisodicMemoryItem::age);
+
+    // NeuralWorkingMemory bindings
+    py::class_<NeuralWorkingMemory>(m, "NeuralWorkingMemory", R"pbdoc(Working memory using neural dynamics)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralWorkingMemory::initialize)
+        .def("store", &NeuralWorkingMemory::store,
+             py::arg("pattern"), py::arg("strength") = 1.0f)
+        .def("storeToNeuron", &NeuralWorkingMemory::storeToNeuron,
+             py::arg("neuron"), py::arg("activation"))
+        .def("retrieve", &NeuralWorkingMemory::retrieve)
+        .def("contains", &NeuralWorkingMemory::contains,
+             py::arg("neuron"))
+        .def("getNeuronActivation", &NeuralWorkingMemory::getNeuronActivation,
+             py::arg("neuron"))
+        .def("update", &NeuralWorkingMemory::update, py::arg("dt"))
+        .def("clear", &NeuralWorkingMemory::clear)
+        .def("getActiveTraces", &NeuralWorkingMemory::getActiveTraces)
+        .def("getCapacity", &NeuralWorkingMemory::getCapacity)
+        .def("setCapacity", &NeuralWorkingMemory::setCapacity)
+        .def("getDecayRate", &NeuralWorkingMemory::getDecayRate)
+        .def("setDecayRate", &NeuralWorkingMemory::setDecayRate)
+        .def("getMemoryNeurons", &NeuralWorkingMemory::getMemoryNeurons)
+        .def("strengthenMemory", &NeuralWorkingMemory::strengthenMemory,
+             py::arg("factor"))
+        .def("runCompetition", &NeuralWorkingMemory::runCompetition)
+        .def("isWinning", &NeuralWorkingMemory::isWinning,
+             py::arg("neuron"))
+        .def("getMemoryActivity", &NeuralWorkingMemory::getMemoryActivity);
+
+    // NeuralAssociativeMemory bindings
+    py::class_<NeuralAssociativeMemory>(m, "NeuralAssociativeMemory", R"pbdoc(Associative memory for creating and retrieving relationships between experiences)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralAssociativeMemory::initialize)
+        .def("associate", &NeuralAssociativeMemory::associate,
+             py::arg("patternA"), py::arg("patternB"), py::arg("strength") = 1.0f)
+        .def("associateFromExperience", &NeuralAssociativeMemory::associateFromExperience)
+        .def("retrieve", &NeuralAssociativeMemory::retrieve,
+             py::arg("queryPattern"), py::arg("maxResults") = 5)
+        .def("getAssociationStrength", &NeuralAssociativeMemory::getAssociationStrength)
+        .def("updateAssociation", &NeuralAssociativeMemory::updateAssociation,
+             py::arg("patternA"), py::arg("patternB"), py::arg("delta"))
+        .def("spreadActivation", &NeuralAssociativeMemory::spreadActivation,
+             py::arg("cuePattern"), py::arg("steps") = 2)
+        .def("clear", &NeuralAssociativeMemory::clear)
+        .def("getAssociationCount", &NeuralAssociativeMemory::getAssociationCount);
+
+    // AttentionalSelection bindings
+    py::class_<AttentionalSelection>(m, "AttentionalSelection", R"pbdoc(Neural attention through competition)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &AttentionalSelection::initialize)
+        .def("processCompetition", &AttentionalSelection::processCompetition,
+             py::arg("competitors"), py::arg("globalInhibition") = 0.5f)
+        .def("focusOnRegion", &AttentionalSelection::focusOnRegion,
+             py::arg("region"))
+        .def("releaseAttention", &AttentionalSelection::releaseAttention)
+        .def("getAttendedRegions", &AttentionalSelection::getAttendedRegions)
+        .def("setInhibitionStrength", &AttentionalSelection::setInhibitionStrength,
+             py::arg("strength"))
+        .def("setExcitationStrength", &AttentionalSelection::setExcitationStrength,
+             py::arg("strength"))
+        .def("setCompetitionThreshold", &AttentionalSelection::setCompetitionThreshold,
+             py::arg("threshold"))
+        .def("getInhibitionFor", &AttentionalSelection::getInhibitionFor,
+             py::arg("neuron"))
+        .def("getExcitationFor", &AttentionalSelection::getExcitationFor,
+             py::arg("neuron"))
+        .def("update", &AttentionalSelection::update, py::arg("dt"))
+        .def("isAttended", &AttentionalSelection::isAttended,
+             py::arg("neuron"))
+        .def("getWinners", &AttentionalSelection::getWinners)
+        .def("applyTopDownBias", &AttentionalSelection::applyTopDownBias,
+             py::arg("neuron"), py::arg("biasStrength"))
+        .def("applyBottomUpSalience", &AttentionalSelection::applyBottomUpSalience,
+             py::arg("neuron"), py::arg("salienceStrength"))
+        .def("reset", &AttentionalSelection::reset);
+
+    // Plasticity system
+    // Hebbian bindings
+    py::class_<Hebbian, PlasticityRule>(m, "Hebbian", R"pbdoc(Hebbian learning implementation)pbdoc")
+        .def(py::init<>())
+        .def("update", &Hebbian::update,
+             py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"))
+        .def("applyWeightChange", &Hebbian::applyWeightChange,
+             py::arg("synapse"), py::arg("delta"))
+        .def("getName", &Hebbian::getName)
+        .def("setLearningRate", &Hebbian::setLearningRate,
+             py::arg("rate"))
+        .def("getLearningRate", &Hebbian::getLearningRate)
+        .def("setMaxWeight", &Hebbian::setMaxWeight,
+             py::arg("maxWeight"))
+        .def("getMaxWeight", &Hebbian::getMaxWeight);
+
+    // Prediction system
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(Prediction system: predicts future sensory states and consequences)pbdoc")
+        .def(py::init<>())
+        .def("predictNextState", &PredictionSystem::predictNextState,
+             "Make prediction for next timestep")
+        .def("updatePredictions", &PredictionSystem::updatePredictions,
+             py::arg("predicted"), py::arg("actual"))
+        .def("getPredictionError", &PredictionSystem::getPredictionError,
+             "Get prediction error")
+        .def("getConfidence", &PredictionSystem::getConfidence,
+             "Get prediction confidence")
+        .def("getErrorHistory", &PredictionSystem::getErrorHistory,
+             "Get prediction error history")
+        .def("clearHistory", &PredictionSystem::clearHistory,
+             "Clear prediction error history")
+        .def("train", &PredictionSystem::train,
+             py::arg("observation"));
+
+    // Spike system
+    py::class_<SpikeSystem>(m, "SpikeSystem", R"pbdoc(Spike event system for event-driven neural computation)pbdoc")
+        .def(py::init<>())
+        .def("queueSpike", static_cast<void (SpikeSystem::*)(const SpikeEvent&)>(&SpikeSystem::queueSpike))
+        .def("queueSpike", static_cast<void (SpikeSystem::*)(NeuronId, Timestamp, SimulationStep)>(&SpikeSystem::queueSpike))
+        .def("queueDelayedSpike", &SpikeSystem::queueDelayedSpike)
+        .def("processSpikes", &SpikeSystem::processSpikes, py::arg("currentStep"))
+        .def("processDelayedSpikes", &SpikeSystem::processDelayedSpikes,
+             py::arg("currentStep"), py::arg("currentTime"))
+        .def("registerHandler", &SpikeSystem::registerHandler)
+        .def("registerDelayedHandler", &SpikeSystem::registerDelayedHandler)
+        .def("getSpikeHistory", &SpikeSystem::getSpikeHistory)
+        .def("clearHistory", &SpikeSystem::clearHistory)
+        .def("getSpikeCount", &SpikeSystem::getSpikeCount)
+        .def("getPendingSpikeCount", &SpikeSystem::getPendingSpikeCount)
+        .def("getPendingDelayedCount", &SpikeSystem::getPendingDelayedCount)
+        .def("getAverageSpikeRate", &SpikeSystem::getAverageSpikeRate)
+        .def("getMostActiveNeurons", &SpikeSystem::getMostActiveNeurons,
+             py::arg("count") = 10)
+        .def("reset", &SpikeSystem::reset);
+
+    // Random number generator
+    py::class_<RandomGenerator>(m, "RandomGenerator", R"pbdoc(Deterministic random number generator)pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("seed"))
+        .def("seed", &RandomGenerator::seed)
+        .def("getSeed", &RandomGenerator::getSeed)
+        .def("uniformInt", static_cast<uint32_t (RandomGenerator::*)(uint32_t, uint32_t)>(&RandomGenerator::uniformInt))
+        .def("uniformInt", static_cast<uint64_t (RandomGenerator::*)(uint64_t, uint64_t)>(&RandomGenerator::uniformInt))
+        .def("uniformReal", static_cast<double (RandomGenerator::*)(double, double)>(&RandomGenerator::uniformReal))
+        .def("uniformReal", static_cast<float (RandomGenerator::*)(float, float)>(&RandomGenerator::uniformReal))
+        .def("normal", static_cast<double (RandomGenerator::*)(double, double)>(&RandomGenerator::normal))
+        .def("normal", static_cast<float (RandomGenerator::*)(float, float)>(&RandomGenerator::normal))
+        .def("bernoulli", &RandomGenerator::bernoulli)
+        .def("poisson", &RandomGenerator::poisson)
+        .def("exponential", &RandomGenerator::exponential)
+        .def("randomBool", &RandomGenerator::randomBool)
+        .def("randomBit", &RandomGenerator::randomBit)
+        .def("pickRandomIndex", &RandomGenerator::pickRandomIndex)
+        .def("fillBytes", &RandomGenerator::fillBytes);
+
+    // Simulation clock
+    py::class_<SimulationClock>(m, "SimulationClock", R"pbdoc(Simulation clock for managing time in the neural simulation)pbdoc")
+        .def(py::init<TimestepDuration>(), py::arg("timestep") = 0.001)
+        .def("reset", &SimulationClock::reset)
+        .def("advance", &SimulationClock::advance)
+        .def("getStep", &SimulationClock::getStep)
+        .def("setStep", &SimulationClock::setStep)
+        .def("getTime", &SimulationClock::getTime)
+        .def("setTime", &SimulationClock::setTime)
+        .def("getTimestep", &SimulationClock::getTimestep)
+        .def("setTimestep", &SimulationClock::setTimestep)
+        .def("isFirstStep", &SimulationClock::isFirstStep)
+        .def("isLastStep", &SimulationClock::isLastStep)
+        .def("stepToTime", &SimulationClock::stepToTime)
+        .def("timeToStep", &SimulationClock::timeToStep)
+        .def("advanceBy", &SimulationClock::advanceBy)
+        .def("timeAtFutureStep", &SimulationClock::timeAtFutureStep)
+        .def("getRealTimeElapsed", &SimulationClock::getRealTimeElapsed)
+        .def("setRealTimeStart", &SimulationClock::setRealTimeStart);
+
+    // Checkpoint system
+    py::class_<CheckpointManager>(m, "CheckpointManager", R"pbdoc(Checkpoint manager for automated checkpointing)pbdoc")
+        .def(py::init<>())
+        .def("configure", &CheckpointManager::configure,
+             py::arg("checkpointDir"), py::arg("saveIntervalSteps") = 10000,
+             py::arg("maxCheckpoints") = 10, py::arg("compress") = true)
+        .def("setNeuronProvider", &CheckpointManager::setNeuronProvider)
+        .def("setSynapseProvider", &CheckpointManager::setSynapseProvider)
+        .def("update", &CheckpointManager::update)
+        .def("save", &CheckpointManager::save)
+        .def("load", &CheckpointManager::load)
+        .def("getLastError", &CheckpointManager::getLastError)
+        .def("isActive", &CheckpointManager::isActive)
+        .def("clear", &CheckpointManager::clear)
+        .def("getCheckpointCount", &CheckpointManager::getCheckpointCount)
+        .def("getCheckpointPath", &CheckpointManager::getCheckpointPath)
+        .def("setCheckpointPath", &CheckpointManager::setCheckpointPath);
+
+    // Core framework classes
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -400,6 +697,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Helper functions for common operations
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,6 +714,32 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Factory functions for system components
+    m.def("createLogger", []() -> std::shared_ptr<Logger> {
+        return std::make_shared<Logger>();
+    }, "Create a logger with default settings");
+
+    m.def("createConsoleLogger", [](LogLevel level) -> std::shared_ptr<ConsoleLogger> {
+        return std::make_shared<ConsoleLogger>(level);
+    }, py::arg("level"), "Create a console logger with specified log level");
+
+    m.def("createRandomGenerator", [](uint64_t seed) -> std::shared_ptr<RandomGenerator> {
+        return std::make_shared<RandomGenerator>(seed);
+    }, py::arg("seed"), "Create a random generator with specified seed");
+
+    m.def("createDefaultRandomGenerator", []() -> std::shared_ptr<RandomGenerator> {
+        return std::make_shared<RandomGenerator>();
+    }, "Create a random generator with time-based seed");
+
+    m.def("createSimulationClock", [](TimestepDuration timestep) -> std::shared_ptr<SimulationClock> {
+        return std::make_shared<SimulationClock>(timestep);
+    }, py::arg("timestep"), "Create a simulation clock with specified timestep");
+
+    m.def("createDefaultSimulationClock", []() -> std::shared_ptr<SimulationClock> {
+        return std::make_shared<SimulationClock>();
+    }, "Create a simulation clock with default timestep (1ms)");
+
+    // Invalid ID constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

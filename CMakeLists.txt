@@ -1,14 +1,88 @@
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
+# Include configuration module
+include(nlm_config.cmake)
+
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+# Platform-specific optimizations
+if(NLM_PLATFORM STREQUAL "Linux")
+    # Linux-specific optimizations and flags
+    add_compile_options(-march=native -mtune=native)
+    if(NLM_ENABLE_OPENMP)
+        target_link_libraries(nlm_core PUBLIC OpenMP::OpenMP_CXX)
+    endif()
+elseif(NLM_PLATFORM STREQUAL "Windows")
+    # Windows-specific optimizations
+    if(MSVC)
+        add_compile_options(/permissive- /arch:AVX2)
+    endif()
+elseif(NLM_PLATFORM STREQUAL "MacOS")
+    # macOS-specific optimizations
+    add_compile_options(-march=native)
+endif()
+
+# SIMD optimizations
+if(NLM_ENABLE_SIMD)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        add_compile_options(-mavx2 -mfma)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2 -mfma")
+    elseif(MSVC)
+        add_compile_options(/arch:AVX2)
+    endif()
+    add_definitions(-DNLM_ENABLE_SIMD=1)
+    message(STATUS "SIMD optimizations enabled")
+endif()
+
+# Sanitizers and testing support
+if(NLM_ENABLE_SANITIZERS)
+    if(NLM_ENABLE_ASAN)
+        add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address)
+    endif()
+    if(NLM_ENABLE_UBSAN)
+        add_compile_options(-fsanitize=undefined -fno-sanitize=alignment)
+        add_link_options(-fsanitize=undefined)
+    endif()
+endif()
+
+# Build type specific settings
+string(TOUPPER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_UPPER)
+if(BUILD_TYPE_UPPER STREQUAL "DEBUG")
+    add_compile_options(-g -O0 -DDEBUG)
+    if(NLM_ENABLE_COVERAGE)
+        add_compile_options(--coverage)
+        add_link_options(--coverage)
+    endif()
+elseif(BUILD_TYPE_UPPER STREQUAL "RELEASE")
+    add_compile_options(-O3 -DNDEBUG)
+    if(NLM_ENABLE_PROFILING)
+        add_compile_options(-pg)
+        add_link_options(-pg)
+    endif()
+elseif(BUILD_TYPE_UPPER STREQUAL "RELWITHDEBINFO")
+    add_compile_options(-O2 -g -DNDEBUG)
+elseif(BUILD_TYPE_UPPER STREQUAL "MINSIZEREL")
+    add_compile_options(-Os -DNDEBUG)
+endif()
+
+# Warnings and errors
+if(NLM_BUILD_WARNINGS_AS_ERRORS)
+    if(MSVC)
+        add_compile_options(/WX)
+    else()
+        add_compile_options(-Werror)
+    endif()
+endif()
+
+if(NLM_BUILD_VERBOSE_LOGGING)
+    message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+    message(STATUS "Platform: ${NLM_PLATFORM}")
+    message(STATUS "Features: SIMD=${NLM_ENABLE_SIMD}, OpenMP=${NLM_ENABLE_OPENMP}, CUDA=${NLM_ENABLE_CUDA}")
 endif()
 
 # Enable warnings
