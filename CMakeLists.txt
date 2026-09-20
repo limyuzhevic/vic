@@ -149,3 +149,18 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# Installation configuration
+include(GNUInstallDirs)
+
+# Install headers
+install(DIRECTORY src/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.hpp"
+    PATTERN ".*" EXCLUDE
+)
+
+# Install configuration file
+install(FILES configs/default.cfg
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/nlm
+)

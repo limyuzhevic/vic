@@ -1,19 +1,23 @@
-#include <iostream>
-#include <memory>
-#include <iomanip>
-#include <sstream>
-#include "core/Config/Config.hpp"
-#include "core/Logger/Logger.hpp"
-#include "brain/Brain.hpp"
-#include "agent/AgentBrain.hpp"
-#include "world/SimpleWorld.hpp"
-#include "experiments/Phase4Experiment.hpp"
-#include "prediction/NeuralPrediction.hpp"
-#include "memory/NeuralWorkingMemory.hpp"
-#include "memory/NeuralEpisodicMemory.hpp"
-#include "cognition/ConceptFormation.hpp"
-#include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
+namespace nlm {
+
+/**
+ * @brief Phase 4: Emerging Cognition Demo
+ * 
+ * This demo demonstrates the cognitive capabilities that emerge from neural dynamics:
+ * - Temporal sequence prediction
+ * - Working memory for information maintenance
+ * - Episodic memory storage and recall
+ * - Concept formation from experience patterns
+ * - Neural attention and selective processing
+ * - Multi-step planning and action selection
+ * - Self-model development
+ * - Social learning through observation
+ * - Continual adaptation to new tasks
+ * 
+ * Phase 4 shows how complex cognitive abilities develop from simple
+ * neural mechanisms without any symbolic representation or
+ * predefined knowledge systems.
+ */
 
 using namespace nlm;
 

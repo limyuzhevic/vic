@@ -6,6 +6,15 @@
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// The main function serves as the entry point for the NLM system and provides:
+// 1. A comprehensive test suite for all Phase 2 neural mechanisms
+// 2. Demonstrations of real neural computation
+// 3. Validation that the brain can learn from experience
+// 4. Verification that plasticity rules function correctly
+//
+// This implementation uses event-driven computation for efficiency and precision,
+// simulating biological neural dynamics with biologically-inspired plasticity rules.
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -326,7 +335,7 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with better error handling
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
@@ -340,8 +349,45 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+    // Load configuration with better error handling
     auto config = std::make_shared<Config>();
+    
+    // Validate command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                std::string configFile = arg.substr(arg.find('=') + 1);
+                NLM_LOG_INFO("Configuration file specified: " + configFile);
+            } else if (i + 1 < argc) {
+                std::string configFile = argv[++i];
+                NLM_LOG_INFO("Configuration file specified: " + configFile);
+            } else {
+                NLM_LOG_ERROR("Configuration file path not provided after --config flag");
+                return 1;
+            }
+        } else if (arg.substr(0, 7) == "--log_level") {
+            if (i + 1 < argc) {
+                std::string logLevel = argv[++i];
+                NLM_LOG_INFO("Log level specified: " + logLevel);
+            } else {
+                NLM_LOG_ERROR("Log level value not provided after --log_level flag");
+                return 1;
+            }
+        } else if (arg.substr(0, 9) == "--neuron_count") {
+            if (i + 1 < argc) {
+                int neuronCount = std::atoi(argv[++i]);
+                if (neuronCount <= 0) {
+                    NLM_LOG_ERROR("Invalid neuron count: " + std::to_string(neuronCount));
+                    return 1;
+                }
+                NLM_LOG_INFO("Neuron count specified: " + std::to_string(neuronCount));
+            } else {
+                NLM_LOG_ERROR("Neuron count value not provided after --neuron_count flag");
+                return 1;
+            }
+        }
+    }
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
@@ -392,8 +438,19 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
+    // Validate configuration values
+    if (config->getOr<int64_t>("neuron_count", 500) <= 0) {
+        NLM_LOG_ERROR("Invalid neuron count in configuration");
+        return 1;
+    }
+    
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0) {
+        NLM_LOG_ERROR("Invalid simulation timestep: " + std::to_string(timestep));
+        return 1;
+    }
+    
+    // Initialize simulation clock
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     

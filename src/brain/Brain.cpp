@@ -22,6 +22,13 @@
 
 namespace nlm {
 
+/**
+ * @brief Implementation details for the Brain class.
+ * 
+ * This struct contains all internal data and implementation details for the
+ * artificial brain system, implementing the Phase 6: Integrated Artificial Brain
+ * with all cognitive and neuromodulatory systems.
+ */
 struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
@@ -1006,6 +1013,8 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
+    return pImpl->workingMemory.get();
+}
     return pImpl->workingMemory.get();
 }
 

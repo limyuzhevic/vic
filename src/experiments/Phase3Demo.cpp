@@ -11,8 +11,18 @@
 
 namespace nlm {
 
-// Main Phase 3 demonstration
-// Shows: experience -> neural activity -> action -> consequence -> learning
+/**
+ * @brief Phase 3 World Interaction Demo
+ * 
+ * Demonstrates the complete NLM brain-environment interaction loop:
+ * - Sensory input transduction
+ * - Action selection through neural dynamics
+ * - Experience-based learning
+ * - Development through plasticity
+ * 
+ * This demo shows how cognition emerges from neural computation
+ * as the brain develops through interaction with the environment.
+ */
 
 class Phase3Demo {
 public:

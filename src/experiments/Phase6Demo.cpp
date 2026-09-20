@@ -1,25 +1,25 @@
+namespace nlm {
+
 /**
- * Phase 6 Demo - Integration Test
+ * @brief Phase 6 Integration Demo
  * 
  * This demo runs the Phase 6 integration experiment to verify
- * that all brain systems are properly connected.
+ * that all brain systems are properly connected and working together.
+ * 
+ * Phase 6 represents the final integration of all NLM components:
+ * - Memory systems (working, episodic, associative)
+ * - Neuromodulation (dopamine, curiosity, novelty, prediction error)
+ * - Prediction system for temporal sequence learning
+ * - Cognitive systems (attention, planning, concept formation)
+ * - Development system for maturation and stage progression
+ * - Checkpoint system for state persistence
+ * - Replay system for memory consolidation
+ * 
+ * The demo validates that all systems integrate correctly into a
+ * coherent artificial brain that can learn, adapt, and develop.
  */
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
-#include "core/Logger/Logger.hpp"
-#include <iostream>
-
-using namespace nlm;
-
-int main(int argc, char* argv[]) {
-    std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
-    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
-    
-    // Initialize logging
-    Logger::getInstance().setLevel(Logger::Level::Info);
-    
-    // Create experiment
-    Phase6IntegratedExperiment experiment;
     
     // First, run the quick integration verification
     std::cout << "--- Integration Verification ---" << std::endl;
