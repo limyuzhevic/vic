@@ -116,22 +116,14 @@ void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>&
     concept->instances.push_back(instance);
     concept->totalObservations++;
     
-    // Update prototype using exponential moving average (Hebbian-like)
+    // Update prototype using simple averaging
     updatePrototype(conceptId, newPattern);
     
     // Update stability
     float newStability = 1.0f;
     if (concept->instances.size() > 1) {
-        // Compute stability as average similarity to prototype
-        float totalSim = 0.0f;
-        size_t recentCount = std::min(concept->instances.size(), stabilityWindow_);
-        
-        for (size_t i = concept->instances.size() - recentCount; 
-             i < concept->instances.size(); ++i) {
-            totalSim += computeSimilarity(concept->instances[i].pattern, concept->prototype);
-        }
-        
-        newStability = totalSim / recentCount;
+        // Simple stability estimate based on instance count
+        newStability = std::min(1.0f, static_cast<float>(concept->instances.size()) / 10.0f);
         concept->avgStability = concept->avgStability * 0.9f + newStability * 0.1f;
     }
     
@@ -142,13 +134,11 @@ void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>&
 void ConceptFormation::updatePrototype(size_t conceptId, const std::vector<float>& newInstance) {
     for (auto& concept : concepts_) {
         if (concept.id == conceptId) {
-            // Hebbian update: weight prototype towards new instance
-            float alpha = 0.2f;  // Learning rate
-            
+            // Simple prototype update
             if (concept.prototype.size() == newInstance.size()) {
                 for (size_t i = 0; i < concept.prototype.size(); ++i) {
-                    concept.prototype[i] = concept.prototype[i] * (1.0f - alpha) + 
-                                          newInstance[i] * alpha;
+                    concept.prototype[i] = concept.prototype[i] * 0.9f + 
+                                          newInstance[i] * 0.1f;
                 }
             }
             break;

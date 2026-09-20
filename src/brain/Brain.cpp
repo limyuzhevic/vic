@@ -46,6 +46,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -119,39 +122,45 @@ struct Brain::Impl {
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
-        
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
-    }
+    // Initialize development system
+    developmentSystem = std::make_unique<DevelopmentSystem>();
+    
+    // Initialize neuromodulation systems
+    dopamine = std::make_unique<Dopamine>();
+    acetylcholine = std::make_unique<Acetylcholine>();
+    norepinephrine = std::make_unique<Norepinephrine>();
+    serotonin = std::make_unique<Serotonin>();
+    curiosity = std::make_unique<Curiosity>();
+    predictionError = std::make_unique<PredictionError>();
+    novelty = std::make_unique<Novelty>();
+    
+    // Configure STDP parameters
+    float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+    float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+    float tau = config->getOr<float>("stdp_tau", 20.0f);
+    stdp->configure(ltpWeight, ltdWeight, tau);
+    
+    // Configure structural plasticity
+    float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+    structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+    structuralPlasticity->setPruningRate(pruningRate);
+    
+    // Get timestep
+    timestep = config->getOr<double>("simulation_timestep", 0.001);
+    
+    // Get integration intervals from config
+    replayInterval = config->getOr<size_t>("replay_interval", 100);
+    consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+    
+    // Initialize checkpoint manager
+    checkpointManager = std::make_unique<CheckpointManager>();
+    
+    NLM_LOG_INFO("Neuromodulation systems initialized:");
+    NLM_LOG_INFO("  Dopamine baseline: {}", dopamine->getBaseline());
+    NLM_LOG_INFO("  Acetylcholine baseline: {}", acetylcholine->getBaseline());
+    NLM_LOG_INFO("  Norepinephrine baseline: {}", norepinephrine->getBaseline());
+    NLM_LOG_INFO("  Serotonin baseline: {}", serotonin->getBaseline());
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;

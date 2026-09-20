@@ -4,7 +4,6 @@
 #include "../brain/Brain.hpp"
 #include <vector>
 #include <memory>
-#include <functional>
 
 namespace nlm {
 
@@ -45,7 +44,7 @@ public:
     // Evaluate a potential action sequence
     // Returns expected total reward and confidence
     PlanningCandidate evaluateSequence(const std::vector<ActionType>& actions,
-                                      const std::vector<float>& startState);
+                                       const std::vector<float>& startState);
 
     // Get number of steps to look ahead
     size_t getPlanningDepth() const { return planningDepth_; }
@@ -81,8 +80,13 @@ private:
     // Evaluate single action from state
     float evaluateAction(ActionType action, const std::vector<float>& state);
 
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Predict next state from action
+    std::vector<float> predictNextState(ActionType action,
+                                         const std::vector<float>& currentState);
+
+    // Helper function for computing similarity between patterns
+    static float computeSimilarity(const std::vector<float>& a,
+                                   const std::vector<float>& b);
 
     Brain* brain_;
     size_t planningDepth_;
@@ -129,7 +133,7 @@ public:
     float getSelfModelConfidence(ActionType action) const;
 
     // Is this change likely caused by self (action) vs external?
-    float computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+    float computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                        const std::vector<float>& afterState,
                                        ActionType action) const;
 
@@ -159,13 +163,14 @@ private:
     std::vector<float> findMatchingEffect(ActionType action,
                                           const std::vector<float>& beforeState) const;
 
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Helper function for computing similarity between patterns
+    static float computeSimilarity(const std::vector<float>& a,
+                                   const std::vector<float>& b);
 
     Brain* brain_;
     float capabilityLevel_;
     
-    // Action -> (beforeState -> afterState) mappings
+    // Simple action effect storage
     struct ActionEffect {
         std::vector<float> beforeState;
         std::vector<float> afterState;
@@ -173,7 +178,7 @@ private:
         size_t observationCount;
     };
     
-    std::vector<std::vector<ActionEffect>> actionEffects_;  // Indexed by ActionType
+    std::vector<ActionEffect> actionEffects_;  // Indexed by ActionType
 };
 
 // SocialLearning: Enables learning from observing other agents
@@ -231,19 +236,21 @@ public:
     size_t getObservationCount() const { return observationCount_; }
 
 private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    size_t observationCount_;
-    
-    // Observed action effects (other agent's actions)
+    // Observed action effect structure
     struct ObservedEffect {
         std::vector<float> state;
         std::vector<float> resultingState;
         float reward;
     };
+
+    // Helper function for computing similarity between patterns
+    static float computeSimilarity(const std::vector<float>& a,
+                                   const std::vector<float>& b);
+
+    Brain* brain_;
+    size_t observationCount_;
     
+    // Observed actions and effects
     std::vector<std::pair<ActionType, ObservedEffect>> observedActions_;
     
     // Communication signal

@@ -40,41 +40,30 @@ public:
     // Get current developmental stage
     DevelopmentalStage getDevelopmentalStage() const;
     
-    // Get neuromodulation level
-    float getNeuromodulationLevel() const;
-    
-    // Get curiosity level
-    float getCuriosityLevel() const;
-    
-    // Get novelty level
+    // Get neuromodulation levels
+    float getDopamineLevel() const;
+    float getAcetylcholineLevel() const;
+    float getNorepinephrineLevel() const;
+    float getSerotoninLevel() const;
     float getNoveltyLevel() const;
-    
-    // Get prediction error
+    float getCuriosityLevel() const;
     float getPredictionError() const;
     
-    // Reset agent for new episode
-    void reset();
+    // Set neuromodulation parameters
+    void setAttentionModulation(bool enable) { attentionModulationEnabled_ = enable; }
+    void setMemoryModulation(bool enable) { memoryModulationEnabled_ = enable; }
+    void setSocialModulation(bool enable) { socialModulationEnabled_ = enable; }
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
-    
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
-    
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    bool isAttentionModulationEnabled() const { return attentionModulationEnabled_; }
+    bool isMemoryModulationEnabled() const { return memoryModulationEnabled_; }
+    bool isSocialModulationEnabled() const { return socialModulationEnabled_; }
     
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    // Motor command selection with neuromodulation
+    MotorCommand selectWithNeuromodulation(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
     
@@ -94,19 +83,22 @@ private:
     
     // Neuromodulation state
     float dopamineLevel_;
+    float acetylcholineLevel_;
+    float norepinephrineLevel_;
+    float serotoninLevel_;
     float noveltyLevel_;
     float curiosityLevel_;
     float predictionError_;
     float expectedReward_;
     
-    // Development state
+    // Integration state
     double developmentalAge_;
     float plasticityModifier_;
     
     // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
+    bool attentionModulationEnabled_;
+    bool memoryModulationEnabled_;
+    bool socialModulationEnabled_;
     bool curiosityEnabled_;
     
     // Previous sensory state for novelty detection
