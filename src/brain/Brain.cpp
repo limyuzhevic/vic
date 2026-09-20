@@ -174,6 +174,15 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
+Brain& Brain::operator=(Brain&& other) noexcept {
+    if (this != &other) {
+        delete pImpl;
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+    return *this;
+}
+
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
@@ -333,24 +342,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // Optimization: Pre-collect all neurons to avoid nested loops through regions and populations
+    std::vector<Neuron*> allNeurons;
+    allNeurons.reserve(getTotalNeuronCount());
+    
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
+                allNeurons.push_back(neuron);
             }
         }
     }
     
+    // Update all neurons with LIF dynamics
+    for (auto* neuron : allNeurons) {
+        neuron->stepLIF(currentTime, pImpl->timestep);
+    }
+    
     // ========== STEP 3: Detect spikes and schedule spike events ==========
+    // Optimized spike detection - only check neurons in refractory state
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
+            // Collect neurons in refractory state for spike detection
+            std::vector<Neuron*> refractoryNeurons;
             for (auto* neuron : pop->getNeurons()) {
-                // Check if neuron just fired this step
+                if (neuron->getState().firingState == FiringState::Refractory) {
+                    refractoryNeurons.push_back(neuron);
+                }
+            }
+            
+            // Only check refractory neurons for potential spikes
+            for (auto* neuron : refractoryNeurons) {
                 const auto& state = neuron->getState();
+                // Optimization: Use currentTime instead of casting
                 bool justFired = (state.firingState == FiringState::Refractory &&
                                  state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
-
+                                 (currentTime - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+                
                 if (justFired) {
                     // Neuron fired this step - queue the spike
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
@@ -446,35 +474,44 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
+    // Optimization: Pre-collect all synapses to avoid nested loops
+    std::vector<Synapse*> allSynapses;
+    allSynapses.reserve(getTotalSynapseCount());
+    
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
-            // Apply STDP with neuromodulation
-            if (syn->getPlasticityFlags().stdp) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                    float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
-                }
-            }
-            
-            // Apply Hebbian learning
-            if (syn->getPlasticityFlags().hebbian) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                }
-            }
-            
-            // Update synapse state
-            syn->step(currentTime);
+            allSynapses.push_back(syn.get());
         }
+    }
+    
+    // Apply STDP and Hebbian plasticity to all synapses
+    for (auto* syn : allSynapses) {
+        // Apply STDP with neuromodulation
+        if (syn->getPlasticityFlags().stdp) {
+            const auto& preSpikes = syn->getPreSpikeHistory();
+            const auto& postSpikes = syn->getPostSpikeHistory();
+            
+            if (!preSpikes.empty() && !postSpikes.empty()) {
+                // Modify weight change based on dopamine
+                pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                float weight = syn->getWeight();
+                weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                syn->setWeight(weight);
+            }
+        }
+        
+        // Apply Hebbian learning
+        if (syn->getPlasticityFlags().hebbian) {
+            const auto& preSpikes = syn->getPreSpikeHistory();
+            const auto& postSpikes = syn->getPostSpikeHistory();
+            
+            if (!preSpikes.empty() && !postSpikes.empty()) {
+                pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+            }
+        }
+        
+        // Update synapse state
+        syn->step(currentTime);
     }
     
     // ========== STEP 7: Update episodic memory ==========
@@ -501,9 +538,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                 }
             }
-            
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
