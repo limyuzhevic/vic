@@ -52,8 +52,31 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Enhanced motor decoding with intrinsic motivation
+    MotorCommand decodeMotorCommandWithIntrinsicMotivations();
+    
+    // Compute multiple action scores for better decision making
+    struct ActionScore {
+        MotorCommand command;
+        float score;
+        float confidence;
+    };
+    std::vector<ActionScore> computeActionScores();
+    
+    // Get entropy of neural activity (measure of uncertainty)
+    float getNeuralActivityEntropy() const;
+    
+    // Check if agent is in resting state (like sleep)
+    bool isResting() const { return isResting_; }
+    
+    // Get current developmental stage with more detail
+    DevelopmentalStage getDetailedDevelopmentalStage() const;
+    
     // Reset agent for new episode
     void reset();
+    
+    // Get comprehensive state for monitoring/debugging
+    std::string getStateSummary() const;
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }

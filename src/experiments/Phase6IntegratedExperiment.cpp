@@ -43,15 +43,15 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create simple world
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.configure(16, 16, 16, 16);  // width, height, visionWidth, visionHeight
     
-    // Create agent
-    AgentBrain agent(brain);
-    agent.initialize(world);
-    agent.enableRewardModulation(true);
-    agent.enableStructuralPlasticity(config.enableDevelopment);
-    agent.enableDevelopment(config.enableDevelopment);
-    agent.enableCuriosity(true);
+    // Set agent starting position
+    world.setAgentStart(8.0f, 8.0f);  // Center of world
+    
+    // Add some resources
+    world.addObject(WorldObject(4.0f, 4.0f, WorldObjectType::Resource, 10.0f));
+    world.addObject(WorldObject(12.0f, 4.0f, WorldObjectType::Hazard, -5.0f));
+    world.addObject(WorldObject(4.0f, 12.0f, WorldObjectType::Resource, 10.0f));
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     

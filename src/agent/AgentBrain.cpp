@@ -154,9 +154,14 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+    // Apply curiosity-based exploration with enhanced logic
+    if (curiosityEnabled_ && curiosityLevel_ > 0.2f) {
+        decoded = selectWithCuriosityEnhanced(decoded);
+    }
+    
+    // Apply intrinsic motivation when level is high
+    if (intrinsicMotivationLevel_ > 0.7f) {
+        decoded = applyIntrinsicMotivation(decoded);
     }
     
     return decoded;

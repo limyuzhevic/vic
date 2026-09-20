@@ -1,4 +1,5 @@
 #include "SensoryPercept.hpp"
+#include <numeric>
 
 namespace nlm {
 
