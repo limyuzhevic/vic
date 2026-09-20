@@ -82,16 +82,44 @@ public:
     bool has(const std::string& key) const;
     
     // Remove key
-    void remove(const std::string& key);
-    
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
     // Get configuration summary
     std::string summary() const;
+    
+    // Advanced configuration features
+    
+    // Batch operations
+    bool setBatch(const std::vector<std::pair<std::string, ConfigValue>>& updates,
+                 ConfigSource source = ConfigSource::Runtime);
+    std::vector<std::pair<std::string, bool>> setMultipleFromJson(
+        const std::string& filepath);
+    
+    // Validation
+    std::vector<std::string> validate() const;
+    bool isValid() const;
+    
+    // Configuration templates
+    static bool loadTemplate(const std::string& name,
+                             const std::string& filepath);
+    bool saveTemplate(const std::string& name) const;
+    
+    // Configuration comparison
+    bool hasChanges(const Config& other) const;
+    double calculateSimilarity(const Config& other) const;
+    
+    // Configuration import/export
+    bool exportToJson(const std::string& filepath, bool pretty = true) const;
+    bool importFromJson(const std::string& filepath);
+    
+    // Configuration statistics
+    size_t getEntryCount() const;
+    std::string getStats() const;
+    
+    // Configuration keys with specific properties
+    std::vector<std::string> getIntegerKeys() const;
+    std::vector<std::string> getDoubleKeys() const;
+    std::vector<std::string> getStringKeys() const;
+    std::vector<std::string> getBoolKeys() const;
+    std::vector<std::string> getVectorKeys() const;
     
 private:
     struct Impl;
@@ -100,6 +128,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
-};
+    
+    // Helper for advanced operations
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    ConfigValue convertToTargetType(const ConfigValue& value,
+                                    const std::string& targetType) const;
+}
 
 } // namespace nlm
