@@ -1,13 +1,17 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
+#include "IMemorySystem.hpp"
 #include <vector>
 #include <memory>
 #include <functional>
 #include <unordered_map>
 
 namespace nlm {
+
+// Forward declarations
+class Brain;
+class BrainMemoryAdapter;
 
 // NeuralWorkingMemory: Implements working memory using neural dynamics
 // NOT a simple storage vector - uses persistent activity and recurrent connections
@@ -17,62 +21,50 @@ namespace nlm {
 // - Recurrent synaptic connections for maintaining information
 // - Activity-dependent short-term plasticity
 // - Neural competition for selective retention
+//
+// Now implements IWorkingMemory interface for better integration
 
-class NeuralWorkingMemory {
+class NeuralWorkingMemory : public IWorkingMemory {
 public:
     NeuralWorkingMemory();
-    ~NeuralWorkingMemory();
+    ~NeuralWorkingMemory() override;
 
-    // Initialize with brain reference
-    void initialize(Brain* brain);
+    // IMemorySystem interface implementation
+    void initialize(Brain* owner) override;
+    void update(TimestepDuration dt) override;
+    void clear() override;
+    Brain* getOwner() const override { return brain_; }
+    bool isInitialized() const override { return brain_ != nullptr; }
 
-    // Store information in working memory
-    // The information is encoded as neural activity pattern
-    void store(const std::vector<float>& pattern, float strength = 1.0f);
+    // IWorkingMemory interface implementation
+    void store(const std::vector<float>& pattern, float strength) override;
+    void storeToNeuron(NeuronId neuron, float activation) override;
+    std::vector<float> retrieve() const override;
+    bool contains(NeuronId neuron) const override;
+    float getNeuronActivation(NeuronId neuron) const override;
+    size_t getCapacity() const override { return capacity_; }
+    void setCapacity(size_t cap) override { capacity_ = cap; }
+    float getDecayRate() const override { return decayRate_; }
+    void setDecayRate(float rate) override { decayRate_ = rate; }
+    size_t getActiveTraces() const override { return activeTraces_.size(); }
+    void runCompetition() override;
+    bool isWinning(NeuronId neuron) const override;
+    float getMemoryActivity() const override;
+    void strengthenMemory(float factor) override;
+    const std::vector<NeuronId>& getMemoryNeurons() const override { return memoryNeurons_; }
 
-    // Store specific neuron activation
-    void storeToNeuron(NeuronId neuron, float activation);
+    // Legacy methods (for compatibility)
+    void initialize(Brain* brain) { initialize(brain); }
+    void update(TimestepDuration dt) { update(dt); }
+    void clear() { clear(); }
+    size_t getActiveTraces() const { return getActiveTraces(); }
+    bool isWinning(NeuronId neuron) const { return isWinning(neuron); }
+    float getMemoryActivity() const { return getMemoryActivity(); }
+    void strengthenMemory(float factor) { strengthenMemory(factor); }
+    const std::vector<NeuronId>& getMemoryNeurons() const { return getMemoryNeurons(); }
 
-    // Retrieve current working memory content as activity levels
-    std::vector<float> retrieve() const;
-
-    // Check if specific neuron is part of working memory
-    bool contains(NeuronId neuron) const;
-
-    // Get activation level of a specific neuron in working memory
-    float getNeuronActivation(NeuronId neuron) const;
-
-    // Update working memory (maintenance and decay)
-    void update(TimestepDuration dt);
-
-    // Clear working memory
-    void clear();
-
-    // Get number of active memory traces
-    size_t getActiveTraces() const { return activeTraces_.size(); }
-
-    // Get capacity
-    size_t getCapacity() const { return capacity_; }
-    void setCapacity(size_t cap) { capacity_ = cap; }
-
-    // Decay rate for memory traces
-    float getDecayRate() const { return decayRate_; }
-    void setDecayRate(float rate) { decayRate_ = rate; }
-
-    // Get neurons currently in working memory
-    const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
-
-    // Strengthen working memory representation (for rehearsal)
-    void strengthenMemory(float factor);
-
-    // Competition between memory traces
-    void runCompetition();
-
-    // Is this neuron part of the winning population?
-    bool isWinning(NeuronId neuron) const;
-
-    // Get overall memory activity level
-    float getMemoryActivity() const;
+    // Set adapter for clean brain interaction
+    void setAdapter(std::shared_ptr<BrainMemoryAdapter> adapter) { adapter_ = adapter; }
 
 private:
     // Create recurrent connection for maintenance
@@ -88,6 +80,7 @@ private:
     std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
+    std::shared_ptr<BrainMemoryAdapter> adapter_;
     size_t capacity_;
     float decayRate_;
     
@@ -115,13 +108,22 @@ private:
 // - Recurrent amplification of winners
 // - Inhibitory surround suppression
 
-class AttentionalSelection {
+class AttentionalSelection : public virtual IMemorySystem {
 public:
     AttentionalSelection();
-    ~AttentionalSelection();
+    ~AttentionalSelection() override;
 
-    // Initialize with brain reference
-    void initialize(Brain* brain);
+    // IMemorySystem interface implementation
+    void initialize(Brain* owner) override;
+    void update(TimestepDuration dt) override;
+    void clear() override;
+    Brain* getOwner() const override { return brain_; }
+    bool isInitialized() const override { return brain_ != nullptr; }
+
+    // Legacy methods (for compatibility)
+    void initialize(Brain* brain) { initialize(brain); }
+    void update(TimestepDuration dt) { update(dt); }
+    void clear() { clear(); }
 
     // Process competing sensory inputs and select winners
     // Returns IDs of winning neural populations
@@ -147,9 +149,6 @@ public:
 
     // Get excitation level for a neuron
     float getExcitationFor(NeuronId neuron) const;
-
-    // Update attention dynamics
-    void update(TimestepDuration dt);
 
     // Is this neuron currently attended?
     bool isAttended(NeuronId neuron) const;

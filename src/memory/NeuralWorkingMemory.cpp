@@ -27,14 +27,14 @@ NeuralWorkingMemory::NeuralWorkingMemory()
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
-void NeuralWorkingMemory::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
+void NeuralWorkingMemory::initialize(Brain* owner) {
+    brain_ = owner;
+    pImpl->brain = owner;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
-    if (pattern.empty() || !brain_) return;
+    if (pattern.empty() || !brain_ || !adapter_) return;
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
@@ -43,14 +43,9 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
+        // Set neuron activation using adapter
+        if (auto* n = adapter_->getNeuron(brain_, neuron)) {
+            n->injectCurrent(activation * 5.0f);
         }
         
         // Update stored activation
@@ -84,8 +79,8 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     }
     
     // Inject current to maintain activation
-    if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
+    if (adapter_) {
+        adapter_->injectCurrent(brain_, neuron, activation * 5.0f);
     }
 }
 
@@ -122,8 +117,10 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         float activation = memoryActivations_[i];
         
         if (activation > 0.1f) {
-            // Inject maintenance current
-            brain_->injectCurrent(neuron, activation * 2.0f);
+            // Inject maintenance current using adapter
+            if (adapter_) {
+                adapter_->injectCurrent(brain_, neuron, activation * 2.0f);
+            }
             
             // Age the trace
             memoryTimestamps_[i]++;
@@ -176,9 +173,9 @@ void NeuralWorkingMemory::runCompetition() {
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
         
-        if (!isWinner && brain_) {
-            // Apply strong inhibition
-            brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
+        if (!isWinner && adapter_) {
+            // Apply strong inhibition using adapter
+            adapter_->injectCurrent(brain_, memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
         }
     }
 }
@@ -218,9 +215,9 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
             fromActivation = memoryActivations_[idx];
         }
         
-        if (fromActivation > 0.1f && brain_) {
-            // Send maintenance signal
-            brain_->injectCurrent(conn.second, fromActivation * 2.0f);
+        if (fromActivation > 0.1f && adapter_) {
+            // Send maintenance signal using adapter
+            adapter_->injectCurrent(brain_, conn.second, fromActivation * 2.0f);
         }
     }
 }
@@ -264,9 +261,9 @@ AttentionalSelection::AttentionalSelection()
 
 AttentionalSelection::~AttentionalSelection() = default;
 
-void AttentionalSelection::initialize(Brain* brain) {
+void AttentionalSelection::initialize(Brain* owner) {
+    brain_ = owner;
     pImpl = std::make_unique<Impl>();
-    brain_ = brain;
     NLM_LOG_INFO("AttentionalSelection initialized");
 }
 
@@ -308,6 +305,8 @@ std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector
             if (relativeActivity > 1.5f) {
                 // i is much stronger than j - apply inhibition to j
                 if (brain_) {
+                    // Would use adapter if available
+                    // For now, direct access for compatibility
                     brain_->injectCurrent(competitors[j], -globalInhibition * inhibitionStrength_);
                 }
                 pImpl->inhibitionLevel.push_back(globalInhibition * inhibitionStrength_);

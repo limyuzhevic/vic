@@ -25,10 +25,17 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
 
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
 
-void NeuralEpisodicMemory::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
+void NeuralEpisodicMemory::initialize(Brain* owner) {
+    brain_ = owner;
+    pImpl->brain = owner;
     NLM_LOG_INFO("NeuralEpisodicMemory initialized");
+}
+
+void NeuralEpisodicMemory::update(TimestepDuration dt) {
+    // Update episode aging
+    for (auto& ep : episodes_) {
+        ep.age++;
+    }
 }
 
 void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
@@ -165,7 +172,7 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveAfterAction
 }
 
 void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
-    if (!episode || !brain_) return;
+    if (!episode || !brain_ || !adapter_) return;
     
     // Reactivate neurons that were active during this episode
     for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
@@ -173,8 +180,8 @@ void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
         float activation = i < episode->neuronActivations.size() ? 
                           episode->neuronActivations[i] : 0.5f;
         
-        // Inject current to reawaken this pattern
-        brain_->injectCurrent(neuron, activation * 3.0f);
+        // Inject current to reawaken this pattern using adapter
+        adapter_->injectCurrent(brain_, neuron, activation * 3.0f);
     }
     
     // Also inject sensory pattern if available
@@ -333,15 +340,19 @@ NeuralAssociativeMemory::NeuralAssociativeMemory()
 
 NeuralAssociativeMemory::~NeuralAssociativeMemory() = default;
 
-void NeuralAssociativeMemory::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
+void NeuralAssociativeMemory::initialize(Brain* owner) {
+    brain_ = owner;
+    pImpl->brain = owner;
     NLM_LOG_INFO("NeuralAssociativeMemory initialized");
 }
 
+void NeuralAssociativeMemory::update(TimestepDuration dt) {
+    // Update associative memory
+}
+
 void NeuralAssociativeMemory::associate(const std::vector<float>& patternA,
-                                        const std::vector<float>& patternB,
-                                        float strength) {
+                                         const std::vector<float>& patternB,
+                                         float strength) {
     NeuronId neuronA = findPatternNeuron(patternA);
     NeuronId neuronB = findPatternNeuron(patternB);
     
@@ -467,8 +478,8 @@ float NeuralAssociativeMemory::getAssociationStrength(
 }
 
 void NeuralAssociativeMemory::updateAssociation(const std::vector<float>& patternA,
-                                                const std::vector<float>& patternB,
-                                                float delta) {
+                                                 const std::vector<float>& patternB,
+                                                 float delta) {
     NeuronId neuronA = findPatternNeuron(patternA);
     NeuronId neuronB = findPatternNeuron(patternB);
     

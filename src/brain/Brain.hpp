@@ -6,6 +6,8 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../memory/IMemorySystem.hpp"
+#include "../memory/BrainMemoryAdapter.hpp"
 #include <memory>
 #include <string>
 
@@ -16,9 +18,9 @@ class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
+class IWorkingMemory;
+class IEpisodicMemory;
+class IAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
@@ -140,13 +142,13 @@ public:
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    IWorkingMemory* getWorkingMemory();
     
     // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    IEpisodicMemory* getEpisodicMemory();
     
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    IAssociativeMemory* getAssociativeMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
