@@ -105,18 +105,118 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Collect final metrics
     result.totalReward = totalReward / config.maxSteps;
     result.avgFiringRate = totalFiringRate / config.maxSteps;
-    result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
-        static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
-    result.noveltyLevel = agent.getNoveltyLevel();
-    result.curiosityLevel = agent.getCuriosityLevel();
-    result.dopamineLevel = agent.getNeuromodulationLevel();
     
-    // Verify integration
+    // Memory system metrics
+    if (brain->getWorkingMemory()) {
+        result.memoryWorkingMemoryActiveTraces = brain->getWorkingMemory()->getActiveTraces();
+        result.workingMemoryUtilization = static_cast<float>(brain->getWorkingMemory()->getActiveTraces()) / 
+                                         brain->getWorkingMemory()->getCapacity();
+    }
+    
+    if (brain->getEpisodicMemory()) {
+        result.memoryEpisodesStored = static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount());
+        result.episodicMemoryUtilization = result.memoryEpisodesStored / 1000.0f; // Assuming max 1000 episodes
+        result.memoryReplayCount = brain->getEpisodicMemory()->getReplayCount();
+        result.memoryConsolidationQuality = brain->getEpisodicMemory()->getConsolidationQuality();
+    }
+    
+    // Brain structure metrics
+    result.totalNeuronCount = brain->getTotalNeuronCount();
+    result.totalSynapseCount = brain->getTotalSynapseCount();
+    result.avgSynapticWeight = brain->getExcitationInhibitionRatio();
+    
+    // System dynamics metrics
+    result.totalSpikeCount = brain->getTotalSpikeCount();
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
+    
+    // Neuromodulation metrics
+    if (brain->getDopamine()) {
+        result.dopamineLevel = brain->getDopamine()->getLevel();
+        result.rewardPredictionError = brain->getDopamine()->getRewardPredictionError();
+    }
+    
+    if (brain->getCuriosity()) {
+        result.curiosityLevel = brain->getCuriosity()->getLevel();
+    }
+    
+    if (brain->getNovelty()) {
+        result.noveltyLevel = brain->getNovelty()->getLevel();
+    }
+    
+    if (brain->getPredictionErrorSignal()) {
+        result.predictionError = brain->getPredictionErrorSignal()->getLevel();
+    }
+    
+    // Agent neuromodulation metrics
+    result.noveltyLevel = agent.getNoveltyLevel();
+    result.curiosityLevel = agent.getCuriosityLevel();
+    result.dopamineLevel = agent.getNeuromodulationLevel();
+    result.predictionError = agent.getPredictionError();
+    
+    // Additional system metrics
+    result.systemCohesionScore = calculateSystemCohesion(brain);
+    result.integrationCompleteness = calculateIntegrationCompleteness(brain);
+    result.emergentBehaviorScore = calculateEmergentBehaviorScore(brain, agent);
+    result.learningCurveQuality = calculateLearningCurveQuality(totalReward, config.maxSteps);
+    
+    // Development metrics
+    if (brain->getDevelopmentSystem()) {
+        result.developmentalProgress = brain->getDevelopmentSystem()->getProgress();
+        result.developmentalStageProgress = static_cast<float>(brain->getDevelopmentalStage()) / 6.0f;
+        result.developmentalPlasticity = brain->getDevelopmentSystem()->getPlasticityModifier();
+    }
+    
+    // Cognition metrics
+    if (brain->getPlanner()) {
+        result.planningEfficiency = brain->getPlanner()->getEfficiency();
+    }
+    
+    if (brain->getConceptFormation()) {
+        result.conceptFormationScore = brain->getConceptFormation()->getFormationScore();
+    }
+    
+    if (brain->getAttention()) {
+        result.attentionFocusScore = brain->getAttention()->getFocusScore();
+    }
+    
+    // Plasticity metrics
+    if (brain->getSTDP()) {
+        result.synapticPlasticityRate = brain->getSTDP()->getLearningRate();
+    }
+    
+    if (brain->getStructuralPlasticity()) {
+        result.structuralPlasticityRate = brain->getStructuralPlasticity()->getRate();
+    }
+    
+    // Neuromodulation balance
+    result.neuromodulationBalance = calculateNeuromodulationBalance(brain);
+    
+    // Exploration-exploitation ratio
+    result.explorationExploitationRatio = calculateExplorationExploitationRatio(agent);
+    
+    // Behavioral metrics
+    result.behavioralDiversity = calculateBehavioralDiversity(agent);
+    result.adaptationSpeed = calculateAdaptationSpeed(totalReward, config.maxSteps);
+    result.behavioralStability = calculateBehavioralStability(brain);
+    
+    // Performance metrics
+    if (brain->getTotalNeuronCount() > 0) {
+        result.simulationEfficiency = result.totalSpikeCount / static_cast<double>(brain->getTotalNeuronCount());
+    }
+    
+    result.peakMemoryUsage = getPeakMemoryUsage();
+    result.averageCPUUsage = getAverageCPUUsage();
+    result.networkActivity = getNetworkActivity();
+    
+    // Stability metrics
+    result.stabilityScore = calculateStabilityScore(brain);
+    result.robustnessScore = calculateRobustnessScore(brain);
+    result.simulationErrors = getSimulationErrorCount();
+    result.convergenceFailures = getConvergenceFailureCount();
     
     NLM_LOG_INFO("=== Integration Verification ===");
     NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
@@ -143,6 +243,18 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
             }
         } else {
             NLM_LOG_ERROR("Failed to save checkpoint");
+        }
+    }
+    
+    // Test replay system
+    if (config.enableReplay && brain->getEpisodicMemory() && brain->getEpisodicMemory()->getEpisodeCount() > 0) {
+        NLM_LOG_INFO("Testing memory replay system...");
+        auto episodes = brain->getEpisodicMemory()->getEpisodesForReplay(3);
+        if (!episodes.empty()) {
+            NLM_LOG_INFO("Replay system working - " + std::to_string(episodes.size()) + " episodes retrieved");
+            result.replayWorks = true;
+        } else {
+            NLM_LOG_ERROR("Replay system failed - no episodes retrieved");
         }
     }
     

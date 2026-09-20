@@ -25,9 +25,6 @@
 
 namespace nlm {
 
-/**
- * Phase 6 integration test result
- */
 struct Phase6IntegrationResult {
     // System integration status
     bool memoryWorkingMemoryIntegrated;
@@ -38,19 +35,73 @@ struct Phase6IntegrationResult {
     bool checkpointingWorks;
     bool replayWorks;
     
-    // Metrics
+    // Performance metrics
     float totalReward;
     float avgFiringRate;
     float avgSynapticWeight;
     float memoryEpisodesStored;
+    float memoryWorkingMemoryActiveTraces;
+    size_t totalSpikeCount;
+    size_t totalSynapseCount;
+    size_t totalNeuronCount;
+    float memoryConsolidationEfficiency;
+    float predictionAccuracy;
+    float planningEfficiency;
+    float attentionFocusScore;
+    float conceptFormationScore;
+    float developmentalProgress;
+    float neuromodulationBalance;
+    float explorationExploitationRatio;
+    
+    // Neuromodulation metrics
     float noveltyLevel;
     float curiosityLevel;
     float dopamineLevel;
+    float predictionError;
+    float rewardPredictionError;
     
-    // Timestamps
+    // Time metrics
     time_t startTime;
     time_t endTime;
     double totalWallClockTime;
+    double avgStepTime;
+    double simulationEfficiency;
+    
+    // Memory system metrics
+    float episodicMemoryUtilization;
+    float workingMemoryUtilization;
+    float memoryRetentionRate;
+    size_t memoryReplayCount;
+    float memoryConsolidationQuality;
+    
+    // Plasticity and development metrics
+    float synapticPlasticityRate;
+    float structuralPlasticityRate;
+    float developmentalStageProgress;
+    float plasticityHomeostasis;
+    
+    // Integration quality scores
+    float systemCohesionScore;
+    float integrationCompleteness;
+    float emergentBehaviorScore;
+    float learningCurveQuality;
+    
+    // Error and stability metrics
+    size_t simulationErrors;
+    size_t convergenceFailures;
+    float stabilityScore;
+    float robustnessScore;
+    
+    // Resource utilization
+    double peakMemoryUsage;
+    double averageCPUUsage;
+    double networkActivity;
+    
+    // Behavioral metrics
+    float behavioralDiversity;
+    float adaptationSpeed;
+    float behavioralStability;
+    float goalProgress;
     
     Phase6IntegrationResult()
         : memoryWorkingMemoryIntegrated(false)
@@ -64,12 +115,52 @@ struct Phase6IntegrationResult {
         , avgFiringRate(0.0f)
         , avgSynapticWeight(0.0f)
         , memoryEpisodesStored(0.0f)
+        , memoryWorkingMemoryActiveTraces(0.0f)
+        , totalSpikeCount(0)
+        , totalSynapseCount(0)
+        , totalNeuronCount(0)
+        , memoryConsolidationEfficiency(0.0f)
+        , predictionAccuracy(0.0f)
+        , planningEfficiency(0.0f)
+        , attentionFocusScore(0.0f)
+        , conceptFormationScore(0.0f)
+        , developmentalProgress(0.0f)
+        , neuromodulationBalance(0.0f)
+        , explorationExploitationRatio(0.0f)
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
         , dopamineLevel(0.0f)
+        , predictionError(0.0f)
+        , rewardPredictionError(0.0f)
+        , totalWallClockTime(0.0)
+        , avgStepTime(0.0)
+        , simulationEfficiency(0.0)
+        , episodicMemoryUtilization(0.0f)
+        , workingMemoryUtilization(0.0f)
+        , memoryRetentionRate(0.0f)
+        , memoryReplayCount(0)
+        , memoryConsolidationQuality(0.0f)
+        , synapticPlasticityRate(0.0f)
+        , structuralPlasticityRate(0.0f)
+        , developmentalStageProgress(0.0f)
+        , plasticityHomeostasis(0.0f)
+        , systemCohesionScore(0.0f)
+        , integrationCompleteness(0.0f)
+        , emergentBehaviorScore(0.0f)
+        , learningCurveQuality(0.0f)
+        , simulationErrors(0)
+        , convergenceFailures(0)
+        , stabilityScore(0.0f)
+        , robustnessScore(0.0f)
+        , peakMemoryUsage(0.0)
+        , averageCPUUsage(0.0)
+        , networkActivity(0.0)
+        , behavioralDiversity(0.0f)
+        , adaptationSpeed(0.0f)
+        , behavioralStability(0.0f)
+        , goalProgress(0.0f)
         , startTime(0)
-        , endTime(0)
-        , totalWallClockTime(0.0) {}
+        , endTime(0) {}
 };
 
 /**
