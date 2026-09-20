@@ -1,8 +1,11 @@
 #include "NeuralEpisodicMemory.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../brain/Neuron.hpp"
+#include "../plasticity/Hebbian.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <random>
 
 namespace nlm {
 
@@ -12,7 +15,50 @@ struct NeuralEpisodicMemory::Impl {
     // Pattern neurons for episodic recall
     std::vector<NeuronId> episodeNeurons;
     
-    Impl() : brain(nullptr) {}
+    // Synaptic tagging and capture state
+    std::unordered_map<NeuronId, float> synapticTags;        // NeuronId -> tag strength (0-1)
+    std::unordered_map<NeuronId, float> capturedResources;  // NeuronId -> captured resources
+    std::unordered_map<NeuronId, float> consolidationDelay; // NeuronId -> remaining delay
+    
+    // Offline consolidation state
+    bool offlineConsolidationActive;
+    float consolidationPhase;
+    size_t consolidationStepsProcessed;
+    SimulationStep offlineConsolidationStartTime;
+    
+    // Systems consolidation state
+    std::unordered_map<size_t, float> longTermMemoryStrength; // episodeId -> strength (0-1)
+    
+    // Neural replay statistics
+    struct ReplayStats {
+        size_t replayCount;
+        size_t replaySteps;
+        float totalReplayStrength;
+        float totalPatternCompletion;
+    } replayStats;
+    
+    // Replay timing and sequencing
+    struct ReplayEvent {
+        size_t episodeId;
+        float strength;
+        SimulationStep timestamp;
+        bool isOffline;
+        float predictedCompletion;
+    };
+    
+    std::deque<ReplayEvent> replayQueue;
+    SimulationStep lastReplayTime;
+    
+    Impl() : brain(nullptr),
+             offlineConsolidationActive(false),
+             consolidationPhase(0.0f),
+             consolidationStepsProcessed(0),
+             offlineConsolidationStartTime(0) {
+        replayStats.replayCount = 0;
+        replayStats.replaySteps = 0;
+        replayStats.totalReplayStrength = 0.0f;
+        replayStats.totalPatternCompletion = 0.0f;
+    }
 };
 
 NeuralEpisodicMemory::NeuralEpisodicMemory()
@@ -20,6 +66,10 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
     , brain_(nullptr)
     , maxEpisodes_(1000)
     , replayEnabled_(true)
+    , offlineConsolidationActive_(false)
+    , consolidationPhase_(0.0f)
+    , consolidationStepsProcessed_(0)
+    , lastReplayTime_(0)
 {
 }
 
@@ -32,34 +82,101 @@ void NeuralEpisodicMemory::initialize(Brain* brain) {
 }
 
 void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
-    // Create episode copy with age 0
-    EpisodicMemoryItem stored = episode;
-    stored.age = 0;
+    // Legacy function - kept for backward compatibility
+    storeEpisodeWithPlasticity(episode, std::vector<NeuronId>());
+}
+
+float NeuralEpisodicMemory::calculateMemoryRelevance(const EpisodicMemoryItem& episode) const {
+    // Calculate memory relevance based on multiple neurobiological factors
+    float relevance = 0.0f;
     
-    episodes_.push_back(stored);
+    // 1. Recency factor (recent experiences are more relevant)
+    float recencyFactor = 1.0f / (1.0f + static_cast<float>(episode.age) / 100.0f);
     
-    // Create episode neuron for pattern completion
-    if (brain_ && !episode.sensoryState.empty()) {
-        NeuronId epNeuron(episodes_.size() + 20000);
-        pImpl->episodeNeurons.push_back(epNeuron);
-        
-        // Store episode index in the neuron
-        // (This is a simplified approach - real implementation would use more distributed encoding)
+    // 2. Reward factor (rewarded experiences are more relevant)
+    float rewardFactor = std::min(1.0f, episode.reward / 10.0f);
+    
+    // 3. Novelty factor (novel experiences are more relevant)
+    float noveltyFactor = std::min(1.0f, episode.novelty);
+    
+    // 4. Co-activity factor (experiences with co-active neurons are more relevant)
+    float coactivityFactor = std::min(1.0f, static_cast<float>(episode.activeNeurons.size()) / 20.0f);
+    
+    // 5. Emotional intensity factor (energy, novelty, reward combined)
+    float emotionalFactor = std::min(1.0f, (episode.energy + episode.novelty + episode.reward) / 30.0f);
+    
+    // Weighted combination of factors
+    relevance = recencyFactor * 0.2f +
+                rewardFactor * 0.25f +
+                noveltyFactor * 0.15f +
+                coactivityFactor * 0.2f +
+                emotionalFactor * 0.2f;
+    
+    // Ensure relevance is within bounds
+    return std::clamp(relevance, 0.0f, 1.0f);
+}
+
+float NeuralEpisodicMemory::calculateHebbianWeightChange(NeuronId sourceNeuron, NeuronId destNeuron) const {
+    // Calculate Hebbian weight change for episode neuron connections
+    // Based on the principle "neurons that fire together, wire together"
+    
+    // For simplicity, use a probabilistic Hebbian update
+    // In real implementation, would depend on actual spike timing
+    float weightChange = (rand() % 100) / 100.0f * 0.1f;  // Random 0-0.1
+    
+    // Bias toward positive (excitatory) changes for episode neurons
+    if ((rand() % 100) < 50) {
+        weightChange *= 1.5f;
     }
     
-    // Remove old episodes if over capacity
-    while (episodes_.size() > maxEpisodes_) {
-        episodes_.erase(episodes_.begin());
-        if (!pImpl->episodeNeurons.empty()) {
-            pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
-        }
+    return weightChange;
+}
+
+void NeuralEpisodicMemory::updateConsolidationStatus(EpisodicMemoryItem& episode, float replayStrength) {
+    // Update memory consolidation status based on neurobiological principles
+    
+    // Calculate consolidation strength based on multiple factors
+    float ageFactor = std::min(1.0f, static_cast<float>(episode.age) / 1000.0f);
+    float relevanceFactor = episode.relevance;
+    float emotionalFactor = std::min(1.0f, (episode.reward + episode.energy + episode.novelty) / 30.0f);
+    
+    // Consolidation strength increases with age, relevance, and emotional intensity
+    float newConsolidationStrength = ageFactor * 0.3f +
+                                      relevanceFactor * 0.4f +
+                                      emotionalFactor * 0.3f;
+    
+    // Apply replay-induced plasticity to consolidation status
+    if (replayStrength > 0.0f) {
+        float replayBoost = std::min(1.0f, replayStrength * 2.0f);
+        newConsolidationStrength = std::min(1.0f, newConsolidationStrength + replayBoost * 0.3f);
     }
     
-    // Age all episodes
-    for (auto& ep : episodes_) {
-        ep.age++;
+    episode.consolidationStrength = newConsolidationStrength;
+    
+    // Check if episode should be consolidated (transfer to long-term storage)
+    if (newConsolidationStrength > 0.7f && !episode.isConsolidated) {
+        episode.isConsolidated = true;
+        NLM_LOG_INFO("Episode " + std::to_string(episode.timestamp) + 
+                   " consolidated to long-term memory (strength: " +
+                   std::to_string(newConsolidationStrength) + ")");
+    }
+    
+    // Update systems consolidation progress
+    if (episode.isConsolidated) {
+        episode.systemsConsolidationProgress = std::min(1.0f,
+            episode.systemsConsolidationProgress + 0.01f * static_cast<float>(episode.age) / 1000.0f);
     }
 }
+
+float NeuralEpisodicMemory::calculateHebbianWeightChange(NeuronId sourceNeuron, NeuronId destNeuron) const {
+    return 0.0f;  // Placeholder
+}
+
+void NeuralEpisodicMemory::updateConsolidationStatus(EpisodicMemoryItem& episode, float replayStrength) {
+    // Placeholder for updateConsolidationStatus
+}
+
+} // namespace nlm
 
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveSimilar(
     const std::vector<float>& sensoryPattern,

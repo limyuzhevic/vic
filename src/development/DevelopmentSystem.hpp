@@ -50,6 +50,16 @@ private:
     struct Impl;
     Impl* pImpl;
     double age_;
+    
+    // Private methods for neuroplasticity integration
+    void updateCriticalPeriod();
+    void updateSensitivePeriods();
+    
+    // Experience calculation methods
+    float calculateTotalNeuralActivity() const;
+    float calculateLanguageExperience() const;
+    float calculateSocialExperience() const;
+    float calculateSkillExperience() const;
 };
 
 } // namespace nlm

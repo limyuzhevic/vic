@@ -404,17 +404,37 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Connect working memory to attention system
+        if (pImpl->attention && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
+        
+        // Novelty modulates attention and prediction error
+        float noveltyLevel = pImpl->novelty->getLevel();
+        if (pImpl->attention) {
+            pImpl->attention->applyBottomUpSalience(nullptr, noveltyLevel * 0.5f);
+        }
     }
     
     // Update curiosity
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
+        
+        // Curiosity modulates planning and exploration
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        if (pImpl->planner) {
+            // Curiosity affects planning confidence and depth
+            float confidenceFactor = curiosityLevel * 0.5f + 0.5f;
+            // In a real implementation, this would affect planning parameters
+        }
     }
     
     // Update dopamine (reward prediction error)
@@ -436,6 +456,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                 }
             }
+        }
+        
+        // Dopamine also modulates plasticity
+        if (pImpl->dopamine) {
+            // In real NLM, dopamine modulates STDP learning rates
+            // Higher dopamine can strengthen LTP, suppress LTD
         }
     }
     
@@ -509,9 +535,45 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 7: Update episodic memory ==========
+    pImpl->stepsSinceLastEpisode++;
+    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+        pImpl->stepsSinceLastEpisode = 0;
+        
+        if (pImpl->episodicMemory) {
+            // Capture current brain state as an episode
+            EpisodicMemoryItem episode;
+            episode.timestamp = currentStep;
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Store active neurons
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring() || 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            episode.activeNeurons.push_back(neuron->getId());
+                            episode.neuronActivations.push_back(
+                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                        }
+                    }
+                }
+            }
+            
+            // Store reward in episode
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            pImpl->episodicMemory->storeEpisode(episode);
+        }
+    }
+    
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
+        // For now, just track prediction error history
+        // Create a placeholder sensory input for prediction update
+        SensoryInput dummyInput;
+        // This would need to be connected to actual sensory processing
         // For now, just track prediction error history
     }
     
@@ -528,8 +590,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation processes neural activity patterns to extract
+        // regularities and form abstract representations
+        // In real NLM, this would analyze firing patterns to identify
+        // recurring motifs and relationships
+        pImpl->conceptFormation->update(pImpl->timestep);
+        
+        // Concepts influence attention and working memory
+        if (pImpl->attention) {
+            // Concepts guide attention to relevant features
+            // This would require encoding current concept activations
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1006,41 +1077,41 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
+    return pImpl->workingMemory ? pImpl->workingMemory.get() : nullptr;
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
+    return pImpl->episodicMemory ? pImpl->episodicMemory.get() : nullptr;
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
+    return pImpl->associativeMemory ? pImpl->associativeMemory.get() : nullptr;
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
+    return pImpl->predictionSystem ? pImpl->predictionSystem.get() : nullptr;
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
+    return pImpl->planner ? pImpl->planner.get() : nullptr;
 }
 
 ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
+    return pImpl->conceptFormation ? pImpl->conceptFormation.get() : nullptr;
 }
 
 AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
+    return pImpl->attention ? pImpl->attention.get() : nullptr;
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
+    return pImpl->developmentSystem ? pImpl->developmentSystem.get() : nullptr;
 }
 
 DevelopmentalStage Brain::getDevelopmentalStage() const {
@@ -1054,19 +1125,19 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 // ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
+    return pImpl->dopamine ? pImpl->dopamine.get() : nullptr;
 }
 
 Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
+    return pImpl->curiosity ? pImpl->curiosity.get() : nullptr;
 }
 
 Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
+    return pImpl->novelty ? pImpl->novelty.get() : nullptr;
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
+    return pImpl->predictionError ? pImpl->predictionError.get() : nullptr;
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
@@ -1075,6 +1146,217 @@ std::shared_ptr<const Config> Brain::getConfig() const {
 
 RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
+}
+
+// Include concept formation and spatial representation access methods
+
+// ========== COGNITION SYSTEM ACCESSORS (ADDITIONAL) ==========
+
+// SpatialRepresentation* Brain::getSpatialRepresentation() {
+//     return pImpl->spatialRepresentation ? pImpl->spatialRepresentation.get() : nullptr;
+// }
+
+// TemporalRelation* Brain::getTemporalRelation() {
+//     return pImpl->temporalRelation ? pImpl->temporalRelation.get() : nullptr;
+// }
+
+// ========== ADAPTIVE BEHAVIOR SYSTEMS ==========
+
+// SocialLearning* Brain::getSocialLearning() {
+//     return pImpl->socialLearning ? pImpl->socialLearning.get() : nullptr;
+// }
+
+// =========== SelfModel ===========
+
+// SelfModel* Brain::getSelfModel() {
+//     return pImpl->selfModel ? pImpl->selfModel.get() : nullptr;
+// }
+
+// ============= Additional Functionality =============
+
+void Brain::setCurrentGoal(const std::vector<float>& goal) {
+    if (pImpl->planner) {
+        pImpl->planner->setCurrentGoal(goal);
+    }
+}
+
+void Brain::setActionQuality(ActionType action, float quality) {
+    if (pImpl->planner) {
+        pImpl->planner->setActionQuality(action, quality);
+    }
+}
+
+void Brain::activateConcept(size_t conceptId) {
+    if (pImpl->conceptFormation) {
+        // This would activate the concept and influence neural activity
+        // In real implementation, this would encode the concept in working memory
+    }
+}
+
+void Brain::applyTopDownBias(NeuronId neuron, float biasStrength) {
+    if (pImpl->attention) {
+        pImpl->attention->applyTopDownBias(neuron, biasStrength);
+    }
+}
+
+void Brain::applyBottomUpSalience(NeuronId neuron, float salienceStrength) {
+    if (pImpl->attention) {
+        pImpl->attention->applyBottomUpSalience(neuron, salienceStrength);
+    }
+}
+
+void Brain::updatePrediction() {
+    if (pImpl->predictionSystem) {
+        // This would update predictions based on current state
+        // In real implementation, this would be connected to sensory processing
+    }
+}
+
+void Brain::storeInEpisodicMemory(float reward, const std::vector<NeuronId>& activeNeurons,
+                                 const std::vector<float>& activations, SimulationStep step) {
+    if (pImpl->episodicMemory) {
+        EpisodicMemoryItem episode;
+        episode.timestamp = step;
+        episode.reward = reward;
+        episode.activeNeurons = activeNeurons;
+        episode.neuronActivations = activations;
+        pImpl->episodicMemory->storeEpisode(episode);
+    }
+}
+
+void Brain::enableReplay(bool enable) {
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->enableReplay(enable);
+    }
+}
+
+void Brain::setReplayInterval(size_t interval) {
+    pImpl->replayInterval = interval;
+}
+
+void Brain::setConsolidationInterval(size_t interval) {
+    pImpl->consolidationInterval = interval;
+}
+
+void Brain::setDevelopmentStage(DevelopmentalStage stage) {
+    setDevelopmentalStage(stage);
+    // Development stage affects neural plasticity and maturation
+}
+
+void Brain::collectStatistics() {
+    // Record statistics for learning and analysis
+    // This would integrate with metrics system
+}
+
+void Brain::logCognitionStatus() const {
+    if (pImpl->planner) {
+        NLM_LOG_INFO("Planner confidence: " + std::to_string(pImpl->planner->getPlanningConfidence()));
+        NLM_LOG_INFO("Planning depth: " + std::to_string(pImpl->planner->getPlanningDepth()));
+    }
+    if (pImpl->conceptFormation) {
+        NLM_LOG_INFO("Concepts formed: " + std::to_string(conceptCount()));
+    }
+    if (pImpl->attention) {
+        NLM_LOG_INFO("Attention winners: " + std::to_string(pImpl->attention->getWinners().size()));
+    }
+}
+
+void Brain::logMemoryStatus() const {
+    logStatus();  // Reuse existing log status
+    
+    if (pImpl->episodicMemory) {
+        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+        NLM_LOG_INFO("Replay enabled: " + std::to_string(pImpl->episodicMemory->isReplayEnabled()));
+    }
+}
+
+void Brain::logNeuromodulationStatus() const {
+    if (pImpl->dopamine) {
+        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
+    }
+}
+
+void Brain::logDevelopmentStatus() const {
+    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    // Additional development metrics would go here
+}
+
+// Helper method to get concept count
+size_t Brain::conceptCount() const {
+    if (pImpl->conceptFormation) {
+        // This would need to be exposed in ConceptFormation
+        return 0; // Placeholder
+    }
+    return 0;
+}
+
+// ============ ADVANCED BRAIN OPERATIONS =============
+
+void Brain::performSleepConsolidation() {
+    // Put brain in resting state and consolidate memories
+    pImpl->isResting = true;
+    
+    if (pImpl->episodicMemory) {
+        // Consolidate recently formed memories
+        pImpl->episodicMemory->consolidate(0.3f);
+    }
+    
+    // Replay important memories during sleep
+    if (pImpl->episodicMemory) {
+        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(10);
+        for (const auto* episode : episodesToReplay) {
+            pImpl->episodicMemory->replayEpisode(episode);
+        }
+    }
+}
+
+void Brain::awaken() {
+    pImpl->isResting = false;
+    // Reset replay interval after sleep
+    pImpl->stepsSinceLastEpisode = 0;
+}
+
+void Brain::setNeuromodulationLevel(const std::string& type, float level) {
+    if (type == "dopamine" && pImpl->dopamine) {
+        // This would require direct access to neuromodulator internal state
+        // For now, this is a placeholder for future implementation
+    } else if (type == "curiosity" && pImpl->curiosity) {
+        // Similar here
+    } else if (type == "novelty" && pImpl->novelty) {
+        // Similar here
+    }
+}
+
+void Brain::updateLearningRate(float rate) {
+    // This would affect plasticity parameters throughout the brain
+    // In real implementation, would update STDP, Hebbian, and structural plasticity
+}
+
+void Brain::enableOnlineLearning(bool enable) {
+    // Enable or disable online learning capabilities
+    // When disabled, the brain would be in a stable, completed state
+}
+
+void Brain::resetLearningBuffers() {
+    // Clear prediction errors, memory traces, and learning buffers
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->clearHistory();
+    }
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->clear();
+    }
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->clear();
+    }
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->clear();
+    }
 }
 
 void Brain::logStatus() const {

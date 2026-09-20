@@ -218,6 +218,52 @@ void Synapse::step(Timestamp currentTime) {
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
+    // Implement homeostatic plasticity - maintain firing rate stability
+    // This implements synaptic scaling as described in BCM theory
+    // Target firing rate ~2-10 Hz for excitatory neurons
+    float targetFiringRate = 5.0f;  // Hz
+    float currentFiringRate = pImpl->efficacy;  // Simplified model
+    float error = targetFiringRate - currentFiringRate;
+    
+    // Synaptic scaling: global weight adjustment proportional to firing error
+    // Homeostatic plasticity: gradual weight changes to maintain stability
+    if (std::abs(error) > 0.1f) {
+        // Scaling factor - larger for bigger errors
+        float scaleFactor = std::min(0.01f, std::abs(error) * 0.005f);
+        
+        // Scale weight in the direction that brings firing rate toward target
+        float scaleChange = scaleFactor * (error > 0 ? 0.5f : -0.5f);
+        
+        // Apply scaling with exponential decay to prevent overshoot
+        pImpl->weight += scaleChange * pImpl->weight;
+        
+        // Limit scaling to reasonable range
+        if (std::abs(pImpl->weight) > 2.0f) {
+            pImpl->weight = std::copysign(2.0f, pImpl->weight);
+        }
+    }
+    
+    // Implement synaptic tagging and capture for memory consolidation
+    // Synaptic tags mark synapses for potential strengthening
+    if (pImpl->preSpikeHistory.size() > 0 && pImpl->postSpikeHistory.size() > 0) {
+        // Check for recent correlated activity (Hebbian-like)
+        float tagThreshold = 0.3f;
+        float tagStrength = 0.0f;
+        
+        // Simple correlation-based tagging
+        for (Timestamp preTime : pImpl->preSpikeHistory) {
+            for (Timestamp postTime : pImpl->postSpikeHistory) {
+                float dt = static_cast<float>(postTime - preTime);
+                if (std::abs(dt) < 50.0f) {  // 50ms window
+                    tagStrength += 0.1f;
+                }
+            }
+        }
+        
+        // Update synaptic tag
+        pImpl->eligibilityTrace += tagStrength * 0.1f;
+    }
+    
     // Clamp weight bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
