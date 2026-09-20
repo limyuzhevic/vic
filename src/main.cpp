@@ -363,24 +363,30 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
+// Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Fix: Add configuration validation
+    if (!validateConfiguration(config)) {
+        NLM_LOG_ERROR("Invalid configuration! Please check your config file or command line arguments.");
+        return 1;
+    }
+    
+    // Set default values for Phase 2 (only if not set by config or command line)
+    if (!config->has("random_seed")) config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    if (!config->has("simulation_timestep")) config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    if (!config->has("neuron_count")) config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    if (!config->has("region_count")) config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    if (!config->has("connection_probability")) config->set("connection_probability", 0.15f, ConfigSource::Default);
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    if (!config->has("stdp_ltp_weight")) config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    if (!config->has("stdp_ltd_weight")) config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    if (!config->has("stdp_tau")) config->set("stdp_tau", 20.0f, ConfigSource::Default);
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    if (!config->has("synaptogenesis_rate")) config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    if (!config->has("pruning_rate")) config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -392,19 +398,38 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
+    // Validate parameter ranges
+    if (config->getOr<int64_t>("neuron_count", 500) <= 0) {
+        NLM_LOG_ERROR("Error: neuron_count must be positive");
+        return 1;
+    }
+    
+    if (config->getOr<int64_t>("region_count", 1) <= 0) {
+        NLM_LOG_ERROR("Error: region_count must be positive");
+        return 1;
+    }
+    
+    if (config->getOr<float>("connection_probability", 0.15f) < 0.0f || 
+        config->getOr<float>("connection_probability", 0.15f) > 1.0f) {
+        NLM_LOG_ERROR("Error: connection_probability must be between 0.0 and 1.0");
+        return 1;
+    }
+    
+    if (config->getOr<double>("simulation_timestep", 0.001) <= 0.0) {
+        NLM_LOG_ERROR("Error: simulation_timestep must be positive");
+        return 1;
+    }
+    
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
-    
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
-        return 1;
+    // Validate timestep range
+    if (timestep < 1e-6) {
+        NLM_LOG_WARNING("Very small timestep may cause numerical instability");
+    } else if (timestep > 1.0) {
+        NLM_LOG_WARNING("Large timestep may cause temporal aliasing");
     }
     
     brain->logStatus();

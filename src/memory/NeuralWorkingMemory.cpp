@@ -23,6 +23,12 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    // Fix: Initialize all vectors properly
+    memoryNeurons_.reserve(capacity_);
+    memoryActivations_.reserve(capacity_);
+    memoryTimestamps_.reserve(capacity_);
+    activeTraces_.reserve(capacity_);
+    recurrentConnections_.reserve(capacity_ * 2);
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
@@ -70,7 +76,7 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
-    // Find or add this neuron to memory
+    // Find or add this neuron to working memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     
     if (it != memoryNeurons_.end()) {
@@ -81,6 +87,7 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        activeTraces_.push_back(0);
     }
     
     // Inject current to maintain activation
@@ -128,7 +135,7 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             // Age the trace
             memoryTimestamps_[i]++;
             
-            // Check if trace is too old
+            // Check if trace is too old (decay older traces)
             if (memoryTimestamps_[i] > 1000) {
                 activation *= (1.0f - decayRate_);
             }
@@ -140,8 +147,8 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     // Decay weak traces
     decayWeakTraces();
     
-    // Run competition to select winners
-    runCompetition();
+    // Update recurrent connections
+    updateRecurrentConnections();
 }
 
 void NeuralWorkingMemory::clear() {
@@ -158,30 +165,31 @@ void NeuralWorkingMemory::strengthenMemory(float factor) {
     }
 }
 
-void NeuralWorkingMemory::runCompetition() {
-    winners_.clear();
-    
-    if (memoryActivations_.empty()) return;
-    
-    // Find neurons with above-threshold activation
-    float threshold = 0.3f;
-    
-    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        if (memoryActivations_[i] >= threshold) {
-            winners_.push_back(memoryNeurons_[i]);
-        }
-    }
-    
-    // Inhibitory competition - suppress non-winners
-    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
+// Run competition - select winning memory traces
+    void NeuralWorkingMemory::runCompetition() {
+        winners_.clear();
         
-        if (!isWinner && brain_) {
-            // Apply strong inhibition
-            brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
+        if (memoryActivations_.empty()) return;
+        
+        // Find neurons with above-threshold activation
+        float threshold = 0.3f;
+        
+        for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+            if (memoryActivations_[i] >= threshold) {
+                winners_.push_back(memoryNeurons_[i]);
+            }
+        }
+        
+        // Apply competition - suppress non-winners
+        for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+            bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
+            
+            if (!isWinner && brain_) {
+                // Apply strong inhibition
+                brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
+            }
         }
     }
-}
 
 bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
     return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
@@ -241,6 +249,9 @@ void NeuralWorkingMemory::decayWeakTraces() {
         memoryNeurons_.erase(memoryNeurons_.begin() + *it);
         memoryActivations_.erase(memoryActivations_.begin() + *it);
         memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
+        if (*it < activeTraces_.size()) {
+            activeTraces_.erase(activeTraces_.begin() + *it);
+        }
     }
 }
 
