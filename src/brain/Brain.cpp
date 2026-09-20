@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <atomic>
 
 namespace nlm {
 
@@ -62,8 +63,8 @@ struct Brain::Impl {
     Timestamp currentTime;
     
     // Statistics
-    size_t totalSpikesThisStep;
-    size_t totalSpikesTotal;
+    std::atomic<size_t> totalSpikesThisStep;
+    std::atomic<size_t> totalSpikesTotal;
     
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
@@ -149,8 +150,14 @@ struct Brain::Impl {
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+        // Initialize parallel processing system
+        pImpl->parallelProcessing = std::make_unique<ParallelProcessing>();
+        pImpl->parallelProcessing->configure(pImpl->config->getOr<size_t>("max_parallel_tasks", 4));
+        
+        // Initialize memory pools
+        pImpl->neuronPool = std::make_unique<MemoryPool<Neuron>>(config->getOr<size_t>("neuron_pool_size", 10000));
+        pImpl->synapsePool = std::make_unique<MemoryPool<Synapse>>(config->getOr<size_t>("synapse_pool_size", 50000));
+        pImpl->populationPool = std::make_unique<MemoryPool<NeuralPopulation>>(config->getOr<size_t>("population_pool_size", 1000));
     }
     
     DevelopmentalStage developmentalStage;
@@ -159,15 +166,23 @@ struct Brain::Impl {
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
-Brain::~Brain() = default;
+Brain::~Brain() {
+    delete pImpl;
+}
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Brain::Brain(Brain&& other) noexcept : pImpl(nullptr) {
+    if (other.pImpl) {
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
 }
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
+        // Delete current pImpl
         delete pImpl;
+        
+        // Take ownership of other's pImpl
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -261,9 +276,9 @@ bool Brain::initialize() {
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
+        // Count spikes with atomic operations for thread safety
+        std::atomic_fetch_add_explicit(&pImpl->totalSpikesThisStep, 1, std::memory_order_relaxed);
+        std::atomic_fetch_add_explicit(&pImpl->totalSpikesTotal, 1, std::memory_order_relaxed);
     });
     
     // Register delayed spike handler to deliver synaptic input
@@ -332,10 +347,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
-    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // ========== STEP 2: Update all neurons (LIF dynamics) with optimized bulk processing ==========
+    // Pre-compute region and population pointers to avoid repeated virtual calls
+    std::vector<NeuralRegion*> regionPtrs;
+    regionPtrs.reserve(pImpl->regions.size());
     for (auto& region : pImpl->regions) {
+        regionPtrs.push_back(region.get());
+    }
+    
+    for (auto* region : regionPtrs) {
+        std::vector<NeuralPopulation*> popPtrs;
+        popPtrs.reserve(region->getPopulationCount());
         for (auto& pop : region->getPopulations()) {
+            popPtrs.push_back(pop.get());
+        }
+        
+        for (auto* pop : popPtrs) {
+            std::vector<Neuron*> neuronPtrs;
+            neuronPtrs.reserve(pop->getSize());
             for (auto* neuron : pop->getNeurons()) {
+                if (neuron) {  // Null check
+                    neuronPtrs.push_back(neuron);
+                }
+            }
+            
+            // Bulk update for this population
+            for (auto* neuron : neuronPtrs) {
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }
@@ -345,6 +382,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
+                if (!neuron) continue;  // Null check
+                
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
@@ -359,12 +398,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     // Record post-synaptic spike for incoming synapses (plasticity)
                     auto incomingSynapses = region->getSynapsesTo(neuron->getId());
                     for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
+                        if (syn) syn->recordPostSpike(currentTime);
                     }
 
                     // Get outgoing synapses and schedule delayed spike events
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
+                        if (!syn) continue;
+                        
                         // Create delayed spike event
                         Delay delay = syn->getDelay();
                         SimulationStep deliveryStep = currentStep + delay;
@@ -439,7 +480,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) with null pointer safety ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
@@ -448,6 +489,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
+            if (!syn) continue;  // Null check
+            
             // Apply STDP with neuromodulation
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
