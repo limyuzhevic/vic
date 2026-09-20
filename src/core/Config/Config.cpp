@@ -3,12 +3,88 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
+
+// Helper function to convert JSON value to ConfigValue
+static ConfigValue jsonToConfigValue(const json& j) {
+    if (j.is_number_integer()) {
+        return j.get<int64_t>();
+    } else if (j.is_number_float()) {
+        return j.get<double>();
+    } else if (j.is_boolean()) {
+        return j.get<bool>();
+    } else if (j.is_string()) {
+        return j.get<std::string>();
+    } else if (j.is_array()) {
+        // Handle array type - check element type
+        if (!j.empty()) {
+            if (j[0].is_number_integer()) {
+                std::vector<int64_t> intVec;
+                for (const auto& elem : j) {
+                    intVec.push_back(elem.get<int64_t>());
+                }
+                return intVec;
+            } else if (j[0].is_number_float()) {
+                std::vector<double> doubleVec;
+                for (const auto& elem : j) {
+                    doubleVec.push_back(elem.get<double>());
+                }
+                return doubleVec;
+            } else if (j[0].is_string()) {
+                std::vector<std::string> stringVec;
+                for (const auto& elem : j) {
+                    stringVec.push_back(elem.get<std::string>());
+                }
+                return stringVec;
+            }
+        }
+        // Default to empty vector of strings
+        return std::vector<std::string>();
+    }
+    return std::string();
+}
+
+// Helper function to convert ConfigValue to JSON
+static json configValueToJson(const ConfigValue& value) {
+    if (std::holds_alternative<int64_t>(value)) {
+        return std::get<int64_t>(value);
+    } else if (std::holds_alternative<double>(value)) {
+        return std::get<double>(value);
+    } else if (std::holds_alternative<bool>(value)) {
+        return std::get<bool>(value);
+    } else if (std::holds_alternative<std::string>(value)) {
+        return std::get<std::string>(value);
+    } else if (std::holds_alternative<std::vector<int64_t>>(value)) {
+        json j = std::get<std::vector<int64_t>>(value);
+        return j;
+    } else if (std::holds_alternative<std::vector<double>>(value)) {
+        json j = std::get<std::vector<double>>(value);
+        return j;
+    } else if (std::holds_alternative<std::vector<std::string>>(value)) {
+        json j = std::get<std::vector<std::string>>(value);
+        return j;
+    }
+    return json();
+}
+
+// Helper function to save configuration as JSON
+static void saveToJsonFile(const Config& config, const std::string& filepath) {
+    json j;
+    for (const auto& entry : config.pImpl->entries) {
+        j[entry.key] = configValueToJson(entry.value);
+    }
+    
+    std::ofstream file(filepath);
+    if (file.is_open()) {
+        file << j.dump(4); // Pretty print with 4-space indentation
+    }
+}
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
@@ -19,9 +95,41 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // TODO: Add JSON/YAML file loading support for config files
+    // TODO: Add config validation for parameter ranges
+    // TODO: Add environment variable support for config
+    // TODO: Add config merging capabilities
     
+    // Detect file format based on extension
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    // Try JSON format first (if extension is .json or .cfg)
+    if (ext == ".json" || ext == ".cfg" || ext == ".toml" || ext == ".yaml" || ext == ".yml") {
+        try {
+            std::ifstream file(filepath);
+            if (!file.is_open()) {
+                return false;
+            }
+            
+            json j;
+            file >> j;
+            
+            // If it's a JSON object, iterate through key-value pairs
+            if (j.is_object()) {
+                for (auto it = j.begin(); it != j.end(); ++it) {
+                    std::string key = it.key();
+                    ConfigValue value = jsonToConfigValue(it.value());
+                    set(key, value, ConfigSource::File);
+                }
+                return true;
+            }
+        } catch (const std::exception&) {
+            // Fall back to simple format if JSON parsing fails
+        }
+    }
+    
+    // Use simple key=value format as fallback
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -79,6 +187,16 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Determine format based on file extension
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == ".json") {
+        saveToJsonFile(*this, filepath);
+        return true;
+    }
+    
+    // Default to simple key=value format
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
