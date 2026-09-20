@@ -1,3 +1,4 @@
+// Check if Config.hpp has proper implementations for trim() and toLower() helper methods
 #pragma once
 
 #include <string>
@@ -5,6 +6,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <algorithm>
+#include <cctype>
 
 namespace nlm {
 
@@ -100,6 +103,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Parser implementations
+    bool parseJSON(const std::string& filepath);
+    bool parseYAML(const std::string& filepath);
+    bool parseSimpleKeyValue(const std::string& filepath);
 };
 
 } // namespace nlm

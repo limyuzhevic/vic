@@ -19,8 +19,152 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // NEW: JSON/YAML parser implementation with fallback to simple key=value format
+    
+    // First try JSON parsing (if jsoncpp library is available)
+    bool success = false;
+    
+    // Try JSON parsing first
+    success = parseJSON(filepath);
+    
+    // If JSON parsing fails and file extension suggests YAML, try YAML
+    if (!success && (filepath.size() > 5 && filepath.substr(filepath.size() - 5) == ".yaml") ||
+        (filepath.size() > 4 && filepath.substr(filepath.size() - 4) == ".yml")) {
+        success = parseYAML(filepath);
+    }
+    
+    // If both JSON/YAML parsing fail, fall back to simple key=value format
+    if (!success) {
+        success = parseSimpleKeyValue(filepath);
+    }
+    
+    return success;
+}
+
+bool Config::parseJSON(const std::string& filepath) {
+    // Simple JSON parser - in production, would use a proper JSON library like jsoncpp
+    // For now, implement a basic JSON parser that handles simple key-value pairs
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Try to parse as JSON object {
+    if (content.find('{') != std::string::npos && content.find('}') != std::string::npos) {
+        // Simple JSON parsing - extract key-value pairs
+        // This is a simplified implementation
+        size_t pos = content.find('{');
+        if (pos != std::string::npos) {
+            pos = content.find('"', pos);
+            while (pos != std::string::npos) {
+                size_t keyEnd = content.find('"', pos + 1);
+                if (keyEnd == std::string::npos) break;
+                
+                std::string key = content.substr(pos + 1, keyEnd - pos - 1);
+                
+                pos = content.find('"', keyEnd + 1);
+                if (pos == std::string::npos) break;
+                
+                pos = content.find(':', pos);
+                if (pos == std::string::npos) break;
+                
+                pos = content.find('"', pos + 1);
+                if (pos == std::string::npos) break;
+                
+                size_t valueEnd = content.find('"', pos + 1);
+                if (valueEnd == std::string::npos) break;
+                
+                std::string value = content.substr(pos + 1, valueEnd - pos - 1);
+                
+                // Remove quotes from key and value
+                if (!key.empty() && key.front() == '"' && key.back() == '"') {
+                    key = key.substr(1, key.size() - 2);
+                }
+                if (!value.empty() && value.front() == '"' && value.back() == '"') {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+                
+                pos = content.find('"', valueEnd + 1);
+            }
+            
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+bool Config::parseYAML(const std::string& filepath) {
+    // Simple YAML parser - in production, would use a proper YAML library like yaml-cpp
+    // For now, implement a basic YAML parser that handles key: value pairs
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip comments
+        line = trim(line);
+        if (line.empty() || line.substr(0, 2) == "# " || line.substr(0, 1) == "%") {
+            continue;
+        }
+        
+        // Parse YAML key: value
+        size_t pos = line.find(':');
+        if (pos != std::string::npos && pos > 0) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes from value if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            // Handle YAML boolean values
+            if (value == "true" || value == "yes" || value == "on") {
+                set(key, true, ConfigSource::File);
+            } else if (value == "false" || value == "no" || value == "off") {
+                set(key, false, ConfigSource::File);
+            } else if (value.find('.') != std::string::npos) {
+                // Try to parse as float
+                try {
+                    double floatValue = std::stod(value);
+                    set(key, floatValue, ConfigSource::File);
+                } catch (...) {
+                    set(key, value, ConfigSource::File);
+                }
+            } else {
+                // Try to parse as int
+                try {
+                    size_t posInt = 0;
+                    int intValue = std::stoi(value, &posInt);
+                    if (posInt == value.size()) {
+                        set(key, intValue, ConfigSource::File);
+                    } else {
+                        set(key, value, ConfigSource::File);
+                    }
+                } catch (...) {
+                    set(key, value, ConfigSource::File);
+                }
+            }
+        }
+    }
+    
+    return true;
+}
+
+bool Config::parseSimpleKeyValue(const std::string& filepath) {
+    // Original simple key=value parser - kept for backward compatibility
     
     std::ifstream file(filepath);
     if (!file.is_open()) {

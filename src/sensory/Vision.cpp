@@ -2,30 +2,40 @@
 
 namespace nlm {
 
-struct VisionProcessor::Impl {
-    std::vector<float> features;
-    size_t featureDimensions;
-    
-    Impl() : featureDimensions(0) {}
-};
+Vision::Vision() : width(0), height(0) {}
 
-VisionProcessor::VisionProcessor() : pImpl(new Impl) {}
-
-VisionProcessor::~VisionProcessor() = default;
-
-void VisionProcessor::process(const Vision& input) {
-    // TODO PHASE 2: Implement real vision processing using NLM's neural machinery
-    // PLACEHOLDER: Just pass through raw data
-    pImpl->features = input.getData();
-    pImpl->featureDimensions = input.getDimensions();
+Vision::Vision(size_t w, size_t h, size_t c) : width(w), height(h) {
+    data.resize(w * h * c, 0.0f);
 }
 
-const std::vector<float>& VisionProcessor::getFeatures() const {
-    return pImpl->features;
+const char* Vision::getType() const {
+    return "Vision";
 }
 
-size_t VisionProcessor::getFeatureDimensions() const {
-    return pImpl->featureDimensions;
+const std::vector<float>& Vision::getData() const {
+    return data;
 }
+
+size_t Vision::getDimensions() const {
+    return data.size();
+}
+
+std::unique_ptr<SensoryInput> Vision::clone() const {
+    auto clone = std::make_unique<Vision>(width, height, 3);
+    clone->setData(this->data);
+    return clone;
+}
+
+void Vision::setData(const std::vector<float>& inputData) {
+    data = inputData;
+}
+
+void Vision::setData(float* inputData, size_t size) {
+    data.assign(inputData, inputData + size);
+}
+
+size_t Vision::getWidth() const { return width; }
+size_t Vision::getHeight() const { return height; }
+size_t Vision::getChannels() const { return channels; }
 
 } // namespace nlm

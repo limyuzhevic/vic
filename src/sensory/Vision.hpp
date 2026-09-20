@@ -1,6 +1,8 @@
 #pragma once
 
 #include "SensoryInput.hpp"
+#include <vector>
+#include <memory>
 
 namespace nlm {
 
@@ -13,13 +15,23 @@ public:
     ~VisionProcessor();
     
     // Process vision input
-    void process(const Vision& input);
+    void process(const SensoryInput& input);
     
     // Get feature representation
     const std::vector<float>& getFeatures() const;
     
     // Get feature dimensionality
     size_t getFeatureDimensions() const;
+    
+    // Get feature at specific location
+    float getFeature(size_t x, size_t y, size_t channel) const;
+    
+    // Reset processor for new sequence
+    void reset();
+    
+    // Enable/disable vision processing
+    void enable(bool enabled) { pImpl->enabled = enabled; }
+    bool isEnabled() const { return pImpl->enabled; }
     
 private:
     struct Impl;
