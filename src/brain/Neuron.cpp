@@ -260,9 +260,17 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
+    // Use the brain's timestep for consistency
     // Default LIF step with standard timestep (1ms)
     TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    bool fired = stepLIF(currentTime, dt);
+    
+    // Update firing rate based on activity
+    if (fired) {
+        pImpl->state.firingRate = std::min(pImpl->state.firingRate + 1.0f, 1000.0f);
+    } else {
+        pImpl->state.firingRate *= 0.95f;  // Decay
+    }
 }
 
 void Neuron::reset() {

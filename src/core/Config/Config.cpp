@@ -22,6 +22,37 @@ bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
+    // Determine format based on file extension
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == ".json") {
+        return loadFromJSON(filepath);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Default to simple key=value format
+        return loadFromSimple(filepath);
+    }
+}
+
+bool Config::loadFromSimple(const std::string& filepath) {
+bool Config::loadFromFile(const std::string& filepath) {
+    // Determine format based on file extension
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == ".json") {
+        return loadFromJSON(filepath);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Default to simple key=value format
+        return loadFromSimple(filepath);
+    }
+}
+
+bool Config::loadFromSimple(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -53,6 +84,232 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+#ifdef HAVE_NLOHMANN_JSON
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        nlohmann::json j;
+        file >> j;
+        
+        // Convert JSON to config entries
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            std::string key = it.key();
+            setFromJSONValue(key, *it);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error loading JSON config: ") + e.what());
+        return false;
+    }
+#else
+    NLM_LOG_ERROR("JSON support not compiled in - use -DHAVE_NLOHMANN_JSON during CMake configuration");
+    return false;
+#endif
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+#ifdef HAVE_YAML_CPP
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        YAML::Node doc = YAML::LoadFile(filepath);
+        
+        // Convert YAML to config entries
+        for (const auto& pair : doc) {
+            std::string key = pair.first.as<std::string>();
+            setFromYAMLNode(key, pair.second);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error loading YAML config: ") + e.what());
+        return false;
+    }
+#else
+    NLM_LOG_ERROR("YAML support not compiled in - use -DHAVE_YAML_CPP during CMake configuration");
+    return false;
+#endif
+}
+
+void Config::setFromJSONValue(const std::string& key, const nlohmann::json& value) {
+    if (value.is_string()) {
+        set(key, value.get<std::string>(), ConfigSource::File);
+    } else if (value.is_number_integer()) {
+        set(key, value.get<int64_t>(), ConfigSource::File);
+    } else if (value.is_number_float()) {
+        set(key, value.get<double>(), ConfigSource::File);
+    } else if (value.is_boolean()) {
+        set(key, value.get<bool>(), ConfigSource::File);
+    } else if (value.is_array()) {
+        // For arrays, store as string representation
+        std::string arrayStr = "[";
+        for (size_t i = 0; i < value.size(); ++i) {
+            if (i > 0) arrayStr += ",";
+            arrayStr += value[i].dump();
+        }
+        arrayStr += "]";
+        set(key, arrayStr, ConfigSource::File);
+    } else {
+        set(key, value.dump(), ConfigSource::File);
+    }
+}
+
+void Config::setFromYAMLNode(const std::string& key, const YAML::Node& node) {
+    if (node.IsScalar()) {
+        if (node.Tag() == "!!str") {
+            set(key, node.as<std::string>(), ConfigSource::File);
+        } else if (node.Tag() == "!!int" || node.Tag() == "!!integer") {
+            set(key, node.as<int64_t>(), ConfigSource::File);
+        } else if (node.Tag() == "!!float" || node.Tag() == "!!double" || node.Tag() == "!!real") {
+            set(key, node.as<double>(), ConfigSource::File);
+        } else if (node.Tag() == "!!bool") {
+            set(key, node.as<bool>(), ConfigSource::File);
+        } else {
+            set(key, node.as<std::string>(), ConfigSource::File);
+        }
+    } else if (node.IsSequence()) {
+        // For sequences, store as string representation
+        std::string arrayStr = "[";
+        for (size_t i = 0; i < node.size(); ++i) {
+            if (i > 0) arrayStr += ",";
+            arrayStr += std::to_string(node[i].as<double>());
+        }
+        arrayStr += "]";
+        set(key, arrayStr, ConfigSource::File);
+    } else if (node.IsMap()) {
+        // Nested object - store as JSON string
+        std::stringstream ss;
+        for (const auto& pair : node) {
+            ss << "\"" << pair.first.as<std::string>() << "\":" << pair.second;
+        }
+        set(key, ss.str(), ConfigSource::File);
+    } else {
+        set(key, node.as<std::string>(), ConfigSource::File);
+    }
+}
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+#ifdef HAVE_NLOHMANN_JSON
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        nlohmann::json j;
+        file >> j;
+        
+        // Convert JSON to config entries
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            std::string key = it.key();
+            setFromJSONValue(key, *it);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error loading JSON config: ") + e.what());
+        return false;
+    }
+#else
+    NLM_LOG_ERROR("JSON support not compiled in - use -DHAVE_NLOHMANN_JSON during CMake configuration");
+    return false;
+#endif
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+#ifdef HAVE_YAML_CPP
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        YAML::Node doc = YAML::LoadFile(filepath);
+        
+        // Convert YAML to config entries
+        for (const auto& pair : doc) {
+            std::string key = pair.first.as<std::string>();
+            setFromYAMLNode(key, pair.second);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error loading YAML config: ") + e.what());
+        return false;
+    }
+#else
+    NLM_LOG_ERROR("YAML support not compiled in - use -DHAVE_YAML_CPP during CMake configuration");
+    return false;
+#endif
+}
+
+void Config::setFromJSONValue(const std::string& key, const nlohmann::json& value) {
+    if (value.is_string()) {
+        set(key, value.get<std::string>(), ConfigSource::File);
+    } else if (value.is_number_integer()) {
+        set(key, value.get<int64_t>(), ConfigSource::File);
+    } else if (value.is_number_float()) {
+        set(key, value.get<double>(), ConfigSource::File);
+    } else if (value.is_boolean()) {
+        set(key, value.get<bool>(), ConfigSource::File);
+    } else if (value.is_array()) {
+        // For arrays, store as string representation
+        std::string arrayStr = "[";
+        for (size_t i = 0; i < value.size(); ++i) {
+            if (i > 0) arrayStr += ",";
+            arrayStr += value[i].dump();
+        }
+        arrayStr += "]";
+        set(key, arrayStr, ConfigSource::File);
+    } else {
+        set(key, value.dump(), ConfigSource::File);
+    }
+}
+
+void Config::setFromYAMLNode(const std::string& key, const YAML::Node& node) {
+    if (node.IsScalar()) {
+        if (node.Tag() == "!!str") {
+            set(key, node.as<std::string>(), ConfigSource::File);
+        } else if (node.Tag() == "!!int" || node.Tag() == "!!integer") {
+            set(key, node.as<int64_t>(), ConfigSource::File);
+        } else if (node.Tag() == "!!float" || node.Tag() == "!!double" || node.Tag() == "!!real") {
+            set(key, node.as<double>(), ConfigSource::File);
+        } else if (node.Tag() == "!!bool") {
+            set(key, node.as<bool>(), ConfigSource::File);
+        } else {
+            set(key, node.as<std::string>(), ConfigSource::File);
+        }
+    } else if (node.IsSequence()) {
+        // For sequences, store as string representation
+        std::string arrayStr = "[";
+        for (size_t i = 0; i < node.size(); ++i) {
+            if (i > 0) arrayStr += ",";
+            arrayStr += std::to_string(node[i].as<double>());
+        }
+        arrayStr += "]";
+        set(key, arrayStr, ConfigSource::File);
+    } else if (node.IsMap()) {
+        // Nested object - store as JSON string
+        std::stringstream ss;
+        for (const auto& pair : node) {
+            ss << "\"" << pair.first.as<std::string>() << "\":" << pair.second;
+        }
+        set(key, ss.str(), ConfigSource::File);
+    } else {
+        set(key, node.as<std::string>(), ConfigSource::File);
+    }
+}
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

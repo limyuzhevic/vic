@@ -372,6 +372,7 @@ int main(int argc, char** argv) {
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
+    config->set("max_steps", static_cast<int64_t>(1000), ConfigSource::Default);
     
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
@@ -381,6 +382,19 @@ int main(int argc, char** argv) {
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Advanced user parameters
+    config->set("enable_visualization", false, ConfigSource::Default);
+    config->set("visualization_window_width", 1024, ConfigSource::Default);
+    config->set("visualization_window_height", 768, ConfigSource::Default);
+    config->set("advanced_neuron_types", true, ConfigSource::Default);
+    config->set("enable_short_term_plasticity", true, ConfigSource::Default);
+    config->set("enable_reward_modulated_plasticity", true, ConfigSource::Default);
+    config->set("enable_higher_order_plasticity", false, ConfigSource::Default);
+    config->set("enable_competitive_plasticity", true, ConfigSource::Default);
+    
+    // Config file format support
+    config->set("config_format", "simple", ConfigSource::Default);  // simple, json, yaml
     
     // Log configuration summary
     NLM_LOG_INFO("");
