@@ -64,16 +64,29 @@ public:
     void reset() override {}
 };
 
-// FitzHugh-Nagumo dynamics (simplified兴奋性模型)
-// TODO PHASE 2: Implement FHN dynamics
+// FitzHugh-Nagumo dynamics (simplified excitability model)
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement FHN dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    FitzHughNagumoDynamics();
+    ~FitzHughNagumoDynamics() override;
+    
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
+    
+    // Parameters
+    void setThreshold(float threshold);
+    float getThreshold() const;
+    void setRecoveryTimeConstant(float tau);
+    float getRecoveryTimeConstant() const;
+    void setSlopeFactor(float slope);
+    float getSlopeFactor() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

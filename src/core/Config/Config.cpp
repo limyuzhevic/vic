@@ -3,6 +3,10 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <optional>
+#include <variant>
+#include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -19,9 +23,30 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    // Try to detect file format based on extension and content
+    std::string extension = filepath.substr(filepath.find_last_of('.') + 1);
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+    
+    if (extension == "json") {
+        return loadFromJSON(filepath);
+    } else if (extension == "yaml" || extension == "yml") {
+        return loadFromYAML(filepath);
+    } else if (extension == "cfg" || extension == "txt" || extension == "ini") {
+        // For backward compatibility, support simple key=value format
+        return loadFromSimpleFormat(filepath);
+    } else {
+        // Default to simple format for unknown extensions
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+// Simple key=value format loader (backward compatibility)
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,7 +68,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -53,6 +78,133 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
+}
+
+// JSON file loader
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Simple JSON parser (placeholder for now)
+    // In a real implementation, this would use a proper JSON library like nlohmann::json
+    // For now, implement a basic JSON parser that handles simple objects
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Remove whitespace
+    std::string cleanContent;
+    for (char c : content) {
+        if (!std::isspace(c)) {
+            cleanContent += c;
+        }
+    }
+    
+    if (cleanContent.empty() || cleanContent[0] != '{') {
+        return false; // Not a valid JSON object
+    }
+    
+    // Parse simple key-value pairs (no nested objects or arrays for now)
+    size_t pos = 1; // Skip opening {
+    while (pos < cleanContent.size()) {
+        if (cleanContent[pos] == '}') {
+            break; // End of object
+        }
+        
+        // Find key
+        size_t keyStart = pos;
+        while (pos < cleanContent.size() && cleanContent[pos] != ':') {
+            pos++;
+        }
+        if (pos >= cleanContent.size()) {
+            break; // Malformed JSON
+        }
+        
+        std::string key = cleanContent.substr(keyStart, pos - keyStart);
+        pos++; // Skip colon
+        
+        // Skip whitespace
+        while (pos < cleanContent.size() && (cleanContent[pos] == ' ' || cleanContent[pos] == '\t')) {
+            pos++;
+        }
+        
+        // Parse value
+        size_t valueStart = pos;
+        if (cleanContent[pos] == '"') {
+            // String value
+            while (pos < cleanContent.size() && cleanContent[pos] != '\"') {
+                pos++;
+            }
+            if (pos >= cleanContent.size()) {
+                break; // Malformed JSON
+            }
+            pos++; // Skip closing quote
+        } else if (cleanContent[pos] == '{' || cleanContent[pos] == '[') {
+            // For now, skip complex values (objects/arrays)
+            size_t braceCount = 1;
+            pos++;
+            while (pos < cleanContent.size() && braceCount > 0) {
+                if (cleanContent[pos] == '{' || cleanContent[pos] == '[') {
+                    braceCount++;
+                } else if (cleanContent[pos] == '}' || cleanContent[pos] == ']') {
+                    braceCount--;
+                }
+                pos++;
+            }
+        } else {
+            // Simple value (number, boolean, null)
+            while (pos < cleanContent.size() && cleanContent[pos] != ',' && cleanContent[pos] != '}') {
+                pos++;
+            }
+        }
+        
+        std::string value = cleanContent.substr(valueStart, pos - valueStart);
+        
+        // Clean up quotes and parse value
+        if (!value.empty() && value.front() == '\"' && value.back() == '\"') {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Try to parse value as different types
+        try {
+            if (value == "true") {
+                set(key, true, ConfigSource::File);
+            } else if (value == "false") {
+                set(key, false, ConfigSource::File);
+            } else if (value == "null") {
+                // Skip null values
+            } else {
+                // Try to parse as number
+                try {
+                    if (value.find('.') != std::string::npos) {
+                        set(key, std::stod(value), ConfigSource::File);
+                    } else {
+                        set(key, std::stoll(value), ConfigSource::File);
+                    }
+                } catch (...) {
+                    // Not a number, treat as string
+                    set(key, value, ConfigSource::File);
+                }
+            }
+        } catch (...) {
+            // Skip problematic values
+        }
+        
+        // Skip comma or closing brace
+        while (pos < cleanContent.size() && (cleanContent[pos] == ',' || cleanContent[pos] == ' ')) {
+            pos++;
+        }
+    }
+    
+    return true;
+}
+
+// YAML file loader (basic implementation)
+bool Config::loadFromYAML(const std::string& filepath) {
+    // For now, treat as simple format since implementing full YAML parser
+    // would require adding yaml-cpp dependency
+    return loadFromSimpleFormat(filepath);
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

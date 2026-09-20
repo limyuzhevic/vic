@@ -398,7 +398,36 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Advanced agent features
+        .def("setLearningRate", &AgentBrain::setLearningRate,
+             py::arg("rate"),
+             "Set learning rate for plasticity rules")
+        .def("setCuriosityThreshold", &AgentBrain::setCuriosityThreshold,
+             py::arg("threshold"),
+             "Set threshold for curiosity-driven exploration")
+        .def("setNoveltySensitivity", &AgentBrain::setNoveltySensitivity,
+             py::arg("sensitivity"),
+             "Set sensitivity to novel stimuli")
+        .def("setPredictionHorizon", &AgentBrain::setPredictionHorizon,
+             py::arg("horizon"),
+             "Set time horizon for predictions")
+        .def("getEffectiveLearningRate", &AgentBrain::getEffectiveLearningRate,
+             "Get effective learning rate based on neuromodulation")
+        .def("getExplorationRate", &AgentBrain::getExplorationRate,
+             "Get exploration rate based on curiosity and novelty")
+        .def("getMemoryUsage", &AgentBrain::getMemoryUsage,
+             "Get current memory usage statistics")
+        .def("getPerformanceMetrics", &AgentBrain::getPerformanceMetrics,
+             "Get performance metrics and statistics")
+        .def("exportState", &AgentBrain::exportState,
+             "Export complete agent state for checkpointing")
+        .def("importState", &AgentBrain::importState,
+             py::arg("state"),
+             "Import agent state from checkpoint")
+        .def("isHealthy", &AgentBrain::isHealthy,
+             "Check if agent is in healthy state for operation");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -421,5 +450,7 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
+
+} // namespace nlm
 
 } // namespace nlm

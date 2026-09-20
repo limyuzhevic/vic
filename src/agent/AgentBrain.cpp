@@ -5,6 +5,23 @@
 
 namespace nlm {
 
+#include "AgentBrain.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <algorithm>
+#include <cmath>
+#include <sstream>
+#include <iomanip>
+
+namespace nlm {
+
+const float AgentBrain::DEFAULT_NOVELTY_DECAY = 0.99f;
+const float AgentBrain::DEFAULT_DOPAMINE_PEAK = 1.0f;
+const float AgentBrain::DEFAULT_NOVELTY_THRESHOLD = 0.1f;
+const float AgentBrain::DEFAULT_EXPLORATION_RATE = 0.3f;
+const float AgentBrain::MAX_ADAPTION_VARIABLE = 2.0f;
+const float AgentBrain::MIN_ADAPTION_VARIABLE = -2.0f;
+const float AgentBrain::DEFAULT_LEARNING_RATE = 0.01f;
+
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
@@ -18,7 +35,18 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
+    , workingMemoryEnabled_(false)
+    , episodicMemoryEnabled_(false)
+    , semanticMemoryEnabled_(false)
+    , proceduralMemoryEnabled_(false)
+    , associativeMemoryEnabled_(false)
+    , sensoryNoveltyDecay_(DEFAULT_NOVELTY_DECAY)
+    , lastOptimizationTime_(0.0)
+    , optimizationCount_(0)
+    , consecutiveErrors_(0)
+    , recoveryMode_(false)
+    , lastHealthCheckStep_(0)
+    , stabilityScore_(1.0f)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -59,7 +87,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
             }
         }
     }
+    
+    NLM_LOG_INFO("AgentBrain initialized with advanced features enabled");
 }
+
+AgentBrain::~AgentBrain() = default;
 
 AgentBrain::~AgentBrain() = default;
 
