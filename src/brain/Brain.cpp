@@ -511,8 +511,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Create internal signals from current neural state for prediction
+        InternalSignals predictionInput;
+        
+        // Add current membrane potentials of all neurons as prediction features
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Use normalized membrane potential as input to prediction system
+                    float normalizedPotential = (neuron->getMembranePotential() + 70.0f) / 140.0f;  // [-1, 1] range
+                    predictionInput.addSignal(normalizedPotential);
+                }
+            }
+        }
+        
+        // Add current firing rate as input
+        predictionInput.addSignal(getAverageFiringRate());
+        
+        // Train prediction system with current neural state
+        pImpl->predictionSystem->train(predictionInput);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -538,8 +555,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
+    if (pImpl->isResting && currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
+        // Get episodes for replay during rest
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
             pImpl->episodicMemory->replayEpisode(episode);
