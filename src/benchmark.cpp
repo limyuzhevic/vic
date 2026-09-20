@@ -15,7 +15,7 @@
 #include <iomanip>
 #include <string>
 
-using namespace nlm;
+
 
 // Simple performance measurement
 struct BenchmarkResult {
@@ -34,11 +34,11 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     
     // Create configuration
     auto config = std::make_shared<Config>();
-    config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.1f, ConfigSource::Default);
-    config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(neuronCount), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    config->set("connection_probability", 0.1f, nlm::ConfigSource::Default);
+    config->set("stdp_ltp_weight", 0.01f, nlm::ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.012f, nlm::ConfigSource::Default);
     
     // Create brain
     auto brain = std::make_shared<Brain>(config);

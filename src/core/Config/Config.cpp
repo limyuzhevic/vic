@@ -48,7 +48,7 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            set(key, value, nlm::ConfigSource::File);
         }
     }
     
@@ -65,14 +65,14 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                set(key, value, nlm::ConfigSource::CommandLine);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            set(key, value, nlm::ConfigSource::CommandLine);
         }
     }
     return true;
@@ -114,7 +114,7 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+void Config::set(const std::string& key, const ConfigValue& value, nlm::ConfigSource source) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -126,19 +126,19 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     }
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+void Config::set(const std::string& key, const std::string& value, nlm::ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
-void Config::set(const std::string& key, int value, ConfigSource source) {
+void Config::set(const std::string& key, int value, nlm::ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
-void Config::set(const std::string& key, double value, ConfigSource source) {
+void Config::set(const std::string& key, double value, nlm::ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
-void Config::set(const std::string& key, bool value, ConfigSource source) {
+void Config::set(const std::string& key, bool value, nlm::ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
