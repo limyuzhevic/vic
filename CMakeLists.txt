@@ -18,73 +18,77 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Performance configuration options
+
+# Enable all performance features (default: OFF for maximum compatibility)
+option(NLM_PERFORMANCE_ENABLED "Enable performance optimizations" ON)
+
+# Individual performance feature options (can be combined with build-type)
+option(NLM_ENABLE_MEMORY_POOL "Enable memory pool allocators" ON)
+option(NLM_ENABLE_SOA "Enable Structure-of-Arrays data layout" ON)
+option(NLM_ENABLE_EVENT_QUEUE "Enable event-driven spike processing" ON)
+option(NLM_ENABLE_SPARSE_CONNECTIVITY "Enable sparse connectivity" ON)
+option(NLM_ENABLE_MULTITHREADING "Enable parallel processing" ON)
+option(NLM_ENABLE_SIMD "Enable SIMD vectorization" ON)
+
+# SIMD preference (platform-specific fallback available)
+option(NLM_PREFER_AVX512 "Prefer AVX-512 instructions" OFF)
+option(NLM_PREFER_AVX2 "Prefer AVX2 instructions" OFF)
+option(NLM_PREFER_SSE "Prefer SSE instructions" OFF)
+
+# Multithreading configuration
+option(NLM_DYNAMIC_THREAD_COUNT "Auto-detect thread count" ON)
+set(NLM_FIXED_THREAD_COUNT 0 CACHE STRING "Fixed thread count (0 = auto)")
+
+# Memory pool configuration
+set(NLM_MEMORY_POOL_PAGE_SIZE 4096 CACHE STRING "Memory pool page size in bytes")
+set(NLM_MAX_POOL_SIZE 1048576 CACHE STRING "Maximum objects per pool")
+
+# Event queue configuration
+set(NLM_SPIKE_QUEUE_CAPACITY 16384 CACHE STRING "Spike event queue capacity")
+set(NLM_DELAYED_SPIKE_BUCKETS 1024 CACHE STRING "Number of delayed spike buckets")
+
+# Runtime configuration
+option(NLM_RUNTIME_FEATURE_TOGGLE "Allow runtime feature toggling" ON)
+option(NLM_PERFORMANCE_STATS "Enable performance statistics collection" ON)
+option(NLM_PERFORMANCE_VALIDATION "Enable configuration validation" ON)
+
+# Adaptive performance scaling
+option(NLM_ADAPTIVE_PERFORMANCE "Enable runtime performance adaptation" OFF)
+set(NLM_MIN_THREADS 1 CACHE STRING "Minimum thread count for adaptive scaling")
+set(NLM_MAX_THREADS 64 CACHE STRING "Maximum thread count for adaptive scaling")
+set(NLM_PERFORMANCE_ADAPTATION_INTERVAL 10000 CACHE STRING "Steps between performance adaptations")
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Check for missing source files
+file(GLOB ALL_SOURCE_FILES
+    src/core/Types/*.cpp
+    src/core/Config/*.cpp
+    src/core/Random/*.cpp
+    src/core/Logger/*.cpp
+    src/core/SimulationClock/*.cpp
+    src/brain/*.cpp
+    src/dynamics/*.cpp
+    src/plasticity/*.cpp
+    src/development/*.cpp
+    src/neuromodulation/*.cpp
+    src/memory/*.cpp
+    src/cognition/*.cpp
+    src/sensory/*.cpp
+    src/prediction/*.cpp
+    src/motor/*.cpp
+    src/environment/*.cpp
+    src/experiments/*.cpp
+    src/visualization/*.cpp
+    src/agent/*.cpp
+    src/world/*.cpp
+)
+
 # Core library
 add_library(nlm_core STATIC
-    # Core
-    src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
-    # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
-    # Dynamics
-    src/dynamics/NeuralDynamics.cpp
-    src/dynamics/SpikeSystem.cpp
-    # Plasticity
-    src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
-    src/plasticity/STDP.cpp
-    src/plasticity/StructuralPlasticity.cpp
-    # Development
-    src/development/DevelopmentSystem.cpp
-    src/development/Synaptogenesis.cpp
-    src/development/Pruning.cpp
-    src/development/Maturation.cpp
-    # Neuromodulation
-    src/neuromodulation/Neuromodulator.cpp
-    src/neuromodulation/Reward.cpp
-    src/neuromodulation/PredictionError.cpp
-    src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
-    src/memory/NeuralWorkingMemory.cpp
-    src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
-    src/cognition/ConceptFormation.cpp
-    src/cognition/NeuralPlanner.cpp
-    # Sensory
-    src/sensory/SensoryInput.cpp
-    src/sensory/Vision.cpp
-    src/sensory/Audio.cpp
-    src/sensory/InternalSignals.cpp
-    # Prediction
-    src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+    ${ALL_SOURCE_FILES}
 )
 
 target_include_directories(nlm_core PUBLIC

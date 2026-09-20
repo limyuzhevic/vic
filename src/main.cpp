@@ -1,3 +1,5 @@
+#pragma once
+
 // NLM (熙然) - Neural Learning Machine
 // Phase 2: Real Neural Computation
 //
@@ -6,6 +8,9 @@
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// main.cpp - Enhanced with comprehensive CLI options, configuration validation,
+// benchmark support, and helper functions for robust operation
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -18,6 +23,8 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "experiments/ScalingBenchmark.hpp"
+#include "performance/CheckpointSystem.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,8 +32,16 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
+#include <map>
+#include <set>
+#include <ctime>
+#include <algorithm>
+#include <fstream>
+#include <sstream>
+#include <stdexcept>
 
-using namespace nlm;
+namespace nlm {
 
 void printBanner() {
     std::cout << R"(
@@ -159,6 +174,117 @@ struct LearningExperiment {
     }
 };
 
+// CLI argument structure
+struct CLIArgs {
+    bool benchmarkMode = false;
+    std::string benchmarkFile;
+    std::string configFile = "configs/default.cfg";
+    int verbosityLevel = 1;
+    std::string outputFormat = "text";
+    bool enableCheckpoints = false;
+    std::string checkpointDir;
+    int simulationSteps = 1000;
+    bool validateConfig = true;
+    std::vector<std::string> customArgs;
+};
+
+// Parse CLI arguments
+CLIArgs parseCLIArgs(int argc, char** argv) {
+    CLIArgs args;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--benchmark" || arg == "-b") {
+            args.benchmarkMode = true;
+        }
+        else if (arg.substr(0, 12) == "--benchmark=") {
+            args.benchmarkMode = true;
+            args.benchmarkFile = arg.substr(12);
+        }
+        else if (arg == "--benchmark-file") {
+            if (i + 1 < argc) {
+                args.benchmarkFile = argv[++i];
+            }
+        }
+        else if (arg == "--config" || arg == "-c") {
+            if (i + 1 < argc) {
+                args.configFile = argv[++i];
+            }
+        }
+        else if (arg.substr(0, 8) == "--config=") {
+            args.configFile = arg.substr(8);
+        }
+        else if (arg == "--verbose" || arg == "-v") {
+            args.verbosityLevel = std::min(args.verbosityLevel + 1, 3);
+        }
+        else if (arg == "--quiet" || arg == "-q") {
+            args.verbosityLevel = 0;
+        }
+        else if (arg == "--output-format" || arg == "--output") {
+            if (i + 1 < argc) {
+                args.outputFormat = argv[++i];
+            }
+        }
+        else if (arg == "--checkpoint" || arg == "--checkpoint-dir") {
+            args.enableCheckpoints = true;
+            if (i + 1 < argc) {
+                args.checkpointDir = argv[++i];
+            }
+        }
+        else if (arg == "--steps" || arg == "--simulation-steps") {
+            if (i + 1 < argc) {
+                args.simulationSteps = std::stoi(argv[++i]);
+            }
+        }
+        else if (arg == "--validate-config" || arg == "--validate") {
+            args.validateConfig = true;
+        }
+        else if (arg == "--help" || arg == "-h") {
+            printUsage();
+            exit(0);
+        }
+        else if (arg.substr(0, 2) == "--") {
+            args.customArgs.push_back(arg);
+        }
+        else if (arg.substr(0, 1) == "-") {
+            args.customArgs.push_back(arg);
+        }
+    }
+    
+    return args;
+}
+
+// Print help/usage information
+void printUsage() {
+    printBanner();
+    std::cout << R"(
+USAGE: nlm [OPTIONS]
+
+COMMANDS:
+  --benchmark[=FILE]    Run benchmark mode with optional output file
+  --config[=FILE]       Load configuration from file (default: configs/default.cfg)
+  --verbose, -v         Increase verbosity level
+  --quiet, -q           Decrease verbosity level
+  --output-format FORMAT Set output format: text, json, csv (default: text)
+  --checkpoint[=DIR]    Enable checkpoint system with optional directory
+  --steps N             Number of simulation steps (default: 1000)
+  --validate-config      Validate configuration parameters
+
+OPTIONS:
+  -h, --help            Show this help message
+
+EXAMPLES:
+  nlm --benchmark                    # Run benchmark tests
+  nlm --benchmark results.json       # Run benchmark and save to file
+  nlm --config custom.cfg --verbose   # Load custom config with verbose output
+  nlm --checkpoint --steps 5000       # Run with checkpoints for 5000 steps
+  nlm --validate-config               # Validate configuration before running
+
+For more information, visit: https://github.com/nlm-sim/nlm
+)" << std::endl;
+}
+
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
@@ -267,7 +393,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+                        " before: " + std::to_string(beforeWeights[i]));
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -301,8 +427,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
     }
     
     // Check if weights increased (LTP)
@@ -447,3 +573,5 @@ int main(int argc, char** argv) {
     
     return 0;
 }
+
+} // namespace nlm
