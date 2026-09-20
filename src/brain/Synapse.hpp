@@ -1,11 +1,14 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <vector>
+#include <algorithm>
 
 namespace nlm {
 
-// Forward declaration
+// Forward declarations
 class Neuron;
+class RandomGenerator;
 
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
@@ -71,14 +74,34 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state
     void reset();
     
     // Initialize with random parameters
-    void initializeRandom(class RandomGenerator& rng);
+    void initializeRandom(RandomGenerator& rng);
+    
+    // Synaptic transmission and plasticity methods
+    void calculateSynapticCurrent(float& totalCurrent, Timestamp currentTime);
+    void updateEfficacyWithSTDP(const std::vector<Timestamp>& preSpikes,
+                               const std::vector<Timestamp>& postSpikes);
+    void applySynapticTagging(float neuromodulatorLevel, Timestamp currentTime);
+    void applySynapticCapture(float rewardPredictionError, float neuromodulatorLevel);
+    void resetLastSpikeTimes();
+    void updateSTDP(const std::vector<Timestamp>& preSpikes,
+                   const std::vector<Timestamp>& postSpikes,
+                   float neuromodulationFactor,
+                   Timestamp currentTime);
+    void applyHebbianLearning(const std::vector<Timestamp>& preSpikes,
+                             const std::vector<Timestamp>& postSpikes,
+                             float learningRate);
+    void applyNeuromodulation(float dopamine, float acetylcholine,
+                             float serotonin);
+    void applyConductionBasedCurrent(Neuron& postNeuron,
+                                    float synapticConductance,
+                                    Timestamp currentTime);
+    void applySynapticTransmission(Neuron* postNeuron, Timestamp currentTime);
     
 private:
     struct Impl;
