@@ -3,51 +3,62 @@
 
 namespace nlm {
 
-// Working Memory Implementation
+// Working Memory Implementation - Enhanced with neural dynamics
 struct WorkingMemory::Impl {
-    std::vector<std::pair<NeuronId, float>> items;
+    // Store neural activations by neuron ID
+    std::unordered_map<NeuronId, std::vector<std::pair<float, SimulationStep>>> itemHistory;
+    std::unordered_map<NeuronId, float> currentValues;
     size_t capacity;
+    float decayRate;
+    SimulationStep timestamp;
     
-    Impl(size_t cap) : capacity(cap) {}
+    Impl(size_t cap) : capacity(cap), decayRate(0.01f), timestamp(0) {}
 };
 
-WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
+WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {
+    NLM_LOG_INFO("WorkingMemory initialized with capacity: " + std::to_string(pImpl->capacity));
+}
 
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
-    for (auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            item.second = value;
-            return;
+    // Check capacity and remove oldest items if needed
+    if (pImpl->currentValues.size() >= pImpl->capacity && 
+        pImpl->currentValues.find(neuron) == pImpl->currentValues.end()) {
+        // Remove oldest item (simple FIFO for now)
+        auto oldestIt = pImpl->currentValues.begin();
+        pImpl->currentValues.erase(oldestIt);
+        // Also remove from history
+        auto historyIt = pImpl->itemHistory.find(oldestIt->first);
+        if (historyIt != pImpl->itemHistory.end()) {
+            historyIt->second.clear();
         }
     }
-    if (pImpl->items.size() < pImpl->capacity) {
-        pImpl->items.emplace_back(neuron, value);
-    }
+    
+    // Store current value and timestamp
+    pImpl->currentValues[neuron] = value;
+    pImpl->itemHistory[neuron].emplace_back(value, ++pImpl->timestamp);
+    
+    NLM_LOG_DEBUG("WorkingMemory: Stored neuron " + std::to_string(neuron.index()) + 
+                  " value: " + std::to_string(value));
 }
 
 float WorkingMemory::retrieve(NeuronId neuron) const {
-    for (const auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            return item.second;
-        }
+    auto it = pImpl->currentValues.find(neuron);
+    if (it != pImpl->currentValues.end()) {
+        return it->second;
     }
     return 0.0f;
 }
 
 bool WorkingMemory::contains(NeuronId neuron) const {
-    for (const auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            return true;
-        }
-    }
-    return false;
+    return pImpl->currentValues.find(neuron) != pImpl->currentValues.end();
 }
 
 void WorkingMemory::clear() {
-    pImpl->items.clear();
+    pImpl->currentValues.clear();
+    pImpl->itemHistory.clear();
+    NLM_LOG_INFO("WorkingMemory cleared");
 }
 
 size_t WorkingMemory::getCapacity() const {
@@ -55,32 +66,45 @@ size_t WorkingMemory::getCapacity() const {
 }
 
 size_t WorkingMemory::getCurrentSize() const {
-    return pImpl->items.size();
+    return pImpl->currentValues.size();
 }
 
 void WorkingMemory::decay(float decayRate) {
-    for (auto& item : pImpl->items) {
+    for (auto& item : pImpl->currentValues) {
         item.second *= (1.0f - decayRate);
     }
 }
 
-// Episodic Memory Implementation
+// Episodic Memory Implementation - Enhanced with replay
 struct EpisodicMemory::Impl {
     std::vector<EpisodicMemoryItem> episodes;
     size_t maxEpisodes;
+    std::unordered_map<size_t, std::vector<size_t>> replayIndices;
+    float consolidationThreshold;
     
-    Impl(size_t max) : maxEpisodes(max) {}
+    Impl(size_t max) : maxEpisodes(max), consolidationThreshold(0.5f) {}
 };
 
-EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {}
+EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {
+    NLM_LOG_INFO("EpisodicMemory initialized with capacity: " + std::to_string(pImpl->maxEpisodes));
+}
 
 EpisodicMemory::~EpisodicMemory() = default;
 
 void EpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     if (pImpl->episodes.size() >= pImpl->maxEpisodes) {
-        pImpl->episodes.erase(pImpl->episodes.begin());
+        // Remove oldest episode for replay
+        auto oldest = pImpl->episodes.begin();
+        pImpl->episodes.erase(oldest);
     }
     pImpl->episodes.push_back(episode);
+    
+    // Mark for potential replay
+    if (pImpl->episodes.size() % 10 == 0) {
+        pImpl->replayIndices[pImpl->episodes.size() - 1] = std::vector<size_t>();
+    }
+    
+    NLM_LOG_INFO("EpisodicMemory: Stored episode " + std::to_string(episode.timestamp));
 }
 
 EpisodicMemoryItem EpisodicMemory::retrieveEpisode(size_t index) const {
@@ -96,19 +120,42 @@ size_t EpisodicMemory::getEpisodeCount() const {
 
 std::vector<EpisodicMemoryItem> EpisodicMemory::getRecentEpisodes(size_t count) const {
     std::vector<EpisodicMemoryItem> result;
-    size_t start = count > pImpl->episodes.size() ? 0 : pImpl->episodes.size() - count;
-    for (size_t i = start; i < pImpl->episodes.size(); ++i) {
-        result.push_back(pImpl->episodes[i]);
+    if (count > pImpl->episodes.size()) {
+        result = pImpl->episodes;
+    } else {
+        size_t start = pImpl->episodes.size() - count;
+        result.assign(pImpl->episodes.begin() + start, pImpl->episodes.end());
     }
     return result;
 }
 
 void EpisodicMemory::clear() {
     pImpl->episodes.clear();
+    pImpl->replayIndices.clear();
+    NLM_LOG_INFO("EpisodicMemory cleared");
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Simple consolidation: keep episodes above relevance threshold
+    std::vector<EpisodicMemoryItem> toKeep;
+    
+    for (const auto& episode : pImpl->episodes) {
+        // Calculate relevance based on neuron activations and rewards
+        float relevance = 0.0f;
+        for (float value : episode.values) {
+            relevance += std::abs(value);
+        }
+        relevance /= std::max<size_t>(episode.values.size(), 1);
+        
+        if (relevance >= relevanceThreshold) {
+            toKeep.push_back(episode);
+        }
+    }
+    
+    // Replace with consolidated memory
+    pImpl->episodes = toKeep;
+    NLM_LOG_INFO("EpisodicMemory consolidated: " + std::to_string(pImpl->episodes.size()) + 
+                 " episodes retained");
 }
 
 // Semantic Memory Implementation

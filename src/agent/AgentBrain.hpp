@@ -52,6 +52,13 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Get expected reward
+    float getExpectedReward() const;
+    
+    // Get novelty detection threshold
+    float getNoveltyThreshold() const;
+    void setNoveltyThreshold(float threshold);
+    
     // Reset agent for new episode
     void reset();
     

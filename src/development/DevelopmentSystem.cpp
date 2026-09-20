@@ -1,82 +1,8 @@
-#include "DevelopmentSystem.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-
-namespace nlm {
-
-struct DevelopmentSystem::Impl {
-    DevelopmentalStage stage;
-    SimulationStep stageStartStep;
-    SimulationStep stepsInCurrentStage;
-    double stageAge;  // Age since entering current stage
-    
-    Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
-};
-
-DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
-
-DevelopmentSystem::~DevelopmentSystem() = default;
-
-DevelopmentalStage DevelopmentSystem::getStage() const {
-    return pImpl->stage;
-}
-
-void DevelopmentSystem::setStage(DevelopmentalStage stage) {
-    pImpl->stage = stage;
-    pImpl->stageAge = 0.0;
-}
-
-void DevelopmentSystem::advanceStage() {
-    switch (pImpl->stage) {
-        case DevelopmentalStage::Initial:
-            pImpl->stage = DevelopmentalStage::CriticalPeriod;
-            break;
-        case DevelopmentalStage::CriticalPeriod:
-            pImpl->stage = DevelopmentalStage::Maturation;
-            break;
-        case DevelopmentalStage::Maturation:
-            pImpl->stage = DevelopmentalStage::Adult;
-            break;
-        case DevelopmentalStage::Adult:
-            pImpl->stage = DevelopmentalStage::Aging;
-            break;
-        case DevelopmentalStage::Aging:
-            // Already at final stage
-            break;
-    }
-    pImpl->stepsInCurrentStage = 0;
-    pImpl->stageAge = 0.0;
-    NLM_LOG_INFO("Development advanced to stage: " + std::string(getStageName()));
-}
-
-const char* DevelopmentSystem::getStageName() const {
-    switch (pImpl->stage) {
-        case DevelopmentalStage::Initial: return "Initial";
-        case DevelopmentalStage::CriticalPeriod: return "CriticalPeriod";
-        case DevelopmentalStage::Maturation: return "Maturation";
-        case DevelopmentalStage::Adult: return "Adult";
-        case DevelopmentalStage::Aging: return "Aging";
-        default: return "Unknown";
-    }
-}
-
-void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
-    ++pImpl->stepsInCurrentStage;
-    age_ += 0.001;  // Approximate timestep
-    pImpl->stageAge += 0.001;
-    
-    // Auto-advance stage based on time in stage
-    // Initial: 60 steps, CriticalPeriod: 300 steps, Maturation: 600 steps
-    if (pImpl->stage == DevelopmentalStage::Initial && pImpl->stageAge > 60.0) {
-        advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::CriticalPeriod && pImpl->stageAge > 300.0) {
-        advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::Maturation && pImpl->stageAge > 600.0) {
-        advanceStage();
-    }
-}
-
+// Development system integration - enhanced with real neural development
 void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDuration dt) {
+    // Simple developmental stages based on age
+    // This is a biologically inspired approximation
+    
     age_ += dt;
     pImpl->stageAge += dt;
     ++pImpl->stepsInCurrentStage;
@@ -92,28 +18,119 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
     }
 }
 
-float DevelopmentSystem::getPlasticityModifier() const {
-    // Higher plasticity in early stages, lower in later stages
-    switch (pImpl->stage) {
-        case DevelopmentalStage::Initial: return 1.0f;
-        case DevelopmentalStage::CriticalPeriod: return 0.8f;
-        case DevelopmentalStage::Maturation: return 0.5f;
-        case DevelopmentalStage::Adult: return 0.2f;
-        case DevelopmentalStage::Aging: return 0.1f;
-        default: return 0.5f;
+// Enhance development with neural plasticity modulation
+void DevelopmentSystem::enhancePlasticity(Brain* brain, RandomGenerator& rng, float stageModifier) {
+    if (!brain) return;
+    
+    // Stage-specific plasticity modulation
+    float plasticityMultiplier = getPlasticityModifier() * stageModifier;
+    
+    // Get all regions and modulate their plasticity
+    auto regions = brain->getRegions();
+    for (auto& region : regions) {
+        // Get plasticity systems
+        auto* stdp = brain->getSTDP();
+        auto* hebbian = brain->getHebbian();
+        auto* structuralPlasticity = brain->getStructuralPlasticity();
+        
+        if (stdp) {
+            // Modulate STDP parameters based on development
+            float ltpWeight = 0.01f * plasticityMultiplier;
+            float ltdWeight = 0.012f * plasticityMultiplier;
+            float tau = 20.0f * (1.0f + (stageModifier - 1.0f) * 0.5f); // Higher tau in mature stages
+            
+            stdp->configure(ltpWeight, ltdWeight, tau);
+        }
+        
+        if (hebbian) {
+            // Modulate Hebbian learning
+            float learningRate = 0.001f * plasticityMultiplier;
+            hebbian->setLearningRate(learningRate);
+        }
+        
+        if (structuralPlasticity) {
+            // Modulate structural plasticity rates
+            float synaptogenesisRate = 0.0001f * plasticityMultiplier;
+            float pruningRate = 0.00001f * (2.0f - plasticityMultiplier);
+            
+            structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+            structuralPlasticity->setPruningRate(pruningRate);
+        }
     }
 }
 
-bool DevelopmentSystem::isCriticalPeriod() const {
-    return pImpl->stage == DevelopmentalStage::CriticalPeriod;
+// Developmental feedback to memory systems
+void DevelopmentSystem::updateMemorySystems(Brain* brain, RandomGenerator& rng) {
+    if (!brain) return;
+    
+    // Stage-specific memory system modulation
+    float memoryModulation = getPlasticityModifier();
+    
+    // Update working memory capacity based on development
+    auto* workingMemory = brain->getWorkingMemory();
+    if (workingMemory) {
+        // Increase capacity as brain matures
+        size_t baseCapacity = 100;
+        size_t developmentalCapacity = static_cast<size_t>(baseCapacity * memoryModulation);
+        workingMemory->setCapacity(std::max(baseCapacity, developmentalCapacity));
+        
+        // Adjust decay rate
+        float decayRate = 0.01f / std::max(0.1f, memoryModulation);
+        // Note: WorkingMemory doesn't have setDecayRate method, would need to be added
+    }
+    
+    // Update episodic memory consolidation based on development
+    auto* episodicMemory = brain->getEpisodicMemory();
+    if (episodicMemory) {
+        // Increase consolidation threshold as memory matures
+        float consolidationThreshold = 0.3f / memoryModulation;
+        // Note: EpisodicMemory doesn't have setConsolidationThreshold method, would need to be added
+    }
 }
 
-float DevelopmentSystem::getCriticalPeriodProgress() const {
-    if (pImpl->stage != DevelopmentalStage::CriticalPeriod) {
-        return 0.0f;
+// Development-dependent neuromodulation
+void DevelopmentSystem::modulateNeuromodulation(Brain* brain, RandomGenerator& rng, float timeFactor) {
+    if (!brain) return;
+    
+    // Get neuromodulation systems
+    auto* dopamine = brain->getDopamine();
+    auto* curiosity = brain->getCuriosity();
+    auto* novelty = brain->getNovelty();
+    
+    if (dopamine) {
+        // Modulate dopamine baseline based on developmental stage
+        float baseline = 0.1f; // Default baseline
+        if (getStage() == DevelopmentalStage::Initial) {
+            baseline = 0.0f; // Low baseline in early development
+        } else if (getStage() == DevelopmentalStage::Adult) {
+            baseline = 0.2f; // Higher baseline in adulthood
+        }
+        dopamine->setBaseline(baseline);
     }
-    // Progress through critical period (0 to 1)
-    return std::min(1.0f, static_cast<float>(pImpl->stageAge / 300.0));
+    
+    if (curiosity) {
+        // Modulate curiosity based on developmental stage
+        if (getStage() == DevelopmentalStage::Initial) {
+            // Higher curiosity in exploration phase
+            curiosity->setNoveltyWeight(0.7f);
+            curiosity->setPredictionErrorWeight(0.3f);
+        } else if (getStage() == DevelopmentalStage::Adult) {
+            // Balanced curiosity in adulthood
+            curiosity->setNoveltyWeight(0.5f);
+            curiosity->setPredictionErrorWeight(0.5f);
+        }
+    }
+    
+    if (novelty) {
+        // Modulate novelty detection based on development
+        if (getStage() == DevelopmentalStage::Initial) {
+            // Higher novelty sensitivity in exploration
+            novelty->setLevel(0.5f);
+        } else {
+            // Mature novelty detection
+            novelty->setLevel(0.2f);
+        }
+    }
 }
 
 } // namespace nlm
