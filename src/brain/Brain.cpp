@@ -768,6 +768,7 @@ bool Brain::save(const std::string& filepath) const {
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+            NLM_LOG_ERROR("Please check file permissions and available disk space.");
             return false;
         }
         
@@ -789,8 +790,20 @@ bool Brain::save(const std::string& filepath) const {
         neuronData.leakConductance.reserve(getTotalNeuronCount());
         
         for (const auto& region : pImpl->regions) {
+            if (!region) {
+                NLM_LOG_ERROR("Failed to save brain: Invalid region found");
+                return false;
+            }
             for (const auto& pop : region->getPopulations()) {
+                if (!pop) {
+                    NLM_LOG_ERROR("Failed to save brain: Invalid population found");
+                    return false;
+                }
                 for (const auto* neuron : pop->getNeurons()) {
+                    if (!neuron) {
+                        NLM_LOG_ERROR("Failed to save brain: Invalid neuron found");
+                        return false;
+                    }
                     const auto& state = neuron->getState();
                     neuronData.membranePotential.push_back(state.membranePotential);
                     neuronData.restingPotential.push_back(state.restingPotential);
@@ -805,15 +818,29 @@ bool Brain::save(const std::string& filepath) const {
             }
         }
         
+        if (neuronData.membranePotential.size() != getTotalNeuronCount()) {
+            NLM_LOG_ERROR("Failed to save brain: Neuron count mismatch during serialization");
+            return false;
+        }
+        
         if (!writer.writeNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to write neurons to checkpoint");
+            NLM_LOG_ERROR("This may be due to insufficient memory or corrupted data.");
             return false;
         }
         
         // Write synapses
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
+            if (!region) {
+                NLM_LOG_ERROR("Failed to save brain: Invalid region found");
+                return false;
+            }
             for (const auto* syn : region->getSynapses()) {
+                if (!syn) {
+                    NLM_LOG_ERROR("Failed to save brain: Invalid synapse found");
+                    return false;
+                }
                 synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
                 synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
                 synapseData.weight.push_back(syn->getWeight());
@@ -823,14 +850,21 @@ bool Brain::save(const std::string& filepath) const {
             }
         }
         
+        if (synapseData.sourceNeuron.size() != getTotalSynapseCount()) {
+            NLM_LOG_ERROR("Failed to save brain: Synapse count mismatch during serialization");
+            return false;
+        }
+        
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+            NLM_LOG_ERROR("This may be due to insufficient memory or invalid synaptic data.");
             return false;
         }
         
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
+            NLM_LOG_ERROR("The checkpoint file may be corrupted. Try removing it and retrying.");
             return false;
         }
         
@@ -839,6 +873,7 @@ bool Brain::save(const std::string& filepath) const {
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+        NLM_LOG_ERROR("Please check system resources and file system permissions.");
         return false;
     }
 }

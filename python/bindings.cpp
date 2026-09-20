@@ -351,7 +351,15 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Context manager support
+        .def("__enter__", [](py::object self) { return self; })
+        .def("__exit__", [](py::object self, py::args args) {
+            auto* brain = py::cast<Brain*>(self.attr("getBrain")());
+            if (brain) {
+                brain->reset();
+            }
+        });
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
