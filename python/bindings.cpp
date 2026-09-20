@@ -9,7 +9,7 @@
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
 #include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
+#include "../src/agent/AgentBrain.h"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
 #include "../src/motor/Action.hpp"

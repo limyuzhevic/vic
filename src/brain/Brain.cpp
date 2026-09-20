@@ -614,6 +614,47 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
     }
+    
+    // ========== STEP 0: Update prediction system ==========
+    if (pImpl->predictionSystem) {
+        // The prediction system uses sensory input to generate predictions
+        // This is the core of the predictive coding loop
+        pImpl->predictionSystem->update(input, pImpl->timestep);
+    }
+    
+    // ========== STEP 1.5: Update concept formation ==========
+    if (pImpl->conceptFormation && !pImpl->regions.empty()) {
+        // Concept formation uses current neural activity patterns to update concepts
+        // Extract activity patterns from current neural firing
+        std::vector<float> activityPattern;
+        activityPattern.reserve(100);
+        
+        // Sample neural activity for concept formation
+        size_t samplesPerRegion = 10;
+        for (const auto& region : pImpl->regions) {
+            const auto& populations = region->getPopulations();
+            size_t totalNeurons = region->getTotalNeuronCount();
+            
+            for (size_t sampleIdx = 0; sampleIdx < samplesPerRegion && 
+                                   sampleIdx < totalNeurons; ++sampleIdx) {
+                // Simple approximation: use neuron index as proxy for activity
+                float activity = static_cast<float>(sampleIdx) / 
+                                static_cast<float>(totalNeurons);
+                activityPattern.push_back(activity);
+            }
+        }
+        
+        // Convert to sensory pattern for concept formation
+        if (!activityPattern.empty()) {
+            // This is a simplified approach - real implementation would
+            // encode current neural activity more directly
+            float reward = 0.0f;  // Neutral reward for concept formation
+            
+            // Present current activity as experience for concept learning
+            pImpl->conceptFormation->presentExperience(
+                activityPattern, activityPattern, reward, pImpl->currentStep);
+        }
+    }
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {

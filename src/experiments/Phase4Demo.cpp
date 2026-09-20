@@ -5,7 +5,7 @@
 #include "core/Config/Config.hpp"
 #include "core/Logger/Logger.hpp"
 #include "brain/Brain.hpp"
-#include "agent/AgentBrain.hpp"
+#include "agent/AgentBrain.h"
 #include "world/SimpleWorld.hpp"
 #include "experiments/Phase4Experiment.hpp"
 #include "prediction/NeuralPrediction.hpp"

@@ -3,7 +3,7 @@
 #include "../core/Logger/Logger.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
-#include "../agent/AgentBrain.hpp"
+#include "../agent/AgentBrain.h"
 #include <chrono>
 #include <cmath>
 

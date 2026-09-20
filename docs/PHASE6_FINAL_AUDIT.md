@@ -60,7 +60,7 @@ bool Brain::load(const std::string& filepath) {
 
 ### 1.2 Agent Brain (Integration Layer) - STATUS: PARTIALLY INTEGRATED
 
-**Location:** `src/agent/AgentBrain.hpp`, `src/agent/AgentBrain.cpp`
+**Location:** `src/agent/AgentBrain.h`, `src/agent/AgentBrain.cpp`
 
 | Component | Status | Notes |
 |-----------|--------|-------|
