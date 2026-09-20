@@ -1,0 +1,472 @@
+#!/usr/bin/env bash
+
+# NLM CLI - Command Line Interface for Neural Learning Machine
+# 
+# This script provides a user-friendly interface for running NLM simulations,
+# managing configurations, and exploring brain models.
+
+# Color definitions for better output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Default configuration
+DEFAULT_CONFIG="configs/default.cfg"
+BUILD_DIR="build"
+LOG_LEVEL="info"
+
+# Help message
+function show_help() {
+    cat << EOF
+NLM CLI - Neural Learning Machine Command Line Interface
+
+Usage: nlm [OPTIONS] [ARGS]
+
+Commands:
+  run                    Run a simulation with specified configuration
+  config                  Manage configuration files
+  brain                   Brain manipulation and analysis
+  demo                    Run built-in demonstration
+  help                    Show this help message
+
+Options:
+  -h, --help              Show help message
+  -v, --version           Show version information
+  -c, --config FILE        Specify configuration file (default: $DEFAULT_CONFIG)
+  -b, --build-dir DIR      Specify build directory (default: $BUILD_DIR)
+  -l, --log-level LEVEL    Set logging level (debug, info, warning, error, critical)
+
+Arguments:
+  <command>               Command to execute
+
+Examples:
+  nlm run --config my_config.cfg
+  nlm brain --create-region "Cortex" --neuron-count 1000
+  nlm demo --phase2
+  nlm config --list
+
+For more information about a specific command, use:
+  nlm help <command>
+EOF
+}
+
+# Version information
+function show_version() {
+    cat << EOF
+NLM CLI v1.0.0
+Neural Learning Machine Command Line Interface
+Built on NLM Phase 6: Final Integration
+MIT License
+EOF
+}
+
+# Brain management functions
+function brain_create_region() {
+    local name="$1"
+    local neuron_count="$2"
+    
+    if [[ -z "$name" ]]; then
+        echo "${RED}Error: Region name is required${NC}"
+        echo "Usage: nlm brain --create-region <name> [--neuron-count N]"
+        return 1
+    fi
+    
+    echo "${BLUE}Creating neural region '$name' with $neuron_count neurons...${NC}"
+    
+    # Build the executable if needed
+    if [[ ! -f "${BUILD_DIR}/nlm" ]]; then
+        echo "Building NLM..."
+        mkdir -p "$BUILD_DIR"
+        cd "$BUILD_DIR"
+        cmake .. -DCMAKE_BUILD_TYPE=Release 2>/dev/null || {
+            echo "${RED}Build failed. Make sure CMake is installed and try again.${NC}"
+            cd - > /dev/null
+            return 1
+        }
+        make -j4 2>/dev/null || {
+            echo "${RED}Build failed. Please check your build configuration.${NC}"
+            cd - > /dev/null
+            return 1
+        }
+        cd - > /dev/null
+    fi
+    
+    # Run the brain creation using the built executable
+    "${BUILD_DIR}/nlm" --config "configs/template.cfg" \
+        --create-region "$name" \
+        --neuron-count "$neuron_count" \
+        2>&1 | grep -v "\[NLM\]" || true
+    
+    echo "${GREEN}Region '$name' created successfully!${NC}"
+}
+
+function brain_list_regions() {
+    echo "${BLUE}Available brain regions:${NC}"
+    
+    if [[ ! -f "${BUILD_DIR}/nlm" ]]; then
+        echo "${YELLOW}Warning: NLM executable not found. Building...${NC}"
+        mkdir -p "$BUILD_DIR"
+        cd "$BUILD_DIR"
+        cmake .. -DCMAKE_BUILD_TYPE=Release > /dev/null 2>&1 || {
+            echo "${RED}Build failed. Cannot list regions.${NC}"
+            cd - > /dev/null
+            return 1
+        }
+        make -j4 > /dev/null 2>&1 || {
+            echo "${RED}Build failed. Cannot list regions.${NC}"
+            cd - > /dev/null
+            return 1
+        }
+        cd - > /dev/null
+    fi
+    
+    "${BUILD_DIR}/nlm" --list-regions 2>&1 | grep -v "\[NLM\]" || echo "No regions found or regions not available."
+}
+
+function brain_analyze() {
+    local analysis_type="$1"
+    
+    case "$analysis_type" in
+        stats)
+            echo "${BLUE}Running brain statistics analysis...${NC}"
+            if [[ -f "${BUILD_DIR}/nlm" ]]; then
+                "${BUILD_DIR}/nlm" --stats 2>&1 | grep -E "(\[NLM\]|Region|Total|Synapse|Firing)" || true
+            else
+                echo "${YELLOW}Warning: NLM executable not found.${NC}"
+            fi
+            ;;
+        dump)
+            echo "${BLUE}Dumping brain state...${NC}"
+            echo "Use 'nlm brain dump --output file.bin' for checkpointing"
+            ;;
+        "*")
+            echo "${RED}Unknown analysis type: $analysis_type${NC}"
+            echo "Available analyses: stats, dump"
+            return 1
+            ;;
+    esac
+}
+
+# Configuration management functions
+function config_list() {
+    echo "${BLUE}Available configuration files:${NC}"
+    
+    local config_dir="configs"
+    if [[ -d "$config_dir" ]]; then
+        ls -la "$config_dir"/ 2>/dev/null | grep -v "^total" || {
+            echo "${YELLOW}No configuration files found in '$config_dir'${NC}"
+        }
+    else
+        echo "${YELLOW}Configuration directory '$config_dir' does not exist${NC}"
+        echo "${BLUE}Creating default configs directory...${NC}"
+        mkdir -p "$config_dir"
+    fi
+    
+    echo ""
+    echo "${BLUE}Creating default configuration...${NC}"
+    cat > "configs/default.cfg" << EOF
+# Default NLM configuration
+# Generated by NLM CLI
+
+# Brain parameters
+brain.neuron_count = 1000
+brain.region_count = 1
+brain.connection_probability = 0.1
+
+# Neuron parameters
+brain.v_thresh = -50.0
+brain.v_rest = -70.0
+brain.v_reset = -75.0
+brain.tau_mem = 20.0
+brain.tau_ref = 2.0
+
+# Plasticity parameters
+plasticity.stdp.enable = true
+plasticity.stdp.learning_rate = 0.001
+plasticity.stdp.tau_plus = 20.0
+plasticity.stdp.tau_minus = 20.0
+plasticity.hebbian.enable = true
+plasticity.structural.enable = true
+
+# Neuromodulation parameters
+neuromod.dopamine.scale = 1.0
+neuromod.curiosity.enable = true
+neuromod.novelty.enable = true
+
+# Simulation parameters
+simulation_timestep = 0.001
+random_seed = 42
+replay_interval = 100
+consolidation_interval = 1000
+EOF
+    echo "${GREEN}Default configuration created at 'configs/default.cfg'${NC}"
+}
+
+function config_set() {
+    local key="$1"
+    local value="$2"
+    
+    if [[ -z "$key" || -z "$value" ]]; then
+        echo "${RED}Error: Both key and value are required${NC}"
+        echo "Usage: nlm config set <key> <value>"
+        return 1
+    fi
+    
+    echo "${BLUE}Setting configuration '$key' = '$value'...${NC}"
+    
+    # Check if config file exists
+    if [[ ! -f "$DEFAULT_CONFIG" ]]; then
+        echo "${YELLOW}Warning: Configuration file not found. Creating default...${NC}"
+        config_list > /dev/null
+    fi
+    
+    # Append to config file
+    echo "# Set by NLM CLI" >> "$DEFAULT_CONFIG"
+    echo "$key = $value" >> "$DEFAULT_CONFIG"
+    
+    echo "${GREEN}Configuration '$key' set to '$value' in '$DEFAULT_CONFIG'${NC}"
+}
+
+# Demo functions
+function demo_phase2() {
+    echo "${BLUE}Running Phase 2 Neural Computation Demo...${NC}"
+    echo "This demo demonstrates real spiking neural computation with:"
+    echo "  - Leaky Integrate-and-Fire (LIF) neurons"
+    echo "  - Event-driven spike propagation"
+    echo "  - STDP and Hebbian plasticity"
+    echo "  - Structural plasticity"
+    echo ""
+    
+    if [[ ! -f "${BUILD_DIR}/nlm" ]]; then
+        echo "${YELLOW}Building NLM for demo...${NC}"
+        mkdir -p "$BUILD_DIR"
+        cd "$BUILD_DIR"
+        cmake .. -DCMAKE_BUILD_TYPE=Release > /dev/null 2>&1 || {
+            echo "${RED}Build failed.${NC}"
+            cd - > /dev/null
+            return 1
+        }
+        make -j4 > /dev/null 2>&1 || {
+            echo "${RED}Build failed.${NC}"
+            cd - > /dev/null
+            return 1
+        }
+        cd - > /dev/null
+    fi
+    
+    echo "${BLUE}Starting Phase 2 demonstration...${NC}"
+    
+    # Run the demo
+    "${BUILD_DIR}/nlm" --phase2 2>&1 | tail -50 || {
+        echo "${YELLOW}Demo completed or encountered issues.${NC}"
+    }
+}
+
+function demo_phase6() {
+    echo "${BLUE}Running Phase 6 Integration Demo...${NC}"
+    echo "This comprehensive demo tests the fully integrated brain:"
+    echo "  - Memory systems integration"
+    echo "  - Neuromodulation integration"
+    echo "  - Prediction system integration"
+    echo "  - Development system integration"
+    echo "  - Checkpointing and replay"
+    echo ""
+    
+    if [[ ! -f "${BUILD_DIR}/nlm_phase6_demo" ]]; then
+        echo "${YELLOW}Building Phase 6 demo executable...${NC}"
+        mkdir -p "$BUILD_DIR"
+        cd "$BUILD_DIR"
+        cmake .. -DCMAKE_BUILD_TYPE=Release > /dev/null 2>&1 || {
+            echo "${RED}Build failed.${NC}"
+            cd - > /dev/null
+            return 1
+        }
+        make -j4 > /dev/null 2>&1 || {
+            echo "${RED}Build failed.${NC}"
+            cd - > /dev/null
+            return 1
+        }
+        cd - > /dev/null
+    fi
+    
+    echo "${BLUE}Starting Phase 6 integration demo...${NC}"
+    
+    # Run the demo
+    "${BUILD_DIR}/nlm_phase6_demo" 2>&1 | tail -100 || {
+        echo "${YELLOW}Demo completed or encountered issues.${NC}"
+    }
+}
+
+# Main command parsing
+function main() {
+    # Parse command line arguments
+    local command=""
+    local config_file="$DEFAULT_CONFIG"
+    local build_dir="$BUILD_DIR"
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -v|--version)
+                show_version
+                exit 0
+                ;;
+            -c|--config)
+                config_file="$2"
+                shift 2
+                ;;
+            -b|--build-dir)
+                build_dir="$2"
+                shift 2
+                ;;
+            -l|--log-level)
+                LOG_LEVEL="$2"
+                shift 2
+                ;;
+            run)
+                command="run"
+                shift
+                ;;
+            config)
+                command="config"
+                shift
+                ;;
+            brain)
+                command="brain"
+                shift
+                ;;
+            demo)
+                command="demo"
+                shift
+                ;;
+            --*)
+                echo "${RED}Unknown option: $1${NC}"
+                show_help
+                exit 1
+                ;;
+            *)
+                if [[ -z "$command" ]]; then
+                    command="$1"
+                    shift
+                else
+                    echo "${RED}Too many arguments: $1${NC}"
+                    show_help
+                    exit 1
+                fi
+                ;;
+        esac
+    done
+    
+    # Set global variables
+    DEFAULT_CONFIG="$config_file"
+    BUILD_DIR="$build_dir"
+    
+    # Execute command
+    case "$command" in
+        run)
+            echo "${BLUE}Running NLM simulation with config: $DEFAULT_CONFIG${NC}"
+            if [[ ! -f "$DEFAULT_CONFIG" ]]; then
+                echo "${YELLOW}Configuration file not found. Creating default...${NC}"
+                config_list > /dev/null
+            fi
+            
+            if [[ ! -f "${BUILD_DIR}/nlm" ]]; then
+                echo "${YELLOW}Building NLM...${NC}"
+                mkdir -p "$BUILD_DIR"
+                cd "$BUILD_DIR"
+                cmake .. -DCMAKE_BUILD_TYPE=Release "$DEFAULT_CONFIG" > /dev/null 2>&1 || {
+                    echo "${RED}Configuration error. Check your config file.${NC}"
+                    cd - > /dev/null
+                    exit 1
+                }
+                make -j4 > /dev/null 2>&1 || {
+                    echo "${RED}Build failed. Check system requirements.${NC}"
+                    cd - > /dev/null
+                    exit 1
+                }
+                cd - > /dev/null
+            fi
+            
+            echo "${BLUE}Starting simulation...${NC}"
+            "${BUILD_DIR}/nlm" "$@" 2>&1
+            ;;
+        config)
+            # Check for subcommand
+            if [[ $# -gt 0 ]]; then
+                case $1 in
+                    list)
+                        config_list
+                        ;;
+                    set)
+                        config_set "$2" "$3"
+                        ;;
+                    *)
+                        echo "${RED}Unknown config command: $1${NC}"
+                        echo "Available commands: list, set"
+                        exit 1
+                        ;;
+                esac
+            else
+                echo "${YELLOW}Config command requires subcommand. Available: list, set${NC}"
+            fi
+            ;;
+        brain)
+            if [[ $# -gt 0 ]]; then
+                case $1 in
+                    --create-region)
+                        brain_create_region "$2" "${3:-1000}"
+                        ;;
+                    --list-regions)
+                        brain_list_regions
+                        ;;
+                    --analyze)
+                        brain_analyze "$2"
+                        ;;
+                    *)
+                        echo "${RED}Unknown brain command: $1${NC}"
+                        echo "Available commands: --create-region, --list-regions, --analyze"
+                        exit 1
+                        ;;
+                esac
+            else
+                echo "${YELLOW}Brain command requires subcommand. Available: --create-region, --list-regions, --analyze${NC}"
+            fi
+            ;;
+        demo)
+            if [[ $# -gt 0 ]]; then
+                case $1 in
+                    --phase2)
+                        demo_phase2
+                        ;;
+                    --phase6)
+                        demo_phase6
+                        ;;
+                    *)
+                        echo "${RED}Unknown demo: $1${NC}"
+                        echo "Available demos: --phase2, --phase6"
+                        exit 1
+                        ;;
+                esac
+            else
+                echo "${YELLOW}Demo command requires phase (--phase2 or --phase6)${NC}"
+            fi
+            ;;
+        "")
+            show_help
+            exit 1
+            ;;
+        *)
+            echo "${RED}Unknown command: $command${NC}"
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+# Execute main function with all arguments
+main "$@"
