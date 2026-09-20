@@ -82,6 +82,10 @@ void NeuralPopulation::setNeuronType(NeuronType type) {
 size_t NeuralPopulation::getActiveCount() const {
     size_t count = 0;
     for (const auto* neuron : pImpl->neurons) {
+        if (!neuron) {
+            NLM_LOG_ERROR("Null neuron in population at index " + std::to_string(count));
+            continue;
+        }
         if (neuron->isFiring() || neuron->getFiringRate() > 0.0f) {
             ++count;
         }

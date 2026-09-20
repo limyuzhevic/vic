@@ -30,11 +30,17 @@ struct AgentBody {
     bool isTurning;
     float lastActionTime;
     
+    // Advanced state
+    float fatigue;         // Fatigue level (0-1)
+    int explorationStep;   // Current step in systematic exploration
+    float burstEnergy;     // Energy for burst movements
+    
     AgentBody()
         : x(0.0f), y(0.0f), orientation(0.0f)
         , velocityX(0.0f), velocityY(0.0f), angularVelocity(0.0f)
-        , energy(1.0f), health(1.0f), age(0.0f)
-        , isMoving(false), isTurning(false), lastActionTime(0.0f) {}
+        , energy(1.0f), health(1.0f), age(0.0f), fatigue(0.0f)
+        , isMoving(false), isTurning(false), lastActionTime(0.0f)
+        , explorationStep(0), burstEnergy(0.0f) {}
     
     void reset() {
         x = 0.0f;
@@ -46,9 +52,12 @@ struct AgentBody {
         energy = 1.0f;
         health = 1.0f;
         age = 0.0f;
+        fatigue = 0.0f;
         isMoving = false;
         isTurning = false;
         lastActionTime = 0.0f;
+        explorationStep = 0;
+        burstEnergy = 0.0f;
     }
 };
 
@@ -62,7 +71,10 @@ enum class MotorCommand {
     LookLeft = 4,      // Pan sensor left
     LookRight = 5,     // Pan sensor right
     Interact = 6,      // Interact with nearby object
-    Wait = 7           // No movement
+    Wait = 7,          // No movement
+    Sprint = 8,        // Move forward quickly
+    Dodge = 9,         // Quick avoidance maneuver
+    Explore = 10       // Systematic exploration mode
 };
 
 // Action result from the world's perspective

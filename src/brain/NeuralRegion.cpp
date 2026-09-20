@@ -89,14 +89,31 @@ std::vector<NeuralPopulation*> NeuralRegion::getAllPopulations() {
 }
 
 SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
-                                   SynapticWeight weight, Delay delay) {
+                                    SynapticWeight weight, Delay delay) {
+    // Safety check for null populations
+    if (pImpl->populations.empty()) {
+        NLM_LOG_ERROR("Cannot add synapse: region has no populations");
+        return SynapseId();
+    }
+    
     SynapseId synId(pImpl->nextSynapseId++);
     auto synapse = std::make_unique<Synapse>(synId, source, destination);
     synapse->setWeight(weight);
     synapse->setDelay(delay);
     
-    pImpl->outgoingSynapses[source].push_back(synId);
-    pImpl->incomingSynapses[destination].push_back(synId);
+    // Add to maps (but check if they're null)
+    if (!source.isNull()) {
+        pImpl->outgoingSynapses[source].push_back(synId);
+    }
+    if (!destination.isNull()) {
+        pImpl->incomingSynapses[destination].push_back(synId);
+    }
+    
+    // Safety check for synapse
+    if (!synapse) {
+        NLM_LOG_ERROR("Failed to create synapse object");
+        return SynapseId();
+    }
     
     pImpl->synapses.push_back(std::move(synapse));
     return synId;
