@@ -113,6 +113,13 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
+        // Store reference to brain instance for future use by brain methods
+        // The brain instance will be set later via initialize method
+        // This is a hack for accessing memory systems from brain methods
+        pImpl->memorySystemContainer.workingMemory = workingMemory.get();
+        pImpl->memorySystemContainer.episodicMemory = episodicMemory.get();
+        pImpl->memorySystemContainer.associativeMemory = associativeMemory.get();
+        
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
         
