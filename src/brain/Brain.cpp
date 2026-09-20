@@ -527,9 +527,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Update concept formation with current working memory activity
+        std::vector<float> workingPattern = pImpl->workingMemory->retrieve();
+        if (!workingPattern.empty()) {
+            // Convert working memory to sensory features for concept formation
+            std::vector<float> features = workingPattern;
+            // Simple reward signal from dopamine
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Present experience to concept formation system
+            pImpl->conceptFormation->presentExperience(workingPattern, features, reward, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -810,23 +819,55 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
-        // Write synapses
-        SynapseCheckpointData synapseData;
-        for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
-            }
+        // Write episodic memory
+        if (pImpl->episodicMemory) {
+            auto episodes = pImpl->episodicMemory->getAllEpisodes();
+            writer.writeEpisodicMemory(pImpl->currentStep, episodes);
         }
         
-        if (!writer.writeSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to write synapses to checkpoint");
-            return false;
+        // Write working memory
+        if (pImpl->workingMemory) {
+            writer.writeWorkingMemory(*pImpl->workingMemory);
         }
+        
+        // Write prediction system
+        if (pImpl->predictionSystem) {
+            writer.writePredictionSystem(*pImpl->predictionSystem);
+        }
+        
+        // Write attention system
+        if (pImpl->attention) {
+            writer.writeAttentionSystem(*pImpl->attention);
+        }
+        
+        // Write planner
+        if (pImpl->planner) {
+            writer.writePlanner(*pImpl->planner);
+        }
+        
+        // Write concept formation
+        if (pImpl->conceptFormation) {
+            writer.writeConceptFormation(*pImpl->conceptFormation);
+        }
+        
+        // Write neuromodulation systems
+        if (pImpl->dopamine) writer.writeNeuromodulator(*pImpl->dopamine);
+        if (pImpl->curiosity) writer.writeNeuromodulator(*pImpl->curiosity);
+        if (pImpl->novelty) writer.writeNeuromodulator(*pImpl->novelty);
+        if (pImpl->predictionError) writer.writeNeuromodulator(*pImpl->predictionError);
+        
+        // Write development system
+        if (pImpl->developmentSystem) {
+            writer.writeDevelopmentSystem(*pImpl->developmentSystem);
+        }
+        
+        // Write associative memory
+        if (pImpl->associativeMemory) {
+            writer.writeAssociativeMemory(*pImpl->associativeMemory);
+        }
+        
+        // Write inter-region connections
+        writer.writeInterRegionConnections(pImpl->interRegionConnections);
         
         // Finalize
         if (!writer.finalize()) {
@@ -888,16 +929,93 @@ bool Brain::load(const std::string& filepath) {
             }
         }
         
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
-            return false;
-        }
-        
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // Read episodic memory
+        EpisodicMemoryCheckpointData episodicData;
+        if (reader.readEpisodicMemory(episodicData)) {
+            if (pImpl->episodicMemory) {
+                pImpl->episodicMemory->loadEpisodes(episodicData);
+            }
+        }
+        
+        // Read working memory
+        WorkingMemoryCheckpointData workingData;
+        if (reader.readWorkingMemory(workingData)) {
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->load(workingData);
+            }
+        }
+        
+        // Read prediction system
+        PredictionSystemCheckpointData predictionData;
+        if (reader.readPredictionSystem(predictionData)) {
+            if (pImpl->predictionSystem) {
+                pImpl->predictionSystem->load(predictionData);
+            }
+        }
+        
+        // Read attention system
+        AttentionSystemCheckpointData attentionData;
+        if (reader.readAttentionSystem(attentionData)) {
+            if (pImpl->attention) {
+                pImpl->attention->load(attentionData);
+            }
+        }
+        
+        // Read planner
+        PlannerCheckpointData plannerData;
+        if (reader.readPlanner(plannerData)) {
+            if (pImpl->planner) {
+                pImpl->planner->load(plannerData);
+            }
+        }
+        
+        // Read concept formation
+        ConceptFormationCheckpointData conceptData;
+        if (reader.readConceptFormation(conceptData)) {
+            if (pImpl->conceptFormation) {
+                pImpl->conceptFormation->load(conceptData);
+            }
+        }
+        
+        // Read neuromodulators
+        NeuromodulatorCheckpointData neuromodData;
+        if (reader.readNeuromodulator(neuromData)) {
+            if (pImpl->dopamine && neuromodData.systemType == "dopamine") {
+                pImpl->dopamine->load(neuromData);
+            }
+            if (pImpl->curiosity && neuromodData.systemType == "curiosity") {
+                pImpl->curiosity->load(neuromData);
+            }
+            if (pImpl->novelty && neuromodData.systemType == "novelty") {
+                pImpl->novelty->load(neuromData);
+            }
+            if (pImpl->predictionError && neuromodData.systemType == "prediction_error") {
+                pImpl->predictionError->load(neuromData);
+            }
+        }
+        
+        // Read development system
+        DevelopmentSystemCheckpointData devData;
+        if (reader.readDevelopmentSystem(devData)) {
+            if (pImpl->developmentSystem) {
+                pImpl->developmentSystem->load(devData);
+            }
+        }
+        
+        // Read associative memory
+        AssociativeMemoryCheckpointData assocData;
+        if (reader.readAssociativeMemory(assocData)) {
+            if (pImpl->associativeMemory) {
+                pImpl->associativeMemory->load(assocData);
+            }
+        }
+        
+        // Read inter-region connections
+        reader.readInterRegionConnections(pImpl->interRegionConnections);
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -1035,6 +1153,30 @@ ConceptFormation* Brain::getConceptFormation() {
 
 AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
+}
+
+// ========== DEVELOPMENT SYSTEM ==========
+
+DevelopmentSystem* Brain::getDevelopmentSystem() {
+    return pImpl->developmentSystem.get();
+}
+
+// ========== NEUROMODULATION SYSTEMS ==========
+
+Dopamine* Brain::getDopamine() {
+    return pImpl->dopamine.get();
+}
+
+Curiosity* Brain::getCuriosity() {
+    return pImpl->curiosity.get();
+}
+
+Novelty* Brain::getNovelty() {
+    return pImpl->novelty.get();
+}
+
+PredictionError* Brain::getPredictionErrorSignal() {
+    return pImpl->predictionError.get();
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
