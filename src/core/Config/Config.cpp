@@ -3,6 +3,10 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cmath>
+#include <cctype>
+#include <iomanip>
+#include <map>
 
 namespace nlm {
 
@@ -18,38 +22,336 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+struct JsonValue {
+    enum Type { NULL_TYPE, BOOL, INT, DOUBLE, STRING, ARRAY, OBJECT };
+    Type type;
     
+    // Primitive types
+    bool boolValue;
+    int64_t intValue;
+    double doubleValue;
+    std::string stringValue;
+    
+    // Complex types
+    std::vector<JsonValue> arrayValue;
+    std::map<std::string, JsonValue> objectValue;
+    
+    JsonValue() : type(NULL_TYPE) {}
+    JsonValue(bool v) : type(BOOL), boolValue(v) {}
+    JsonValue(int64_t v) : type(INT), intValue(v) {}
+    JsonValue(double v) : type(DOUBLE), doubleValue(v) {}
+    JsonValue(const std::string& v) : type(STRING), stringValue(v) {}
+};
+
+// Simple JSON parser (supports basic JSON)
+JsonValue parseJson(const std::string& json);
+std::string jsonToString(const JsonValue& value);
+void flattenJson(const JsonValue& value, const std::string& prefix, std::map<std::string, std::string>& flatConfig);
+
+JsonValue parseJson(const std::string& json) {
+    JsonValue result;
+    const char* data = json.c_str();
+    size_t pos = 0;
+    
+    while (pos < json.length() && std::isspace(data[pos])) pos++;
+    
+    if (parseJsonValue(data, pos, result)) {
+        return result;
+    }
+    return result;
+}
+
+bool parseJsonValue(const char* data, size_t& pos, JsonValue& out);
+bool parseJsonString(const char* data, size_t& pos, std::string& out);
+bool parseJsonNumber(const char* data, size_t& pos, double& out);
+bool parseJsonBoolean(const char* data, size_t& pos, bool& out);
+bool parseJsonArray(const char* data, size_t& pos, JsonValue& out);
+bool parseJsonObject(const char* data, size_t& pos, JsonValue& out);
+
+bool parseJsonValue(const char* data, size_t& pos, JsonValue& out) {
+    if (pos >= strlen(data)) return false;
+    
+    switch (data[pos]) {
+        case 'n': // null
+            if (strncmp(data + pos, "null", 4) == 0) {
+                pos += 4;
+                return true;
+            }
+            return false;
+        case 't': // true
+            if (strncmp(data + pos, "true", 4) == 0) {
+                out = JsonValue(true);
+                pos += 4;
+                return true;
+            }
+            return false;
+        case 'f': // false
+            if (strncmp(data + pos, "false", 5) == 0) {
+                out = JsonValue(false);
+                pos += 5;
+                return true;
+            }
+            return false;
+        case '\"': // string
+            return parseJsonString(data, pos, out.stringValue);
+        case '{': // object
+            return parseJsonObject(data, pos, out);
+        case '[': // array
+            return parseJsonArray(data, pos, out);
+        default: // number or -something
+            if (isdigit(data[pos]) || data[pos] == '-' || data[pos] == '+') {
+                double num;
+                if (parseJsonNumber(data, pos, num)) {
+                    out = JsonValue(num);
+                    return true;
+                }
+                return false;
+            }
+    }
+    return false;
+}
+
+bool parseJsonString(const char* data, size_t& pos, std::string& out) {
+    if (data[pos] != '\"') return false;
+    pos++;
+    out.clear();
+    
+    while (pos < strlen(data) && data[pos] != '\"') {
+        if (data[pos] == '\\') {
+            pos++;
+            if (pos >= strlen(data)) return false;
+            switch (data[pos]) {
+                case '\"': out += '\"'; break;
+                case '\\': out += '\\'; break;
+                case '/': out += '/'; break;
+                case 'b': out += '\b'; break;
+                case 'f': out += '\f'; break;
+                case 'n': out += '\n'; break;
+                case 'r': out += '\r'; break;
+                case 't': out += '\t'; break;
+                default: out += data[pos]; break;
+            }
+        } else {
+            out += data[pos];
+        }
+        pos++;
+    }
+    
+    if (data[pos] != '\"') return false;
+    pos++;
+    return true;
+}
+
+bool parseJsonNumber(const char* data, size_t& pos, double& out) {
+    char* end;
+    out = std::strtod(data + pos, &end);
+    pos = end - data;
+    return true;
+}
+
+bool parseJsonBoolean(const char* data, size_t& pos, bool& out) {
+    if (strncmp(data + pos, "true", 4) == 0) {
+        out = true;
+        pos += 4;
+        return true;
+    } else if (strncmp(data + pos, "false", 5) == 0) {
+        out = false;
+        pos += 5;
+        return true;
+    }
+    return false;
+}
+
+bool parseJsonArray(const char* data, size_t& pos, JsonValue& out) {
+    if (data[pos] != '[') return false;
+    pos++;
+    
+    while (pos < strlen(data) && data[pos] != ']') {
+        skipWhitespace(data, pos);
+        
+        JsonValue element;
+        if (!parseJsonValue(data, pos, element)) {
+            return false;
+        }
+        out.arrayValue.push_back(element);
+        
+        skipWhitespace(data, pos);
+        if (data[pos] == ',') {
+            pos++;
+            continue;
+        } else if (data[pos] != ']') {
+            return false;
+        }
+    }
+    
+    if (data[pos] != ']') return false;
+    pos++;
+    return true;
+}
+
+bool parseJsonObject(const char* data, size_t& pos, JsonValue& out) {
+    if (data[pos] != '{') return false;
+    pos++;
+    
+    while (pos < strlen(data) && data[pos] != '}') {
+        skipWhitespace(data, pos);
+        
+        // Parse key
+        std::string key;
+        if (!parseJsonString(data, pos, key)) return false;
+        
+        skipWhitespace(data, pos);
+        if (data[pos] != ':') return false;
+        pos++;
+        
+        skipWhitespace(data, pos);
+        
+        // Parse value
+        JsonValue value;
+        if (!parseJsonValue(data, pos, value)) return false;
+        out.objectValue[key] = value;
+        
+        skipWhitespace(data, pos);
+        if (data[pos] == ',') {
+            pos++;
+            continue;
+        } else if (data[pos] != '}') {
+            return false;
+        }
+    }
+    
+    if (data[pos] != '}') return false;
+    pos++;
+    return true;
+}
+
+void skipWhitespace(const char* data, size_t& pos) {
+    while (pos < strlen(data) && std::isspace(data[pos])) {
+        pos++;
+    }
+}
+
+std::string jsonToString(const JsonValue& value) {
+    switch (value.type) {
+        case JsonValue::NULL_TYPE:
+            return "null";
+        case JsonValue::BOOL:
+            return value.boolValue ? "true" : "false";
+        case JsonValue::INT:
+            return std::to_string(value.intValue);
+        case JsonValue::DOUBLE:
+            return std::to_string(value.doubleValue);
+        case JsonValue::STRING:
+            return '"' + value.stringValue + '"';
+        case JsonValue::ARRAY:
+            return "[" + arrayToString(value.arrayValue) + "]";
+        case JsonValue::OBJECT:
+            return objectToString(value.objectValue);
+        default:
+            return "";
+    }
+}
+
+std::string arrayToString(const std::vector<JsonValue>& array) {
+    std::string result;
+    for (size_t i = 0; i < array.size(); ++i) {
+        if (i > 0) result += ", ";
+        result += jsonToString(array[i]);
+    }
+    return result;
+}
+
+std::string objectToString(const std::map<std::string, JsonValue>& object) {
+    std::string result;
+    for (auto it = object.begin(); it != object.end(); ++it) {
+        if (it != object.begin()) result += ", ";
+        result += '"' + it->first + '"' + ": " + jsonToString(it->second);
+    }
+    return "{" + result + "}";
+}
+
+void flattenJson(const JsonValue& value, const std::string& prefix, std::map<std::string, std::string>& flatConfig) {
+    std::string key = prefix;
+    if (!key.empty() && key.back() != '.') key += '.';
+    
+    switch (value.type) {
+        case JsonValue::NULL_TYPE:
+            flatConfig[key.substr(0, key.length() - 1)] = "null";
+            break;
+        case JsonValue::BOOL:
+            flatConfig[key.substr(0, key.length() - 1)] = value.boolValue ? "true" : "false";
+            break;
+        case JsonValue::INT:
+            flatConfig[key.substr(0, key.length() - 1)] = std::to_string(value.intValue);
+            break;
+        case JsonValue::DOUBLE:
+            flatConfig[key.substr(0, key.length() - 1)] = std::to_string(value.doubleValue);
+            break;
+        case JsonValue::STRING:
+            flatConfig[key.substr(0, key.length() - 1)] = value.stringValue;
+            break;
+        case JsonValue::ARRAY:
+            for (size_t i = 0; i < value.arrayValue.size(); ++i) {
+                flattenJson(value.arrayValue[i], key + std::to_string(i) + ".", flatConfig);
+            }
+            break;
+        case JsonValue::OBJECT:
+            for (const auto& pair : value.objectValue) {
+                flattenJson(pair.second, key + pair.first + ".", flatConfig);
+            }
+            break;
+    }
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    // Read entire file
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Try to parse as JSON
+    JsonValue jsonValue = parseJson(content);
+    
+    if (jsonValue.type != JsonValue::OBJECT) {
+        // If not JSON, fall back to legacy key=value format
+        file.clear();
+        file.seekg(0);
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        std::string line;
+        while (std::getline(file, line)) {
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        return true;
+    }
+    
+    // Convert JSON to flat key=value format
+    std::map<std::string, std::string> flatConfig;
+    flattenJson(jsonValue, "", flatConfig);
+    
+    for (const auto& pair : flatConfig) {
+        set(pair.first, pair.second, ConfigSource::File);
     }
     
     return true;
