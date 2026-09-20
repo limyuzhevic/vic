@@ -25,6 +25,8 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
+#include <map>
 
 using namespace nlm;
 
@@ -46,6 +48,17 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printSeparator(const std::string& title = "") {
+    NLM_LOG_INFO("");
+    if (!title.empty()) {
+        std::string separator(70, '=');
+        NLM_LOG_INFO(separator);
+        NLM_LOG_INFO(title);
+        NLM_LOG_INFO(separator);
+    }
+    NLM_LOG_INFO("");
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -203,8 +216,7 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
 }
 
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
+    printSeparator("Test 2: Plasticity Learning Experiment");
     
     LearningExperiment experiment(brain, 42);
     
@@ -219,8 +231,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     }
     
     // Apply repeated input pattern to stimulate learning
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    printSeparator("Applying repeated input patterns (1000 steps)...");
     
     for (SimulationStep step = 0; step < 1000; ++step) {
         // Create input pattern - inject current into sensory neurons
@@ -246,8 +257,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
 }
 
 void runStdpVerification(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 3: STDP Verification ===");
+    printSeparator("Test 3: STDP Verification");
     
     auto* region = brain->getRegion(RegionId(1));
     if (!region) return;
@@ -271,8 +281,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
+    printSeparator("Creating correlated pre->post activity (potentiation)...");
     
     for (int trial = 0; trial < 50; ++trial) {
         // Fire pre-synaptic neuron
@@ -297,7 +306,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
     
     // Record after weights
-    NLM_LOG_INFO("  After correlated activity:");
+    printSeparator("After correlated activity:");
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
@@ -311,7 +320,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         totalDelta += synapses[i]->getWeight() - beforeWeights[i];
     }
     
-    NLM_LOG_INFO("");
+    printSeparator("STDP Results:");
     if (totalDelta > 0.001f) {
         NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
     } else if (totalDelta < -0.001f) {
@@ -332,13 +341,12 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    printSeparator("NLM Phase 2: Real Neural Computation");
     NLM_LOG_INFO("Implementing:");
     NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
     NLM_LOG_INFO("  - Event-driven spike propagation with delays");
     NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
     
     // Load configuration
     auto config = std::make_shared<Config>();
@@ -383,14 +391,12 @@ int main(int argc, char** argv) {
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
     // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    printSeparator("Configuration");
+    NLM_LOG_INFO("random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -398,8 +404,7 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
     // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
+    printSeparator("Initializing NLM Brain");
     auto brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
@@ -425,13 +430,10 @@ int main(int argc, char** argv) {
     runStdpVerification(brain);
     
     // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
+    printSeparator("Final Brain Status");
     brain->logStatus();
     
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
+    printSeparator("Phase 2 Complete");
     NLM_LOG_INFO("Phase 2 Objectives Completed:");
     NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
     NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
