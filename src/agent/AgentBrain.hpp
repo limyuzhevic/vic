@@ -55,8 +55,19 @@ public:
     // Reset agent for new episode
     void reset();
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Get brain pointer (const version)
+    const Brain* getBrain() const { return brain_.get(); }
+    
+    // Get world dimensions (for bounds checking)
+    static constexpr size_t getMaxVisionNeurons() { return 256; }
+    static constexpr size_t getMaxTouchNeurons() { return 8; }
+    static constexpr size_t getMaxInternalNeurons() { return 4; }
+    static constexpr size_t getMaxProprioceptionNeurons() { return 6; }
+    static constexpr size_t getMaxMotorActions() { return 8; }
+    
+    // Configuration validation
+    bool validateConfiguration() const;
+    std::string getConfigurationSummary() const;
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -83,6 +94,8 @@ private:
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
     std::vector<Neuron*> motorTurnRight_;
+    std::vector<Neuron*> motorLookLeft_;
+    std::vector<Neuron*> motorLookRight_;
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     

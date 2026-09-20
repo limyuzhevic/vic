@@ -1,3 +1,6 @@
+# CMake configuration for NLM Neural Learning Machine
+# Modern CMake with better organization and build options
+
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
@@ -18,134 +21,160 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Source directory - use absolute path for consistency
+get_filename_component(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src" ABSOLUTE)
 
-# Core library
-add_library(nlm_core STATIC
-    # Core
-    src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
-    # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
-    # Dynamics
-    src/dynamics/NeuralDynamics.cpp
-    src/dynamics/SpikeSystem.cpp
-    # Plasticity
-    src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
-    src/plasticity/STDP.cpp
-    src/plasticity/StructuralPlasticity.cpp
-    # Development
-    src/development/DevelopmentSystem.cpp
-    src/development/Synaptogenesis.cpp
-    src/development/Pruning.cpp
-    src/development/Maturation.cpp
-    # Neuromodulation
-    src/neuromodulation/Neuromodulator.cpp
-    src/neuromodulation/Reward.cpp
-    src/neuromodulation/PredictionError.cpp
-    src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
-    src/memory/NeuralWorkingMemory.cpp
-    src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
-    src/cognition/ConceptFormation.cpp
-    src/cognition/NeuralPlanner.cpp
-    # Sensory
-    src/sensory/SensoryInput.cpp
-    src/sensory/Vision.cpp
-    src/sensory/Audio.cpp
-    src/sensory/InternalSignals.cpp
-    # Prediction
-    src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+# Configuration options
+option(NLM_BUILD_PYTHON_BINDINGS "Build Python bindings" ON)
+option(NLM_BUILD_TESTS "Build tests" ON)
+option(NLM_BUILD_DOCS "Build documentation" OFF)
+option(NLM_ENABLE_PERFORMANCE_OPTS "Enable performance optimizations" ON)
+option(NLM_ENABLE_VALIDATION "Enable runtime validation" ON)
+
+# Set version for pkg-config (if available)
+set(NLM_SOVERSION 0)
+
+# Core library - use GLOB to organize by module structure
+file(GLOB NLM_CORE_SOURCES
+    "${NLM_SOURCE_DIR}/core/*.cpp"
+    "${NLM_SOURCE_DIR}/brain/*.cpp"
+    "${NLM_SOURCE_DIR}/dynamics/*.cpp"
+    "${NLM_SOURCE_DIR}/plasticity/*.cpp"
+    "${NLM_SOURCE_DIR}/development/*.cpp"
+    "${NLM_SOURCE_DIR}/neuromodulation/*.cpp"
+    "${NLM_SOURCE_DIR}/memory/*.cpp"
+    "${NLM_SOURCE_DIR}/cognition/*.cpp"
+    "${NLM_SOURCE_DIR}/sensory/*.cpp"
+    "${NLM_SOURCE_DIR}/prediction/*.cpp"
+    "${NLM_SOURCE_DIR}/motor/*.cpp"
+    "${NLM_SOURCE_DIR}/environment/*.cpp"
+    "${NLM_SOURCE_DIR}/experiments/*.cpp"
+    "${NLM_SOURCE_DIR}/visualization/*.cpp"
 )
 
+# Filter out test and benchmark files
+list(FILTER NLM_CORE_SOURCES EXCLUDE REGEX ".*test.*\.cpp$|.*benchmark\.cpp$")
+
+add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
+
 target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${NLM_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
+# Agent system
 add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
+    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
 )
-target_include_directories(nlm_agent PUBLIC src)
+
+target_include_directories(nlm_agent PUBLIC ${NLM_SOURCE_DIR})
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-# World system (environment, objects, simple world)
+# World system
 add_library(nlm_world STATIC
-    src/world/SimpleWorld.cpp
+    ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
 )
-target_include_directories(nlm_world PUBLIC src)
+
+target_include_directories(nlm_world PUBLIC ${NLM_SOURCE_DIR})
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
-    src/experiments/Phase3Experiment.cpp
+    ${NLM_SOURCE_DIR}/experiments/Phase3Experiment.cpp
 )
-target_include_directories(nlm_phase3 PUBLIC src)
+
+target_include_directories(nlm_phase3 PUBLIC ${NLM_SOURCE_DIR})
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 4 experiments
 add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
+    ${NLM_SOURCE_DIR}/experiments/Phase4Experiment.cpp
 )
-target_include_directories(nlm_phase4 PUBLIC src)
+
+target_include_directories(nlm_phase4 PUBLIC ${NLM_SOURCE_DIR})
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
-)
+# Main executables
+add_executable(nlm ${NLM_SOURCE_DIR}/main.cpp)
 target_link_libraries(nlm PUBLIC nlm_core)
 
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
-)
+add_executable(nlm_phase3_demo ${NLM_SOURCE_DIR}/experiments/Phase3Demo.cpp)
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
-)
+add_executable(nlm_phase4_demo ${NLM_SOURCE_DIR}/experiments/Phase4Demo.cpp)
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Python bindings (optional)
+if(NLM_BUILD_PYTHON_BINDINGS)
+    add_subdirectory(python)
+endif()
 
-# Install targets (future)
+# Testing (optional)
+if(NLM_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
+# Performance optimizations
+if(NLM_ENABLE_PERFORMANCE_OPTS)
+    target_compile_definitions(nlm_core PUBLIC NLM_ENABLE_PERF_OPT)
+    target_compile_definitions(nlm_agent PUBLIC NLM_ENABLE_PERF_OPT)
+    target_compile_definitions(nlm_world PUBLIC NLM_ENABLE_PERF_OPT)
+endif()
+
+# Validation (optional)
+if(NLM_ENABLE_VALIDATION)
+    target_compile_definitions(nlm_core PUBLIC NLM_ENABLE_VALIDATION)
+    target_compile_definitions(nlm_agent PUBLIC NLM_ENABLE_VALIDATION)
+endif()
+
+# Installation
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+    EXPORT NLMTargets
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+    INCLUDES DESTINATION include
 )
+
+# Install headers
+install(DIRECTORY ${NLM_SOURCE_DIR}/ DESTINATION include/
+    FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h"
+)
+
+# Install Python module (if built)
+if(NLM_BUILD_PYTHON_BINDINGS)
+    install(TARGETS pynlm
+        LIBRARY DESTINATION pynlm
+        ARCHIVE DESTINATION pynlm
+        RUNTIME DESTINATION pynlm
+    )
+endif()
+
+# Generate and install pkg-config file
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/nlm.pc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/nlm.pc"
+    @ONLY
+)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/nlm.pc
+    DESTINATION lib/pkgconfig
+)
+
+# Create CMake package configuration
+install(EXPORT NLMTargets
+    FILE NLMConfig.cmake
+    NAMESPACE nlm::
+    DESTINATION lib/cmake/nlm
+)
+
+# Summary
+message(STATUS "NLM Build Configuration:")
+message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Python bindings: ${NLM_BUILD_PYTHON_BINDINGS}")
+message(STATUS "  Tests: ${NLM_BUILD_TESTS}")
+message(STATUS "  Performance optimizations: ${NLM_ENABLE_PERFORMANCE_OPTS}")
+message(STATUS "  Runtime validation: ${NLM_ENABLE_VALIDATION}")
+message(STATUS "  Core source files: ${NLM_CORE_SOURCES}")
