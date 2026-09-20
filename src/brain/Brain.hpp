@@ -1,18 +1,18 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include "../core/Types/Types.hpp"
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+class NeuralRegion;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
@@ -28,6 +28,19 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class CheckpointManager;
+class Action;
+class Neuromodulator;
+class DetailedSpikeEvent;
+class DelayedSpikeEvent;
+class Synapse;
+class Neuron;
+class Population;
+class SpikeEvent;
+class CheckpointWriter;
+class CheckpointReader;
+class NeuronCheckpointData;
+class SynapseCheckpointData;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -47,6 +60,28 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// 
+// This class represents a complete artificial brain with integrated cognitive
+// and neurobiological systems. It coordinates spiking neural networks with
+// memory, prediction, attention, and neuromodulation systems to create
+// experience-driven learning and behavior.
+// 
+// The brain implements:
+// - Real spiking neural computation (LIF neurons, event-driven dynamics)
+// - Multiple memory systems (working, episodic, associative)
+// - Prediction and planning systems
+// - Attention and cognition mechanisms
+// - Neuromodulation (dopamine, curiosity, novelty)
+// - Developmental processes
+// - Checkpointing and persistence
+// 
+// The brain operates in a closed-loop system where sensory input drives
+// neural processing, which produces actions, which affect the environment,
+// creating experiences that drive learning and development.
+// 
+// Phase 6 (FINAL INTEGRATION): All systems are integrated into a coherent
+// artificial brain architecture that can learn from experience and adapt
+// over time.
 
 class Brain {
 public:
