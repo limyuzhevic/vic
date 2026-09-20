@@ -12,6 +12,19 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    
+    ~Impl() {
+        if (fileOut.is_open()) {
+            fileOut.close();
+        }
+    }
+};
+
+struct Logger::Impl {
+    std::vector<std::shared_ptr<ILogger>> loggers;
+    std::mutex mutex;
+    
+    ~Impl() = default;
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}

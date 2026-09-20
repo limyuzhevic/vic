@@ -133,9 +133,12 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Update neuron for one simulation step using neural dynamics
+    // TODO PHASE 2: Implement integration with NeuralDynamics system
     void step(Timestamp currentTime);
+    
+    // Set neural dynamics system
+    void setNeuralDynamics(std::shared_ptr<NeuralDynamics> dynamics) { neuralDynamics_ = dynamics; }
     
     // Reset to initial state
     void reset();

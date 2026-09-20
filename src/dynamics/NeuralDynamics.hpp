@@ -7,27 +7,47 @@
 namespace nlm {
 
 // Abstract base class for neural dynamics
-// PLACEHOLDER - Phase 2 will implement various dynamics models
+// Provides interface for different neural computation models
 
 class NeuralDynamics {
 public:
     virtual ~NeuralDynamics() = default;
     
-    // Update neuron state for one step
-    // TODO PHASE 2: Implement real dynamics
+    /**
+     * Update neuron state for one simulation step
+     * 
+     * @param neuron Neuron to update
+     * @param dt Simulation timestep (ms)
+     */
     virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
     
-    // Update synapse state for one step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    /**
+     * Update synapse state for one simulation step
+     * 
+     * @param synapse Synapse to update
+     * @param dt Simulation timestep (ms)
+     */
     virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
     
-    // Apply synaptic input from spike
+    /**
+     * Apply synaptic input resulting from spike transmission
+     * 
+     * @param neuron Destination neuron
+     * @param synapse Synapse that transmitted the spike
+     */
     virtual void applySpikeInput(Neuron* neuron, const Synapse* synapse) = 0;
     
-    // Check if neuron should fire
+    /**
+     * Check if neuron has reached firing threshold
+     * 
+     * @param neuron Neuron to check
+     * @return true if neuron should fire this step
+     */
     virtual bool shouldFire(const Neuron* neuron) const = 0;
     
-    // Reset dynamics state
+    /**
+     * Reset dynamics state to initial conditions
+     */
     virtual void reset() = 0;
 };
 

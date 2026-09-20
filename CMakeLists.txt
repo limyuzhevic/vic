@@ -139,9 +139,20 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Enable testing if available
+if (NOT CMAKE_VERSION VERSION_LESS 3.14)
+    include(CTest)
+    enable_testing()
+    
+    # Add integration test executable
+    add_executable(nlm_test_integration test_integration.cpp)
+    target_link_libraries(nlm_test_integration nlm_core)
+    
+    add_test(NAME nlm_integration_test
+        COMMAND nlm_test_integration
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+endif()
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
