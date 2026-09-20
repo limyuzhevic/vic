@@ -28,6 +28,15 @@ struct Brain::Impl {
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
+    // Thread safety
+    mutable std::shared_mutex regionsMutex;
+    mutable std::shared_mutex connectionsMutex;
+    mutable std::mutex statsMutex;
+    
+    // Atomic counters for statistics
+    std::atomic<size_t> totalSpikesThisStep{0};
+    std::atomic<size_t> totalSpikesTotal{0};
+    
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;

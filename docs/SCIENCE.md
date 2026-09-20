@@ -315,11 +315,74 @@ NLM IS:
 - An educational tool for understanding neural computation
 - An investigation of whether cognition can emerge from spiking dynamics
 
-## Acknowledging Uncertainty
+## Modern Extensions (Phase 5+)
 
-We acknowledge that:
-1. Biological brains are far more complex than any current simulation
-2. Our understanding of the brain is incomplete
-3. Many approximations are necessary for computational tractability
-4. Claims of "brain-like" behavior should be critically examined
-5. Phase 4 does not claim human-like intelligence, consciousness, or genuine understanding
+### Performance Optimizations
+NLM has evolved with significant performance improvements:
+
+1. **Event-Driven Processing**: Only active neurons consume computation
+2. **Structure-of-Arrays (SoA)**: Contiguous state arrays for cache efficiency
+3. **Sparse Connectivity**: Efficient adjacency lists for large networks
+4. **Multithreading**: Parallel processing with work-stealing
+5. **SIMD Vectorization**: Vector operations for modern CPUs
+
+### New Features
+1. **Circular Buffer History**: Efficient spike history for STDP with bounded memory
+2. **Advanced Memory Management**: Memory pools, allocators, and leak detection
+3. **Thread-Safe Operations**: Fine-grained locking and atomic operations
+4. **Performance Profiling**: Comprehensive profiling system for optimization
+5. **Memory Monitoring**: Real-time memory tracking and leak detection
+
+### Modern C++ Implementation
+1. **C++2020 Standard**: Uses modules, coroutines, and contracts
+2. **RAII**: Automatic resource management throughout
+3. **Move Semantics**: Efficient transfer of ownership
+4. **Templates**: Type-safe generic programming
+5. **Standard Library**: Modern algorithms and data structures
+
+## Future Research Directions
+
+### 1. Enhanced Biological Fidelity
+- Implement realistic ion channel dynamics
+- Add detailed neuron morphology
+- Incorporate glial cell interactions
+- Model neuromodulatory systems accurately
+
+### 2. Advanced Cognitive Models
+- Hierarchical predictive coding
+- Bayesian inference for perception
+- Theory of mind extensions
+- Complex social learning
+
+### 3. Scalability Improvements
+- GPU acceleration for matrix operations
+- Distributed computing for large networks
+- Neuromorphic hardware compatibility
+- Energy-efficient designs
+
+### 4. Learning Algorithm Extensions
+- Meta-learning and few-shot learning
+- Continual learning without catastrophic interference
+- Transfer learning across tasks
+- Intrinsic motivation systems
+
+## References
+
+This scientific background draws from:
+- Neuroscience literature on neural plasticity
+- Computational neuroscience models
+- Machine learning theory
+- Cognitive science research
+- Current NLM implementation documentation
+
+## Notes for Researchers
+
+When using NLM for research:
+
+1. **Acknowledge Limitations**: Clearly state which biological phenomena are modeled and which are approximated
+2. **Document Configuration**: Record all parameter settings for reproducibility
+3. **Use Deterministic Seeds**: For experimental reproducibility
+4. **Profile Performance**: Understand performance characteristics for your use case
+5. **Consider Alternatives**: NLM is one approach among many for brain-inspired computing
+
+The NLM project is designed as a research platform, not a final production system. Feedback and suggestions for improvements are always welcome!

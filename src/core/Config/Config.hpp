@@ -5,6 +5,16 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <atomic>
+#include <mutex>
+#include <shared_mutex>
+#include <unordered_map>
+#include <functional>
+#include <chrono>
+#include <deque>
+#include <any>
+#include <stdexcept>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -37,11 +47,47 @@ struct ConfigEntry {
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    std::chrono::system_clock::time_point timestamp;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description(), timestamp(std::chrono::system_clock::now()) {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+        : key(k), value(v), source(s), description(desc), timestamp(std::chrono::system_clock::now()) {}
 };
+
+// Configuration validation error
+struct ConfigValidationError {
+    std::string path;
+    std::string message;
+    std::string expected;
+    std::string actual;
+};
+
+// Configuration validation function type
+using ConfigValidator = std::function<bool(const std::string&, const ConfigValue&, std::vector<ConfigValidationError>&)>;
+
+// Configuration schema entry
+struct ConfigSchemaEntry {
+    std::string key;
+    std::type_index type;
+    std::string description;
+    std::vector<ConfigValue> allowedValues;
+    ConfigValidator validator;
+    bool required;
+    ConfigValue defaultValue;
+};
+
+// Configuration history entry
+struct ConfigHistoryEntry {
+    std::chrono::system_clock::time_point timestamp;
+    std::string key;
+    ConfigValue oldValue;
+    ConfigValue newValue;
+    ConfigSource source;
+    std::string reason;
+};
+
+// Configuration change callback type
+using ConfigChangeCallback = std::function<void(const std::string&, const ConfigValue&, const ConfigValue&)>;
 
 // Main configuration class
 class Config {
@@ -92,6 +138,24 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation
+    bool validate(const std::string& key, const ConfigValue& value) const;
+    bool validateAll() const;
+    
+    // Schema support
+    void addSchemaEntry(const std::string& key, const std::type_info& type, 
+                       const std::string& description, bool required = false,
+                       const ConfigValue& defaultValue = {});
+    bool validateSchema() const;
+    
+    // Copy-on-write support
+    void enableCopyOnWrite(bool enable);
+    bool isCopyOnWriteEnabled() const;
+    
+    // Configuration flags
+    void setFlag(const std::string& flag, bool value);
+    bool getFlag(const std::string& flag) const;
     
 private:
     struct Impl;
