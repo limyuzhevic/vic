@@ -39,6 +39,7 @@ public:
     void setPruningRate(float rate);
     
     // Update structural plasticity
+    // Phase 2: Real implementation with activity-dependent synaptic formation and pruning
     void update(Brain* brain, class RandomGenerator& rng);
     
 private:

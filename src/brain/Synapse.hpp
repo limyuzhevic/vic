@@ -71,18 +71,18 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Phase 2: Real synaptic dynamics implementation
     void step(Timestamp currentTime);
-    
+
     // Reset to initial state
     void reset();
-    
+
     // Initialize with random parameters
-    void initializeRandom(class RandomGenerator& rng);
-    
+    void initializeRandom(RandomGenerator& rng);
+
 private:
     struct Impl;
     Impl* pImpl;
-};
+}
 
 } // namespace nlm

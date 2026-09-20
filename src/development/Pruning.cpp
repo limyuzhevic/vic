@@ -30,13 +30,59 @@ void Pruning::setPruningRate(float rate) {
 }
 
 void Pruning::update(Brain* brain, RandomGenerator& rng) {
-    // TODO PHASE 2: Implement real pruning
-    // PLACEHOLDER: Weak synapses are removed probabilistically
-}
+        // Phase 2: Real pruning implementation
+        // Remove weak synapses based on threshold and rate
+        if (!brain) return;
+        
+        auto* region = brain->getRegion(RegionId(1));
+        if (!region) return;
+        
+        const float threshold = getThreshold();
+        const float pruningRate = getPruningRate();
+        
+        // Iterate through synapses and prune weak ones
+        auto& synapses = region->getSynapses();
+        std::vector<Synapse*> synapsesToRemove;
+        
+        for (auto& syn : synapses) {
+            if (syn->getWeight() < threshold) {
+                // Determine if this synapse gets pruned
+                if (rng.getFloat() < pruningRate) {
+                    synapsesToRemove.push_back(syn.get());
+                }
+            }
+        }
+        
+        // Remove pruned synapses
+        for (auto* synapse : synapsesToRemove) {
+            pruneSynapse(synapse);
+        }
+        
+        if (!synapsesToRemove.empty()) {
+            NLM_LOG_INFO("Pruned " + std::to_string(synapsesToRemove.size()) + " weak synapses");
+        }
+    }
 
 bool Pruning::pruneSynapse(Synapse* synapse) {
-    // TODO PHASE 2: Implement real synapse removal
-    return false;
-}
+        if (!synapse) return false;
+        
+        // Get the parent region
+        auto* region = synapse->getOwner();
+        if (!region) return false;
+        
+        // Create synapse removal request
+        SynapseId synapseId = synapse->getId();
+        
+        // Remove from region's synapse list
+        region->removeSynapse(synapseId);
+        
+        // Mark synapse for removal in brain's synaptic management
+        if (auto* brain = region->getBrain()) {
+            brain->markSynapseForRemoval(synapseId);
+        }
+        
+        NLM_LOG_INFO("Pruned synapse " + std::to_string(synapseId.value));
+        return true;
+    }
 
 } // namespace nlm
