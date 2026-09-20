@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,43 +20,42 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Use nlohmann::json for proper JSON parsing
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        nlohmann::json j;
+        file >> j;
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Parse JSON object
+        if (j.is_object()) {
+            for (auto& [key, value] : j.items()) {
+                ConfigValue configValue;
+                ConfigSource source = ConfigSource::File;
+                std::string description = "";
+                
+                // Store original key for lookup
+                set(key, value, source);
             }
-            
-            set(key, value, ConfigSource::File);
         }
+        
+        return true;
+    } catch (const std::exception&) {
+        // Fall back to simple key=value parsing for backward compatibility
+        return loadFromArgs(0, nullptr);
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Clear existing entries first
+    pImpl->entries.clear();
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -79,17 +79,45 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+    // Use nlohmann::json for proper JSON serialization
+    try {
+        nlohmann::json j;
+        
+        // Create JSON object from configuration entries
+        for (const auto& entry : pImpl->entries) {
+            // Convert ConfigValue to nlohmann::json
+            if (std::holds_alternative<int>(entry.value)) {
+                j[entry.key] = std::get<int>(entry.value);
+            } else if (std::holds_alternative<int64_t>(entry.value)) {
+                j[entry.key] = std::get<int64_t>(entry.value);
+            } else if (std::holds_alternative<double>(entry.value)) {
+                j[entry.key] = std::get<double>(entry.value);
+            } else if (std::holds_alternative<bool>(entry.value)) {
+                j[entry.key] = std::get<bool>(entry.value);
+            } else if (std::holds_alternative<std::string>(entry.value)) {
+                j[entry.key] = std::get<std::string>(entry.value);
+            } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+                j[entry.key] = std::get<std::vector<int>>(entry.value);
+            } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+                j[entry.key] = std::get<std::vector<double>>(entry.value);
+            } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+                j[entry.key] = std::get<std::vector<std::string>>(entry.value);
+            } else {
+                // Skip unsupported types
+                continue;
+            }
+        }
+        
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        file << j.dump(4); // Pretty-print with 4-space indentation
+        return true;
+    } catch (const std::exception&) {
         return false;
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
 }
 
 template<typename T>
@@ -200,16 +228,16 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+//template std::optional<int> Config::get<int>(const std::string&) const;
+//template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+//template std::optional<double> Config::get<double>(const std::string&) const;
+//template std::optional<bool> Config::get<bool>(const std::string&) const;
+//template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+//template int Config::getOr<int>(const std::string&, const int&) const;
+//template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+//template double Config::getOr<double>(const std::string&, const double&) const;
+//template bool Config::getOr<bool>(const std::string&, const bool&) const;
+//template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm

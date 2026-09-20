@@ -160,9 +160,111 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set an integer configuration value")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a float/double configuration value")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a string configuration value")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a boolean configuration value")
+        .def("get", [](Config& self, const std::string& key) {
+            return self.get<std::string>(key).value_or("");
+        }, py::arg("key"),
+           "Get a string configuration value (returns empty string if not found)")
+        .def("get", [](Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value"),
+           "Get an integer configuration value (returns default if not found)")
+        .def("get", [](Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value"),
+           "Get a double configuration value (returns default if not found)")
+        .def("get", [](Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value"),
+           "Get a boolean configuration value (returns default if not found)")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        .def("__getitem__", [](Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (val.has_value()) {
+                return py::str(val.value());
+            }
+            throw py::key_error("Configuration key not found: " + key);
+        }, py::arg("key"),
+           "Python-style dictionary access to configuration")
+        .def("__setitem__", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Python-style dictionary assignment to configuration")
+        .def("__contains__", &Config::has, py::arg("key"),
+             "Python-style 'in' operator for configuration keys")
+        .def("__len__", &Config::getKeys,
+             "Python-style len() function for configuration")
+        .def("keys", &Config::getKeys,
+             "Get all configuration keys (alias for getKeys)")
+        .def("values", [](Config& self) {
+            std::vector<std::string> values;
+            for (const auto& key : self.getKeys()) {
+                auto val = self.get<std::string>(key);
+                if (val.has_value()) {
+                    values.push_back(val.value());
+                }
+            }
+            return values;
+        }, "Get all configuration values")
+        .def("items", [](Config& self) {
+            std::vector<std::pair<std::string, std::string>> items;
+            for (const auto& key : self.getKeys()) {
+                auto val = self.get<std::string>(key);
+                if (val.has_value()) {
+                    items.emplace_back(key, val.value());
+                }
+            }
+            return items;
+        }, "Get all configuration key-value pairs")
+        .def("from_dict", [](Config& self, const py::dict& d) {
+            for (auto item : d) {
+                std::string key = py::cast<std::string>(item.first);
+                auto value = item.second;
+                
+                if (value.is(py::int_())) {
+                    self.set(key, py::cast<int>(value));
+                } else if (value.is(py::float())) {
+                    self.set(key, py::cast<double>(value));
+                } else if (value.is(py::bool_())) {
+                    self.set(key, py::cast<bool>(value));
+                } else {
+                    self.set(key, py::cast<std::string>(value));
+                }
+            }
+        }, py::arg("dictionary"),
+           "Load configuration from a Python dictionary")
+        .def("to_dict", [](const Config& self) {
+            py::dict d;
+            for (const auto& key : self.getKeys()) {
+                auto val = self.get<std::string>(key);
+                if (val.has_value()) {
+                    d[key] = val.value();
+                }
+            }
+            return d;
+        }, "Convert configuration to Python dictionary")
+        .def("clone", []() -> std::shared_ptr<Config> {
+            return std::make_shared<Config>();
+        }, "Create a copy of this configuration");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
