@@ -1,3 +1,4 @@
+// NLM Configuration Header
 #pragma once
 
 #include <string>
@@ -93,6 +94,21 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Development Phase 6 enhancements
+    // Validation and consistency checks
+    std::vector<std::string> validate() const;
+    bool isConsistent() const;
+    
+    // Configuration for Phase 6 systems
+    void setMemoryConfig(const std::string& key, double value);
+    void setNeuromodulationConfig(const std::string& key, double value);
+    void setPredictionConfig(const std::string& key, double value);
+    
+    // Get configuration by category
+    std::vector<std::pair<std::string, double>> getMemoryConfig() const;
+    std::vector<std::pair<std::string, double>> getNeuromodulationConfig() const;
+    std::vector<std::pair<std::string, double>> getPredictionConfig() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +116,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Enhanced validation helpers
+    static bool isValidMemoryConfig(const std::string& key, double value);
+    static bool isValidNeuromodulationConfig(const std::string& key, double value);
+    static bool isValidPredictionConfig(const std::string& key, double value);
 };
 
 } // namespace nlm

@@ -1,3 +1,7 @@
+// NLM (熙然) - Neural Learning Machine Python Bindings
+// Enhanced Python API for NLM C++ neural simulation framework
+// Provides comprehensive bindings for Phase 6 memory, neuromodulation, and prediction systems
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
@@ -5,30 +9,220 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "src/brain/Brain.hpp"
+#include "src/core/Config/Config.hpp"
+#include "src/core/Types/Types.hpp"
+#include "src/agent/AgentBrain.hpp"
+#include "src/world/SimpleWorld.hpp"
+#include "src/sensory/SensoryInput.hpp"
+#include "src/motor/Action.hpp"
+#include "src/agent/AgentBody.hpp"
+#include "src/agent/SensoryPercept.hpp"
+
+// Memory system bindings
+#include "src/memory/WorkingMemory.hpp"
+#include "src/memory/EpisodicMemory.hpp"
+#include "src/memory/AssociativeMemory.hpp"
+
+// Neuromodulation system bindings
+#include "src/neuromodulation/Neuromodulator.hpp"
+#include "src/neuromodulation/Dopamine.hpp"
+#include "src/neuromodulation/PredictionError.hpp"
+#include "src/neuromodulation/Novelty.hpp"
+#include "src/neuromodulation/Curiosity.hpp"
+
+// Prediction system bindings
+#include "src/prediction/PredictionSystem.hpp"
 
 namespace py = pybind11;
 namespace nlm {
 
+// Enhanced WorkingMemory bindings
+py::class_<WorkingMemory> bindWorkingMemory(py::module_ &m) {
+    return py::class_<WorkingMemory>(m, "WorkingMemory")
+        .def(py::init<>())
+        .def("store", &WorkingMemory::store, py::arg("content"), py::arg("activation") = 1.0)
+        .def("retrieve", &WorkingMemory::retrieve, py::arg("threshold") = 0.1)
+        .def("clear", &WorkingMemory::clear)
+        .def("get_entry_count", &WorkingMemory::getEntryCount)
+        .def("get_active_entry_count", &WorkingMemory::getActiveEntryCount)
+        .def("add_observer", &WorkingMemory::addObserver)
+        .def("remove_observer", &WorkingMemory::removeObserver)
+        .def("set_decay_rate", &WorkingMemory::setDecayRate)
+        .def("get_decay_rate", &WorkingMemory::getDecayRate)
+        .def("set_capacity", &WorkingMemory::setCapacity)
+        .def("get_capacity", &WorkingMemory::getCapacity);
+}
+
+// Enhanced EpisodicMemory bindings
+py::class_<EpisodicMemory> bindEpisodicMemory(py::module_ &m) {
+    return py::class_<EpisodicMemory>(m, "EpisodicMemory")
+        .def(py::init<>())
+        .def("store_episode", &EpisodicMemory::storeEpisode, py::arg("context"), py::arg("outcome"))
+        .def("retrieve_episodes", &EpisodicMemory::retrieveEpisodes, py::arg("context_pattern") = "")
+        .def("replay_episodes", &EpisodicMemory::replayEpisodes, py::arg("target_neurons"), py::arg("replay_rate") = 0.05)
+        .def("get_episode_count", &EpisodicMemory::getEpisodeCount)
+        .def("set_max_episodes", &EpisodicMemory::setMaxEpisodes)
+        .def("get_max_episodes", &EpisodicMemory::getMaxEpisodes)
+        .def("enable_replay", &EpisodicMemory::enableReplay)
+        .def("disable_replay", &EpisodicMemory::disableReplay)
+        .def("is_replay_enabled", &EpisodicMemory::isReplayEnabled)
+        .def("clear_episodes", &EpisodicMemory::clearEpisodes);
+}
+
+// Enhanced AssociativeMemory bindings
+py::class_<AssociativeMemory> bindAssociativeMemory(py::module_ &m) {
+    return py::class_<AssociativeMemory>(m, "AssociativeMemory")
+        .def(py::init<>())
+        .def("store", &AssociativeMemory::store, py::arg("key"), py::arg("value"), py::arg("strength") = 0.5)
+        .def("retrieve", &AssociativeMemory::retrieve, py::arg("key"))
+        .def("search", &AssociativeMemory::search, py::arg("pattern"))
+        .def("strengthen", &AssociativeMemory::strengthen, py::arg("key"), py::arg("amount") = 0.1)
+        .def("weaken", &AssociativeMemory::weaken, py::arg("key"), py::arg("amount") = 0.1)
+        .def("remove", &AssociativeMemory::remove, py::arg("key"))
+        .def("get_entry_count", &AssociativeMemory::getEntryCount)
+        .def("set_capacity", &AssociativeMemory::setCapacity)
+        .def("get_capacity", &AssociativeMemory::getCapacity)
+        .def("set_learning_rate", &AssociativeMemory::setLearningRate)
+        .def("get_learning_rate", &AssociativeMemory::getLearningRate);
+}
+
+// Enhanced Neuromodulator bindings
+py::class_<Neuromodulator> bindNeuromodulator(py::module_ &m) {
+    return py::class_<Neuromodulator>(m, "Neuromodulator")
+        .def(py::init<>())
+        .def("update_state", &Neuromodulator::updateState)
+        .def("get_dopamine_level", &Neuromodulator::getDopamineLevel)
+        .def("get_curiosity_level", &Neuromodulator::getCuriosityLevel)
+        .def("get_novelty_level", &Neuromodulator::getNoveltyLevel)
+        .def("get_prediction_error_level", &Neuromodulator::getPredictionErrorLevel)
+        .def("set_dopamine_level", &Neuromodulator::setDopamineLevel, py::arg("level"))
+        .def("set_curiosity_level", &Neuromodulator::setCuriosityLevel, py::arg("level"))
+        .def("set_novelty_level", &Neuromodulator::setNoveltyLevel, py::arg("level"))
+        .def("set_prediction_error_level", &Neuromodulator::setPredictionErrorLevel, py::arg("level"))
+        .def("add_reward", &Neuromodulator::addReward, py::arg("reward"))
+        .def("get_reward_history", &Neuromodulator::getRewardHistory)
+        .def("reset", &Neuromodulator::reset)
+        .def("enable_plasticity_modulation", &Neuromodulator::enablePlasticityModulation)
+        .def("disable_plasticity_modulation", &Neuromodulator::disablePlasticityModulation)
+        .def("is_plasticity_modulation_enabled", &Neuromodulator::isPlasticityModulationEnabled);
+}
+
+// Enhanced Dopamine bindings
+py::class_<Dopamine, Neuromodulator> bindDopamine(py::module_ &m) {
+    return py::class_<Dopamine, Neuromodulator>(m, "Dopamine")
+        .def(py::init<>())
+        .def("set_dopamine_response", &Dopamine::setDopamineResponse, py::arg("response"))
+        .def("get_dopamine_response", &Dopamine::getDopamineResponse)
+        .def("set_learning_modulation", &Dopamine::setLearningModulation, py::arg("modulation"))
+        .def("get_learning_modulation", &Dopamine::getLearningModulation);
+}
+
+// Enhanced PredictionError bindings
+py::class_<PredictionError, Neuromodulator> bindPredictionError(py::module_ &m) {
+    return py::class_<PredictionError, Neuromodulator>(m, "PredictionError")
+        .def(py::init<>())
+        .def("set_error_threshold", &PredictionError::setErrorThreshold, py::arg("threshold"))
+        .def("get_error_threshold", &PredictionError::getErrorThreshold)
+        .def("set_confidence_threshold", &PredictionError::setConfidenceThreshold, py::arg("threshold"))
+        .def("get_confidence_threshold", &PredictionError::getConfidenceThreshold)
+        .def("calculate_error", &PredictionError::calculateError, py::arg("predicted"), py::arg("actual"));
+}
+
+// Enhanced Novelty bindings
+py::class_<Novelty, Neuromodulator> bindNovelty(py::module_ &m) {
+    return py::class_<Novelty, Neuromodulator>(m, "Novelty")
+        .def(py::init<>())
+        .def("set_novelty_sensitivity", &Novelty::setNoveltySensitivity, py::arg("sensitivity"))
+        .def("get_novelty_sensitivity", &Novelty::getNoveltySensitivity)
+        .def("set_stimulus_history_size", &Novelty::setStimulusHistorySize, py::arg("size"))
+        .def("get_stimulus_history_size", &Novelty::getStimulusHistorySize)
+        .def("calculate_novelty", &Novelty::calculateNovelty, py::arg("stimulus"));
+}
+
+// Enhanced Curiosity bindings
+py::class_<Curiosity, Neuromodulator> bindCuriosity(py::module_ &m) {
+    return py::class_<Curiosity, Neuromodulator>(m, "Curiosity")
+        .def(py::init<>())
+        .def("set_curiosity_threshold", &Curiosity::setCuriosityThreshold, py::arg("threshold"))
+        .def("get_curiosity_threshold", &Curiosity::getCuriosityThreshold)
+        .def("set_exploration_rate", &Curiosity::setExplorationRate, py::arg("rate"))
+        .def("get_exploration_rate", &Curiosity::getExplorationRate)
+        .def("calculate_curiosity", &Curiosity::calculateCuriosity, py::arg("environment"));
+}
+
+// Enhanced PredictionSystem bindings
+py::class_<PredictionSystem> bindPredictionSystem(py::module_ &m) {
+    return py::class_<PredictionSystem>(m, "PredictionSystem")
+        .def(py::init<>())
+        .def("make_prediction", &PredictionSystem::makePrediction, py::arg("action"), py::arg("context"))
+        .def("update_prediction", &PredictionSystem::updatePrediction, py::arg("action"), py::arg("reward"))
+        .def("get_prediction", &PredictionSystem::getPrediction, py::arg("action"))
+        .def("get_predicted_reward", &PredictionSystem::getPredictedReward, py::arg("action"))
+        .def("get_confidence", &PredictionSystem::getConfidence, py::arg("action"))
+        .def("set_learning_rate", &PredictionSystem::setLearningRate, py::arg("rate"))
+        .def("get_learning_rate", &PredictionSystem::getLearningRate)
+        .def("set_error_threshold", &PredictionSystem::setErrorThreshold, py::arg("threshold"))
+        .def("get_error_threshold", &PredictionSystem::getErrorThreshold)
+        .def("get_prediction_count", &PredictionSystem::getPredictionCount)
+        .def("reset", &PredictionSystem::reset);
+}
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        NLM (Neural Learning Machine) Python Bindings - Enhanced Version
+        -----------------------------------------------------------------
+        A comprehensive Python API for the NLM C++ neural simulation framework.
+        This enhanced version includes:
+        
+        **Memory Systems:**
+        - WorkingMemory: Short-term memory with activation decay
+        - EpisodicMemory: Event-based memory with replay capability
+        - AssociativeMemory: Pattern-based memory associations
+        
+        **Neuromodulation Systems:**
+        - Neuromodulator: Base neuromodulation system
+        - Dopamine: Reward prediction and learning modulation
+        - PredictionError: Error signal for prediction learning
+        - Novelty: Novelty detection and exploration
+        - Curiosity: Intrinsic motivation and exploration
+        
+        **Prediction System:**
+        - PredictionSystem: Action prediction and reward forecasting
+        
+        **Core Systems:**
+        - Brain: Central neural simulation brain
+        - Config: Configuration management
+        - SimpleWorld: 2D simulation environment
+        - AgentBrain: Brain-world interface
+        
+        **Sensory/Motor:**
+        - Vision, Audio, InternalSignals: Sensory inputs
+        - Action, WorldObject, AgentBody: Motor outputs
+        - SensoryPercept: Integrated sensory processing
+        
+        **Enhanced Python Utilities:**
+        - MemoryIntegrator: Memory system integration
+        - ExperimentRunner: Experiment management
+        - NLM: High-level NLM interface
+        
+        **Type Definitions:**
+        - NeuronId, SynapseId, RegionId, PopulationId
+        - NeuronType, SynapseType, DevelopmentalStage, FiringState
+        - ActionType, MotorCommand, WorldObjectType
+        - SimulationStep, Timestamp
+        
+        **Constants:**
+        - INVALID_NEURON_ID, INVALID_SYNAPSE_ID
+        - INVALID_REGION_ID, INVALID_POPULATION_ID
     )pbdoc";
 
+    // Register exception
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
+    // Core type definitions
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -142,6 +336,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Core classes
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -164,6 +359,22 @@ PYBIND11_MODULE(pynlm, m) {
             return "<Config: " + cfg.summary() + ">";
         });
 
+    // Memory system classes
+    bindWorkingMemory(m);
+    bindEpisodicMemory(m);
+    bindAssociativeMemory(m);
+
+    // Neuromodulation system classes
+    bindNeuromodulator(m);
+    bindDopamine(m);
+    bindPredictionError(m);
+    bindNovelty(m);
+    bindCuriosity(m);
+
+    // Prediction system class
+    bindPredictionSystem(m);
+
+    // Sensory input classes
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
@@ -198,6 +409,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
+    // Motor classes
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
         .def(py::init<ActionType>(), py::arg("type"))
@@ -245,6 +457,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("success", &ActionResult::success)
         .def_readwrite("message", &ActionResult::message);
 
+    // Agent classes
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
         .def("getVision", &SensoryPercept::getVision)
@@ -263,6 +476,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
+    // World and Agent classes
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
@@ -289,6 +503,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // Main Brain class
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -353,6 +568,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // AgentBrain class
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -400,6 +616,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Convenience factory functions
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,10 +633,14 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Invalid ID constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Enhanced Python module exports (these will be included in nlm_core.py)
+    // The actual enhanced functionality is provided through the nlm_core module
 }
 
-} // namespace nlm
+} // namespace nlm"
