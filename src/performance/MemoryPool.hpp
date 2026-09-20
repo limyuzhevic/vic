@@ -24,6 +24,10 @@
 #include <atomic>
 #include <array>
 #include <optional>
+#include <commonmark/commonmark.h>
+#include <commonmark/blocks.h>
+#include <commonmark/iterator.h>
+#include <commonmark/xml.h>
 
 namespace nlm {
 
