@@ -69,6 +69,20 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Utility methods
+    size_t getVisionNeuronCount() const { return sensoryVision_.size(); }
+    size_t getTouchNeuronCount() const { return sensoryTouch_.size(); }
+    size_t getInternalNeuronCount() const { return sensoryInternal_.size(); }
+    size_t getProprioceptionNeuronCount() const { return sensoryProprioception_.size(); }
+    size_t getTotalMotorNeuronCount() const { return motorForward_.size() + motorBackward_.size() + motorTurnLeft_.size() + motorTurnRight_.size() + motorInteract_.size() + motorWait_.size(); }
+    
+    // Utility methods
+    size_t getVisionNeuronCount() const { return sensoryVision_.size(); }
+    size_t getTouchNeuronCount() const { return sensoryTouch_.size(); }
+    size_t getInternalNeuronCount() const { return sensoryInternal_.size(); }
+    size_t getProprioceptionNeuronCount() const { return sensoryProprioception_.size(); }
+    size_t getTotalMotorNeuronCount() const { return motorForward_.size() + motorBackward_.size() + motorTurnLeft_.size() + motorTurnRight_.size() + motorInteract_.size() + motorWait_.size(); }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -112,6 +126,9 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Cleanup helper
+    void cleanupNeuronPointers();
 };
 
 } // namespace nlm

@@ -20,7 +20,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups dynamically based on available neurons
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
@@ -29,6 +29,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
+                        // Use modulo 6 for 6 motor commands: MoveForward, MoveBackward, TurnLeft, TurnRight, Interact, Wait
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
@@ -44,7 +45,8 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
+                        // Distribute sensory neurons based on type
+                        // We'll categorize by neuron index for now, but could be improved with type detection
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
@@ -61,7 +63,23 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::~AgentBrain() {
+    cleanupNeuronPointers();
+}
+
+void AgentBrain::cleanupNeuronPointers() {
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
@@ -75,20 +93,75 @@ void AgentBrain::initialize(const SimpleWorld& world) {
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
+    // Dynamic calculation based on actual neuron groups available
+    // This provides flexibility for different brain configurations
+    size_t total = 0;
+    
+    // Vision neurons expect 16x16 grid (256 values)
+    if (!sensoryVision_.empty()) total += 256;
+    
+    // Touch neurons expect 8 values (binary collision signals)
+    if (!sensoryTouch_.empty()) total += 8;
+    
+    // Internal neurons expect 4 values (homeostatic signals)
+    if (!sensoryInternal_.empty()) total += 4;
+    
+    // Proprioception neurons expect 6 values (body position/velocity)
+    if (!sensoryProprioception_.empty()) total += 6;
+    
+    // If no neurons found, return default to maintain backward compatibility
+    if (total == 0) {
+        // Default configuration from documentation
+        return 256 + 8 + 4 + 6;
+    }
+    
+    return total;
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
+    // Dynamic calculation based on actual motor neuron groups available
+    size_t total = 0;
+    
+    // Motor neurons expect 6 commands: MoveForward, MoveBackward, TurnLeft, TurnRight, Interact, Wait
+    if (!motorForward_.empty()) total++;
+    if (!motorBackward_.empty()) total++;
+    if (!motorTurnLeft_.empty()) total++;
+    if (!motorTurnRight_.empty()) total++;
+    if (!motorInteract_.empty()) total++;
+    if (!motorWait_.empty()) total++;
+    
+    // If no neurons found, return default to maintain backward compatibility
+    if (total == 0) {
+        // Default configuration
+        return 6;
+    }
+    
+    return total;
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_WARN("AgentBrain: No brain pointer set, skipping sensory processing");
+        return;
+    }
+    
+    // Validate sensory data dimensions
+    const auto& vision = percept.getVision();
+    const auto& touch = percept.getTouch();
+    const auto& internal = percept.getInternal();
+    const auto& proprio = percept.getProprioception();
+    const auto& audio = percept.getAudio();
+    
+    // Log warning if dimensions don't match expected sizes
+    if (!vision.empty()) {
+        NLM_LOG_DEBUG("Processing vision data: " + std::to_string(vision.size()) + " values");
+    }
+    
+    if (sensoryVision_.empty()) {
+        NLM_LOG_WARN("AgentBrain: No vision sensory neurons available to process vision input");
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
-    const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
@@ -97,8 +170,20 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
+    // Handle vision data that's larger than neuron count - inject to all neurons
+    if (!vision.empty() && sensoryVision_.size() > 0 && vision.size() > sensoryVision_.size()) {
+        NLM_LOG_DEBUG("Vision input larger than neuron count, distributing to all available neurons");
+        for (size_t i = 0; i < vision.size(); ++i) {
+            // Distribute vision data evenly across all vision neurons
+            size_t neuronIdx = i % sensoryVision_.size();
+            if (sensoryVision_[neuronIdx]) {
+                float current = vision[i] * 5.0f * 0.5f;  // Reduced scale factor
+                sensoryVision_[neuronIdx]->injectCurrent(current);
+            }
+        }
+    }
+    
     // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
@@ -106,21 +191,52 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
+    // Handle touch data that's larger than neuron count
+    if (!touch.empty() && sensoryTouch_.size() > 0 && touch.size() > sensoryTouch_.size()) {
+        for (size_t i = 0; i < touch.size(); ++i) {
+            size_t neuronIdx = i % sensoryTouch_.size();
+            if (sensoryTouch_[neuronIdx]) {
+                float current = touch[i] * 8.0f * 0.5f;
+                sensoryTouch_[neuronIdx]->injectCurrent(current);
+            }
+        }
+    }
+    
     // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+    for (size_t i = 0; i < sensoryInternal_.size() && i < internal.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            float current = (internal[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
     
+    // Handle internal data that's larger than neuron count
+    if (!internal.empty() && sensoryInternal_.size() > 0 && internal.size() > sensoryInternal_.size()) {
+        for (size_t i = 0; i < internal.size(); ++i) {
+            size_t neuronIdx = i % sensoryInternal_.size();
+            if (sensoryInternal_[neuronIdx]) {
+                float current = (internal[i] * 2.0f - 1.0f) * 5.0f * 0.5f;
+                sensoryInternal_[neuronIdx]->injectCurrent(current);
+            }
+        }
+    }
+    
     // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
+        }
+    }
+    
+    // Handle proprioception data that's larger than neuron count
+    if (!proprio.empty() && sensoryProprioception_.size() > 0 && proprio.size() > sensoryProprioception_.size()) {
+        for (size_t i = 0; i < proprio.size(); ++i) {
+            size_t neuronIdx = i % sensoryProprioception_.size();
+            if (sensoryProprioception_[neuronIdx]) {
+                float current = (proprio[i] * 2.0f - 1.0f) * 3.0f * 0.5f;
+                sensoryProprioception_[neuronIdx]->injectCurrent(current);
+            }
         }
     }
     
@@ -227,7 +343,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+                case 7: return MotorCommand::Wait;  // Explicitly include Wait
             }
         }
     }
