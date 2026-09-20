@@ -150,6 +150,7 @@ float SpikeSystem::getAverageSpikeRate() const {
     return static_cast<float>(pImpl->spikeHistory.size()) / duration;
 }
 
+// Get the most active neurons based on spike count
 std::vector<NeuronId> SpikeSystem::getMostActiveNeurons(size_t count) const {
     std::vector<std::pair<uint64_t, size_t>> neuronCounts;
     neuronCounts.reserve(pImpl->spikeCountPerNeuron.size());
@@ -169,6 +170,15 @@ std::vector<NeuronId> SpikeSystem::getMostActiveNeurons(size_t count) const {
     }
     
     return result;
+}
+
+// Get spike count for a specific neuron (helper method)
+size_t SpikeSystem::getSpikeCountForNeuron(NeuronId neuron) const {
+    auto it = pImpl->spikeCountPerNeuron.find(neuron.value);
+    if (it != pImpl->spikeCountPerNeuron.end()) {
+        return it->second;
+    }
+    return 0;
 }
 
 void SpikeSystem::reset() {

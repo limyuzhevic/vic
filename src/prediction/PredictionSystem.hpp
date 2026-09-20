@@ -6,6 +6,9 @@
 
 namespace nlm {
 
+// Forward declaration to avoid circular dependency
+class SensoryInput;
+
 // Prediction system: predicts future sensory states and consequences
 // PLACEHOLDER - Phase 2 will implement real predictive coding
 
@@ -33,6 +36,15 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Reset system state
+    void reset();
+    
+    // Get average prediction error
+    float getAverageError() const;
+    
+    // Check if predictions are stable
+    bool isStable() const;
     
 private:
     struct Impl;

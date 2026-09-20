@@ -2,12 +2,9 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
-#include <functional>
+#include <memory>
 
 namespace nlm {
-
-// Forward declarations
-class RandomGenerator;
 
 // Development system: orchestrates neural development
 // Implements developmental stages, plasticity modulation, and structural changes
@@ -16,6 +13,12 @@ class DevelopmentSystem {
 public:
     DevelopmentSystem();
     ~DevelopmentSystem();
+    
+    // Disable copying, enable moving
+    DevelopmentSystem(const DevelopmentSystem&) = delete;
+    DevelopmentSystem& operator=(const DevelopmentSystem&) = delete;
+    DevelopmentSystem(DevelopmentSystem&&) noexcept;
+    DevelopmentSystem& operator=(DevelopmentSystem&&) noexcept;
     
     // Get current developmental stage
     DevelopmentalStage getStage() const;
@@ -46,9 +49,12 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // Reset system state
+    void reset();
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
     double age_;
 };
 

@@ -68,6 +68,7 @@ public:
     // Statistics
     float getAverageSpikeRate() const;
     std::vector<NeuronId> getMostActiveNeurons(size_t count) const;
+    size_t getSpikeCountForNeuron(NeuronId neuron) const;
     
     // Reset
     void reset();

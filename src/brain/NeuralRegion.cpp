@@ -61,7 +61,8 @@ NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    NeuralPopulation* result = pImpl->populations[id.index() - 1].get();
+    return result;  // Explicitly return the dereferenced pointer for clarity
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
